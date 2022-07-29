@@ -162,4 +162,3 @@ iot central device twin update:
     central_dns_suffix:
       rule_exclusions:
       - no_parameter_defaults_for_update_commands
-      - no_parameter_defaults_for_update_commands

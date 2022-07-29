@@ -328,22 +328,47 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         )
         device_events.append((device_id, send_d2c_msg))
 
-        # Simulate with secondary key
+        # Simulate with secondary key and include model Id upon connection
+        model_id_simulate_key = "dtmi:com:example:simulatekey;1"
         self.cmd(
-            "iot device simulate -d {} -n {} -g {} --da '{}' --mc 1 --mi 1 --key {}".format(
-                device_id, self.entity_name, self.entity_rg, simulate_msg,
-                keys["secondaryKey"]
+            "iot device simulate -d {} -n {} -g {} --da '{}' --mc 1 --mi 1 --key {} --model-id {}".format(
+                device_id, self.entity_name, self.entity_rg, simulate_msg, keys["secondaryKey"], model_id_simulate_key
             )
         )
         device_events.append((device_id, f"{simulate_msg} #1"))
+        twin_result = self.cmd(
+            f"iot hub device-twin show -d {device_id} -n {self.entity_name} -g {self.entity_rg}").get_output_in_json()
+        assert twin_result["modelId"] == model_id_simulate_key
 
+        # Include model Id for send-d2c-message with secondary key
+        model_id_d2c_key = "dtmi:com:example:d2ckey;1"
         self.cmd(
-            "iot device send-d2c-message -d {} -n {} -g {} --da '{}' --key {}".format(
+            "iot device send-d2c-message -d {} -n {} -g {} --da '{}' --key {} --model-id {}".format(
                 device_id, self.entity_name, self.entity_rg, send_d2c_msg,
-                keys["secondaryKey"]
+                keys["secondaryKey"], model_id_d2c_key
             )
         )
         device_events.append((device_id, send_d2c_msg))
+        twin_result = self.cmd(
+            f"iot hub device-twin show -d {device_id} -n {self.entity_name} -g {self.entity_rg}").get_output_in_json()
+        assert twin_result["modelId"] == model_id_d2c_key
+
+        # Error - model Id requires valid dtmi.
+        self.cmd(
+            "iot device send-d2c-message -d {} -n {} -g {} --da '{}' --key {} --model-id {}".format(
+                device_id, self.entity_name, self.entity_rg, send_d2c_msg,
+                keys["secondaryKey"], "abcd:com:"
+            ),
+            expect_failure=True
+        )
+
+        # Error - model Id requires valid dtmi.
+        self.cmd(
+            "iot device send-d2c-message -d {} -n {} -g {} --da '{}' --key {} --model-id {} ".format(
+                device_id, self.entity_name, self.entity_rg, send_d2c_msg, keys["primaryKey"], "dtmi:com:example;"
+            ),
+            expect_failure=True
+        )
 
         self._monitor_checker(enqueued_time=enqueued_time, device_events=device_events)
 
@@ -442,13 +467,18 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             checks=[self.check("deviceId", device_ids[1])],
         )
 
+        # x509 CA device simulation and include model Id upon connection
+        model_id_simulate_x509ca = "dtmi:com:example:simulatex509ca;1"
         self.cmd(
-            "iot device simulate -d {} -n {} -g {} --da '{}' --mc 1 --mi 1 --cp {} --kp {} --pass {}".format(
+            "iot device simulate -d {} -n {} -g {} --da '{}' --mc 1 --mi 1 --cp {} --kp {} --pass {} --model-id {}".format(
                 device_ids[1], self.entity_name, self.entity_rg, simulate_msg,
-                f"{device_ids[1]}-cert.pem", f"{device_ids[1]}-key.pem", fake_pass
+                f"{device_ids[1]}-cert.pem", f"{device_ids[1]}-key.pem", fake_pass, model_id_simulate_x509ca
             )
         )
         device_events.append((device_ids[1], f"{simulate_msg} #1"))
+        twin_result = self.cmd(
+            f"iot hub device-twin show -d {device_ids[1]} -n {self.entity_name} -g {self.entity_rg}").get_output_in_json()
+        assert twin_result["modelId"] == model_id_simulate_x509ca
 
         self.cmd(
             "iot device send-d2c-message -d {} -n {} -g {} --da '{}' --cp {} --kp {} --pass {}".format(

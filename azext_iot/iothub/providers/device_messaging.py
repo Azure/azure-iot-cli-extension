@@ -61,6 +61,7 @@ class DeviceMessagingProvider(IoTHubProvider):
         certificate_file: Optional[str] = None,
         key_file: Optional[str] = None,
         passphrase: Optional[str] = None,
+        model_id: Optional[str] = None,
     ):
         from azext_iot.iothub.providers.mqtt import MQTTProvider
 
@@ -78,7 +79,8 @@ class DeviceMessagingProvider(IoTHubProvider):
             hub_hostname=self.target["entity"],
             device_conn_string=device_connection_string,
             x509_files=device["authentication"].get("x509_files"),
-            device_id=self.device_id
+            device_id=self.device_id,
+            model_id=model_id
         )
         for _ in range(msg_count):
             client_mqtt.send_d2c_message(message_text=data, properties=properties)
@@ -290,7 +292,8 @@ class DeviceMessagingProvider(IoTHubProvider):
         passphrase: Optional[str] = None,
         method_response_code: Optional[str] = None,
         method_response_payload: Optional[str] = None,
-        init_reported_properties: Optional[str] = None
+        init_reported_properties: Optional[str] = None,
+        model_id: Optional[str] = None,
     ):
         import sys
         import uuid
@@ -333,6 +336,10 @@ class DeviceMessagingProvider(IoTHubProvider):
                 raise ArgumentUsageError(
                     "'certificate-file', 'key-file', and 'passphrase' not supported, {} doesn't allow x509 "
                     "certificate authentication".format(protocol_type)
+                )
+            if model_id:
+                raise ArgumentUsageError(
+                    f"`model-id` is not supported with {protocol_type} protocol."
                 )
 
         properties_to_send = _simulate_get_default_properties(protocol_type)
@@ -388,7 +395,8 @@ class DeviceMessagingProvider(IoTHubProvider):
                     device_id=self.device_id,
                     method_response_code=method_response_code,
                     method_response_payload=method_response_payload,
-                    init_reported_properties=init_reported_properties
+                    init_reported_properties=init_reported_properties,
+                    model_id=model_id
                 )
                 client_mqtt.execute(
                     data=generator(),

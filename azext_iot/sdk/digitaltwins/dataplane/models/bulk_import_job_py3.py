@@ -45,7 +45,7 @@ class BulkImportJob(Model):
     :vartype purge_date_time: datetime
     :param error: Details of the error(s) that occurred executing the bulk
      job.
-    :type error: ~dataplane.models.Error
+    :type error: ~dataplane.models.ImportJobError
     """
 
     _validation = {
@@ -66,7 +66,7 @@ class BulkImportJob(Model):
         'last_action_date_time': {'key': 'lastActionDateTime', 'type': 'iso-8601'},
         'finished_date_time': {'key': 'finishedDateTime', 'type': 'iso-8601'},
         'purge_date_time': {'key': 'purgeDateTime', 'type': 'iso-8601'},
-        'error': {'key': 'error', 'type': 'Error'},
+        'error': {'key': 'error', 'type': 'ImportJobError'},
     }
 
     def __init__(self, *, input_blob_uri: str=None, output_blob_uri: str=None, error=None, **kwargs) -> None:
@@ -80,3 +80,26 @@ class BulkImportJob(Model):
         self.finished_date_time = None
         self.purge_date_time = None
         self.error = error
+
+
+# @vilit - adt service does not return errors properly for import job so added a temporary
+# class. Will need to revist when the API changes.
+class ImportJobError(Model):
+    """Error definition.
+
+    The service populates error like so:
+    "error": {
+        "error": {
+        "code": "ManagedIdentityNotConfigured",
+        "message": "Unable to read input blob because managed identity is not set on Azure Digital Twins instance."
+        }
+    },
+    """
+
+    _validation = {}
+
+    _attribute_map = {}
+
+    def __init__(self, *, innererror=None, **kwargs) -> None:
+        super(ImportJobError, self).__init__(**kwargs)
+
