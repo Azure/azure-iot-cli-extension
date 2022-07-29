@@ -5,11 +5,8 @@
 # --------------------------------------------------------------------------------------------
 
 
-import time
 import pytest
 from azext_iot.iothub.common import AuthenticationType
-from azext_iot.tests.generators import generate_generic_id
-from azext_iot.tests.helpers import create_cosmos_db
 from azext_iot.tests.iothub import (
     EP_COSMOS_PARTITION_PATH,
     STORAGE_ACCOUNT,
@@ -29,34 +26,32 @@ from azext_iot.common._azure import _parse_connection_string, parse_cosmos_db_co
 
 class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
     def __init__(self, test_case):
-        self.start = time.time()
         super(TestIoTMessagingEndpoints, self).__init__(
             test_case
         )
-        self.entity_sub = self.get_hub_sub()
         self._create_user_identity()
         self.enable_hub_system_identity()
-        print(f"finished setting up __init__: {time.time() - self.start}")
+        self.ran_eventhub = False
 
     @pytest.fixture(scope='class', autouse=True)
     def tearDownEndpoints(self):
         yield None
-        print('start delete')
         self._delete_user_identity()
-        print('deleted user ident')
-        self._delete_eventhub()
-        print('deleted eventhub')
+
+        # Event hub deletes fail if not there (delete is not a no-op)
+        if self.ran_eventhub:
+            self._delete_eventhub()
+
         self._delete_cosmos_db()
-        print('deleted cosmos')
         self._delete_service_bus_topic_queue()
-        print('deleted servicebus')
 
         # Only delete storage if it was created for this test
         if hasattr(self, "storage_cstring"):
             self._delete_storage_account()
 
     def test_iot_storage_endpoint_lifecycle(self):
-        storage_cs = self._create_storage_account()
+        self._create_storage_account()
+        self._assign_storage_account_roles()
         endpoint_names = self.generate_device_names(3)
         endpoint_uri = f"https://{STORAGE_ACCOUNT}.blob.core.windows.net"
         default_file_format = "{iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}"
@@ -65,13 +60,13 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         # endpoint uri and path are left blank
         self.cmd(
             "iot hub messaging-endpoint create storage-container -n {} -g {} --en {} --erg {} -c {} --container {}".format(
-                self.entity_name, self.entity_rg, endpoint_names[0], EP_RG, storage_cs, STORAGE_CONTAINER
+                self.entity_name, self.entity_rg, endpoint_names[0], EP_RG, self.storage_cstring, STORAGE_CONTAINER
             )
         )
 
         # use defaults
         expected_cs_endpoint = build_expected_endpoint(
-            endpoint_names[0], EP_RG, self.entity_sub, connection_string=storage_cs, container_name=STORAGE_CONTAINER, batch_frequency_in_seconds=300, encoding="avro", file_name_format=default_file_format, max_chunk_size_in_bytes=max_chunk_size_constant*300
+            endpoint_names[0], EP_RG, self.entity_sub, connection_string=self.storage_cstring, container_name=STORAGE_CONTAINER, batch_frequency_in_seconds=300, encoding="avro", file_name_format=default_file_format, max_chunk_size_in_bytes=max_chunk_size_constant*300
         )
 
         endpoint_output = self.cmd(
@@ -83,16 +78,16 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         assert_endpoint_properties(endpoint_output, expected_cs_endpoint)
 
         # Use hub identity with no defaults
-        file_format = default_file_format.replace("/", "_")
+        self.kwargs["file_format"] = default_file_format.replace("/", "_")
         self.cmd(
             "iot hub messaging-endpoint create storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {} --identity [system] --auth-type identityBased -b {} -w {} --encoding {} --ff {}".format(
-                self.entity_name, self.entity_rg, endpoint_names[1], EP_RG, endpoint_uri, STORAGE_CONTAINER, 60, 10, "json", file_format
+                self.entity_name, self.entity_rg, endpoint_names[1], EP_RG, endpoint_uri, STORAGE_CONTAINER, 60, 10, "json", "{file_format}"
             )
         )
 
         expected_sys_endpoint = build_expected_endpoint(
             endpoint_names[1], EP_RG, self.entity_sub, container_name=STORAGE_CONTAINER, authentication_type=AuthenticationType.IdentityBased.value, endpoint_uri=endpoint_uri,
-            batch_frequency_in_seconds=60, encoding="json", file_name_format=file_format, max_chunk_size_in_bytes=max_chunk_size_constant*10
+            batch_frequency_in_seconds=60, encoding="json", file_name_format=self.kwargs["file_format"], max_chunk_size_in_bytes=max_chunk_size_constant*10
         )
 
         endpoint_output = self.cmd(
@@ -135,7 +130,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         ).get_output_in_json()
 
         assert len(storage_list) == 3
-        assert endpoint_list["eventHubs"] == storage_list
+        assert endpoint_list["storageContainers"] == storage_list
 
         # Delete one event hub endpoint
         self.cmd(
@@ -169,10 +164,8 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         assert endpoint_list == []
 
     def test_iot_servicebus_endpoint_lifecycle(self):
-        # TODO: technically both should be able to take in entity paths
         # this test covers two endpoint types
         topic_cs, queue_cs = self._create_service_bus_topic_queue()
-        # TODO: double check this
         endpoint_uri = f"sb://{EP_SERVICEBUS_NAMESPACE}.servicebus.windows.net"
         # create 6 names, 2 types of service bus endpoints * 3 auth types
         endpoint_names = self.generate_device_names(6)
@@ -383,10 +376,9 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         endpoint_names = self.generate_device_names(3)
         partition_template = "{iothub}-{device_id}-{DD}-{MM}-{YYYY}"
         partition_template_default = "{deviceid}-{YYYY}-{MM}"
-        print(f"finished setting up cosmos: {time.time() - self.start}")
         # use connection string - no pkn or pkt
         self.cmd(
-            "iot hub messaging-endpoint create cosmos-db-collection -n {} -g {} --en {} --erg {} -c {} --cn {} --dn {}".format(
+            "iot hub messaging-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} -c {} --cn {} --dn {}".format(
                 self.entity_name, self.entity_rg, endpoint_names[0], EP_RG, connection_string, EP_COSMOS_COLLECTION, EP_COSMOS_DATABASE
             )
         )
@@ -407,7 +399,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # system assigned identity - pkn and default pkt
         self.cmd(
-            "iot hub messaging-endpoint create storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {}  --identity [system] --auth-type identityBased --cn {} --dn {} --pkn {}".format(
+            "iot hub messaging-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} --endpoint-uri {}  --identity [system] --auth-type identityBased --cn {} --dn {} --pkn {}".format(
                 self.entity_name, self.entity_rg, endpoint_names[1], EP_RG, endpoint_uri, EP_COSMOS_COLLECTION, EP_COSMOS_DATABASE, EP_COSMOS_PARTITION_PATH
             )
         )
@@ -425,14 +417,15 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         assert_endpoint_properties(endpoint_output, expected_sys_endpoint)
 
         # user assigned identity - pkn and pkt
+        self.kwargs["template"] = partition_template
         self.cmd(
-            "iot hub messaging-endpoint create eventhub -n {} -g {} --en {} --erg {} --endpoint-uri {}  --identity {} --auth-type identityBased --cn {} --dn {} --pkn {} --pkt {}".format(
-                self.entity_name, self.entity_rg, endpoint_names[2], EP_RG, endpoint_uri, self.user_identity_id, EP_COSMOS_COLLECTION, EP_COSMOS_DATABASE, EP_COSMOS_PARTITION_PATH, partition_template
+            "iot hub messaging-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} --endpoint-uri {}  --identity {} --auth-type identityBased --cn {} --dn {} --pkn {} --pkt {}".format(
+                self.entity_name, self.entity_rg, endpoint_names[2], EP_RG, endpoint_uri, self.user_identity_id, EP_COSMOS_COLLECTION, EP_COSMOS_DATABASE, EP_COSMOS_PARTITION_PATH, '{template}'
             )
         )
 
         expected_user_endpoint = build_expected_endpoint(
-            endpoint_names[2], EP_RG, self.entity_sub, endpoint_uri=endpoint_uri, collection_name=EP_COSMOS_COLLECTION, database_name=EP_COSMOS_DATABASE, partition_key_name=EP_COSMOS_PARTITION_PATH, authentication_type="identityBased", partition_key_template=partition_template_default, identity=self.user_identity_id
+            endpoint_names[2], EP_RG, self.entity_sub, endpoint_uri=endpoint_uri, collection_name=EP_COSMOS_COLLECTION, database_name=EP_COSMOS_DATABASE, partition_key_name=EP_COSMOS_PARTITION_PATH, authentication_type="identityBased", partition_key_template=partition_template, identity=self.user_identity_id
         )
 
         endpoint_output = self.cmd(
@@ -451,12 +444,12 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         cosmos_list = self.cmd(
             "iot hub messaging-endpoint list -n {} -g {} -t {}".format(
-                self.entity_name, self.entity_rg, "cosmosdbcollection"
+                self.entity_name, self.entity_rg, "cosmosdb-collection"
             )
         ).get_output_in_json()
 
         assert len(cosmos_list) == 3
-        assert endpoint_list["cosmosDBSqlCollections"] == cosmos_list
+        assert endpoint_list["cosmosDbSqlCollections"] == cosmos_list
 
         # Delete one cosmos endpoint
         self.cmd(
@@ -466,7 +459,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         )
         cosmos_list = self.cmd(
             "iot hub messaging-endpoint list -n {} -g {} -t {}".format(
-                self.entity_name, self.entity_rg, "cosmosdbcollection"
+                self.entity_name, self.entity_rg, "cosmosdb-collection"
             )
         ).get_output_in_json()
 
@@ -475,22 +468,23 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         # Delete all cosmos endpoints
         self.cmd(
             "iot hub messaging-endpoint delete -n {} -g {} -t {}".format(
-                self.entity_name, self.entity_rg, "cosmosdbcollection"
+                self.entity_name, self.entity_rg, "cosmosdb-collection"
             )
         )
 
         endpoint_list = self.cmd(
             "iot hub messaging-endpoint list -n {} -g {} -t {}".format(
-                self.entity_name, self.entity_rg, "cosmosdbcollection"
+                self.entity_name, self.entity_rg, "cosmosdb-collection"
             )
         ).get_output_in_json()
 
         assert endpoint_list == []
 
     def test_iot_eventhub_endpoint_lifecycle(self):
+        # Flag to ensure that event hub resources get deleted
+        self.ran_eventhub = True
         endpoint_uri = f"sb://{EP_EVENTHUB_NAMESPACE}.servicebus.windows.net"
         eventhub_cs = self._create_eventhub()
-        print(f"finished setting up eventhub: {time.time() - self.start}")
         endpoint_names = self.generate_device_names(3)
         # use connection string - note how the connection string needs to have entity path and the
         # endpoint uri and path are left blank
@@ -530,20 +524,6 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         ).get_output_in_json()
 
         assert_endpoint_properties(endpoint_output, expected_sys_endpoint)
-
-        print("hub identities")
-        print(
-            self.cmd(
-                f"iot hub identity show --name {self.entity_name} -g {self.entity_rg}"
-            ).get_output_in_json()
-        )
-
-        print("role assignments")
-        print(
-            self.cmd(
-                f"role assignment list --assignee '{self.user_identity_principal_id}'"
-            ).get_output_in_json()
-        )
 
         # Use user identity
         self.cmd(
@@ -677,13 +657,19 @@ def assert_endpoint_properties(result: dict, expected: dict):
         expected_cs_props = _parse_connection_string(result["connectionString"])
 
         # keys will be masked - only check for existence in the result
-        expected_cs_props.pop("SharedAccessKey")
-        assert "SharedAccessKey" in result_cs_props
+        if expected_cs_props.get("SharedAccessKey"):
+            # Service Bus and Event Hub
+            expected_cs_props.pop("SharedAccessKey")
+            assert "SharedAccessKey" in result_cs_props
+        elif expected_cs_props.get("AccountKey"):
+            # Storage Account
+            expected_cs_props.pop("AccountKey")
+            assert "AccountKey" in result_cs_props
 
         for prop in expected_cs_props:
             assert expected_cs_props[prop] == result_cs_props[prop]
 
-    # Shared between Event Hub and Service Bus Topic
+    # Shared between Event Hub and Service Bus
     if "entityPath" in expected:
         assert result["entityPath"] == expected["entityPath"]
 

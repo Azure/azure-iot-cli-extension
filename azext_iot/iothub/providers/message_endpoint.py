@@ -142,7 +142,7 @@ class MessageEndpoint(IoTHubProvider):
                 # parse out endpoint uri from connection string
                 if not endpoint_uri:
                     endpoint_uri = parsed_cs["AccountEndpoint"]
-            if not primary_key and not secondary_key:
+            if authentication_type != AuthenticationType.IdentityBased.value and not any([primary_key, secondary_key]):
                 raise RequiredArgumentMissingError("Primary key via --primary-key, secondary key via --secondary-key, or connection string via --connection-string is required.")
             if primary_key and not secondary_key:
                 secondary_key = primary_key

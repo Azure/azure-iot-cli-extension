@@ -303,7 +303,7 @@ def create_cosmos_db(
         )
 
     output = cmd(
-        'cosmosdb keys --resource-group {} --name {} --type connection-strings'.format(rg, account_name)
+        'cosmosdb keys list --resource-group {} --name {} --type connection-strings'.format(rg, account_name)
     ).get_output_in_json()
 
     for cs_object in output["connectionStrings"]:
@@ -330,18 +330,12 @@ def assign_rbac_role(cmd, assignee: str, scope: str, role: str, max_tries: int =
     Assign a given role for a given assignee and scope. Will check for assignment completion.
     """
     tries = 0
-    max_tries = 3
-    print(f"assignee {assignee}, role {scope}, scope {role}")
     while tries < max_tries:
         role_assignments = get_role_assignments(cmd, scope, role)
         role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
         if assignee in role_assignment_principal_ids:
             break
         # else assign role to scope and check again
-        print(f"try {tries}")
-        print('role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
-            assignee, role, scope
-        ))
         cmd(
             'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
                 assignee, role, scope
@@ -349,6 +343,15 @@ def assign_rbac_role(cmd, assignee: str, scope: str, role: str, max_tries: int =
         )
         sleep(10)
         tries += 1
+
+
+def assign_cosmos_db_role(cmd, principal_id: str, role: str, cosmos_db_account: str, rg: str):
+    cmd(
+        "cosmosdb sql role assignment create -a {} -g {} --scope '/' -n '{}' -p {}".format(
+            cosmos_db_account, rg, role, principal_id
+        )
+    )
+
 
 
 class MockLogger:

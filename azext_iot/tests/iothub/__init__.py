@@ -8,7 +8,7 @@ import pytest
 
 from time import sleep
 from typing import List
-from azext_iot.tests.helpers import add_test_tag, assign_rbac_role, create_cosmos_db, create_event_hub, create_managed_identity, create_service_bus_queue, create_service_bus_topic, create_storage_account
+from azext_iot.tests.helpers import add_test_tag, assign_cosmos_db_role, assign_rbac_role, create_cosmos_db, create_event_hub, create_managed_identity, create_service_bus_queue, create_service_bus_topic, create_storage_account
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests import CaptureOutputLiveScenarioTest
@@ -60,7 +60,7 @@ EP_SERVICEBUS_POLICY = settings.env.azext_iot_servicebus_policy or ("testpolicy"
 EP_COSMOS_NAMESPACE = settings.env.azext_iot_cosmos_namespace or ("testcos" + generate_generic_id())
 EP_COSMOS_DATABASE = settings.env.azext_iot_cosmos_database or ("testdb" + generate_generic_id())
 EP_COSMOS_COLLECTION = settings.env.azext_iot_cosmos_collection or ("testcol" + generate_generic_id())
-EP_COSMOS_PARTITION_PATH = "/test"
+EP_COSMOS_PARTITION_PATH = "test"
 USER_IDENTITY = settings.env.azext_iot_user_identity or ("testuser" + generate_generic_id())
 
 
@@ -133,6 +133,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         self.region = self.get_region()
         self.connection_string = self.get_hub_cstring()
+        self.entity_sub = self.get_hub_sub()
         add_test_tag(
             cmd=self.cmd,
             name=self.entity_name,
@@ -226,7 +227,11 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
 
     def _assign_storage_account_roles(self):
-        scope = ""
+        scope = "/subscriptions/{}/resourceGroups/{}/providers/Microsoft.Storage/storageAccounts/{}".format(
+            self.entity_sub,
+            EP_RG,
+            STORAGE_ACCOUNT
+        )
         assign_rbac_role(
             cmd=self.cmd,
             assignee=self.entity_identity,
@@ -277,28 +282,24 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             create_collection=(not settings.env.azext_iot_cosmos_collection)
         )
 
-        scope = "/subscriptions/{}/resourceGroups/{}/providers/Microsoft.EventHub/namespaces/{}/eventhubs/{}".format(
-            self.entity_sub,
-            EP_RG,
-            EP_EVENTHUB_NAMESPACE,
-            EP_EVENTHUB_INSTANCE
-        )
-
-        assign_rbac_role(
+        # Cosmos DB uses some internal RBAC - can take a bit to sync with AAD
+        sleep(30)
+        role = "Cosmos DB Built-in Data Reader"
+        assign_cosmos_db_role(
             cmd=self.cmd,
-            assignee=self.entity_identity,
-            scope=scope, #eventhub id
-            role="Azure Event Hubs Data Sender",
-            max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+            principal_id=self.entity_identity,
+            role=role,
+            cosmos_db_account=EP_COSMOS_NAMESPACE,
+            rg=EP_RG
         )
 
         if hasattr(self, "user_identity_principal_id"):
-            assign_rbac_role(
+            assign_cosmos_db_role(
                 cmd=self.cmd,
-                assignee=self.user_identity_principal_id,
-                scope=scope, #eventhub id
-                role="Azure Event Hubs Data Sender",
-                max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+                principal_id=self.user_identity_principal_id,
+                role=role,
+                cosmos_db_account=EP_COSMOS_NAMESPACE,
+                rg=EP_RG
             )
 
         return cosmos_cs
@@ -339,6 +340,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             create_policy=(not settings.env.azext_iot_eventhub_policy)
         )
 
+        role = "Azure Event Hubs Data Sender"
         scope = "/subscriptions/{}/resourceGroups/{}/providers/Microsoft.EventHub/namespaces/{}/eventhubs/{}".format(
             self.entity_sub,
             EP_RG,
@@ -350,17 +352,16 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             cmd=self.cmd,
             assignee=self.entity_identity,
             scope=scope, #eventhub id
-            role="Azure Event Hubs Data Sender",
+            role=role,
             max_tries=MAX_RBAC_ASSIGNMENT_TRIES
         )
 
         if hasattr(self, "user_identity_principal_id"):
-            print("user identity")
             assign_rbac_role(
                 cmd=self.cmd,
                 assignee=self.user_identity_principal_id,
                 scope=scope, #eventhub id
-                role="Azure Event Hubs Data Sender",
+                role=role,
                 max_tries=MAX_RBAC_ASSIGNMENT_TRIES
             )
 
@@ -390,7 +391,6 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             )
 
     def _create_service_bus_topic_queue(self):
-        role = "Azure Service Bus Data Sender"
         topic_cs = create_service_bus_topic(
             cmd=self.cmd,
             namespace_name=EP_SERVICEBUS_NAMESPACE,
@@ -403,6 +403,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             create_policy=(not settings.env.azext_iot_servicebus_policy)
         )
 
+        role = "Azure Service Bus Data Sender"
         scope = "/subscriptions/{}/resourceGroups/{}/providers/Microsoft.ServiceBus/namespaces/{}/topics/{}".format(
             self.entity_sub,
             EP_RG,
@@ -503,7 +504,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 )
 
     def _create_user_identity(self):
-        """Set self.user_identity_id"""
+        """Set self.user_identity_id and assign user identity to iot hub."""
         if hasattr(self, "user_identity_id"):
             return
 
@@ -526,13 +527,13 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
 
     def _delete_user_identity(self):
-        if settings.env.azext_iot_user_identity:
+        if not settings.env.azext_iot_user_identity:
             self.cmd(
                 f"identity delete -n {USER_IDENTITY} -g {EP_RG}"
             )
 
     def enable_hub_system_identity(self):
-        """Set self.entity_identity"""
+        """Set self.entity_identity and turn on system assigned identity if needed."""
         if hasattr(self, "entity_identity"):
             return
 
@@ -613,7 +614,6 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
     @pytest.fixture(scope='class', autouse=True)
     def tearDownSuite(self):
         yield None
-        print("tearDownSuite")
         if not settings.env.azext_iot_testhub:
             self.cmd(
                 "iot hub delete --name {} --resource-group {}".format(
