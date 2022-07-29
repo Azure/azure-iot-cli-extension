@@ -121,6 +121,21 @@ jobs:
       pythonVersion: $(python)
       serviceConnection: $(AzureServiceConnection)
 
+- job: 'testHub_job_3'
+  condition: and(succeeded(), eq('${{ parameters.testHub }}', true))
+  displayName: 'Test IoT Hub - devices, messaging and modules'
+  strategy:
+    matrix: $[ variables['pythonVersions'] ]
+    maxParallel: ${{ parameters.maxParallelHub }}
+  steps:
+  - template: run-tests-parallel.yml
+    parameters:
+      path: 'azext_iot/tests/iothub/messaging_endpoints'
+      name: 'iot-hub-3'
+      azureCLIVersion: ${{ parameters.azureCLIVersion }}
+      pythonVersion: $(python)
+      serviceConnection: $(AzureServiceConnection)
+
 - job: 'testADU'
   timeoutInMinutes: 90
   displayName: 'Test Azure Device Update'
