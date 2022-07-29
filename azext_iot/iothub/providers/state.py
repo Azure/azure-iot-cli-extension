@@ -31,7 +31,6 @@ import json
 from tqdm import tqdm
 from typing import Optional
 import os
-import sys
 
 logger = get_logger(__name__)
 
@@ -201,7 +200,7 @@ class StateProvider(IoTHubProvider):
         }
         '''
         if os.path.exists(filename) and os.stat(filename).st_size and not overwrite_file:
-            raise FileOperationError(f'File {filename} is not empty. If you want to overwrite this file, include the --overwrite-file flag')
+            raise FileOperationError(f'File {filename} is not empty. Include the --overwrite-file flag to overwrite file.')
 
         hub_state = self.process_hub(self.target)
 
@@ -302,7 +301,7 @@ class StateProvider(IoTHubProvider):
 
             self.upload_hub_from_dict(hub_state)
             logger.info("Uploaded state from '{}' to IoT Hub '{}'".format(filename, self.hub_name))
-        
+
         except FileNotFoundError:
             raise FileOperationError(f'File {filename} does not exist.')
 
