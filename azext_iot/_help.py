@@ -595,6 +595,9 @@ helps[
     - name: Export the state of the specified hub to the specified file.
       text: >
         az iot hub state export -n {iothub_name} -f {filename}
+    - name: Export the state of the specified hub to the specified file, overwriting the file contents. 
+      text: >
+        az iot hub state export -n {iothub_name} -f {filename} --of
 """
 
 helps[

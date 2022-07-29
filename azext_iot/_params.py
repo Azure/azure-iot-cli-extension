@@ -303,7 +303,12 @@ def load_arguments(self, _):
         context.argument(
             "replace",
             options_list=["--replace", "-r"],
-            help="If this flag is set, then the command will overwrite all configurations and devices in the destination hub."
+            help="If this flag is set, then the command will overwrite the state of the destination hub."
+        )
+        context.argument(
+            "overwrite_file",
+            options_list=["--overwrite-file", "--of"],
+            help="If this flag is set, then the command will overwrite the contents of the output file."
         )
 
     with self.argument_context("iot hub invoke-device-method") as context:

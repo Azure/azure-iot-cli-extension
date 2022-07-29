@@ -8,9 +8,11 @@ from azext_iot.common.shared import DeviceAuthApiType
 
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 from azext_iot.tests.iothub import IoTLiveScenarioTest
+from azext_iot.tests.test_constants import ResourceTypes
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.utility import generate_key, read_file_content
 from azext_iot.common.certops import create_self_signed_certificate
+from azext_iot.tests.helpers import add_test_tag
 from azext_iot.tests.iothub import (
     PRIMARY_THUMBPRINT,
     SECONDARY_THUMBPRINT,
@@ -31,7 +33,15 @@ class TestHubExportImport(IoTLiveScenarioTest):
         # create destination hub
 
         if not settings.env.azext_iot_desthub:
-            self.create_hub(self.dest_hub, self.entity_rg)
+            self.create_hub(self.dest_hub, self.dest_hub_rg)
+
+        add_test_tag(
+            cmd=self.cmd,
+            name=self.dest_hub,
+            rg=self.dest_hub_rg,
+            rtype=ResourceTypes.hub.value,
+            test_tag=test_case
+        )
 
         self.dest_hub_cstring = self.cmd(
             f"iot hub connection-string show -n {self.dest_hub} -g {self.dest_hub_rg}"
@@ -455,7 +465,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
         for auth_phase in DATAPLANE_AUTH_TYPES:
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub state export -n {self.entity_name} -f {self.filename} -g {self.entity_rg}",
+                    f"iot hub state export -n {self.entity_name} -f {self.filename} -g {self.entity_rg} --of",
                     auth_type=auth_phase
                 )
             )

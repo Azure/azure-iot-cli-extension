@@ -8,6 +8,7 @@ from knack.log import get_logger
 
 from azext_iot.common.shared import DeviceAuthApiType, DeviceAuthType, ConfigType
 from azext_iot.iothub.providers.base import IoTHubProvider
+from azure.cli.core.azclierror import FileOperationError
 from azext_iot.operations.hub import (
     _iot_device_show,
     _iot_device_module_twin_show,
@@ -29,6 +30,8 @@ from azext_iot.operations.hub import (
 import json
 from tqdm import tqdm
 from typing import Optional
+import os
+import sys
 
 logger = get_logger(__name__)
 
@@ -181,7 +184,7 @@ class StateProvider(IoTHubProvider):
             child_list = hub_state["children"][parentId]
             _iot_device_children_add(target=self.target, device_id=parentId, child_list=child_list)
 
-    def save_state(self, filename: str):
+    def save_state(self, filename: str, overwrite_file=False):
         '''
         Writes all hub configurations, device identities and device twins from the origin hub to a json file
         {
@@ -197,13 +200,19 @@ class StateProvider(IoTHubProvider):
             }
         }
         '''
+        if os.path.exists(filename) and os.stat(filename).st_size and not overwrite_file:
+            raise FileOperationError(f'File {filename} is not empty. If you want to overwrite this file, include the --overwrite-file flag')
 
         hub_state = self.process_hub(self.target)
 
-        with open(filename, 'w', encoding='utf-8') as f:
-            json.dump(hub_state, f)
+        try:
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(hub_state, f)
 
-        logger.info("Saved state of IoT Hub '{}' to {}".format(self.hub_name, filename))
+            logger.info("Saved state of IoT Hub '{}' to {}".format(self.hub_name, filename))
+
+        except FileNotFoundError:
+            raise FileOperationError(f'File {filename} does not exist.')
 
     def upload_device_identity(self, identity: dict):
         device_id = identity["deviceId"]
@@ -287,12 +296,15 @@ class StateProvider(IoTHubProvider):
             self.delete_all_configs()
             self.delete_all_devices()
 
-        with open(filename, 'r', encoding='utf-8') as f:
-            hub_state = json.load(f)
+        try:
+            with open(filename, 'r', encoding='utf-8') as f:
+                hub_state = json.load(f)
 
-        self.upload_hub_from_dict(hub_state)
-
-        logger.info("Uploaded state from '{}' to IoT Hub '{}'".format(filename, self.hub_name))
+            self.upload_hub_from_dict(hub_state)
+            logger.info("Uploaded state from '{}' to IoT Hub '{}'".format(filename, self.hub_name))
+        
+        except FileNotFoundError:
+            raise FileOperationError(f'File {filename} does not exist.')
 
     def migrate_devices(
         self,
