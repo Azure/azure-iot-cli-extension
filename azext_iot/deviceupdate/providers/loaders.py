@@ -31,6 +31,8 @@ def reload_modules() -> None:
     import importlib
 
     ext_path = get_extension_path(EXTENSION_NAME)
+    if not ext_path:
+        return
 
     ext_azure_dir = os.path.join(ext_path, "azure")
     if not os.path.isdir(ext_azure_dir):
