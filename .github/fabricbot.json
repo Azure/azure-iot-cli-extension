@@ -102,8 +102,7 @@
             }
           }
         ]
-      },
-      "id": "4aC1bxl8vW6"
+      }
     },
     {
       "taskType": "trigger",
@@ -165,8 +164,7 @@
             }
           }
         ]
-      },
-      "id": "gkGX04TIbDC"
+      }
     },
     {
       "taskType": "scheduled",
@@ -269,7 +267,6 @@
           }
         ]
       },
-      "id": "Ems6CqozRvO",
       "disabled": true
     },
     {
@@ -322,7 +319,6 @@
           "project_card"
         ]
       },
-      "id": "ApEHPD2GIFx",
       "disabled": true
     },
     {
@@ -380,7 +376,6 @@
           "issue_comment"
         ]
       },
-      "id": "F5DPV6CTbbn",
       "disabled": true
     },
     {
@@ -426,7 +421,6 @@
           "project_card"
         ]
       },
-      "id": "70lcaRQxqte",
       "disabled": true
     },
     {
@@ -460,7 +454,6 @@
           "issue_comment"
         ]
       },
-      "id": "-HEhMrYOMRz",
       "disabled": true
     },
     {
@@ -563,7 +556,6 @@
           }
         ]
       },
-      "id": "iS-0P0cMYhr",
       "disabled": true
     },
     {
@@ -674,7 +666,6 @@
           }
         ]
       },
-      "id": "QWayG_kxFjE",
       "disabled": true
     },
     {
@@ -784,7 +775,6 @@
           }
         ]
       },
-      "id": "KYmqyfK21VT",
       "disabled": true
     },
     {
@@ -798,7 +788,6 @@
         "fixedLabelText": "Status: Fixed",
         "fixedLabelEnabled": true
       },
-      "id": "2RlCmYrW_qe",
       "disabled": true
     },
     {
@@ -806,7 +795,6 @@
       "capabilityId": "IssueResponder",
       "subCapability": "IssuesOnlyResponder",
       "version": "1.0",
-      "id": "eWmCBKRBzcgieWQfmlV-f",
       "config": {
         "conditions": {
           "operator": "and",
@@ -847,7 +835,6 @@
       "capabilityId": "IssueResponder",
       "subCapability": "IssuesOnlyResponder",
       "version": "1.0",
-      "id": "kMgy3MqHjZgYVBTS1Wp7G",
       "config": {
         "conditions": {
           "operator": "and",
@@ -882,6 +869,45 @@
         ]
       },
       "disabled": false
+    },
+    {
+      "taskType": "trigger",
+      "capabilityId": "IssueResponder",
+      "subCapability": "IssuesOnlyResponder",
+      "version": "1.0",
+      "config": {
+        "conditions": {
+          "operator": "and",
+          "operands": [
+            {
+              "name": "bodyContains",
+              "parameters": {
+                "bodyPattern": "gather() got an unexpected keyword argument 'loop'"
+              }
+            },
+            {
+              "name": "isAction",
+              "parameters": {
+                "action": "opened"
+              }
+            }
+          ]
+        },
+        "eventType": "issue",
+        "eventNames": [
+          "issues",
+          "project_card"
+        ],
+        "taskName": "Auto-respond to `unexpected keyword argument 'loop'`",
+        "actions": [
+          {
+            "name": "addReply",
+            "parameters": {
+              "comment": "Thanks for submitting an issue, @${issueAuthor}. I noticed your issue contains the following error:\n\n`gather() got an unexpected keyword argument 'loop'`\nwhich can often be solved quickly by updating your installed version of the `azure-iot` extension.\n\nPlease try upgrading your CLI extension to a newer version and see if that resolves the issue:\n`az extension update --name azure-iot`"
+            }
+          }
+        ]
+      }
     }
   ],
   "userGroups": []
