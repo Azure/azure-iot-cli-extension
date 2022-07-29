@@ -292,6 +292,11 @@ def load_iothub_arguments(self, _):
             options_list=["--entity-path"],
             help="The entity path of the endpoint resource."
         )
+        context.argument(
+            "endpoint_uri",
+            options_list=["--endpoint-uri"],
+            help="The uri of the endpoint resource."
+        )
 
     with self.argument_context("iot hub messaging-endpoint create storage-container") as context:
         context.argument(
@@ -304,11 +309,6 @@ def load_iothub_arguments(self, _):
             options_list=["--encoding"],
             arg_type=get_enum_type(EncodingFormat),
             help="Encoding format for the container."
-        )
-        context.argument(
-            "endpoint_uri",
-            options_list=["--endpoint-uri"],
-            help="The uri of the endpoint resource."
         )
         context.argument(
             'batch_frequency',
