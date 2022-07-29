@@ -1,0 +1,925 @@
+{
+  "children": {
+    "device2": [
+      "edge-parent1",
+      "simDevice"
+    ],
+    "edge-parent1": [
+      "device1-child",
+      "edge-parent2"
+    ],
+    "edge-parent2": [
+      "device2-child"
+    ]
+  },
+  "configurations": [
+    {
+      "content": {
+        "deviceContent": {
+          "properties.desired.awesome": 3
+        }
+      },
+      "createdTimeUtc": "2022-06-28T22:56:32.937713Z",
+      "etag": "MQ==",
+      "id": "my_config",
+      "labels": null,
+      "lastUpdatedTimeUtc": "2022-06-28T22:56:32.937713Z",
+      "metrics": {
+        "queries": {},
+        "results": {}
+      },
+      "priority": 10,
+      "schemaVersion": "2.0",
+      "systemMetrics": {
+        "queries": {
+          "appliedCount": "select deviceId from devices where configurations.[[my_config]].status = 'Applied'",
+          "targetedCount": "select deviceId from devices where tags.environment='test'"
+        },
+        "results": {
+          "appliedCount": 0,
+          "targetedCount": 0
+        }
+      },
+      "targetCondition": "tags.environment='test'"
+    },
+    {
+      "content": {
+        "deviceContent": {
+          "properties.desired.prop2": 5
+        }
+      },
+      "createdTimeUtc": "2022-06-28T23:03:31.8831286Z",
+      "etag": "MQ==",
+      "id": "my_config2",
+      "labels": null,
+      "lastUpdatedTimeUtc": "2022-06-28T23:03:31.8831286Z",
+      "metrics": {
+        "queries": {},
+        "results": {}
+      },
+      "priority": 7,
+      "schemaVersion": "2.0",
+      "systemMetrics": {
+        "queries": {
+          "appliedCount": "select deviceId from devices where configurations.[[my_config2]].status = 'Applied'",
+          "targetedCount": "select deviceId from devices"
+        },
+        "results": {
+          "appliedCount": 7,
+          "targetedCount": 7
+        }
+      },
+      "targetCondition": "*"
+    }
+  ],
+  "devices": {
+    "device1-child": {
+      "authenticationType": "sas",
+      "capabilities": {
+        "iotEdge": false
+      },
+      "cloudToDeviceMessageCount": 0,
+      "configurations": {
+        "my_config2": {
+          "status": "Applied"
+        }
+      },
+      "connectionState": "Disconnected",
+      "deviceEtag": "MjIyMjQxNDgw",
+      "deviceId": "device1-child",
+      "deviceScope": "ms-azure-iot-edge://edge-parent1-637941250662905791",
+      "etag": "AAAAAAAAAAI=",
+      "lastActivityTime": "0001-01-01T00:00:00Z",
+      "modelId": "",
+      "parentScopes": [
+        "ms-azure-iot-edge://edge-parent1-637941250662905791"
+      ],
+      "properties": {
+        "desired": {
+          "$metadata": {
+            "$lastUpdated": "2022-07-22T22:21:36.3128496Z",
+            "$lastUpdatedVersion": 2,
+            "prop2": {
+              "$lastUpdated": "2022-07-22T22:21:36.3128496Z",
+              "$lastUpdatedBy": "my_config2",
+              "$lastUpdatedByDigest": "637920542118831286",
+              "$lastUpdatedVersion": 2
+            }
+          },
+          "$version": 2,
+          "prop2": 5
+        },
+        "reported": {
+          "$metadata": {
+            "$lastUpdated": "2022-07-22T22:18:31.5584761Z"
+          },
+          "$version": 1
+        }
+      },
+      "status": "enabled",
+      "statusUpdateTime": "0001-01-01T00:00:00Z",
+      "symmetricKey": {
+        "primaryKey": "mock_key",
+        "secondaryKey": "mock_key"
+      },
+      "version": 3,
+      "x509Thumbprint": {
+        "primaryThumbprint": null,
+        "secondaryThumbprint": null
+      }
+    },
+    "device2": {
+      "authenticationType": "selfSigned",
+      "capabilities": {
+        "iotEdge": true
+      },
+      "cloudToDeviceMessageCount": 0,
+      "configurations": {
+        "my_config2": {
+          "status": "Applied"
+        }
+      },
+      "connectionState": "Disconnected",
+      "deviceEtag": "MTI2NjkxNTk2",
+      "deviceId": "device2",
+      "deviceScope": "ms-azure-iot-edge://device2-637909226754880775",
+      "etag": "AAAAAAAAAAk=",
+      "lastActivityTime": "0001-01-01T00:00:00Z",
+      "modelId": "",
+      "properties": {
+        "desired": {
+          "$metadata": {
+            "$lastUpdated": "2022-07-06T22:40:59.3474004Z",
+            "$lastUpdatedVersion": 8,
+            "prop2": {
+              "$lastUpdated": "2022-07-06T22:40:59.3474004Z",
+              "$lastUpdatedBy": "my_config2",
+              "$lastUpdatedByDigest": "637920542118831286",
+              "$lastUpdatedVersion": 8
+            }
+          },
+          "$version": 8,
+          "prop2": 5
+        },
+        "reported": {
+          "$metadata": {
+            "$lastUpdated": "2022-06-15T20:44:35.4880775Z"
+          },
+          "$version": 1
+        }
+      },
+      "status": "enabled",
+      "statusUpdateTime": "0001-01-01T00:00:00Z",
+      "tags": {
+        "deviceType": "Type1, Type2, Type3",
+        "example": "val"
+      },
+      "version": 10,
+      "x509Thumbprint": {
+        "primaryThumbprint": "085836B09D1272B03F21FDFA8DC055D658C5AF14",
+        "secondaryThumbprint": null
+      }
+    },
+    "device2-child": {
+      "authenticationType": "sas",
+      "capabilities": {
+        "iotEdge": false
+      },
+      "cloudToDeviceMessageCount": 0,
+      "configurations": {
+        "my_config2": {
+          "status": "Applied"
+        }
+      },
+      "connectionState": "Disconnected",
+      "deviceEtag": "MzQyMDgxOTU2",
+      "deviceId": "device2-child",
+      "deviceScope": "ms-azure-iot-edge://edge-parent2-637941252071656633",
+      "etag": "AAAAAAAAAAI=",
+      "lastActivityTime": "0001-01-01T00:00:00Z",
+      "modelId": "",
+      "parentScopes": [
+        "ms-azure-iot-edge://edge-parent2-637941252071656633"
+      ],
+      "properties": {
+        "desired": {
+          "$metadata": {
+            "$lastUpdated": "2022-07-22T22:21:35.7788603Z",
+            "$lastUpdatedVersion": 2,
+            "prop2": {
+              "$lastUpdated": "2022-07-22T22:21:35.7788603Z",
+              "$lastUpdatedBy": "my_config2",
+              "$lastUpdatedByDigest": "637920542118831286",
+              "$lastUpdatedVersion": 2
+            }
+          },
+          "$version": 2,
+          "prop2": 5
+        },
+        "reported": {
+          "$metadata": {
+            "$lastUpdated": "2022-07-22T22:18:38.1536309Z"
+          },
+          "$version": 1
+        }
+      },
+      "status": "enabled",
+      "statusUpdateTime": "0001-01-01T00:00:00Z",
+      "symmetricKey": {
+        "primaryKey": "mock_key",
+        "secondaryKey": "mock_key"
+      },
+      "version": 3,
+      "x509Thumbprint": {
+        "primaryThumbprint": null,
+        "secondaryThumbprint": null
+      }
+    },
+    "device3": {
+      "authenticationType": "certificateAuthority",
+      "capabilities": {
+        "iotEdge": false
+      },
+      "cloudToDeviceMessageCount": 0,
+      "configurations": {
+        "my_config2": {
+          "status": "Applied"
+        }
+      },
+      "connectionState": "Disconnected",
+      "deviceEtag": "NTI0MTU2MTYx",
+      "deviceId": "device3",
+      "etag": "AAAAAAAAAAU=",
+      "lastActivityTime": "0001-01-01T00:00:00Z",
+      "modelId": "",
+      "properties": {
+        "desired": {
+          "$metadata": {
+            "$lastUpdated": "2022-07-06T22:42:36.939444Z",
+            "$lastUpdatedVersion": 4,
+            "prop2": {
+              "$lastUpdated": "2022-07-06T22:42:36.939444Z",
+              "$lastUpdatedBy": "my_config2",
+              "$lastUpdatedByDigest": "637920542118831286",
+              "$lastUpdatedVersion": 4
+            }
+          },
+          "$version": 4,
+          "prop2": 5
+        },
+        "reported": {
+          "$metadata": {
+            "$lastUpdated": "2022-06-15T22:34:50.4953043Z"
+          },
+          "$version": 1
+        }
+      },
+      "status": "enabled",
+      "statusUpdateTime": "0001-01-01T00:00:00Z",
+      "tags": {
+        "deviceType": "Type1, Type2, Type3"
+      },
+      "version": 6,
+      "x509Thumbprint": {
+        "primaryThumbprint": null,
+        "secondaryThumbprint": null
+      }
+    },
+    "edge-parent1": {
+      "authenticationType": "sas",
+      "capabilities": {
+        "iotEdge": true
+      },
+      "cloudToDeviceMessageCount": 0,
+      "configurations": {
+        "my_config2": {
+          "status": "Applied"
+        }
+      },
+      "connectionState": "Disconnected",
+      "deviceEtag": "NzgyOTY0MzY=",
+      "deviceId": "edge-parent1",
+      "deviceScope": "ms-azure-iot-edge://edge-parent1-637941250662905791",
+      "etag": "AAAAAAAAAAI=",
+      "lastActivityTime": "0001-01-01T00:00:00Z",
+      "modelId": "",
+      "parentScopes": [
+        "ms-azure-iot-edge://device2-637909226754880775"
+      ],
+      "properties": {
+        "desired": {
+          "$metadata": {
+            "$lastUpdated": "2022-07-22T22:21:34.7300503Z",
+            "$lastUpdatedVersion": 2,
+            "prop2": {
+              "$lastUpdated": "2022-07-22T22:21:34.7300503Z",
+              "$lastUpdatedBy": "my_config2",
+              "$lastUpdatedByDigest": "637920542118831286",
+              "$lastUpdatedVersion": 2
+            }
+          },
+          "$version": 2,
+          "prop2": 5
+        },
+        "reported": {
+          "$metadata": {
+            "$lastUpdated": "2022-07-22T22:17:46.2905791Z"
+          },
+          "$version": 1
+        }
+      },
+      "status": "enabled",
+      "statusUpdateTime": "0001-01-01T00:00:00Z",
+      "symmetricKey": {
+        "primaryKey": "mock_key",
+        "secondaryKey": "mock_key"
+      },
+      "version": 3,
+      "x509Thumbprint": {
+        "primaryThumbprint": null,
+        "secondaryThumbprint": null
+      }
+    },
+    "edge-parent2": {
+      "authenticationType": "sas",
+      "capabilities": {
+        "iotEdge": true
+      },
+      "cloudToDeviceMessageCount": 0,
+      "configurations": {
+        "my_config2": {
+          "status": "Applied"
+        }
+      },
+      "connectionState": "Disconnected",
+      "deviceEtag": "MTkxNjA3MjYx",
+      "deviceId": "edge-parent2",
+      "deviceScope": "ms-azure-iot-edge://edge-parent2-637941252071656633",
+      "etag": "AAAAAAAAAAI=",
+      "lastActivityTime": "0001-01-01T00:00:00Z",
+      "modelId": "",
+      "parentScopes": [
+        "ms-azure-iot-edge://edge-parent1-637941250662905791"
+      ],
+      "properties": {
+        "desired": {
+          "$metadata": {
+            "$lastUpdated": "2022-07-22T22:21:35.6819195Z",
+            "$lastUpdatedVersion": 2,
+            "prop2": {
+              "$lastUpdated": "2022-07-22T22:21:35.6819195Z",
+              "$lastUpdatedBy": "my_config2",
+              "$lastUpdatedByDigest": "637920542118831286",
+              "$lastUpdatedVersion": 2
+            }
+          },
+          "$version": 2,
+          "prop2": 5
+        },
+        "reported": {
+          "$metadata": {
+            "$lastUpdated": "2022-07-22T22:20:07.1656633Z"
+          },
+          "$version": 1
+        }
+      },
+      "status": "enabled",
+      "statusUpdateTime": "0001-01-01T00:00:00Z",
+      "symmetricKey": {
+        "primaryKey": "mock_key",
+        "secondaryKey": "mock_key"
+      },
+      "version": 3,
+      "x509Thumbprint": {
+        "primaryThumbprint": null,
+        "secondaryThumbprint": null
+      }
+    },
+    "simDevice": {
+      "authenticationType": "sas",
+      "capabilities": {
+        "iotEdge": false
+      },
+      "cloudToDeviceMessageCount": 0,
+      "configurations": {
+        "my_config2": {
+          "status": "Applied"
+        }
+      },
+      "connectionState": "Disconnected",
+      "deviceEtag": "OTk2NjcxNjY1",
+      "deviceId": "simDevice",
+      "deviceScope": "ms-azure-iot-edge://device2-637909226754880775",
+      "etag": "AAAAAAAAAAQ=",
+      "lastActivityTime": "2022-06-08T21:58:20.0868016Z",
+      "modelId": "",
+      "parentScopes": [
+        "ms-azure-iot-edge://device2-637909226754880775"
+      ],
+      "properties": {
+        "desired": {
+          "$metadata": {
+            "$lastUpdated": "2022-06-28T23:03:34.2370119Z",
+            "$lastUpdatedVersion": 3,
+            "prop2": {
+              "$lastUpdated": "2022-06-28T23:03:34.2370119Z",
+              "$lastUpdatedBy": "my_config2",
+              "$lastUpdatedByDigest": "637920542118831286",
+              "$lastUpdatedVersion": 3
+            },
+            "property1": {
+              "$lastUpdated": "2022-06-13T19:18:18.5277494Z",
+              "$lastUpdatedVersion": 2
+            }
+          },
+          "$version": 3,
+          "prop2": 5,
+          "property1": 24
+        },
+        "reported": {
+          "$metadata": {
+            "$lastUpdated": "2022-06-08T21:39:37.6807769Z"
+          },
+          "$version": 1
+        }
+      },
+      "status": "enabled",
+      "statusUpdateTime": "0001-01-01T00:00:00Z",
+      "symmetricKey": {
+        "primaryKey": "mock_key",
+        "secondaryKey": "mock_key"
+      },
+      "tags": {
+        "deviceType": "Type1, Type2, Type3"
+      },
+      "version": 5,
+      "x509Thumbprint": {
+        "primaryThumbprint": null,
+        "secondaryThumbprint": null
+      }
+    }
+  },
+  "edgeDeployments": [
+    {
+      "content": {
+        "modulesContent": {
+          "$edgeAgent": {
+            "properties.desired": {
+              "modules": {
+                "SimulatedTemperatureSensor": {
+                  "restartPolicy": "always",
+                  "settings": {
+                    "createOptions": "{}",
+                    "image": "mcr.microsoft.com/azureiotedge-simulated-temperature-sensor:1.0"
+                  },
+                  "startupOrder": 2,
+                  "status": "running",
+                  "type": "docker",
+                  "version": "1.0"
+                },
+                "filtermodule": {
+                  "env": {
+                    "tempLimit": {
+                      "value": "100"
+                    }
+                  },
+                  "restartPolicy": "always",
+                  "settings": {
+                    "createOptions": "{}",
+                    "image": "myacr.azurecr.io/filtermodule:latest"
+                  },
+                  "startupOrder": 1,
+                  "status": "running",
+                  "type": "docker",
+                  "version": "1.0"
+                }
+              },
+              "runtime": {
+                "settings": {
+                  "loggingOptions": "",
+                  "minDockerVersion": "v1.25",
+                  "registryCredentials": {
+                    "ContosoRegistry": {
+                      "address": "myacr.azurecr.io",
+                      "password": "<password>",
+                      "username": "myacr"
+                    }
+                  }
+                },
+                "type": "docker"
+              },
+              "schemaVersion": "1.1",
+              "systemModules": {
+                "edgeAgent": {
+                  "settings": {
+                    "createOptions": "",
+                    "image": "mcr.microsoft.com/azureiotedge-agent:1.0"
+                  },
+                  "type": "docker"
+                },
+                "edgeHub": {
+                  "restartPolicy": "always",
+                  "settings": {
+                    "createOptions": "{\"HostConfig\":{\"PortBindings\":{\"443/tcp\":[{\"HostPort\":\"443\"}],\"5671/tcp\":[{\"HostPort\":\"5671\"}],\"8883/tcp\":[{\"HostPort\":\"8883\"}]}}}",
+                    "image": "mcr.microsoft.com/azureiotedge-hub:1.0"
+                  },
+                  "startupOrder": 0,
+                  "status": "running",
+                  "type": "docker"
+                }
+              }
+            }
+          },
+          "$edgeHub": {
+            "properties.desired": {
+              "routes": {
+                "filterToIoTHub": {
+                  "priority": 1,
+                  "route": "FROM /messages/modules/filtermodule/outputs/output1 INTO $upstream",
+                  "timeToLiveSecs": 1800
+                },
+                "sensorToFilter": {
+                  "priority": 0,
+                  "route": "FROM /messages/modules/SimulatedTemperatureSensor/outputs/temperatureOutput INTO BrokeredEndpoint(\"/modules/filtermodule/inputs/input1\")",
+                  "timeToLiveSecs": 1800
+                }
+              },
+              "schemaVersion": "1.2",
+              "storeAndForwardConfiguration": {
+                "timeToLiveSecs": 100
+              }
+            }
+          }
+        }
+      },
+      "createdTimeUtc": "2022-07-22T22:13:23.289712Z",
+      "etag": "MQ==",
+      "id": "mydeployment1",
+      "labels": null,
+      "lastUpdatedTimeUtc": "2022-07-22T22:13:23.289712Z",
+      "metrics": {
+        "queries": {
+          "mymetric": "SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200"
+        },
+        "results": {}
+      },
+      "priority": 1,
+      "schemaVersion": "2.0",
+      "systemMetrics": {
+        "queries": {
+          "appliedCount": "select deviceId from devices.modules where moduleId = '$edgeAgent' and configurations.[[mydeployment1]].status = 'Applied'",
+          "reportedFailedCount": "select deviceId from devices.modules where moduleId = '$edgeAgent' and configurations.[[mydeployment1]].status = 'Applied' and properties.desired.$version = properties.reported.lastDesiredVersion and properties.reported.lastDesiredStatus.code != 200",
+          "reportedSuccessfulCount": "select deviceId from devices.modules where moduleId = '$edgeAgent' and configurations.[[mydeployment1]].status = 'Applied' and properties.desired.$version = properties.reported.lastDesiredVersion and properties.reported.lastDesiredStatus.code = 200",
+          "targetedCount": ""
+        },
+        "results": {
+          "appliedCount": 0,
+          "reportedFailedCount": 0,
+          "reportedSuccessfulCount": 0,
+          "targetedCount": 0
+        }
+      },
+      "targetCondition": ""
+    },
+    {
+      "content": {
+        "modulesContent": {
+          "$edgeAgent": {
+            "properties.desired.modules.mymodule0": {
+              "env": {
+                "envvar0": {
+                  "value": "envvarval0"
+                }
+              },
+              "restartPolicy": "always",
+              "settings": {
+                "createOptions": "{\"MemorySwap\":0}",
+                "image": "myimageuri"
+              },
+              "status": "running",
+              "type": "docker",
+              "version": "1.0"
+            }
+          },
+          "$edgeHub": {
+            "properties.desired.routes.route0": "from /messages/* INTO $upstream"
+          },
+          "mymodule0": {
+            "properties.desired.settings": {
+              "prop0": "val0"
+            }
+          }
+        }
+      },
+      "createdTimeUtc": "2022-07-22T22:16:02.3200653Z",
+      "etag": "MQ==",
+      "id": "mylayereddeployment1",
+      "labels": null,
+      "lastUpdatedTimeUtc": "2022-07-22T22:16:02.3200653Z",
+      "metrics": {
+        "queries": {
+          "mymetric": "SELECT deviceId FROM devices WHERE properties.reported.lastDesiredStatus.code = 200"
+        },
+        "results": {}
+      },
+      "priority": 1,
+      "schemaVersion": "2.0",
+      "systemMetrics": {
+        "queries": {
+          "appliedCount": "select deviceId from devices.modules where moduleId = '$edgeAgent' and configurations.[[mylayereddeployment1]].status = 'Applied'",
+          "reportedFailedCount": "select deviceId from devices.modules where moduleId = '$edgeAgent' and configurations.[[mylayereddeployment1]].status = 'Applied' and properties.desired.$version = properties.reported.lastDesiredVersion and properties.reported.lastDesiredStatus.code != 200",
+          "reportedSuccessfulCount": "select deviceId from devices.modules where moduleId = '$edgeAgent' and configurations.[[mylayereddeployment1]].status = 'Applied' and properties.desired.$version = properties.reported.lastDesiredVersion and properties.reported.lastDesiredStatus.code = 200",
+          "targetedCount": ""
+        },
+        "results": {
+          "appliedCount": 0,
+          "reportedFailedCount": 0,
+          "reportedSuccessfulCount": 0,
+          "targetedCount": 0
+        }
+      },
+      "targetCondition": ""
+    }
+  ],
+  "modules": {
+    "device1-child": [],
+    "device2": [
+      [
+        {
+          "additional_properties": {},
+          "authentication": {
+            "symmetricKey": {
+              "primaryKey": null,
+              "secondaryKey": null
+            },
+            "type": "certificateAuthority",
+            "x509Thumbprint": {
+              "primaryThumbprint": null,
+              "secondaryThumbprint": null
+            }
+          },
+          "cloud_to_device_message_count": 0,
+          "connection_state": "Disconnected",
+          "device_id": "device2",
+          "etag": "NzI5NDA2MzEx",
+          "generation_id": "637920587461553088",
+          "managed_by": null,
+          "module_id": "module2"
+        },
+        {
+          "authenticationType": "certificateAuthority",
+          "cloudToDeviceMessageCount": 0,
+          "connectionState": "Disconnected",
+          "deviceEtag": "NzI5NDA2MzEx",
+          "deviceId": "device2",
+          "etag": "AAAAAAAAAAM=",
+          "lastActivityTime": "0001-01-01T00:00:00Z",
+          "modelId": "",
+          "moduleId": "module2",
+          "properties": {
+            "desired": {
+              "$metadata": {
+                "$lastUpdated": "2022-06-29T00:22:29.3929471Z",
+                "$lastUpdatedVersion": 2,
+                "conditions": {
+                  "$lastUpdated": "2022-06-29T00:22:29.3929471Z",
+                  "$lastUpdatedVersion": 2,
+                  "temperature": {
+                    "$lastUpdated": "2022-06-29T00:22:29.3929471Z",
+                    "$lastUpdatedVersion": 2,
+                    "critical": {
+                      "$lastUpdated": "2022-06-29T00:22:29.3929471Z",
+                      "$lastUpdatedVersion": 2
+                    },
+                    "warning": {
+                      "$lastUpdated": "2022-06-29T00:22:29.3929471Z",
+                      "$lastUpdatedVersion": 2
+                    }
+                  }
+                }
+              },
+              "$version": 2,
+              "conditions": {
+                "temperature": {
+                  "critical": 100,
+                  "warning": 70
+                }
+              }
+            },
+            "reported": {
+              "$metadata": {
+                "$lastUpdated": "0001-01-01T00:00:00Z"
+              },
+              "$version": 1
+            }
+          },
+          "status": "enabled",
+          "statusUpdateTime": "0001-01-01T00:00:00Z",
+          "tags": {
+            "timeZone": "western"
+          },
+          "version": 4,
+          "x509Thumbprint": {
+            "primaryThumbprint": null,
+            "secondaryThumbprint": null
+          }
+        }
+      ]
+    ],
+    "device2-child": [],
+    "device3": [
+      [
+        {
+          "additional_properties": {},
+          "authentication": {
+            "symmetricKey": {
+              "primaryKey": "mock_key",
+              "secondaryKey": "mock_key"
+            },
+            "type": "sas",
+            "x509Thumbprint": {
+              "primaryThumbprint": null,
+              "secondaryThumbprint": null
+            }
+          },
+          "cloud_to_device_message_count": 0,
+          "connection_state": "Disconnected",
+          "device_id": "device3",
+          "etag": "NDE1NDI5MjMw",
+          "generation_id": "637937846362414376",
+          "managed_by": null,
+          "module_id": "module1"
+        },
+        {
+          "authenticationType": "sas",
+          "cloudToDeviceMessageCount": 0,
+          "connectionState": "Disconnected",
+          "deviceEtag": "NDE1NDI5MjMw",
+          "deviceId": "device3",
+          "etag": "AAAAAAAAAAI=",
+          "lastActivityTime": "0001-01-01T00:00:00Z",
+          "modelId": "",
+          "moduleId": "module1",
+          "properties": {
+            "desired": {
+              "$metadata": {
+                "$lastUpdated": "2022-07-18T23:44:30.7287962Z",
+                "$lastUpdatedVersion": 2,
+                "magic": {
+                  "$lastUpdated": "2022-07-18T23:44:30.7287962Z",
+                  "$lastUpdatedVersion": 2
+                }
+              },
+              "$version": 2,
+              "magic": 3
+            },
+            "reported": {
+              "$metadata": {
+                "$lastUpdated": "0001-01-01T00:00:00Z"
+              },
+              "$version": 1
+            }
+          },
+          "status": "enabled",
+          "statusUpdateTime": "0001-01-01T00:00:00Z",
+          "version": 3,
+          "x509Thumbprint": {
+            "primaryThumbprint": null,
+            "secondaryThumbprint": null
+          }
+        }
+      ]
+    ],
+    "edge-parent1": [],
+    "edge-parent2": [],
+    "simDevice": [
+      [
+        {
+          "additional_properties": {},
+          "authentication": {
+            "symmetricKey": {
+              "primaryKey": "mock_key",
+              "secondaryKey": "mock_key"
+            },
+            "type": "sas",
+            "x509Thumbprint": {
+              "primaryThumbprint": null,
+              "secondaryThumbprint": null
+            }
+          },
+          "cloud_to_device_message_count": 0,
+          "connection_state": "Disconnected",
+          "device_id": "simDevice",
+          "etag": "NTIxMjQzNDU5",
+          "generation_id": "637907447770121687",
+          "managed_by": null,
+          "module_id": "module1"
+        },
+        {
+          "authenticationType": "sas",
+          "cloudToDeviceMessageCount": 0,
+          "connectionState": "Disconnected",
+          "deviceEtag": "NTIxMjQzNDU5",
+          "deviceId": "simDevice",
+          "etag": "AAAAAAAAAAI=",
+          "lastActivityTime": "0001-01-01T00:00:00Z",
+          "modelId": "",
+          "moduleId": "module1",
+          "properties": {
+            "desired": {
+              "$metadata": {
+                "$lastUpdated": "2022-06-13T19:20:22.0278478Z",
+                "$lastUpdatedVersion": 2,
+                "property2": {
+                  "$lastUpdated": "2022-06-13T19:20:22.0278478Z",
+                  "$lastUpdatedVersion": 2
+                }
+              },
+              "$version": 2,
+              "property2": 25
+            },
+            "reported": {
+              "$metadata": {
+                "$lastUpdated": "0001-01-01T00:00:00Z"
+              },
+              "$version": 1
+            }
+          },
+          "status": "enabled",
+          "statusUpdateTime": "0001-01-01T00:00:00Z",
+          "version": 3,
+          "x509Thumbprint": {
+            "primaryThumbprint": null,
+            "secondaryThumbprint": null
+          }
+        }
+      ],
+      [
+        {
+          "additional_properties": {},
+          "authentication": {
+            "symmetricKey": {
+              "primaryKey": "mock_key",
+              "secondaryKey": "mock_key"
+            },
+            "type": "sas",
+            "x509Thumbprint": {
+              "primaryThumbprint": null,
+              "secondaryThumbprint": null
+            }
+          },
+          "cloud_to_device_message_count": 0,
+          "connection_state": "Disconnected",
+          "device_id": "simDevice",
+          "etag": "NzU1NTgwOTgw",
+          "generation_id": "637920585539407125",
+          "managed_by": null,
+          "module_id": "simModule"
+        },
+        {
+          "authenticationType": "sas",
+          "cloudToDeviceMessageCount": 0,
+          "connectionState": "Disconnected",
+          "deviceEtag": "NzU1NTgwOTgw",
+          "deviceId": "simDevice",
+          "etag": "AAAAAAAAAAM=",
+          "lastActivityTime": "0001-01-01T00:00:00Z",
+          "modelId": "",
+          "moduleId": "simModule",
+          "properties": {
+            "desired": {
+              "$metadata": {
+                "$lastUpdated": "2022-06-30T18:49:50.0761263Z",
+                "$lastUpdatedVersion": 3,
+                "color": {
+                  "$lastUpdated": "2022-06-30T18:49:50.0761263Z",
+                  "$lastUpdatedVersion": 3
+                },
+                "shape": {
+                  "$lastUpdated": "2022-06-30T18:49:50.0761263Z",
+                  "$lastUpdatedVersion": 3
+                }
+              },
+              "$version": 3,
+              "color": "green",
+              "shape": "square"
+            },
+            "reported": {
+              "$metadata": {
+                "$lastUpdated": "0001-01-01T00:00:00Z"
+              },
+              "$version": 1
+            }
+          },
+          "status": "enabled",
+          "statusUpdateTime": "0001-01-01T00:00:00Z",
+          "version": 4,
+          "x509Thumbprint": {
+            "primaryThumbprint": null,
+            "secondaryThumbprint": null
+          }
+        }
+      ]
+    ]
+  }
+}

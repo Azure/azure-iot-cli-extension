@@ -60,61 +60,10 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             self._create_storage_account()
 
         if not settings.env.azext_iot_testhub:
-            hubs_list = self.cmd(
-                'iot hub list -g "{}"'.format(self.entity_rg)
-            ).get_output_in_json()
-
-            target_hub = None
-            for hub in hubs_list:
-                if hub["name"] == self.entity_name:
-                    target_hub = hub
-                    break
-
-            if not target_hub:
-                if hasattr(self, 'storage_cstring'):
-                    self.cmd(
-                        "iot hub create --name {} --resource-group {} --fc {} --fcs {} --sku S1 ".format(
-                            self.entity_name, self.entity_rg,
-                            self.storage_container, self.storage_cstring
-                        )
-                    )
-                else:
-                    self.cmd(
-                        "iot hub create --name {} --resource-group {} --sku S1 ".format(
-                            self.entity_name, self.entity_rg
-                        )
-                    )
-                sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
-
-                target_hub = self.cmd(
-                    "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg)
-                ).get_output_in_json()
-
-                account = self.cmd("account show").get_output_in_json()
-                user = account["user"]
-
-                if user["name"] is None:
-                    raise Exception("User not found")
-
-                tries = 0
-                while tries < MAX_RBAC_ASSIGNMENT_TRIES:
-                    role_assignments = self.get_role_assignments(target_hub["id"], USER_ROLE)
-                    role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
-                    if user["name"] in role_assignment_principal_names:
-                        break
-                    # else assign IoT Hub Data Contributor role to current user and check again
-                    self.cmd(
-                        'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
-                            user["name"], USER_ROLE, target_hub["id"]
-                        )
-                    )
-                    sleep(10)
-
-                if tries == MAX_RBAC_ASSIGNMENT_TRIES:
-                    raise Exception(
-                        "Reached max ({}) number of tries to assign RBAC role. Please re-run the test later "
-                        "or with more max number of tries.".format(MAX_RBAC_ASSIGNMENT_TRIES)
-                    )
+            if hasattr(self, 'storage_container') and hasattr(self, 'storage_cstring'):
+                self.create_hub(self.entity_name, self.entity_rg, self.storage_container, self.storage_cstring)
+            else:
+                self.create_hub(self.entity_name, self.entity_rg)
 
         self.region = self.get_region()
         self.connection_string = self.get_hub_cstring()
@@ -125,6 +74,63 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             rtype=ResourceTypes.hub.value,
             test_tag=test_scenario
         )
+
+    def create_hub(self, hub_name, resource_group, storage_container=None, storage_cstring=None):
+        hubs_list = self.cmd(
+            'iot hub list -g "{}"'.format(resource_group)
+        ).get_output_in_json()
+
+        target_hub = None
+        for hub in hubs_list:
+            if hub["name"] == hub_name:
+                target_hub = hub
+                break
+
+        if not target_hub:
+            if hasattr(self, 'storage_cstring'):
+                self.cmd(
+                    "iot hub create --name {} --resource-group {} --fc {} --fcs {} --sku S1 ".format(
+                        hub_name, resource_group,
+                        storage_container, storage_cstring
+                    )
+                )
+            else:
+                self.cmd(
+                    "iot hub create --name {} --resource-group {} --sku S1 ".format(
+                        hub_name, resource_group
+                    )
+                )
+            sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
+
+            target_hub = self.cmd(
+                "iot hub show -n {} -g {}".format(hub_name, resource_group)
+            ).get_output_in_json()
+
+            account = self.cmd("account show").get_output_in_json()
+            user = account["user"]
+
+            if user["name"] is None:
+                raise Exception("User not found")
+
+            tries = 0
+            while tries < MAX_RBAC_ASSIGNMENT_TRIES:
+                role_assignments = self.get_role_assignments(target_hub["id"], USER_ROLE)
+                role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
+                if user["name"] in role_assignment_principal_names:
+                    break
+                # else assign IoT Hub Data Contributor role to current user and check again
+                self.cmd(
+                    'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
+                        user["name"], USER_ROLE, target_hub["id"]
+                    )
+                )
+                sleep(10)
+
+            if tries == MAX_RBAC_ASSIGNMENT_TRIES:
+                raise Exception(
+                    "Reached max ({}) number of tries to assign RBAC role. Please re-run the test later "
+                    "or with more max number of tries.".format(MAX_RBAC_ASSIGNMENT_TRIES)
+                )
 
     def clean_up(self, device_ids: List[str] = None, config_ids: List[str] = None):
         if device_ids:
