@@ -400,6 +400,13 @@ def load_arguments(self, _):
             options_list=["--interface", "-i"],
             help="Target interface identifier to filter on. For example: dtmi:com:example:TemperatureController;1",
         )
+        context.argument(
+            "message_count",
+            options_list=["--message-count", "--mc"],
+            type=int,
+            help="Number of telemetry messages to capture before the monitor is terminated. "
+            "If not specified, monitor keeps running until meeting the timeout threshold of not receiving messages from hub.",
+        )
 
     with self.argument_context("iot hub monitor-feedback") as context:
         context.argument(

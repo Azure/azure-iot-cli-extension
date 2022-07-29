@@ -50,6 +50,7 @@ class CommonHandlerArguments:
         device_id="",
         interface_name="",
         module_id="",
+        max_messages: int = None,
     ):
         self.output = output
         self.devices = devices or []
@@ -57,6 +58,7 @@ class CommonHandlerArguments:
         self.interface_name = interface_name or ""
         self.module_id = module_id or ""
         self.common_parser_args = common_parser_args
+        self.max_messages = max_messages
 
 
 class CentralHandlerArguments:

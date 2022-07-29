@@ -886,6 +886,15 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 device_subset_exclude,
             )
 
+        # Expect failure when message count is negative
+        with pytest.raises(Exception):
+            self.command_execute_assert(
+                "iot hub monitor-events -n {} -g {} -d {} --et {} -t 8 -y -p sys anno app --mc -5".format(
+                    self.entity_name, self.entity_rg, PREFIX_DEVICE + "*", enqueued_time
+                ),
+                device_ids,
+            )
+
         # Monitor events with --login parameter
         self.command_execute_assert(
             "iot hub monitor-events -t 8 -y -p all --cg {} --et {} --login {}".format(

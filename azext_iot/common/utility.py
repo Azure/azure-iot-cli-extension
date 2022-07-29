@@ -411,7 +411,7 @@ def calculate_millisec_since_unix_epoch_utc(offset_seconds: int = 0):
     return int(1000 * ((now - epoch).total_seconds() + offset_seconds))
 
 
-def init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes):
+def init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes, message_count: int = None):
     from azext_iot.common.deps import ensure_uamqp
 
     if timeout < 0:
@@ -419,6 +419,11 @@ def init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes):
             "Monitoring timeout must be 0 (inf) or greater."
         )
     timeout = timeout * 1000
+
+    if message_count and message_count <= 0:
+        raise InvalidArgumentValueError(
+            "Message count must be greater than 0."
+        )
 
     config = cmd.cli_ctx.config
     output = cmd.cli_ctx.invocation.data.get("output", None)
@@ -432,7 +437,7 @@ def init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes):
 
     if not enqueued_time:
         enqueued_time = calculate_millisec_since_unix_epoch_utc()
-    return (enqueued_time, properties, timeout, output)
+    return (enqueued_time, properties, timeout, output, message_count)
 
 
 def dict_clean(d):
