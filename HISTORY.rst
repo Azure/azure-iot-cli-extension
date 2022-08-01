@@ -6,14 +6,6 @@ Release History
 unreleased
 +++++++++++++++
 
-Adds support for exporting, importing and migrating the state of an IoT Hub. 
-
-* Adds preview command group "az iot hub state"
-
-  * Adds preview command "az iot hub state export"
-  * Adds preview command "az iot hub state import"
-  * Adds preview command "az iot hub state migrate"
-
 
 0.16.1
 +++++++++++++++
