@@ -576,7 +576,6 @@ helps[
         -m {module_name} -j ../mymodtwin.json
 """
 
-'''
 helps[
     "iot hub state"
 ] = """
@@ -631,7 +630,6 @@ helps[
       text: >
         az iot hub state migrate --destination-hub {dest_hub_name} --origin-hub {orig_hub_name} -r
 """
-'''
 
 helps[
     "iot hub generate-sas-token"

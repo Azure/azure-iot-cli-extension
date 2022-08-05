@@ -16,12 +16,15 @@ from azext_iot.tests.helpers import add_test_tag
 from azext_iot.tests.iothub import (
     PRIMARY_THUMBPRINT,
     SECONDARY_THUMBPRINT,
-    DATAPLANE_AUTH_TYPES,
     DEVICE_TYPES,
 )
 
 settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL)
 CWD = os.path.dirname(os.path.abspath(__file__))
+
+# changing the order so the final exported file can be used for all import tests
+# (the cstring output doesn't include the keys for the control plane features)
+DATAPLANE_AUTH_TYPES = ["cstring", "key", "login"]
 
 
 class TestHubExportImport(IoTLiveScenarioTest):
@@ -49,9 +52,8 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
         self.filename = generate_generic_id() + ".json"
 
-        self.create_hub_state()
-
-    def create_hub_state(self):
+    @pytest.fixture(scope="class", autouse=True)
+    def setup_class(self):
 
         # make a configuration for the hub (applies to 0 devices, this is just to test the configuration settings)
 
@@ -181,7 +183,6 @@ class TestHubExportImport(IoTLiveScenarioTest):
                 )
 
     def compare_configs(self, configlist1, configlist2):
-
         assert(len(configlist1) == len(configlist2))
 
         for config in configlist1:
@@ -193,12 +194,12 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
             assert target
 
-        assert(config["id"] == target["id"])
-        assert(config["content"] == target["content"])
-        assert(config["metrics"] == target["metrics"])
-        assert(config["priority"] == target["priority"])
-        assert(config["systemMetrics"]["queries"] == target["systemMetrics"]["queries"])
-        assert(config["targetCondition"] == target["targetCondition"])
+            assert(config["id"] == target["id"])
+            assert(config["content"] == target["content"])
+            assert(config["metrics"] == target["metrics"])
+            assert(config["priority"] == target["priority"])
+            assert(config["systemMetrics"]["queries"] == target["systemMetrics"]["queries"])
+            assert(config["targetCondition"] == target["targetCondition"])
 
     def compare_devices(self, device1, device2):
 
@@ -446,12 +447,15 @@ class TestHubExportImport(IoTLiveScenarioTest):
         # gives the api enough time to update
         time.sleep(1)
 
-    def tearDown(self):
+    @pytest.fixture(scope="class", autouse=True)
+    def teardown_module(self):
+        yield
+        
         if os.path.isfile(self.filename):
             os.remove(self.filename)
 
         # tears down origin hub
-        super().tearDown()
+        # super().tearDown()
 
         # tears down destination hub
         if not settings.env.azext_iot_desthub:
@@ -459,7 +463,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
         else:
             self.clean_up_hub(self.dest_hub_cstring)
 
-    @pytest.mark.skip(reason="no way of currently testing this")
+    # @pytest.mark.skip(reason="no way of currently testing this")
     def test_export_import(self):
 
         for auth_phase in DATAPLANE_AUTH_TYPES:
@@ -469,7 +473,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
                     auth_type=auth_phase
                 )
             )
-            time.sleep(1)
+            time.sleep(2)
             self.compare_hub_to_file()
 
         for auth_phase in DATAPLANE_AUTH_TYPES:
@@ -480,10 +484,10 @@ class TestHubExportImport(IoTLiveScenarioTest):
                     auth_type=auth_phase
                 )
             )
-            time.sleep(1)  # gives the hub time to update before the checks
+            time.sleep(2)  # gives the hub time to update before the checks
             self.compare_hub_to_file()
 
-    @pytest.mark.skip(reason="no way of currently testing this")
+    # @pytest.mark.skip(reason="no way of currently testing this")
     def test_migrate(self):
 
         for auth_phase in DATAPLANE_AUTH_TYPES:
@@ -501,6 +505,6 @@ class TestHubExportImport(IoTLiveScenarioTest):
                     )
                 )
 
-            time.sleep(1)  # gives the hub time to update before the checks
+            time.sleep(2)  # gives the hub time to update before the checks
             self.compare_hubs()
             self.clean_up_hub(self.dest_hub_cstring)

@@ -7,8 +7,11 @@
 from knack.log import get_logger
 
 from azext_iot.common.shared import DeviceAuthApiType, DeviceAuthType, ConfigType
+from azext_iot.common._azure import parse_iot_endpoint_connection_string, parse_storage_container_connection_string
 from azext_iot.iothub.providers.base import IoTHubProvider
 from azure.cli.core.azclierror import FileOperationError
+from azext_iot.tests.generators import generate_generic_id
+from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.operations.hub import (
     _iot_device_show,
     _iot_device_module_twin_show,
@@ -31,6 +34,9 @@ import json
 from tqdm import tqdm
 from typing import Optional
 import os
+import sys
+import time
+from contextlib import contextmanager
 
 logger = get_logger(__name__)
 
@@ -51,7 +57,15 @@ class StateProvider(IoTHubProvider):
             login=login,
             auth_type_dataplane=auth_type_dataplane
         )
+
+        if not login:
+            self.include_control_plane = True
+            self.rg = self.target["resourcegroup"]
+        else:
+            self.include_control_plane = False
+
         self.auth_type = auth_type_dataplane
+        self.cli = EmbeddedCLI()
 
     def process_hub(self, target: dict):
         '''
@@ -69,14 +83,14 @@ class StateProvider(IoTHubProvider):
         hub_state["configurations"] = adm_configs
 
         num_configs = len(hub_state["configurations"])
-        pbar = tqdm(total=num_configs, desc="Saving configurations")
+        pbar = tqdm(total=num_configs, desc="Saving configurations", file=sys.stdout)
         pbar.update(num_configs)
         pbar.close()
 
         hub_state["edgeDeployments"] = [c for c in all_configs if c["content"].get("modulesContent")]
 
         num_edge_deployments = len(hub_state["edgeDeployments"])
-        pbar = tqdm(total=num_edge_deployments, desc="Saving edge deployments")
+        pbar = tqdm(total=num_edge_deployments, desc="Saving edge deployments", file=sys.stdout)
         pbar.update(num_edge_deployments)
         pbar.close()
 
@@ -86,7 +100,7 @@ class StateProvider(IoTHubProvider):
         hub_state["modules"] = {}
         hub_state["children"] = {}
 
-        for i in tqdm(range(len(identities)), desc="Saving devices and modules"):
+        for i in tqdm(range(len(identities)), desc="Saving devices and modules", file=sys.stdout):
 
             id = identities[i]
             hub_state["modules"][id["deviceId"]] = []
@@ -121,6 +135,18 @@ class StateProvider(IoTHubProvider):
 
                     hub_state["modules"][id["deviceId"]].append([module, module_twin])
 
+        # CONTROL PLANE
+
+        if self.include_control_plane:
+            hub_name = target["entity"].split('.')[0]
+            rg = target["resourcegroup"]
+            control_plane = self.cli.invoke("iot hub show -n {} -g {}".format(hub_name, rg)).as_json()
+
+            hub_state["certificates"] = self.cli.invoke("iot hub certificate list --hub-name {} -g {}".format(hub_name, rg)).as_json()["value"]
+            hub_state["identities"] = control_plane["identity"]
+            hub_state["endpoints"] = control_plane["properties"]["routing"]["endpoints"]
+            hub_state["routes"] = control_plane["properties"]["routing"]["routes"]
+        
         return hub_state
 
     def upload_hub_from_dict(self, hub_state: dict):
@@ -129,7 +155,7 @@ class StateProvider(IoTHubProvider):
 
         configs = hub_state["configurations"]
 
-        for i in tqdm(range(len(configs)), desc="Uploading hub configurations"):
+        for i in tqdm(range(len(configs)), desc="Uploading hub configurations", file=sys.stdout):
             c = configs[i]
             _iot_hub_configuration_create(target=self.target, config_id=c["id"], content=json.dumps(c["content"]),
                                           target_condition=c["targetCondition"], priority=c["priority"],
@@ -137,7 +163,7 @@ class StateProvider(IoTHubProvider):
 
         edge_deployments = hub_state["edgeDeployments"]
 
-        for i in tqdm(range(len(edge_deployments)), desc="Uploading edge deployments"):
+        for i in tqdm(range(len(edge_deployments)), desc="Uploading edge deployments", file=sys.stdout):
             d = edge_deployments[i]
 
             if "properties.desired" in d["content"]["modulesContent"]["$edgeAgent"]:
@@ -150,7 +176,7 @@ class StateProvider(IoTHubProvider):
                                           labels=json.dumps(d["labels"]), metrics=json.dumps(d["metrics"]),
                                           config_type=config_type)
 
-        for i in tqdm(hub_state["devices"], desc="Uploading devices and modules"):
+        for i in tqdm(hub_state["devices"], desc="Uploading devices and modules", file=sys.stdout):
 
             # upload device identity and twin
             identity = hub_state["devices"][i]
@@ -183,6 +209,30 @@ class StateProvider(IoTHubProvider):
             child_list = hub_state["children"][parentId]
             _iot_device_children_add(target=self.target, device_id=parentId, child_list=child_list)
 
+        # CONTROL PLANE
+
+        if self.include_control_plane:
+
+            with self.suppress_stderr():
+
+                temp_cert_file = generate_generic_id() + ".cer"
+
+                for c in tqdm(hub_state["certificates"], desc="Uploading certificates", file=sys.stdout):
+                    with open(temp_cert_file, 'w', encoding='utf-8') as f:
+                        f.write(c["properties"]["certificate"])
+                    self.cli.invoke("iot hub certificate create --hub-name {} --name {} --path {} -g {} -v {}".format(self.hub_name,
+                        c["name"], temp_cert_file, self.rg, c["properties"]["isVerified"]))
+
+                if os.path.isfile(temp_cert_file):
+                    os.remove(temp_cert_file)
+
+                self.assign_identities_to_hub(hub_state["identities"])
+                self.upload_endpoints(hub_state["endpoints"])
+                
+                for route in tqdm(hub_state["routes"], desc="Uploading routes", file=sys.stdout):
+                    self.cli.invoke(f"iot hub route create --endpoint {route['endpointNames'][0]} --hub-name {self.hub_name} -g {self.rg}"
+                                    f" --name {route['name']} --source {route['source']} --condition {route['condition']} --enabled {route['isEnabled']}")
+
     def save_state(self, filename: str, overwrite_file=False):
         '''
         Writes all hub configurations, device identities and device twins from the origin hub to a json file
@@ -192,13 +242,15 @@ class StateProvider(IoTHubProvider):
             "devices": {
                 "deviceId": {},
                 ...
-            }
+            },
             "modules": {
                 "deviceId": [ [{identity}, {twin}], ... ],
                 ...
-            }
+            }.
+            "certificates": []
         }
         '''
+
         if os.path.exists(filename) and os.stat(filename).st_size and not overwrite_file:
             raise FileOperationError(f'File {filename} is not empty. Include the --overwrite-file flag to overwrite file.')
 
@@ -212,6 +264,109 @@ class StateProvider(IoTHubProvider):
 
         except FileNotFoundError:
             raise FileOperationError(f'File {filename} does not exist.')
+
+    @contextmanager
+    def suppress_stderr(self):
+        with open(os.devnull, "w") as devnull:
+            old_stderr = sys.stderr
+            sys.stderr = devnull
+            try:  
+                yield
+            finally:
+                sys.stderr = old_stderr
+
+    def assign_identities_to_hub(self, identities):
+        num_identities = (1 if identities["principalId"] else 0) + (len(identities["userAssignedIdentities"]) if identities["userAssignedIdentities"] else 0)
+
+        pbar = tqdm(total=num_identities, desc="Assigning identities", file=sys.stdout)
+
+        if(identities["principalId"]):
+            self.cli.invoke("iot hub identity assign -n {} -g {} --system-assigned".format(self.hub_name, self.rg))
+            pbar.update(1)
+        if(identities["userAssignedIdentities"]):
+            userIds = ""
+            for userId in identities["userAssignedIdentities"]:
+                userIds += userId + " "
+            self.cli.invoke("iot hub identity assign --name {} -g {} --user-assigned {}".format(self.hub_name, self.rg, userIds))
+            pbar.update(len(identities["userAssignedIdentities"]))
+
+        pbar.close()
+
+    def upload_endpoint(self, ep, ep_type):
+
+        if ep["connectionString"]:
+
+            if ep_type == "azurestoragecontainer":
+                cs = parse_storage_container_connection_string(ep["connectionString"])
+                ep["connectionString"] = self.cli.invoke("storage account show-connection-string --name {} -g {}".format(cs["AccountName"],
+                    ep["resourceGroup"])).as_json()["connectionString"]
+            else:
+                cs = parse_iot_endpoint_connection_string(ep["connectionString"])
+                namespace = cs["Endpoint"].split('.')[0][5:]
+
+                if ep_type == "eventhub":
+                    type_str = "eventhubs eventhub"
+                    entity_str = "--eventhub-name"
+                elif ep_type == "servicebusqueue":
+                    type_str = "servicebus queue"
+                    entity_str = "--queue-name"
+                elif ep_type == "servicebustopic":
+                    type_str = "servicebus topic"
+                    entity_str = "--topic-name"
+                    
+                keys = self.cli.invoke("{} authorization-rule keys list {} {} --namespace-name {} -g {} -n {}".format(type_str, entity_str, cs["EntityPath"],
+                    namespace, ep["resourceGroup"], cs["SharedAccessKeyName"])).as_json()
+
+                ep["connectionString"] = keys["primaryConnectionString"]
+
+        if ep["authenticationType"] == "identityBased":
+            
+            parameters = "--endpoint-uri {} ".format(ep["endpointUri"])
+
+            if ep_type != "azurestoragecontainer":
+                parameters += "--entity-path {} ".format(ep["entityPath"])
+
+            if ep["identity"]:
+                id = ep["identity"]["userAssignedIdentity"]
+                parameters += "--identity {} ".format(id)
+
+        else:
+            parameters = "-c {} ".format(ep["connectionString"])
+
+        if ep["authenticationType"]:
+            parameters += "--auth-type {} ".format(ep["authenticationType"])
+
+        if ep_type == "azurestoragecontainer":
+            max_chunk_size = int(ep["maxChunkSizeInBytes"] / 1048576)
+            parameters += "--container-name {} --encoding {} --batch-frequency {} --chunk-size {} --file-name-format {} ".format(ep["containerName"],
+                            ep["encoding"], ep["batchFrequencyInSeconds"], max_chunk_size, ep["fileNameFormat"])
+        
+        self.cli.invoke("iot hub routing-endpoint create --hub-name {} -g {} --endpoint-name {} --erg {} --endpoint-subscription-id {} \
+            --type {} {}".format(self.hub_name, self.rg, ep["name"], ep["resourceGroup"], ep["subscriptionId"], ep_type, parameters))
+
+    def upload_endpoints(self, endpoints):
+        eventHubs = endpoints["eventHubs"]
+        serviceBusQueues = endpoints["serviceBusQueues"]
+        serviceBusTopics = endpoints["serviceBusTopics"]
+        storageContainers = endpoints["storageContainers"]
+        
+        num_endpoints = len(eventHubs) + len(serviceBusQueues) + len(serviceBusTopics) + len(storageContainers)
+        pbar = tqdm(total=num_endpoints, desc="Uploading endpoints", file=sys.stdout)
+
+        for ep in eventHubs:
+            self.upload_endpoint(ep, "eventhub")
+            pbar.update(1)
+        for ep in serviceBusQueues:
+            self.upload_endpoint(ep, "servicebusqueue")
+            pbar.update(1)
+        for ep in serviceBusTopics:
+            self.upload_endpoint(ep, "servicebustopic")
+            pbar.update(1)
+        for ep in storageContainers:
+            self.upload_endpoint(ep, "azurestoragecontainer")
+            pbar.update(1)
+
+        pbar.close()
 
     def upload_device_identity(self, identity: dict):
         device_id = identity["deviceId"]
@@ -231,17 +386,17 @@ class StateProvider(IoTHubProvider):
             sk = identity["symmetricKey"]["secondaryKey"]
 
             _iot_device_create(target=self.target, device_id=device_id, edge_enabled=edge, primary_key=pk, secondary_key=sk,
-                               status=status, status_reason=status_reason)
+                            status=status, status_reason=status_reason)
 
         elif auth_type == DeviceAuthApiType.selfSigned.value:
             _iot_device_create(target=self.target, device_id=device_id, edge_enabled=edge,
-                               auth_method=DeviceAuthType.x509_thumbprint.value, primary_thumbprint=ptp,
-                               secondary_thumbprint=stp, status=status, status_reason=status_reason)
+                            auth_method=DeviceAuthType.x509_thumbprint.value, primary_thumbprint=ptp,
+                            secondary_thumbprint=stp, status=status, status_reason=status_reason)
 
         elif auth_type == DeviceAuthApiType.certificateAuthority.value:
             _iot_device_create(target=self.target, device_id=device_id, edge_enabled=edge,
-                               auth_method=DeviceAuthType.x509_ca.value, primary_thumbprint=ptp, secondary_thumbprint=stp,
-                               status=status, status_reason=status_reason)
+                            auth_method=DeviceAuthType.x509_ca.value, primary_thumbprint=ptp, secondary_thumbprint=stp,
+                            status=status, status_reason=status_reason)
 
         else:
             logger.error("Authorization type for device '{0}' not recognized.".format(device_id))
@@ -276,15 +431,57 @@ class StateProvider(IoTHubProvider):
 
     def delete_all_configs(self):
         configs = _iot_hub_configuration_list(target=self.target)
-        for i in tqdm(range(len(configs)), desc="Deleting configurations and edge deployments from destination hub"):
+        for i in tqdm(range(len(configs)), desc="Deleting configurations and edge deployments from destination hub", file=sys.stdout):
             c = configs[i]
             _iot_hub_configuration_delete(target=self.target, config_id=c["id"])
 
     def delete_all_devices(self):
         identities = _iot_device_list(target=self.target, top=-1)
-        for i in tqdm(range(len(identities)), desc="Deleting identities from destination hub"):
+        for i in tqdm(range(len(identities)), desc="Deleting devices from destination hub", file=sys.stdout):
             id = identities[i]
             _iot_device_delete(target=self.target, device_id=id["deviceId"])
+
+    def delete_all_certificates(self):
+        certificates = self.cli.invoke("iot hub certificate list --hub-name {} -g {}".format(self.hub_name, self.rg)).as_json()
+        for i in tqdm(range(len(certificates["value"])), desc="Deleting certificates from destination hub", file=sys.stdout):
+            c = certificates["value"][i]
+            self.cli.invoke("iot hub certificate delete --name {} --etag {} --hub-name {} -g {}".format(c["name"], c["etag"],
+                                                                                                        self.hub_name, self.rg))
+
+    def delete_all_endpoints(self):
+        endpoints = self.cli.invoke(f"iot hub routing-endpoint list --hub-name {self.hub_name} -g {self.rg}").as_json()
+        eventHubs = endpoints["eventHubs"]
+        serviceBusQueues = endpoints["serviceBusQueues"]
+        serviceBusTopics = endpoints["serviceBusTopics"]
+        storageContainers = endpoints["storageContainers"]
+
+        num_endpoints = len(eventHubs) + len(serviceBusQueues) + len(serviceBusTopics) + len(storageContainers)
+        pbar = tqdm(total=num_endpoints, desc="Deleting endpoints from destination hub", file=sys.stdout)
+
+        for ep in eventHubs:
+            self.cli.invoke("iot hub routing-endpoint delete --hub-name {} -g {} --endpoint-name {} --endpoint-type \
+                eventhub".format(self.hub_name, self.rg, ep["name"]))
+            pbar.update(1)
+        for ep in serviceBusQueues:
+            self.cli.invoke("iot hub routing-endpoint delete --hub-name {} -g {} --endpoint-name {} --endpoint-type \
+                servicebusqueue".format(self.hub_name, self.rg, ep["name"]))
+            pbar.update(1)   
+        for ep in serviceBusTopics:
+            self.cli.invoke("iot hub routing-endpoint delete --hub-name {} -g {} --endpoint-name {} --endpoint-type \
+                servicebustopic".format(self.hub_name, self.rg, ep["name"]))
+            pbar.update(1)
+        for ep in storageContainers:
+            self.cli.invoke("iot hub routing-endpoint delete --hub-name {} -g {} --endpoint-name {} --endpoint-type \
+                azurestoragecontainer".format(self.hub_name, self.rg, ep["name"]))
+            pbar.update(1)
+
+        pbar.close()
+
+    def delete_all_routes(self):
+        routes = self.cli.invoke(f"iot hub route list --hub-name {self.hub_name} -g {self.rg}").as_json()
+        for i in tqdm(range(len(routes)), desc="Deleting routes from destination hub", file=sys.stdout):
+            route = routes[i]
+            self.cli.invoke(f"iot hub route delete --hub-name {self.hub_name} -g {self.rg} --name {route['name']}")
 
     def upload_state(self, filename: str, replace: Optional[bool] = None):
         '''
@@ -292,6 +489,12 @@ class StateProvider(IoTHubProvider):
         '''
 
         if replace:
+            if self.include_control_plane:
+                with self.suppress_stderr():
+                    self.delete_all_routes()
+                    self.delete_all_certificates()
+                    self.delete_all_endpoints()
+
             self.delete_all_configs()
             self.delete_all_devices()
 
@@ -320,7 +523,16 @@ class StateProvider(IoTHubProvider):
             auth_type=self.auth_type
         )
 
+        if "resourcegroup" not in orig_hub_target:
+            orig_hub_target["resourcegroup"] = orig_rg
+
         if replace:
+            if self.include_control_plane:
+                with self.suppress_stderr():
+                    self.delete_all_routes()
+                    self.delete_all_certificates()
+                    self.delete_all_endpoints()
+
             self.delete_all_configs()
             self.delete_all_devices()
 
