@@ -94,7 +94,7 @@ def test_account_list(provisioned_accounts: Dict[str, dict]):
 
     group_accounts: list = cli.invoke(f"iot device-update account list -g {ACCOUNT_RG}").as_json()
     group_accounts_len = len(group_accounts)
-    assert group_accounts_len >= provisioned_accounts_len and sub_accounts_len >= group_accounts_len
+    assert group_accounts_len >= provisioned_accounts_len
     group_acct_map = {}
     for acct in group_accounts:
         group_acct_map[acct["name"]] = True
