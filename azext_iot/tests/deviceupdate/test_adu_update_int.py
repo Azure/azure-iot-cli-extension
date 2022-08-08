@@ -445,12 +445,12 @@ def test_instance_update_nested(provisioned_instances_module: Dict[str, dict]):
     surface15_script = "install.sh"
     surface15_leaf1 = "leaf1.importmanifest.json"
     surface15_leaf2 = "leaf2.importmanifest.json"
-    surface15_readme = "README.md"
+    surface15_action = "action.sh"
 
     cli = EmbeddedCLI()
 
     file_paths = []
-    for name in [surface15_root, surface15_script, surface15_leaf1, surface15_leaf2, surface15_readme]:
+    for name in [surface15_root, surface15_script, surface15_leaf1, surface15_leaf2, surface15_action]:
         file_paths.append(get_context_path(__file__, "manifests", "surface15", name))
     file_uris = _stage_update_assets(file_paths, storage_account_id=storage_account_id)
     complex_manifest_id = process_json_arg(file_paths[0])["updateId"]
@@ -464,7 +464,7 @@ def test_instance_update_nested(provisioned_instances_module: Dict[str, dict]):
     leaf1_friendly_name = f"complex_{generate_generic_id()}"
     assert cli.invoke(
         f"iot device-update update import -n {account_name} -i {instance_name} --friendly-name {leaf1_friendly_name} "
-        f"--url {file_uris[2]} --file filename={surface15_readme} url={file_uris[-1]} --defer"
+        f"--url {file_uris[2]} --file filename={surface15_action} url={file_uris[-1]} --defer"
     ).success()
     # Omitting --defer will combine cached objects and send the combined payload to Azure.
     # We also have to re-init the embedded CLI because using `--defer` once maintains a to-cache state.
@@ -472,7 +472,7 @@ def test_instance_update_nested(provisioned_instances_module: Dict[str, dict]):
     leaf2_friendly_name = f"complex_{generate_generic_id()}"
     assert cli.invoke(
         f"iot device-update update import -n {account_name} -i {instance_name} --friendly-name {leaf2_friendly_name} "
-        f"--url {file_uris[3]} --file filename={surface15_readme} url={file_uris[-1]}"
+        f"--url {file_uris[3]} --file filename={surface15_action} url={file_uris[-1]}"
     ).success()
     list_updates = cli.invoke(f"iot device-update update list -n {account_name} -i {instance_name}").as_json()
     friendly_name_map = [r["friendlyName"] for r in list_updates]
