@@ -588,8 +588,8 @@ helps[
 ] = """
     type: command
     short-summary: Export the state of an IoT Hub to a file.
-    long-summary: The exported state will include hub configurations, edge deployments, device identities and twins, and module
-                  identities and twins.
+    long-summary: The exported state will include hub configurations, edge deployments, device identities and twins, module
+                  identities and twins, hub system and user identities, certificates, endpoints and routes.
     examples:
     - name: Export the state of the specified hub to the specified file.
       text: >
@@ -604,8 +604,8 @@ helps[
 ] = """
     type: command
     short-summary: Import a Hub state from a file to an IoT Hub.
-    long-summary: The imported state will include hub configurations, edge deployments, device identities and twins, and module
-                  identities and twins.
+    long-summary: The imported state will include hub configurations, edge deployments, device identities and twins, module
+                  identities and twins, hub system and user identities, certificates, endpoints and routes.
     examples:
     - name: Import the state from the specified file to the specified hub.
       text: >
@@ -620,8 +620,8 @@ helps[
 ] = """
     type: command
     short-summary: Copy the state of one hub to another hub without saving to a file.
-    long-summary: The migrated state will include hub configurations, edge deployments, device identities and twins, and module
-                  identities and twins.
+    long-summary: The migrated state will include hub configurations, edge deployments, device identities and twins, module
+                  identities and twins, hub system and user identities, certificates, endpoints and routes.
     examples:
     - name: Migrate the state of the original hub to the destination hub.
       text: >
