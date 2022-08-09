@@ -15,10 +15,10 @@ def state_export(
     resource_group_name: Optional[str] = None,
     login: Optional[str] = None,
     auth_type_dataplane: Optional[str] = None,
-    overwrite_file: Optional[bool] = False
+    force: Optional[bool] = False
 ):
     sp = StateProvider(cmd=cmd, hub=hub_name, rg=resource_group_name, login=login, auth_type_dataplane=auth_type_dataplane)
-    sp.save_state(filename, overwrite_file)
+    sp.save_state(filename, force)
 
 
 def state_import(

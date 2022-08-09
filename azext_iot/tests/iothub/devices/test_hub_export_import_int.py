@@ -52,10 +52,13 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
         self.filename = generate_generic_id() + ".json"
 
-    @pytest.fixture(scope="class", autouse=True)
-    def setup_class(self):
+        self.create_hub_state()
 
-        # make a configuration for the hub (applies to 0 devices, this is just to test the configuration settings)
+    def create_hub_state(self):
+
+        self.clean_up_hub(self.connection_string)
+
+        # make an adm device configuration for the hub (applies to 0 devices, this is just to test the configuration settings)
 
         labels = {generate_generic_id() : generate_generic_id(), generate_generic_id() : generate_generic_id()}
         labels = json.dumps(labels)
@@ -69,13 +72,27 @@ class TestHubExportImport(IoTLiveScenarioTest):
         self.kwargs["target_condition"] = "tags.bar=12"
 
         self.cmd(
-            "iot hub configuration create --config-id hubConfig -l {} --content '{}' --labels '{}' --priority {} --metrics '{}' "
-            "--target-condition {}".format(
+            "iot hub configuration create --config-id hubConfig1 -l {} --content '{}' --labels '{}' --priority {} --metrics '{}'"
+            " --target-condition '{}'".format(
                 self.connection_string, "{config_content}", "{labels}", random.randint(1, 10), "{metrics}", "{target_condition}"
             )
         )
 
+        # make an adm module configuration
+
+        content_path = os.path.join(Path(CWD), "..", "configurations", "test_adm_module_content.json")
+        self.kwargs["config_content"] = read_file_content(content_path)
+        target_condition = "from devices.modules where tags.bar=12"
+
+        self.cmd(
+            "iot hub configuration create --config-id hubConfig2 -l {} --content '{}' --labels '{}' --priority {} --metrics '{}'"
+            " --target-condition '{}'".format(
+                self.connection_string, "{config_content}", "{labels}", random.randint(1, 10), "{metrics}", target_condition
+            )
+        )
+
         # make a regular edge deployment
+
         deployment1_path = os.path.join(Path(CWD), "..", "configurations", "test_edge_deployment.json")
         self.kwargs["edge_content1"] = read_file_content(deployment1_path)
         self.cmd(
@@ -361,7 +378,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
         # compare devices
 
-        file_devices = hub_info["devices"]
+        file_devices = hub_info["devices"]["identities"]
         hub_devices = self.cmd(
             f"iot hub device-identity list -l {self.connection_string}"
         ).get_output_in_json()
@@ -373,10 +390,15 @@ class TestHubExportImport(IoTLiveScenarioTest):
             ).get_output_in_json()
             device["symmetricKey"] = id["authentication"]["symmetricKey"]
 
-            assert device["deviceId"] in file_devices
+            target_device = None
+            for d in file_devices:
+                if device["deviceId"] == d["deviceId"]:
+                    target_device = d
+                    break
 
-            target_device = file_devices[device["deviceId"]]
+            assert target_device
 
+            [device["properties"]["desired"].pop(key) for key in ["$metadata", "$version"]]
             self.compare_devices(device, target_device)
 
             file_modules = hub_info["modules"][device["deviceId"]]
@@ -409,11 +431,12 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
                 assert(module["authentication"] == target_module["authentication"])
 
+                [module_twin["properties"]["desired"].pop(key) for key in ["$metadata", "$version"]]
                 self.compare_module_twins(module_twin, target_module_twin)
 
             # compare children
             if device["capabilities"]["iotEdge"]:
-                file_children = hub_info["children"][device["deviceId"]]
+                file_children = hub_info["devices"]["children"][device["deviceId"]]
                 dest_children = self.cmd(
                     f"iot hub device-identity children list -d {device['deviceId']} -l {self.connection_string}"
                 ).get_output_in_json()
@@ -450,12 +473,9 @@ class TestHubExportImport(IoTLiveScenarioTest):
     @pytest.fixture(scope="class", autouse=True)
     def teardown_module(self):
         yield
-        
+
         if os.path.isfile(self.filename):
             os.remove(self.filename)
-
-        # tears down origin hub
-        # super().tearDown()
 
         # tears down destination hub
         if not settings.env.azext_iot_desthub:
@@ -469,7 +489,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
         for auth_phase in DATAPLANE_AUTH_TYPES:
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub state export -n {self.entity_name} -f {self.filename} -g {self.entity_rg} --of",
+                    f"iot hub state export -n {self.entity_name} -f {self.filename} -g {self.entity_rg} --force",
                     auth_type=auth_phase
                 )
             )

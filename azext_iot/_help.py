@@ -596,7 +596,7 @@ helps[
         az iot hub state export -n {iothub_name} -f {filename}
     - name: Export the state of the specified hub to the specified file, overwriting the file contents.
       text: >
-        az iot hub state export -n {iothub_name} -f {filename} --of
+        az iot hub state export -n {iothub_name} -f {filename} --force
 """
 
 helps[
@@ -610,9 +610,9 @@ helps[
     - name: Import the state from the specified file to the specified hub.
       text: >
         az iot hub state import -n {iothub_name} -f {filename}
-    - name: Import the state from the default file to the specified hub, overwriting the previous state of the hub.
+    - name: Import the state from the default file to the specified hub, replacing the previous state of the hub.
       text: >
-        az iot hub state import -n {iothub_name} -f {filename} -r
+        az iot hub state import -n {iothub_name} -f {filename} --replace
 """
 
 helps[
@@ -626,9 +626,9 @@ helps[
     - name: Migrate the state of the original hub to the destination hub.
       text: >
         az iot hub state migrate --destination-hub {dest_hub_name} --origin-hub {orig_hub_name}
-    - name: Migrate the state of the original hub to the destination hub, overwriting the previous state of the hub.
+    - name: Migrate the state of the original hub to the destination hub, replacing the previous state of the hub.
       text: >
-        az iot hub state migrate --destination-hub {dest_hub_name} --origin-hub {orig_hub_name} -r
+        az iot hub state migrate --destination-hub {dest_hub_name} --origin-hub {orig_hub_name} --replace
 """
 
 helps[

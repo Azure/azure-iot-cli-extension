@@ -3,23 +3,14 @@ import pytest
 import json
 import os
 import time
-from pathlib import Path
-from azext_iot.common.shared import DeviceAuthApiType
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 from azure.cli.command_modules.iot.tests.latest._test_utils import _create_test_cert, _delete_test_cert
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.test_constants import ResourceTypes
 from azext_iot.tests.generators import generate_generic_id
-from azext_iot.common.utility import generate_key, read_file_content
-from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.tests.helpers import add_test_tag
-from azext_iot.tests.iothub import (
-    PRIMARY_THUMBPRINT,
-    SECONDARY_THUMBPRINT,
-    DATAPLANE_AUTH_TYPES,
-    DEVICE_TYPES,
-)
+from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 
 settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL)
 CWD = os.path.dirname(os.path.abspath(__file__))
@@ -35,7 +26,7 @@ class TestHubControlPlaneExportImport(IoTLiveScenarioTest):
         self.dest_hub = settings.env.azext_iot_desthub or "test-hub-" + generate_generic_id()
         self.dest_hub_rg = settings.env.azext_iot_destrg or settings.env.azext_iot_testrg
         self.cli = EmbeddedCLI()
-        
+
         hub_id = self.cli.invoke(f"iot hub show -n {self.entity_name} -g {self.entity_rg}").as_json()["id"]
         self.subscription_id = hub_id.split("/")[2]
 
@@ -64,9 +55,11 @@ class TestHubControlPlaneExportImport(IoTLiveScenarioTest):
         self.clean_up_hub(self.entity_name, self.entity_rg)
 
         # add identities
-        self.uid = "/subscriptions/a386d5ea-ea90-441a-8263-d816368c84a1/resourcegroups/mirabai/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mirabaiidentity"
+        self.uid = "/subscriptions/a386d5ea-ea90-441a-8263-d816368c84a1/resourcegroups/mirabai/providers/" + \
+            "Microsoft.ManagedIdentity/userAssignedIdentities/mirabaiidentity"
         self.cli.invoke("iot hub identity assign -n {} -g {} --system-assigned".format(self.entity_name, self.entity_rg))
-        self.cli.invoke("iot hub identity assign -n {} -g {} --user-assigned {}".format(self.entity_name, self.entity_rg, self.uid))
+        self.cli.invoke("iot hub identity assign -n {} -g {} --user-assigned {}".format(self.entity_name, self.entity_rg,
+                                                                                        self.uid))
 
         rg = "mirabai"
         eventhub_endpointuri = "sb://mirabaieventhub.servicebus.windows.net"
@@ -80,13 +73,16 @@ class TestHubControlPlaneExportImport(IoTLiveScenarioTest):
 
         _create_test_cert(CERT_FILE, KEY_FILE, "testcert", 3, random.randint(1, 10))
 
-        self.cli.invoke("iot hub certificate create --hub-name {} --name cert1 --path {} -g {} -v True".format(self.entity_name,
-            CERT_FILE, self.entity_rg))
+        self.cli.invoke(
+            "iot hub certificate create --hub-name {} --name cert1 --path {} -g {} -v True".format(self.entity_name, CERT_FILE,
+                                                                                                   self.entity_rg)
+        )
 
         # add endpoints
 
-        storage_cstring = self.cli.invoke(f"storage account show-connection-string --name {storage_account} -g {rg}"). \
-            as_json()["connectionString"]
+        storage_cstring = self.cli.invoke(
+            f"storage account show-connection-string --name {storage_account} -g {rg}"
+        ).as_json()["connectionString"]
 
         self.cli.invoke(f"iot hub routing-endpoint create -n eventhub-systemid -r {rg} -g {self.entity_rg} -s "
                         f"{self.subscription_id} -t eventhub --hub-name {self.entity_name} --endpoint-uri {eventhub_endpointuri}"
@@ -115,7 +111,7 @@ class TestHubControlPlaneExportImport(IoTLiveScenarioTest):
     @pytest.fixture(scope="class", autouse=True)
     def teardown_module(self):
         yield
-        
+
         if os.path.isfile(self.filename):
             os.remove(self.filename)
 
@@ -171,7 +167,7 @@ class TestHubControlPlaneExportImport(IoTLiveScenarioTest):
                 if endpoint["name"] == ep["name"]:
                     target = ep
                     break
-            
+
             assert target
             assert endpoint["authenticationType"] == target["authenticationType"]
             assert endpoint["identity"] == target["identity"]
@@ -211,7 +207,9 @@ class TestHubControlPlaneExportImport(IoTLiveScenarioTest):
         # compare certificates
 
         file_certs = hub_info["certificates"]
-        hub_certs = self.cli.invoke("iot hub certificate list --hub-name {} -g {}".format(self.entity_name, self.entity_rg)).as_json()["value"]
+        hub_certs = self.cli.invoke(
+            "iot hub certificate list --hub-name {} -g {}".format(self.entity_name, self.entity_rg)
+        ).as_json()["value"]
         assert (len(file_certs) == len(hub_certs) == 1)
         for i in range(len(file_certs)):
             self.compare_certs(file_certs[i], hub_certs[i])
@@ -219,7 +217,9 @@ class TestHubControlPlaneExportImport(IoTLiveScenarioTest):
         # compare endpoints
 
         file_endpoints = hub_info["endpoints"]
-        hub_endpoints = self.cli.invoke(f"iot hub routing-endpoint list --hub-name {self.entity_name} -g {self.entity_rg}").as_json()
+        hub_endpoints = self.cli.invoke(
+            f"iot hub routing-endpoint list --hub-name {self.entity_name} -g {self.entity_rg}"
+        ).as_json()
         for ep_type in ["eventHubs", "serviceBusQueues", "serviceBusTopics", "storageContainers"]:
             assert len(file_endpoints[ep_type]) == len(hub_endpoints[ep_type])
             self.compare_endpoints(file_endpoints[ep_type], hub_endpoints[ep_type], ep_type)
@@ -231,19 +231,27 @@ class TestHubControlPlaneExportImport(IoTLiveScenarioTest):
         self.compare_routes(file_routes, hub_routes)
 
     def compare_hubs(self):
-        
+
         # compare certificates
 
-        orig_hub_certs = self.cli.invoke("iot hub certificate list --hub-name {} -g {}".format(self.entity_name, self.entity_rg)).as_json()["value"]
-        dest_hub_certs = self.cli.invoke("iot hub certificate list --hub-name {} -g {}".format(self.dest_hub, self.dest_hub_rg)).as_json()["value"]
+        orig_hub_certs = self.cli.invoke(
+            "iot hub certificate list --hub-name {} -g {}".format(self.entity_name, self.entity_rg)
+        ).as_json()["value"]
+        dest_hub_certs = self.cli.invoke(
+            "iot hub certificate list --hub-name {} -g {}".format(self.dest_hub, self.dest_hub_rg)
+        ).as_json()["value"]
         assert (len(orig_hub_certs) == len(dest_hub_certs))
         for i in range(len(orig_hub_certs)):
             self.compare_certs(orig_hub_certs[i], dest_hub_certs[i])
 
         # compare endpoints
 
-        orig_hub_endpoints = self.cli.invoke(f"iot hub routing-endpoint list --hub-name {self.entity_name} -g {self.entity_rg}").as_json()
-        dest_hub_endpoints = self.cli.invoke(f"iot hub routing-endpoint list --hub-name {self.dest_hub} -g {self.dest_hub_rg}").as_json()
+        orig_hub_endpoints = self.cli.invoke(
+            f"iot hub routing-endpoint list --hub-name {self.entity_name} -g {self.entity_rg}"
+        ).as_json()
+        dest_hub_endpoints = self.cli.invoke(
+            f"iot hub routing-endpoint list --hub-name {self.dest_hub} -g {self.dest_hub_rg}"
+        ).as_json()
         for ep_type in ["eventHubs", "serviceBusQueues", "serviceBusTopics", "storageContainers"]:
             assert len(orig_hub_endpoints[ep_type]) == len(dest_hub_endpoints[ep_type])
             self.compare_endpoints(orig_hub_endpoints[ep_type], dest_hub_endpoints[ep_type], ep_type)
@@ -261,7 +269,7 @@ class TestHubControlPlaneExportImport(IoTLiveScenarioTest):
         for auth_phase in DATAPLANE_AUTH_TYPES:
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub state export -n {self.entity_name} -f {self.filename} -g {self.entity_rg} --of",
+                    f"iot hub state export -n {self.entity_name} -f {self.filename} -g {self.entity_rg} --force",
                     auth_type=auth_phase
                 )
             )

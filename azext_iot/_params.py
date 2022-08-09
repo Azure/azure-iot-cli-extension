@@ -297,7 +297,7 @@ def load_arguments(self, _):
         )
         context.argument(
             "filename",
-            options_list=["--filename", "-f"],
+            options_list=["--state-file", "-f"],
             help="The path to the file where the state information will be stored."
         )
         context.argument(
@@ -306,8 +306,8 @@ def load_arguments(self, _):
             help="If this flag is set, then the command will overwrite the state of the destination hub."
         )
         context.argument(
-            "overwrite_file",
-            options_list=["--overwrite-file", "--of"],
+            "force",
+            options_list=["--force"],
             help="If this flag is set, then the command will overwrite the contents of the output file."
         )
 
