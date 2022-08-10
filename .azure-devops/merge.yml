@@ -3,8 +3,7 @@
 trigger:
   branches:
     include:
-      - dev
-      - main
+      - '*'
   paths:
     exclude:
     - '**/*.md'
@@ -12,8 +11,7 @@ trigger:
 pr:
   branches:
     include:
-      - dev
-      - main
+      - '*'
   paths:
     exclude:
     - '**/*.md'
