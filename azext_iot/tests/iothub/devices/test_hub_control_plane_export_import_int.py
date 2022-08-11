@@ -1,34 +1,54 @@
-import random
 import pytest
 import json
 import os
 import time
 from azext_iot.common.embedded_cli import EmbeddedCLI
-from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
-from azure.cli.command_modules.iot.tests.latest._test_utils import _create_test_cert, _delete_test_cert
+from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED
+from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.test_constants import ResourceTypes
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests.helpers import add_test_tag
-from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 
-settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL)
+resource_test_env_vars = [
+    "azext_iot_testhub",
+    "azext_iot_desthub",
+    "azext_iot_destrg",
+    "azext_dt_ep_rg",
+    "azext_dt_ep_eventhub_namespace",
+    "azext_dt_ep_eventhub_topic",
+    "azext_dt_ep_servicebus_namespace",
+    "azext_dt_ep_servicebus_topic",
+    "azext_dt_ep_servicebus_queue",
+    "azext_iot_teststorageaccount",
+    "azext_iot_teststoragecontainer"
+]
+
+settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=resource_test_env_vars)
 CWD = os.path.dirname(os.path.abspath(__file__))
 
-CERT_FILE = "test_cert.cer"
-KEY_FILE = "test_key.cer"
-DATAPLANE_AUTH_TYPES.remove("cstring")
+DATAPLANE_AUTH_TYPES = ["key", "login"]
+
+EP_RG = settings.env.azext_dt_ep_rg or settings.env.azext_iot_testrg
+EVENTHUB_NAMESPACE = settings.env.azext_dt_ep_eventhub_namespace or "testEHnamespace" + generate_generic_id()
+EVENTHUB = settings.env.azext_dt_ep_eventhub_topic or "testeventhub" + generate_generic_id()
+STORAGE_ACCOUNT = settings.env.azext_iot_teststorageaccount or "teststorage" + generate_generic_id()[:13]
+STORAGE_CONTAINER = settings.env.azext_iot_teststoragecontainer or "container" + generate_generic_id()[:13]
+SERVICEBUS_NAMESPACE = settings.env.azext_dt_ep_servicebus_namespace or "testServiceBus" + generate_generic_id()
+SERVICEBUS_QUEUE = settings.env.azext_dt_ep_servicebus_queue or "queue" + generate_generic_id()
+SERVICEBUS_TOPIC = settings.env.azext_dt_ep_servicebus_topic or "topic" + generate_generic_id()
 
 
 class TestHubControlPlaneExportImport(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestHubControlPlaneExportImport, self).__init__(test_case)
+
         self.dest_hub = settings.env.azext_iot_desthub or "test-hub-" + generate_generic_id()
         self.dest_hub_rg = settings.env.azext_iot_destrg or settings.env.azext_iot_testrg
         self.cli = EmbeddedCLI()
 
-        hub_id = self.cli.invoke(f"iot hub show -n {self.entity_name} -g {self.entity_rg}").as_json()["id"]
-        self.subscription_id = hub_id.split("/")[2]
+        self.hub_id = self.cli.invoke(f"iot hub show -n {self.entity_name} -g {self.entity_rg}").as_json()["id"]
+        self.subscription_id = self.hub_id.split("/")[2]
 
         # create destination hub
 
@@ -54,52 +74,128 @@ class TestHubControlPlaneExportImport(IoTLiveScenarioTest):
 
         self.clean_up_hub(self.entity_name, self.entity_rg)
 
+        # create identity: TESTING
+        self.identity_name = "userAssignedId" + generate_generic_id()
+        self.uid = self.cli.invoke(f"identity create -n {self.identity_name} -g {self.entity_rg}").as_json()["id"]
+
         # add identities
-        self.uid = "/subscriptions/a386d5ea-ea90-441a-8263-d816368c84a1/resourcegroups/mirabai/providers/" + \
-            "Microsoft.ManagedIdentity/userAssignedIdentities/mirabaiidentity"
         self.cli.invoke("iot hub identity assign -n {} -g {} --system-assigned".format(self.entity_name, self.entity_rg))
         self.cli.invoke("iot hub identity assign -n {} -g {} --user-assigned {}".format(self.entity_name, self.entity_rg,
                                                                                         self.uid))
 
-        rg = "mirabai"
-        eventhub_endpointuri = "sb://mirabaieventhub.servicebus.windows.net"
-        servicebus_endpointuri = "sb://mirabaiservicebus.servicebus.windows.net"
-        eventhub_entity_path = "eventhub1"
-        queue_entity_path = "queue1"
-        topic_entity_path = "topic1"
-        storage_account = "mirabaistorage"
+        if not settings.env.azext_dt_ep_eventhub_namespace:
+            self.cli.invoke(
+                f"eventhubs namespace create --name {EVENTHUB_NAMESPACE} -g {EP_RG} --mi-system-assigned True"
+            )
+
+            self.cli.invoke(
+                f"eventhubs eventhub create -n {EVENTHUB} --namespace-name {EVENTHUB_NAMESPACE} -g {EP_RG}"
+            )
+
+        if not settings.env.azext_iot_teststorageaccount:
+            self.cli.invoke(f"storage account create --name {STORAGE_ACCOUNT} -g {EP_RG}")
+            self.cli.invoke(f"storage container create -n {STORAGE_CONTAINER} -g {EP_RG} --account-name {STORAGE_ACCOUNT}")
+
+        if not settings.env.azext_dt_ep_servicebus_namespace:
+            self.cli.invoke(
+                f"servicebus namespace create -n {SERVICEBUS_NAMESPACE} -g {self.entity_rg}"
+            )
+
+            self.cli.invoke(
+                f"servicebus queue create -n {SERVICEBUS_QUEUE} --namespace-name {SERVICEBUS_NAMESPACE} -g {self.entity_rg}"
+            )
+
+            self.cli.invoke(
+                f"servicebus topic create -n {SERVICEBUS_TOPIC} --namespace-name {SERVICEBUS_NAMESPACE} -g {self.entity_rg}"
+            )
 
         # add a certificate
 
-        _create_test_cert(CERT_FILE, KEY_FILE, "testcert", 3, random.randint(1, 10))
+        cert = create_self_signed_certificate(subject="aziotcli", valid_days=1, cert_output_dir=None)["certificate"]
+        cert_file = "testCert" + generate_generic_id() + ".cer"
+        with open(cert_file, 'w', encoding='utf-8') as f:
+            f.write(cert)
 
         self.cli.invoke(
-            "iot hub certificate create --hub-name {} --name cert1 --path {} -g {} -v True".format(self.entity_name, CERT_FILE,
+            "iot hub certificate create --hub-name {} --name cert1 --path {} -g {} -v True".format(self.entity_name, cert_file,
                                                                                                    self.entity_rg)
         )
 
+        if os.path.isfile(cert_file):
+            os.remove(cert_file)
+
         # add endpoints
 
-        storage_cstring = self.cli.invoke(
-            f"storage account show-connection-string --name {storage_account} -g {rg}"
-        ).as_json()["connectionString"]
+        username = self.cli.invoke("account show").as_json()["user"]["name"]
+        orig_ids = self.cli.invoke(
+            f"iot hub show -n {self.entity_name} -g {self.entity_rg}"
+        ).as_json()["identity"]
+        dest_ids = self.cli.invoke(
+            f"iot hub show -n {self.dest_hub} -g {self.dest_hub_rg}"
+        ).as_json()["identity"]
+        orig_principal_id = orig_ids["principalId"]
+        dest_principal_id = dest_ids["principalId"]
+        user_id = orig_ids["userAssignedIdentities"][self.uid]["principalId"]
 
-        self.cli.invoke(f"iot hub routing-endpoint create -n eventhub-systemid -r {rg} -g {self.entity_rg} -s "
+        eh = self.cli.invoke(f"eventhubs namespace show -n {EVENTHUB_NAMESPACE} -g {EP_RG}").as_json()
+        servicebus_info = self.cli.invoke(f"servicebus namespace show -n {SERVICEBUS_NAMESPACE} -g {EP_RG}").as_json()
+        queue = self.cli.invoke(
+            f"servicebus queue show -n {SERVICEBUS_QUEUE} --namespace-name {SERVICEBUS_NAMESPACE} -g {EP_RG}"
+        ).as_json()
+        topic = self.cli.invoke(
+            f"servicebus topic show -n {SERVICEBUS_TOPIC} --namespace-name {SERVICEBUS_NAMESPACE} -g {EP_RG}"
+        ).as_json()
+
+        # put endpoint uri in correct format
+        eventhub_endpointuri = eh["serviceBusEndpoint"]
+        eventhub_endpointuri = eventhub_endpointuri[:eventhub_endpointuri.find(".net") + 4]
+        if eventhub_endpointuri[:5] == "https":
+            eventhub_endpointuri = "sb" + eventhub_endpointuri[5:]
+
+        # put servicebus uri in correct format
+        servicebus_endpointuri = servicebus_info["serviceBusEndpoint"]
+        servicebus_endpointuri = servicebus_endpointuri[:servicebus_endpointuri.find(".net") + 4]
+        if servicebus_endpointuri[:5] == "https":
+            servicebus_endpointuri = "sb" + servicebus_endpointuri[5:]
+
+        self.cli.invoke(
+            f"role assignment create --role 'IoT Hub Data Contributor' --scope {self.hub_id} --assignee {username}"
+        )
+        self.cli.invoke(
+            f"role assignment create --role 'Azure Event Hubs Data Sender' --scope {eh['id']} --assignee {orig_principal_id}"
+        )
+        self.cli.invoke(
+            f"role assignment create --role 'Azure Service Bus Data Sender' --scope {queue['id']} --assignee {orig_principal_id}"
+        )
+        self.cli.invoke(
+            f"role assignment create --role 'Azure Event Hubs Data Sender' --scope {eh['id']} --assignee {dest_principal_id}"
+        )
+        self.cli.invoke(
+            f"role assignment create --role 'Azure Service Bus Data Sender' --scope {queue['id']} --assignee {dest_principal_id}"
+        )
+        self.cli.invoke(
+            f"role assignment create --role 'Azure Service Bus Data Sender' --scope {topic['id']} --assignee {user_id}"
+        )
+
+        self.cli.invoke(f"iot hub routing-endpoint create -n eventhub-systemid -r {EP_RG} -g {self.entity_rg} -s "
                         f"{self.subscription_id} -t eventhub --hub-name {self.entity_name} --endpoint-uri {eventhub_endpointuri}"
-                        f" --entity-path {eventhub_entity_path} --auth-type identityBased")
+                        f" --entity-path {EVENTHUB} --auth-type identityBased")
 
-        self.cli.invoke(f"iot hub routing-endpoint create -n queue-systemid -r {rg} -g {self.entity_rg} -s "
+        self.cli.invoke(f"iot hub routing-endpoint create -n queue-systemid -r {EP_RG} -g {self.entity_rg} -s "
                         f"{self.subscription_id} -t servicebusqueue --hub-name {self.entity_name} --endpoint-uri "
-                        f"{servicebus_endpointuri} --entity-path {queue_entity_path} --auth-type identityBased")
+                        f"{servicebus_endpointuri} --entity-path {SERVICEBUS_QUEUE} --auth-type identityBased")
 
-        self.cli.invoke(f"iot hub routing-endpoint create -n topic-userid -r {rg} -g {self.entity_rg} -s "
+        self.cli.invoke(f"iot hub routing-endpoint create -n topic-userid -r {EP_RG} -g {self.entity_rg} -s "
                         f"{self.subscription_id} -t servicebustopic --hub-name {self.entity_name} --endpoint-uri "
-                        f"{servicebus_endpointuri} --entity-path {topic_entity_path} --auth-type identityBased --identity "
+                        f"{servicebus_endpointuri} --entity-path {SERVICEBUS_TOPIC} --auth-type identityBased --identity "
                         f"{self.uid}")
 
-        self.cli.invoke(f"iot hub routing-endpoint create -n storagecontainer-key -r {rg} -g {self.entity_rg} -s "
+        storage_cstring = self.cli.invoke(
+            f"storage account show-connection-string --name {STORAGE_ACCOUNT} -g {EP_RG}"
+        ).as_json()["connectionString"]
+        self.cli.invoke(f"iot hub routing-endpoint create -n storagecontainer-key -r {EP_RG} -g {self.entity_rg} -s "
                         f"{self.subscription_id} -t azurestoragecontainer --hub-name {self.entity_name} -c {storage_cstring} "
-                        f"--container container1  -b 350 -w 250 --encoding json")
+                        f"--container {STORAGE_CONTAINER}  -b 350 -w 250 --encoding json")
 
         # add routes
 
@@ -115,8 +211,6 @@ class TestHubControlPlaneExportImport(IoTLiveScenarioTest):
         if os.path.isfile(self.filename):
             os.remove(self.filename)
 
-        _delete_test_cert(CERT_FILE, KEY_FILE, KEY_FILE)
-
         if settings.env.azext_iot_testhub:
             self.clean_up_hub(self.entity_name, self.entity_rg)
 
@@ -125,6 +219,15 @@ class TestHubControlPlaneExportImport(IoTLiveScenarioTest):
             self.cmd("iot hub delete -n {} -g {}".format(self.dest_hub, self.dest_hub_rg))
         else:
             self.clean_up_hub(self.dest_hub, self.dest_hub_rg)
+
+        self.cli.invoke(f"iot hub identity remove -n {self.entity_name} -g {self.entity_rg} --user-assigned {self.uid}")
+        if not settings.env.azext_dt_ep_eventhub_namespace:
+            self.cli.invoke(f"eventhubs namespace delete -n {EVENTHUB_NAMESPACE} -g {EP_RG}")
+        if not settings.env.azext_iot_teststorageaccount:
+            self.cli.invoke(f"storage account delete -y -n {STORAGE_ACCOUNT} -g {EP_RG}")
+        if not settings.env.azext_dt_ep_servicebus_namespace:
+            self.cli.invoke(f"servicebus namespace delete -n {SERVICEBUS_NAMESPACE} -g {self.entity_rg}")
+        self.cli.invoke(f"identity delete -n {self.identity_name} -g {self.entity_rg}")
 
     def clean_up_hub(self, hub_name, rg):
 
@@ -264,8 +367,6 @@ class TestHubControlPlaneExportImport(IoTLiveScenarioTest):
 
     def test_export_import(self):
 
-        # DATAPLANE_AUTH_TYPES = ["key"] # FOR TESTING PURPOSES ONLY
-
         for auth_phase in DATAPLANE_AUTH_TYPES:
             self.cmd(
                 self.set_cmd_auth_type(
@@ -288,8 +389,6 @@ class TestHubControlPlaneExportImport(IoTLiveScenarioTest):
             self.compare_hub_to_file()
 
     def test_migrate(self):
-
-        # DATAPLANE_AUTH_TYPES = ["key"] # FOR TESTING PURPOSES ONLY
 
         for auth_phase in DATAPLANE_AUTH_TYPES:
             self.cmd(

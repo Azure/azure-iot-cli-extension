@@ -5,6 +5,7 @@ import os
 import time
 from pathlib import Path
 from azext_iot.common.shared import DeviceAuthApiType
+from azext_iot.common.embedded_cli import EmbeddedCLI
 
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 from azext_iot.tests.iothub import IoTLiveScenarioTest
@@ -32,6 +33,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
         super(TestHubExportImport, self).__init__(test_case)
         self.dest_hub = settings.env.azext_iot_desthub or "test-hub-" + generate_generic_id()
         self.dest_hub_rg = settings.env.azext_iot_destrg or settings.env.azext_iot_testrg
+        self.cli = EmbeddedCLI()
 
         # create destination hub
 
@@ -55,6 +57,14 @@ class TestHubExportImport(IoTLiveScenarioTest):
         self.create_hub_state()
 
     def create_hub_state(self):
+
+        # remove previously existing user identities from hub
+        userAssignedIds = self.cli.invoke(
+            f"iot hub identity show -n {self.entity_name} -g {self.entity_rg}"
+        ).as_json()["userAssignedIdentities"]
+        if userAssignedIds:
+            userAssignedIds = " ".join(userAssignedIds.keys())
+            self.cli.invoke(f"iot hub identity remove -n {self.entity_name} -g {self.entity_rg} --user {userAssignedIds}")
 
         self.clean_up_hub(self.connection_string)
 
@@ -493,7 +503,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
                     auth_type=auth_phase
                 )
             )
-            time.sleep(2)
+            time.sleep(3)
             self.compare_hub_to_file()
 
         for auth_phase in DATAPLANE_AUTH_TYPES:
@@ -504,7 +514,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
                     auth_type=auth_phase
                 )
             )
-            time.sleep(2)  # gives the hub time to update before the checks
+            time.sleep(3)  # gives the hub time to update before the checks
             self.compare_hub_to_file()
 
     # @pytest.mark.skip(reason="no way of currently testing this")
@@ -525,6 +535,6 @@ class TestHubExportImport(IoTLiveScenarioTest):
                     )
                 )
 
-            time.sleep(2)  # gives the hub time to update before the checks
+            time.sleep(3)  # gives the hub time to update before the checks
             self.compare_hubs()
             self.clean_up_hub(self.dest_hub_cstring)

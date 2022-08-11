@@ -138,7 +138,7 @@ class StateProvider(IoTHubProvider):
                     module["authentication"] = module2["authentication"]
 
                     [module.pop(key) for key in ["connection_state_updated_time", "last_activity_time", "etag",
-                                                 "cloud_to_device_message_count"]]
+                                                 "cloud_to_device_message_count", "device_id"]]
                     [module_twin.pop(key) for key in ["deviceEtag", "lastActivityTime", "etag", "version",
                                                       "cloudToDeviceMessageCount", "statusUpdateTime"]]
                     [module_twin["properties"]["desired"].pop(key) for key in ["$metadata", "$version"]]
@@ -210,7 +210,7 @@ class StateProvider(IoTHubProvider):
                 module_identity = modules[j][0]
                 module_twin = modules[j][1]
 
-                self.upload_module_identity(module_identity)
+                self.upload_module_identity(identity["deviceId"], module_identity)
 
                 _iot_device_module_twin_replace(target=self.target, device_id=identity["deviceId"],
                                                 module_id=module_identity["module_id"], target_json=json.dumps(module_twin))
@@ -224,7 +224,7 @@ class StateProvider(IoTHubProvider):
 
         if self.include_control_plane:
 
-            with self.suppress_stderr():
+            with self.capture_stderr():
 
                 temp_cert_file = generate_generic_id() + ".cer"
 
@@ -283,14 +283,21 @@ class StateProvider(IoTHubProvider):
             raise FileOperationError(f'File {filename} does not exist.')
 
     @contextmanager
-    def suppress_stderr(self):
-        with open(os.devnull, 'w', encoding='utf-8') as devnull:
+    def capture_stderr(self):
+        temp_file = "stderr_file" + generate_generic_id()
+
+        with open(temp_file, 'w+', encoding='utf-8') as f:
             old_stderr = sys.stderr
-            sys.stderr = devnull
+            sys.stderr = f
             try:
                 yield
             finally:
                 sys.stderr = old_stderr
+
+            sys.stderr.write(f.read())
+
+        if os.path.isfile(temp_file):
+            os.remove(temp_file)
 
     def assign_identities_to_hub(self, identities):
         num_identities = (1 if identities["principalId"] else 0) + \
@@ -422,9 +429,8 @@ class StateProvider(IoTHubProvider):
         else:
             logger.error("Authorization type for device '{0}' not recognized.".format(device_id))
 
-    def upload_module_identity(self, identity: dict):
+    def upload_module_identity(self, device_id: str, identity: dict):
 
-        device_id = identity["device_id"]
         module_id = identity["module_id"]
         auth_type = identity["authentication"]["type"]
 
@@ -504,6 +510,14 @@ class StateProvider(IoTHubProvider):
             route = routes[i]
             self.cli.invoke(f"iot hub route delete --hub-name {self.hub_name} -g {self.rg} --name {route['name']}")
 
+    def remove_identities(self):
+        userAssignedIds = self.cli.invoke(
+            f"iot hub identity show -n {self.hub_name} -g {self.rg}"
+        ).as_json()["userAssignedIdentities"]
+        if userAssignedIds:
+            userAssignedIds = " ".join(userAssignedIds.keys())
+            self.cli.invoke(f"iot hub identity remove -n {self.hub_name} -g {self.rg} --user-assigned {userAssignedIds}")
+
     def upload_state(self, filename: str, replace: Optional[bool] = None):
         '''
         Uses device info from file to recreate the devices
@@ -511,10 +525,11 @@ class StateProvider(IoTHubProvider):
 
         if replace:
             if self.include_control_plane:
-                with self.suppress_stderr():
+                with self.capture_stderr():
                     self.delete_all_routes()
                     self.delete_all_certificates()
                     self.delete_all_endpoints()
+                    self.remove_identities()
 
             self.delete_all_configs()
             self.delete_all_devices()
@@ -549,10 +564,11 @@ class StateProvider(IoTHubProvider):
 
         if replace:
             if self.include_control_plane:
-                with self.suppress_stderr():
+                with self.capture_stderr():
                     self.delete_all_routes()
                     self.delete_all_certificates()
                     self.delete_all_endpoints()
+                    self.remove_identities()
 
             self.delete_all_configs()
             self.delete_all_devices()

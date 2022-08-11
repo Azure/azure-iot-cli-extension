@@ -31,6 +31,7 @@ steps:
             "azext_dt_ep_eventhub_namespace": os.environ.get("AZEXT_DT_EP_EVENTHUB_NAMESPACE", sentinel_value),
             "azext_dt_ep_eventhub_policy": os.environ.get("AZEXT_DT_EP_EVENTHUB_POLICY", sentinel_value),
             "azext_dt_ep_eventhub_topic": os.environ.get("AZEXT_DT_EP_EVENTHUB_TOPIC", sentinel_value),
+            "azext_dt_ep_eventhub_queue": os.environ.get("AZEXT_DT_EP_EVENTHUB_QUEUE", sentinel_value),
             "azext_dt_ep_rg": os.environ.get("AZEXT_DT_EP_RG", sentinel_value),
             "azext_dt_adx_cluster": os.environ.get("AZEXT_DT_ADX_CLUSTER", sentinel_value),
             "azext_dt_adx_database": os.environ.get("AZEXT_DT_ADX_DATABASE", sentinel_value),

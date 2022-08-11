@@ -417,7 +417,6 @@
           "additional_properties": {},
           "module_id": "module2",
           "managed_by": null,
-          "device_id": "device2",
           "generation_id": "637920587461553088",
           "connection_state": "Disconnected",
           "authentication": {
@@ -466,7 +465,6 @@
           "additional_properties": {},
           "module_id": "module1",
           "managed_by": null,
-          "device_id": "simDevice",
           "generation_id": "637907447770121687",
           "connection_state": "Disconnected",
           "authentication": {
@@ -504,7 +502,6 @@
           "additional_properties": {},
           "module_id": "simModule",
           "managed_by": null,
-          "device_id": "simDevice",
           "generation_id": "637920585539407125",
           "connection_state": "Disconnected",
           "authentication": {
@@ -545,7 +542,6 @@
           "additional_properties": {},
           "module_id": "module1",
           "managed_by": null,
-          "device_id": "device3",
           "generation_id": "637937846362414376",
           "connection_state": "Disconnected",
           "authentication": {

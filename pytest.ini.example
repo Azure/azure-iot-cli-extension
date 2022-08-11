@@ -33,6 +33,7 @@ env =
     azext_dt_ep_eventgrid_topic=
     azext_dt_ep_servicebus_namespace=
     azext_dt_ep_servicebus_policy=
+    azext_dt_ep_servicebus_queue=
     azext_dt_ep_servicebus_topic=
     azext_dt_ep_eventhub_namespace=
     azext_dt_ep_eventhub_policy=
