@@ -39,4 +39,4 @@ def install(package, exact_version=None, compatible_version=None, custom_version
     except subprocess.CalledProcessError as e:
         logger.debug(e.output)
         logger.debug(e)
-        raise(RuntimeError(e.output))
+        raise RuntimeError(e.output)

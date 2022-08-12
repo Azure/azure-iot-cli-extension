@@ -10,7 +10,6 @@ from azext_iot.common.shared import DeviceAuthApiType, DeviceAuthType, ConfigTyp
 from azext_iot.common._azure import parse_iot_endpoint_connection_string, parse_storage_container_connection_string
 from azext_iot.iothub.providers.base import IoTHubProvider
 from azure.cli.core.azclierror import FileOperationError
-from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.operations.hub import (
     _iot_device_show,
@@ -35,6 +34,7 @@ from tqdm import tqdm
 from typing import Optional
 import os
 import sys
+import random
 from contextlib import contextmanager
 
 logger = get_logger(__name__)
@@ -226,7 +226,7 @@ class StateProvider(IoTHubProvider):
 
             with self.capture_stderr():
 
-                temp_cert_file = generate_generic_id() + ".cer"
+                temp_cert_file = f"cert{random.randrange(100000000)}.cer"
 
                 for c in tqdm(hub_state["certificates"], desc="Uploading certificates", file=sys.stdout):
                     with open(temp_cert_file, 'w', encoding='utf-8') as f:
@@ -250,22 +250,6 @@ class StateProvider(IoTHubProvider):
     def save_state(self, filename: str, force=False):
         '''
         Writes all hub configurations, device identities and device twins from the origin hub to a json file
-        {
-            "configurations": [{}, ...],
-            "edgeDeployments": [{}, ...],
-            "devices": {
-                "identities": [{}, ...],
-                "children": {
-                    "parentId": [],
-                    ...
-                }
-            }
-            "modules": {
-                "deviceId": [ [{identity}, {twin}], ... ],
-                ...
-            }.
-            "certificates": []
-        }
         '''
 
         if os.path.exists(filename) and os.stat(filename).st_size and not force:
@@ -284,7 +268,7 @@ class StateProvider(IoTHubProvider):
 
     @contextmanager
     def capture_stderr(self):
-        temp_file = "stderr_file" + generate_generic_id()
+        temp_file = "stderr_file" + str(random.randrange(100000000))
 
         with open(temp_file, 'w+', encoding='utf-8') as f:
             old_stderr = sys.stderr
@@ -305,10 +289,10 @@ class StateProvider(IoTHubProvider):
 
         pbar = tqdm(total=num_identities, desc="Assigning identities", file=sys.stdout)
 
-        if(identities["principalId"]):
+        if identities["principalId"]:
             self.cli.invoke("iot hub identity assign -n {} -g {} --system-assigned".format(self.hub_name, self.rg))
             pbar.update(1)
-        if(identities["userAssignedIdentities"]):
+        if identities["userAssignedIdentities"]:
             userIds = ""
             for userId in identities["userAssignedIdentities"]:
                 userIds += userId + " "

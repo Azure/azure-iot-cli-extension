@@ -210,7 +210,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
                 )
 
     def compare_configs(self, configlist1, configlist2):
-        assert(len(configlist1) == len(configlist2))
+        assert (len(configlist1) == len(configlist2))
 
         for config in configlist1:
             target = None
@@ -221,50 +221,50 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
             assert target
 
-            assert(config["id"] == target["id"])
-            assert(config["content"] == target["content"])
-            assert(config["metrics"] == target["metrics"])
-            assert(config["priority"] == target["priority"])
-            assert(config["systemMetrics"]["queries"] == target["systemMetrics"]["queries"])
-            assert(config["targetCondition"] == target["targetCondition"])
+            assert (config["id"] == target["id"])
+            assert (config["content"] == target["content"])
+            assert (config["metrics"] == target["metrics"])
+            assert (config["priority"] == target["priority"])
+            assert (config["systemMetrics"]["queries"] == target["systemMetrics"]["queries"])
+            assert (config["targetCondition"] == target["targetCondition"])
 
     def compare_devices(self, device1, device2):
 
-        assert(device1["authenticationType"] == device2["authenticationType"])
-        assert(device1["capabilities"]["iotEdge"] == device2["capabilities"]["iotEdge"])
-        assert(device1["connectionState"] == device2["connectionState"])
-        assert(device1["status"] == device2["status"])
+        assert (device1["authenticationType"] == device2["authenticationType"])
+        assert (device1["capabilities"]["iotEdge"] == device2["capabilities"]["iotEdge"])
+        assert (device1["connectionState"] == device2["connectionState"])
+        assert (device1["status"] == device2["status"])
 
         if "tags" in device1:
-            assert(device1["tags"] == device2["tags"])
+            assert (device1["tags"] == device2["tags"])
 
         if device1["authenticationType"] == DeviceAuthApiType.sas.value:
-            assert(device1["symmetricKey"]["primaryKey"] ==
+            assert (device1["symmetricKey"]["primaryKey"] ==
                    device2["symmetricKey"]["primaryKey"])
-            assert(device1["symmetricKey"]["secondaryKey"] ==
+            assert (device1["symmetricKey"]["secondaryKey"] ==
                    device2["symmetricKey"]["secondaryKey"])
 
         if device1["authenticationType"] == DeviceAuthApiType.selfSigned.value:
-            assert(device1["x509Thumbprint"]["primaryThumbprint"] == device2["x509Thumbprint"]["primaryThumbprint"])
-            assert(device1["x509Thumbprint"]["secondaryThumbprint"] == device2["x509Thumbprint"]["secondaryThumbprint"])
+            assert (device1["x509Thumbprint"]["primaryThumbprint"] == device2["x509Thumbprint"]["primaryThumbprint"])
+            assert (device1["x509Thumbprint"]["secondaryThumbprint"] == device2["x509Thumbprint"]["secondaryThumbprint"])
 
-        assert(len(device1["properties"]["desired"]) == len(device2["properties"]["desired"]))
+        assert (len(device1["properties"]["desired"]) == len(device2["properties"]["desired"]))
 
         for prop in device1["properties"]["desired"]:
             if prop not in ["$metadata", "$version"]:
-                assert(prop in device2["properties"]["desired"])
-                assert(device1["properties"]["desired"][prop] == device2["properties"]["desired"][prop])
+                assert (prop in device2["properties"]["desired"])
+                assert (device1["properties"]["desired"][prop] == device2["properties"]["desired"][prop])
 
     def compare_module_twins(self, twin1, twin2):
-        assert(len(twin1["properties"]["desired"]) == len(twin2["properties"]["desired"]))
+        assert (len(twin1["properties"]["desired"]) == len(twin2["properties"]["desired"]))
         for prop in twin1["properties"]["desired"]:
             if prop not in ["$metadata", "$version"]:
-                assert(prop in twin2["properties"]["desired"])
-                assert(twin1["properties"]["desired"][prop] == twin2["properties"]["desired"][prop])
+                assert (prop in twin2["properties"]["desired"])
+                assert (twin1["properties"]["desired"][prop] == twin2["properties"]["desired"][prop])
 
         if "tags" in twin1:
-            assert(twin1["tags"] == twin2["tags"])
-        assert(twin1["status"] == twin2["status"])
+            assert (twin1["tags"] == twin2["tags"])
+        assert (twin1["status"] == twin2["status"])
 
     def compare_hubs(self):
 
@@ -301,7 +301,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
         for id in dest_hub_identities:
             dest_hub_identities_dict[id["deviceId"]] = id
 
-        assert(len(orig_hub_identities) == len(dest_hub_identities))
+        assert (len(orig_hub_identities) == len(dest_hub_identities))
 
         for device in orig_hub_identities:
             assert device["deviceId"] in dest_hub_identities_dict
@@ -330,9 +330,9 @@ class TestHubExportImport(IoTLiveScenarioTest):
             ).get_output_in_json()
 
             if device["capabilities"]["iotEdge"]:
-                assert(len(orig_modules) == len(dest_modules) == 3)
+                assert (len(orig_modules) == len(dest_modules) == 3)
             else:
-                assert(len(orig_modules) == len(dest_modules) == 1)
+                assert (len(orig_modules) == len(dest_modules) == 1)
 
             for module in orig_modules:
                 target_module = None
@@ -343,7 +343,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
                 assert target_module
 
-                assert(module["authentication"] == target_module["authentication"])
+                assert (module["authentication"] == target_module["authentication"])
 
                 module_twin = self.cmd(
                     f"iot hub module-twin show -m {module['moduleId']} -d {device['deviceId']} -l {self.connection_string}"
@@ -364,7 +364,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
                     f"iot hub device-identity children list -d {device['deviceId']} -l {self.dest_hub_cstring}"
                 ).get_output_in_json()
 
-                assert(orig_children == dest_children)
+                assert (orig_children == dest_children)
 
     def compare_hub_to_file(self):
         with open(self.filename, 'r', encoding='utf-8') as f:
@@ -393,7 +393,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
             f"iot hub device-identity list -l {self.connection_string}"
         ).get_output_in_json()
 
-        assert(len(file_devices) == len(hub_devices))
+        assert (len(file_devices) == len(hub_devices))
         for device in hub_devices:
             id = self.cmd(
                 "iot hub device-identity show -l {} -d {}".format(self.connection_string, device['deviceId'])
@@ -418,9 +418,9 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
             # edge devices have two default modules that aren't saved to the file
             if device["capabilities"]["iotEdge"]:
-                assert(len(file_modules) == len(hub_modules) - 2)
+                assert (len(file_modules) == len(hub_modules) - 2)
             else:
-                assert(len(file_modules) == len(hub_modules))
+                assert (len(file_modules) == len(hub_modules))
 
             for module in hub_modules:
                 if module['moduleId'] in ["$edgeAgent", "$edgeHub"]:
@@ -439,7 +439,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
                 assert target_module
 
-                assert(module["authentication"] == target_module["authentication"])
+                assert (module["authentication"] == target_module["authentication"])
 
                 [module_twin["properties"]["desired"].pop(key) for key in ["$metadata", "$version"]]
                 self.compare_module_twins(module_twin, target_module_twin)
@@ -451,7 +451,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
                     f"iot hub device-identity children list -d {device['deviceId']} -l {self.connection_string}"
                 ).get_output_in_json()
 
-                assert(file_children == dest_children)
+                assert (file_children == dest_children)
 
     def clean_up_hub(self, cstring):
 
