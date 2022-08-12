@@ -4,7 +4,7 @@ import json
 import os
 import time
 from pathlib import Path
-from azext_iot.common.shared import DeviceAuthApiType
+from azext_iot.common.shared import DeviceAuthApiType, AuthenticationTypeDataplane
 from azext_iot.common.embedded_cli import EmbeddedCLI
 
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
@@ -25,7 +25,7 @@ CWD = os.path.dirname(os.path.abspath(__file__))
 
 # changing the order so the final exported file can be used for all import tests
 # (the cstring output doesn't include the keys for the control plane features)
-DATAPLANE_AUTH_TYPES = ["cstring", "key", "login"]
+DATAPLANE_AUTH_TYPES = ["cstring", AuthenticationTypeDataplane.key.value, AuthenticationTypeDataplane.login.value]
 
 
 class TestHubExportImport(IoTLiveScenarioTest):
@@ -455,24 +455,24 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
     def clean_up_hub(self, cstring):
 
-        dest_hub_configs = self.cmd(
+        configs = self.cmd(
             f"iot hub configuration list -l {cstring}"
         ).get_output_in_json()
 
-        dest_hub_deploys = self.cmd(
-            f"iot edge deployment list -l {self.dest_hub_cstring}"
+        edge_deploys = self.cmd(
+            f"iot edge deployment list -l {cstring}"
         ).get_output_in_json()
 
-        for config in dest_hub_configs + dest_hub_deploys:
+        for config in configs + edge_deploys:
             self.cmd(
                 "iot hub configuration delete -c {} -l {}".format(config["id"], cstring)
             )
 
-        dest_hub_identities = self.cmd(
+        device_identities = self.cmd(
             f"iot hub device-identity list -l {cstring}"
         ).get_output_in_json()
 
-        for id in dest_hub_identities:
+        for id in device_identities:
             self.cmd(
                 "iot hub device-identity delete -d {} -l {}".format(id["deviceId"], cstring)
             )
@@ -503,7 +503,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
                     auth_type=auth_phase
                 )
             )
-            time.sleep(3)
+            time.sleep(2)
             self.compare_hub_to_file()
 
         for auth_phase in DATAPLANE_AUTH_TYPES:
@@ -514,7 +514,7 @@ class TestHubExportImport(IoTLiveScenarioTest):
                     auth_type=auth_phase
                 )
             )
-            time.sleep(3)  # gives the hub time to update before the checks
+            time.sleep(2)  # gives the hub time to update before the checks
             self.compare_hub_to_file()
 
     # @pytest.mark.skip(reason="no way of currently testing this")
@@ -535,6 +535,6 @@ class TestHubExportImport(IoTLiveScenarioTest):
                     )
                 )
 
-            time.sleep(3)  # gives the hub time to update before the checks
+            time.sleep(2)  # gives the hub time to update before the checks
             self.compare_hubs()
             self.clean_up_hub(self.dest_hub_cstring)

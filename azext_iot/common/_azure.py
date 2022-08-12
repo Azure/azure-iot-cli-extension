@@ -46,6 +46,7 @@ def parse_iot_device_module_connection_string(cs):
     return _parse_connection_string(cs, validate, "Module")
 
 
+# parses connection string for event hub, service bus topic and service bus queue endpoints
 def parse_iot_endpoint_connection_string(cs):
     validate = ["Endpoint", "SharedAccessKeyName", "SharedAccessKey"]
     return _parse_connection_string(cs, validate, "Endpoint")

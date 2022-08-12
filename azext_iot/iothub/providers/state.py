@@ -11,6 +11,7 @@ from azext_iot.common._azure import parse_iot_endpoint_connection_string, parse_
 from azext_iot.iothub.providers.base import IoTHubProvider
 from azure.cli.core.azclierror import FileOperationError
 from azext_iot.common.embedded_cli import EmbeddedCLI
+from azext_iot.common.utility import capture_stderr
 from azext_iot.operations.hub import (
     _iot_device_show,
     _iot_device_module_twin_show,
@@ -35,7 +36,6 @@ from typing import Optional
 import os
 import sys
 import random
-from contextlib import contextmanager
 
 logger = get_logger(__name__)
 
@@ -155,9 +155,37 @@ class StateProvider(IoTHubProvider):
 
             hub_state["certificates"] = self.cli.invoke("iot hub certificate list --hub-name {} -g {}"
                                                         .format(hub_name, rg)).as_json()["value"]
+
+            pbar = tqdm(total=len(hub_state["certificates"]), desc="Saving certificates", file=sys.stdout)
+            pbar.update(len(hub_state["certificates"]))
+            pbar.close()
+
             hub_state["identities"] = control_plane["identity"]
+            num_identities = (1 if hub_state["identities"]["principalId"] else 0) + \
+                (len(hub_state["identities"]["userAssignedIdentities"]) if hub_state["identities"]["userAssignedIdentities"] 
+                else 0)
+
+            pbar = tqdm(total=num_identities, desc="Saving system- and user-assigned identities", file=sys.stdout)
+            pbar.update(num_identities)
+            pbar.close()
+
             hub_state["endpoints"] = control_plane["properties"]["routing"]["endpoints"]
+
+            eventHubs = hub_state["endpoints"]["eventHubs"]
+            serviceBusQueues = hub_state["endpoints"]["serviceBusQueues"]
+            serviceBusTopics = hub_state["endpoints"]["serviceBusTopics"]
+            storageContainers = hub_state["endpoints"]["storageContainers"]
+            num_endpoints = len(eventHubs) + len(serviceBusQueues) + len(serviceBusTopics) + len(storageContainers)
+
+            pbar = tqdm(total=num_endpoints, desc="Saving endpoints", file=sys.stdout)
+            pbar.update(num_endpoints)
+            pbar.close()
+
             hub_state["routes"] = control_plane["properties"]["routing"]["routes"]
+
+            pbar = tqdm(total=len(hub_state["routes"]), desc="Saving routes", file=sys.stdout)
+            pbar.update(len(hub_state["routes"]))
+            pbar.close()
 
         return hub_state
 
@@ -224,7 +252,7 @@ class StateProvider(IoTHubProvider):
 
         if self.include_control_plane:
 
-            with self.capture_stderr():
+            with capture_stderr():
 
                 temp_cert_file = f"cert{random.randrange(100000000)}.cer"
 
@@ -265,23 +293,6 @@ class StateProvider(IoTHubProvider):
 
         except FileNotFoundError:
             raise FileOperationError(f'File {filename} does not exist.')
-
-    @contextmanager
-    def capture_stderr(self):
-        temp_file = "stderr_file" + str(random.randrange(100000000))
-
-        with open(temp_file, 'w+', encoding='utf-8') as f:
-            old_stderr = sys.stderr
-            sys.stderr = f
-            try:
-                yield
-            finally:
-                sys.stderr = old_stderr
-
-            sys.stderr.write(f.read())
-
-        if os.path.isfile(temp_file):
-            os.remove(temp_file)
 
     def assign_identities_to_hub(self, identities):
         num_identities = (1 if identities["principalId"] else 0) + \
@@ -509,7 +520,7 @@ class StateProvider(IoTHubProvider):
 
         if replace:
             if self.include_control_plane:
-                with self.capture_stderr():
+                with capture_stderr():
                     self.delete_all_routes()
                     self.delete_all_certificates()
                     self.delete_all_endpoints()
@@ -548,7 +559,7 @@ class StateProvider(IoTHubProvider):
 
         if replace:
             if self.include_control_plane:
-                with self.capture_stderr():
+                with capture_stderr():
                     self.delete_all_routes()
                     self.delete_all_certificates()
                     self.delete_all_endpoints()

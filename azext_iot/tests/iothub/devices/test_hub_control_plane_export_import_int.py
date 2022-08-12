@@ -5,6 +5,7 @@ import time
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED
 from azext_iot.common.certops import create_self_signed_certificate
+from azext_iot.common.shared import AuthenticationTypeDataplane
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.test_constants import ResourceTypes
 from azext_iot.tests.generators import generate_generic_id
@@ -27,7 +28,7 @@ resource_test_env_vars = [
 settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=resource_test_env_vars)
 CWD = os.path.dirname(os.path.abspath(__file__))
 
-DATAPLANE_AUTH_TYPES = ["key", "login"]
+DATAPLANE_AUTH_TYPES = [AuthenticationTypeDataplane.key.value, AuthenticationTypeDataplane.login.value]
 
 EP_RG = settings.env.azext_dt_ep_rg or settings.env.azext_iot_testrg
 EVENTHUB_NAMESPACE = settings.env.azext_dt_ep_eventhub_namespace or "testEHnamespace" + generate_generic_id()

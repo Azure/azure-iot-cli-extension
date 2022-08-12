@@ -4,21 +4,19 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from azure.cli.core.azclierror import InvalidArgumentValueError
-
 PARAM_MAPPING = {
     "DPS": ['--dps-name'],
     "IoT Hub": ['--hub-name']
 }
 
 
-def error_no_hub_or_login_on_input(entity_type="IoT Hub"):
-    if entity_type:
+def error_no_hub_or_login_on_input(entity_type: str = "IoT Hub"):
+    if entity_type and isinstance(entity_type, str):
         return (
             "Please provide an {0} entity name (via the '{1}' or '-n' parameter)"
             " or {0} connection string via --login..."
         ).format(entity_type, PARAM_MAPPING[entity_type])
-    raise InvalidArgumentValueError("Please provide either a hub name or a DPS name.")
+    raise TypeError("entity_type requires a string value")
 
 
 def error_param_top_out_of_bounds(upper_limit=None):
