@@ -162,8 +162,8 @@ class StateProvider(IoTHubProvider):
 
             hub_state["identities"] = control_plane["identity"]
             num_identities = (1 if hub_state["identities"]["principalId"] else 0) + \
-                (len(hub_state["identities"]["userAssignedIdentities"]) if hub_state["identities"]["userAssignedIdentities"] 
-                else 0)
+                (len(hub_state["identities"]["userAssignedIdentities"]) if hub_state["identities"]["userAssignedIdentities"]
+                 else 0)
 
             pbar = tqdm(total=num_identities, desc="Saving system- and user-assigned identities", file=sys.stdout)
             pbar.update(num_identities)
