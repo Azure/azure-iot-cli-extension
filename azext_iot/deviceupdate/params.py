@@ -259,7 +259,8 @@ def load_deviceupdate_arguments(self, _):
             "best_update",
             options_list=["--best-update"],
             help="Flag indicating the command should fetch the best available update for the device class subgroup including "
-            "a count of how many devices need the update. Group Id is required for this flag.",
+            "a count of how many devices need the update. Group Id is required for this flag. "
+            "A best update is the lastest update that meets all compatibility specifications of a device class. ",
             arg_group="Update",
             arg_type=get_three_state_flag(),
         )
@@ -291,7 +292,8 @@ def load_deviceupdate_arguments(self, _):
             "best_updates",
             options_list=["--best-updates"],
             help="Flag indicating the command should fetch the best available updates for the device group including "
-            "a count of how many devices need each update.",
+            "a count of how many devices need each update. "
+            "A best update is the lastest update that meets all compatibility specifications of a device class. ",
             arg_group="Update",
             arg_type=get_three_state_flag(),
         )

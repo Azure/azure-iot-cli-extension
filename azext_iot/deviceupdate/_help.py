@@ -269,11 +269,21 @@ def load_deviceupdate_help():
     helps["iot device-update update list"] = """
         type: command
         short-summary: List updates that have been imported to the Device Update instance.
+        long-summary: This command supports pivot flags such as --by-provider, --by-name
+          and --by-version where only the respective pivot attribute of updates are shown.
 
         examples:
         - name: List all updates.
           text: >
             az iot device-update update list -n {account_name} -i {instance_name}
+
+        - name: List all updates satisfying a free-text search criteria, in this case the update provider of Contoso.
+          text: >
+            az iot device-update update list -n {account_name} -i {instance_name} --search 'Contoso'
+
+        - name: List all updates satisfying an odata filter, in this case filtering for non-deployable updates.
+          text: >
+            az iot device-update update list -n {account_name} -i {instance_name} --filter 'isDeployable eq false'
 
         - name: List all update providers.
           text: >
@@ -497,7 +507,7 @@ def load_deviceupdate_help():
         examples:
         - name: Show a device group.
           text: >
-            az iot device-update device group show -n {account_name} -i {instance_name} --group-id {device_class_id}
+            az iot device-update device group show -n {account_name} -i {instance_name} --group-id {device_group_id}
 
         - name: Show the best updates available for a device group. This flag modifies the command to returns a list.
           text: >
@@ -519,7 +529,7 @@ def load_deviceupdate_help():
         examples:
         - name: Delete a device group.
           text: >
-            az iot device-update device group delete -n {account_name} -i {instance_name} --group-id {device_class_id}
+            az iot device-update device group delete -n {account_name} -i {instance_name} --group-id {device_group_id}
 
         - name: Delete a device group skipping the confirmation prompt.
           text: >
