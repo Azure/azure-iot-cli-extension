@@ -70,25 +70,17 @@ def test_instance_update_lifecycle(provisioned_instances_module: Dict[str, dict]
     ).as_json()
     assert simple_manifest_id["provider"] in list_updates_by_provider
     list_updates_by_name_cmd = (
-        f"iot device-update update list -n {account_name} -i {instance_name} --by-name "
+        f"iot device-update update list -n {account_name} -i {instance_name} "
         f"--update-provider {simple_manifest_id['provider']}"
     )
     list_updates_by_name = cli.invoke(list_updates_by_name_cmd).as_json()
     assert simple_manifest_id["name"] in list_updates_by_name
-    # Error --update-provider is required when listing updates by name.
-    assert not cli.invoke(list_updates_by_name_cmd.split("--update-provider")[0]).success()
     list_updates_by_version_cmd = (
-        f"iot device-update update list -n {account_name} -i {instance_name} --by-version "
+        f"iot device-update update list -n {account_name} -i {instance_name} "
         f"--update-provider {simple_manifest_id['provider']} --update-name {simple_manifest_id['name']}"
     )
     list_updates_by_version = cli.invoke(list_updates_by_version_cmd).as_json()
     assert simple_manifest_id["version"] in list_updates_by_version
-    # Error --update-provider and --update-name is required when listing updates by version.
-    assert not cli.invoke(list_updates_by_version_cmd.split("--update-name")[0]).success()
-    # Error cannot use multiple --by-* constraint flags at the same time.
-    assert not cli.invoke(
-        f"iot device-update update list -n {account_name} -i {instance_name} --by-version --by-name"
-    ).success()
 
     list_update_files = cli.invoke(
         f"iot device-update update file list -n {account_name} -i {instance_name} --update-name {simple_manifest_id['name']} "

@@ -12,7 +12,6 @@ from azext_iot.deviceupdate.providers.base import (
     AzureError,
     ARMPolling,
 )
-from azure.cli.core.azclierror import ArgumentUsageError
 from typing import Optional, List, Union
 
 logger = get_logger(__name__)
@@ -25,8 +24,6 @@ def list_updates(
     search: Optional[str] = None,
     filter: Optional[str] = None,
     by_provider: Optional[bool] = None,
-    by_name: Optional[bool] = None,
-    by_version: Optional[bool] = None,
     update_name: Optional[str] = None,
     update_provider: Optional[str] = None,
     resource_group_name: Optional[str] = None,
@@ -34,8 +31,6 @@ def list_updates(
     data_manager = DeviceUpdateDataManager(
         cmd=cmd, account_name=name, instance_name=instance_name, resource_group=resource_group_name
     )
-    if [by_provider, by_name, by_version].count(True) > 1:
-        raise ArgumentUsageError("Only a single --by-* flag can be used at a time.")
 
     try:
         if by_provider:
@@ -44,24 +39,18 @@ def list_updates(
                     "--search, --filter, --update-name and --update-provider are not applicable "
                     "when using --by-provider.")
             return data_manager.data_client.device_update.list_providers()
-        if by_name:
-            if not update_provider:
-                raise ArgumentUsageError("--update-provider is required when using --by-name.")
-            if any([search, filter, update_name]):
-                logger.warning("--search, --filter and --update-name are not applicable when using --by-name.")
-            return data_manager.data_client.device_update.list_names(provider=update_provider)
-        if by_version:
-            if not all([update_name, update_provider]):
-                raise ArgumentUsageError(
-                    "--update-provider and --update-name are required when using --by-version"
-                )
-            if any([search]):
-                logger.warning("--search is not applicable when using --by-version.")
+        if update_provider and update_name:
+            if search:
+                logger.warning("--search is not applicable when listing update versions.")
             return data_manager.data_client.device_update.list_versions(
                 provider=update_provider, name=update_name, filter=filter
             )
-        if any([update_name, update_provider]):
-            logger.warning("--update-name and --update-provider are not applicable when listing updates with no constraints.")
+        if update_provider:
+            if any([search, filter, update_name]):
+                logger.warning("--search, --filter and --update-name are not applicable when listing update names.")
+            return data_manager.data_client.device_update.list_names(provider=update_provider)
+        if update_name:
+            logger.warning("Use --update-name with --update-provider to list updates by version.")
         return data_manager.data_client.device_update.list_updates(search=search, filter=filter)
     except AzureError as e:
         handle_service_exception(e)

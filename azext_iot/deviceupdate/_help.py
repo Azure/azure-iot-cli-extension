@@ -269,8 +269,10 @@ def load_deviceupdate_help():
     helps["iot device-update update list"] = """
         type: command
         short-summary: List updates that have been imported to the Device Update instance.
-        long-summary: This command supports pivot flags such as --by-provider, --by-name
-          and --by-version where only the respective pivot attribute of updates are shown.
+        long-summary: When listing update providers only the --by-provider flag needs to be supplied
+          in addition to the common instance look up arguments.
+          When listing update names the update provider must be supplied.
+          When listing update versions the update provider and update name must be supplied.
 
         examples:
         - name: List all updates.
@@ -291,11 +293,11 @@ def load_deviceupdate_help():
 
         - name: List all update names by update provider.
           text: >
-            az iot device-update update list -n {account_name} -i {instance_name} --by-name --update-provider {provider_name}
+            az iot device-update update list -n {account_name} -i {instance_name} --update-provider {provider_name}
 
-        - name: List all update versions by update provider and name.
+        - name: List all update versions by update provider and update name.
           text: >
-            az iot device-update update list -n {account_name} -i {instance_name} --by-version --update-provider {provider_name} --update-name {update_name}
+            az iot device-update update list -n {account_name} -i {instance_name} --update-provider {provider_name} --update-name {update_name}
     """
 
     helps["iot device-update update show"] = """

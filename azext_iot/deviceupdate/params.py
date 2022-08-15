@@ -164,36 +164,19 @@ def load_deviceupdate_arguments(self, _):
             options_list=["--by-provider"],
             help="Flag indicating the result set should be constrained to update providers.",
             arg_type=get_three_state_flag(),
-            arg_group="Constraint"
-        )
-        context.argument(
-            "by_name",
-            options_list=["--by-name"],
-            help="Flag indicating the result set should be constrained to update names by provider. "
-            "When using this flag --update-provider is required.",
-            arg_type=get_three_state_flag(),
-            arg_group="Constraint"
-        )
-        context.argument(
-            "by_version",
-            options_list=["--by-version"],
-            help="Flag indicating the result set should be constrained to update versions by provider and update name. "
-            "When using this flag --update-provider and --update-name are required.",
-            arg_type=get_three_state_flag(),
-            arg_group="Constraint"
         )
         context.argument(
             "search",
             options_list=["--search"],
             help="Request updates matching a free-text search expression. "
-            "Supported with no constraint flags.",
+            "Supported by list updates with no constraints.",
             arg_group="Filter",
         )
         context.argument(
             "filter",
             options_list=["--filter"],
             help="Restricts the set of updates returned by property values. "
-            "Supported with --by-version and no constraint flags. ",
+            "Supported by list update versions and list updates with no constraints.",
             arg_group="Filter",
         )
 
