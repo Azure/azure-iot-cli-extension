@@ -39,19 +39,29 @@ def list_updates(
 
     try:
         if by_provider:
+            if any([search, filter, update_name, update_provider]):
+                logger.warning(
+                    "--search, --filter, --update-name and --update-provider are not applicable "
+                    "when using --by-provider.")
             return data_manager.data_client.device_update.list_providers()
         if by_name:
             if not update_provider:
                 raise ArgumentUsageError("--update-provider is required when using --by-name.")
+            if any([search, filter, update_name]):
+                logger.warning("--search, --filter and --update-name are not applicable when using --by-name.")
             return data_manager.data_client.device_update.list_names(provider=update_provider)
         if by_version:
-            if not all([update_provider, update_name]):
+            if not all([update_name, update_provider]):
                 raise ArgumentUsageError(
                     "--update-provider and --update-name are required when using --by-version"
                 )
+            if any([search]):
+                logger.warning("--search is not applicable when using --by-version.")
             return data_manager.data_client.device_update.list_versions(
                 provider=update_provider, name=update_name, filter=filter
             )
+        if any([update_name, update_provider]):
+            logger.warning("--update-name and --update-provider are not applicable when listing updates with no constraints.")
         return data_manager.data_client.device_update.list_updates(search=search, filter=filter)
     except AzureError as e:
         handle_service_exception(e)
