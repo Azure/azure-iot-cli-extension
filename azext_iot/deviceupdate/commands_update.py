@@ -39,15 +39,15 @@ def list_updates(
                     "--search, --filter, --update-name and --update-provider are not applicable "
                     "when using --by-provider.")
             return data_manager.data_client.device_update.list_providers()
-        if update_provider and update_name:
-            if search:
-                logger.warning("--search is not applicable when listing update versions.")
-            return data_manager.data_client.device_update.list_versions(
-                provider=update_provider, name=update_name, filter=filter
-            )
         if update_provider:
+            if update_name:
+                if search:
+                    logger.warning("--search is not applicable when listing update versions by provider and name.")
+                return data_manager.data_client.device_update.list_versions(
+                    provider=update_provider, name=update_name, filter=filter
+                )
             if any([search, filter, update_name]):
-                logger.warning("--search, --filter and --update-name are not applicable when listing update names.")
+                logger.warning("--search, --filter and --update-name are not applicable when listing update names by provider.")
             return data_manager.data_client.device_update.list_names(provider=update_provider)
         if update_name:
             logger.warning("Use --update-name with --update-provider to list updates by version.")
