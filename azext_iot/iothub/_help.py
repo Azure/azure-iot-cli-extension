@@ -332,16 +332,16 @@ def load_iothub_help():
         examples:
           - name: Create a Cosmos DB Collection endpoint for your IoT Hub using a connection string.
             text: >
-                az iot hub messaging-endpoint create cosmosdb-collection -n {iothub_name} --en {endpoint_name} -c {connection_string} --cn {collection} --db {database}
+                az iot hub messaging-endpoint create cosmosdb-collection -n {iothub_name} --en {endpoint_name} -c {connection_string} --collection {collection} --db {database}
           - name: Create a Cosmos DB Collection endpoint for your IoT Hub using the specified primary key and endpoint uri.
             text: >
-                az iot hub messaging-endpoint create cosmosdb-collection -n {iothub_name} --en {endpoint_name} --pk {primary_key} --endpoint-uri {endpoint_uri} --cn {collection} --db {database}
+                az iot hub messaging-endpoint create cosmosdb-collection -n {iothub_name} --en {endpoint_name} --pk {primary_key} --endpoint-uri {endpoint_uri} --collection {collection} --db {database}
           - name: Create a Cosmos DB Collection endpoint for your IoT Hub using system assigned identity and a partition key name. The partition key template will be the default.
             text: >
-                az iot hub messaging-endpoint create cosmosdb-collection -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri} --cn {collection} --db {database} --auth-type identityBased --pkn {partition_key_name}
+                az iot hub messaging-endpoint create cosmosdb-collection -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri} --collection {collection} --db {database} --auth-type identityBased --pkn {partition_key_name}
           - name: Create a Cosmos DB Collection endpoint for your IoT Hub using user assigned identity, partition key name, and partition key template.
             text: >
-                az iot hub messaging-endpoint create cosmosdb-collection -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri} --cn {collection} --db {database} --auth-type identityBased --pkn {partition_key_name} --pkt {partition_key_template}
+                az iot hub messaging-endpoint create cosmosdb-collection -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri} --collection {collection} --db {database} --auth-type identityBased --pkn {partition_key_name} --pkt {partition_key_template}
     """
 
     helps[
@@ -403,13 +403,13 @@ def load_iothub_help():
         examples:
           - name: Create a Storage Container endpoint for your IoT Hub using a connection string. The endpoint uri is omitted because it is in the connection string.
             text: >
-                az iot hub messaging-endpoint create storage-container -n {iothub_name} --en {endpoint_name} -c {connection_string} --cn {container_name}
+                az iot hub messaging-endpoint create storage-container -n {iothub_name} --en {endpoint_name} -c {connection_string} --container {container_name}
           - name: Create a Storage Container endpoint for your IoT Hub using system assigned identity with the given batch frequency, chunk size, and file name format. The endpoint must be specified.
             text: >
-                az iot hub messaging-endpoint create storage-container -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri} --auth-type identityBased --entity-path {entity_path} --cn {container_name} -b {batch_frequency} -w {chunk_size} --ff {file_format}
+                az iot hub messaging-endpoint create storage-container -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri} --auth-type identityBased --entity-path {entity_path} --container {container_name} -b {batch_frequency} -w {chunk_size} --ff {file_format}
           - name: Create a Storage Container endpoint for your IoT Hub using user assigned identity with json encoding. The endpoint must be specified.
             text: >
-                az iot hub messaging-endpoint create storage-container -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri} --auth-type identityBased --entity-path {entity_path} --cn {container_name} --encoding json
+                az iot hub messaging-endpoint create storage-container -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri} --auth-type identityBased --entity-path {entity_path} --container {container_name} --encoding json
     """
 
     helps[

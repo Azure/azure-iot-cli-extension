@@ -43,7 +43,10 @@ def load_iothub_commands(self, _):
         cmd_group.show_command("show", "message_endpoint_show")
         cmd_group.command("list", "message_endpoint_list")
         cmd_group.command(
-            "delete", "message_endpoint_delete", transform=EndpointUpdateResultTransform(self.cli_ctx)
+            "delete",
+            "message_endpoint_delete",
+            transform=EndpointUpdateResultTransform(self.cli_ctx),
+            confirmation=True
         )
 
     with self.command_group(

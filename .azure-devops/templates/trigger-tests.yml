@@ -123,7 +123,7 @@ jobs:
 
 - job: 'testHub_job_3'
   condition: and(succeeded(), eq('${{ parameters.testHub }}', true))
-  displayName: 'Test IoT Hub - devices, messaging and modules'
+  displayName: 'Test IoT Hub - routing endpoints'
   strategy:
     matrix: $[ variables['pythonVersions'] ]
     maxParallel: ${{ parameters.maxParallelHub }}

@@ -343,12 +343,12 @@ def load_iothub_arguments(self, _):
     with self.argument_context("iot hub messaging-endpoint create cosmosdb-collection") as context:
         context.argument(
             'database_name',
-            options_list=['--database-name', '--dn'],
+            options_list=['--database-name', '--db'],
             help='The name of the cosmos DB database in the cosmos DB account. Required for Cosmos DB SQL Collection Endpoints.',
         )
         context.argument(
             'collection_name',
-            options_list=['--collection-name', '--cn'],
+            options_list=['--collection-name', '--collection'],
             help='The name of the cosmos DB sql collection in the cosmos DB database. Required for Cosmos DB SQL Collection Endpoints.',
         )
         context.argument(

@@ -193,76 +193,58 @@ class MessageEndpoint(IoTHubProvider):
 
     def show(self, endpoint_name: str):
         endpoints = self.hub_resource.properties.routing.endpoints
-        for endpoint in endpoints.event_hubs:
-            if endpoint.name.lower() == endpoint_name.lower():
-                return endpoint
-        for endpoint in endpoints.service_bus_queues:
-            if endpoint.name.lower() == endpoint_name.lower():
-                return endpoint
-        for endpoint in endpoints.service_bus_topics:
-            if endpoint.name.lower() == endpoint_name.lower():
-                return endpoint
-        for endpoint in endpoints.cosmos_db_sql_collections:
-            if endpoint.name.lower() == endpoint_name.lower():
-                return endpoint
-        for endpoint in endpoints.storage_containers:
-            if endpoint.name.lower() == endpoint_name.lower():
-                return endpoint
-        # for endpoint_list in self.hub_resource.properties.routing.endpoints.values():
-        #     for endpoint in endpoint_list:
-        #         if endpoint.name.lower() == endpoint_name.lower():
-        #             return endpoint
+        endpoint_lists = [endpoints.event_hubs, endpoints.service_bus_queues, endpoints.service_bus_topics, endpoints.cosmos_db_sql_collections, endpoints.storage_containers]
+        for endpoint_list in endpoint_lists:
+            for endpoint in endpoint_list:
+                if endpoint.name.lower() == endpoint_name.lower():
+                    return endpoint
         raise ResourceNotFoundError("No endpoint found.")
 
     def list(self, endpoint_type: Optional[str] = None):
         endpoints = self.hub_resource.properties.routing.endpoints
         if not endpoint_type:
             return endpoints
-        if EndpointType.EventHub.value == endpoint_type.lower():
+        endpoint_type = endpoint_type.lower()
+        if EndpointType.EventHub.value == endpoint_type:
             return endpoints.event_hubs
-        if EndpointType.ServiceBusQueue.value == endpoint_type.lower():
+        if EndpointType.ServiceBusQueue.value == endpoint_type:
             return endpoints.service_bus_queues
-        if EndpointType.ServiceBusTopic.value == endpoint_type.lower():
+        if EndpointType.ServiceBusTopic.value == endpoint_type:
             return endpoints.service_bus_topics
-        if EndpointType.CosmosDBCollection.value == endpoint_type.lower():
+        if EndpointType.CosmosDBCollection.value == endpoint_type:
             return endpoints.cosmos_db_sql_collections
-        if EndpointType.AzureStorageContainer.value == endpoint_type.lower():
+        if EndpointType.AzureStorageContainer.value == endpoint_type:
             return endpoints.storage_containers
 
     def delete(self, endpoint_name: Optional[str] = None, endpoint_type: Optional[str] = None):
         endpoints = self.hub_resource.properties.routing.endpoints
         if endpoint_type:
-            if EndpointType.EventHub.value == endpoint_type.lower():
-                endpoints.event_hubs = []
-            elif EndpointType.ServiceBusQueue.value == endpoint_type.lower():
-                endpoints.service_bus_queues = []
-            elif EndpointType.ServiceBusTopic.value == endpoint_type.lower():
-                endpoints.service_bus_topics = []
-            elif EndpointType.CosmosDBCollection.value == endpoint_type.lower():
-                endpoints.cosmos_db_sql_collections = []
-            elif EndpointType.AzureStorageContainer.value == endpoint_type.lower():
-                endpoints.storage_containers = []
-
+            endpoint_type = endpoint_type.lower()
         if endpoint_name:
-            if any(e.name.lower() == endpoint_name.lower() for e in endpoints.event_hubs):
-                remaining_endpoints = [e for e in endpoints.event_hubs if e.name.lower() != endpoint_name.lower()]
-                endpoints.event_hubs = remaining_endpoints
-            elif any(e.name.lower() == endpoint_name.lower() for e in endpoints.service_bus_queues):
-                remaining_endpoints = [e for e in endpoints.service_bus_queues if e.name.lower() != endpoint_name.lower()]
-                endpoints.service_bus_queues = remaining_endpoints
-            elif any(e.name.lower() == endpoint_name.lower() for e in endpoints.service_bus_topics):
-                remaining_endpoints = [e for e in endpoints.service_bus_topics if e.name.lower() != endpoint_name.lower()]
-                endpoints.service_bus_topics = remaining_endpoints
-            elif any(e.name.lower() == endpoint_name.lower() for e in endpoints.cosmos_db_sql_collections):
-                remaining_endpoints = [e for e in endpoints.cosmos_db_sql_collections if e.name.lower() != endpoint_name.lower()]
-                endpoints.cosmos_db_sql_collections = remaining_endpoints
-            elif any(e.name.lower() == endpoint_name.lower() for e in endpoints.storage_containers):
-                remaining_endpoints = [e for e in endpoints.storage_containers if e.name.lower() != endpoint_name.lower()]
-                endpoints.storage_containers = remaining_endpoints
-            # for endpoint_type in endpoints:
-            #     if any(e.name.lower() == endpoint_name.lower() for e in endpoints[endpoint_type]):
-            #         remaining_endpoints = [e for e in endpoints[endpoint_type] if e.name.lower() != endpoint_name.lower()]
-            #         endpoints[endpoint_type] = remaining_endpoints
+            endpoint_name = endpoint_name.lower()
+
+            if not endpoint_type or EndpointType.EventHub.value == endpoint_type:
+                endpoints.event_hubs = [e for e in endpoints.event_hubs if e.name.lower() != endpoint_name]
+            elif not endpoint_type or EndpointType.ServiceBusQueue.value == endpoint_type:
+                endpoints.service_bus_queues = [e for e in endpoints.service_bus_queues if e.name.lower() != endpoint_name]
+            elif not endpoint_type or EndpointType.ServiceBusTopic.value == endpoint_type:
+                endpoints.service_bus_topics = [e for e in endpoints.service_bus_topics if e.name.lower() != endpoint_name]
+            elif not endpoint_type or EndpointType.CosmosDBCollection.value == endpoint_type:
+                endpoints.cosmos_db_sql_collections = [e for e in endpoints.cosmos_db_sql_collections if e.name.lower() != endpoint_name]
+            elif not endpoint_type or EndpointType.AzureStorageContainer.value == endpoint_type:
+                endpoints.storage_containers = [e for e in endpoints.storage_containers if e.name.lower() != endpoint_name]
+
+        elif endpoint_type:
+            if EndpointType.EventHub.value == endpoint_type:
+                endpoints.event_hubs = []
+            elif EndpointType.ServiceBusQueue.value == endpoint_type:
+                endpoints.service_bus_queues = []
+            elif EndpointType.ServiceBusTopic.value == endpoint_type:
+                endpoints.service_bus_topics = []
+            elif EndpointType.CosmosDBCollection.value == endpoint_type:
+                endpoints.cosmos_db_sql_collections = []
+            elif EndpointType.AzureStorageContainer.value == endpoint_type:
+                endpoints.storage_containers = []
 
         if not endpoint_type and not endpoint_name:
             endpoints.event_hubs = []
