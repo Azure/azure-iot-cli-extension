@@ -8,7 +8,7 @@ import pytest
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.settings import DynamoSettings
 from azext_iot.tests.generators import generate_generic_id
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict, Any
 from knack.log import get_logger
 
 logger = get_logger(__name__)
@@ -17,11 +17,13 @@ logger = get_logger(__name__)
 cli = EmbeddedCLI()
 
 
-required_test_env_vars = ["azext_iot_testrg"]
-settings = DynamoSettings(req_env_set=required_test_env_vars)
+REQUIRED_TEST_ENV_VARS = ["azext_iot_testrg"]
+settings = DynamoSettings(req_env_set=REQUIRED_TEST_ENV_VARS)
 
 ACCOUNT_RG = settings.env.azext_iot_testrg
 VALID_IDENTITY_MAP = {"system": 1, "user": 1}
+DEFAULT_ADU_RBAC_SLEEP_SEC = 90
+ADU_CLIENT_DTMI = "dtmi:azure:iot:deviceUpdateModel;1"
 
 
 def generate_account_id() -> str:
@@ -53,8 +55,23 @@ def tags_to_dict(tags: str) -> dict:
     return result
 
 
+@pytest.fixture(scope="module")
+def provisioned_accounts_module(request, provisioned_storage_module) -> dict:
+    accounts, user_identities = _account_provisioner(request, provisioned_storage_module)
+    yield accounts
+    if accounts:
+        _account_removal(request, accounts, user_identities)
+
+
 @pytest.fixture
-def provisioned_accounts(request, provisioned_storage: dict) -> dict:
+def provisioned_accounts(request, provisioned_storage) -> dict:
+    accounts, user_identities = _account_provisioner(request, provisioned_storage)
+    yield accounts
+    if accounts:
+        _account_removal(request, accounts, user_identities)
+
+
+def _account_provisioner(request, provisioned_storage: dict) -> Tuple[dict, List[dict]]:
     result_accounts = {"accounts": {}}
     if provisioned_storage:
         result_accounts["storage"] = provisioned_storage
@@ -63,7 +80,6 @@ def provisioned_accounts(request, provisioned_storage: dict) -> dict:
     desired_location = None
     desired_tags = None
     desired_count = None
-    desired_delete = True
     desired_public_network_access = None
     desired_identity = None
     desired_sku = None
@@ -72,7 +88,6 @@ def provisioned_accounts(request, provisioned_storage: dict) -> dict:
         desired_location = acct_marker.kwargs.get("location")
         desired_tags = acct_marker.kwargs.get("tags")
         desired_count = acct_marker.kwargs.get("count", 1)
-        desired_delete = acct_marker.kwargs.get("delete", True)
         desired_public_network_access = acct_marker.kwargs.get(
             "public_network_access"
         )
@@ -153,17 +168,22 @@ def provisioned_accounts(request, provisioned_storage: dict) -> dict:
         if not any([user_identities, system_identity]):
             assert account["identity"] is None
 
-    yield result_accounts
+    return result_accounts, user_identities
+
+
+def _account_removal(request, accounts: dict, user_identities: Optional[List[dict]]):
+    acct_marker = request.node.get_closest_marker("adu_infrastructure")
+    desired_delete = acct_marker.kwargs.get("delete", True)
 
     if not desired_delete:
         return
 
     account_delete_failures = []
-    for account_name in result_accounts["accounts"]:
+    for account_name in accounts["accounts"]:
         delete_command = f"iot device-update account delete -g {ACCOUNT_RG} -n {account_name} --no-wait -y"
         acct_delete_result = cli.invoke(delete_command)
         if not acct_delete_result.success():
-            account_delete_failures.append(result_accounts["accounts"][account_name]["id"])
+            account_delete_failures.append(accounts["accounts"][account_name]["id"])
 
     user_delete_failures = []
     for user_identity in user_identities:
@@ -208,8 +228,19 @@ def _process_identity(
     return base_command, user_id_result, system_processed
 
 
+@pytest.fixture(scope="module")
+def provisioned_instances_module(request, provisioned_accounts_module: dict, provisioned_iothubs_module: dict) -> dict:
+    yield _instance_provisioner(request, provisioned_accounts_module, provisioned_iothubs_module)
+    # Non-explicit clean-up of instance done through account deletion.
+
+
 @pytest.fixture
 def provisioned_instances(request, provisioned_accounts: dict, provisioned_iothubs: dict) -> dict:
+    yield _instance_provisioner(request, provisioned_accounts, provisioned_iothubs)
+    # Non-explicit clean-up of instance done through account deletion.
+
+
+def _instance_provisioner(request, provisioned_accounts: dict, provisioned_iothubs: dict) -> dict:
     acct_marker = request.node.get_closest_marker("adu_infrastructure")
     desired_instance_diagnostics = None
     desired_instance_diagnostics_user_storage = None
@@ -253,12 +284,26 @@ def provisioned_instances(request, provisioned_accounts: dict, provisioned_iothu
                 result_map[acct_name][target_instance_name] = target_instance
             else:
                 result_map[acct_name] = {target_instance_name: target_instance}
-    yield result_map
-    # Non-explicit clean-up of instance done through account deletion.
+    return result_map
+
+
+@pytest.fixture(scope="module")
+def provisioned_iothubs_module(request) -> Optional[dict]:
+    result = _iothub_provisioner(request)
+    yield result
+    if result:
+        _iothub_removal(result)
 
 
 @pytest.fixture
 def provisioned_iothubs(request) -> Optional[dict]:
+    result = _iothub_provisioner(request)
+    yield result
+    if result:
+        _iothub_removal(result)
+
+
+def _iothub_provisioner(request) -> Optional[dict]:
     acct_marker = request.node.get_closest_marker("adu_infrastructure")
     if acct_marker:
         desired_instance_count = acct_marker.kwargs.get("instance_count")
@@ -273,17 +318,34 @@ def provisioned_iothubs(request) -> Optional[dict]:
                 create_result = create_result.as_json()
                 hub_id_map[create_result["id"]] = create_result
                 hub_names.append(target_name)
-            yield hub_id_map
-            for target_name in hub_names:
-                delete_result = cli.invoke(f"iot hub delete -g {ACCOUNT_RG} -n {target_name}")
-                if not delete_result.success():
-                    logger.error(f"Failed to delete iot hub resource {target_name}.")
-        else:
-            yield
+            return hub_id_map
+
+
+def _iothub_removal(hub_id_map: Dict[str, Any]):
+    for target_id in hub_id_map:
+        target_name = target_id.split("/")[-1]
+        delete_result = cli.invoke(f"iot hub delete -g {ACCOUNT_RG} -n {target_name}")
+        if not delete_result.success():
+            logger.error(f"Failed to delete iot hub resource {target_name}.")
+
+
+@pytest.fixture(scope="module")
+def provisioned_storage_module(request) -> Optional[dict]:
+    result = _storage_provisioner(request)
+    yield result
+    if result:
+        _storage_removal(result)
 
 
 @pytest.fixture
 def provisioned_storage(request) -> Optional[dict]:
+    result = _storage_provisioner(request)
+    yield result
+    if result:
+        _storage_removal(result)
+
+
+def _storage_provisioner(request):
     acct_marker = request.node.get_closest_marker("adu_infrastructure")
     if acct_marker:
         desired_scope = acct_marker.kwargs.get("scope")
@@ -293,9 +355,10 @@ def provisioned_storage(request) -> Optional[dict]:
             create_result = cli.invoke(f"storage account create -g {ACCOUNT_RG} -n {target_name}")
             if not create_result.success():
                 raise RuntimeError(f"Failed to provision storage account resource {target_name}.")
-            yield create_result.as_json()
-            delete_result = cli.invoke(f"storage account delete -g {ACCOUNT_RG} -n {target_name} -y")
-            if not delete_result.success():
-                logger.error(f"Failed to delete storage account resource {target_name}.")
-        else:
-            yield
+            return create_result.as_json()
+
+
+def _storage_removal(storage_account: dict):
+    delete_result = cli.invoke(f"storage account delete -g {ACCOUNT_RG} -n {storage_account['name']} -y")
+    if not delete_result.success():
+        logger.error(f"Failed to delete storage account resource {storage_account['name']}.")

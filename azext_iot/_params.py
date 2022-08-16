@@ -108,10 +108,10 @@ def load_arguments(self, _):
             arg_group="IoT Hub Identifier"
         )
         context.argument(
-            "device_id", options_list=["--device-id", "-d"], help="Target Device."
+            "device_id", options_list=["--device-id", "-d"], help="Target Device Id."
         )
         context.argument(
-            "module_id", options_list=["--module-id", "-m"], help="Target Module."
+            "module_id", options_list=["--module-id", "-m"], help="Target Module Id."
         )
         context.argument(
             "key_type",
@@ -185,7 +185,7 @@ def load_arguments(self, _):
             "yes",
             options_list=["--yes", "-y"],
             arg_type=get_three_state_flag(),
-            help="Skip user prompts. Indicates acceptance of dependency installation (if required). "
+            help="Skip user prompts. Indicates acceptance of action. "
             "Used primarily for automation scenarios. Default: false",
         )
         context.argument(

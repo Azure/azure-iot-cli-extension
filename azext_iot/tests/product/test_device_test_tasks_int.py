@@ -31,7 +31,7 @@ class TestProductDeviceTestTasks(AICSLiveScenarioTest):
 
         # see if existing task is created
         exists = self.cmd("iot product test task show --running -t {device_test_id} --base-url {BASE_URL}")
-        if(exists.output):
+        if exists.output:
             # delete it before attempting to create a new one
             id = exists.get_output_in_json()[0]['id']
             self.cmd("iot product test task delete -t {} --task-id {} --base-url {}"
