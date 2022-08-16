@@ -74,7 +74,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
             batch_frequency_in_seconds=300,
             encoding="avro",
             file_name_format=default_file_format,
-            max_chunk_size_in_bytes=max_chunk_size_constant * 300
+            max_chunk_size_in_bytes=300
         )
 
         endpoint_output = self.cmd(
@@ -112,7 +112,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
             batch_frequency_in_seconds=60,
             encoding="json",
             file_name_format=self.kwargs["file_format"],
-            max_chunk_size_in_bytes=max_chunk_size_constant * 10
+            max_chunk_size_in_bytes=10
         )
 
         endpoint_output = self.cmd(
@@ -150,7 +150,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
             batch_frequency_in_seconds=720,
             encoding="avro",
             file_name_format=default_file_format,
-            max_chunk_size_in_bytes=max_chunk_size_constant * 500
+            max_chunk_size_in_bytes=500
         )
 
         endpoint_output = self.cmd(
