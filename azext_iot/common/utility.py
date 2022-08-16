@@ -118,7 +118,7 @@ def validate_key_value_pairs(string):
     return result
 
 
-def process_json_arg(content, argument_name, preserve_order=False):
+def process_json_arg(content: str, argument_name: str = "content", preserve_order=False):
     """Primary processor of json input"""
 
     json_from_file = None
@@ -580,6 +580,8 @@ def ensure_azure_namespace_path():
     from azext_iot.constants import EXTENSION_NAME
 
     ext_path = get_extension_path(EXTENSION_NAME)
+    if not ext_path:
+        return
 
     ext_azure_dir = os.path.join(ext_path, "azure")
     if os.path.isdir(ext_azure_dir):
@@ -597,3 +599,17 @@ def ensure_azure_namespace_path():
         sys.path.insert(0, ext_path)
 
     return
+
+
+def is_valid_dtmi(dtmi):
+    """Checks validity of a DTMI
+    :param str dtmi: DTMI
+    :returns: Boolean indicating if DTMI is valid
+    :rtype: bool
+    """
+    pattern = re.compile(
+        "^dtmi:[A-Za-z](?:[A-Za-z0-9_]*[A-Za-z0-9])?(?::[A-Za-z](?:[A-Za-z0-9_]*[A-Za-z0-9])?)*;[1-9][0-9]{0,8}$"
+    )
+    if not pattern.match(dtmi):
+        return False
+    return True
