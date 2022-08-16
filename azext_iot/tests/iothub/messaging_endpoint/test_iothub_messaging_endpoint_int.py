@@ -178,7 +178,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # Delete one event hub endpoint
         self.cmd(
-            "iot hub messaging-endpoint delete -n {} -g {} --en {}".format(
+            "iot hub messaging-endpoint delete -n {} -g {} --en {} -y".format(
                 self.entity_name, self.entity_rg, endpoint_names[0]
             )
         )
@@ -194,7 +194,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # Delete all event hub endpoints
         self.cmd(
-            "iot hub messaging-endpoint delete -n {} -g {} -t {}".format(
+            "iot hub messaging-endpoint delete -n {} -g {} -t {} -y".format(
                 self.entity_name, self.entity_rg, "storage-container"
             )
         )
@@ -392,7 +392,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # Delete one (topic)
         self.cmd(
-            "iot hub messaging-endpoint delete -n {} -g {} --en {}".format(
+            "iot hub messaging-endpoint delete -n {} -g {} --en {} -y".format(
                 self.entity_name, self.entity_rg, endpoint_names[0]
             )
         )
@@ -416,7 +416,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # delete all queue
         self.cmd(
-            "iot hub messaging-endpoint delete -n {} -g {} -t {}".format(
+            "iot hub messaging-endpoint delete -n {} -g {} -t {} -y".format(
                 self.entity_name, self.entity_rg, "servicebus-queue"
             )
         )
@@ -439,7 +439,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # delete all
         self.cmd(
-            "iot hub messaging-endpoint delete -n {} -g {}".format(
+            "iot hub messaging-endpoint delete -n {} -g {} -y".format(
                 self.entity_name, self.entity_rg
             )
         )
@@ -459,7 +459,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         partition_template_default = "{deviceid}-{YYYY}-{MM}"
         # use connection string - no pkn or pkt
         self.cmd(
-            "iot hub messaging-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} -c {} --cn {} --dn {}".format(
+            "iot hub messaging-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} -c {} --collection {} --db {}".format(
                 self.entity_name,
                 self.entity_rg,
                 endpoint_names[0],
@@ -494,7 +494,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         # system assigned identity - pkn and default pkt
         self.cmd(
             "iot hub messaging-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} --endpoint-uri {} "
-            "--identity [system] --auth-type identityBased --cn {} --dn {} --pkn {}".format(
+            "--identity [system] --auth-type identityBased --collection {} --db {} --pkn {}".format(
                 self.entity_name,
                 self.entity_rg,
                 endpoint_names[1],
@@ -530,7 +530,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         self.kwargs["template"] = partition_template
         self.cmd(
             "iot hub messaging-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} --endpoint-uri {} "
-            "--identity {} --auth-type identityBased --cn {} --dn {} --pkn {} --pkt {}".format(
+            "--identity {} --auth-type identityBased --collection {} --db {} --pkn {} --pkt {}".format(
                 self.entity_name,
                 self.entity_rg,
                 endpoint_names[2],
@@ -582,7 +582,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # Delete one cosmos endpoint
         self.cmd(
-            "iot hub messaging-endpoint delete -n {} -g {} --en {}".format(
+            "iot hub messaging-endpoint delete -n {} -g {} --en {} -y".format(
                 self.entity_name, self.entity_rg, endpoint_names[0]
             )
         )
@@ -596,7 +596,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # Delete all cosmos endpoints
         self.cmd(
-            "iot hub messaging-endpoint delete -n {} -g {} -t {}".format(
+            "iot hub messaging-endpoint delete -n {} -g {} -t {} -y".format(
                 self.entity_name, self.entity_rg, "cosmosdb-collection"
             )
         )
@@ -709,7 +709,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # Delete one event hub endpoint
         self.cmd(
-            "iot hub messaging-endpoint delete -n {} -g {} --en {}".format(
+            "iot hub messaging-endpoint delete -n {} -g {} --en {} -y".format(
                 self.entity_name, self.entity_rg, endpoint_names[0]
             )
         )
@@ -725,7 +725,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # Delete all event hub endpoints
         self.cmd(
-            "iot hub messaging-endpoint delete -n {} -g {} -t {}".format(
+            "iot hub messaging-endpoint delete -n {} -g {} -t {} -y".format(
                 self.entity_name, self.entity_rg, "eventhub"
             )
         )

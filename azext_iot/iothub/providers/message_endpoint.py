@@ -238,15 +238,15 @@ class MessageEndpoint(IoTHubProvider):
 
             if not endpoint_type or EndpointType.EventHub.value == endpoint_type:
                 endpoints.event_hubs = [e for e in endpoints.event_hubs if e.name.lower() != endpoint_name]
-            elif not endpoint_type or EndpointType.ServiceBusQueue.value == endpoint_type:
+            if not endpoint_type or EndpointType.ServiceBusQueue.value == endpoint_type:
                 endpoints.service_bus_queues = [e for e in endpoints.service_bus_queues if e.name.lower() != endpoint_name]
-            elif not endpoint_type or EndpointType.ServiceBusTopic.value == endpoint_type:
+            if not endpoint_type or EndpointType.ServiceBusTopic.value == endpoint_type:
                 endpoints.service_bus_topics = [e for e in endpoints.service_bus_topics if e.name.lower() != endpoint_name]
-            elif not endpoint_type or EndpointType.CosmosDBCollection.value == endpoint_type:
+            if not endpoint_type or EndpointType.CosmosDBCollection.value == endpoint_type:
                 endpoints.cosmos_db_sql_collections = [
                     e for e in endpoints.cosmos_db_sql_collections if e.name.lower() != endpoint_name
                 ]
-            elif not endpoint_type or EndpointType.AzureStorageContainer.value == endpoint_type:
+            if not endpoint_type or EndpointType.AzureStorageContainer.value == endpoint_type:
                 endpoints.storage_containers = [e for e in endpoints.storage_containers if e.name.lower() != endpoint_name]
 
         elif endpoint_type:
