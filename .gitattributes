@@ -11,3 +11,7 @@
 
 # Some Windows-specific files should always be CRLF
 *.bat eol=crlf
+
+# ADU tests need a manifest hash which is impacted by line endings.
+**/deviceupdate/manifests/**/*.json text eol=lf
+**/deviceupdate/manifests/**/*.sh text eol=lf

@@ -7,6 +7,15 @@ unreleased
 +++++++++++++++
 
 
+0.17.0
++++++++++++++++
+
+**Device Update**
+
+* The Device Update command group supports all data plane functionality via **in-preview** `update` and `device`
+  sub-command groups. The data plane API version used is 2022-07-01-preview.
+
+
 0.16.1
 +++++++++++++++
 
