@@ -1,0 +1,60 @@
+{
+  "updateId": {
+
+    "provider": "Microsoft",
+    "name": "Surface",
+    "version": "1.5"
+  },
+  "isDeployable": true,
+  "compatibility": [
+    {
+      "deviceModel": "Surface",
+      "deviceManufacturer": "Microsoft"
+    }
+  ],
+  "instructions": {
+    "steps": [
+      {
+        "type": "inline",
+        "description": "Pre-install script",
+        "handler": "microsoft/script:1",
+        "files": [ "install.sh" ],
+        "handlerProperties": { "arguments": "--pre" }
+      },
+      {
+        "type": "reference",
+        "description": "Microphone Firmware",
+        "updateId": {
+          "provider": "Microsoft",
+          "name": "Microphone",
+          "version": "1.3"
+        }
+      },
+      {
+        "type": "reference",
+        "description": "Speaker Firmware",
+        "updateId": {
+          "provider": "Microsoft",
+          "name": "Speaker",
+          "version": "1.3"
+        }
+      },
+      {
+        "type": "inline",
+        "description": "Post-install script",
+        "handler": "microsoft/script:1",
+        "files": [ "install.sh" ],
+        "handlerProperties": { "arguments": "--post" }
+      }
+    ]
+  },
+  "files": [
+    {
+      "filename": "install.sh",
+      "sizeInBytes": 23,
+      "hashes": { "sha256": "u6QdeTFImuTiReJ4WP9RlnYABdpd0cs8kuCz2zrHW28=" }
+    }
+  ],
+  "createdDateTime": "2021-11-10T01:30:04.8978755Z",
+  "manifestVersion": "4.0"
+}

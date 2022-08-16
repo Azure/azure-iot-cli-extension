@@ -62,7 +62,12 @@ def reload_modules() -> None:
             importlib.reload(sys.modules[module_name])
 
     # This structure defines the target module for reload, and any prereq removals for a succesful reload.
-    mods_for_reload = {"azure.core": [], "azure.core.utils": ["azure.core.utils._utils"], "azure.mgmt.core": []}
+    mods_for_reload = {
+        "msrest": [],
+        "azure.core": [],
+        "azure.core.utils": ["azure.core.utils._utils"],
+        "azure.mgmt.core": [],
+    }
 
     # Import modules with best attempt
     for mod in mods_for_reload:
