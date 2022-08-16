@@ -6,12 +6,6 @@ Release History
 unreleased
 +++++++++++++++
 
-**IoT Hub Updates**
-
-* Updated the `az iot hub monitor-events` command to support an optional `--message-count` argument.
-  The message-count defines the maximum number of messages received from the hub before the monitor automatically stops.
-  If not provided the monitor keeps running until the user force-kills the monitor.
-
 
 0.17.0
 +++++++++++++++
@@ -20,6 +14,12 @@ unreleased
 
 * The Device Update command group supports all data plane functionality via **in-preview** `update` and `device`
   sub-command groups. The data plane API version used is 2022-07-01-preview.
+
+**IoT Hub Update**
+
+* Updated the `az iot hub monitor-events` command to support an optional `--message-count` argument.
+  The message-count defines the maximum number of messages received from the hub before the monitor automatically stops.
+  If not provided the monitor keeps running until the user force-kills the monitor.
 
 
 0.16.1
