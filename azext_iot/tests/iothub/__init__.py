@@ -283,7 +283,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             account_name=EP_COSMOS_NAMESPACE,
             database_name=EP_COSMOS_DATABASE,
             collection_name=EP_COSMOS_COLLECTION,
-            partition_key_path=EP_COSMOS_PARTITION_PATH,
+            partition_key_path="/" + EP_COSMOS_PARTITION_PATH,
             rg=EP_RG,
             resource_name=ENTITY_NAME,
             create_account=(not settings.env.azext_iot_cosmos_namespace),

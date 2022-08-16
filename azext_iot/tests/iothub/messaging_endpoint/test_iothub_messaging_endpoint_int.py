@@ -459,7 +459,8 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         partition_template_default = "{deviceid}-{YYYY}-{MM}"
         # use connection string - no pkn or pkt
         self.cmd(
-            "iot hub messaging-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} -c {} --collection {} --db {}".format(
+            "iot hub messaging-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} -c {} --collection {} "
+            "--db {}".format(
                 self.entity_name,
                 self.entity_rg,
                 endpoint_names[0],
