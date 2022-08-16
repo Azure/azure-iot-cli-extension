@@ -9,7 +9,6 @@ import os
 
 from inspect import getsourcefile
 from time import sleep
-from typing import Optional
 from azure.iot.device import ProvisioningDeviceClient, IoTHubDeviceClient
 
 from azext_iot.common.utility import read_file_content
@@ -351,7 +350,6 @@ def assign_cosmos_db_role(cmd, principal_id: str, role: str, cosmos_db_account: 
             cosmos_db_account, rg, role, principal_id
         )
     )
-
 
 
 class MockLogger:

@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import Dict, Optional
+from typing import Optional
 from knack.log import get_logger
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
@@ -89,7 +89,9 @@ class MessageEndpoint(IoTHubProvider):
 
         endpoint_identity = None
         if identity and authentication_type != AuthenticationType.IdentityBased.value:
-            raise ArgumentUsageError("In order to use an identity for authentication, you must select --auth-type as 'identityBased'")
+            raise ArgumentUsageError(
+                "In order to use an identity for authentication, you must select --auth-type as 'identityBased'."
+            )
         elif identity and identity not in [IdentityType.none.value, SYSTEM_ASSIGNED_IDENTITY]:
             endpoint_identity = ManagedIdentity(
                 user_assigned_identity=identity
@@ -143,13 +145,18 @@ class MessageEndpoint(IoTHubProvider):
                 if not endpoint_uri:
                     endpoint_uri = parsed_cs["AccountEndpoint"]
             if authentication_type != AuthenticationType.IdentityBased.value and not any([primary_key, secondary_key]):
-                raise RequiredArgumentMissingError("Primary key via --primary-key, secondary key via --secondary-key, or connection string via --connection-string is required.")
+                raise RequiredArgumentMissingError(
+                    "Primary key via --primary-key, secondary key via --secondary-key, or connection string via "
+                    "--connection-string is required."
+                )
             if primary_key and not secondary_key:
                 secondary_key = primary_key
             if secondary_key and not primary_key:
                 primary_key = secondary_key
             if not endpoint_uri:
-                raise RequiredArgumentMissingError("Endpoint uri via --endpoint-uri or connection string via --connection-string is required.")
+                raise RequiredArgumentMissingError(
+                    "Endpoint uri via --endpoint-uri or connection string via --connection-string is required."
+                )
             if partition_key_name and not partition_key_template:
                 partition_key_template = '{deviceid}-{YYYY}-{MM}'
             endpoints.cosmos_db_sql_collections.append({
@@ -188,12 +195,18 @@ class MessageEndpoint(IoTHubProvider):
             resource_group_name,
             self.hub_resource.name,
             self.hub_resource,
-            if_match = self.hub_resource.etag
+            if_match=self.hub_resource.etag
         )
 
     def show(self, endpoint_name: str):
         endpoints = self.hub_resource.properties.routing.endpoints
-        endpoint_lists = [endpoints.event_hubs, endpoints.service_bus_queues, endpoints.service_bus_topics, endpoints.cosmos_db_sql_collections, endpoints.storage_containers]
+        endpoint_lists = [
+            endpoints.event_hubs,
+            endpoints.service_bus_queues,
+            endpoints.service_bus_topics,
+            endpoints.cosmos_db_sql_collections,
+            endpoints.storage_containers
+        ]
         for endpoint_list in endpoint_lists:
             for endpoint in endpoint_list:
                 if endpoint.name.lower() == endpoint_name.lower():
@@ -230,7 +243,9 @@ class MessageEndpoint(IoTHubProvider):
             elif not endpoint_type or EndpointType.ServiceBusTopic.value == endpoint_type:
                 endpoints.service_bus_topics = [e for e in endpoints.service_bus_topics if e.name.lower() != endpoint_name]
             elif not endpoint_type or EndpointType.CosmosDBCollection.value == endpoint_type:
-                endpoints.cosmos_db_sql_collections = [e for e in endpoints.cosmos_db_sql_collections if e.name.lower() != endpoint_name]
+                endpoints.cosmos_db_sql_collections = [
+                    e for e in endpoints.cosmos_db_sql_collections if e.name.lower() != endpoint_name
+                ]
             elif not endpoint_type or EndpointType.AzureStorageContainer.value == endpoint_type:
                 endpoints.storage_containers = [e for e in endpoints.storage_containers if e.name.lower() != endpoint_name]
 
@@ -259,5 +274,5 @@ class MessageEndpoint(IoTHubProvider):
             self.hub_resource.additional_properties['resourcegroup'],
             self.hub_resource.name,
             self.hub_resource,
-            if_match = self.hub_resource.etag
+            if_match=self.hub_resource.etag
         )

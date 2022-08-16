@@ -277,9 +277,9 @@ def load_iothub_arguments(self, _):
         context.argument(
             'identity',
             help='Use a system-assigned or user-assigned managed identity for endpoint '
-                'authentication. Use "[system]" to refer to the system-assigned identity or a resource ID '
-                'to refer to a user-assigned identity. If you use --auth-type without this parameter, '
-                'system-assigned managed identity is assumed.'
+                 'authentication. Use "[system]" to refer to the system-assigned identity or a resource ID '
+                 'to refer to a user-assigned identity. If you use --auth-type without this parameter, '
+                 'system-assigned managed identity is assumed.'
         )
         context.argument(
             "endpoint_resource_group",
@@ -336,9 +336,9 @@ def load_iothub_arguments(self, _):
             'file_name_format',
             options_list=['--file-name-format', '--ff'],
             help='File name format for the blob. The file name format must contain {iothub},'
-                ' {partition}, {YYYY}, {MM}, {DD}, {HH} and {mm} fields. All parameters are'
-                ' mandatory but can be reordered with or without delimiters.'
-            )
+                 ' {partition}, {YYYY}, {MM}, {DD}, {HH} and {mm} fields. All parameters are'
+                 ' mandatory but can be reordered with or without delimiters.'
+        )
 
     with self.argument_context("iot hub messaging-endpoint create cosmosdb-collection") as context:
         context.argument(
@@ -349,7 +349,8 @@ def load_iothub_arguments(self, _):
         context.argument(
             'collection_name',
             options_list=['--collection-name', '--collection'],
-            help='The name of the cosmos DB sql collection in the cosmos DB database. Required for Cosmos DB SQL Collection Endpoints.',
+            help='The name of the cosmos DB sql collection in the cosmos DB database. Required for Cosmos DB SQL Collection '
+                 'Endpoints.',
         )
         context.argument(
             'primary_key',
@@ -371,5 +372,8 @@ def load_iothub_arguments(self, _):
         context.argument(
             'partition_key_template',
             options_list=['--partition-key-template', '--pkt'],
-            help='The template for generating a synthetic partition key value for use with this cosmos DB sql collection. The template must include at least one of the following placeholders: {iothub}, {deviceid}, {DD}, {MM}, and {YYYY}. Any one placeholder may be specified at most once, but order and non-placeholder components are arbitrary. If partition key name is provided, partition key template defaults to {deviceid}-{YYYY}-{MM}',
+            help='The template for generating a synthetic partition key value for use with this cosmos DB sql collection. '
+                 'The template must include at least one of the following placeholders: {iothub}, {deviceid}, {DD}, {MM}, and '
+                 '{YYYY}. Any one placeholder may be specified at most once, but order and non-placeholder components are '
+                 'arbitrary. If partition key name is provided, partition key template defaults to {deviceid}-{YYYY}-{MM}',
         )

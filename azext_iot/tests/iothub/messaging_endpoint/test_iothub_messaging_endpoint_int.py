@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 
+from typing import Optional
 import pytest
 from azext_iot.iothub.common import AuthenticationType
 from azext_iot.tests.iothub import (
@@ -55,7 +56,6 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         endpoint_names = self.generate_device_names(3)
         endpoint_uri = f"https://{STORAGE_ACCOUNT}.blob.core.windows.net"
         default_file_format = "{iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}"
-        max_chunk_size_constant = 1048576
         # use connection string - note how the connection string needs to have entity path and the
         # endpoint uri and path are left blank
         self.cmd(
@@ -66,7 +66,15 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # use defaults
         expected_cs_endpoint = build_expected_endpoint(
-            endpoint_names[0], EP_RG, self.entity_sub, connection_string=self.storage_cstring, container_name=STORAGE_CONTAINER, batch_frequency_in_seconds=300, encoding="avro", file_name_format=default_file_format, max_chunk_size_in_bytes=max_chunk_size_constant*300
+            endpoint_names[0],
+            EP_RG,
+            self.entity_sub,
+            connection_string=self.storage_cstring,
+            container_name=STORAGE_CONTAINER,
+            batch_frequency_in_seconds=300,
+            encoding="avro",
+            file_name_format=default_file_format,
+            max_chunk_size_in_bytes=max_chunk_size_constant * 300
         )
 
         endpoint_output = self.cmd(
@@ -80,14 +88,31 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         # Use hub identity with no defaults
         self.kwargs["file_format"] = default_file_format.replace("/", "_")
         self.cmd(
-            "iot hub messaging-endpoint create storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {} --identity [system] --auth-type identityBased -b {} -w {} --encoding {} --ff {}".format(
-                self.entity_name, self.entity_rg, endpoint_names[1], EP_RG, endpoint_uri, STORAGE_CONTAINER, 60, 10, "json", "{file_format}"
+            "iot hub messaging-endpoint create storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {} "
+            "--identity [system] --auth-type identityBased -b {} -w {} --encoding {} --ff {}".format(
+                self.entity_name,
+                self.entity_rg,
+                endpoint_names[1],
+                EP_RG, endpoint_uri,
+                STORAGE_CONTAINER,
+                60,
+                10,
+                "json",
+                "{file_format}"
             )
         )
 
         expected_sys_endpoint = build_expected_endpoint(
-            endpoint_names[1], EP_RG, self.entity_sub, container_name=STORAGE_CONTAINER, authentication_type=AuthenticationType.IdentityBased.value, endpoint_uri=endpoint_uri,
-            batch_frequency_in_seconds=60, encoding="json", file_name_format=self.kwargs["file_format"], max_chunk_size_in_bytes=max_chunk_size_constant*10
+            endpoint_names[1],
+            EP_RG,
+            self.entity_sub,
+            container_name=STORAGE_CONTAINER,
+            authentication_type=AuthenticationType.IdentityBased.value,
+            endpoint_uri=endpoint_uri,
+            batch_frequency_in_seconds=60,
+            encoding="json",
+            file_name_format=self.kwargs["file_format"],
+            max_chunk_size_in_bytes=max_chunk_size_constant * 10
         )
 
         endpoint_output = self.cmd(
@@ -100,13 +125,32 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # Use user identity
         self.cmd(
-            "iot hub messaging-endpoint create storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {} --identity {} --auth-type identityBased -b {} -w {}".format(
-                self.entity_name, self.entity_rg, endpoint_names[2], EP_RG, endpoint_uri, STORAGE_CONTAINER, self.user_identity_id, 720, 500
+            "iot hub messaging-endpoint create storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {} "
+            "--identity {} --auth-type identityBased -b {} -w {}".format(
+                self.entity_name,
+                self.entity_rg,
+                endpoint_names[2],
+                EP_RG,
+                endpoint_uri,
+                STORAGE_CONTAINER,
+                self.user_identity_id,
+                720,
+                500
             )
         )
 
         expected_user_endpoint = build_expected_endpoint(
-            endpoint_names[2], EP_RG, self.entity_sub, container_name=STORAGE_CONTAINER, authentication_type=AuthenticationType.IdentityBased.value, endpoint_uri=endpoint_uri, identity=self.user_identity_id, batch_frequency_in_seconds=720, encoding="avro", file_name_format=default_file_format, max_chunk_size_in_bytes=max_chunk_size_constant*500
+            endpoint_names[2],
+            EP_RG,
+            self.entity_sub,
+            container_name=STORAGE_CONTAINER,
+            authentication_type=AuthenticationType.IdentityBased.value,
+            endpoint_uri=endpoint_uri,
+            identity=self.user_identity_id,
+            batch_frequency_in_seconds=720,
+            encoding="avro",
+            file_name_format=default_file_format,
+            max_chunk_size_in_bytes=max_chunk_size_constant * 500
         )
 
         endpoint_output = self.cmd(
@@ -191,13 +235,18 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # topic - Use hub identity
         self.cmd(
-            "iot hub messaging-endpoint create servicebus-topic -n {} -g {} --en {} --erg {} --endpoint-uri {} --entity-path {} --identity [system] --auth-type identityBased".format(
+            "iot hub messaging-endpoint create servicebus-topic -n {} -g {} --en {} --erg {} --endpoint-uri {} "
+            "--entity-path {} --identity [system] --auth-type identityBased".format(
                 self.entity_name, self.entity_rg, endpoint_names[1], EP_RG, endpoint_uri, EP_SERVICEBUS_TOPIC
             )
         )
 
         expected_sys_endpoint = build_expected_endpoint(
-            endpoint_names[1], EP_RG, self.entity_sub, entity_path=EP_SERVICEBUS_TOPIC, authentication_type=AuthenticationType.IdentityBased.value, endpoint_uri=endpoint_uri
+            endpoint_names[1],
+            EP_RG, self.entity_sub,
+            entity_path=EP_SERVICEBUS_TOPIC,
+            authentication_type=AuthenticationType.IdentityBased.value,
+            endpoint_uri=endpoint_uri
         )
 
         endpoint_output = self.cmd(
@@ -210,13 +259,26 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # topic - Use user identity
         self.cmd(
-            "iot hub messaging-endpoint create servicebus-topic -n {} -g {} --en {} --erg {} --endpoint-uri {} --entity-path {} --identity {} --auth-type identityBased".format(
-                self.entity_name, self.entity_rg, endpoint_names[2], EP_RG, endpoint_uri, EP_SERVICEBUS_TOPIC, self.user_identity_id
+            "iot hub messaging-endpoint create servicebus-topic -n {} -g {} --en {} --erg {} --endpoint-uri {} "
+            "--entity-path {} --identity {} --auth-type identityBased".format(
+                self.entity_name,
+                self.entity_rg,
+                endpoint_names[2],
+                EP_RG,
+                endpoint_uri,
+                EP_SERVICEBUS_TOPIC,
+                self.user_identity_id
             )
         )
 
         expected_user_endpoint = build_expected_endpoint(
-            endpoint_names[2], EP_RG, self.entity_sub, entity_path=EP_SERVICEBUS_TOPIC, authentication_type=AuthenticationType.IdentityBased.value, endpoint_uri=endpoint_uri, identity=self.user_identity_id
+            endpoint_names[2],
+            EP_RG,
+            self.entity_sub,
+            entity_path=EP_SERVICEBUS_TOPIC,
+            authentication_type=AuthenticationType.IdentityBased.value,
+            endpoint_uri=endpoint_uri,
+            identity=self.user_identity_id
         )
 
         endpoint_output = self.cmd(
@@ -248,13 +310,19 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # queue - Use hub identity
         self.cmd(
-            "iot hub messaging-endpoint create servicebus-queue -n {} -g {} --en {} --erg {} --endpoint-uri {} --entity-path {} --identity [system] --auth-type identityBased".format(
+            "iot hub messaging-endpoint create servicebus-queue -n {} -g {} --en {} --erg {} --endpoint-uri {} "
+            "--entity-path {} --identity [system] --auth-type identityBased".format(
                 self.entity_name, self.entity_rg, endpoint_names[4], EP_RG, endpoint_uri, EP_SERVICEBUS_QUEUE
             )
         )
 
         expected_sys_endpoint = build_expected_endpoint(
-            endpoint_names[4], EP_RG, self.entity_sub, entity_path=EP_SERVICEBUS_QUEUE, authentication_type=AuthenticationType.IdentityBased.value, endpoint_uri=endpoint_uri
+            endpoint_names[4],
+            EP_RG,
+            self.entity_sub,
+            entity_path=EP_SERVICEBUS_QUEUE,
+            authentication_type=AuthenticationType.IdentityBased.value,
+            endpoint_uri=endpoint_uri
         )
 
         endpoint_output = self.cmd(
@@ -267,13 +335,26 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # queue - Use user identity
         self.cmd(
-            "iot hub messaging-endpoint create servicebus-queue -n {} -g {} --en {} --erg {} --endpoint-uri {} --entity-path {} --identity {} --auth-type identityBased".format(
-                self.entity_name, self.entity_rg, endpoint_names[5], EP_RG, endpoint_uri, EP_SERVICEBUS_QUEUE, self.user_identity_id
+            "iot hub messaging-endpoint create servicebus-queue -n {} -g {} --en {} --erg {} --endpoint-uri {} "
+            "--entity-path {} --identity {} --auth-type identityBased".format(
+                self.entity_name,
+                self.entity_rg,
+                endpoint_names[5],
+                EP_RG,
+                endpoint_uri,
+                EP_SERVICEBUS_QUEUE,
+                self.user_identity_id
             )
         )
 
         expected_user_endpoint = build_expected_endpoint(
-            endpoint_names[5], EP_RG, self.entity_sub, entity_path=EP_SERVICEBUS_QUEUE, authentication_type=AuthenticationType.IdentityBased.value, endpoint_uri=endpoint_uri, identity=self.user_identity_id
+            endpoint_names[5],
+            EP_RG,
+            self.entity_sub,
+            entity_path=EP_SERVICEBUS_QUEUE,
+            authentication_type=AuthenticationType.IdentityBased.value,
+            endpoint_uri=endpoint_uri,
+            identity=self.user_identity_id
         )
 
         endpoint_output = self.cmd(
@@ -379,14 +460,27 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         # use connection string - no pkn or pkt
         self.cmd(
             "iot hub messaging-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} -c {} --cn {} --dn {}".format(
-                self.entity_name, self.entity_rg, endpoint_names[0], EP_RG, connection_string, EP_COSMOS_COLLECTION, EP_COSMOS_DATABASE
+                self.entity_name,
+                self.entity_rg,
+                endpoint_names[0],
+                EP_RG,
+                connection_string,
+                EP_COSMOS_COLLECTION,
+                EP_COSMOS_DATABASE
             )
         )
 
         parsed_cs = parse_cosmos_db_connection_string(connection_string)
         endpoint_uri = parsed_cs["AccountEndpoint"]
         expected_cs_endpoint = build_expected_endpoint(
-            endpoint_names[0], EP_RG, self.entity_sub, primary_key=parsed_cs["AccountKey"], secondary_key=parsed_cs["AccountKey"], endpoint_uri=endpoint_uri, collection_name=EP_COSMOS_COLLECTION, database_name=EP_COSMOS_DATABASE
+            endpoint_names[0],
+            EP_RG,
+            self.entity_sub,
+            primary_key=parsed_cs["AccountKey"],
+            secondary_key=parsed_cs["AccountKey"],
+            endpoint_uri=endpoint_uri,
+            collection_name=EP_COSMOS_COLLECTION,
+            database_name=EP_COSMOS_DATABASE
         )
 
         endpoint_output = self.cmd(
@@ -399,13 +493,29 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # system assigned identity - pkn and default pkt
         self.cmd(
-            "iot hub messaging-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} --endpoint-uri {}  --identity [system] --auth-type identityBased --cn {} --dn {} --pkn {}".format(
-                self.entity_name, self.entity_rg, endpoint_names[1], EP_RG, endpoint_uri, EP_COSMOS_COLLECTION, EP_COSMOS_DATABASE, EP_COSMOS_PARTITION_PATH
+            "iot hub messaging-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} --endpoint-uri {} "
+            "--identity [system] --auth-type identityBased --cn {} --dn {} --pkn {}".format(
+                self.entity_name,
+                self.entity_rg,
+                endpoint_names[1],
+                EP_RG,
+                endpoint_uri,
+                EP_COSMOS_COLLECTION,
+                EP_COSMOS_DATABASE,
+                EP_COSMOS_PARTITION_PATH
             )
         )
 
         expected_sys_endpoint = build_expected_endpoint(
-            endpoint_names[1], EP_RG, self.entity_sub, endpoint_uri=endpoint_uri, collection_name=EP_COSMOS_COLLECTION, database_name=EP_COSMOS_DATABASE, partition_key_name=EP_COSMOS_PARTITION_PATH, authentication_type="identityBased", partition_key_template=partition_template_default
+            endpoint_names[1],
+            EP_RG,
+            self.entity_sub,
+            endpoint_uri=endpoint_uri,
+            collection_name=EP_COSMOS_COLLECTION,
+            database_name=EP_COSMOS_DATABASE,
+            partition_key_name=EP_COSMOS_PARTITION_PATH,
+            authentication_type="identityBased",
+            partition_key_template=partition_template_default
         )
 
         endpoint_output = self.cmd(
@@ -419,13 +529,32 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         # user assigned identity - pkn and pkt
         self.kwargs["template"] = partition_template
         self.cmd(
-            "iot hub messaging-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} --endpoint-uri {}  --identity {} --auth-type identityBased --cn {} --dn {} --pkn {} --pkt {}".format(
-                self.entity_name, self.entity_rg, endpoint_names[2], EP_RG, endpoint_uri, self.user_identity_id, EP_COSMOS_COLLECTION, EP_COSMOS_DATABASE, EP_COSMOS_PARTITION_PATH, '{template}'
+            "iot hub messaging-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} --endpoint-uri {} "
+            "--identity {} --auth-type identityBased --cn {} --dn {} --pkn {} --pkt {}".format(
+                self.entity_name,
+                self.entity_rg,
+                endpoint_names[2],
+                EP_RG,
+                endpoint_uri,
+                self.user_identity_id,
+                EP_COSMOS_COLLECTION,
+                EP_COSMOS_DATABASE,
+                EP_COSMOS_PARTITION_PATH,
+                '{template}'
             )
         )
 
         expected_user_endpoint = build_expected_endpoint(
-            endpoint_names[2], EP_RG, self.entity_sub, endpoint_uri=endpoint_uri, collection_name=EP_COSMOS_COLLECTION, database_name=EP_COSMOS_DATABASE, partition_key_name=EP_COSMOS_PARTITION_PATH, authentication_type="identityBased", partition_key_template=partition_template, identity=self.user_identity_id
+            endpoint_names[2],
+            EP_RG,
+            self.entity_sub,
+            endpoint_uri=endpoint_uri,
+            collection_name=EP_COSMOS_COLLECTION,
+            database_name=EP_COSMOS_DATABASE,
+            partition_key_name=EP_COSMOS_PARTITION_PATH,
+            authentication_type="identityBased",
+            partition_key_template=partition_template,
+            identity=self.user_identity_id
         )
 
         endpoint_output = self.cmd(
@@ -508,13 +637,19 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # Use hub identity
         self.cmd(
-            "iot hub messaging-endpoint create eventhub -n {} -g {} --en {} --erg {} --endpoint-uri {} --entity-path {} --identity [system] --auth-type identityBased".format(
+            "iot hub messaging-endpoint create eventhub -n {} -g {} --en {} --erg {} --endpoint-uri {} --entity-path {} "
+            "--identity [system] --auth-type identityBased".format(
                 self.entity_name, self.entity_rg, endpoint_names[1], EP_RG, endpoint_uri, EP_EVENTHUB_INSTANCE
             )
         )
 
         expected_sys_endpoint = build_expected_endpoint(
-            endpoint_names[1], EP_RG, self.entity_sub, entity_path=EP_EVENTHUB_INSTANCE, authentication_type=AuthenticationType.IdentityBased.value, endpoint_uri=endpoint_uri
+            endpoint_names[1],
+            EP_RG,
+            self.entity_sub,
+            entity_path=EP_EVENTHUB_INSTANCE,
+            authentication_type=AuthenticationType.IdentityBased.value,
+            endpoint_uri=endpoint_uri
         )
 
         endpoint_output = self.cmd(
@@ -527,13 +662,26 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # Use user identity
         self.cmd(
-            "iot hub messaging-endpoint create eventhub -n {} -g {} --en {} --erg {} --endpoint-uri {} --entity-path {} --identity {} --auth-type identityBased".format(
-                self.entity_name, self.entity_rg, endpoint_names[2], EP_RG, endpoint_uri, EP_EVENTHUB_INSTANCE, self.user_identity_id
+            "iot hub messaging-endpoint create eventhub -n {} -g {} --en {} --erg {} --endpoint-uri {} --entity-path {} "
+            "--identity {} --auth-type identityBased".format(
+                self.entity_name,
+                self.entity_rg,
+                endpoint_names[2],
+                EP_RG,
+                endpoint_uri,
+                EP_EVENTHUB_INSTANCE,
+                self.user_identity_id
             )
         )
 
         expected_user_endpoint = build_expected_endpoint(
-            endpoint_names[2], EP_RG, self.entity_sub, entity_path=EP_EVENTHUB_INSTANCE, authentication_type=AuthenticationType.IdentityBased.value, endpoint_uri=endpoint_uri, identity=self.user_identity_id
+            endpoint_names[2],
+            EP_RG,
+            self.entity_sub,
+            entity_path=EP_EVENTHUB_INSTANCE,
+            authentication_type=AuthenticationType.IdentityBased.value,
+            endpoint_uri=endpoint_uri,
+            identity=self.user_identity_id
         )
 
         endpoint_output = self.cmd(
@@ -592,7 +740,25 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
 
 def build_expected_endpoint(
-    name, resource_group, subscription_id, authentication_type=None, endpoint_uri=None, identity=None, connection_string=None, entity_path=None, container_name=None, encoding=None, file_name_format=None, batch_frequency_in_seconds=None, max_chunk_size_in_bytes=None, database_name=None, collection_name=None, partition_key_name=None, partition_key_template=None, primary_key=None, secondary_key=None
+    name: str,
+    resource_group: str,
+    subscription_id: str,
+    authentication_type: Optional[str] = None,
+    endpoint_uri: Optional[str] = None,
+    identity: Optional[str] = None,
+    connection_string: Optional[str] = None,
+    entity_path: Optional[str] = None,
+    container_name: Optional[str] = None,
+    encoding: Optional[str] = None,
+    file_name_format: Optional[str] = None,
+    batch_frequency_in_seconds: Optional[int] = None,
+    max_chunk_size_in_bytes: Optional[int] = None,
+    database_name: Optional[str] = None,
+    collection_name: Optional[str] = None,
+    partition_key_name: Optional[str] = None,
+    partition_key_template: Optional[str] = None,
+    primary_key: Optional[str] = None,
+    secondary_key: Optional[str] = None
 ):
     expected = {
         "name": name,
@@ -619,7 +785,8 @@ def build_expected_endpoint(
     if batch_frequency_in_seconds:
         expected["batchFrequencyInSeconds"] = batch_frequency_in_seconds
     if max_chunk_size_in_bytes:
-        expected["maxChunkSizeInBytes"] = max_chunk_size_in_bytes
+        max_chunk_size_constant = 1048576
+        expected["maxChunkSizeInBytes"] = max_chunk_size_in_bytes * max_chunk_size_constant
     if database_name:
         expected["databaseName"] = database_name
     if collection_name:

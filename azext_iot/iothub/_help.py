@@ -406,10 +406,10 @@ def load_iothub_help():
                 az iot hub messaging-endpoint create storage-container -n {iothub_name} --en {endpoint_name} -c {connection_string} --container {container_name}
           - name: Create a Storage Container endpoint for your IoT Hub using system assigned identity with the given batch frequency, chunk size, and file name format. The endpoint must be specified.
             text: >
-                az iot hub messaging-endpoint create storage-container -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri} --auth-type identityBased --entity-path {entity_path} --container {container_name} -b {batch_frequency} -w {chunk_size} --ff {file_format}
+                az iot hub messaging-endpoint create storage-container -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri} --auth-type identityBased --container {container_name} -b {batch_frequency} -w {chunk_size} --ff {file_format}
           - name: Create a Storage Container endpoint for your IoT Hub using user assigned identity with json encoding. The endpoint must be specified.
             text: >
-                az iot hub messaging-endpoint create storage-container -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri} --auth-type identityBased --entity-path {entity_path} --container {container_name} --encoding json
+                az iot hub messaging-endpoint create storage-container -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri} --auth-type identityBased --container {container_name} --encoding json
     """
 
     helps[

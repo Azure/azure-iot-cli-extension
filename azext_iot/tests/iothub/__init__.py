@@ -8,7 +8,17 @@ import pytest
 
 from time import sleep
 from typing import List
-from azext_iot.tests.helpers import add_test_tag, assign_cosmos_db_role, assign_rbac_role, create_cosmos_db, create_event_hub, create_managed_identity, create_service_bus_queue, create_service_bus_topic, create_storage_account
+from azext_iot.tests.helpers import (
+    add_test_tag,
+    assign_cosmos_db_role,
+    assign_rbac_role,
+    create_cosmos_db,
+    create_event_hub,
+    create_managed_identity,
+    create_service_bus_queue,
+    create_service_bus_topic,
+    create_storage_account
+)
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests import CaptureOutputLiveScenarioTest
@@ -235,7 +245,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         assign_rbac_role(
             cmd=self.cmd,
             assignee=self.entity_identity,
-            scope=scope, #eventhub id
+            scope=scope,
             role="Storage Blob Data Contributor",
             max_tries=MAX_RBAC_ASSIGNMENT_TRIES
         )
@@ -244,11 +254,10 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             assign_rbac_role(
                 cmd=self.cmd,
                 assignee=self.user_identity_principal_id,
-                scope=scope, #eventhub id
+                scope=scope,
                 role="Storage Blob Data Contributor",
                 max_tries=MAX_RBAC_ASSIGNMENT_TRIES
             )
-
 
     def _delete_storage_account(self):
         """
@@ -351,7 +360,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         assign_rbac_role(
             cmd=self.cmd,
             assignee=self.entity_identity,
-            scope=scope, #eventhub id
+            scope=scope,
             role=role,
             max_tries=MAX_RBAC_ASSIGNMENT_TRIES
         )
@@ -360,7 +369,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             assign_rbac_role(
                 cmd=self.cmd,
                 assignee=self.user_identity_principal_id,
-                scope=scope, #eventhub id
+                scope=scope,
                 role=role,
                 max_tries=MAX_RBAC_ASSIGNMENT_TRIES
             )
@@ -414,7 +423,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         assign_rbac_role(
             cmd=self.cmd,
             assignee=self.entity_identity,
-            scope=scope, #eventhub id
+            scope=scope,
             role=role,
             max_tries=MAX_RBAC_ASSIGNMENT_TRIES
         )
@@ -423,7 +432,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             assign_rbac_role(
                 cmd=self.cmd,
                 assignee=self.user_identity_principal_id,
-                scope=scope, #eventhub id
+                scope=scope,
                 role=role,
                 max_tries=MAX_RBAC_ASSIGNMENT_TRIES
             )
@@ -450,7 +459,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         assign_rbac_role(
             cmd=self.cmd,
             assignee=self.entity_identity,
-            scope=scope, #queue id
+            scope=scope,
             role=role,
             max_tries=MAX_RBAC_ASSIGNMENT_TRIES
         )
@@ -459,7 +468,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             assign_rbac_role(
                 cmd=self.cmd,
                 assignee=self.user_identity_principal_id,
-                scope=scope, #queue id
+                scope=scope,
                 role=role,
                 max_tries=MAX_RBAC_ASSIGNMENT_TRIES
             )
@@ -485,7 +494,8 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 )
             elif not settings.env.azext_iot_servicebus_policy:
                 self.cmd(
-                    'servicebus topic authorization-rule delete --resource-group {} --namespace-name {} --topic-name {} --name {}'.format(
+                    'servicebus topic authorization-rule delete --resource-group {} --namespace-name {} --topic-name {} '
+                    '--name {}'.format(
                         EP_RG, EP_SERVICEBUS_NAMESPACE, EP_SERVICEBUS_TOPIC, EP_SERVICEBUS_POLICY
                     )
                 )
@@ -498,7 +508,8 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 )
             elif not settings.env.azext_iot_servicebus_policy:
                 self.cmd(
-                    'servicebus queue authorization-rule delete --resource-group {} --namespace-name {} --queue-name {} --name {}'.format(
+                    'servicebus queue authorization-rule delete --resource-group {} --namespace-name {} --queue-name {} '
+                    '--name {}'.format(
                         EP_RG, EP_SERVICEBUS_NAMESPACE, EP_SERVICEBUS_QUEUE, EP_SERVICEBUS_POLICY
                     )
                 )
@@ -552,7 +563,6 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 self.entity_name, self.entity_rg
             )
         ).get_output_in_json()["principalId"]
-
 
     def tearDown(self):
         device_list = []

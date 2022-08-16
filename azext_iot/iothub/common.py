@@ -42,10 +42,10 @@ class IdentityType(Enum):
     system_assigned_user_assigned = "SystemAssigned, UserAssigned"
     none = "None"
 
+
 class EncodingFormat(Enum):
     """
     Type of the encoding format for the container.
     """
     JSON = 'json'
     AVRO = 'avro'
-

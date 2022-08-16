@@ -11,7 +11,6 @@ from knack.log import get_logger
 logger = get_logger(__name__)
 
 
-# TODO: fix typing for auth type
 def message_endpoint_create_event_hub(
     cmd,
     hub_name: str,
@@ -173,6 +172,7 @@ def message_endpoint_create_storage_container(
         endpoint_uri=endpoint_uri,
         identity=identity
     )
+
 
 def message_endpoint_show(
     cmd,

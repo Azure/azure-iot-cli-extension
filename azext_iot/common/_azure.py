@@ -50,6 +50,7 @@ def parse_cosmos_db_connection_string(cs):
     validate = ["AccountEndpoint", "AccountKey"]
     return _parse_connection_string(cs, validate, "Cosmos DB Collection")
 
+
 def parse_event_hub_connection_string(cs):
     # note that this is for an event hub instance, not namespace
     validate = ["Endpoint", "SharedAccessKeyName", "SharedAccessKey", "EntityPath"]

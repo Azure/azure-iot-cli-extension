@@ -18,11 +18,13 @@ device_messaging_ops = CliCommandType(
     operations_tmpl="azext_iot.iothub.commands_device_messaging#{}"
 )
 
+
 class EndpointUpdateResultTransform(LongRunningOperation):  # pylint: disable=too-few-public-methods
     def __call__(self, poller):
         result = super(EndpointUpdateResultTransform, self).__call__(poller)
         return result.properties.routing.endpoints
         # return result["properties"]["routing"]["endpoints"]
+
 
 def load_iothub_commands(self, _):
     """
