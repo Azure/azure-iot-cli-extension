@@ -151,7 +151,7 @@ jobs:
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
       pythonVersion: $(python)
       num_reruns: 0
-      num_threads: 2
+      num_threads: 3
       serviceConnection: $(AzureServiceConnectionAlt)
 
 - job: 'unitTests'

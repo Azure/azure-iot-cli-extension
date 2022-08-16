@@ -1,0 +1,37 @@
+{
+    "updateId": {
+        "provider": "digimaun",
+        "name": "simpleaptupdate",
+        "version": "1.0.0.0"
+    },
+    "compatibility": [{
+            "deviceManufacturer": "Contoso",
+            "deviceModel": "Vacuum"
+        },
+        {
+            "deviceManufacturer": "Contoso",
+            "deviceModel": "Radio"
+        }
+    ],
+    "instructions": {
+        "steps": [{
+            "description": "Example APT update that install libcurl4-doc on a host device.",
+            "handler": "microsoft/apt:1",
+            "files": [
+                "libcurl4-doc-apt-manifest.json"
+            ],
+            "handlerProperties": {
+                "installedCriteria": "libcurl4-doc-apt-manifest"
+            }
+        }]
+    },
+    "files": [{
+        "filename": "libcurl4-doc-apt-manifest.json",
+        "sizeInBytes": 169,
+        "hashes": {
+            "sha256": "cYhedpblfuRmq0fM7jbzBiI6FjDTqVb+U0qkdgd9+fk="
+        }
+    }],
+    "createdDateTime": "2022-07-12T00:02:41.2100526Z",
+    "manifestVersion": "5.0"
+}
