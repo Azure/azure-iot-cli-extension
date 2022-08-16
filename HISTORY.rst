@@ -6,6 +6,12 @@ Release History
 unreleased
 +++++++++++++++
 
+**IoT Hub Updates**
+
+* Updated the `az iot hub monitor-events` command to support an optional `--message-count` argument.
+  The message-count defines the maximum number of messages received from the hub before the monitor automatically stops.
+  If not provided the monitor keeps running until the user force-kills the monitor.
+
 
 0.17.0
 +++++++++++++++
