@@ -7,6 +7,7 @@
 from azure.cli.core.commands import AzCliCommand
 from azext_iot.common.utility import init_monitoring
 from azext_iot.monitor.models.enum import Severity
+from typing import Optional
 
 
 class TelemetryArguments:
@@ -50,7 +51,7 @@ class CommonHandlerArguments:
         device_id="",
         interface_name="",
         module_id="",
-        max_messages: int = None,
+        max_messages: Optional[int] = None,
     ):
         self.output = output
         self.devices = devices or []

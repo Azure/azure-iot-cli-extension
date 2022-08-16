@@ -22,6 +22,7 @@ import hashlib
 from threading import Event, Thread
 from datetime import datetime
 from knack.log import get_logger
+from typing import Optional
 from azure.cli.core.azclierror import (
     CLIInternalError,
     FileOperationError,
@@ -411,7 +412,7 @@ def calculate_millisec_since_unix_epoch_utc(offset_seconds: int = 0):
     return int(1000 * ((now - epoch).total_seconds() + offset_seconds))
 
 
-def init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes, message_count: int = None):
+def init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes, message_count: Optional[int] = None):
     from azext_iot.common.deps import ensure_uamqp
 
     if timeout < 0:

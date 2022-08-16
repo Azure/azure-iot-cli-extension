@@ -47,6 +47,7 @@ from azext_iot.common.utility import (
 )
 from azext_iot._factory import SdkResolver, CloudError
 from azext_iot.operations.generic import _execute_query, _process_top
+from typing import Optional
 import pprint
 
 logger = get_logger(__name__)
@@ -2401,7 +2402,7 @@ def iot_hub_monitor_events(
     login=None,
     content_type=None,
     device_query=None,
-    message_count: int = None,
+    message_count: Optional[int] = None,
 ):
     try:
         _iot_hub_monitor_events(
@@ -2493,7 +2494,7 @@ def _iot_hub_monitor_events(
     login=None,
     content_type=None,
     device_query=None,
-    message_count: int = None,
+    message_count: Optional[int] = None,
 ):
     (enqueued_time, properties, timeout, output, message_count) = init_monitoring(
         cmd, timeout, properties, enqueued_time, repair, yes, message_count
