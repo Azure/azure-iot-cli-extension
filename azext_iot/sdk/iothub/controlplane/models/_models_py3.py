@@ -11,7 +11,8 @@ import datetime
 import sys
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
 
-from .. import _serialization
+
+import msrest.serialization
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import,ungrouped-imports
@@ -20,10 +21,10 @@ if sys.version_info >= (3, 9):
     from collections.abc import MutableMapping
 else:
     from typing import MutableMapping  # type: ignore  # pylint: disable=ungrouped-imports
-JSON = MutableMapping[str, Any]  # pylint: disable=unsubscriptable-object
+JSON = MutableMapping[str, Any] # pylint: disable=unsubscriptable-object
 
 
-class ArmIdentity(_serialization.Model):
+class ArmIdentity(msrest.serialization.Model):
     """ArmIdentity.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -36,14 +37,15 @@ class ArmIdentity(_serialization.Model):
      includes both an implicitly created identity and a set of user assigned identities. The type
      'None' will remove any identities from the service. Known values are: "SystemAssigned",
      "UserAssigned", "SystemAssigned, UserAssigned", and "None".
-    :vartype type: str or ~azure.mgmt.iothub.models.ResourceIdentityType
+    :vartype type: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.ResourceIdentityType
     :ivar user_assigned_identities: Dictionary of :code:`<ArmUserIdentity>`.
-    :vartype user_assigned_identities: dict[str, ~azure.mgmt.iothub.models.ArmUserIdentity]
+    :vartype user_assigned_identities: dict[str,
+     ~azure.mgmt.iothub.v2022_04_30_preview.models.ArmUserIdentity]
     """
 
     _validation = {
-        "principal_id": {"readonly": True},
-        "tenant_id": {"readonly": True},
+        'principal_id': {'readonly': True},
+        'tenant_id': {'readonly': True},
     }
 
     _attribute_map = {
@@ -65,9 +67,10 @@ class ArmIdentity(_serialization.Model):
          'SystemAssigned,UserAssigned' includes both an implicitly created identity and a set of user
          assigned identities. The type 'None' will remove any identities from the service. Known values
          are: "SystemAssigned", "UserAssigned", "SystemAssigned, UserAssigned", and "None".
-        :paramtype type: str or ~azure.mgmt.iothub.models.ResourceIdentityType
+        :paramtype type: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.ResourceIdentityType
         :keyword user_assigned_identities: Dictionary of :code:`<ArmUserIdentity>`.
-        :paramtype user_assigned_identities: dict[str, ~azure.mgmt.iothub.models.ArmUserIdentity]
+        :paramtype user_assigned_identities: dict[str,
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.ArmUserIdentity]
         """
         super().__init__(**kwargs)
         self.principal_id = None
@@ -76,7 +79,7 @@ class ArmIdentity(_serialization.Model):
         self.user_assigned_identities = user_assigned_identities
 
 
-class ArmUserIdentity(_serialization.Model):
+class ArmUserIdentity(msrest.serialization.Model):
     """ArmUserIdentity.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -88,8 +91,8 @@ class ArmUserIdentity(_serialization.Model):
     """
 
     _validation = {
-        "principal_id": {"readonly": True},
-        "client_id": {"readonly": True},
+        'principal_id': {'readonly': True},
+        'client_id': {'readonly': True},
     }
 
     _attribute_map = {
@@ -97,14 +100,18 @@ class ArmUserIdentity(_serialization.Model):
         "client_id": {"key": "clientId", "type": "str"},
     }
 
-    def __init__(self, **kwargs):
-        """ """
+    def __init__(
+        self,
+        **kwargs
+    ):
+        """
+        """
         super().__init__(**kwargs)
         self.principal_id = None
         self.client_id = None
 
 
-class CertificateBodyDescription(_serialization.Model):
+class CertificateBodyDescription(msrest.serialization.Model):
     """The JSON-serialized X509 Certificate.
 
     :ivar certificate: base-64 representation of the X509 leaf certificate .cer file or just .pem
@@ -120,7 +127,13 @@ class CertificateBodyDescription(_serialization.Model):
         "is_verified": {"key": "isVerified", "type": "bool"},
     }
 
-    def __init__(self, *, certificate: Optional[str] = None, is_verified: Optional[bool] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        certificate: Optional[str] = None,
+        is_verified: Optional[bool] = None,
+        **kwargs
+    ):
         """
         :keyword certificate: base-64 representation of the X509 leaf certificate .cer file or just
          .pem file content.
@@ -134,13 +147,13 @@ class CertificateBodyDescription(_serialization.Model):
         self.is_verified = is_verified
 
 
-class CertificateDescription(_serialization.Model):
+class CertificateDescription(msrest.serialization.Model):
     """The X509 Certificate.
 
     Variables are only populated by the server, and will be ignored when sending a request.
 
     :ivar properties: The description of an X509 CA Certificate.
-    :vartype properties: ~azure.mgmt.iothub.models.CertificateProperties
+    :vartype properties: ~azure.mgmt.iothub.v2022_04_30_preview.models.CertificateProperties
     :ivar id: The resource identifier.
     :vartype id: str
     :ivar name: The name of the certificate.
@@ -152,10 +165,10 @@ class CertificateDescription(_serialization.Model):
     """
 
     _validation = {
-        "id": {"readonly": True},
-        "name": {"readonly": True},
-        "etag": {"readonly": True},
-        "type": {"readonly": True},
+        'id': {'readonly': True},
+        'name': {'readonly': True},
+        'etag': {'readonly': True},
+        'type': {'readonly': True},
     }
 
     _attribute_map = {
@@ -166,10 +179,15 @@ class CertificateDescription(_serialization.Model):
         "type": {"key": "type", "type": "str"},
     }
 
-    def __init__(self, *, properties: Optional["_models.CertificateProperties"] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        properties: Optional["_models.CertificateProperties"] = None,
+        **kwargs
+    ):
         """
         :keyword properties: The description of an X509 CA Certificate.
-        :paramtype properties: ~azure.mgmt.iothub.models.CertificateProperties
+        :paramtype properties: ~azure.mgmt.iothub.v2022_04_30_preview.models.CertificateProperties
         """
         super().__init__(**kwargs)
         self.properties = properties
@@ -179,27 +197,32 @@ class CertificateDescription(_serialization.Model):
         self.type = None
 
 
-class CertificateListDescription(_serialization.Model):
+class CertificateListDescription(msrest.serialization.Model):
     """The JSON-serialized array of Certificate objects.
 
     :ivar value: The array of Certificate objects.
-    :vartype value: list[~azure.mgmt.iothub.models.CertificateDescription]
+    :vartype value: list[~azure.mgmt.iothub.v2022_04_30_preview.models.CertificateDescription]
     """
 
     _attribute_map = {
         "value": {"key": "value", "type": "[CertificateDescription]"},
     }
 
-    def __init__(self, *, value: Optional[List["_models.CertificateDescription"]] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        value: Optional[List["_models.CertificateDescription"]] = None,
+        **kwargs
+    ):
         """
         :keyword value: The array of Certificate objects.
-        :paramtype value: list[~azure.mgmt.iothub.models.CertificateDescription]
+        :paramtype value: list[~azure.mgmt.iothub.v2022_04_30_preview.models.CertificateDescription]
         """
         super().__init__(**kwargs)
         self.value = value
 
 
-class CertificateProperties(_serialization.Model):
+class CertificateProperties(msrest.serialization.Model):
     """The description of an X509 CA Certificate.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -221,11 +244,11 @@ class CertificateProperties(_serialization.Model):
     """
 
     _validation = {
-        "subject": {"readonly": True},
-        "expiry": {"readonly": True},
-        "thumbprint": {"readonly": True},
-        "created": {"readonly": True},
-        "updated": {"readonly": True},
+        'subject': {'readonly': True},
+        'expiry': {'readonly': True},
+        'thumbprint': {'readonly': True},
+        'created': {'readonly': True},
+        'updated': {'readonly': True},
     }
 
     _attribute_map = {
@@ -238,7 +261,13 @@ class CertificateProperties(_serialization.Model):
         "certificate": {"key": "certificate", "type": "str"},
     }
 
-    def __init__(self, *, is_verified: Optional[bool] = None, certificate: Optional[str] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        is_verified: Optional[bool] = None,
+        certificate: Optional[str] = None,
+        **kwargs
+    ):
         """
         :keyword is_verified: Determines whether certificate has been verified.
         :paramtype is_verified: bool
@@ -255,7 +284,7 @@ class CertificateProperties(_serialization.Model):
         self.certificate = certificate
 
 
-class CertificatePropertiesWithNonce(_serialization.Model):
+class CertificatePropertiesWithNonce(msrest.serialization.Model):
     """The description of an X509 CA Certificate including the challenge nonce issued for the Proof-Of-Possession flow.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -280,14 +309,14 @@ class CertificatePropertiesWithNonce(_serialization.Model):
     """
 
     _validation = {
-        "subject": {"readonly": True},
-        "expiry": {"readonly": True},
-        "thumbprint": {"readonly": True},
-        "is_verified": {"readonly": True},
-        "created": {"readonly": True},
-        "updated": {"readonly": True},
-        "verification_code": {"readonly": True},
-        "certificate": {"readonly": True},
+        'subject': {'readonly': True},
+        'expiry': {'readonly': True},
+        'thumbprint': {'readonly': True},
+        'is_verified': {'readonly': True},
+        'created': {'readonly': True},
+        'updated': {'readonly': True},
+        'verification_code': {'readonly': True},
+        'certificate': {'readonly': True},
     }
 
     _attribute_map = {
@@ -301,8 +330,12 @@ class CertificatePropertiesWithNonce(_serialization.Model):
         "certificate": {"key": "certificate", "type": "str"},
     }
 
-    def __init__(self, **kwargs):
-        """ """
+    def __init__(
+        self,
+        **kwargs
+    ):
+        """
+        """
         super().__init__(**kwargs)
         self.subject = None
         self.expiry = None
@@ -314,7 +347,7 @@ class CertificatePropertiesWithNonce(_serialization.Model):
         self.certificate = None
 
 
-class CertificateVerificationDescription(_serialization.Model):
+class CertificateVerificationDescription(msrest.serialization.Model):
     """The JSON-serialized leaf certificate.
 
     :ivar certificate: base-64 representation of X509 certificate .cer file or just .pem file
@@ -326,7 +359,12 @@ class CertificateVerificationDescription(_serialization.Model):
         "certificate": {"key": "certificate", "type": "str"},
     }
 
-    def __init__(self, *, certificate: Optional[str] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        certificate: Optional[str] = None,
+        **kwargs
+    ):
         """
         :keyword certificate: base-64 representation of X509 certificate .cer file or just .pem file
          content.
@@ -336,14 +374,15 @@ class CertificateVerificationDescription(_serialization.Model):
         self.certificate = certificate
 
 
-class CertificateWithNonceDescription(_serialization.Model):
+class CertificateWithNonceDescription(msrest.serialization.Model):
     """The X509 Certificate.
 
     Variables are only populated by the server, and will be ignored when sending a request.
 
     :ivar properties: The description of an X509 CA Certificate including the challenge nonce
      issued for the Proof-Of-Possession flow.
-    :vartype properties: ~azure.mgmt.iothub.models.CertificatePropertiesWithNonce
+    :vartype properties:
+     ~azure.mgmt.iothub.v2022_04_30_preview.models.CertificatePropertiesWithNonce
     :ivar id: The resource identifier.
     :vartype id: str
     :ivar name: The name of the certificate.
@@ -355,10 +394,10 @@ class CertificateWithNonceDescription(_serialization.Model):
     """
 
     _validation = {
-        "id": {"readonly": True},
-        "name": {"readonly": True},
-        "etag": {"readonly": True},
-        "type": {"readonly": True},
+        'id': {'readonly': True},
+        'name': {'readonly': True},
+        'etag': {'readonly': True},
+        'type': {'readonly': True},
     }
 
     _attribute_map = {
@@ -369,11 +408,17 @@ class CertificateWithNonceDescription(_serialization.Model):
         "type": {"key": "type", "type": "str"},
     }
 
-    def __init__(self, *, properties: Optional["_models.CertificatePropertiesWithNonce"] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        properties: Optional["_models.CertificatePropertiesWithNonce"] = None,
+        **kwargs
+    ):
         """
         :keyword properties: The description of an X509 CA Certificate including the challenge nonce
          issued for the Proof-Of-Possession flow.
-        :paramtype properties: ~azure.mgmt.iothub.models.CertificatePropertiesWithNonce
+        :paramtype properties:
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.CertificatePropertiesWithNonce
         """
         super().__init__(**kwargs)
         self.properties = properties
@@ -383,7 +428,7 @@ class CertificateWithNonceDescription(_serialization.Model):
         self.type = None
 
 
-class CloudToDeviceProperties(_serialization.Model):
+class CloudToDeviceProperties(msrest.serialization.Model):
     """The IoT hub cloud-to-device messaging properties.
 
     :ivar max_delivery_count: The max delivery count for cloud-to-device messages in the device
@@ -395,11 +440,11 @@ class CloudToDeviceProperties(_serialization.Model):
      https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
     :vartype default_ttl_as_iso8601: ~datetime.timedelta
     :ivar feedback: The properties of the feedback queue for cloud-to-device messages.
-    :vartype feedback: ~azure.mgmt.iothub.models.FeedbackProperties
+    :vartype feedback: ~azure.mgmt.iothub.v2022_04_30_preview.models.FeedbackProperties
     """
 
     _validation = {
-        "max_delivery_count": {"maximum": 100, "minimum": 1},
+        'max_delivery_count': {'maximum': 100, 'minimum': 1},
     }
 
     _attribute_map = {
@@ -426,7 +471,7 @@ class CloudToDeviceProperties(_serialization.Model):
          https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
         :paramtype default_ttl_as_iso8601: ~datetime.timedelta
         :keyword feedback: The properties of the feedback queue for cloud-to-device messages.
-        :paramtype feedback: ~azure.mgmt.iothub.models.FeedbackProperties
+        :paramtype feedback: ~azure.mgmt.iothub.v2022_04_30_preview.models.FeedbackProperties
         """
         super().__init__(**kwargs)
         self.max_delivery_count = max_delivery_count
@@ -434,13 +479,14 @@ class CloudToDeviceProperties(_serialization.Model):
         self.feedback = feedback
 
 
-class EncryptionPropertiesDescription(_serialization.Model):
+class EncryptionPropertiesDescription(msrest.serialization.Model):
     """The encryption properties for the IoT hub.
 
     :ivar key_source: The source of the key.
     :vartype key_source: str
     :ivar key_vault_properties: The properties of the KeyVault key.
-    :vartype key_vault_properties: list[~azure.mgmt.iothub.models.KeyVaultKeyProperties]
+    :vartype key_vault_properties:
+     list[~azure.mgmt.iothub.v2022_04_30_preview.models.KeyVaultKeyProperties]
     """
 
     _attribute_map = {
@@ -459,14 +505,15 @@ class EncryptionPropertiesDescription(_serialization.Model):
         :keyword key_source: The source of the key.
         :paramtype key_source: str
         :keyword key_vault_properties: The properties of the KeyVault key.
-        :paramtype key_vault_properties: list[~azure.mgmt.iothub.models.KeyVaultKeyProperties]
+        :paramtype key_vault_properties:
+         list[~azure.mgmt.iothub.v2022_04_30_preview.models.KeyVaultKeyProperties]
         """
         super().__init__(**kwargs)
         self.key_source = key_source
         self.key_vault_properties = key_vault_properties
 
 
-class EndpointHealthData(_serialization.Model):
+class EndpointHealthData(msrest.serialization.Model):
     """The health data for an endpoint.
 
     :ivar endpoint_id: Id of the endpoint.
@@ -481,7 +528,8 @@ class EndpointHealthData(_serialization.Model):
      the IoT Hub has not established a connection with the endpoint. No messages have been delivered
      to or rejected from this endpoint. Known values are: "unknown", "healthy", "degraded",
      "unhealthy", and "dead".
-    :vartype health_status: str or ~azure.mgmt.iothub.models.EndpointHealthStatus
+    :vartype health_status: str or
+     ~azure.mgmt.iothub.v2022_04_30_preview.models.EndpointHealthStatus
     :ivar last_known_error: Last error obtained when a message failed to be delivered to iot hub.
     :vartype last_known_error: str
     :ivar last_known_error_time: Time at which the last known error occurred.
@@ -526,7 +574,8 @@ class EndpointHealthData(_serialization.Model):
          shows that the IoT Hub has not established a connection with the endpoint. No messages have
          been delivered to or rejected from this endpoint. Known values are: "unknown", "healthy",
          "degraded", "unhealthy", and "dead".
-        :paramtype health_status: str or ~azure.mgmt.iothub.models.EndpointHealthStatus
+        :paramtype health_status: str or
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.EndpointHealthStatus
         :keyword last_known_error: Last error obtained when a message failed to be delivered to iot
          hub.
         :paramtype last_known_error: str
@@ -547,19 +596,19 @@ class EndpointHealthData(_serialization.Model):
         self.last_send_attempt_time = last_send_attempt_time
 
 
-class EndpointHealthDataListResult(_serialization.Model):
+class EndpointHealthDataListResult(msrest.serialization.Model):
     """The JSON-serialized array of EndpointHealthData objects with a next link.
 
     Variables are only populated by the server, and will be ignored when sending a request.
 
     :ivar value: JSON-serialized array of Endpoint health data.
-    :vartype value: list[~azure.mgmt.iothub.models.EndpointHealthData]
+    :vartype value: list[~azure.mgmt.iothub.v2022_04_30_preview.models.EndpointHealthData]
     :ivar next_link: Link to more results.
     :vartype next_link: str
     """
 
     _validation = {
-        "next_link": {"readonly": True},
+        'next_link': {'readonly': True},
     }
 
     _attribute_map = {
@@ -567,17 +616,22 @@ class EndpointHealthDataListResult(_serialization.Model):
         "next_link": {"key": "nextLink", "type": "str"},
     }
 
-    def __init__(self, *, value: Optional[List["_models.EndpointHealthData"]] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        value: Optional[List["_models.EndpointHealthData"]] = None,
+        **kwargs
+    ):
         """
         :keyword value: JSON-serialized array of Endpoint health data.
-        :paramtype value: list[~azure.mgmt.iothub.models.EndpointHealthData]
+        :paramtype value: list[~azure.mgmt.iothub.v2022_04_30_preview.models.EndpointHealthData]
         """
         super().__init__(**kwargs)
         self.value = value
         self.next_link = None
 
 
-class EnrichmentProperties(_serialization.Model):
+class EnrichmentProperties(msrest.serialization.Model):
     """The properties of an enrichment that your IoT hub applies to messages delivered to endpoints.
 
     All required parameters must be populated in order to send to Azure.
@@ -592,9 +646,9 @@ class EnrichmentProperties(_serialization.Model):
     """
 
     _validation = {
-        "key": {"required": True},
-        "value": {"required": True},
-        "endpoint_names": {"required": True, "min_items": 1},
+        'key': {'required': True},
+        'value': {'required': True},
+        'endpoint_names': {'required': True, 'min_items': 1},
     }
 
     _attribute_map = {
@@ -603,7 +657,14 @@ class EnrichmentProperties(_serialization.Model):
         "endpoint_names": {"key": "endpointNames", "type": "[str]"},
     }
 
-    def __init__(self, *, key: str, value: str, endpoint_names: List[str], **kwargs):
+    def __init__(
+        self,
+        *,
+        key: str,
+        value: str,
+        endpoint_names: List[str],
+        **kwargs
+    ):
         """
         :keyword key: The key or name for the enrichment property. Required.
         :paramtype key: str
@@ -619,7 +680,7 @@ class EnrichmentProperties(_serialization.Model):
         self.endpoint_names = endpoint_names
 
 
-class ErrorDetails(_serialization.Model):
+class ErrorDetails(msrest.serialization.Model):
     """Error details.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -635,10 +696,10 @@ class ErrorDetails(_serialization.Model):
     """
 
     _validation = {
-        "code": {"readonly": True},
-        "http_status_code": {"readonly": True},
-        "message": {"readonly": True},
-        "details": {"readonly": True},
+        'code': {'readonly': True},
+        'http_status_code': {'readonly': True},
+        'message': {'readonly': True},
+        'details': {'readonly': True},
     }
 
     _attribute_map = {
@@ -648,8 +709,12 @@ class ErrorDetails(_serialization.Model):
         "details": {"key": "details", "type": "str"},
     }
 
-    def __init__(self, **kwargs):
-        """ """
+    def __init__(
+        self,
+        **kwargs
+    ):
+        """
+        """
         super().__init__(**kwargs)
         self.code = None
         self.http_status_code = None
@@ -657,33 +722,38 @@ class ErrorDetails(_serialization.Model):
         self.details = None
 
 
-class EventHubConsumerGroupBodyDescription(_serialization.Model):
+class EventHubConsumerGroupBodyDescription(msrest.serialization.Model):
     """The EventHub consumer group.
 
     All required parameters must be populated in order to send to Azure.
 
     :ivar properties: The EventHub consumer group name. Required.
-    :vartype properties: ~azure.mgmt.iothub.models.EventHubConsumerGroupName
+    :vartype properties: ~azure.mgmt.iothub.v2022_04_30_preview.models.EventHubConsumerGroupName
     """
 
     _validation = {
-        "properties": {"required": True},
+        'properties': {'required': True},
     }
 
     _attribute_map = {
         "properties": {"key": "properties", "type": "EventHubConsumerGroupName"},
     }
 
-    def __init__(self, *, properties: "_models.EventHubConsumerGroupName", **kwargs):
+    def __init__(
+        self,
+        *,
+        properties: "_models.EventHubConsumerGroupName",
+        **kwargs
+    ):
         """
         :keyword properties: The EventHub consumer group name. Required.
-        :paramtype properties: ~azure.mgmt.iothub.models.EventHubConsumerGroupName
+        :paramtype properties: ~azure.mgmt.iothub.v2022_04_30_preview.models.EventHubConsumerGroupName
         """
         super().__init__(**kwargs)
         self.properties = properties
 
 
-class EventHubConsumerGroupInfo(_serialization.Model):
+class EventHubConsumerGroupInfo(msrest.serialization.Model):
     """The properties of the EventHubConsumerGroupInfo object.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -701,10 +771,10 @@ class EventHubConsumerGroupInfo(_serialization.Model):
     """
 
     _validation = {
-        "id": {"readonly": True},
-        "name": {"readonly": True},
-        "type": {"readonly": True},
-        "etag": {"readonly": True},
+        'id': {'readonly': True},
+        'name': {'readonly': True},
+        'type': {'readonly': True},
+        'etag': {'readonly': True},
     }
 
     _attribute_map = {
@@ -715,7 +785,12 @@ class EventHubConsumerGroupInfo(_serialization.Model):
         "etag": {"key": "etag", "type": "str"},
     }
 
-    def __init__(self, *, properties: Optional[Dict[str, Any]] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        properties: Optional[Dict[str, Any]] = None,
+        **kwargs
+    ):
         """
         :keyword properties: The tags.
         :paramtype properties: dict[str, any]
@@ -728,7 +803,7 @@ class EventHubConsumerGroupInfo(_serialization.Model):
         self.etag = None
 
 
-class EventHubConsumerGroupName(_serialization.Model):
+class EventHubConsumerGroupName(msrest.serialization.Model):
     """The EventHub consumer group name.
 
     All required parameters must be populated in order to send to Azure.
@@ -738,14 +813,19 @@ class EventHubConsumerGroupName(_serialization.Model):
     """
 
     _validation = {
-        "name": {"required": True},
+        'name': {'required': True},
     }
 
     _attribute_map = {
         "name": {"key": "name", "type": "str"},
     }
 
-    def __init__(self, *, name: str, **kwargs):
+    def __init__(
+        self,
+        *,
+        name: str,
+        **kwargs
+    ):
         """
         :keyword name: EventHub consumer group name. Required.
         :paramtype name: str
@@ -754,19 +834,19 @@ class EventHubConsumerGroupName(_serialization.Model):
         self.name = name
 
 
-class EventHubConsumerGroupsListResult(_serialization.Model):
+class EventHubConsumerGroupsListResult(msrest.serialization.Model):
     """The JSON-serialized array of Event Hub-compatible consumer group names with a next link.
 
     Variables are only populated by the server, and will be ignored when sending a request.
 
     :ivar value: List of consumer groups objects.
-    :vartype value: list[~azure.mgmt.iothub.models.EventHubConsumerGroupInfo]
+    :vartype value: list[~azure.mgmt.iothub.v2022_04_30_preview.models.EventHubConsumerGroupInfo]
     :ivar next_link: The next link.
     :vartype next_link: str
     """
 
     _validation = {
-        "next_link": {"readonly": True},
+        'next_link': {'readonly': True},
     }
 
     _attribute_map = {
@@ -774,17 +854,22 @@ class EventHubConsumerGroupsListResult(_serialization.Model):
         "next_link": {"key": "nextLink", "type": "str"},
     }
 
-    def __init__(self, *, value: Optional[List["_models.EventHubConsumerGroupInfo"]] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        value: Optional[List["_models.EventHubConsumerGroupInfo"]] = None,
+        **kwargs
+    ):
         """
         :keyword value: List of consumer groups objects.
-        :paramtype value: list[~azure.mgmt.iothub.models.EventHubConsumerGroupInfo]
+        :paramtype value: list[~azure.mgmt.iothub.v2022_04_30_preview.models.EventHubConsumerGroupInfo]
         """
         super().__init__(**kwargs)
         self.value = value
         self.next_link = None
 
 
-class EventHubProperties(_serialization.Model):
+class EventHubProperties(msrest.serialization.Model):
     """The properties of the provisioned Event Hub-compatible endpoint used by the IoT hub.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -805,9 +890,9 @@ class EventHubProperties(_serialization.Model):
     """
 
     _validation = {
-        "partition_ids": {"readonly": True},
-        "path": {"readonly": True},
-        "endpoint": {"readonly": True},
+        'partition_ids': {'readonly': True},
+        'path': {'readonly': True},
+        'endpoint': {'readonly': True},
     }
 
     _attribute_map = {
@@ -819,7 +904,11 @@ class EventHubProperties(_serialization.Model):
     }
 
     def __init__(
-        self, *, retention_time_in_days: Optional[int] = None, partition_count: Optional[int] = None, **kwargs
+        self,
+        *,
+        retention_time_in_days: Optional[int] = None,
+        partition_count: Optional[int] = None,
+        **kwargs
     ):
         """
         :keyword retention_time_in_days: The retention time for device-to-cloud messages in days. See:
@@ -838,7 +927,7 @@ class EventHubProperties(_serialization.Model):
         self.endpoint = None
 
 
-class ExportDevicesRequest(_serialization.Model):
+class ExportDevicesRequest(msrest.serialization.Model):
     """Use to provide parameters when requesting an export of all devices in the IoT hub.
 
     All required parameters must be populated in order to send to Azure.
@@ -853,9 +942,10 @@ class ExportDevicesRequest(_serialization.Model):
     :vartype export_blob_name: str
     :ivar authentication_type: Specifies authentication type being used for connecting to the
      storage account. Known values are: "keyBased" and "identityBased".
-    :vartype authentication_type: str or ~azure.mgmt.iothub.models.AuthenticationType
+    :vartype authentication_type: str or
+     ~azure.mgmt.iothub.v2022_04_30_preview.models.AuthenticationType
     :ivar identity: Managed identity properties of storage endpoint for export devices.
-    :vartype identity: ~azure.mgmt.iothub.models.ManagedIdentity
+    :vartype identity: ~azure.mgmt.iothub.v2022_04_30_preview.models.ManagedIdentity
     :ivar include_configurations: The value indicating whether configurations should be exported.
     :vartype include_configurations: bool
     :ivar configurations_blob_name: The name of the blob that will be created in the provided
@@ -864,8 +954,8 @@ class ExportDevicesRequest(_serialization.Model):
     """
 
     _validation = {
-        "export_blob_container_uri": {"required": True},
-        "exclude_keys": {"required": True},
+        'export_blob_container_uri': {'required': True},
+        'exclude_keys': {'required': True},
     }
 
     _attribute_map = {
@@ -902,9 +992,10 @@ class ExportDevicesRequest(_serialization.Model):
         :paramtype export_blob_name: str
         :keyword authentication_type: Specifies authentication type being used for connecting to the
          storage account. Known values are: "keyBased" and "identityBased".
-        :paramtype authentication_type: str or ~azure.mgmt.iothub.models.AuthenticationType
+        :paramtype authentication_type: str or
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.AuthenticationType
         :keyword identity: Managed identity properties of storage endpoint for export devices.
-        :paramtype identity: ~azure.mgmt.iothub.models.ManagedIdentity
+        :paramtype identity: ~azure.mgmt.iothub.v2022_04_30_preview.models.ManagedIdentity
         :keyword include_configurations: The value indicating whether configurations should be
          exported.
         :paramtype include_configurations: bool
@@ -922,7 +1013,7 @@ class ExportDevicesRequest(_serialization.Model):
         self.configurations_blob_name = configurations_blob_name
 
 
-class FailoverInput(_serialization.Model):
+class FailoverInput(msrest.serialization.Model):
     """Use to provide failover region when requesting manual Failover for a hub.
 
     All required parameters must be populated in order to send to Azure.
@@ -932,14 +1023,19 @@ class FailoverInput(_serialization.Model):
     """
 
     _validation = {
-        "failover_region": {"required": True},
+        'failover_region': {'required': True},
     }
 
     _attribute_map = {
         "failover_region": {"key": "failoverRegion", "type": "str"},
     }
 
-    def __init__(self, *, failover_region: str, **kwargs):
+    def __init__(
+        self,
+        *,
+        failover_region: str,
+        **kwargs
+    ):
         """
         :keyword failover_region: Region the hub will be failed over to. Required.
         :paramtype failover_region: str
@@ -948,7 +1044,7 @@ class FailoverInput(_serialization.Model):
         self.failover_region = failover_region
 
 
-class FallbackRouteProperties(_serialization.Model):
+class FallbackRouteProperties(msrest.serialization.Model):
     """The properties of the fallback route. IoT Hub uses these properties when it routes messages to the fallback endpoint.
 
     All required parameters must be populated in order to send to Azure.
@@ -960,7 +1056,7 @@ class FallbackRouteProperties(_serialization.Model):
      DeviceMessages. Required. Known values are: "Invalid", "DeviceMessages", "TwinChangeEvents",
      "DeviceLifecycleEvents", "DeviceJobLifecycleEvents", "DigitalTwinChangeEvents",
      "DeviceConnectionStateEvents", and "MqttBrokerMessages".
-    :vartype source: str or ~azure.mgmt.iothub.models.RoutingSource
+    :vartype source: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingSource
     :ivar condition: The condition which is evaluated in order to apply the fallback route. If the
      condition is not provided it will evaluate to true by default. For grammar, See:
      https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
@@ -973,9 +1069,9 @@ class FallbackRouteProperties(_serialization.Model):
     """
 
     _validation = {
-        "source": {"required": True},
-        "endpoint_names": {"required": True, "max_items": 1, "min_items": 1},
-        "is_enabled": {"required": True},
+        'source': {'required': True},
+        'endpoint_names': {'required': True, 'max_items': 1, 'min_items': 1},
+        'is_enabled': {'required': True},
     }
 
     _attribute_map = {
@@ -1004,7 +1100,7 @@ class FallbackRouteProperties(_serialization.Model):
          DeviceMessages. Required. Known values are: "Invalid", "DeviceMessages", "TwinChangeEvents",
          "DeviceLifecycleEvents", "DeviceJobLifecycleEvents", "DigitalTwinChangeEvents",
          "DeviceConnectionStateEvents", and "MqttBrokerMessages".
-        :paramtype source: str or ~azure.mgmt.iothub.models.RoutingSource
+        :paramtype source: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingSource
         :keyword condition: The condition which is evaluated in order to apply the fallback route. If
          the condition is not provided it will evaluate to true by default. For grammar, See:
          https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
@@ -1023,7 +1119,7 @@ class FallbackRouteProperties(_serialization.Model):
         self.is_enabled = is_enabled
 
 
-class FeedbackProperties(_serialization.Model):
+class FeedbackProperties(msrest.serialization.Model):
     """The properties of the feedback queue for cloud-to-device messages.
 
     :ivar lock_duration_as_iso8601: The lock duration for the feedback queue. See:
@@ -1040,7 +1136,7 @@ class FeedbackProperties(_serialization.Model):
     """
 
     _validation = {
-        "max_delivery_count": {"maximum": 100, "minimum": 1},
+        'max_delivery_count': {'maximum': 100, 'minimum': 1},
     }
 
     _attribute_map = {
@@ -1076,7 +1172,7 @@ class FeedbackProperties(_serialization.Model):
         self.max_delivery_count = max_delivery_count
 
 
-class GroupIdInformation(_serialization.Model):
+class GroupIdInformation(msrest.serialization.Model):
     """The group information for creating a private endpoint on an IotHub.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -1090,14 +1186,14 @@ class GroupIdInformation(_serialization.Model):
     :ivar type: The resource type.
     :vartype type: str
     :ivar properties: The properties for a group information object. Required.
-    :vartype properties: ~azure.mgmt.iothub.models.GroupIdInformationProperties
+    :vartype properties: ~azure.mgmt.iothub.v2022_04_30_preview.models.GroupIdInformationProperties
     """
 
     _validation = {
-        "id": {"readonly": True},
-        "name": {"readonly": True},
-        "type": {"readonly": True},
-        "properties": {"required": True},
+        'id': {'readonly': True},
+        'name': {'readonly': True},
+        'type': {'readonly': True},
+        'properties': {'required': True},
     }
 
     _attribute_map = {
@@ -1107,10 +1203,16 @@ class GroupIdInformation(_serialization.Model):
         "properties": {"key": "properties", "type": "GroupIdInformationProperties"},
     }
 
-    def __init__(self, *, properties: "_models.GroupIdInformationProperties", **kwargs):
+    def __init__(
+        self,
+        *,
+        properties: "_models.GroupIdInformationProperties",
+        **kwargs
+    ):
         """
         :keyword properties: The properties for a group information object. Required.
-        :paramtype properties: ~azure.mgmt.iothub.models.GroupIdInformationProperties
+        :paramtype properties:
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.GroupIdInformationProperties
         """
         super().__init__(**kwargs)
         self.id = None
@@ -1119,7 +1221,7 @@ class GroupIdInformation(_serialization.Model):
         self.properties = properties
 
 
-class GroupIdInformationProperties(_serialization.Model):
+class GroupIdInformationProperties(msrest.serialization.Model):
     """The properties for a group information object.
 
     :ivar group_id: The group id.
@@ -1158,7 +1260,7 @@ class GroupIdInformationProperties(_serialization.Model):
         self.required_zone_names = required_zone_names
 
 
-class ImportDevicesRequest(_serialization.Model):
+class ImportDevicesRequest(msrest.serialization.Model):
     """Use to provide parameters when requesting an import of all devices in the hub.
 
     All required parameters must be populated in order to send to Azure.
@@ -1174,9 +1276,10 @@ class ImportDevicesRequest(_serialization.Model):
     :vartype output_blob_name: str
     :ivar authentication_type: Specifies authentication type being used for connecting to the
      storage account. Known values are: "keyBased" and "identityBased".
-    :vartype authentication_type: str or ~azure.mgmt.iothub.models.AuthenticationType
+    :vartype authentication_type: str or
+     ~azure.mgmt.iothub.v2022_04_30_preview.models.AuthenticationType
     :ivar identity: Managed identity properties of storage endpoint for import devices.
-    :vartype identity: ~azure.mgmt.iothub.models.ManagedIdentity
+    :vartype identity: ~azure.mgmt.iothub.v2022_04_30_preview.models.ManagedIdentity
     :ivar include_configurations: The value indicating whether configurations should be imported.
     :vartype include_configurations: bool
     :ivar configurations_blob_name: The blob name to be used when importing configurations from the
@@ -1185,8 +1288,8 @@ class ImportDevicesRequest(_serialization.Model):
     """
 
     _validation = {
-        "input_blob_container_uri": {"required": True},
-        "output_blob_container_uri": {"required": True},
+        'input_blob_container_uri': {'required': True},
+        'output_blob_container_uri': {'required': True},
     }
 
     _attribute_map = {
@@ -1225,9 +1328,10 @@ class ImportDevicesRequest(_serialization.Model):
         :paramtype output_blob_name: str
         :keyword authentication_type: Specifies authentication type being used for connecting to the
          storage account. Known values are: "keyBased" and "identityBased".
-        :paramtype authentication_type: str or ~azure.mgmt.iothub.models.AuthenticationType
+        :paramtype authentication_type: str or
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.AuthenticationType
         :keyword identity: Managed identity properties of storage endpoint for import devices.
-        :paramtype identity: ~azure.mgmt.iothub.models.ManagedIdentity
+        :paramtype identity: ~azure.mgmt.iothub.v2022_04_30_preview.models.ManagedIdentity
         :keyword include_configurations: The value indicating whether configurations should be
          imported.
         :paramtype include_configurations: bool
@@ -1246,7 +1350,7 @@ class ImportDevicesRequest(_serialization.Model):
         self.configurations_blob_name = configurations_blob_name
 
 
-class IotHubCapacity(_serialization.Model):
+class IotHubCapacity(msrest.serialization.Model):
     """IoT Hub capacity information.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -1259,14 +1363,14 @@ class IotHubCapacity(_serialization.Model):
     :vartype default: int
     :ivar scale_type: The type of the scaling enabled. Known values are: "Automatic", "Manual", and
      "None".
-    :vartype scale_type: str or ~azure.mgmt.iothub.models.IotHubScaleType
+    :vartype scale_type: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.IotHubScaleType
     """
 
     _validation = {
-        "minimum": {"readonly": True, "maximum": 1, "minimum": 1},
-        "maximum": {"readonly": True},
-        "default": {"readonly": True},
-        "scale_type": {"readonly": True},
+        'minimum': {'readonly': True, 'maximum': 1, 'minimum': 1},
+        'maximum': {'readonly': True},
+        'default': {'readonly': True},
+        'scale_type': {'readonly': True},
     }
 
     _attribute_map = {
@@ -1276,8 +1380,12 @@ class IotHubCapacity(_serialization.Model):
         "scale_type": {"key": "scaleType", "type": "str"},
     }
 
-    def __init__(self, **kwargs):
-        """ """
+    def __init__(
+        self,
+        **kwargs
+    ):
+        """
+        """
         super().__init__(**kwargs)
         self.minimum = None
         self.maximum = None
@@ -1285,7 +1393,7 @@ class IotHubCapacity(_serialization.Model):
         self.scale_type = None
 
 
-class Resource(_serialization.Model):
+class Resource(msrest.serialization.Model):
     """The common properties of an Azure resource.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -1305,10 +1413,10 @@ class Resource(_serialization.Model):
     """
 
     _validation = {
-        "id": {"readonly": True},
-        "name": {"readonly": True, "pattern": r"^(?![0-9]+$)(?!-)[a-zA-Z0-9-]{2,49}[a-zA-Z0-9]$"},
-        "type": {"readonly": True},
-        "location": {"required": True},
+        'id': {'readonly': True},
+        'name': {'readonly': True, 'pattern': r'^(?![0-9]+$)(?!-)[a-zA-Z0-9-]{2,49}[a-zA-Z0-9]$'},
+        'type': {'readonly': True},
+        'location': {'required': True},
     }
 
     _attribute_map = {
@@ -1319,7 +1427,13 @@ class Resource(_serialization.Model):
         "tags": {"key": "tags", "type": "{str}"},
     }
 
-    def __init__(self, *, location: str, tags: Optional[Dict[str, str]] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        location: str,
+        tags: Optional[Dict[str, str]] = None,
+        **kwargs
+    ):
         """
         :keyword location: The resource location. Required.
         :paramtype location: str
@@ -1355,22 +1469,22 @@ class IotHubDescription(Resource):
      also be provided as a header per the normal ETag convention.
     :vartype etag: str
     :ivar properties: IotHub properties.
-    :vartype properties: ~azure.mgmt.iothub.models.IotHubProperties
+    :vartype properties: ~azure.mgmt.iothub.v2022_04_30_preview.models.IotHubProperties
     :ivar sku: IotHub SKU info. Required.
-    :vartype sku: ~azure.mgmt.iothub.models.IotHubSkuInfo
+    :vartype sku: ~azure.mgmt.iothub.v2022_04_30_preview.models.IotHubSkuInfo
     :ivar identity: The managed identities for the IotHub.
-    :vartype identity: ~azure.mgmt.iothub.models.ArmIdentity
+    :vartype identity: ~azure.mgmt.iothub.v2022_04_30_preview.models.ArmIdentity
     :ivar system_data: The system meta data relating to this resource.
-    :vartype system_data: ~azure.mgmt.iothub.models.SystemData
+    :vartype system_data: ~azure.mgmt.iothub.v2022_04_30_preview.models.SystemData
     """
 
     _validation = {
-        "id": {"readonly": True},
-        "name": {"readonly": True, "pattern": r"^(?![0-9]+$)(?!-)[a-zA-Z0-9-]{2,49}[a-zA-Z0-9]$"},
-        "type": {"readonly": True},
-        "location": {"required": True},
-        "sku": {"required": True},
-        "system_data": {"readonly": True},
+        'id': {'readonly': True},
+        'name': {'readonly': True, 'pattern': r'^(?![0-9]+$)(?!-)[a-zA-Z0-9-]{2,49}[a-zA-Z0-9]$'},
+        'type': {'readonly': True},
+        'location': {'required': True},
+        'sku': {'required': True},
+        'system_data': {'readonly': True},
     }
 
     _attribute_map = {
@@ -1406,11 +1520,11 @@ class IotHubDescription(Resource):
          must also be provided as a header per the normal ETag convention.
         :paramtype etag: str
         :keyword properties: IotHub properties.
-        :paramtype properties: ~azure.mgmt.iothub.models.IotHubProperties
+        :paramtype properties: ~azure.mgmt.iothub.v2022_04_30_preview.models.IotHubProperties
         :keyword sku: IotHub SKU info. Required.
-        :paramtype sku: ~azure.mgmt.iothub.models.IotHubSkuInfo
+        :paramtype sku: ~azure.mgmt.iothub.v2022_04_30_preview.models.IotHubSkuInfo
         :keyword identity: The managed identities for the IotHub.
-        :paramtype identity: ~azure.mgmt.iothub.models.ArmIdentity
+        :paramtype identity: ~azure.mgmt.iothub.v2022_04_30_preview.models.ArmIdentity
         """
         super().__init__(location=location, tags=tags, **kwargs)
         self.etag = etag
@@ -1420,19 +1534,19 @@ class IotHubDescription(Resource):
         self.system_data = None
 
 
-class IotHubDescriptionListResult(_serialization.Model):
+class IotHubDescriptionListResult(msrest.serialization.Model):
     """The JSON-serialized array of IotHubDescription objects with a next link.
 
     Variables are only populated by the server, and will be ignored when sending a request.
 
     :ivar value: The array of IotHubDescription objects.
-    :vartype value: list[~azure.mgmt.iothub.models.IotHubDescription]
+    :vartype value: list[~azure.mgmt.iothub.v2022_04_30_preview.models.IotHubDescription]
     :ivar next_link: The next link.
     :vartype next_link: str
     """
 
     _validation = {
-        "next_link": {"readonly": True},
+        'next_link': {'readonly': True},
     }
 
     _attribute_map = {
@@ -1440,17 +1554,22 @@ class IotHubDescriptionListResult(_serialization.Model):
         "next_link": {"key": "nextLink", "type": "str"},
     }
 
-    def __init__(self, *, value: Optional[List["_models.IotHubDescription"]] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        value: Optional[List["_models.IotHubDescription"]] = None,
+        **kwargs
+    ):
         """
         :keyword value: The array of IotHubDescription objects.
-        :paramtype value: list[~azure.mgmt.iothub.models.IotHubDescription]
+        :paramtype value: list[~azure.mgmt.iothub.v2022_04_30_preview.models.IotHubDescription]
         """
         super().__init__(**kwargs)
         self.value = value
         self.next_link = None
 
 
-class IotHubLocationDescription(_serialization.Model):
+class IotHubLocationDescription(msrest.serialization.Model):
     """Public representation of one of the locations where a resource is provisioned.
 
     :ivar location: The name of the Azure region.
@@ -1459,7 +1578,7 @@ class IotHubLocationDescription(_serialization.Model):
      where the IoT hub is currently provisioned. The secondary region is the Azure disaster recovery
      (DR) paired region and also the region where the IoT hub can failover to. Known values are:
      "primary" and "secondary".
-    :vartype role: str or ~azure.mgmt.iothub.models.IotHubReplicaRoleType
+    :vartype role: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.IotHubReplicaRoleType
     """
 
     _attribute_map = {
@@ -1481,14 +1600,14 @@ class IotHubLocationDescription(_serialization.Model):
          is where the IoT hub is currently provisioned. The secondary region is the Azure disaster
          recovery (DR) paired region and also the region where the IoT hub can failover to. Known values
          are: "primary" and "secondary".
-        :paramtype role: str or ~azure.mgmt.iothub.models.IotHubReplicaRoleType
+        :paramtype role: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.IotHubReplicaRoleType
         """
         super().__init__(**kwargs)
         self.location = location
         self.role = role
 
 
-class IotHubNameAvailabilityInfo(_serialization.Model):
+class IotHubNameAvailabilityInfo(msrest.serialization.Model):
     """The properties indicating whether a given IoT hub name is available.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -1496,14 +1615,15 @@ class IotHubNameAvailabilityInfo(_serialization.Model):
     :ivar name_available: The value which indicates whether the provided name is available.
     :vartype name_available: bool
     :ivar reason: The reason for unavailability. Known values are: "Invalid" and "AlreadyExists".
-    :vartype reason: str or ~azure.mgmt.iothub.models.IotHubNameUnavailabilityReason
+    :vartype reason: str or
+     ~azure.mgmt.iothub.v2022_04_30_preview.models.IotHubNameUnavailabilityReason
     :ivar message: The detailed reason message.
     :vartype message: str
     """
 
     _validation = {
-        "name_available": {"readonly": True},
-        "reason": {"readonly": True},
+        'name_available': {'readonly': True},
+        'reason': {'readonly': True},
     }
 
     _attribute_map = {
@@ -1512,7 +1632,12 @@ class IotHubNameAvailabilityInfo(_serialization.Model):
         "message": {"key": "message", "type": "str"},
     }
 
-    def __init__(self, *, message: Optional[str] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        message: Optional[str] = None,
+        **kwargs
+    ):
         """
         :keyword message: The detailed reason message.
         :paramtype message: str
@@ -1523,7 +1648,7 @@ class IotHubNameAvailabilityInfo(_serialization.Model):
         self.message = message
 
 
-class IotHubProperties(_serialization.Model):  # pylint: disable=too-many-instance-attributes
+class IotHubProperties(msrest.serialization.Model):  # pylint: disable=too-many-instance-attributes
     """The properties of an IoT hub.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -1531,7 +1656,7 @@ class IotHubProperties(_serialization.Model):  # pylint: disable=too-many-instan
     :ivar authorization_policies: The shared access policies you can use to secure a connection to
      the IoT hub.
     :vartype authorization_policies:
-     list[~azure.mgmt.iothub.models.SharedAccessSignatureAuthorizationRule]
+     list[~azure.mgmt.iothub.v2022_04_30_preview.models.SharedAccessSignatureAuthorizationRule]
     :ivar disable_local_auth: If true, SAS tokens with Iot hub scoped SAS keys cannot be used for
      authentication.
     :vartype disable_local_auth: bool
@@ -1549,17 +1674,19 @@ class IotHubProperties(_serialization.Model):  # pylint: disable=too-many-instan
     :vartype allowed_fqdn_list: list[str]
     :ivar public_network_access: Whether requests from Public Network are allowed. Known values
      are: "Enabled" and "Disabled".
-    :vartype public_network_access: str or ~azure.mgmt.iothub.models.PublicNetworkAccess
+    :vartype public_network_access: str or
+     ~azure.mgmt.iothub.v2022_04_30_preview.models.PublicNetworkAccess
     :ivar ip_filter_rules: The IP filter rules.
-    :vartype ip_filter_rules: list[~azure.mgmt.iothub.models.IpFilterRule]
+    :vartype ip_filter_rules: list[~azure.mgmt.iothub.v2022_04_30_preview.models.IpFilterRule]
     :ivar network_rule_sets: Network Rule Set Properties of IotHub.
-    :vartype network_rule_sets: ~azure.mgmt.iothub.models.NetworkRuleSetProperties
+    :vartype network_rule_sets:
+     ~azure.mgmt.iothub.v2022_04_30_preview.models.NetworkRuleSetProperties
     :ivar min_tls_version: Specifies the minimum TLS version to support for this hub. Can be set to
      "1.2" to have clients that use a TLS version below 1.2 to be rejected.
     :vartype min_tls_version: str
     :ivar private_endpoint_connections: Private endpoint connections created on this IotHub.
     :vartype private_endpoint_connections:
-     list[~azure.mgmt.iothub.models.PrivateEndpointConnection]
+     list[~azure.mgmt.iothub.v2022_04_30_preview.models.PrivateEndpointConnection]
     :ivar provisioning_state: The provisioning state.
     :vartype provisioning_state: str
     :ivar state: The hub state.
@@ -1569,46 +1696,53 @@ class IotHubProperties(_serialization.Model):  # pylint: disable=too-many-instan
     :ivar event_hub_endpoints: The Event Hub-compatible endpoint properties. The only possible keys
      to this dictionary is events. This key has to be present in the dictionary while making create
      or update calls for the IoT hub.
-    :vartype event_hub_endpoints: dict[str, ~azure.mgmt.iothub.models.EventHubProperties]
+    :vartype event_hub_endpoints: dict[str,
+     ~azure.mgmt.iothub.v2022_04_30_preview.models.EventHubProperties]
     :ivar routing: The routing related properties of the IoT hub. See:
      https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging.
-    :vartype routing: ~azure.mgmt.iothub.models.RoutingProperties
+    :vartype routing: ~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingProperties
     :ivar storage_endpoints: The list of Azure Storage endpoints where you can upload files.
      Currently you can configure only one Azure Storage account and that MUST have its key as
      $default. Specifying more than one storage account causes an error to be thrown. Not specifying
      a value for this property when the enableFileUploadNotifications property is set to True,
      causes an error to be thrown.
-    :vartype storage_endpoints: dict[str, ~azure.mgmt.iothub.models.StorageEndpointProperties]
+    :vartype storage_endpoints: dict[str,
+     ~azure.mgmt.iothub.v2022_04_30_preview.models.StorageEndpointProperties]
     :ivar messaging_endpoints: The messaging endpoint properties for the file upload notification
      queue.
-    :vartype messaging_endpoints: dict[str, ~azure.mgmt.iothub.models.MessagingEndpointProperties]
+    :vartype messaging_endpoints: dict[str,
+     ~azure.mgmt.iothub.v2022_04_30_preview.models.MessagingEndpointProperties]
     :ivar enable_file_upload_notifications: If True, file upload notifications are enabled.
     :vartype enable_file_upload_notifications: bool
     :ivar cloud_to_device: The IoT hub cloud-to-device messaging properties.
-    :vartype cloud_to_device: ~azure.mgmt.iothub.models.CloudToDeviceProperties
+    :vartype cloud_to_device: ~azure.mgmt.iothub.v2022_04_30_preview.models.CloudToDeviceProperties
     :ivar comments: IoT hub comments.
     :vartype comments: str
     :ivar device_streams: The device streams properties of iothub.
-    :vartype device_streams: ~azure.mgmt.iothub.models.IotHubPropertiesDeviceStreams
+    :vartype device_streams:
+     ~azure.mgmt.iothub.v2022_04_30_preview.models.IotHubPropertiesDeviceStreams
     :ivar features: The capabilities and features enabled for the IoT hub. Known values are: "None"
      and "DeviceManagement".
-    :vartype features: str or ~azure.mgmt.iothub.models.Capabilities
+    :vartype features: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.Capabilities
     :ivar encryption: The encryption properties for the IoT hub.
-    :vartype encryption: ~azure.mgmt.iothub.models.EncryptionPropertiesDescription
+    :vartype encryption:
+     ~azure.mgmt.iothub.v2022_04_30_preview.models.EncryptionPropertiesDescription
     :ivar locations: Primary and secondary location for iot hub.
-    :vartype locations: list[~azure.mgmt.iothub.models.IotHubLocationDescription]
+    :vartype locations:
+     list[~azure.mgmt.iothub.v2022_04_30_preview.models.IotHubLocationDescription]
     :ivar enable_data_residency: This property when set to true, will enable data residency, thus,
      disabling disaster recovery.
     :vartype enable_data_residency: bool
-    :ivar root_certificate: This property store root certificate related informaiton.
-    :vartype root_certificate: ~azure.mgmt.iothub.models.RootCertificateProperties
+    :ivar root_certificate: This property store root certificate related information.
+    :vartype root_certificate:
+     ~azure.mgmt.iothub.v2022_04_30_preview.models.RootCertificateProperties
     """
 
     _validation = {
-        "provisioning_state": {"readonly": True},
-        "state": {"readonly": True},
-        "host_name": {"readonly": True},
-        "locations": {"readonly": True},
+        'provisioning_state': {'readonly': True},
+        'state': {'readonly': True},
+        'host_name': {'readonly': True},
+        'locations': {'readonly': True},
     }
 
     _attribute_map = {
@@ -1673,7 +1807,7 @@ class IotHubProperties(_serialization.Model):  # pylint: disable=too-many-instan
         :keyword authorization_policies: The shared access policies you can use to secure a connection
          to the IoT hub.
         :paramtype authorization_policies:
-         list[~azure.mgmt.iothub.models.SharedAccessSignatureAuthorizationRule]
+         list[~azure.mgmt.iothub.v2022_04_30_preview.models.SharedAccessSignatureAuthorizationRule]
         :keyword disable_local_auth: If true, SAS tokens with Iot hub scoped SAS keys cannot be used
          for authentication.
         :paramtype disable_local_auth: bool
@@ -1691,52 +1825,60 @@ class IotHubProperties(_serialization.Model):  # pylint: disable=too-many-instan
         :paramtype allowed_fqdn_list: list[str]
         :keyword public_network_access: Whether requests from Public Network are allowed. Known values
          are: "Enabled" and "Disabled".
-        :paramtype public_network_access: str or ~azure.mgmt.iothub.models.PublicNetworkAccess
+        :paramtype public_network_access: str or
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.PublicNetworkAccess
         :keyword ip_filter_rules: The IP filter rules.
-        :paramtype ip_filter_rules: list[~azure.mgmt.iothub.models.IpFilterRule]
+        :paramtype ip_filter_rules: list[~azure.mgmt.iothub.v2022_04_30_preview.models.IpFilterRule]
         :keyword network_rule_sets: Network Rule Set Properties of IotHub.
-        :paramtype network_rule_sets: ~azure.mgmt.iothub.models.NetworkRuleSetProperties
+        :paramtype network_rule_sets:
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.NetworkRuleSetProperties
         :keyword min_tls_version: Specifies the minimum TLS version to support for this hub. Can be set
          to "1.2" to have clients that use a TLS version below 1.2 to be rejected.
         :paramtype min_tls_version: str
         :keyword private_endpoint_connections: Private endpoint connections created on this IotHub.
         :paramtype private_endpoint_connections:
-         list[~azure.mgmt.iothub.models.PrivateEndpointConnection]
+         list[~azure.mgmt.iothub.v2022_04_30_preview.models.PrivateEndpointConnection]
         :keyword event_hub_endpoints: The Event Hub-compatible endpoint properties. The only possible
          keys to this dictionary is events. This key has to be present in the dictionary while making
          create or update calls for the IoT hub.
-        :paramtype event_hub_endpoints: dict[str, ~azure.mgmt.iothub.models.EventHubProperties]
+        :paramtype event_hub_endpoints: dict[str,
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.EventHubProperties]
         :keyword routing: The routing related properties of the IoT hub. See:
          https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging.
-        :paramtype routing: ~azure.mgmt.iothub.models.RoutingProperties
+        :paramtype routing: ~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingProperties
         :keyword storage_endpoints: The list of Azure Storage endpoints where you can upload files.
          Currently you can configure only one Azure Storage account and that MUST have its key as
          $default. Specifying more than one storage account causes an error to be thrown. Not specifying
          a value for this property when the enableFileUploadNotifications property is set to True,
          causes an error to be thrown.
-        :paramtype storage_endpoints: dict[str, ~azure.mgmt.iothub.models.StorageEndpointProperties]
+        :paramtype storage_endpoints: dict[str,
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.StorageEndpointProperties]
         :keyword messaging_endpoints: The messaging endpoint properties for the file upload
          notification queue.
         :paramtype messaging_endpoints: dict[str,
-         ~azure.mgmt.iothub.models.MessagingEndpointProperties]
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.MessagingEndpointProperties]
         :keyword enable_file_upload_notifications: If True, file upload notifications are enabled.
         :paramtype enable_file_upload_notifications: bool
         :keyword cloud_to_device: The IoT hub cloud-to-device messaging properties.
-        :paramtype cloud_to_device: ~azure.mgmt.iothub.models.CloudToDeviceProperties
+        :paramtype cloud_to_device:
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.CloudToDeviceProperties
         :keyword comments: IoT hub comments.
         :paramtype comments: str
         :keyword device_streams: The device streams properties of iothub.
-        :paramtype device_streams: ~azure.mgmt.iothub.models.IotHubPropertiesDeviceStreams
+        :paramtype device_streams:
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.IotHubPropertiesDeviceStreams
         :keyword features: The capabilities and features enabled for the IoT hub. Known values are:
          "None" and "DeviceManagement".
-        :paramtype features: str or ~azure.mgmt.iothub.models.Capabilities
+        :paramtype features: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.Capabilities
         :keyword encryption: The encryption properties for the IoT hub.
-        :paramtype encryption: ~azure.mgmt.iothub.models.EncryptionPropertiesDescription
+        :paramtype encryption:
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.EncryptionPropertiesDescription
         :keyword enable_data_residency: This property when set to true, will enable data residency,
          thus, disabling disaster recovery.
         :paramtype enable_data_residency: bool
-        :keyword root_certificate: This property store root certificate related informaiton.
-        :paramtype root_certificate: ~azure.mgmt.iothub.models.RootCertificateProperties
+        :keyword root_certificate: This property store root certificate related information.
+        :paramtype root_certificate:
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.RootCertificateProperties
         """
         super().__init__(**kwargs)
         self.authorization_policies = authorization_policies
@@ -1768,7 +1910,7 @@ class IotHubProperties(_serialization.Model):  # pylint: disable=too-many-instan
         self.root_certificate = root_certificate
 
 
-class IotHubPropertiesDeviceStreams(_serialization.Model):
+class IotHubPropertiesDeviceStreams(msrest.serialization.Model):
     """The device streams properties of iothub.
 
     :ivar streaming_endpoints: List of Device Streams Endpoints.
@@ -1779,7 +1921,12 @@ class IotHubPropertiesDeviceStreams(_serialization.Model):
         "streaming_endpoints": {"key": "streamingEndpoints", "type": "[str]"},
     }
 
-    def __init__(self, *, streaming_endpoints: Optional[List[str]] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        streaming_endpoints: Optional[List[str]] = None,
+        **kwargs
+    ):
         """
         :keyword streaming_endpoints: List of Device Streams Endpoints.
         :paramtype streaming_endpoints: list[str]
@@ -1788,7 +1935,7 @@ class IotHubPropertiesDeviceStreams(_serialization.Model):
         self.streaming_endpoints = streaming_endpoints
 
 
-class IotHubQuotaMetricInfo(_serialization.Model):
+class IotHubQuotaMetricInfo(msrest.serialization.Model):
     """Quota metrics properties.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -1802,9 +1949,9 @@ class IotHubQuotaMetricInfo(_serialization.Model):
     """
 
     _validation = {
-        "name": {"readonly": True},
-        "current_value": {"readonly": True},
-        "max_value": {"readonly": True},
+        'name': {'readonly': True},
+        'current_value': {'readonly': True},
+        'max_value': {'readonly': True},
     }
 
     _attribute_map = {
@@ -1813,27 +1960,31 @@ class IotHubQuotaMetricInfo(_serialization.Model):
         "max_value": {"key": "maxValue", "type": "int"},
     }
 
-    def __init__(self, **kwargs):
-        """ """
+    def __init__(
+        self,
+        **kwargs
+    ):
+        """
+        """
         super().__init__(**kwargs)
         self.name = None
         self.current_value = None
         self.max_value = None
 
 
-class IotHubQuotaMetricInfoListResult(_serialization.Model):
+class IotHubQuotaMetricInfoListResult(msrest.serialization.Model):
     """The JSON-serialized array of IotHubQuotaMetricInfo objects with a next link.
 
     Variables are only populated by the server, and will be ignored when sending a request.
 
     :ivar value: The array of quota metrics objects.
-    :vartype value: list[~azure.mgmt.iothub.models.IotHubQuotaMetricInfo]
+    :vartype value: list[~azure.mgmt.iothub.v2022_04_30_preview.models.IotHubQuotaMetricInfo]
     :ivar next_link: The next link.
     :vartype next_link: str
     """
 
     _validation = {
-        "next_link": {"readonly": True},
+        'next_link': {'readonly': True},
     }
 
     _attribute_map = {
@@ -1841,17 +1992,22 @@ class IotHubQuotaMetricInfoListResult(_serialization.Model):
         "next_link": {"key": "nextLink", "type": "str"},
     }
 
-    def __init__(self, *, value: Optional[List["_models.IotHubQuotaMetricInfo"]] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        value: Optional[List["_models.IotHubQuotaMetricInfo"]] = None,
+        **kwargs
+    ):
         """
         :keyword value: The array of quota metrics objects.
-        :paramtype value: list[~azure.mgmt.iothub.models.IotHubQuotaMetricInfo]
+        :paramtype value: list[~azure.mgmt.iothub.v2022_04_30_preview.models.IotHubQuotaMetricInfo]
         """
         super().__init__(**kwargs)
         self.value = value
         self.next_link = None
 
 
-class IotHubSkuDescription(_serialization.Model):
+class IotHubSkuDescription(msrest.serialization.Model):
     """SKU properties.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -1861,15 +2017,15 @@ class IotHubSkuDescription(_serialization.Model):
     :ivar resource_type: The type of the resource.
     :vartype resource_type: str
     :ivar sku: The type of the resource. Required.
-    :vartype sku: ~azure.mgmt.iothub.models.IotHubSkuInfo
+    :vartype sku: ~azure.mgmt.iothub.v2022_04_30_preview.models.IotHubSkuInfo
     :ivar capacity: IotHub capacity. Required.
-    :vartype capacity: ~azure.mgmt.iothub.models.IotHubCapacity
+    :vartype capacity: ~azure.mgmt.iothub.v2022_04_30_preview.models.IotHubCapacity
     """
 
     _validation = {
-        "resource_type": {"readonly": True},
-        "sku": {"required": True},
-        "capacity": {"required": True},
+        'resource_type': {'readonly': True},
+        'sku': {'required': True},
+        'capacity': {'required': True},
     }
 
     _attribute_map = {
@@ -1878,12 +2034,18 @@ class IotHubSkuDescription(_serialization.Model):
         "capacity": {"key": "capacity", "type": "IotHubCapacity"},
     }
 
-    def __init__(self, *, sku: "_models.IotHubSkuInfo", capacity: "_models.IotHubCapacity", **kwargs):
+    def __init__(
+        self,
+        *,
+        sku: "_models.IotHubSkuInfo",
+        capacity: "_models.IotHubCapacity",
+        **kwargs
+    ):
         """
         :keyword sku: The type of the resource. Required.
-        :paramtype sku: ~azure.mgmt.iothub.models.IotHubSkuInfo
+        :paramtype sku: ~azure.mgmt.iothub.v2022_04_30_preview.models.IotHubSkuInfo
         :keyword capacity: IotHub capacity. Required.
-        :paramtype capacity: ~azure.mgmt.iothub.models.IotHubCapacity
+        :paramtype capacity: ~azure.mgmt.iothub.v2022_04_30_preview.models.IotHubCapacity
         """
         super().__init__(**kwargs)
         self.resource_type = None
@@ -1891,19 +2053,19 @@ class IotHubSkuDescription(_serialization.Model):
         self.capacity = capacity
 
 
-class IotHubSkuDescriptionListResult(_serialization.Model):
+class IotHubSkuDescriptionListResult(msrest.serialization.Model):
     """The JSON-serialized array of IotHubSkuDescription objects with a next link.
 
     Variables are only populated by the server, and will be ignored when sending a request.
 
     :ivar value: The array of IotHubSkuDescription.
-    :vartype value: list[~azure.mgmt.iothub.models.IotHubSkuDescription]
+    :vartype value: list[~azure.mgmt.iothub.v2022_04_30_preview.models.IotHubSkuDescription]
     :ivar next_link: The next link.
     :vartype next_link: str
     """
 
     _validation = {
-        "next_link": {"readonly": True},
+        'next_link': {'readonly': True},
     }
 
     _attribute_map = {
@@ -1911,17 +2073,22 @@ class IotHubSkuDescriptionListResult(_serialization.Model):
         "next_link": {"key": "nextLink", "type": "str"},
     }
 
-    def __init__(self, *, value: Optional[List["_models.IotHubSkuDescription"]] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        value: Optional[List["_models.IotHubSkuDescription"]] = None,
+        **kwargs
+    ):
         """
         :keyword value: The array of IotHubSkuDescription.
-        :paramtype value: list[~azure.mgmt.iothub.models.IotHubSkuDescription]
+        :paramtype value: list[~azure.mgmt.iothub.v2022_04_30_preview.models.IotHubSkuDescription]
         """
         super().__init__(**kwargs)
         self.value = value
         self.next_link = None
 
 
-class IotHubSkuInfo(_serialization.Model):
+class IotHubSkuInfo(msrest.serialization.Model):
     """Information about the SKU of the IoT hub.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -1930,18 +2097,18 @@ class IotHubSkuInfo(_serialization.Model):
 
     :ivar name: The name of the SKU. Required. Known values are: "F1", "S1", "S2", "S3", "B1",
      "B2", and "B3".
-    :vartype name: str or ~azure.mgmt.iothub.models.IotHubSku
+    :vartype name: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.IotHubSku
     :ivar tier: The billing tier for the IoT hub. Known values are: "Free", "Standard", and
      "Basic".
-    :vartype tier: str or ~azure.mgmt.iothub.models.IotHubSkuTier
+    :vartype tier: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.IotHubSkuTier
     :ivar capacity: The number of provisioned IoT Hub units. See:
      https://docs.microsoft.com/azure/azure-subscription-service-limits#iot-hub-limits.
     :vartype capacity: int
     """
 
     _validation = {
-        "name": {"required": True},
-        "tier": {"readonly": True},
+        'name': {'required': True},
+        'tier': {'readonly': True},
     }
 
     _attribute_map = {
@@ -1950,11 +2117,17 @@ class IotHubSkuInfo(_serialization.Model):
         "capacity": {"key": "capacity", "type": "int"},
     }
 
-    def __init__(self, *, name: Union[str, "_models.IotHubSku"], capacity: Optional[int] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        name: Union[str, "_models.IotHubSku"],
+        capacity: Optional[int] = None,
+        **kwargs
+    ):
         """
         :keyword name: The name of the SKU. Required. Known values are: "F1", "S1", "S2", "S3", "B1",
          "B2", and "B3".
-        :paramtype name: str or ~azure.mgmt.iothub.models.IotHubSku
+        :paramtype name: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.IotHubSku
         :keyword capacity: The number of provisioned IoT Hub units. See:
          https://docs.microsoft.com/azure/azure-subscription-service-limits#iot-hub-limits.
         :paramtype capacity: int
@@ -1965,7 +2138,7 @@ class IotHubSkuInfo(_serialization.Model):
         self.capacity = capacity
 
 
-class IpFilterRule(_serialization.Model):
+class IpFilterRule(msrest.serialization.Model):
     """The IP filter rules for the IoT hub.
 
     All required parameters must be populated in order to send to Azure.
@@ -1974,16 +2147,16 @@ class IpFilterRule(_serialization.Model):
     :vartype filter_name: str
     :ivar action: The desired action for requests captured by this rule. Required. Known values
      are: "Accept" and "Reject".
-    :vartype action: str or ~azure.mgmt.iothub.models.IpFilterActionType
+    :vartype action: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.IpFilterActionType
     :ivar ip_mask: A string that contains the IP address range in CIDR notation for the rule.
      Required.
     :vartype ip_mask: str
     """
 
     _validation = {
-        "filter_name": {"required": True},
-        "action": {"required": True},
-        "ip_mask": {"required": True},
+        'filter_name': {'required': True},
+        'action': {'required': True},
+        'ip_mask': {'required': True},
     }
 
     _attribute_map = {
@@ -1992,13 +2165,20 @@ class IpFilterRule(_serialization.Model):
         "ip_mask": {"key": "ipMask", "type": "str"},
     }
 
-    def __init__(self, *, filter_name: str, action: Union[str, "_models.IpFilterActionType"], ip_mask: str, **kwargs):
+    def __init__(
+        self,
+        *,
+        filter_name: str,
+        action: Union[str, "_models.IpFilterActionType"],
+        ip_mask: str,
+        **kwargs
+    ):
         """
         :keyword filter_name: The name of the IP filter rule. Required.
         :paramtype filter_name: str
         :keyword action: The desired action for requests captured by this rule. Required. Known values
          are: "Accept" and "Reject".
-        :paramtype action: str or ~azure.mgmt.iothub.models.IpFilterActionType
+        :paramtype action: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.IpFilterActionType
         :keyword ip_mask: A string that contains the IP address range in CIDR notation for the rule.
          Required.
         :paramtype ip_mask: str
@@ -2009,7 +2189,7 @@ class IpFilterRule(_serialization.Model):
         self.ip_mask = ip_mask
 
 
-class JobResponse(_serialization.Model):
+class JobResponse(msrest.serialization.Model):
     """The properties of the Job Response object.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -2023,10 +2203,10 @@ class JobResponse(_serialization.Model):
     :ivar type: The type of the job. Known values are: "unknown", "export", "import", "backup",
      "readDeviceProperties", "writeDeviceProperties", "updateDeviceConfiguration", "rebootDevice",
      "factoryResetDevice", and "firmwareUpdate".
-    :vartype type: str or ~azure.mgmt.iothub.models.JobType
+    :vartype type: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.JobType
     :ivar status: The status of the job. Known values are: "unknown", "enqueued", "running",
      "completed", "failed", and "cancelled".
-    :vartype status: str or ~azure.mgmt.iothub.models.JobStatus
+    :vartype status: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.JobStatus
     :ivar failure_reason: If status == failed, this string containing the reason for the failure.
     :vartype failure_reason: str
     :ivar status_message: The status message for the job.
@@ -2036,14 +2216,14 @@ class JobResponse(_serialization.Model):
     """
 
     _validation = {
-        "job_id": {"readonly": True},
-        "start_time_utc": {"readonly": True},
-        "end_time_utc": {"readonly": True},
-        "type": {"readonly": True},
-        "status": {"readonly": True},
-        "failure_reason": {"readonly": True},
-        "status_message": {"readonly": True},
-        "parent_job_id": {"readonly": True},
+        'job_id': {'readonly': True},
+        'start_time_utc': {'readonly': True},
+        'end_time_utc': {'readonly': True},
+        'type': {'readonly': True},
+        'status': {'readonly': True},
+        'failure_reason': {'readonly': True},
+        'status_message': {'readonly': True},
+        'parent_job_id': {'readonly': True},
     }
 
     _attribute_map = {
@@ -2057,8 +2237,12 @@ class JobResponse(_serialization.Model):
         "parent_job_id": {"key": "parentJobId", "type": "str"},
     }
 
-    def __init__(self, **kwargs):
-        """ """
+    def __init__(
+        self,
+        **kwargs
+    ):
+        """
+        """
         super().__init__(**kwargs)
         self.job_id = None
         self.start_time_utc = None
@@ -2070,19 +2254,19 @@ class JobResponse(_serialization.Model):
         self.parent_job_id = None
 
 
-class JobResponseListResult(_serialization.Model):
+class JobResponseListResult(msrest.serialization.Model):
     """The JSON-serialized array of JobResponse objects with a next link.
 
     Variables are only populated by the server, and will be ignored when sending a request.
 
     :ivar value: The array of JobResponse objects.
-    :vartype value: list[~azure.mgmt.iothub.models.JobResponse]
+    :vartype value: list[~azure.mgmt.iothub.v2022_04_30_preview.models.JobResponse]
     :ivar next_link: The next link.
     :vartype next_link: str
     """
 
     _validation = {
-        "next_link": {"readonly": True},
+        'next_link': {'readonly': True},
     }
 
     _attribute_map = {
@@ -2090,23 +2274,28 @@ class JobResponseListResult(_serialization.Model):
         "next_link": {"key": "nextLink", "type": "str"},
     }
 
-    def __init__(self, *, value: Optional[List["_models.JobResponse"]] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        value: Optional[List["_models.JobResponse"]] = None,
+        **kwargs
+    ):
         """
         :keyword value: The array of JobResponse objects.
-        :paramtype value: list[~azure.mgmt.iothub.models.JobResponse]
+        :paramtype value: list[~azure.mgmt.iothub.v2022_04_30_preview.models.JobResponse]
         """
         super().__init__(**kwargs)
         self.value = value
         self.next_link = None
 
 
-class KeyVaultKeyProperties(_serialization.Model):
+class KeyVaultKeyProperties(msrest.serialization.Model):
     """The properties of the KeyVault key.
 
     :ivar key_identifier: The identifier of the key.
     :vartype key_identifier: str
     :ivar identity: Managed identity properties of KeyVault Key.
-    :vartype identity: ~azure.mgmt.iothub.models.ManagedIdentity
+    :vartype identity: ~azure.mgmt.iothub.v2022_04_30_preview.models.ManagedIdentity
     """
 
     _attribute_map = {
@@ -2115,20 +2304,24 @@ class KeyVaultKeyProperties(_serialization.Model):
     }
 
     def __init__(
-        self, *, key_identifier: Optional[str] = None, identity: Optional["_models.ManagedIdentity"] = None, **kwargs
+        self,
+        *,
+        key_identifier: Optional[str] = None,
+        identity: Optional["_models.ManagedIdentity"] = None,
+        **kwargs
     ):
         """
         :keyword key_identifier: The identifier of the key.
         :paramtype key_identifier: str
         :keyword identity: Managed identity properties of KeyVault Key.
-        :paramtype identity: ~azure.mgmt.iothub.models.ManagedIdentity
+        :paramtype identity: ~azure.mgmt.iothub.v2022_04_30_preview.models.ManagedIdentity
         """
         super().__init__(**kwargs)
         self.key_identifier = key_identifier
         self.identity = identity
 
 
-class ManagedIdentity(_serialization.Model):
+class ManagedIdentity(msrest.serialization.Model):
     """The properties of the Managed identity.
 
     :ivar user_assigned_identity: The user assigned identity.
@@ -2139,7 +2332,12 @@ class ManagedIdentity(_serialization.Model):
         "user_assigned_identity": {"key": "userAssignedIdentity", "type": "str"},
     }
 
-    def __init__(self, *, user_assigned_identity: Optional[str] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        user_assigned_identity: Optional[str] = None,
+        **kwargs
+    ):
         """
         :keyword user_assigned_identity: The user assigned identity.
         :paramtype user_assigned_identity: str
@@ -2148,27 +2346,32 @@ class ManagedIdentity(_serialization.Model):
         self.user_assigned_identity = user_assigned_identity
 
 
-class MatchedRoute(_serialization.Model):
+class MatchedRoute(msrest.serialization.Model):
     """Routes that matched.
 
     :ivar properties: Properties of routes that matched.
-    :vartype properties: ~azure.mgmt.iothub.models.RouteProperties
+    :vartype properties: ~azure.mgmt.iothub.v2022_04_30_preview.models.RouteProperties
     """
 
     _attribute_map = {
         "properties": {"key": "properties", "type": "RouteProperties"},
     }
 
-    def __init__(self, *, properties: Optional["_models.RouteProperties"] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        properties: Optional["_models.RouteProperties"] = None,
+        **kwargs
+    ):
         """
         :keyword properties: Properties of routes that matched.
-        :paramtype properties: ~azure.mgmt.iothub.models.RouteProperties
+        :paramtype properties: ~azure.mgmt.iothub.v2022_04_30_preview.models.RouteProperties
         """
         super().__init__(**kwargs)
         self.properties = properties
 
 
-class MessagingEndpointProperties(_serialization.Model):
+class MessagingEndpointProperties(msrest.serialization.Model):
     """The properties of the messaging endpoints used by this IoT hub.
 
     :ivar lock_duration_as_iso8601: The lock duration. See:
@@ -2184,7 +2387,7 @@ class MessagingEndpointProperties(_serialization.Model):
     """
 
     _validation = {
-        "max_delivery_count": {"maximum": 100, "minimum": 1},
+        'max_delivery_count': {'maximum': 100, 'minimum': 1},
     }
 
     _attribute_map = {
@@ -2219,7 +2422,7 @@ class MessagingEndpointProperties(_serialization.Model):
         self.max_delivery_count = max_delivery_count
 
 
-class Name(_serialization.Model):
+class Name(msrest.serialization.Model):
     """Name of Iot Hub type.
 
     :ivar value: IotHub type.
@@ -2233,7 +2436,13 @@ class Name(_serialization.Model):
         "localized_value": {"key": "localizedValue", "type": "str"},
     }
 
-    def __init__(self, *, value: Optional[str] = None, localized_value: Optional[str] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        value: Optional[str] = None,
+        localized_value: Optional[str] = None,
+        **kwargs
+    ):
         """
         :keyword value: IotHub type.
         :paramtype value: str
@@ -2245,7 +2454,7 @@ class Name(_serialization.Model):
         self.localized_value = localized_value
 
 
-class NetworkRuleSetIpRule(_serialization.Model):
+class NetworkRuleSetIpRule(msrest.serialization.Model):
     """IP Rule to be applied as part of Network Rule Set.
 
     All required parameters must be populated in order to send to Azure.
@@ -2253,15 +2462,15 @@ class NetworkRuleSetIpRule(_serialization.Model):
     :ivar filter_name: Name of the IP filter rule. Required.
     :vartype filter_name: str
     :ivar action: IP Filter Action. "Allow"
-    :vartype action: str or ~azure.mgmt.iothub.models.NetworkRuleIPAction
+    :vartype action: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.NetworkRuleIPAction
     :ivar ip_mask: A string that contains the IP address range in CIDR notation for the rule.
      Required.
     :vartype ip_mask: str
     """
 
     _validation = {
-        "filter_name": {"required": True},
-        "ip_mask": {"required": True},
+        'filter_name': {'required': True},
+        'ip_mask': {'required': True},
     }
 
     _attribute_map = {
@@ -2271,13 +2480,18 @@ class NetworkRuleSetIpRule(_serialization.Model):
     }
 
     def __init__(
-        self, *, filter_name: str, ip_mask: str, action: Union[str, "_models.NetworkRuleIPAction"] = "Allow", **kwargs
+        self,
+        *,
+        filter_name: str,
+        ip_mask: str,
+        action: Union[str, "_models.NetworkRuleIPAction"] = "Allow",
+        **kwargs
     ):
         """
         :keyword filter_name: Name of the IP filter rule. Required.
         :paramtype filter_name: str
         :keyword action: IP Filter Action. "Allow"
-        :paramtype action: str or ~azure.mgmt.iothub.models.NetworkRuleIPAction
+        :paramtype action: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.NetworkRuleIPAction
         :keyword ip_mask: A string that contains the IP address range in CIDR notation for the rule.
          Required.
         :paramtype ip_mask: str
@@ -2288,24 +2502,24 @@ class NetworkRuleSetIpRule(_serialization.Model):
         self.ip_mask = ip_mask
 
 
-class NetworkRuleSetProperties(_serialization.Model):
+class NetworkRuleSetProperties(msrest.serialization.Model):
     """Network Rule Set Properties of IotHub.
 
     All required parameters must be populated in order to send to Azure.
 
     :ivar default_action: Default Action for Network Rule Set. Known values are: "Deny" and
      "Allow".
-    :vartype default_action: str or ~azure.mgmt.iothub.models.DefaultAction
+    :vartype default_action: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.DefaultAction
     :ivar apply_to_built_in_event_hub_endpoint: If True, then Network Rule Set is also applied to
      BuiltIn EventHub EndPoint of IotHub. Required.
     :vartype apply_to_built_in_event_hub_endpoint: bool
     :ivar ip_rules: List of IP Rules. Required.
-    :vartype ip_rules: list[~azure.mgmt.iothub.models.NetworkRuleSetIpRule]
+    :vartype ip_rules: list[~azure.mgmt.iothub.v2022_04_30_preview.models.NetworkRuleSetIpRule]
     """
 
     _validation = {
-        "apply_to_built_in_event_hub_endpoint": {"required": True},
-        "ip_rules": {"required": True},
+        'apply_to_built_in_event_hub_endpoint': {'required': True},
+        'ip_rules': {'required': True},
     }
 
     _attribute_map = {
@@ -2325,12 +2539,12 @@ class NetworkRuleSetProperties(_serialization.Model):
         """
         :keyword default_action: Default Action for Network Rule Set. Known values are: "Deny" and
          "Allow".
-        :paramtype default_action: str or ~azure.mgmt.iothub.models.DefaultAction
+        :paramtype default_action: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.DefaultAction
         :keyword apply_to_built_in_event_hub_endpoint: If True, then Network Rule Set is also applied
          to BuiltIn EventHub EndPoint of IotHub. Required.
         :paramtype apply_to_built_in_event_hub_endpoint: bool
         :keyword ip_rules: List of IP Rules. Required.
-        :paramtype ip_rules: list[~azure.mgmt.iothub.models.NetworkRuleSetIpRule]
+        :paramtype ip_rules: list[~azure.mgmt.iothub.v2022_04_30_preview.models.NetworkRuleSetIpRule]
         """
         super().__init__(**kwargs)
         self.default_action = default_action
@@ -2338,7 +2552,7 @@ class NetworkRuleSetProperties(_serialization.Model):
         self.ip_rules = ip_rules
 
 
-class Operation(_serialization.Model):
+class Operation(msrest.serialization.Model):
     """IoT Hub REST API operation.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -2346,11 +2560,11 @@ class Operation(_serialization.Model):
     :ivar name: Operation name: {provider}/{resource}/{read | write | action | delete}.
     :vartype name: str
     :ivar display: The object that represents the operation.
-    :vartype display: ~azure.mgmt.iothub.models.OperationDisplay
+    :vartype display: ~azure.mgmt.iothub.v2022_04_30_preview.models.OperationDisplay
     """
 
     _validation = {
-        "name": {"readonly": True},
+        'name': {'readonly': True},
     }
 
     _attribute_map = {
@@ -2358,17 +2572,22 @@ class Operation(_serialization.Model):
         "display": {"key": "display", "type": "OperationDisplay"},
     }
 
-    def __init__(self, *, display: Optional["_models.OperationDisplay"] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        display: Optional["_models.OperationDisplay"] = None,
+        **kwargs
+    ):
         """
         :keyword display: The object that represents the operation.
-        :paramtype display: ~azure.mgmt.iothub.models.OperationDisplay
+        :paramtype display: ~azure.mgmt.iothub.v2022_04_30_preview.models.OperationDisplay
         """
         super().__init__(**kwargs)
         self.name = None
         self.display = display
 
 
-class OperationDisplay(_serialization.Model):
+class OperationDisplay(msrest.serialization.Model):
     """The object that represents the operation.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -2384,10 +2603,10 @@ class OperationDisplay(_serialization.Model):
     """
 
     _validation = {
-        "provider": {"readonly": True},
-        "resource": {"readonly": True},
-        "operation": {"readonly": True},
-        "description": {"readonly": True},
+        'provider': {'readonly': True},
+        'resource': {'readonly': True},
+        'operation': {'readonly': True},
+        'description': {'readonly': True},
     }
 
     _attribute_map = {
@@ -2397,8 +2616,12 @@ class OperationDisplay(_serialization.Model):
         "description": {"key": "description", "type": "str"},
     }
 
-    def __init__(self, **kwargs):
-        """ """
+    def __init__(
+        self,
+        **kwargs
+    ):
+        """
+        """
         super().__init__(**kwargs)
         self.provider = None
         self.resource = None
@@ -2406,7 +2629,7 @@ class OperationDisplay(_serialization.Model):
         self.description = None
 
 
-class OperationInputs(_serialization.Model):
+class OperationInputs(msrest.serialization.Model):
     """Input values.
 
     All required parameters must be populated in order to send to Azure.
@@ -2416,14 +2639,19 @@ class OperationInputs(_serialization.Model):
     """
 
     _validation = {
-        "name": {"required": True},
+        'name': {'required': True},
     }
 
     _attribute_map = {
         "name": {"key": "name", "type": "str"},
     }
 
-    def __init__(self, *, name: str, **kwargs):
+    def __init__(
+        self,
+        *,
+        name: str,
+        **kwargs
+    ):
         """
         :keyword name: The name of the IoT hub to check. Required.
         :paramtype name: str
@@ -2432,20 +2660,20 @@ class OperationInputs(_serialization.Model):
         self.name = name
 
 
-class OperationListResult(_serialization.Model):
+class OperationListResult(msrest.serialization.Model):
     """Result of the request to list IoT Hub operations. It contains a list of operations and a URL link to get the next set of results.
 
     Variables are only populated by the server, and will be ignored when sending a request.
 
     :ivar value: List of IoT Hub operations supported by the Microsoft.Devices resource provider.
-    :vartype value: list[~azure.mgmt.iothub.models.Operation]
+    :vartype value: list[~azure.mgmt.iothub.v2022_04_30_preview.models.Operation]
     :ivar next_link: URL to get the next set of operation list results if there are any.
     :vartype next_link: str
     """
 
     _validation = {
-        "value": {"readonly": True},
-        "next_link": {"readonly": True},
+        'value': {'readonly': True},
+        'next_link': {'readonly': True},
     }
 
     _attribute_map = {
@@ -2453,14 +2681,18 @@ class OperationListResult(_serialization.Model):
         "next_link": {"key": "nextLink", "type": "str"},
     }
 
-    def __init__(self, **kwargs):
-        """ """
+    def __init__(
+        self,
+        **kwargs
+    ):
+        """
+        """
         super().__init__(**kwargs)
         self.value = None
         self.next_link = None
 
 
-class PrivateEndpoint(_serialization.Model):
+class PrivateEndpoint(msrest.serialization.Model):
     """The private endpoint property of a private endpoint connection.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -2470,20 +2702,24 @@ class PrivateEndpoint(_serialization.Model):
     """
 
     _validation = {
-        "id": {"readonly": True},
+        'id': {'readonly': True},
     }
 
     _attribute_map = {
         "id": {"key": "id", "type": "str"},
     }
 
-    def __init__(self, **kwargs):
-        """ """
+    def __init__(
+        self,
+        **kwargs
+    ):
+        """
+        """
         super().__init__(**kwargs)
         self.id = None
 
 
-class PrivateEndpointConnection(_serialization.Model):
+class PrivateEndpointConnection(msrest.serialization.Model):
     """The private endpoint connection of an IotHub.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -2497,14 +2733,15 @@ class PrivateEndpointConnection(_serialization.Model):
     :ivar type: The resource type.
     :vartype type: str
     :ivar properties: The properties of a private endpoint connection. Required.
-    :vartype properties: ~azure.mgmt.iothub.models.PrivateEndpointConnectionProperties
+    :vartype properties:
+     ~azure.mgmt.iothub.v2022_04_30_preview.models.PrivateEndpointConnectionProperties
     """
 
     _validation = {
-        "id": {"readonly": True},
-        "name": {"readonly": True},
-        "type": {"readonly": True},
-        "properties": {"required": True},
+        'id': {'readonly': True},
+        'name': {'readonly': True},
+        'type': {'readonly': True},
+        'properties': {'required': True},
     }
 
     _attribute_map = {
@@ -2514,10 +2751,16 @@ class PrivateEndpointConnection(_serialization.Model):
         "properties": {"key": "properties", "type": "PrivateEndpointConnectionProperties"},
     }
 
-    def __init__(self, *, properties: "_models.PrivateEndpointConnectionProperties", **kwargs):
+    def __init__(
+        self,
+        *,
+        properties: "_models.PrivateEndpointConnectionProperties",
+        **kwargs
+    ):
         """
         :keyword properties: The properties of a private endpoint connection. Required.
-        :paramtype properties: ~azure.mgmt.iothub.models.PrivateEndpointConnectionProperties
+        :paramtype properties:
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.PrivateEndpointConnectionProperties
         """
         super().__init__(**kwargs)
         self.id = None
@@ -2526,29 +2769,26 @@ class PrivateEndpointConnection(_serialization.Model):
         self.properties = properties
 
 
-class PrivateEndpointConnectionProperties(_serialization.Model):
+class PrivateEndpointConnectionProperties(msrest.serialization.Model):
     """The properties of a private endpoint connection.
 
     All required parameters must be populated in order to send to Azure.
 
     :ivar private_endpoint: The private endpoint property of a private endpoint connection.
-    :vartype private_endpoint: ~azure.mgmt.iothub.models.PrivateEndpoint
+    :vartype private_endpoint: ~azure.mgmt.iothub.v2022_04_30_preview.models.PrivateEndpoint
     :ivar private_link_service_connection_state: The current state of a private endpoint
      connection. Required.
     :vartype private_link_service_connection_state:
-     ~azure.mgmt.iothub.models.PrivateLinkServiceConnectionState
+     ~azure.mgmt.iothub.v2022_04_30_preview.models.PrivateLinkServiceConnectionState
     """
 
     _validation = {
-        "private_link_service_connection_state": {"required": True},
+        'private_link_service_connection_state': {'required': True},
     }
 
     _attribute_map = {
         "private_endpoint": {"key": "privateEndpoint", "type": "PrivateEndpoint"},
-        "private_link_service_connection_state": {
-            "key": "privateLinkServiceConnectionState",
-            "type": "PrivateLinkServiceConnectionState",
-        },
+        "private_link_service_connection_state": {"key": "privateLinkServiceConnectionState", "type": "PrivateLinkServiceConnectionState"},
     }
 
     def __init__(
@@ -2560,45 +2800,51 @@ class PrivateEndpointConnectionProperties(_serialization.Model):
     ):
         """
         :keyword private_endpoint: The private endpoint property of a private endpoint connection.
-        :paramtype private_endpoint: ~azure.mgmt.iothub.models.PrivateEndpoint
+        :paramtype private_endpoint: ~azure.mgmt.iothub.v2022_04_30_preview.models.PrivateEndpoint
         :keyword private_link_service_connection_state: The current state of a private endpoint
          connection. Required.
         :paramtype private_link_service_connection_state:
-         ~azure.mgmt.iothub.models.PrivateLinkServiceConnectionState
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.PrivateLinkServiceConnectionState
         """
         super().__init__(**kwargs)
         self.private_endpoint = private_endpoint
         self.private_link_service_connection_state = private_link_service_connection_state
 
 
-class PrivateLinkResources(_serialization.Model):
+class PrivateLinkResources(msrest.serialization.Model):
     """The available private link resources for an IotHub.
 
     :ivar value: The list of available private link resources for an IotHub.
-    :vartype value: list[~azure.mgmt.iothub.models.GroupIdInformation]
+    :vartype value: list[~azure.mgmt.iothub.v2022_04_30_preview.models.GroupIdInformation]
     """
 
     _attribute_map = {
         "value": {"key": "value", "type": "[GroupIdInformation]"},
     }
 
-    def __init__(self, *, value: Optional[List["_models.GroupIdInformation"]] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        value: Optional[List["_models.GroupIdInformation"]] = None,
+        **kwargs
+    ):
         """
         :keyword value: The list of available private link resources for an IotHub.
-        :paramtype value: list[~azure.mgmt.iothub.models.GroupIdInformation]
+        :paramtype value: list[~azure.mgmt.iothub.v2022_04_30_preview.models.GroupIdInformation]
         """
         super().__init__(**kwargs)
         self.value = value
 
 
-class PrivateLinkServiceConnectionState(_serialization.Model):
+class PrivateLinkServiceConnectionState(msrest.serialization.Model):
     """The current state of a private endpoint connection.
 
     All required parameters must be populated in order to send to Azure.
 
     :ivar status: The status of a private endpoint connection. Required. Known values are:
      "Pending", "Approved", "Rejected", and "Disconnected".
-    :vartype status: str or ~azure.mgmt.iothub.models.PrivateLinkServiceConnectionStatus
+    :vartype status: str or
+     ~azure.mgmt.iothub.v2022_04_30_preview.models.PrivateLinkServiceConnectionStatus
     :ivar description: The description for the current state of a private endpoint connection.
      Required.
     :vartype description: str
@@ -2607,8 +2853,8 @@ class PrivateLinkServiceConnectionState(_serialization.Model):
     """
 
     _validation = {
-        "status": {"required": True},
-        "description": {"required": True},
+        'status': {'required': True},
+        'description': {'required': True},
     }
 
     _attribute_map = {
@@ -2628,7 +2874,8 @@ class PrivateLinkServiceConnectionState(_serialization.Model):
         """
         :keyword status: The status of a private endpoint connection. Required. Known values are:
          "Pending", "Approved", "Rejected", and "Disconnected".
-        :paramtype status: str or ~azure.mgmt.iothub.models.PrivateLinkServiceConnectionStatus
+        :paramtype status: str or
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.PrivateLinkServiceConnectionStatus
         :keyword description: The description for the current state of a private endpoint connection.
          Required.
         :paramtype description: str
@@ -2641,7 +2888,7 @@ class PrivateLinkServiceConnectionState(_serialization.Model):
         self.actions_required = actions_required
 
 
-class RegistryStatistics(_serialization.Model):
+class RegistryStatistics(msrest.serialization.Model):
     """Identity registry statistics.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -2655,9 +2902,9 @@ class RegistryStatistics(_serialization.Model):
     """
 
     _validation = {
-        "total_device_count": {"readonly": True},
-        "enabled_device_count": {"readonly": True},
-        "disabled_device_count": {"readonly": True},
+        'total_device_count': {'readonly': True},
+        'enabled_device_count': {'readonly': True},
+        'disabled_device_count': {'readonly': True},
     }
 
     _attribute_map = {
@@ -2666,18 +2913,21 @@ class RegistryStatistics(_serialization.Model):
         "disabled_device_count": {"key": "disabledDeviceCount", "type": "int"},
     }
 
-    def __init__(self, **kwargs):
-        """ """
+    def __init__(
+        self,
+        **kwargs
+    ):
+        """
+        """
         super().__init__(**kwargs)
         self.total_device_count = None
         self.enabled_device_count = None
         self.disabled_device_count = None
 
 
-class RootCertificateProperties(_serialization.Model):
-    """This property store root certificate related informaiton.
+class RootCertificateProperties(msrest.serialization.Model):
+    """This property store root certificate related information.
 
-    @ vilit - changed the type of the last_updated_rot_certificate_v2 to a rfc-1123
     Variables are only populated by the server, and will be ignored when sending a request.
 
     :ivar enable_root_certificate_v2: This property when set to true, hub will use G2 cert; while
@@ -2688,15 +2938,20 @@ class RootCertificateProperties(_serialization.Model):
     """
 
     _validation = {
-        "last_updated_time_utc": {"readonly": True},
+        'last_updated_time_utc': {'readonly': True},
     }
 
     _attribute_map = {
         "enable_root_certificate_v2": {"key": "enableRootCertificateV2", "type": "bool"},
-        "last_updated_time_utc": {"key": "lastUpdatedTimeUtc", "type": "rfc-1123"},
+        "last_updated_time_utc": {"key": "lastUpdatedTimeUtc", "type": "iso-8601"},
     }
 
-    def __init__(self, *, enable_root_certificate_v2: Optional[bool] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        enable_root_certificate_v2: Optional[bool] = None,
+        **kwargs
+    ):
         """
         :keyword enable_root_certificate_v2: This property when set to true, hub will use G2 cert;
          while it's set to false, hub uses Baltimore Cert.
@@ -2707,15 +2962,15 @@ class RootCertificateProperties(_serialization.Model):
         self.last_updated_time_utc = None
 
 
-class RouteCompilationError(_serialization.Model):
+class RouteCompilationError(msrest.serialization.Model):
     """Compilation error when evaluating route.
 
     :ivar message: Route error message.
     :vartype message: str
     :ivar severity: Severity of the route error. Known values are: "error" and "warning".
-    :vartype severity: str or ~azure.mgmt.iothub.models.RouteErrorSeverity
+    :vartype severity: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.RouteErrorSeverity
     :ivar location: Location where the route error happened.
-    :vartype location: ~azure.mgmt.iothub.models.RouteErrorRange
+    :vartype location: ~azure.mgmt.iothub.v2022_04_30_preview.models.RouteErrorRange
     """
 
     _attribute_map = {
@@ -2736,9 +2991,9 @@ class RouteCompilationError(_serialization.Model):
         :keyword message: Route error message.
         :paramtype message: str
         :keyword severity: Severity of the route error. Known values are: "error" and "warning".
-        :paramtype severity: str or ~azure.mgmt.iothub.models.RouteErrorSeverity
+        :paramtype severity: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.RouteErrorSeverity
         :keyword location: Location where the route error happened.
-        :paramtype location: ~azure.mgmt.iothub.models.RouteErrorRange
+        :paramtype location: ~azure.mgmt.iothub.v2022_04_30_preview.models.RouteErrorRange
         """
         super().__init__(**kwargs)
         self.message = message
@@ -2746,7 +3001,7 @@ class RouteCompilationError(_serialization.Model):
         self.location = location
 
 
-class RouteErrorPosition(_serialization.Model):
+class RouteErrorPosition(msrest.serialization.Model):
     """Position where the route error happened.
 
     :ivar line: Line where the route error happened.
@@ -2760,7 +3015,13 @@ class RouteErrorPosition(_serialization.Model):
         "column": {"key": "column", "type": "int"},
     }
 
-    def __init__(self, *, line: Optional[int] = None, column: Optional[int] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        line: Optional[int] = None,
+        column: Optional[int] = None,
+        **kwargs
+    ):
         """
         :keyword line: Line where the route error happened.
         :paramtype line: int
@@ -2772,13 +3033,13 @@ class RouteErrorPosition(_serialization.Model):
         self.column = column
 
 
-class RouteErrorRange(_serialization.Model):
+class RouteErrorRange(msrest.serialization.Model):
     """Range of route errors.
 
     :ivar start: Start where the route error happened.
-    :vartype start: ~azure.mgmt.iothub.models.RouteErrorPosition
+    :vartype start: ~azure.mgmt.iothub.v2022_04_30_preview.models.RouteErrorPosition
     :ivar end: End where the route error happened.
-    :vartype end: ~azure.mgmt.iothub.models.RouteErrorPosition
+    :vartype end: ~azure.mgmt.iothub.v2022_04_30_preview.models.RouteErrorPosition
     """
 
     _attribute_map = {
@@ -2795,16 +3056,16 @@ class RouteErrorRange(_serialization.Model):
     ):
         """
         :keyword start: Start where the route error happened.
-        :paramtype start: ~azure.mgmt.iothub.models.RouteErrorPosition
+        :paramtype start: ~azure.mgmt.iothub.v2022_04_30_preview.models.RouteErrorPosition
         :keyword end: End where the route error happened.
-        :paramtype end: ~azure.mgmt.iothub.models.RouteErrorPosition
+        :paramtype end: ~azure.mgmt.iothub.v2022_04_30_preview.models.RouteErrorPosition
         """
         super().__init__(**kwargs)
         self.start = start
         self.end = end
 
 
-class RouteProperties(_serialization.Model):
+class RouteProperties(msrest.serialization.Model):
     """The properties of a routing rule that your IoT hub uses to route messages to endpoints.
 
     All required parameters must be populated in order to send to Azure.
@@ -2816,7 +3077,7 @@ class RouteProperties(_serialization.Model):
      Required. Known values are: "Invalid", "DeviceMessages", "TwinChangeEvents",
      "DeviceLifecycleEvents", "DeviceJobLifecycleEvents", "DigitalTwinChangeEvents",
      "DeviceConnectionStateEvents", and "MqttBrokerMessages".
-    :vartype source: str or ~azure.mgmt.iothub.models.RoutingSource
+    :vartype source: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingSource
     :ivar condition: The condition that is evaluated to apply the routing rule. If no condition is
      provided, it evaluates to true by default. For grammar, see:
      https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
@@ -2829,10 +3090,10 @@ class RouteProperties(_serialization.Model):
     """
 
     _validation = {
-        "name": {"required": True, "pattern": r"^[A-Za-z0-9-._]{1,64}$"},
-        "source": {"required": True},
-        "endpoint_names": {"required": True, "max_items": 1, "min_items": 1},
-        "is_enabled": {"required": True},
+        'name': {'required': True, 'pattern': r'^[A-Za-z0-9-._]{1,64}$'},
+        'source': {'required': True},
+        'endpoint_names': {'required': True, 'max_items': 1, 'min_items': 1},
+        'is_enabled': {'required': True},
     }
 
     _attribute_map = {
@@ -2862,7 +3123,7 @@ class RouteProperties(_serialization.Model):
          Required. Known values are: "Invalid", "DeviceMessages", "TwinChangeEvents",
          "DeviceLifecycleEvents", "DeviceJobLifecycleEvents", "DigitalTwinChangeEvents",
          "DeviceConnectionStateEvents", and "MqttBrokerMessages".
-        :paramtype source: str or ~azure.mgmt.iothub.models.RoutingSource
+        :paramtype source: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingSource
         :keyword condition: The condition that is evaluated to apply the routing rule. If no condition
          is provided, it evaluates to true by default. For grammar, see:
          https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
@@ -2881,7 +3142,7 @@ class RouteProperties(_serialization.Model):
         self.is_enabled = is_enabled
 
 
-class RoutingCosmosDBSqlApiProperties(_serialization.Model):  # pylint: disable=too-many-instance-attributes
+class RoutingCosmosDBSqlApiProperties(msrest.serialization.Model):  # pylint: disable=too-many-instance-attributes
     """The properties related to a cosmos DB sql collection endpoint.
 
     All required parameters must be populated in order to send to Azure.
@@ -2902,9 +3163,10 @@ class RoutingCosmosDBSqlApiProperties(_serialization.Model):  # pylint: disable=
     :vartype endpoint_uri: str
     :ivar authentication_type: Method used to authenticate against the cosmos DB sql collection
      endpoint. Known values are: "keyBased" and "identityBased".
-    :vartype authentication_type: str or ~azure.mgmt.iothub.models.AuthenticationType
+    :vartype authentication_type: str or
+     ~azure.mgmt.iothub.v2022_04_30_preview.models.AuthenticationType
     :ivar identity: Managed identity properties of routing cosmos DB collection endpoint.
-    :vartype identity: ~azure.mgmt.iothub.models.ManagedIdentity
+    :vartype identity: ~azure.mgmt.iothub.v2022_04_30_preview.models.ManagedIdentity
     :ivar primary_key: The primary key of the cosmos DB account.
     :vartype primary_key: str
     :ivar secondary_key: The secondary key of the cosmos DB account.
@@ -2926,10 +3188,10 @@ class RoutingCosmosDBSqlApiProperties(_serialization.Model):  # pylint: disable=
     """
 
     _validation = {
-        "name": {"required": True, "pattern": r"^[A-Za-z0-9-._]{1,64}$"},
-        "endpoint_uri": {"required": True},
-        "database_name": {"required": True},
-        "collection_name": {"required": True},
+        'name': {'required': True, 'pattern': r'^[A-Za-z0-9-._]{1,64}$'},
+        'endpoint_uri': {'required': True},
+        'database_name': {'required': True},
+        'collection_name': {'required': True},
     }
 
     _attribute_map = {
@@ -2983,9 +3245,10 @@ class RoutingCosmosDBSqlApiProperties(_serialization.Model):  # pylint: disable=
         :paramtype endpoint_uri: str
         :keyword authentication_type: Method used to authenticate against the cosmos DB sql collection
          endpoint. Known values are: "keyBased" and "identityBased".
-        :paramtype authentication_type: str or ~azure.mgmt.iothub.models.AuthenticationType
+        :paramtype authentication_type: str or
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.AuthenticationType
         :keyword identity: Managed identity properties of routing cosmos DB collection endpoint.
-        :paramtype identity: ~azure.mgmt.iothub.models.ManagedIdentity
+        :paramtype identity: ~azure.mgmt.iothub.v2022_04_30_preview.models.ManagedIdentity
         :keyword primary_key: The primary key of the cosmos DB account.
         :paramtype primary_key: str
         :keyword secondary_key: The secondary key of the cosmos DB account.
@@ -3021,27 +3284,29 @@ class RoutingCosmosDBSqlApiProperties(_serialization.Model):  # pylint: disable=
         self.partition_key_template = partition_key_template
 
 
-class RoutingEndpoints(_serialization.Model):
+class RoutingEndpoints(msrest.serialization.Model):
     """The properties related to the custom endpoints to which your IoT hub routes messages based on the routing rules. A maximum of 10 custom endpoints are allowed across all endpoint types for paid hubs and only 1 custom endpoint is allowed across all endpoint types for free hubs.
 
     :ivar service_bus_queues: The list of Service Bus queue endpoints that IoT hub routes the
      messages to, based on the routing rules.
     :vartype service_bus_queues:
-     list[~azure.mgmt.iothub.models.RoutingServiceBusQueueEndpointProperties]
+     list[~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingServiceBusQueueEndpointProperties]
     :ivar service_bus_topics: The list of Service Bus topic endpoints that the IoT hub routes the
      messages to, based on the routing rules.
     :vartype service_bus_topics:
-     list[~azure.mgmt.iothub.models.RoutingServiceBusTopicEndpointProperties]
+     list[~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingServiceBusTopicEndpointProperties]
     :ivar event_hubs: The list of Event Hubs endpoints that IoT hub routes messages to, based on
      the routing rules. This list does not include the built-in Event Hubs endpoint.
-    :vartype event_hubs: list[~azure.mgmt.iothub.models.RoutingEventHubProperties]
+    :vartype event_hubs:
+     list[~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingEventHubProperties]
     :ivar storage_containers: The list of storage container endpoints that IoT hub routes messages
      to, based on the routing rules.
-    :vartype storage_containers: list[~azure.mgmt.iothub.models.RoutingStorageContainerProperties]
+    :vartype storage_containers:
+     list[~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingStorageContainerProperties]
     :ivar cosmos_db_sql_collections: The list of Cosmos DB collection endpoints that IoT hub routes
      messages to, based on the routing rules.
     :vartype cosmos_db_sql_collections:
-     list[~azure.mgmt.iothub.models.RoutingCosmosDBSqlApiProperties]
+     list[~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingCosmosDBSqlApiProperties]
     """
 
     _attribute_map = {
@@ -3066,22 +3331,23 @@ class RoutingEndpoints(_serialization.Model):
         :keyword service_bus_queues: The list of Service Bus queue endpoints that IoT hub routes the
          messages to, based on the routing rules.
         :paramtype service_bus_queues:
-         list[~azure.mgmt.iothub.models.RoutingServiceBusQueueEndpointProperties]
+         list[~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingServiceBusQueueEndpointProperties]
         :keyword service_bus_topics: The list of Service Bus topic endpoints that the IoT hub routes
          the messages to, based on the routing rules.
         :paramtype service_bus_topics:
-         list[~azure.mgmt.iothub.models.RoutingServiceBusTopicEndpointProperties]
+         list[~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingServiceBusTopicEndpointProperties]
         :keyword event_hubs: The list of Event Hubs endpoints that IoT hub routes messages to, based on
          the routing rules. This list does not include the built-in Event Hubs endpoint.
-        :paramtype event_hubs: list[~azure.mgmt.iothub.models.RoutingEventHubProperties]
+        :paramtype event_hubs:
+         list[~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingEventHubProperties]
         :keyword storage_containers: The list of storage container endpoints that IoT hub routes
          messages to, based on the routing rules.
         :paramtype storage_containers:
-         list[~azure.mgmt.iothub.models.RoutingStorageContainerProperties]
+         list[~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingStorageContainerProperties]
         :keyword cosmos_db_sql_collections: The list of Cosmos DB collection endpoints that IoT hub
          routes messages to, based on the routing rules.
         :paramtype cosmos_db_sql_collections:
-         list[~azure.mgmt.iothub.models.RoutingCosmosDBSqlApiProperties]
+         list[~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingCosmosDBSqlApiProperties]
         """
         super().__init__(**kwargs)
         self.service_bus_queues = service_bus_queues
@@ -3091,7 +3357,7 @@ class RoutingEndpoints(_serialization.Model):
         self.cosmos_db_sql_collections = cosmos_db_sql_collections
 
 
-class RoutingEventHubProperties(_serialization.Model):
+class RoutingEventHubProperties(msrest.serialization.Model):
     """The properties related to an event hub endpoint.
 
     All required parameters must be populated in order to send to Azure.
@@ -3106,9 +3372,10 @@ class RoutingEventHubProperties(_serialization.Model):
     :vartype entity_path: str
     :ivar authentication_type: Method used to authenticate against the event hub endpoint. Known
      values are: "keyBased" and "identityBased".
-    :vartype authentication_type: str or ~azure.mgmt.iothub.models.AuthenticationType
+    :vartype authentication_type: str or
+     ~azure.mgmt.iothub.v2022_04_30_preview.models.AuthenticationType
     :ivar identity: Managed identity properties of routing event hub endpoint.
-    :vartype identity: ~azure.mgmt.iothub.models.ManagedIdentity
+    :vartype identity: ~azure.mgmt.iothub.v2022_04_30_preview.models.ManagedIdentity
     :ivar name: The name that identifies this endpoint. The name can only include alphanumeric
      characters, periods, underscores, hyphens and has a maximum length of 64 characters. The
      following names are reserved:  events, fileNotifications, $default. Endpoint names must be
@@ -3121,7 +3388,7 @@ class RoutingEventHubProperties(_serialization.Model):
     """
 
     _validation = {
-        "name": {"required": True, "pattern": r"^[A-Za-z0-9-._]{1,64}$"},
+        'name': {'required': True, 'pattern': r'^[A-Za-z0-9-._]{1,64}$'},
     }
 
     _attribute_map = {
@@ -3161,9 +3428,10 @@ class RoutingEventHubProperties(_serialization.Model):
         :paramtype entity_path: str
         :keyword authentication_type: Method used to authenticate against the event hub endpoint. Known
          values are: "keyBased" and "identityBased".
-        :paramtype authentication_type: str or ~azure.mgmt.iothub.models.AuthenticationType
+        :paramtype authentication_type: str or
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.AuthenticationType
         :keyword identity: Managed identity properties of routing event hub endpoint.
-        :paramtype identity: ~azure.mgmt.iothub.models.ManagedIdentity
+        :paramtype identity: ~azure.mgmt.iothub.v2022_04_30_preview.models.ManagedIdentity
         :keyword name: The name that identifies this endpoint. The name can only include alphanumeric
          characters, periods, underscores, hyphens and has a maximum length of 64 characters. The
          following names are reserved:  events, fileNotifications, $default. Endpoint names must be
@@ -3186,7 +3454,7 @@ class RoutingEventHubProperties(_serialization.Model):
         self.resource_group = resource_group
 
 
-class RoutingMessage(_serialization.Model):
+class RoutingMessage(msrest.serialization.Model):
     """Routing message.
 
     :ivar body: Body of routing message.
@@ -3225,26 +3493,26 @@ class RoutingMessage(_serialization.Model):
         self.system_properties = system_properties
 
 
-class RoutingProperties(_serialization.Model):
+class RoutingProperties(msrest.serialization.Model):
     """The routing related properties of the IoT hub. See: https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging.
 
     :ivar endpoints: The properties related to the custom endpoints to which your IoT hub routes
      messages based on the routing rules. A maximum of 10 custom endpoints are allowed across all
      endpoint types for paid hubs and only 1 custom endpoint is allowed across all endpoint types
      for free hubs.
-    :vartype endpoints: ~azure.mgmt.iothub.models.RoutingEndpoints
+    :vartype endpoints: ~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingEndpoints
     :ivar routes: The list of user-provided routing rules that the IoT hub uses to route messages
      to built-in and custom endpoints. A maximum of 100 routing rules are allowed for paid hubs and
      a maximum of 5 routing rules are allowed for free hubs.
-    :vartype routes: list[~azure.mgmt.iothub.models.RouteProperties]
+    :vartype routes: list[~azure.mgmt.iothub.v2022_04_30_preview.models.RouteProperties]
     :ivar fallback_route: The properties of the route that is used as a fall-back route when none
      of the conditions specified in the 'routes' section are met. This is an optional parameter.
      When this property is not set, the messages which do not meet any of the conditions specified
      in the 'routes' section get routed to the built-in eventhub endpoint.
-    :vartype fallback_route: ~azure.mgmt.iothub.models.FallbackRouteProperties
+    :vartype fallback_route: ~azure.mgmt.iothub.v2022_04_30_preview.models.FallbackRouteProperties
     :ivar enrichments: The list of user-provided enrichments that the IoT hub applies to messages
      to be delivered to built-in and custom endpoints. See: https://aka.ms/telemetryoneventgrid.
-    :vartype enrichments: list[~azure.mgmt.iothub.models.EnrichmentProperties]
+    :vartype enrichments: list[~azure.mgmt.iothub.v2022_04_30_preview.models.EnrichmentProperties]
     """
 
     _attribute_map = {
@@ -3268,20 +3536,22 @@ class RoutingProperties(_serialization.Model):
          messages based on the routing rules. A maximum of 10 custom endpoints are allowed across all
          endpoint types for paid hubs and only 1 custom endpoint is allowed across all endpoint types
          for free hubs.
-        :paramtype endpoints: ~azure.mgmt.iothub.models.RoutingEndpoints
+        :paramtype endpoints: ~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingEndpoints
         :keyword routes: The list of user-provided routing rules that the IoT hub uses to route
          messages to built-in and custom endpoints. A maximum of 100 routing rules are allowed for paid
          hubs and a maximum of 5 routing rules are allowed for free hubs.
-        :paramtype routes: list[~azure.mgmt.iothub.models.RouteProperties]
+        :paramtype routes: list[~azure.mgmt.iothub.v2022_04_30_preview.models.RouteProperties]
         :keyword fallback_route: The properties of the route that is used as a fall-back route when
          none of the conditions specified in the 'routes' section are met. This is an optional
          parameter. When this property is not set, the messages which do not meet any of the conditions
          specified in the 'routes' section get routed to the built-in eventhub endpoint.
-        :paramtype fallback_route: ~azure.mgmt.iothub.models.FallbackRouteProperties
+        :paramtype fallback_route:
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.FallbackRouteProperties
         :keyword enrichments: The list of user-provided enrichments that the IoT hub applies to
          messages to be delivered to built-in and custom endpoints. See:
          https://aka.ms/telemetryoneventgrid.
-        :paramtype enrichments: list[~azure.mgmt.iothub.models.EnrichmentProperties]
+        :paramtype enrichments:
+         list[~azure.mgmt.iothub.v2022_04_30_preview.models.EnrichmentProperties]
         """
         super().__init__(**kwargs)
         self.endpoints = endpoints
@@ -3290,7 +3560,7 @@ class RoutingProperties(_serialization.Model):
         self.enrichments = enrichments
 
 
-class RoutingServiceBusQueueEndpointProperties(_serialization.Model):
+class RoutingServiceBusQueueEndpointProperties(msrest.serialization.Model):
     """The properties related to service bus queue endpoint types.
 
     All required parameters must be populated in order to send to Azure.
@@ -3306,9 +3576,10 @@ class RoutingServiceBusQueueEndpointProperties(_serialization.Model):
     :vartype entity_path: str
     :ivar authentication_type: Method used to authenticate against the service bus queue endpoint.
      Known values are: "keyBased" and "identityBased".
-    :vartype authentication_type: str or ~azure.mgmt.iothub.models.AuthenticationType
+    :vartype authentication_type: str or
+     ~azure.mgmt.iothub.v2022_04_30_preview.models.AuthenticationType
     :ivar identity: Managed identity properties of routing service bus queue endpoint.
-    :vartype identity: ~azure.mgmt.iothub.models.ManagedIdentity
+    :vartype identity: ~azure.mgmt.iothub.v2022_04_30_preview.models.ManagedIdentity
     :ivar name: The name that identifies this endpoint. The name can only include alphanumeric
      characters, periods, underscores, hyphens and has a maximum length of 64 characters. The
      following names are reserved:  events, fileNotifications, $default. Endpoint names must be
@@ -3321,7 +3592,7 @@ class RoutingServiceBusQueueEndpointProperties(_serialization.Model):
     """
 
     _validation = {
-        "name": {"required": True, "pattern": r"^[A-Za-z0-9-._]{1,64}$"},
+        'name': {'required': True, 'pattern': r'^[A-Za-z0-9-._]{1,64}$'},
     }
 
     _attribute_map = {
@@ -3362,9 +3633,10 @@ class RoutingServiceBusQueueEndpointProperties(_serialization.Model):
         :paramtype entity_path: str
         :keyword authentication_type: Method used to authenticate against the service bus queue
          endpoint. Known values are: "keyBased" and "identityBased".
-        :paramtype authentication_type: str or ~azure.mgmt.iothub.models.AuthenticationType
+        :paramtype authentication_type: str or
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.AuthenticationType
         :keyword identity: Managed identity properties of routing service bus queue endpoint.
-        :paramtype identity: ~azure.mgmt.iothub.models.ManagedIdentity
+        :paramtype identity: ~azure.mgmt.iothub.v2022_04_30_preview.models.ManagedIdentity
         :keyword name: The name that identifies this endpoint. The name can only include alphanumeric
          characters, periods, underscores, hyphens and has a maximum length of 64 characters. The
          following names are reserved:  events, fileNotifications, $default. Endpoint names must be
@@ -3387,7 +3659,7 @@ class RoutingServiceBusQueueEndpointProperties(_serialization.Model):
         self.resource_group = resource_group
 
 
-class RoutingServiceBusTopicEndpointProperties(_serialization.Model):
+class RoutingServiceBusTopicEndpointProperties(msrest.serialization.Model):
     """The properties related to service bus topic endpoint types.
 
     All required parameters must be populated in order to send to Azure.
@@ -3403,9 +3675,10 @@ class RoutingServiceBusTopicEndpointProperties(_serialization.Model):
     :vartype entity_path: str
     :ivar authentication_type: Method used to authenticate against the service bus topic endpoint.
      Known values are: "keyBased" and "identityBased".
-    :vartype authentication_type: str or ~azure.mgmt.iothub.models.AuthenticationType
+    :vartype authentication_type: str or
+     ~azure.mgmt.iothub.v2022_04_30_preview.models.AuthenticationType
     :ivar identity: Managed identity properties of routing service bus topic endpoint.
-    :vartype identity: ~azure.mgmt.iothub.models.ManagedIdentity
+    :vartype identity: ~azure.mgmt.iothub.v2022_04_30_preview.models.ManagedIdentity
     :ivar name: The name that identifies this endpoint. The name can only include alphanumeric
      characters, periods, underscores, hyphens and has a maximum length of 64 characters. The
      following names are reserved:  events, fileNotifications, $default. Endpoint names must be
@@ -3419,7 +3692,7 @@ class RoutingServiceBusTopicEndpointProperties(_serialization.Model):
     """
 
     _validation = {
-        "name": {"required": True, "pattern": r"^[A-Za-z0-9-._]{1,64}$"},
+        'name': {'required': True, 'pattern': r'^[A-Za-z0-9-._]{1,64}$'},
     }
 
     _attribute_map = {
@@ -3460,9 +3733,10 @@ class RoutingServiceBusTopicEndpointProperties(_serialization.Model):
         :paramtype entity_path: str
         :keyword authentication_type: Method used to authenticate against the service bus topic
          endpoint. Known values are: "keyBased" and "identityBased".
-        :paramtype authentication_type: str or ~azure.mgmt.iothub.models.AuthenticationType
+        :paramtype authentication_type: str or
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.AuthenticationType
         :keyword identity: Managed identity properties of routing service bus topic endpoint.
-        :paramtype identity: ~azure.mgmt.iothub.models.ManagedIdentity
+        :paramtype identity: ~azure.mgmt.iothub.v2022_04_30_preview.models.ManagedIdentity
         :keyword name: The name that identifies this endpoint. The name can only include alphanumeric
          characters, periods, underscores, hyphens and has a maximum length of 64 characters. The
          following names are reserved:  events, fileNotifications, $default. Endpoint names must be
@@ -3486,7 +3760,7 @@ class RoutingServiceBusTopicEndpointProperties(_serialization.Model):
         self.resource_group = resource_group
 
 
-class RoutingStorageContainerProperties(_serialization.Model):  # pylint: disable=too-many-instance-attributes
+class RoutingStorageContainerProperties(msrest.serialization.Model):  # pylint: disable=too-many-instance-attributes
     """The properties related to a storage container endpoint.
 
     All required parameters must be populated in order to send to Azure.
@@ -3499,9 +3773,10 @@ class RoutingStorageContainerProperties(_serialization.Model):  # pylint: disabl
     :vartype endpoint_uri: str
     :ivar authentication_type: Method used to authenticate against the storage endpoint. Known
      values are: "keyBased" and "identityBased".
-    :vartype authentication_type: str or ~azure.mgmt.iothub.models.AuthenticationType
+    :vartype authentication_type: str or
+     ~azure.mgmt.iothub.v2022_04_30_preview.models.AuthenticationType
     :ivar identity: Managed identity properties of routing storage endpoint.
-    :vartype identity: ~azure.mgmt.iothub.models.ManagedIdentity
+    :vartype identity: ~azure.mgmt.iothub.v2022_04_30_preview.models.ManagedIdentity
     :ivar name: The name that identifies this endpoint. The name can only include alphanumeric
      characters, periods, underscores, hyphens and has a maximum length of 64 characters. The
      following names are reserved:  events, fileNotifications, $default. Endpoint names must be
@@ -3526,14 +3801,15 @@ class RoutingStorageContainerProperties(_serialization.Model):  # pylint: disabl
     :ivar encoding: Encoding that is used to serialize messages to blobs. Supported values are
      'avro', 'avrodeflate', and 'JSON'. Default value is 'avro'. Known values are: "Avro",
      "AvroDeflate", and "JSON".
-    :vartype encoding: str or ~azure.mgmt.iothub.models.RoutingStorageContainerPropertiesEncoding
+    :vartype encoding: str or
+     ~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingStorageContainerPropertiesEncoding
     """
 
     _validation = {
-        "name": {"required": True, "pattern": r"^[A-Za-z0-9-._]{1,64}$"},
-        "container_name": {"required": True},
-        "batch_frequency_in_seconds": {"maximum": 720, "minimum": 60},
-        "max_chunk_size_in_bytes": {"maximum": 524288000, "minimum": 10485760},
+        'name': {'required': True, 'pattern': r'^[A-Za-z0-9-._]{1,64}$'},
+        'container_name': {'required': True},
+        'batch_frequency_in_seconds': {'maximum': 720, 'minimum': 60},
+        'max_chunk_size_in_bytes': {'maximum': 524288000, 'minimum': 10485760},
     }
 
     _attribute_map = {
@@ -3579,9 +3855,10 @@ class RoutingStorageContainerProperties(_serialization.Model):  # pylint: disabl
         :paramtype endpoint_uri: str
         :keyword authentication_type: Method used to authenticate against the storage endpoint. Known
          values are: "keyBased" and "identityBased".
-        :paramtype authentication_type: str or ~azure.mgmt.iothub.models.AuthenticationType
+        :paramtype authentication_type: str or
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.AuthenticationType
         :keyword identity: Managed identity properties of routing storage endpoint.
-        :paramtype identity: ~azure.mgmt.iothub.models.ManagedIdentity
+        :paramtype identity: ~azure.mgmt.iothub.v2022_04_30_preview.models.ManagedIdentity
         :keyword name: The name that identifies this endpoint. The name can only include alphanumeric
          characters, periods, underscores, hyphens and has a maximum length of 64 characters. The
          following names are reserved:  events, fileNotifications, $default. Endpoint names must be
@@ -3606,7 +3883,8 @@ class RoutingStorageContainerProperties(_serialization.Model):  # pylint: disabl
         :keyword encoding: Encoding that is used to serialize messages to blobs. Supported values are
          'avro', 'avrodeflate', and 'JSON'. Default value is 'avro'. Known values are: "Avro",
          "AvroDeflate", and "JSON".
-        :paramtype encoding: str or ~azure.mgmt.iothub.models.RoutingStorageContainerPropertiesEncoding
+        :paramtype encoding: str or
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingStorageContainerPropertiesEncoding
         """
         super().__init__(**kwargs)
         self.id = id
@@ -3624,13 +3902,13 @@ class RoutingStorageContainerProperties(_serialization.Model):  # pylint: disabl
         self.encoding = encoding
 
 
-class RoutingTwin(_serialization.Model):
+class RoutingTwin(msrest.serialization.Model):
     """Twin reference input parameter. This is an optional parameter.
 
     :ivar tags: Twin Tags.
     :vartype tags: JSON
     :ivar properties:
-    :vartype properties: ~azure.mgmt.iothub.models.RoutingTwinProperties
+    :vartype properties: ~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingTwinProperties
     """
 
     _attribute_map = {
@@ -3639,20 +3917,24 @@ class RoutingTwin(_serialization.Model):
     }
 
     def __init__(
-        self, *, tags: Optional[JSON] = None, properties: Optional["_models.RoutingTwinProperties"] = None, **kwargs
+        self,
+        *,
+        tags: Optional[JSON] = None,
+        properties: Optional["_models.RoutingTwinProperties"] = None,
+        **kwargs
     ):
         """
         :keyword tags: Twin Tags.
         :paramtype tags: JSON
         :keyword properties:
-        :paramtype properties: ~azure.mgmt.iothub.models.RoutingTwinProperties
+        :paramtype properties: ~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingTwinProperties
         """
         super().__init__(**kwargs)
         self.tags = tags
         self.properties = properties
 
 
-class RoutingTwinProperties(_serialization.Model):
+class RoutingTwinProperties(msrest.serialization.Model):
     """RoutingTwinProperties.
 
     :ivar desired: Twin desired properties.
@@ -3666,7 +3948,13 @@ class RoutingTwinProperties(_serialization.Model):
         "reported": {"key": "reported", "type": "object"},
     }
 
-    def __init__(self, *, desired: Optional[JSON] = None, reported: Optional[JSON] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        desired: Optional[JSON] = None,
+        reported: Optional[JSON] = None,
+        **kwargs
+    ):
         """
         :keyword desired: Twin desired properties.
         :paramtype desired: JSON
@@ -3678,7 +3966,7 @@ class RoutingTwinProperties(_serialization.Model):
         self.reported = reported
 
 
-class SharedAccessSignatureAuthorizationRule(_serialization.Model):
+class SharedAccessSignatureAuthorizationRule(msrest.serialization.Model):
     """The properties of an IoT hub shared access policy.
 
     All required parameters must be populated in order to send to Azure.
@@ -3696,12 +3984,12 @@ class SharedAccessSignatureAuthorizationRule(_serialization.Model):
      "RegistryRead, RegistryWrite, ServiceConnect", "RegistryRead, RegistryWrite, DeviceConnect",
      "RegistryRead, ServiceConnect, DeviceConnect", "RegistryWrite, ServiceConnect, DeviceConnect",
      and "RegistryRead, RegistryWrite, ServiceConnect, DeviceConnect".
-    :vartype rights: str or ~azure.mgmt.iothub.models.AccessRights
+    :vartype rights: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.AccessRights
     """
 
     _validation = {
-        "key_name": {"required": True},
-        "rights": {"required": True},
+        'key_name': {'required': True},
+        'rights': {'required': True},
     }
 
     _attribute_map = {
@@ -3734,7 +4022,7 @@ class SharedAccessSignatureAuthorizationRule(_serialization.Model):
          "RegistryRead, RegistryWrite, ServiceConnect", "RegistryRead, RegistryWrite, DeviceConnect",
          "RegistryRead, ServiceConnect, DeviceConnect", "RegistryWrite, ServiceConnect, DeviceConnect",
          and "RegistryRead, RegistryWrite, ServiceConnect, DeviceConnect".
-        :paramtype rights: str or ~azure.mgmt.iothub.models.AccessRights
+        :paramtype rights: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.AccessRights
         """
         super().__init__(**kwargs)
         self.key_name = key_name
@@ -3743,19 +4031,20 @@ class SharedAccessSignatureAuthorizationRule(_serialization.Model):
         self.rights = rights
 
 
-class SharedAccessSignatureAuthorizationRuleListResult(_serialization.Model):
+class SharedAccessSignatureAuthorizationRuleListResult(msrest.serialization.Model):
     """The list of shared access policies with a next link.
 
     Variables are only populated by the server, and will be ignored when sending a request.
 
     :ivar value: The list of shared access policies.
-    :vartype value: list[~azure.mgmt.iothub.models.SharedAccessSignatureAuthorizationRule]
+    :vartype value:
+     list[~azure.mgmt.iothub.v2022_04_30_preview.models.SharedAccessSignatureAuthorizationRule]
     :ivar next_link: The next link.
     :vartype next_link: str
     """
 
     _validation = {
-        "next_link": {"readonly": True},
+        'next_link': {'readonly': True},
     }
 
     _attribute_map = {
@@ -3763,17 +4052,23 @@ class SharedAccessSignatureAuthorizationRuleListResult(_serialization.Model):
         "next_link": {"key": "nextLink", "type": "str"},
     }
 
-    def __init__(self, *, value: Optional[List["_models.SharedAccessSignatureAuthorizationRule"]] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        value: Optional[List["_models.SharedAccessSignatureAuthorizationRule"]] = None,
+        **kwargs
+    ):
         """
         :keyword value: The list of shared access policies.
-        :paramtype value: list[~azure.mgmt.iothub.models.SharedAccessSignatureAuthorizationRule]
+        :paramtype value:
+         list[~azure.mgmt.iothub.v2022_04_30_preview.models.SharedAccessSignatureAuthorizationRule]
         """
         super().__init__(**kwargs)
         self.value = value
         self.next_link = None
 
 
-class StorageEndpointProperties(_serialization.Model):
+class StorageEndpointProperties(msrest.serialization.Model):
     """The properties of the Azure Storage endpoint for file upload.
 
     All required parameters must be populated in order to send to Azure.
@@ -3790,14 +4085,15 @@ class StorageEndpointProperties(_serialization.Model):
     :vartype container_name: str
     :ivar authentication_type: Specifies authentication type being used for connecting to the
      storage account. Known values are: "keyBased" and "identityBased".
-    :vartype authentication_type: str or ~azure.mgmt.iothub.models.AuthenticationType
+    :vartype authentication_type: str or
+     ~azure.mgmt.iothub.v2022_04_30_preview.models.AuthenticationType
     :ivar identity: Managed identity properties of storage endpoint for file upload.
-    :vartype identity: ~azure.mgmt.iothub.models.ManagedIdentity
+    :vartype identity: ~azure.mgmt.iothub.v2022_04_30_preview.models.ManagedIdentity
     """
 
     _validation = {
-        "connection_string": {"required": True},
-        "container_name": {"required": True},
+        'connection_string': {'required': True},
+        'container_name': {'required': True},
     }
 
     _attribute_map = {
@@ -3831,9 +4127,10 @@ class StorageEndpointProperties(_serialization.Model):
         :paramtype container_name: str
         :keyword authentication_type: Specifies authentication type being used for connecting to the
          storage account. Known values are: "keyBased" and "identityBased".
-        :paramtype authentication_type: str or ~azure.mgmt.iothub.models.AuthenticationType
+        :paramtype authentication_type: str or
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.AuthenticationType
         :keyword identity: Managed identity properties of storage endpoint for file upload.
-        :paramtype identity: ~azure.mgmt.iothub.models.ManagedIdentity
+        :paramtype identity: ~azure.mgmt.iothub.v2022_04_30_preview.models.ManagedIdentity
         """
         super().__init__(**kwargs)
         self.sas_ttl_as_iso8601 = sas_ttl_as_iso8601
@@ -3843,21 +4140,22 @@ class StorageEndpointProperties(_serialization.Model):
         self.identity = identity
 
 
-class SystemData(_serialization.Model):
+class SystemData(msrest.serialization.Model):
     """Metadata pertaining to creation and last modification of the resource.
 
     :ivar created_by: The identity that created the resource.
     :vartype created_by: str
     :ivar created_by_type: The type of identity that created the resource. Known values are:
      "User", "Application", "ManagedIdentity", and "Key".
-    :vartype created_by_type: str or ~azure.mgmt.iothub.models.CreatedByType
+    :vartype created_by_type: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.CreatedByType
     :ivar created_at: The timestamp of resource creation (UTC).
     :vartype created_at: ~datetime.datetime
     :ivar last_modified_by: The identity that last modified the resource.
     :vartype last_modified_by: str
     :ivar last_modified_by_type: The type of identity that last modified the resource. Known values
      are: "User", "Application", "ManagedIdentity", and "Key".
-    :vartype last_modified_by_type: str or ~azure.mgmt.iothub.models.CreatedByType
+    :vartype last_modified_by_type: str or
+     ~azure.mgmt.iothub.v2022_04_30_preview.models.CreatedByType
     :ivar last_modified_at: The timestamp of resource last modification (UTC).
     :vartype last_modified_at: ~datetime.datetime
     """
@@ -3887,14 +4185,15 @@ class SystemData(_serialization.Model):
         :paramtype created_by: str
         :keyword created_by_type: The type of identity that created the resource. Known values are:
          "User", "Application", "ManagedIdentity", and "Key".
-        :paramtype created_by_type: str or ~azure.mgmt.iothub.models.CreatedByType
+        :paramtype created_by_type: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.CreatedByType
         :keyword created_at: The timestamp of resource creation (UTC).
         :paramtype created_at: ~datetime.datetime
         :keyword last_modified_by: The identity that last modified the resource.
         :paramtype last_modified_by: str
         :keyword last_modified_by_type: The type of identity that last modified the resource. Known
          values are: "User", "Application", "ManagedIdentity", and "Key".
-        :paramtype last_modified_by_type: str or ~azure.mgmt.iothub.models.CreatedByType
+        :paramtype last_modified_by_type: str or
+         ~azure.mgmt.iothub.v2022_04_30_preview.models.CreatedByType
         :keyword last_modified_at: The timestamp of resource last modification (UTC).
         :paramtype last_modified_at: ~datetime.datetime
         """
@@ -3907,7 +4206,7 @@ class SystemData(_serialization.Model):
         self.last_modified_at = last_modified_at
 
 
-class TagsResource(_serialization.Model):
+class TagsResource(msrest.serialization.Model):
     """A container holding only the Tags for a resource, allowing the user to update the tags on an IoT Hub instance.
 
     :ivar tags: Resource tags.
@@ -3918,7 +4217,12 @@ class TagsResource(_serialization.Model):
         "tags": {"key": "tags", "type": "{str}"},
     }
 
-    def __init__(self, *, tags: Optional[Dict[str, str]] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        tags: Optional[Dict[str, str]] = None,
+        **kwargs
+    ):
         """
         :keyword tags: Resource tags.
         :paramtype tags: dict[str, str]
@@ -3927,17 +4231,17 @@ class TagsResource(_serialization.Model):
         self.tags = tags
 
 
-class TestAllRoutesInput(_serialization.Model):
+class TestAllRoutesInput(msrest.serialization.Model):
     """Input for testing all routes.
 
     :ivar routing_source: Routing source. Known values are: "Invalid", "DeviceMessages",
      "TwinChangeEvents", "DeviceLifecycleEvents", "DeviceJobLifecycleEvents",
      "DigitalTwinChangeEvents", "DeviceConnectionStateEvents", and "MqttBrokerMessages".
-    :vartype routing_source: str or ~azure.mgmt.iothub.models.RoutingSource
+    :vartype routing_source: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingSource
     :ivar message: Routing message.
-    :vartype message: ~azure.mgmt.iothub.models.RoutingMessage
+    :vartype message: ~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingMessage
     :ivar twin: Routing Twin Reference.
-    :vartype twin: ~azure.mgmt.iothub.models.RoutingTwin
+    :vartype twin: ~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingTwin
     """
 
     _attribute_map = {
@@ -3958,11 +4262,11 @@ class TestAllRoutesInput(_serialization.Model):
         :keyword routing_source: Routing source. Known values are: "Invalid", "DeviceMessages",
          "TwinChangeEvents", "DeviceLifecycleEvents", "DeviceJobLifecycleEvents",
          "DigitalTwinChangeEvents", "DeviceConnectionStateEvents", and "MqttBrokerMessages".
-        :paramtype routing_source: str or ~azure.mgmt.iothub.models.RoutingSource
+        :paramtype routing_source: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingSource
         :keyword message: Routing message.
-        :paramtype message: ~azure.mgmt.iothub.models.RoutingMessage
+        :paramtype message: ~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingMessage
         :keyword twin: Routing Twin Reference.
-        :paramtype twin: ~azure.mgmt.iothub.models.RoutingTwin
+        :paramtype twin: ~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingTwin
         """
         super().__init__(**kwargs)
         self.routing_source = routing_source
@@ -3970,41 +4274,46 @@ class TestAllRoutesInput(_serialization.Model):
         self.twin = twin
 
 
-class TestAllRoutesResult(_serialization.Model):
+class TestAllRoutesResult(msrest.serialization.Model):
     """Result of testing all routes.
 
     :ivar routes: JSON-serialized array of matched routes.
-    :vartype routes: list[~azure.mgmt.iothub.models.MatchedRoute]
+    :vartype routes: list[~azure.mgmt.iothub.v2022_04_30_preview.models.MatchedRoute]
     """
 
     _attribute_map = {
         "routes": {"key": "routes", "type": "[MatchedRoute]"},
     }
 
-    def __init__(self, *, routes: Optional[List["_models.MatchedRoute"]] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        routes: Optional[List["_models.MatchedRoute"]] = None,
+        **kwargs
+    ):
         """
         :keyword routes: JSON-serialized array of matched routes.
-        :paramtype routes: list[~azure.mgmt.iothub.models.MatchedRoute]
+        :paramtype routes: list[~azure.mgmt.iothub.v2022_04_30_preview.models.MatchedRoute]
         """
         super().__init__(**kwargs)
         self.routes = routes
 
 
-class TestRouteInput(_serialization.Model):
+class TestRouteInput(msrest.serialization.Model):
     """Input for testing route.
 
     All required parameters must be populated in order to send to Azure.
 
     :ivar message: Routing message.
-    :vartype message: ~azure.mgmt.iothub.models.RoutingMessage
+    :vartype message: ~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingMessage
     :ivar route: Route properties. Required.
-    :vartype route: ~azure.mgmt.iothub.models.RouteProperties
+    :vartype route: ~azure.mgmt.iothub.v2022_04_30_preview.models.RouteProperties
     :ivar twin: Routing Twin Reference.
-    :vartype twin: ~azure.mgmt.iothub.models.RoutingTwin
+    :vartype twin: ~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingTwin
     """
 
     _validation = {
-        "route": {"required": True},
+        'route': {'required': True},
     }
 
     _attribute_map = {
@@ -4023,11 +4332,11 @@ class TestRouteInput(_serialization.Model):
     ):
         """
         :keyword message: Routing message.
-        :paramtype message: ~azure.mgmt.iothub.models.RoutingMessage
+        :paramtype message: ~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingMessage
         :keyword route: Route properties. Required.
-        :paramtype route: ~azure.mgmt.iothub.models.RouteProperties
+        :paramtype route: ~azure.mgmt.iothub.v2022_04_30_preview.models.RouteProperties
         :keyword twin: Routing Twin Reference.
-        :paramtype twin: ~azure.mgmt.iothub.models.RoutingTwin
+        :paramtype twin: ~azure.mgmt.iothub.v2022_04_30_preview.models.RoutingTwin
         """
         super().__init__(**kwargs)
         self.message = message
@@ -4035,13 +4344,13 @@ class TestRouteInput(_serialization.Model):
         self.twin = twin
 
 
-class TestRouteResult(_serialization.Model):
+class TestRouteResult(msrest.serialization.Model):
     """Result of testing one route.
 
     :ivar result: Result of testing route. Known values are: "undefined", "false", and "true".
-    :vartype result: str or ~azure.mgmt.iothub.models.TestResultStatus
+    :vartype result: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.TestResultStatus
     :ivar details: Detailed result of testing route.
-    :vartype details: ~azure.mgmt.iothub.models.TestRouteResultDetails
+    :vartype details: ~azure.mgmt.iothub.v2022_04_30_preview.models.TestRouteResultDetails
     """
 
     _attribute_map = {
@@ -4058,36 +4367,43 @@ class TestRouteResult(_serialization.Model):
     ):
         """
         :keyword result: Result of testing route. Known values are: "undefined", "false", and "true".
-        :paramtype result: str or ~azure.mgmt.iothub.models.TestResultStatus
+        :paramtype result: str or ~azure.mgmt.iothub.v2022_04_30_preview.models.TestResultStatus
         :keyword details: Detailed result of testing route.
-        :paramtype details: ~azure.mgmt.iothub.models.TestRouteResultDetails
+        :paramtype details: ~azure.mgmt.iothub.v2022_04_30_preview.models.TestRouteResultDetails
         """
         super().__init__(**kwargs)
         self.result = result
         self.details = details
 
 
-class TestRouteResultDetails(_serialization.Model):
+class TestRouteResultDetails(msrest.serialization.Model):
     """Detailed result of testing a route.
 
     :ivar compilation_errors: JSON-serialized list of route compilation errors.
-    :vartype compilation_errors: list[~azure.mgmt.iothub.models.RouteCompilationError]
+    :vartype compilation_errors:
+     list[~azure.mgmt.iothub.v2022_04_30_preview.models.RouteCompilationError]
     """
 
     _attribute_map = {
         "compilation_errors": {"key": "compilationErrors", "type": "[RouteCompilationError]"},
     }
 
-    def __init__(self, *, compilation_errors: Optional[List["_models.RouteCompilationError"]] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        compilation_errors: Optional[List["_models.RouteCompilationError"]] = None,
+        **kwargs
+    ):
         """
         :keyword compilation_errors: JSON-serialized list of route compilation errors.
-        :paramtype compilation_errors: list[~azure.mgmt.iothub.models.RouteCompilationError]
+        :paramtype compilation_errors:
+         list[~azure.mgmt.iothub.v2022_04_30_preview.models.RouteCompilationError]
         """
         super().__init__(**kwargs)
         self.compilation_errors = compilation_errors
 
 
-class UserSubscriptionQuota(_serialization.Model):
+class UserSubscriptionQuota(msrest.serialization.Model):
     """User subscription quota response.
 
     :ivar id: IotHub type id.
@@ -4101,7 +4417,7 @@ class UserSubscriptionQuota(_serialization.Model):
     :ivar limit: Numerical limit on IotHub type.
     :vartype limit: int
     :ivar name: IotHub type.
-    :vartype name: ~azure.mgmt.iothub.models.Name
+    :vartype name: ~azure.mgmt.iothub.v2022_04_30_preview.models.Name
     """
 
     _attribute_map = {
@@ -4136,7 +4452,7 @@ class UserSubscriptionQuota(_serialization.Model):
         :keyword limit: Numerical limit on IotHub type.
         :paramtype limit: int
         :keyword name: IotHub type.
-        :paramtype name: ~azure.mgmt.iothub.models.Name
+        :paramtype name: ~azure.mgmt.iothub.v2022_04_30_preview.models.Name
         """
         super().__init__(**kwargs)
         self.id = id
@@ -4147,19 +4463,19 @@ class UserSubscriptionQuota(_serialization.Model):
         self.name = name
 
 
-class UserSubscriptionQuotaListResult(_serialization.Model):
+class UserSubscriptionQuotaListResult(msrest.serialization.Model):
     """Json-serialized array of User subscription quota response.
 
     Variables are only populated by the server, and will be ignored when sending a request.
 
     :ivar value:
-    :vartype value: list[~azure.mgmt.iothub.models.UserSubscriptionQuota]
+    :vartype value: list[~azure.mgmt.iothub.v2022_04_30_preview.models.UserSubscriptionQuota]
     :ivar next_link:
     :vartype next_link: str
     """
 
     _validation = {
-        "next_link": {"readonly": True},
+        'next_link': {'readonly': True},
     }
 
     _attribute_map = {
@@ -4167,10 +4483,15 @@ class UserSubscriptionQuotaListResult(_serialization.Model):
         "next_link": {"key": "nextLink", "type": "str"},
     }
 
-    def __init__(self, *, value: Optional[List["_models.UserSubscriptionQuota"]] = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        value: Optional[List["_models.UserSubscriptionQuota"]] = None,
+        **kwargs
+    ):
         """
         :keyword value:
-        :paramtype value: list[~azure.mgmt.iothub.models.UserSubscriptionQuota]
+        :paramtype value: list[~azure.mgmt.iothub.v2022_04_30_preview.models.UserSubscriptionQuota]
         """
         super().__init__(**kwargs)
         self.value = value
