@@ -26,12 +26,13 @@ CWD = os.path.dirname(os.path.abspath(__file__))
 # changing the order so the final exported file can be used for all import tests
 # (the cstring output doesn't include the keys for the control plane features)
 DATAPLANE_AUTH_TYPES = ["cstring", AuthenticationTypeDataplane.key.value, AuthenticationTypeDataplane.login.value]
+DEST_HUB = settings.env.azext_iot_desthub or "test-hub-" + generate_generic_id()
 
 
 class TestHubExportImport(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestHubExportImport, self).__init__(test_case)
-        self.dest_hub = settings.env.azext_iot_desthub or "test-hub-" + generate_generic_id()
+        self.dest_hub = DEST_HUB
         self.dest_hub_rg = settings.env.azext_iot_destrg or settings.env.azext_iot_testrg
         self.cli = EmbeddedCLI()
 
@@ -493,7 +494,6 @@ class TestHubExportImport(IoTLiveScenarioTest):
         else:
             self.clean_up_hub(self.dest_hub_cstring)
 
-    # @pytest.mark.skip(reason="no way of currently testing this")
     def test_export_import(self):
 
         for auth_phase in DATAPLANE_AUTH_TYPES:
@@ -517,7 +517,6 @@ class TestHubExportImport(IoTLiveScenarioTest):
             time.sleep(2)  # gives the hub time to update before the checks
             self.compare_hub_to_file()
 
-    # @pytest.mark.skip(reason="no way of currently testing this")
     def test_migrate(self):
 
         for auth_phase in DATAPLANE_AUTH_TYPES:

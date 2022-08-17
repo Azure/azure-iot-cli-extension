@@ -619,6 +619,9 @@ def is_valid_dtmi(dtmi):
 
 @contextmanager
 def capture_stderr():
+    """
+    suppresses stderr by redirecting to a text buffer, then writes the buffer contents to stderr all at once
+    """
 
     output = io.StringIO()
     old_stderr = sys.stderr

@@ -9,6 +9,7 @@ from azext_iot.common.shared import SettleType, ProtocolType, AckType
 from azext_iot.assets.user_messages import info_param_properties_device
 from azext_iot._params import hub_auth_type_dataplane_param_type
 from azext_iot.iothub._validators import validate_device_model_id
+from azext_iot._validators import mode2_iot_login_handler
 
 
 def load_iothub_arguments(self, _):
@@ -245,4 +246,75 @@ def load_iothub_arguments(self, _):
             "content_type",
             options_list=["--content-type", "--ct"],
             help="MIME Type of file.",
+        )
+
+    with self.argument_context("iot hub state") as context:
+        context.argument(
+            "force",
+            options_list=["--force"],
+            help="If this flag is set, then the command will overwrite the contents of the output file."
+        )
+        context.argument(
+            "filename",
+            options_list=["--state-file", "-f"],
+            help="The path to the file where the state information will be stored."
+        )
+        context.argument(
+            "login",
+            options_list=["--login", "--l"],
+            validator=mode2_iot_login_handler,
+            help="This command supports an entity connection string with rights to perform action. "
+            'If a connection string is provided, only configurations and device and module information '
+            'will be imported or exported. '
+            'Use to avoid session login via "az login". '
+            "If both an entity connection string and name are provided the connection string takes priority. "
+            "Required if --hub-name is not provided.",
+            arg_group="IoT Hub Identifier"
+        )
+
+    with self.argument_context("iot hub state migrate") as context:
+        context.argument(
+            "hub_name",
+            options_list=["--destination-hub", "--dh"],
+            help="Name of IoT Hub to which the origin hub will be copied."
+        )
+        context.argument(
+            "resource_group_name",
+            options_list=["--destination-resource-group", "--dg"],
+            help="Name of resource group of the IoT Hub to which the origin hub will be copied."
+        )
+        context.argument(
+            "login",
+            options_list=["--destination-hub-login", "--dl"],
+            validator=mode2_iot_login_handler,
+            help="This command supports an entity connection string with rights to perform action on the destination hub. "
+            'If a connection string is provided, only configurations and device and module information '
+            'will be migrated. '
+            'Use to avoid session login via "az login" for this IoT Hub instance. '
+            "If both an entity connection string and name are provided the connection string takes priority. "
+            "Required if --destination-hub is not provided.",
+            arg_group="IoT Hub Identifier"
+        )
+        context.argument(
+            "orig_hub",
+            options_list=["--origin-hub", "--oh"],
+            help="Name of IoT Hub which will be copied.",
+            arg_group="IoT Hub Identifier"
+        )
+        context.argument(
+            "orig_resource_group_name",
+            options_list=["--origin-resource-group", "--og"],
+            help="Name of resource group of the IoT Hub which will be copied."
+        )
+        context.argument(
+            "orig_hub_login",
+            options_list=["--origin-hub-login", "--ol"],
+            validator=mode2_iot_login_handler,
+            help="This command supports an entity connection string with rights to perform action on the origin hub. "
+            'If a connection string is provided, only configurations and device and module information '
+            'will be migrated. '
+            'Use to avoid session login via "az login" for this IoT Hub instance. '
+            "If both an entity connection string and name are provided the connection string takes priority. "
+            "Required if --origin-hub is not provided.",
+            arg_group="IoT Hub Identifier"
         )

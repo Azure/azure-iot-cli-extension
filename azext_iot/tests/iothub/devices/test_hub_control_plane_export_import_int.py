@@ -38,18 +38,25 @@ STORAGE_CONTAINER = settings.env.azext_iot_teststoragecontainer or "container" +
 SERVICEBUS_NAMESPACE = settings.env.azext_dt_ep_servicebus_namespace or "testServiceBus" + generate_generic_id()
 SERVICEBUS_QUEUE = settings.env.azext_dt_ep_servicebus_queue or "queue" + generate_generic_id()
 SERVICEBUS_TOPIC = settings.env.azext_dt_ep_servicebus_topic or "topic" + generate_generic_id()
+DEST_HUB = settings.env.azext_iot_desthub or "test-hub-" + generate_generic_id()
 
 
 class TestHubControlPlaneExportImport(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestHubControlPlaneExportImport, self).__init__(test_case)
 
-        self.dest_hub = settings.env.azext_iot_desthub or "test-hub-" + generate_generic_id()
+        self.dest_hub = DEST_HUB
         self.dest_hub_rg = settings.env.azext_iot_destrg or settings.env.azext_iot_testrg
         self.cli = EmbeddedCLI()
 
         self.hub_id = self.cli.invoke(f"iot hub show -n {self.entity_name} -g {self.entity_rg}").as_json()["id"]
         self.subscription_id = self.hub_id.split("/")[2]
+
+        self.filename = generate_generic_id() + ".json"
+        self.test_case = test_case
+
+    @pytest.fixture(scope="class", autouse=True)
+    def setup_class(self):
 
         # create destination hub
 
@@ -61,28 +68,26 @@ class TestHubControlPlaneExportImport(IoTLiveScenarioTest):
             name=self.dest_hub,
             rg=self.dest_hub_rg,
             rtype=ResourceTypes.hub.value,
-            test_tag=test_case
+            test_tag=self.test_case
         )
 
         self.dest_hub_cstring = self.cmd(
             f"iot hub connection-string show -n {self.dest_hub} -g {self.dest_hub_rg}"
         ).get_output_in_json()["connectionString"]
 
-        self.filename = generate_generic_id() + ".json"
-
-    @pytest.fixture(scope="class", autouse=True)
-    def setup_class(self):
-
         self.clean_up_hub(self.entity_name, self.entity_rg)
 
-        # create identity: TESTING
+        # create identity
         self.identity_name = "userAssignedId" + generate_generic_id()
         self.uid = self.cli.invoke(f"identity create -n {self.identity_name} -g {self.entity_rg}").as_json()["id"]
 
-        # add identities
+        # assign identities
         self.cli.invoke("iot hub identity assign -n {} -g {} --system-assigned".format(self.entity_name, self.entity_rg))
         self.cli.invoke("iot hub identity assign -n {} -g {} --user-assigned {}".format(self.entity_name, self.entity_rg,
                                                                                         self.uid))
+
+        # assign system identity to destination hub too, so we can assign it roles later
+        self.cli.invoke("iot hub identity assign -n {} -g {} --system-assigned".format(self.dest_hub, self.dest_hub_rg))
 
         if not settings.env.azext_dt_ep_eventhub_namespace:
             self.cli.invoke(
@@ -212,23 +217,23 @@ class TestHubControlPlaneExportImport(IoTLiveScenarioTest):
         if os.path.isfile(self.filename):
             os.remove(self.filename)
 
-        if settings.env.azext_iot_testhub:
-            self.clean_up_hub(self.entity_name, self.entity_rg)
+        self.clean_up_hub(self.entity_name, self.entity_rg)
+        self.clean_up_hub(self.dest_hub, self.dest_hub_rg)
 
-        # tears down destination hub
-        if not settings.env.azext_iot_desthub:
-            self.cmd("iot hub delete -n {} -g {}".format(self.dest_hub, self.dest_hub_rg))
-        else:
-            self.clean_up_hub(self.dest_hub, self.dest_hub_rg)
-
-        self.cli.invoke(f"iot hub identity remove -n {self.entity_name} -g {self.entity_rg} --user-assigned {self.uid}")
         if not settings.env.azext_dt_ep_eventhub_namespace:
             self.cli.invoke(f"eventhubs namespace delete -n {EVENTHUB_NAMESPACE} -g {EP_RG}")
         if not settings.env.azext_iot_teststorageaccount:
             self.cli.invoke(f"storage account delete -y -n {STORAGE_ACCOUNT} -g {EP_RG}")
+        self.cli.invoke(f"iot hub identity remove -n {self.entity_name} -g {self.entity_rg} --user-assigned {self.uid}")
         if not settings.env.azext_dt_ep_servicebus_namespace:
             self.cli.invoke(f"servicebus namespace delete -n {SERVICEBUS_NAMESPACE} -g {self.entity_rg}")
         self.cli.invoke(f"identity delete -n {self.identity_name} -g {self.entity_rg}")
+
+        super().tearDown()
+
+        # tears down destination hub
+        if not settings.env.azext_iot_desthub:
+            self.cmd("iot hub delete -n {} -g {}".format(self.dest_hub, self.dest_hub_rg))
 
     def clean_up_hub(self, hub_name, rg):
 

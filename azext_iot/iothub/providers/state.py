@@ -57,11 +57,11 @@ class StateProvider(IoTHubProvider):
             auth_type_dataplane=auth_type_dataplane
         )
 
-        if not login:
+        if login:
+            self.include_control_plane = False
+        else:
             self.include_control_plane = True
             self.rg = self.target["resourcegroup"]
-        else:
-            self.include_control_plane = False
 
         self.auth_type = auth_type_dataplane
         self.cli = EmbeddedCLI()
@@ -160,12 +160,13 @@ class StateProvider(IoTHubProvider):
             pbar.update(len(hub_state["certificates"]))
             pbar.close()
 
-            hub_state["identities"] = control_plane["identity"]
-            num_identities = (1 if hub_state["identities"]["principalId"] else 0) + \
-                (len(hub_state["identities"]["userAssignedIdentities"]) if hub_state["identities"]["userAssignedIdentities"]
-                 else 0)
+            if control_plane["identity"]["userAssignedIdentities"]:
+                hub_state["identities"] = control_plane["identity"]["userAssignedIdentities"]
+            else:
+                hub_state["identities"] = []
+            num_identities = len(hub_state["identities"])
 
-            pbar = tqdm(total=num_identities, desc="Saving system- and user-assigned identities", file=sys.stdout)
+            pbar = tqdm(total=num_identities, desc="Saving user-assigned identities", file=sys.stdout)
             pbar.update(num_identities)
             pbar.close()
 
@@ -295,20 +296,15 @@ class StateProvider(IoTHubProvider):
             raise FileOperationError(f'File {filename} does not exist.')
 
     def assign_identities_to_hub(self, identities):
-        num_identities = (1 if identities["principalId"] else 0) + \
-            (len(identities["userAssignedIdentities"]) if identities["userAssignedIdentities"] else 0)
 
-        pbar = tqdm(total=num_identities, desc="Assigning identities", file=sys.stdout)
+        pbar = tqdm(total=len(identities), desc="Assigning identities", file=sys.stdout)
 
-        if identities["principalId"]:
-            self.cli.invoke("iot hub identity assign -n {} -g {} --system-assigned".format(self.hub_name, self.rg))
-            pbar.update(1)
-        if identities["userAssignedIdentities"]:
+        if identities:
             userIds = ""
-            for userId in identities["userAssignedIdentities"]:
+            for userId in identities:
                 userIds += userId + " "
             self.cli.invoke("iot hub identity assign --name {} -g {} --user-assigned {}".format(self.hub_name, self.rg, userIds))
-            pbar.update(len(identities["userAssignedIdentities"]))
+            pbar.update(len(identities))
 
         pbar.close()
 
