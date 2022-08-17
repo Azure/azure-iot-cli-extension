@@ -20,6 +20,7 @@ iothub_resource_ops = CliCommandType(
     operations_tmpl="azext_iot.iothub.commands_certificate#{}"
 )
 
+
 def load_iothub_commands(self, _):
     """
     Load CLI commands

@@ -4,7 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from azure.cli.core.commands.parameters import get_enum_type
 from azext_iot.iothub.common import CertificateAuthorityVersions
 from azure.cli.core.commands.parameters import get_enum_type, get_three_state_flag
 from azext_iot.common.shared import SettleType, ProtocolType, AckType
