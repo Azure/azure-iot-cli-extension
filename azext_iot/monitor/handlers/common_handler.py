@@ -11,12 +11,14 @@ import yaml
 from azext_iot.monitor.base_classes import AbstractBaseEventsHandler
 from azext_iot.monitor.parsers.common_parser import CommonParser
 from azext_iot.monitor.models.arguments import CommonHandlerArguments
+from azext_iot.monitor.utility import stop_monitor
 
 
 class CommonHandler(AbstractBaseEventsHandler):
     def __init__(self, common_handler_args: CommonHandlerArguments):
         super(CommonHandler, self).__init__()
         self._common_handler_args = common_handler_args
+        self.message_count = 0
 
     def parse_message(self, message):
         parser = CommonParser(
@@ -41,6 +43,12 @@ class CommonHandler(AbstractBaseEventsHandler):
             dump = yaml.safe_dump(result, default_flow_style=False)
 
         print(dump, flush=True)
+
+        self.message_count += 1
+        if self._common_handler_args.max_messages and self.message_count == self._common_handler_args.max_messages:
+            message = "Successfully parsed {} message(s).".format(self._common_handler_args.max_messages)
+            print(message, flush=True)
+            stop_monitor()
 
     def _should_process_device(self, device_id):
         expected_device_id = self._common_handler_args.device_id
