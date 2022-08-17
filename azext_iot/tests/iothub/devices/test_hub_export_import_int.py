@@ -395,6 +395,15 @@ class TestHubExportImport(IoTLiveScenarioTest):
         ).get_output_in_json()
 
         assert (len(file_devices) == len(hub_devices))
+
+        file_modules_list = hub_info["modules"]
+        file_modules_dict = {}
+        for module in file_modules_list:
+            if module[0]["device_id"] in file_modules_dict:
+                file_modules_dict[module[0]["device_id"]].append(module)
+            else:
+                file_modules_dict[module[0]["device_id"]] = [module]
+
         for device in hub_devices:
             id = self.cmd(
                 "iot hub device-identity show -l {} -d {}".format(self.connection_string, device['deviceId'])
@@ -409,10 +418,11 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
             assert target_device
 
-            [device["properties"]["desired"].pop(key) for key in ["$metadata", "$version"]]
+            for key in ["$metadata", "$version"]:
+                device["properties"]["desired"].pop(key)
             self.compare_devices(device, target_device)
 
-            file_modules = hub_info["modules"][device["deviceId"]]
+            file_modules = file_modules_dict[device['deviceId']]
             hub_modules = self.cmd(
                 "iot hub module-identity list -d {} -l {}".format(device["deviceId"], self.connection_string)
             ).get_output_in_json()
@@ -442,7 +452,8 @@ class TestHubExportImport(IoTLiveScenarioTest):
 
                 assert (module["authentication"] == target_module["authentication"])
 
-                [module_twin["properties"]["desired"].pop(key) for key in ["$metadata", "$version"]]
+                for key in ["$metadata", "$version"]:
+                    module_twin["properties"]["desired"].pop(key)
                 self.compare_module_twins(module_twin, target_module_twin)
 
             # compare children

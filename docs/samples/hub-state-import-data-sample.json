@@ -407,173 +407,266 @@
       ]
     }
   },
-  "modules": {
-    "device1-child": [],
-    "edge-parent1": [],
-    "edge-parent2": [],
-    "device2": [
-      [
-        {
-          "additional_properties": {},
-          "module_id": "module2",
-          "managed_by": null,
-          "generation_id": "637920587461553088",
-          "connection_state": "Disconnected",
-          "authentication": {
-            "symmetricKey": {
-              "primaryKey": null,
-              "secondaryKey": null
-            },
-            "x509Thumbprint": {
-              "primaryThumbprint": null,
-              "secondaryThumbprint": null
-            },
-            "type": "certificateAuthority"
-          }
-        },
-        {
-          "deviceId": "device2",
-          "moduleId": "module2",
-          "status": "enabled",
-          "connectionState": "Disconnected",
-          "authenticationType": "certificateAuthority",
+  "modules": [
+    [
+      {
+        "additional_properties": {},
+        "module_id": "module2",
+        "managed_by": null,
+        "device_id": "device2",
+        "generation_id": "637920587461553088",
+        "connection_state": "Disconnected",
+        "authentication": {
+          "symmetricKey": {
+            "primaryKey": null,
+            "secondaryKey": null
+          },
           "x509Thumbprint": {
             "primaryThumbprint": null,
             "secondaryThumbprint": null
           },
-          "modelId": "",
-          "tags": {
-            "timeZone": "western"
-          },
-          "properties": {
-            "desired": {
-              "conditions": {
-                "temperature": {
-                  "warning": 70,
-                  "critical": 100
-                }
+          "type": "certificateAuthority"
+        }
+      },
+      {
+        "deviceId": "device2",
+        "moduleId": "module2",
+        "status": "enabled",
+        "connectionState": "Disconnected",
+        "authenticationType": "certificateAuthority",
+        "x509Thumbprint": {
+          "primaryThumbprint": null,
+          "secondaryThumbprint": null
+        },
+        "modelId": "",
+        "tags": {
+          "timeZone": "western"
+        },
+        "properties": {
+          "desired": {
+            "conditions": {
+              "temperature": {
+                "warning": 70,
+                "critical": 100
               }
             }
           }
         }
-      ]
+      }
     ],
-    "device2-child": [],
-    "simDevice": [
-      [
-        {
-          "additional_properties": {},
-          "module_id": "module1",
-          "managed_by": null,
-          "generation_id": "637907447770121687",
-          "connection_state": "Disconnected",
-          "authentication": {
-            "symmetricKey": {
-              "primaryKey": "mock_key",
-              "secondaryKey": "mock_key"
-            },
-            "x509Thumbprint": {
-              "primaryThumbprint": null,
-              "secondaryThumbprint": null
-            },
-            "type": "sas"
-          }
-        },
-        {
-          "deviceId": "simDevice",
-          "moduleId": "module1",
-          "status": "enabled",
-          "connectionState": "Disconnected",
-          "authenticationType": "sas",
+    [
+      {
+        "additional_properties": {},
+        "module_id": "module1",
+        "managed_by": null,
+        "device_id": "simDevice",
+        "generation_id": "637907447770121687",
+        "connection_state": "Disconnected",
+        "authentication": {
+          "symmetricKey": {
+            "primaryKey": "mock_key",
+            "secondaryKey": "mock_key"
+          },
           "x509Thumbprint": {
             "primaryThumbprint": null,
             "secondaryThumbprint": null
           },
-          "modelId": "",
-          "properties": {
-            "desired": {
-              "property2": 25
-            }
-          }
+          "type": "sas"
         }
-      ],
-      [
-        {
-          "additional_properties": {},
-          "module_id": "simModule",
-          "managed_by": null,
-          "generation_id": "637920585539407125",
-          "connection_state": "Disconnected",
-          "authentication": {
-            "symmetricKey": {
-              "primaryKey": "mock_key",
-              "secondaryKey": "mock_key"
-            },
-            "x509Thumbprint": {
-              "primaryThumbprint": null,
-              "secondaryThumbprint": null
-            },
-            "type": "sas"
-          }
+      },
+      {
+        "deviceId": "simDevice",
+        "moduleId": "module1",
+        "status": "enabled",
+        "connectionState": "Disconnected",
+        "authenticationType": "sas",
+        "x509Thumbprint": {
+          "primaryThumbprint": null,
+          "secondaryThumbprint": null
         },
-        {
-          "deviceId": "simDevice",
-          "moduleId": "simModule",
-          "status": "enabled",
-          "connectionState": "Disconnected",
-          "authenticationType": "sas",
-          "x509Thumbprint": {
-            "primaryThumbprint": null,
-            "secondaryThumbprint": null
-          },
-          "modelId": "",
-          "properties": {
-            "desired": {
-              "color": "green",
-              "shape": "square"
-            }
+        "modelId": "",
+        "properties": {
+          "desired": {
+            "property2": 25
           }
         }
-      ]
+      }
     ],
-    "device3": [
-      [
-        {
-          "additional_properties": {},
-          "module_id": "module1",
-          "managed_by": null,
-          "generation_id": "637937846362414376",
-          "connection_state": "Disconnected",
-          "authentication": {
-            "symmetricKey": {
-              "primaryKey": "mock_key",
-              "secondaryKey": "mock_key"
-            },
-            "x509Thumbprint": {
-              "primaryThumbprint": null,
-              "secondaryThumbprint": null
-            },
-            "type": "sas"
-          }
-        },
-        {
-          "deviceId": "device3",
-          "moduleId": "module1",
-          "status": "enabled",
-          "connectionState": "Disconnected",
-          "authenticationType": "sas",
+    [
+      {
+        "additional_properties": {},
+        "module_id": "simModule",
+        "managed_by": null,
+        "device_id": "simDevice",
+        "generation_id": "637920585539407125",
+        "connection_state": "Disconnected",
+        "authentication": {
+          "symmetricKey": {
+            "primaryKey": "mock_key",
+            "secondaryKey": "mock_key"
+          },
           "x509Thumbprint": {
             "primaryThumbprint": null,
             "secondaryThumbprint": null
           },
-          "modelId": "",
-          "properties": {
-            "desired": {
-              "magic": 3
-            }
+          "type": "sas"
+        }
+      },
+      {
+        "deviceId": "simDevice",
+        "moduleId": "simModule",
+        "status": "enabled",
+        "connectionState": "Disconnected",
+        "authenticationType": "sas",
+        "x509Thumbprint": {
+          "primaryThumbprint": null,
+          "secondaryThumbprint": null
+        },
+        "modelId": "",
+        "properties": {
+          "desired": {
+            "color": "green",
+            "shape": "square"
           }
         }
-      ]
+      }
+    ],
+    [
+      {
+        "additional_properties": {},
+        "module_id": "module1",
+        "managed_by": null,
+        "device_id": "device3",
+        "generation_id": "637937846362414376",
+        "connection_state": "Disconnected",
+        "authentication": {
+          "symmetricKey": {
+            "primaryKey": "mock_key",
+            "secondaryKey": "mock_key"
+          },
+          "x509Thumbprint": {
+            "primaryThumbprint": null,
+            "secondaryThumbprint": null
+          },
+          "type": "sas"
+        }
+      },
+      {
+        "deviceId": "device3",
+        "moduleId": "module1",
+        "status": "enabled",
+        "connectionState": "Disconnected",
+        "authenticationType": "sas",
+        "x509Thumbprint": {
+          "primaryThumbprint": null,
+          "secondaryThumbprint": null
+        },
+        "modelId": "",
+        "properties": {
+          "desired": {
+            "magic": 3
+          }
+        }
+      }
     ]
-  }
+  ],
+  "certificates": [
+    {
+      "etag": "IjE1MDBlNTUyLTAwMDAtMDgwMC0wMDAwLTYyZTMwMGQ2MDAwMCI=",
+      "id": "/subscriptions/a386d5ea-ea90-441a-8263-d816368c84a1/resourceGroups/mirabai/providers/Microsoft.Devices/IotHubs/ms-hub/certificates/cert_from_python",
+      "name": "cert_from_python",
+      "properties": {
+        "certificate": "MIIDKzCCAhOgAwIBAgIUVRJ2BcVaEZc5CmHATu3PaFRfYPowDQYJKoZIhvcNAQELBQAwHTEbMBkGA1UEAwwSQmFuYW5hX1RyZWVfUm9vdDIxMB4XDTIyMDUyNjAxMDU1MFoXDTIyMDYyNTAxMDU1MFowHTEbMBkGA1UEAwwSQmFuYW5hX1RyZWVfUm9vdDIxMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApDVmfiC0bSJTuERjfPJMFe0CuGxJBAQJY9ZMke31/Bz4p96n83yUMG99ZN30bd2j72DWqLFXSC50ZnThDn/dTqy+j/xXqRD4MpRFM0kRUaKb06v2NuKbM0ubozGbWu56M7dGjfSYU1JJp7zyUp6tTchwZcV24nnkUMBE5/UCeDOawMzyb7y9zf6sd7+lUUKnXbZppphvIhkiZbjx4cE49wEWUV5W+g8vnpdaDsFzpFWACuiIenmQWhnA7ixwiYYKy2UvVnBjG6xiAbth+dlBLcV5kbTghmz3KIKzaw5oxj52369f0F7h0YkmwBpwvi/oaMor2NoeMI7YBuvnpo1BOQIDAQABo2MwYTAdBgNVHQ4EFgQUEGZQif3TUHhGv9xVuUCSp0JSTxcwHwYDVR0jBBgwFoAUEGZQif3TUHhGv9xVuUCSp0JSTxcwDwYDVR0TAQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMCAYYwDQYJKoZIhvcNAQELBQADggEBAA1DQhq8vYLZoUeCxNLMfSHjf0OgiSSreG/ZyJHDiuVYnB1Kfbv5QLPooMRGDydE/GL6d85ArLu5u0EP3HdYqS9N1cwM8uiH2uLIfyF2KlGI0IwkMLarVzt4AnOUqVbkuSV+WK6suSsDsiCFWr8pJ0IESloYxIVNH6GPJLUqigwTinz7JVMFKqjEXWmt0gKZBQxfT9fEAegNSHUhBIATnY3iCjYzM99pVw6ZGqbSzFRZjsbtfR7GXyrrx0oU1z8dWeDJrj350nZq5T52n3SLugurVW9WfsfGAV2ZbxkBqjfWZPP7IG3gA+61kpb6763QD9Der/ueAnUgrW7rzZjTSSE=",
+        "created": "2001-01-01T00:00:00+00:00",
+        "expiry": "2022-06-25T01:05:50+00:00",
+        "isVerified": false,
+        "subject": "Banana_Tree_Root21",
+        "thumbprint": "CFA8F8C4DF6FE49DEC18EE604CCB4AF8DE2D2DA0",
+        "updated": "2022-07-28T21:34:14+00:00"
+      },
+      "resourceGroup": "mirabai",
+      "type": "Microsoft.Devices/IotHubs/Certificates"
+    },
+    {
+      "etag": "IjE1MDBlNjUyLTAwMDAtMDgwMC0wMDAwLTYyZTMwMGQ4MDAwMCI=",
+      "id": "/subscriptions/a386d5ea-ea90-441a-8263-d816368c84a1/resourceGroups/mirabai/providers/Microsoft.Devices/IotHubs/ms-hub/certificates/cert_from_ubuntu",
+      "name": "cert_from_ubuntu",
+      "properties": {
+        "certificate": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUZSVENDQXkyZ0F3SUJBZ0lVT00zbTkvNjh1THlmSHQ4ZnR6N3QvWElJV1BJd0RRWUpLb1pJaHZjTkFRRUwKQlFBd0tqRW9NQ1lHQTFVRUF3d2ZRWHAxY21WZlNXOVVYMGgxWWw5RFFWOURaWEowWDFSbGMzUmZUMjVzZVRBZQpGdzB5TWpBMU1qUXlNREU0TkRkYUZ3MHlNakEyTWpNeU1ERTRORGRhTUNveEtEQW1CZ05WQkFNTUgwRjZkWEpsClgwbHZWRjlJZFdKZlEwRmZRMlZ5ZEY5VVpYTjBYMDl1Ykhrd2dnSWlNQTBHQ1NxR1NJYjNEUUVCQVFVQUE0SUMKRHdBd2dnSUtBb0lDQVFDOGZtK3dzT0xJNVVZWWw2M2Jwc09IRkRXYnpsNWdTajV1RlR6VVRxVG5GdVV4R0RaeQpOUEhLMG4vU0QzaXpMTXhwZlpDZTJVb2dtTTNTeWNnQ211LzR4aGdFYlZEYTFwcnFsWXJOWXlyU0xIUzJVVUkxCjNXbW9USFNzZE1GbEUwQVNXZTN1cEs5STU3MHBRZXZoVVJnZENNSzQ2VW82aWZzdTZOVnpYY1FmUWhQNUszcGUKTGF1ZXlNTUtxYzFwWkxHRHZYdFg5NnplZWRQR25vWTZCOU16czE1TEwybzVaaXU4SWFiVzZ3Qjc5ZTd3aXRVawpiRWRKWnc0bkcxTzdqOTNDZk15Rko5WVJEeGg4TlVoSkN1STFSb3hrenhkR0hMU0NXSWJ0RDBlZmpqQjFhKzc0CndOSTJaK3ZEc1hKanQxNHFLVDdYcnFsSUF6dW9XVG1Eb1JRN3pVejNCM2xFbG1PRTV2bndYdmJZMlZDbkVnWGQKKzdUSmdvRTJPQkM3KzliYWJpQjZMeldNUjJ0ZmNVU29hSjVvNUZQNGdaYWExdjJzWHJ4cEl1ZVFrNE1wUVlyLwphcTBrM2N2SDNrRWhaTHZtRGpWRnlRUjRhemhlOXdDQzZYbFg1akNHeXZlcDIrQXJMdzlHdUxIUndwT0NvRXlyCk1aM0djQ1htRnd3Vjl2TGpHaUFubWUyZndFak9IRDZjVkFadDJSVVh0RHFuc2FnVE9QYTNiQkNqMkJrTmNIT3gKY1A3azh5MW1DL2lJaCtYV3cya2FoaHVXTGExL2lJWXlBSFdkWGJXSHo1OS9YWi90VFkyVy9sbXNjbDN3K2tWTgp2QlhRRlA3cEE5RFoyOW1mTHNRRmJCaHI4cEt3WkJrYnhaamo4dkZvZU0wQ3NETzBtalVNOTFRblFRSURBUUFCCm8yTXdZVEFkQmdOVkhRNEVGZ1FVWm1Ha2VaNmNMaERheGxFcHkwNFJtWmdvcmhFd0h3WURWUjBqQkJnd0ZvQVUKWm1Ha2VaNmNMaERheGxFcHkwNFJtWmdvcmhFd0R3WURWUjBUQVFIL0JBVXdBd0VCL3pBT0JnTlZIUThCQWY4RQpCQU1DQVlZd0RRWUpLb1pJaHZjTkFRRUxCUUFEZ2dJQkFFeklqRDRIblNxNDZUdUx6MFYwM0hDdjRSUEZJbUZuCjRteUl1ZFE1dGNPOVllNmM4VkVSZVJQVS9pd25tY0I4S1M3Ukd2dUwwVW1QSWdpN05MbGNCNUZiSVVIWUQ0bFEKRC9mY25GSlJNd3o4dCt4dlB2OUZZZmZVcW5SbnBPZWhkNVJpamQ1WEF1RlM0UGczQURYbmNpNzJYTTdmTnpHVAowUGhVeFNzajZEUDRxa3V4eEVFc1l2TEVCSFZMV211R0xDL1pGL1EzVVNET29nVks3V2xNTENqUDhDelRTRzIrCml0c1M3ZSt3Qk92cDUrWGE2QmRZaEYwVCtMMk1QSHpjckMzcmpIY0VaUTM5aHFUT21tN1N6YUEzWEFKWS9VZFcKYlFDOGliRHp0MmJwUFljbnViU1dCMmN4aEpHWFJxOElEczVwaXA0UjE3L1JsOEpYbDM1RE9lQ3BKZ1MzMlducgprUFpYSFdYWS82V1ZweEpNb0R4bktEUVlQdzFnWDhMWmUxcnRlY2ZKajhBRmpwbGlzYWtMaWoreXhWMHFWTkpOCktrSnpNazEySktpd0RpOFRaaG93b1N1M1lGK0NkU3U1bGd3TUZRenYyb3VIbERhVkNYOFJ5OFI0WVZ0Uy8xd3MKWmdrSjVGZVZUZFlnYkQ4emJBcDgweWVoS2NmVnlIRzdoWCs0Y0VWRURvTTBzOUs5SFpIZ3k1L2JBTDRFaE5RRApzLzV1QTdyNjY3Tm42bVJjQWpQRTNOck5VMitXRGxDcGZuMmhmN0lQRldLem1kNWdwbU5OTEI5d1loWUk2MDFQCldJRkRTTGFlVWxyU1Z1UERjVksrZmEvZklobXNMRU1lU3A2Y1ZEOEFBSVREYVV2d1NYa1hiOEhsWjVXa01mNXUKc2pTZGpXRWV6RWdQCi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K",
+        "created": "2001-01-01T00:00:00+00:00",
+        "expiry": "2022-06-23T20:18:47+00:00",
+        "isVerified": false,
+        "subject": "Azure_IoT_Hub_CA_Cert_Test_Only",
+        "thumbprint": "FC6A54B0687F878B407CDE480E8F85A290421C73",
+        "updated": "2022-07-28T21:34:16+00:00"
+      },
+      "resourceGroup": "mirabai",
+      "type": "Microsoft.Devices/IotHubs/Certificates"
+    },
+    {
+      "etag": "IjE1MDBlNzUyLTAwMDAtMDgwMC0wMDAwLTYyZTMwMGQ5MDAwMCI=",
+      "id": "/subscriptions/a386d5ea-ea90-441a-8263-d816368c84a1/resourceGroups/mirabai/providers/Microsoft.Devices/IotHubs/ms-hub/certificates/root",
+      "name": "root",
+      "properties": {
+        "certificate": "MIIDDzCCAfegAwIBAgIUJTPlis2dTsRTM3WbhBYebf2HG0YwDQYJKoZIhvcNAQELBQAwDzENMAsGA1UEAwwEcm9vdDAeFw0yMjA2MjIxNzA0MTdaFw0yMjA2MjMxNzA0MTdaMA8xDTALBgNVBAMMBHJvb3QwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCLeh7zxV0kyKkj/px/FAFKchOJqSdQuQTCnwiBUtCvyoEKCrcGZnTHnBVhTKOMXETa+HSIuggyf/gTMiCD6AnHyUfVXd4ccauRCSpeZlCBxw4dMjLFiSyqjFXRMTrwkXJAx0xETLQrB97RBZ2ooG+zM7rdcp208XWzWTrCdstDsyWUaHuVEttCivZq4t6CyXGuBJTNHBF4NgxpX6349hV4UB3BP2BR0ZUkgyPer1gOuevtxOC8QZbuEUvblKCxA3QXYuj65g752EcaTgQCcwbGm2G+wN7D4OR3g/hvehzplS+0LDRkWaP3hWY8IFvLK+ThQ79IV1wv8rJBkA4KxyzfAgMBAAGjYzBhMB0GA1UdDgQWBBQRMZfKFh4OytleNyxYJUydjjjKOTAfBgNVHSMEGDAWgBQRMZfKFh4OytleNyxYJUydjjjKOTAPBgNVHRMBAf8EBTADAQH/MA4GA1UdDwEB/wQEAwIBhjANBgkqhkiG9w0BAQsFAAOCAQEAUr/frJxT4dEexNyG6WY62Y8M5iJ80FVGUN67l2ztqgrK7BxpVvFgt2lbs+pPaU6YtMA84S75ZfITYdtNtJIrnQla6IJitKPmHw5eFEMXGURgp1GI6Xl3nTtKxUygXR8Dy8sy029ysJyiO7BU3gdRqjpgsOFr+HB02u39Ts54cpECxRKjDzM1NVap2iz9gIs9B08nowCnJpEiXBRTF0QwinmR7/HVVl6/lUa8zi6vzDmO1p5s/poZFcf223L5nrC7/ngCgdIJG2D7pPr6SKOD8rEd4MzDLHpb+GSgFVHq0dHttwC4wnvhUkVK9WzdLewdEwwUhM+j0wof59+hKEqzrQ==",
+        "created": "2001-01-01T00:00:00+00:00",
+        "expiry": "2022-06-23T17:04:17+00:00",
+        "isVerified": true,
+        "subject": "root",
+        "thumbprint": "6E552E50B40A885B64C4CC5AC67A176DED0FD9FC",
+        "updated": "2022-07-28T21:34:17+00:00"
+      },
+      "resourceGroup": "mirabai",
+      "type": "Microsoft.Devices/IotHubs/Certificates"
+    }
+  ],
+  "identities": {
+    "/subscriptions/a386d5ea-ea90-441a-8263-d816368c84a1/resourcegroups/mirabai/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mirabaiidentity": {
+      "clientId": "31878574-6aa6-4dd8-8421-6c6eab36aad6",
+      "principalId": "e41ddf9e-735d-40fb-aa04-825a77d8784c"
+    }
+  },
+  "endpoints": {
+    "eventHubs": [
+      {
+        "authenticationType": "identityBased",
+        "connectionString": null,
+        "endpointUri": "sb://mirabaieventhub.servicebus.windows.net",
+        "entityPath": "eventhub1",
+        "id": "36ae945a-b5ff-4a6d-9b34-8f3460909558",
+        "identity": {
+          "userAssignedIdentity": "/subscriptions/a386d5ea-ea90-441a-8263-d816368c84a1/resourceGroups/mirabai/providers/Microsoft.ManagedIdentity/userAssignedIdentities/mirabaiidentity"
+        },
+        "name": "eventhub-userid",
+        "resourceGroup": "mirabai",
+        "subscriptionId": "a386d5ea-ea90-441a-8263-d816368c84a1"
+      }
+    ],
+    "serviceBusQueues": [],
+    "serviceBusTopics": [
+      {
+        "authenticationType": "identityBased",
+        "connectionString": null,
+        "endpointUri": "sb://mirabaiservicebus.servicebus.windows.net",
+        "entityPath": "topic1",
+        "id": "9de875da-64cc-4b0f-97fc-4b295686018c",
+        "identity": null,
+        "name": "topic-systemid",
+        "resourceGroup": "mirabai",
+        "subscriptionId": "a386d5ea-ea90-441a-8263-d816368c84a1"
+      }
+    ],
+    "storageContainers": []
+  },
+  "routes": [
+    {
+      "condition": "true",
+      "endpointNames": [
+        "events"
+      ],
+      "isEnabled": true,
+      "name": "route-1",
+      "source": "DeviceLifecycleEvents"
+    }
+  ]
 }

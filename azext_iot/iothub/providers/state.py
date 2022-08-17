@@ -79,7 +79,8 @@ class StateProvider(IoTHubProvider):
             c for c in all_configs if (c["content"].get("deviceContent") or c["content"].get("moduleContent"))
         ]
         for c in adm_configs:
-            [c.pop(key, None) for key in ["createdTimeUtc", "etag", "lastUpdatedTimeUtc", "schemaVersion"]]
+            for key in ["createdTimeUtc", "etag", "lastUpdatedTimeUtc", "schemaVersion"]:
+                c.pop(key, None)
 
         hub_state["configurations"] = adm_configs
 
@@ -101,12 +102,11 @@ class StateProvider(IoTHubProvider):
             "identities": [],
             "children": {}
         }
-        hub_state["modules"] = {}
+        hub_state["modules"] = []
 
         for i in tqdm(range(len(identities)), desc="Saving devices and modules", file=sys.stdout):
 
             id = identities[i]
-            hub_state["modules"][id["deviceId"]] = []
 
             module_objs = _iot_device_module_list(target=target, device_id=id["deviceId"])
 
@@ -120,10 +120,11 @@ class StateProvider(IoTHubProvider):
                 hub_state["devices"]["children"][id["deviceId"]] = [c["deviceId"] for c in children]
 
             identities[i]["properties"].pop("reported")
-            [identities[i]["properties"]["desired"].pop(key) for key in ["$metadata", "$version"]]
-            [identities[i].pop(key, None) for key in ["cloudToDeviceMessageCount", "configurations", "deviceEtag", "deviceScope",
-                                                      "lastActivityTime", "modelId", "parentScopes", "statusUpdateTime", "etag",
-                                                      "version"]]
+            for key in ["$metadata", "$version"]:
+                identities[i]["properties"]["desired"].pop(key)
+            for key in ["cloudToDeviceMessageCount", "configurations", "deviceEtag", "deviceScope", "lastActivityTime",
+                        "modelId", "parentScopes", "statusUpdateTime", "etag", "version"]:
+                identities[i].pop(key, None)
             hub_state["devices"]["identities"].append(identities[i])
 
             for module in module_objs:
@@ -137,14 +138,16 @@ class StateProvider(IoTHubProvider):
                     module2 = _iot_device_module_show(target=target, device_id=id["deviceId"], module_id=module["module_id"])
                     module["authentication"] = module2["authentication"]
 
-                    [module.pop(key) for key in ["connection_state_updated_time", "last_activity_time", "etag",
-                                                 "cloud_to_device_message_count", "device_id"]]
-                    [module_twin.pop(key) for key in ["deviceEtag", "lastActivityTime", "etag", "version",
-                                                      "cloudToDeviceMessageCount", "statusUpdateTime"]]
-                    [module_twin["properties"]["desired"].pop(key) for key in ["$metadata", "$version"]]
+                    for key in ["connection_state_updated_time", "last_activity_time", "etag", "cloud_to_device_message_count"]:
+                        module.pop(key)
+                    for key in ["deviceEtag", "lastActivityTime", "etag", "version", "cloudToDeviceMessageCount",
+                                "statusUpdateTime"]:
+                        module_twin.pop(key)
+                    for key in ["$metadata", "$version"]:
+                        module_twin["properties"]["desired"].pop(key)
                     module_twin["properties"].pop("reported")
 
-                    hub_state["modules"][id["deviceId"]].append([module, module_twin])
+                    hub_state["modules"].append([module, module_twin])
 
         # CONTROL PLANE
 
@@ -217,7 +220,7 @@ class StateProvider(IoTHubProvider):
                                           labels=json.dumps(d["labels"]), metrics=json.dumps(d["metrics"]),
                                           config_type=config_type)
 
-        for identity in tqdm(hub_state["devices"]["identities"], desc="Uploading devices and modules", file=sys.stdout):
+        for identity in tqdm(hub_state["devices"]["identities"], desc="Uploading devices", file=sys.stdout):
 
             # upload device identity and twin
 
@@ -231,18 +234,12 @@ class StateProvider(IoTHubProvider):
 
             _iot_device_twin_replace(target=self.target, device_id=identity["deviceId"], target_json=json.dumps(twin))
 
-            # upload module identities and twins for the given device
-
-            modules = hub_state["modules"][identity["deviceId"]]
-
-            for j in range(len(modules)):
-                module_identity = modules[j][0]
-                module_twin = modules[j][1]
-
-                self.upload_module_identity(identity["deviceId"], module_identity)
-
-                _iot_device_module_twin_replace(target=self.target, device_id=identity["deviceId"],
-                                                module_id=module_identity["module_id"], target_json=json.dumps(module_twin))
+        for module_info in tqdm(hub_state["modules"], desc="Uploading modules", file=sys.stdout):
+            module_identity = module_info[0]
+            module_twin = module_info[1]
+            self.upload_module_identity(module_identity)
+            _iot_device_module_twin_replace(target=self.target, device_id=module_identity["device_id"],
+                                            module_id=module_identity["module_id"], target_json=json.dumps(module_twin))
 
         # set parent-child relationships
         for parentId in hub_state["devices"]["children"]:
@@ -288,7 +285,7 @@ class StateProvider(IoTHubProvider):
 
         try:
             with open(filename, 'w', encoding='utf-8') as f:
-                json.dump(hub_state, f)
+                json.dump(hub_state, f, indent=2)
 
             logger.info("Saved state of IoT Hub '{}' to {}".format(self.hub_name, filename))
 
@@ -420,8 +417,9 @@ class StateProvider(IoTHubProvider):
         else:
             logger.error("Authorization type for device '{0}' not recognized.".format(device_id))
 
-    def upload_module_identity(self, device_id: str, identity: dict):
+    def upload_module_identity(self, identity: dict):
 
+        device_id = identity["device_id"]
         module_id = identity["module_id"]
         auth_type = identity["authentication"]["type"]
 
