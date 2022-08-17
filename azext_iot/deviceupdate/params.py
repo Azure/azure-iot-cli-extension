@@ -192,15 +192,15 @@ def load_deviceupdate_arguments(self, _):
             options_list=["--file"],
             nargs="+",
             action="append",
-            help="Space-separated KEY=VALUE pairs corresponding to import metadata file properties. "
-            "Required key values include filename and url. --file can be used 1 or more times.",
+            help="Space-separated key=value pairs corresponding to import manifest metadata file properties. "
+            "Required keys include filename and url. --file can be used 1 or more times.",
         )
         context.argument(
             "hashes",
             options_list=["--hashes"],
             nargs="+",
-            help="Space-separated KEY=VALUE pairs where the KEY is the hash algorithm used and the VALUE is the base64 encoded "
-            "update manifest file hash. At least a sha256 entry is required. "
+            help="Space-separated key=value pairs where the key is the hash algorithm used and the value is the base64 encoded "
+            "import manifest file hash. At least a sha256 entry is required. "
             "If not provided it will by calculated from the provided url.",
         )
         context.argument(
@@ -406,8 +406,8 @@ def load_deviceupdate_arguments(self, _):
             options_list=["--agent-id"],
             nargs="+",
             action="append",
-            help="Space-separated KEY=VALUE pairs corresponding to device update agent identifier properties. "
-            "The KEY of deviceId is required, while moduleId is optional. --agent-id can be used 1 or more times.",
+            help="Space-separated key=value pairs corresponding to device update agent identifier properties. "
+            "The key of deviceId is required, while moduleId is optional. --agent-id can be used 1 or more times.",
         )
         context.argument(
             "description",

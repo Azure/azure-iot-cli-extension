@@ -68,6 +68,9 @@ helps[
     - name: Receive all messages and parse message payload as JSON
       text: >
         az iot hub monitor-events -n {iothub_name} --content-type application/json
+    - name: Receive the specified number of messages from hub and then shut down.
+      text: >
+        az iot hub monitor-events -n {iothub_name} --message-count {message_count}
 """
 
 helps[
