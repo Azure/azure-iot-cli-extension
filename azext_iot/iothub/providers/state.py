@@ -10,8 +10,10 @@ from azext_iot.common.shared import DeviceAuthApiType, DeviceAuthType, ConfigTyp
 from azext_iot.common._azure import parse_iot_endpoint_connection_string, parse_storage_container_connection_string
 from azext_iot.iothub.providers.base import IoTHubProvider
 from azure.cli.core.azclierror import FileOperationError
+from azure.cli.command_modules.iot.shared import EndpointType
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.common.utility import capture_stderr
+from azext_iot.constants import IMMUTABLE_DEVICE_IDENTITY_FIELDS, IMMUTABLE_MODULE_IDENTITY_FIELDS, IMMUTABLE_MODULE_TWIN_FIELDS
 from azext_iot.operations.hub import (
     _iot_device_show,
     _iot_device_module_twin_show,
@@ -122,8 +124,7 @@ class StateProvider(IoTHubProvider):
             identities[i]["properties"].pop("reported")
             for key in ["$metadata", "$version"]:
                 identities[i]["properties"]["desired"].pop(key)
-            for key in ["cloudToDeviceMessageCount", "configurations", "deviceEtag", "deviceScope", "lastActivityTime",
-                        "modelId", "parentScopes", "statusUpdateTime", "etag", "version"]:
+            for key in IMMUTABLE_DEVICE_IDENTITY_FIELDS:
                 identities[i].pop(key, None)
             hub_state["devices"]["identities"].append(identities[i])
 
@@ -138,10 +139,9 @@ class StateProvider(IoTHubProvider):
                     module2 = _iot_device_module_show(target=target, device_id=id["deviceId"], module_id=module["module_id"])
                     module["authentication"] = module2["authentication"]
 
-                    for key in ["connection_state_updated_time", "last_activity_time", "etag", "cloud_to_device_message_count"]:
+                    for key in IMMUTABLE_MODULE_IDENTITY_FIELDS:
                         module.pop(key)
-                    for key in ["deviceEtag", "lastActivityTime", "etag", "version", "cloudToDeviceMessageCount",
-                                "statusUpdateTime"]:
+                    for key in IMMUTABLE_MODULE_TWIN_FIELDS:
                         module_twin.pop(key)
                     for key in ["$metadata", "$version"]:
                         module_twin["properties"]["desired"].pop(key)
@@ -309,7 +309,7 @@ class StateProvider(IoTHubProvider):
 
         if ep["connectionString"]:
 
-            if ep_type == "azurestoragecontainer":
+            if ep_type == EndpointType.AzureStorageContainer.value:
                 cs = parse_storage_container_connection_string(ep["connectionString"])
                 ep["connectionString"] = self.cli.invoke("storage account show-connection-string --name {} -g {}".format(
                     cs["AccountName"], ep["resourceGroup"])).as_json()["connectionString"]
@@ -317,13 +317,13 @@ class StateProvider(IoTHubProvider):
                 cs = parse_iot_endpoint_connection_string(ep["connectionString"])
                 namespace = cs["Endpoint"].split('.')[0][5:]
 
-                if ep_type == "eventhub":
+                if ep_type == EndpointType.EventHub.value:
                     type_str = "eventhubs eventhub"
                     entity_str = "--eventhub-name"
-                elif ep_type == "servicebusqueue":
+                elif ep_type == EndpointType.ServiceBusQueue.value:
                     type_str = "servicebus queue"
                     entity_str = "--queue-name"
-                elif ep_type == "servicebustopic":
+                elif ep_type == EndpointType.ServiceBusTopic.value:
                     type_str = "servicebus topic"
                     entity_str = "--topic-name"
 
@@ -337,7 +337,7 @@ class StateProvider(IoTHubProvider):
 
             parameters = "--endpoint-uri {} ".format(ep["endpointUri"])
 
-            if ep_type != "azurestoragecontainer":
+            if ep_type != EndpointType.AzureStorageContainer.value:
                 parameters += "--entity-path {} ".format(ep["entityPath"])
 
             if ep["identity"]:
@@ -350,7 +350,7 @@ class StateProvider(IoTHubProvider):
         if ep["authenticationType"]:
             parameters += "--auth-type {} ".format(ep["authenticationType"])
 
-        if ep_type == "azurestoragecontainer":
+        if ep_type == EndpointType.AzureStorageContainer.value:
             max_chunk_size = int(ep["maxChunkSizeInBytes"] / 1048576)
             parameters += f"--container-name {ep['containerName']} --encoding {ep['encoding']} --batch-frequency " + \
                           f"{ep['batchFrequencyInSeconds']} --chunk-size {max_chunk_size} --file-name-format " + \
@@ -370,16 +370,16 @@ class StateProvider(IoTHubProvider):
         pbar = tqdm(total=num_endpoints, desc="Uploading endpoints", file=sys.stdout)
 
         for ep in eventHubs:
-            self.upload_endpoint(ep, "eventhub")
+            self.upload_endpoint(ep, EndpointType.EventHub.value)
             pbar.update(1)
         for ep in serviceBusQueues:
-            self.upload_endpoint(ep, "servicebusqueue")
+            self.upload_endpoint(ep, EndpointType.ServiceBusQueue.value)
             pbar.update(1)
         for ep in serviceBusTopics:
-            self.upload_endpoint(ep, "servicebustopic")
+            self.upload_endpoint(ep, EndpointType.ServiceBusTopic.value)
             pbar.update(1)
         for ep in storageContainers:
-            self.upload_endpoint(ep, "azurestoragecontainer")
+            self.upload_endpoint(ep, EndpointType.AzureStorageContainer.value)
             pbar.update(1)
 
         pbar.close()
@@ -475,20 +475,20 @@ class StateProvider(IoTHubProvider):
         pbar = tqdm(total=num_endpoints, desc="Deleting endpoints from destination hub", file=sys.stdout)
 
         for ep in eventHubs:
-            self.cli.invoke("iot hub routing-endpoint delete --hub-name {} -g {} --endpoint-name {} --endpoint-type \
-                eventhub".format(self.hub_name, self.rg, ep["name"]))
+            self.cli.invoke(f"iot hub routing-endpoint delete --hub-name {self.hub_name} -g {self.rg} --endpoint-name "
+                            f"{ep['name']} --endpoint-type eventhub")
             pbar.update(1)
         for ep in serviceBusQueues:
-            self.cli.invoke("iot hub routing-endpoint delete --hub-name {} -g {} --endpoint-name {} --endpoint-type \
-                servicebusqueue".format(self.hub_name, self.rg, ep["name"]))
+            self.cli.invoke(f"iot hub routing-endpoint delete --hub-name {self.hub_name} -g {self.rg} --endpoint-name "
+                            f"{ep['name']} --endpoint-type servicebusqueue")
             pbar.update(1)
         for ep in serviceBusTopics:
-            self.cli.invoke("iot hub routing-endpoint delete --hub-name {} -g {} --endpoint-name {} --endpoint-type \
-                servicebustopic".format(self.hub_name, self.rg, ep["name"]))
+            self.cli.invoke(f"iot hub routing-endpoint delete --hub-name {self.hub_name} -g {self.rg} --endpoint-name "
+                            f"{ep['name']} --endpoint-type servicebustopic")
             pbar.update(1)
         for ep in storageContainers:
-            self.cli.invoke("iot hub routing-endpoint delete --hub-name {} -g {} --endpoint-name {} --endpoint-type \
-                azurestoragecontainer".format(self.hub_name, self.rg, ep["name"]))
+            self.cli.invoke(f"iot hub routing-endpoint delete --hub-name {self.hub_name} -g {self.rg} --endpoint-name "
+                            f"{ep['name']} --endpoint-type azurestoragecontainer")
             pbar.update(1)
 
         pbar.close()

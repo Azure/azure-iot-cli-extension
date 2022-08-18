@@ -589,11 +589,16 @@ helps[
     type: command
     short-summary: Export the state of an IoT Hub to a file.
     long-summary: The exported state will include hub configurations, edge deployments, device identities and twins, module
-                  identities and twins, hub system and user identities, certificates, endpoints and routes.
+                  identities and twins, hub system and user identities, certificates, endpoints and routes. If a connection
+                  string is given instead of a hub name, only the data plane (configurations, edge deployments, device identities
+                  and twins, and module identities and twins) will be exported.
     examples:
     - name: Export the state of the specified hub to the specified file.
       text: >
         az iot hub state export -n {iothub_name} -f {filename}
+    - name: Export only the data plane of the specified hub to the specified file.
+      text: >
+        az iot hub state export -l {connection_string} -f {filename}
     - name: Export the state of the specified hub to the specified file, overwriting the file contents.
       text: >
         az iot hub state export -n {iothub_name} -f {filename} --force
@@ -605,11 +610,18 @@ helps[
     type: command
     short-summary: Import a Hub state from a file to an IoT Hub.
     long-summary: The imported state will include hub configurations, edge deployments, device identities and twins, module
-                  identities and twins, hub system and user identities, certificates, endpoints and routes.
+                  identities and twins, hub system and user identities, certificates, endpoints and routes. A temporary
+                  certificate file will be generated with a name of the format cert{number}.cer, and will be deleted once the
+                  certificates are uploaded. If a connection string is given instead of a hub name, only the data plane
+                  (configurations, edge deployments, device identities and twins, and module identities and twins) will be
+                  imported.
     examples:
     - name: Import the state from the specified file to the specified hub.
       text: >
         az iot hub state import -n {iothub_name} -f {filename}
+    - name: Import only the data plane from the specified file to the specified hub.
+      text: >
+        az iot hub state import -l {connection_string} -f {filename}
     - name: Import the state from the default file to the specified hub, replacing the previous state of the hub.
       text: >
         az iot hub state import -n {iothub_name} -f {filename} --replace
@@ -621,11 +633,18 @@ helps[
     type: command
     short-summary: Migrate the state of one hub to another hub without saving to a file.
     long-summary: The migrated state will include hub configurations, edge deployments, device identities and twins, module
-                  identities and twins, hub system and user identities, certificates, endpoints and routes.
+                  identities and twins, hub system and user identities, certificates, endpoints and routes.  A temporary
+                  certificate file will be generated with a name of the format cert{number}.cer, and will be deleted once the
+                  certificates are uploaded. If a connection string is given instead of a hub name, only the data plane
+                  (configurations, edge deployments, device identities and twins, and module identities and twins) will be
+                  migrated.
     examples:
     - name: Migrate the state of the original hub to the destination hub.
       text: >
         az iot hub state migrate --destination-hub {dest_hub_name} --origin-hub {orig_hub_name}
+    - name: Migrate only the data plane of the original hub to the destination hub.
+      text: >
+        az iot hub state migrate --destination-hub-login {dest_hub_cstring} --origin-hub-login {orig_hub_cstring}
     - name: Migrate the state of the original hub to the destination hub, replacing the previous state of the hub.
       text: >
         az iot hub state migrate --destination-hub {dest_hub_name} --origin-hub {orig_hub_name} --replace

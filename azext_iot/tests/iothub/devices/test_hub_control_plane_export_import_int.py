@@ -252,17 +252,17 @@ class TestHubControlPlaneExportImport(IoTLiveScenarioTest):
         serviceBusTopics = endpoints["serviceBusTopics"]
         storageContainers = endpoints["storageContainers"]
         for ep in eventHubs:
-            self.cli.invoke("iot hub routing-endpoint delete --hub-name {} -g {} --endpoint-name {} --endpoint-type \
-                eventhub".format(hub_name, rg, ep["name"]))
+            self.cli.invoke(f"iot hub routing-endpoint delete --hub-name {hub_name} -g {rg} --endpoint-name "
+                            f"{ep['name']} --endpoint-type eventhub")
         for ep in serviceBusQueues:
-            self.cli.invoke("iot hub routing-endpoint delete --hub-name {} -g {} --endpoint-name {} --endpoint-type \
-                servicebusqueue".format(hub_name, rg, ep["name"]))
+            self.cli.invoke(f"iot hub routing-endpoint delete --hub-name {hub_name} -g {rg} --endpoint-name "
+                            f"{ep['name']} --endpoint-type servicebusqueue")
         for ep in serviceBusTopics:
-            self.cli.invoke("iot hub routing-endpoint delete --hub-name {} -g {} --endpoint-name {} --endpoint-type \
-                servicebustopic".format(hub_name, rg, ep["name"]))
+            self.cli.invoke(f"iot hub routing-endpoint delete --hub-name {hub_name} -g {rg} --endpoint-name "
+                            f"{ep['name']} --endpoint-type servicebustopic")
         for ep in storageContainers:
-            self.cli.invoke("iot hub routing-endpoint delete --hub-name {} -g {} --endpoint-name {} --endpoint-type \
-                azurestoragecontainer".format(hub_name, rg, ep["name"]))
+            self.cli.invoke(f"iot hub routing-endpoint delete --hub-name {hub_name} -g {rg} --endpoint-name "
+                            f"{ep['name']} --endpoint-type azurestoragecontainer")
 
     def compare_certs(self, cert1, cert2):
         assert cert1["name"] == cert2["name"]
