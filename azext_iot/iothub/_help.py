@@ -325,10 +325,10 @@ def load_iothub_help():
         examples:
         - name: Transition the target IoT Hub certificate root authority to Digicert.
           text: >
-            az iot hub certificate root-authority set -n {iothub_name} --certificate-authority v2
+            az iot hub certificate root-authority set --hub-name {iothub_name} --certificate-authority v2
         - name: Revert the target IoT Hub certificate root authority to Baltimore.
           text: >
-            az iot hub certificate root-authority set -n {iothub_name} --certificate-authority v1
+            az iot hub certificate root-authority set --hub-name {iothub_name} --certificate-authority v1
     """
 
     helps["iot hub certificate root-authority show"] = """
@@ -337,5 +337,5 @@ def load_iothub_help():
         examples:
         - name: Show the target IoT Hub certificate root authority.
           text: >
-            az iot hub certificate root-authority show -n {iothub_name}
+            az iot hub certificate root-authority show --hub-name {iothub_name}
     """

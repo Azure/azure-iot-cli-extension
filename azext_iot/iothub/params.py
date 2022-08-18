@@ -256,23 +256,6 @@ def load_iothub_arguments(self, _):
             help="MIME Type of file.",
         )
 
-    with self.argument_context("iot hub certificate root-authority") as context:
-        context.argument(
-            "hub_name", options_list=["--hub-name", "-n"], arg_type=hub_name_type,
-            help="IoT Hub name. Required if --login is not provided.",
-            arg_group="IoT Hub Identifier"
-        )
-        context.argument(
-            "login",
-            options_list=["--login", "-l"],
-            validator=mode2_iot_login_handler,
-            help="This command supports an entity connection string with rights to perform action. "
-            'Use to avoid session login via "az login". '
-            "If both an entity connection string and name are provided the connection string takes priority. "
-            "Required if --hub-name is not provided.",
-            arg_group="IoT Hub Identifier"
-        )
-
     with self.argument_context("iot hub certificate root-authority set") as context:
         context.argument(
             "ca_version",
