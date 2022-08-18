@@ -2928,7 +2928,7 @@ class RegistryStatistics(msrest.serialization.Model):
 class RootCertificateProperties(msrest.serialization.Model):
     """This property store root certificate related information.
 
-    @vilit - changed the type of the last_updated_rot_certificate_v2 to a rfc-1123
+    @vilit - The change was made to last_updated_time_utc/lastUpdatedTimeUtc (a datetime attribute).
     Variables are only populated by the server, and will be ignored when sending a request.
 
     :ivar enable_root_certificate_v2: This property when set to true, hub will use G2 cert; while

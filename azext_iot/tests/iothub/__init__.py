@@ -394,7 +394,8 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             )
         elif not settings.env.azext_iot_eventhub_policy:
             self.cmd(
-                'eventhubs eventhub authorization-rule delete --resource-group {} --namespace-name {} --eventhub-name {} --name {}'.format(
+                'eventhubs eventhub authorization-rule delete --resource-group {} --namespace-name {} --eventhub-name {} '
+                '--name {}'.format(
                     EP_RG, EP_EVENTHUB_NAMESPACE, EP_EVENTHUB_INSTANCE, EP_EVENTHUB_POLICY
                 )
             )
