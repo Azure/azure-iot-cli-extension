@@ -4,12 +4,20 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from knack.arguments import CLIArgumentType
 from azext_iot.iothub.common import CertificateAuthorityVersions
-from azure.cli.core.commands.parameters import get_enum_type, get_three_state_flag
+from azure.cli.core.commands.parameters import get_enum_type, get_three_state_flag, get_resource_name_completion_list
 from azext_iot.common.shared import SettleType, ProtocolType, AckType
 from azext_iot.assets.user_messages import info_param_properties_device
 from azext_iot._params import hub_auth_type_dataplane_param_type
 from azext_iot.iothub._validators import validate_device_model_id
+from azext_iot._validators import mode2_iot_login_handler
+
+
+hub_name_type = CLIArgumentType(
+    completer=get_resource_name_completion_list("Microsoft.Devices/IotHubs"),
+    help="IoT Hub name.",
+)
 
 
 def load_iothub_arguments(self, _):
@@ -246,6 +254,23 @@ def load_iothub_arguments(self, _):
             "content_type",
             options_list=["--content-type", "--ct"],
             help="MIME Type of file.",
+        )
+
+    with self.argument_context("iot hub certificate root-authority") as context:
+        context.argument(
+            "hub_name", options_list=["--hub-name", "-n"], arg_type=hub_name_type,
+            help="IoT Hub name. Required if --login is not provided.",
+            arg_group="IoT Hub Identifier"
+        )
+        context.argument(
+            "login",
+            options_list=["--login", "-l"],
+            validator=mode2_iot_login_handler,
+            help="This command supports an entity connection string with rights to perform action. "
+            'Use to avoid session login via "az login". '
+            "If both an entity connection string and name are provided the connection string takes priority. "
+            "Required if --hub-name is not provided.",
+            arg_group="IoT Hub Identifier"
         )
 
     with self.argument_context("iot hub certificate root-authority set") as context:
