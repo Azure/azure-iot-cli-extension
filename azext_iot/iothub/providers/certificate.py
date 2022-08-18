@@ -59,22 +59,17 @@ class CertificateProvider(IoTHubProvider):
         root_ca = current_target.get("enableRootCertificateV2") or False
 
         # Check if changes are needed
-        if (
-            (root_ca and ca_version == CertificateAuthorityVersions.v2.value) or
-            (not root_ca and ca_version == CertificateAuthorityVersions.v1.value)
-        ):
-            print(NO_CHANGE_MSG.format(ca_version))
-            return
-        elif ca_version == CertificateAuthorityVersions.v2.value:
-            print(CA_TRANSITION_WARNING)
-            if not yes and not prompt_y_n(msg=CONT_INPUT_MSG, default="n"):
-                raise ManualInterrupt(ABORT_MSG)
-            root_ca = True
-        else:
+        if ca_version == CertificateAuthorityVersions.v1.value and root_ca:
             print(CA_REVERT_WARNING)
             if not yes and not prompt_y_n(msg=CONT_INPUT_MSG, default="n"):
                 raise ManualInterrupt(ABORT_MSG)
-            root_ca = False
+        elif ca_version == CertificateAuthorityVersions.v2.value and not root_ca:
+            print(CA_TRANSITION_WARNING)
+            if not yes and not prompt_y_n(msg=CONT_INPUT_MSG, default="n"):
+                raise ManualInterrupt(ABORT_MSG)
+        else:
+            print(NO_CHANGE_MSG.format(ca_version))
+            return
 
         result = self.cli.invoke(
             "resource update -n {} -g {} --api-version {} --set properties.rootCertificate.enableRootCertificateV2={} "
@@ -82,7 +77,7 @@ class CertificateProvider(IoTHubProvider):
                 self.target["entity"].split(".")[0],
                 self.target['resourcegroup'],
                 CA_TRANSITION_API_VERSION,
-                root_ca,
+                not root_ca,
                 HUB_PROVIDER
             )
         )
