@@ -261,7 +261,7 @@ def load_iothub_arguments(self, _):
         )
         context.argument(
             "login",
-            options_list=["--login", "--l"],
+            options_list=["--login", "-l"],
             validator=mode2_iot_login_handler,
             help="This command supports an entity connection string with rights to perform action. "
             'If a connection string is provided, only configurations and device and module information '
