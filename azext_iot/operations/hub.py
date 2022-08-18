@@ -47,6 +47,7 @@ from azext_iot.common.utility import (
 )
 from azext_iot._factory import SdkResolver, CloudError
 from azext_iot.operations.generic import _execute_query, _process_top
+from typing import Optional
 import pprint
 
 logger = get_logger(__name__)
@@ -2401,6 +2402,7 @@ def iot_hub_monitor_events(
     login=None,
     content_type=None,
     device_query=None,
+    message_count: Optional[int] = None,
 ):
     try:
         _iot_hub_monitor_events(
@@ -2419,6 +2421,7 @@ def iot_hub_monitor_events(
             login=login,
             content_type=content_type,
             device_query=device_query,
+            message_count=message_count,
         )
     except RuntimeError as e:
         raise CLIInternalError(e)
@@ -2491,9 +2494,10 @@ def _iot_hub_monitor_events(
     login=None,
     content_type=None,
     device_query=None,
+    message_count: Optional[int] = None,
 ):
-    (enqueued_time, properties, timeout, output) = init_monitoring(
-        cmd, timeout, properties, enqueued_time, repair, yes
+    (enqueued_time, properties, timeout, output, message_count) = init_monitoring(
+        cmd, timeout, properties, enqueued_time, repair, yes, message_count
     )
 
     device_ids = {}
@@ -2537,6 +2541,7 @@ def _iot_hub_monitor_events(
         device_id=device_id,
         interface_name=interface_name,
         module_id=module_id,
+        max_messages=message_count,
     )
 
     handler = CommonHandler(handler_args)
