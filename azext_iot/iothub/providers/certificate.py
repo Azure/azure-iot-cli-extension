@@ -28,7 +28,12 @@ logger = get_logger(__name__)
 
 class CertificateProvider(IoTHubProvider):
     def __init__(
-        self, cmd, hub_name: str = None, rg: str = None, login: str = None, auth_type_dataplane: str = None
+        self,
+        cmd,
+        hub_name: Optional[str] = None,
+        rg: Optional[str] = None,
+        login: Optional[str] = None,
+        auth_type_dataplane: Optional[str] = None
     ):
         super(CertificateProvider, self).__init__(
             cmd=cmd, hub_name=hub_name, rg=rg, login=login, auth_type_dataplane=auth_type_dataplane

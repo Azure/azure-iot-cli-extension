@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from typing import Optional
 from azext_iot.iothub.providers.certificate import CertificateProvider
 from knack.log import get_logger
 
@@ -12,10 +13,10 @@ logger = get_logger(__name__)
 
 def certificate_root_authority_show(
     cmd,
-    hub_name=None,
-    resource_group_name=None,
-    login=None,
-    auth_type_dataplane=None
+    hub_name: Optional[str] = None,
+    resource_group_name: Optional[str] = None,
+    login: Optional[str] = None,
+    auth_type_dataplane: Optional[str] = None
 ):
     resource = CertificateProvider(
         cmd=cmd,
@@ -29,12 +30,12 @@ def certificate_root_authority_show(
 
 def certificate_root_authority_set(
     cmd,
-    ca_version,
-    hub_name=None,
-    resource_group_name=None,
-    login=None,
-    auth_type_dataplane=None,
-    yes=False
+    ca_version: str,
+    hub_name: Optional[str] = None,
+    resource_group_name: Optional[str] = None,
+    login: Optional[str] = None,
+    auth_type_dataplane: Optional[str] = None,
+    yes: Optional[str] = False
 ):
     resource = CertificateProvider(
         cmd=cmd,
