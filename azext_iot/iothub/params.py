@@ -4,20 +4,12 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from knack.arguments import CLIArgumentType
 from azext_iot.iothub.common import CertificateAuthorityVersions
-from azure.cli.core.commands.parameters import get_enum_type, get_three_state_flag, get_resource_name_completion_list
+from azure.cli.core.commands.parameters import get_enum_type, get_three_state_flag
 from azext_iot.common.shared import SettleType, ProtocolType, AckType
 from azext_iot.assets.user_messages import info_param_properties_device
 from azext_iot._params import hub_auth_type_dataplane_param_type
 from azext_iot.iothub._validators import validate_device_model_id
-from azext_iot._validators import mode2_iot_login_handler
-
-
-hub_name_type = CLIArgumentType(
-    completer=get_resource_name_completion_list("Microsoft.Devices/IotHubs"),
-    help="IoT Hub name.",
-)
 
 
 def load_iothub_arguments(self, _):
