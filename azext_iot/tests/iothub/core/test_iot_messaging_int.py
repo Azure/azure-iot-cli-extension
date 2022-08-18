@@ -836,6 +836,16 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             ],
         )
 
+        # Monitor events for all devices, limiting monitor message count to 10
+        num_messages = 10
+        monitor_stop_msgs = ["Successfully parsed {} message(s).".format(num_messages), "Stopping event monitor..."]
+        self.command_execute_assert(
+            "iot hub monitor-events -n {} -g {} --cg {} --et {} --message-count {} -y -p sys anno app".format(
+                self.entity_name, self.entity_rg, LIVE_CONSUMER_GROUPS[0], enqueued_time, num_messages
+            ),
+            device_ids + monitor_stop_msgs,
+        )
+
         # Monitor events for a single device
         self.command_execute_assert(
             "iot hub monitor-events -n {} -g {} -d {} --cg {} --et {} -t 8 -y -p all".format(
@@ -884,6 +894,15 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                     self.entity_name, self.entity_rg, query_string, enqueued_time
                 ),
                 device_subset_exclude,
+            )
+
+        # Expect failure when message count is negative
+        with pytest.raises(Exception):
+            self.command_execute_assert(
+                "iot hub monitor-events -n {} -g {} -d {} --et {} -t 8 -y -p sys anno app --mc -5".format(
+                    self.entity_name, self.entity_rg, PREFIX_DEVICE + "*", enqueued_time
+                ),
+                device_ids,
             )
 
         # Monitor events with --login parameter
