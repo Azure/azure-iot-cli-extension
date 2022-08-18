@@ -20,7 +20,7 @@ class TelemetryArguments:
         repair: bool,
         yes: bool,
     ):
-        (enqueued_time, unique_properties, timeout_ms, output) = init_monitoring(
+        (enqueued_time, unique_properties, timeout_ms, output, _) = init_monitoring(
             cmd=cmd,
             timeout=timeout,
             properties=properties,
