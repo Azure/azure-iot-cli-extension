@@ -50,7 +50,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         if hasattr(self, "storage_cstring"):
             self._delete_storage_account()
 
-    @pytest.mark.skip()
+    # @pytest.mark.skip()
     def test_iot_storage_endpoint_lifecycle(self):
         self._create_storage_account()
         self._assign_storage_account_roles()
@@ -208,7 +208,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         assert endpoint_list == []
 
-    @pytest.mark.skip()
+    # @pytest.mark.skip()
     def test_iot_servicebus_endpoint_lifecycle(self):
         # this test covers two endpoint types
         topic_cs, queue_cs = self._create_service_bus_topic_queue()
@@ -454,6 +454,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         assert endpoint_list == []
 
+    @pytest.mark.skip()
     def test_iot_cosmos_endpoint_lifecycle(self):
         connection_string = self._create_cosmos_db()
         endpoint_names = self.generate_device_names(3)
@@ -612,7 +613,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         assert endpoint_list == []
 
-    @pytest.mark.skip()
+    # @pytest.mark.skip()
     def test_iot_eventhub_endpoint_lifecycle(self):
         # Flag to ensure that event hub resources get deleted
         self.ran_eventhub = True
