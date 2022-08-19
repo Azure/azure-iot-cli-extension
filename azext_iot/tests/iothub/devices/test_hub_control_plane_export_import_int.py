@@ -224,7 +224,6 @@ class TestHubControlPlaneExportImport(IoTLiveScenarioTest):
             self.cli.invoke(f"eventhubs namespace delete -n {EVENTHUB_NAMESPACE} -g {EP_RG}")
         if not settings.env.azext_iot_teststorageaccount:
             self.cli.invoke(f"storage account delete -y -n {STORAGE_ACCOUNT} -g {EP_RG}")
-        self.cli.invoke(f"iot hub identity remove -n {self.entity_name} -g {self.entity_rg} --user-assigned {self.uid}")
         if not settings.env.azext_dt_ep_servicebus_namespace:
             self.cli.invoke(f"servicebus namespace delete -n {SERVICEBUS_NAMESPACE} -g {self.entity_rg}")
         self.cli.invoke(f"identity delete -n {self.identity_name} -g {self.entity_rg}")
@@ -240,11 +239,6 @@ class TestHubControlPlaneExportImport(IoTLiveScenarioTest):
         routes = self.cli.invoke(f"iot hub route list --hub-name {hub_name} -g {rg}").as_json()
         for route in routes:
             self.cli.invoke(f"iot hub route delete --hub-name {hub_name} -g {rg} --name {route['name']}")
-
-        certificates = self.cli.invoke("iot hub certificate list --hub-name {} -g {}".format(hub_name, rg)).as_json()
-        for c in certificates["value"]:
-            self.cli.invoke("iot hub certificate delete --name {} --etag {} --hub-name {} -g {}".format(c["name"], c["etag"],
-                                                                                                        hub_name, rg))
 
         endpoints = self.cli.invoke(f"iot hub routing-endpoint list --hub-name {hub_name} -g {rg}").as_json()
         eventHubs = endpoints["eventHubs"]
@@ -263,6 +257,16 @@ class TestHubControlPlaneExportImport(IoTLiveScenarioTest):
         for ep in storageContainers:
             self.cli.invoke(f"iot hub routing-endpoint delete --hub-name {hub_name} -g {rg} --endpoint-name "
                             f"{ep['name']} --endpoint-type azurestoragecontainer")
+
+        certificates = self.cli.invoke("iot hub certificate list --hub-name {} -g {}".format(hub_name, rg)).as_json()
+        for c in certificates["value"]:
+            self.cli.invoke("iot hub certificate delete --name {} --etag {} --hub-name {} -g {}".format(c["name"], c["etag"],
+                                                                                                        hub_name, rg))
+
+        userAssignedIds = self.cli.invoke(f"iot hub identity show -n {hub_name} -g {rg}").as_json()["userAssignedIdentities"]
+        if userAssignedIds:
+            userAssignedIds = " ".join(userAssignedIds.keys())
+            self.cli.invoke(f"iot hub identity remove -n {hub_name} -g {rg} --user-assigned {userAssignedIds}")
 
     def compare_certs(self, cert1, cert2):
         assert cert1["name"] == cert2["name"]

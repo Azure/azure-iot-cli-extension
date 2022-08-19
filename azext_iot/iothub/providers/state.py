@@ -285,7 +285,7 @@ class StateProvider(IoTHubProvider):
 
         try:
             with open(filename, 'w', encoding='utf-8') as f:
-                json.dump(hub_state, f, indent=2)
+                json.dump(hub_state, f)
 
             logger.info("Saved state of IoT Hub '{}' to {}".format(self.hub_name, filename))
 
