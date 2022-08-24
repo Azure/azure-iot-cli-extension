@@ -34,6 +34,44 @@ class TestDTImportJobs(DTLiveScenarioTest):
         self.storage_cstring = None
         super(TestDTImportJobs, self).__init__(test_case)
 
+    def _upload_import_data_file(self, import_data_filename):
+        import_data_file = os.path.join(Path(CWD), "import_data", import_data_filename)
+        # Delete already exisiting import data file
+        if self.cmd(
+            "storage blob exists --connection-string '{}' -c '{}' -n '{}'".format(
+                self.storage_cstring, self.storage_container, import_data_filename
+            )
+        ).get_output_in_json()["exists"]:
+            self.cmd(
+                "storage blob delete --connection-string '{}' -c '{}' -n '{}'".format(
+                    self.storage_cstring, self.storage_container, import_data_filename
+                )
+            )
+        # Upload import data files to storage account
+        self.cmd(
+            "storage blob upload --connection-string '{}' --container-name '{}' --file '{}'".format(
+                self.storage_cstring, self.storage_container, import_data_file
+            )
+        )
+
+    def _cleanup_import_job(self, instance_name, import_job_id, import_job_output_file):
+        # Delete import jobs
+        self.cmd(
+            "dt job import delete -n '{}' -g '{}' -j '{}' -y".format(instance_name, self.rg, import_job_id)
+        )
+
+        # Delete output files from storage container
+        if self.cmd(
+            "storage blob exists --connection-string '{}' -c '{}' -n '{}'".format(
+                self.storage_cstring, self.storage_container, import_job_output_file
+            )
+        ).get_output_in_json()["exists"]:
+            self.cmd(
+                "storage blob delete --connection-string '{}' -c '{}' -n '{}'".format(
+                    self.storage_cstring, self.storage_container, import_job_output_file
+                )
+            )
+
     def test_dt_importjobs(self):
         self.wait_for_capacity()
 
@@ -59,23 +97,14 @@ class TestDTImportJobs(DTLiveScenarioTest):
         # Wait for RBAC to catch-up
         sleep(RBAC_SLEEP_INTERVAL)
 
-        # Upload import data files to storage account
-        valid_import_data_file = os.path.join(Path(CWD), "import_data", "bulk-models-twins-relationships-valid.ndjson")
-        self.cmd(
-            "storage blob upload --connection-string '{}' --container-name '{}' --file '{}' --overwrite".format(
-                self.storage_cstring, self.storage_container, valid_import_data_file
-            )
-        )
-        invalid_import_data_file = os.path.join(Path(CWD), "import_data", "bulk-models-twins-relationships-invalid.ndjson")
-        self.cmd(
-            "storage blob upload --connection-string '{}' --container-name '{}' --file '{}' --overwrite".format(
-                self.storage_cstring, self.storage_container, invalid_import_data_file
-            )
-        )
+        # Upload Import Data Files
+        valid_import_data_filename = "bulk-models-twins-relationships-valid.ndjson"
+        self._upload_import_data_file(valid_import_data_filename)
+        invalid_import_data_filename = "bulk-models-twins-relationships-invalid.ndjson"
+        self._upload_import_data_file(invalid_import_data_filename)
 
         # Create import job for valid import data
         valid_import_job_id = "{}_valid_import_job".format(instance_name)
-        valid_import_data_filename = os.path.basename(valid_import_data_file)
         create_valid_import_job_output = self.cmd(
             "dt job import create -n '{}' -g '{}' -j '{}' --df '{}' --ibc '{}' --isa '{}'".format(
                 instance_name, self.rg, valid_import_job_id,
@@ -97,7 +126,6 @@ class TestDTImportJobs(DTLiveScenarioTest):
 
         # Create import job for invalid import data
         invalid_import_job_output_filename = "{}_invalid_import_job_output.txt".format(instance_name)
-        invalid_import_data_filename = os.path.basename(invalid_import_data_file)
         create_invalid_import_job_output = self.cmd(
             "dt job import create -n '{}' -g '{}' --df '{}' --ibc '{}' --isa '{}' --of '{}'".format(
                 instance_name, self.rg, invalid_import_data_filename,
@@ -167,36 +195,9 @@ class TestDTImportJobs(DTLiveScenarioTest):
             ).get_output_in_json()
             assert len(twin_relationship_list_result) == 1
 
-        # Delete import jobs
-        self.cmd(
-            "dt job import delete -n '{}' -g '{}' -j '{}' -y".format(instance_name, self.rg, valid_import_job_id)
-        )
-        self.cmd(
-            "dt job import delete -n '{}' -g '{}' -j '{}' -y".format(instance_name, self.rg, invalid_import_job_id)
-        )
-
-        # Delete output files from storage container
-        if self.cmd(
-            "storage blob exists --connection-string '{}' -c '{}' -n '{}'".format(
-                self.storage_cstring, self.storage_container, valid_import_job_output_filename
-            )
-        ).get_output_in_json()["exists"]:
-            self.cmd(
-                "storage blob delete --connection-string '{}' -c '{}' -n '{}'".format(
-                    self.storage_cstring, self.storage_container, valid_import_job_output_filename
-                )
-            )
-
-        if self.cmd(
-            "storage blob exists --connection-string '{}' -c '{}' -n '{}'".format(
-                self.storage_cstring, self.storage_container, invalid_import_job_output_filename
-            )
-        ).get_output_in_json()["exists"]:
-            self.cmd(
-                "storage blob delete --connection-string '{}' -c '{}' -n '{}'".format(
-                    self.storage_cstring, self.storage_container, invalid_import_job_output_filename
-                )
-            )
+        # Delete import jobs and their output files
+        self._cleanup_import_job(instance_name, valid_import_job_id, valid_import_job_output_filename)
+        self._cleanup_import_job(instance_name, invalid_import_job_id, invalid_import_job_output_filename)
 
 
 def assert_import_job_creation(
