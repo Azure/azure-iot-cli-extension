@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
-from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 
 
 class TestIotHubCertificateRoot(IoTLiveScenarioTest):
@@ -14,7 +13,7 @@ class TestIotHubCertificateRoot(IoTLiveScenarioTest):
 
     def test_certificate_root(self):
         self.cmd(
-                f"iot hub certificate root-authority show -n {self.entity_name} -g {self.entity_rg}",
+            f"iot hub certificate root-authority show -n {self.entity_name} -g {self.entity_rg}",
             checks=[
                 self.check("enableRootCertificateV2", False),
             ],
@@ -22,14 +21,14 @@ class TestIotHubCertificateRoot(IoTLiveScenarioTest):
 
         # Transition to Digicert
         self.cmd(
-                f"iot hub certificate root-authority set -n {self.entity_name} -g {self.entity_rg} --cav v2 --yes",
+            f"iot hub certificate root-authority set -n {self.entity_name} -g {self.entity_rg} --cav v2 --yes",
             checks=[
                 self.check("enableRootCertificateV2", True),
             ],
         )
 
         self.cmd(
-                f"iot hub certificate root-authority show -n {self.entity_name} -g {self.entity_rg}",
+            f"iot hub certificate root-authority show -n {self.entity_name} -g {self.entity_rg}",
             checks=[
                 self.check("enableRootCertificateV2", True),
             ],
@@ -37,14 +36,14 @@ class TestIotHubCertificateRoot(IoTLiveScenarioTest):
 
         # Revert transition
         self.cmd(
-                f"iot hub certificate root-authority set -n {self.entity_name} -g {self.entity_rg} --cav v1 --yes",
+            f"iot hub certificate root-authority set -n {self.entity_name} -g {self.entity_rg} --cav v1 --yes",
             checks=[
                 self.check("enableRootCertificateV2", False),
             ],
         )
 
         self.cmd(
-                f"iot hub certificate root-authority show -n {self.entity_name} -g {self.entity_rg}",
+            f"iot hub certificate root-authority show -n {self.entity_name} -g {self.entity_rg}",
             checks=[
                 self.check("enableRootCertificateV2", False),
             ],
