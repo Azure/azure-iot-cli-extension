@@ -22,6 +22,14 @@ class AuthenticationType(Enum):
     IdentityBased = 'identityBased'
 
 
+class EncodingFormat(Enum):
+    """
+    Type of the encoding format for the container.
+    """
+    JSON = 'json'
+    AVRO = 'avro'
+
+
 class EndpointType(Enum):
     """
     Type of the routing endpoint.
@@ -43,9 +51,14 @@ class IdentityType(Enum):
     none = "None"
 
 
-class EncodingFormat(Enum):
+class RouteSourceType(Enum):
     """
-    Type of the encoding format for the container.
+    Type of the route source.
     """
-    JSON = 'json'
-    AVRO = 'avro'
+    Invalid = 'invalid'
+    DeviceMessages = 'devicemessages'
+    TwinChangeEvents = 'twinchangeevents'
+    DeviceLifecycleEvents = 'devicelifecycleevents'
+    DeviceJobLifecycleEvents = 'devicejoblifecycleevents'
+    DigitalTwinChangeEvents = 'digitaltwinchangeevents'
+    DeviceConnectionStateEvents = 'deviceconnectionstateevents'

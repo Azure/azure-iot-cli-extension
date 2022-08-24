@@ -8,7 +8,7 @@ from azure.cli.core.commands.parameters import get_enum_type, get_three_state_fl
 from azext_iot.common.shared import SettleType, ProtocolType, AckType
 from azext_iot.assets.user_messages import info_param_properties_device
 from azext_iot._params import hub_auth_type_dataplane_param_type
-from azext_iot.iothub.common import AuthenticationType, EncodingFormat, EndpointType
+from azext_iot.iothub.common import AuthenticationType, EncodingFormat, EndpointType, RouteSourceType
 from azext_iot.iothub._validators import validate_device_model_id
 
 
@@ -248,7 +248,7 @@ def load_iothub_arguments(self, _):
             help="MIME Type of file.",
         )
 
-    with self.argument_context("iot hub messaging-endpoint") as context:
+    with self.argument_context("iot hub message-endpoint") as context:
         context.argument(
             "hub_name",
             options_list=["--hub-name", "-n"],
@@ -267,7 +267,7 @@ def load_iothub_arguments(self, _):
             help="Type of the Routing Endpoint."
         )
 
-    with self.argument_context("iot hub messaging-endpoint create") as context:
+    with self.argument_context("iot hub message-endpoint create") as context:
         context.argument(
             'authentication_type',
             options_list=['--auth-type'],
@@ -307,7 +307,7 @@ def load_iothub_arguments(self, _):
             help="The uri of the endpoint resource."
         )
 
-    with self.argument_context("iot hub messaging-endpoint create storage-container") as context:
+    with self.argument_context("iot hub message-endpoint create storage-container") as context:
         context.argument(
             "container_name",
             options_list=["--container-name", "--container"],
@@ -340,7 +340,7 @@ def load_iothub_arguments(self, _):
                  ' mandatory but can be reordered with or without delimiters.'
         )
 
-    with self.argument_context("iot hub messaging-endpoint create cosmosdb-collection") as context:
+    with self.argument_context("iot hub message-endpoint create cosmosdb-collection") as context:
         context.argument(
             'database_name',
             options_list=['--database-name', '--db'],
@@ -376,4 +376,56 @@ def load_iothub_arguments(self, _):
                  'The template must include at least one of the following placeholders: {iothub}, {deviceid}, {DD}, {MM}, and '
                  '{YYYY}. Any one placeholder may be specified at most once, but order and non-placeholder components are '
                  'arbitrary. If partition key name is provided, partition key template defaults to {deviceid}-{YYYY}-{MM}',
+        )
+
+    with self.argument_context("iot hub message-route") as context:
+        context.argument(
+            "hub_name",
+            options_list=["--hub-name", "-n"],
+            help="IoT Hub name.",
+            arg_group=None
+        )
+        context.argument(
+            "route_name",
+            options_list=["--route-name", "--route", "--rn"],
+            help="Name of the route."
+        )
+        context.argument(
+            "endpoint_name",
+            options_list=["--endpoint-name", "--endpoint", "--en"],
+            help="Name of the routing endpoint. For the built-in endpoint, use endpoint name 'events'."
+        )
+        context.argument(
+            "condition",
+            options_list=["--condition", "-c"],
+            help="Condition that is evaluated to apply the routing rule."
+        )
+        context.argument(
+            "enabled",
+            options_list=["--enabled", "-e"],
+            arg_type=get_three_state_flag(),
+            help="A boolean indicating whether to enable route to the IoT Hub."
+        )
+        context.argument(
+            "source_type",
+            arg_type=get_enum_type(RouteSourceType),
+            options_list=["--source-type", "--type", "-t"],
+            help="Source of the route."
+        )
+
+    with self.argument_context("iot hub message-route test") as context:
+        context.argument(
+            "body",
+            options_list=["--body", "-b"],
+            help="Body of the route message.",
+        )
+        context.argument(
+            "app_properties",
+            options_list=["--app-properties", "--ap"],
+            help="App properties of the route message.",
+        )
+        context.argument(
+            "system_properties",
+            options_list=["--system-properties", "--sp"],
+            help="System properties of the route message.",
         )

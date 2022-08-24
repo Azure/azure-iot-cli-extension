@@ -14,6 +14,7 @@ pnp_runtime_ops = CliCommandType(
 )
 iothub_job_ops = CliCommandType(operations_tmpl="azext_iot.iothub.commands_job#{}")
 iothub_message_endpoint_ops = CliCommandType(operations_tmpl="azext_iot.iothub.commands_message_endpoint#{}")
+iothub_message_route_ops = CliCommandType(operations_tmpl="azext_iot.iothub.commands_message_route#{}")
 device_messaging_ops = CliCommandType(
     operations_tmpl="azext_iot.iothub.commands_device_messaging#{}"
 )
@@ -23,7 +24,12 @@ class EndpointUpdateResultTransform(LongRunningOperation):  # pylint: disable=to
     def __call__(self, poller):
         result = super(EndpointUpdateResultTransform, self).__call__(poller)
         return result.properties.routing.endpoints
-        # return result["properties"]["routing"]["endpoints"]
+
+
+class RouteUpdateResultTransform(LongRunningOperation):  # pylint: disable=too-few-public-methods
+    def __call__(self, poller):
+        result = super(RouteUpdateResultTransform, self).__call__(poller)
+        return result.properties.routing.routes
 
 
 def load_iothub_commands(self, _):
@@ -41,7 +47,7 @@ def load_iothub_commands(self, _):
         cmd_group.show_command("show", "get_digital_twin")
         cmd_group.command("update", "patch_digital_twin")
 
-    with self.command_group("iot hub messaging-endpoint", command_type=iothub_message_endpoint_ops) as cmd_group:
+    with self.command_group("iot hub message-endpoint", command_type=iothub_message_endpoint_ops) as cmd_group:
         cmd_group.show_command("show", "message_endpoint_show")
         cmd_group.command("list", "message_endpoint_list")
         cmd_group.command(
@@ -52,7 +58,7 @@ def load_iothub_commands(self, _):
         )
 
     with self.command_group(
-        "iot hub messaging-endpoint create",
+        "iot hub message-endpoint create",
         command_type=iothub_message_endpoint_ops
     ) as cmd_group:
         cmd_group.command(
@@ -80,6 +86,23 @@ def load_iothub_commands(self, _):
             "message_endpoint_create_storage_container",
             transform=EndpointUpdateResultTransform(self.cli_ctx)
         )
+
+    with self.command_group('iot hub message-route', command_type=iothub_message_route_ops) as cmd_group:
+        cmd_group.command(
+            'create', 'message_route_create', transform=RouteUpdateResultTransform(self.cli_ctx)
+        )
+        cmd_group.show_command('show', 'message_route_show')
+        cmd_group.command('list', 'message_route_list')
+        cmd_group.command(
+            'delete',
+            'message_route_delete',
+            transform=RouteUpdateResultTransform(self.cli_ctx),
+            confirmation=True
+        )
+        cmd_group.command(
+            'update', 'message_route_update', transform=RouteUpdateResultTransform(self.cli_ctx)
+        )
+        cmd_group.command('test', 'message_route_test')
 
     with self.command_group("iot device", command_type=device_messaging_ops) as cmd_group:
         cmd_group.command("send-d2c-message", "iot_device_send_message")

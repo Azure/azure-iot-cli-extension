@@ -25,9 +25,9 @@ from azext_iot.tests.iothub import (
 from azext_iot.common._azure import _parse_connection_string, parse_cosmos_db_connection_string
 
 
-class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
+class TestIoTMessageEndpoints(IoTLiveScenarioTest):
     def __init__(self, test_case):
-        super(TestIoTMessagingEndpoints, self).__init__(
+        super(TestIoTMessageEndpoints, self).__init__(
             test_case
         )
         self._create_user_identity()
@@ -60,7 +60,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         # use connection string - note how the connection string needs to have entity path and the
         # endpoint uri and path are left blank
         self.cmd(
-            "iot hub messaging-endpoint create storage-container -n {} -g {} --en {} --erg {} -c {} --container {}".format(
+            "iot hub message-endpoint create storage-container -n {} -g {} --en {} --erg {} -c {} --container {}".format(
                 self.entity_name, self.entity_rg, endpoint_names[0], EP_RG, self.storage_cstring, STORAGE_CONTAINER
             )
         )
@@ -79,7 +79,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         )
 
         endpoint_output = self.cmd(
-            "iot hub messaging-endpoint show -n {} -g {} --en {}".format(
+            "iot hub message-endpoint show -n {} -g {} --en {}".format(
                 self.entity_name, self.entity_rg, endpoint_names[0]
             )
         ).get_output_in_json()
@@ -89,7 +89,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         # Use hub identity with no defaults
         self.kwargs["file_format"] = default_file_format.replace("/", "_")
         self.cmd(
-            "iot hub messaging-endpoint create storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {} "
+            "iot hub message-endpoint create storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {} "
             "--identity [system] --auth-type identityBased -b {} -w {} --encoding {} --ff {}".format(
                 self.entity_name,
                 self.entity_rg,
@@ -117,7 +117,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         )
 
         endpoint_output = self.cmd(
-            "iot hub messaging-endpoint show -n {} -g {} --en {}".format(
+            "iot hub message-endpoint show -n {} -g {} --en {}".format(
                 self.entity_name, self.entity_rg, endpoint_names[1]
             )
         ).get_output_in_json()
@@ -126,7 +126,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # Use user identity
         self.cmd(
-            "iot hub messaging-endpoint create storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {} "
+            "iot hub message-endpoint create storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {} "
             "--identity {} --auth-type identityBased -b {} -w {}".format(
                 self.entity_name,
                 self.entity_rg,
@@ -155,7 +155,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         )
 
         endpoint_output = self.cmd(
-            "iot hub messaging-endpoint show -n {} -g {} --en {}".format(
+            "iot hub message-endpoint show -n {} -g {} --en {}".format(
                 self.entity_name, self.entity_rg, endpoint_names[2]
             )
         ).get_output_in_json()
@@ -163,13 +163,13 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         assert_endpoint_properties(endpoint_output, expected_user_endpoint)
 
         endpoint_list = self.cmd(
-            "iot hub messaging-endpoint list -n {} -g {}".format(
+            "iot hub message-endpoint list -n {} -g {}".format(
                 self.entity_name, self.entity_rg
             )
         ).get_output_in_json()
 
         storage_list = self.cmd(
-            "iot hub messaging-endpoint list -n {} -g {} -t {}".format(
+            "iot hub message-endpoint list -n {} -g {} -t {}".format(
                 self.entity_name, self.entity_rg, "storage-container"
             )
         ).get_output_in_json()
@@ -179,14 +179,14 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # Delete one event hub endpoint
         self.cmd(
-            "iot hub messaging-endpoint delete -n {} -g {} --en {} -y".format(
+            "iot hub message-endpoint delete -n {} -g {} --en {} -y".format(
                 self.entity_name, self.entity_rg, endpoint_names[0]
             )
         )
 
         # ensure that only one got deleted
         storage_list = self.cmd(
-            "iot hub messaging-endpoint list -n {} -g {} -t {}".format(
+            "iot hub message-endpoint list -n {} -g {} -t {}".format(
                 self.entity_name, self.entity_rg, "storage-container"
             )
         ).get_output_in_json()
@@ -195,13 +195,13 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # Delete all event hub endpoints
         self.cmd(
-            "iot hub messaging-endpoint delete -n {} -g {} -t {} -y".format(
+            "iot hub message-endpoint delete -n {} -g {} -t {} -y".format(
                 self.entity_name, self.entity_rg, "storage-container"
             )
         )
 
         endpoint_list = self.cmd(
-            "iot hub messaging-endpoint list -n {} -g {} -t {}".format(
+            "iot hub message-endpoint list -n {} -g {} -t {}".format(
                 self.entity_name, self.entity_rg, "storage-container"
             )
         ).get_output_in_json()
@@ -218,7 +218,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # create topic endpoint first - connection string
         self.cmd(
-            "iot hub messaging-endpoint create servicebus-topic -n {} -g {} --en {} --erg {} -c {}".format(
+            "iot hub message-endpoint create servicebus-topic -n {} -g {} --en {} --erg {} -c {}".format(
                 self.entity_name, self.entity_rg, endpoint_names[0], EP_RG, topic_cs
             )
         )
@@ -228,7 +228,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         )
 
         endpoint_output = self.cmd(
-            "iot hub messaging-endpoint show -n {} -g {} --en {}".format(
+            "iot hub message-endpoint show -n {} -g {} --en {}".format(
                 self.entity_name, self.entity_rg, endpoint_names[0]
             )
         ).get_output_in_json()
@@ -237,7 +237,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # topic - Use hub identity
         self.cmd(
-            "iot hub messaging-endpoint create servicebus-topic -n {} -g {} --en {} --erg {} --endpoint-uri {} "
+            "iot hub message-endpoint create servicebus-topic -n {} -g {} --en {} --erg {} --endpoint-uri {} "
             "--entity-path {} --identity [system] --auth-type identityBased".format(
                 self.entity_name, self.entity_rg, endpoint_names[1], EP_RG, endpoint_uri, EP_SERVICEBUS_TOPIC
             )
@@ -252,7 +252,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         )
 
         endpoint_output = self.cmd(
-            "iot hub messaging-endpoint show -n {} -g {} --en {}".format(
+            "iot hub message-endpoint show -n {} -g {} --en {}".format(
                 self.entity_name, self.entity_rg, endpoint_names[1]
             )
         ).get_output_in_json()
@@ -261,7 +261,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # topic - Use user identity
         self.cmd(
-            "iot hub messaging-endpoint create servicebus-topic -n {} -g {} --en {} --erg {} --endpoint-uri {} "
+            "iot hub message-endpoint create servicebus-topic -n {} -g {} --en {} --erg {} --endpoint-uri {} "
             "--entity-path {} --identity {} --auth-type identityBased".format(
                 self.entity_name,
                 self.entity_rg,
@@ -284,7 +284,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         )
 
         endpoint_output = self.cmd(
-            "iot hub messaging-endpoint show -n {} -g {} --en {}".format(
+            "iot hub message-endpoint show -n {} -g {} --en {}".format(
                 self.entity_name, self.entity_rg, endpoint_names[2]
             )
         ).get_output_in_json()
@@ -293,7 +293,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # create queue endpoint - connection string
         self.cmd(
-            "iot hub messaging-endpoint create servicebus-queue -n {} -g {} --en {} --erg {} -c {}".format(
+            "iot hub message-endpoint create servicebus-queue -n {} -g {} --en {} --erg {} -c {}".format(
                 self.entity_name, self.entity_rg, endpoint_names[3], EP_RG, queue_cs
             )
         )
@@ -303,7 +303,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         )
 
         endpoint_output = self.cmd(
-            "iot hub messaging-endpoint show -n {} -g {} --en {}".format(
+            "iot hub message-endpoint show -n {} -g {} --en {}".format(
                 self.entity_name, self.entity_rg, endpoint_names[3]
             )
         ).get_output_in_json()
@@ -312,7 +312,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # queue - Use hub identity
         self.cmd(
-            "iot hub messaging-endpoint create servicebus-queue -n {} -g {} --en {} --erg {} --endpoint-uri {} "
+            "iot hub message-endpoint create servicebus-queue -n {} -g {} --en {} --erg {} --endpoint-uri {} "
             "--entity-path {} --identity [system] --auth-type identityBased".format(
                 self.entity_name, self.entity_rg, endpoint_names[4], EP_RG, endpoint_uri, EP_SERVICEBUS_QUEUE
             )
@@ -328,7 +328,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         )
 
         endpoint_output = self.cmd(
-            "iot hub messaging-endpoint show -n {} -g {} --en {}".format(
+            "iot hub message-endpoint show -n {} -g {} --en {}".format(
                 self.entity_name, self.entity_rg, endpoint_names[4]
             )
         ).get_output_in_json()
@@ -337,7 +337,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # queue - Use user identity
         self.cmd(
-            "iot hub messaging-endpoint create servicebus-queue -n {} -g {} --en {} --erg {} --endpoint-uri {} "
+            "iot hub message-endpoint create servicebus-queue -n {} -g {} --en {} --erg {} --endpoint-uri {} "
             "--entity-path {} --identity {} --auth-type identityBased".format(
                 self.entity_name,
                 self.entity_rg,
@@ -360,7 +360,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         )
 
         endpoint_output = self.cmd(
-            "iot hub messaging-endpoint show -n {} -g {} --en {}".format(
+            "iot hub message-endpoint show -n {} -g {} --en {}".format(
                 self.entity_name, self.entity_rg, endpoint_names[5]
             )
         ).get_output_in_json()
@@ -369,13 +369,13 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # list
         endpoint_list = self.cmd(
-            "iot hub messaging-endpoint list -n {} -g {}".format(
+            "iot hub message-endpoint list -n {} -g {}".format(
                 self.entity_name, self.entity_rg
             )
         ).get_output_in_json()
 
         topic_list = self.cmd(
-            "iot hub messaging-endpoint list -n {} -g {} -t {}".format(
+            "iot hub message-endpoint list -n {} -g {} -t {}".format(
                 self.entity_name, self.entity_rg, "servicebus-topic"
             )
         ).get_output_in_json()
@@ -384,7 +384,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         assert endpoint_list["serviceBusTopics"] == topic_list
 
         queue_list = self.cmd(
-            "iot hub messaging-endpoint list -n {} -g {} -t {}".format(
+            "iot hub message-endpoint list -n {} -g {} -t {}".format(
                 self.entity_name, self.entity_rg, "servicebus-queue"
             )
         ).get_output_in_json()
@@ -394,14 +394,14 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # Delete one (topic)
         self.cmd(
-            "iot hub messaging-endpoint delete -n {} -g {} --en {} -y".format(
+            "iot hub message-endpoint delete -n {} -g {} --en {} -y".format(
                 self.entity_name, self.entity_rg, endpoint_names[0]
             )
         )
 
         # ensure others are not deleted
         eventhub_list = self.cmd(
-            "iot hub messaging-endpoint list -n {} -g {} -t {}".format(
+            "iot hub message-endpoint list -n {} -g {} -t {}".format(
                 self.entity_name, self.entity_rg, "servicebus-topic"
             )
         ).get_output_in_json()
@@ -409,7 +409,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         assert len(eventhub_list) == 2
 
         queue_list = self.cmd(
-            "iot hub messaging-endpoint list -n {} -g {} -t {}".format(
+            "iot hub message-endpoint list -n {} -g {} -t {}".format(
                 self.entity_name, self.entity_rg, "servicebus-queue"
             )
         ).get_output_in_json()
@@ -418,13 +418,13 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # delete all queue
         self.cmd(
-            "iot hub messaging-endpoint delete -n {} -g {} -t {} -y".format(
+            "iot hub message-endpoint delete -n {} -g {} -t {} -y".format(
                 self.entity_name, self.entity_rg, "servicebus-queue"
             )
         )
 
         endpoint_list = self.cmd(
-            "iot hub messaging-endpoint list -n {} -g {} -t {}".format(
+            "iot hub message-endpoint list -n {} -g {} -t {}".format(
                 self.entity_name, self.entity_rg, "servicebus-queue"
             )
         ).get_output_in_json()
@@ -432,7 +432,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         assert endpoint_list == []
 
         endpoint_list = self.cmd(
-            "iot hub messaging-endpoint list -n {} -g {} -t {}".format(
+            "iot hub message-endpoint list -n {} -g {} -t {}".format(
                 self.entity_name, self.entity_rg, "servicebus-topic"
             )
         ).get_output_in_json()
@@ -441,13 +441,13 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # delete all
         self.cmd(
-            "iot hub messaging-endpoint delete -n {} -g {} -y".format(
+            "iot hub message-endpoint delete -n {} -g {} -y".format(
                 self.entity_name, self.entity_rg
             )
         )
 
         endpoint_list = self.cmd(
-            "iot hub messaging-endpoint list -n {} -g {} -t {}".format(
+            "iot hub message-endpoint list -n {} -g {} -t {}".format(
                 self.entity_name, self.entity_rg, "servicebus-topic"
             )
         ).get_output_in_json()
@@ -462,7 +462,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         partition_template_default = "{deviceid}-{YYYY}-{MM}"
         # use connection string - no pkn or pkt
         self.cmd(
-            "iot hub messaging-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} -c {} --collection {} "
+            "iot hub message-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} -c {} --collection {} "
             "--db {}".format(
                 self.entity_name,
                 self.entity_rg,
@@ -488,7 +488,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         )
 
         endpoint_output = self.cmd(
-            "iot hub messaging-endpoint show -n {} -g {} --en {}".format(
+            "iot hub message-endpoint show -n {} -g {} --en {}".format(
                 self.entity_name, self.entity_rg, endpoint_names[0]
             )
         ).get_output_in_json()
@@ -497,7 +497,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # system assigned identity - pkn and default pkt
         self.cmd(
-            "iot hub messaging-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} --endpoint-uri {} "
+            "iot hub message-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} --endpoint-uri {} "
             "--identity [system] --auth-type identityBased --collection {} --db {} --pkn {}".format(
                 self.entity_name,
                 self.entity_rg,
@@ -523,7 +523,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         )
 
         endpoint_output = self.cmd(
-            "iot hub messaging-endpoint show -n {} -g {} --en {}".format(
+            "iot hub message-endpoint show -n {} -g {} --en {}".format(
                 self.entity_name, self.entity_rg, endpoint_names[1]
             )
         ).get_output_in_json()
@@ -533,7 +533,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         # user assigned identity - pkn and pkt
         self.kwargs["template"] = partition_template
         self.cmd(
-            "iot hub messaging-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} --endpoint-uri {} "
+            "iot hub message-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} --endpoint-uri {} "
             "--identity {} --auth-type identityBased --collection {} --db {} --pkn {} --pkt {}".format(
                 self.entity_name,
                 self.entity_rg,
@@ -562,7 +562,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         )
 
         endpoint_output = self.cmd(
-            "iot hub messaging-endpoint show -n {} -g {} --en {}".format(
+            "iot hub message-endpoint show -n {} -g {} --en {}".format(
                 self.entity_name, self.entity_rg, endpoint_names[2]
             )
         ).get_output_in_json()
@@ -570,13 +570,13 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         assert_endpoint_properties(endpoint_output, expected_user_endpoint)
 
         endpoint_list = self.cmd(
-            "iot hub messaging-endpoint list -n {} -g {}".format(
+            "iot hub message-endpoint list -n {} -g {}".format(
                 self.entity_name, self.entity_rg
             )
         ).get_output_in_json()
 
         cosmos_list = self.cmd(
-            "iot hub messaging-endpoint list -n {} -g {} -t {}".format(
+            "iot hub message-endpoint list -n {} -g {} -t {}".format(
                 self.entity_name, self.entity_rg, "cosmosdb-collection"
             )
         ).get_output_in_json()
@@ -586,12 +586,12 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # Delete one cosmos endpoint
         self.cmd(
-            "iot hub messaging-endpoint delete -n {} -g {} --en {} -y".format(
+            "iot hub message-endpoint delete -n {} -g {} --en {} -y".format(
                 self.entity_name, self.entity_rg, endpoint_names[0]
             )
         )
         cosmos_list = self.cmd(
-            "iot hub messaging-endpoint list -n {} -g {} -t {}".format(
+            "iot hub message-endpoint list -n {} -g {} -t {}".format(
                 self.entity_name, self.entity_rg, "cosmosdb-collection"
             )
         ).get_output_in_json()
@@ -600,13 +600,13 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # Delete all cosmos endpoints
         self.cmd(
-            "iot hub messaging-endpoint delete -n {} -g {} -t {} -y".format(
+            "iot hub message-endpoint delete -n {} -g {} -t {} -y".format(
                 self.entity_name, self.entity_rg, "cosmosdb-collection"
             )
         )
 
         endpoint_list = self.cmd(
-            "iot hub messaging-endpoint list -n {} -g {} -t {}".format(
+            "iot hub message-endpoint list -n {} -g {} -t {}".format(
                 self.entity_name, self.entity_rg, "cosmosdb-collection"
             )
         ).get_output_in_json()
@@ -623,7 +623,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         # use connection string - note how the connection string needs to have entity path and the
         # endpoint uri and path are left blank
         self.cmd(
-            "iot hub messaging-endpoint create eventhub -n {} -g {} --en {} --erg {} -c {}".format(
+            "iot hub message-endpoint create eventhub -n {} -g {} --en {} --erg {} -c {}".format(
                 self.entity_name, self.entity_rg, endpoint_names[0], EP_RG, eventhub_cs
             )
         )
@@ -633,7 +633,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         )
 
         endpoint_output = self.cmd(
-            "iot hub messaging-endpoint show -n {} -g {} --en {}".format(
+            "iot hub message-endpoint show -n {} -g {} --en {}".format(
                 self.entity_name, self.entity_rg, endpoint_names[0]
             )
         ).get_output_in_json()
@@ -642,7 +642,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # Use hub identity
         self.cmd(
-            "iot hub messaging-endpoint create eventhub -n {} -g {} --en {} --erg {} --endpoint-uri {} --entity-path {} "
+            "iot hub message-endpoint create eventhub -n {} -g {} --en {} --erg {} --endpoint-uri {} --entity-path {} "
             "--identity [system] --auth-type identityBased".format(
                 self.entity_name, self.entity_rg, endpoint_names[1], EP_RG, endpoint_uri, EP_EVENTHUB_INSTANCE
             )
@@ -658,7 +658,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         )
 
         endpoint_output = self.cmd(
-            "iot hub messaging-endpoint show -n {} -g {} --en {}".format(
+            "iot hub message-endpoint show -n {} -g {} --en {}".format(
                 self.entity_name, self.entity_rg, endpoint_names[1]
             )
         ).get_output_in_json()
@@ -667,7 +667,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # Use user identity
         self.cmd(
-            "iot hub messaging-endpoint create eventhub -n {} -g {} --en {} --erg {} --endpoint-uri {} --entity-path {} "
+            "iot hub message-endpoint create eventhub -n {} -g {} --en {} --erg {} --endpoint-uri {} --entity-path {} "
             "--identity {} --auth-type identityBased".format(
                 self.entity_name,
                 self.entity_rg,
@@ -690,7 +690,7 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         )
 
         endpoint_output = self.cmd(
-            "iot hub messaging-endpoint show -n {} -g {} --en {}".format(
+            "iot hub message-endpoint show -n {} -g {} --en {}".format(
                 self.entity_name, self.entity_rg, endpoint_names[2]
             )
         ).get_output_in_json()
@@ -698,13 +698,13 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
         assert_endpoint_properties(endpoint_output, expected_user_endpoint)
 
         endpoint_list = self.cmd(
-            "iot hub messaging-endpoint list -n {} -g {}".format(
+            "iot hub message-endpoint list -n {} -g {}".format(
                 self.entity_name, self.entity_rg
             )
         ).get_output_in_json()
 
         eventhub_list = self.cmd(
-            "iot hub messaging-endpoint list -n {} -g {} -t {}".format(
+            "iot hub message-endpoint list -n {} -g {} -t {}".format(
                 self.entity_name, self.entity_rg, "eventhub"
             )
         ).get_output_in_json()
@@ -714,14 +714,14 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # Delete one event hub endpoint
         self.cmd(
-            "iot hub messaging-endpoint delete -n {} -g {} --en {} -y".format(
+            "iot hub message-endpoint delete -n {} -g {} --en {} -y".format(
                 self.entity_name, self.entity_rg, endpoint_names[0]
             )
         )
 
         # ensure that only one got deleted
         eventhub_list = self.cmd(
-            "iot hub messaging-endpoint list -n {} -g {} -t {}".format(
+            "iot hub message-endpoint list -n {} -g {} -t {}".format(
                 self.entity_name, self.entity_rg, "eventhub"
             )
         ).get_output_in_json()
@@ -730,13 +730,13 @@ class TestIoTMessagingEndpoints(IoTLiveScenarioTest):
 
         # Delete all event hub endpoints
         self.cmd(
-            "iot hub messaging-endpoint delete -n {} -g {} -t {} -y".format(
+            "iot hub message-endpoint delete -n {} -g {} -t {} -y".format(
                 self.entity_name, self.entity_rg, "eventhub"
             )
         )
 
         endpoint_list = self.cmd(
-            "iot hub messaging-endpoint list -n {} -g {} -t {}".format(
+            "iot hub message-endpoint list -n {} -g {} -t {}".format(
                 self.entity_name, self.entity_rg, "eventhub"
             )
         ).get_output_in_json()
