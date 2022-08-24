@@ -32,18 +32,11 @@ class CertificateProvider(IoTHubProvider):
         cmd,
         hub_name: Optional[str] = None,
         rg: Optional[str] = None,
-        login: Optional[str] = None,
-        auth_type_dataplane: Optional[str] = None
     ):
         super(CertificateProvider, self).__init__(
-            cmd=cmd, hub_name=hub_name, rg=rg, login=login, auth_type_dataplane=auth_type_dataplane
+            cmd=cmd, hub_name=hub_name, rg=rg,
         )
         self.cli = EmbeddedCLI()
-        # Need to ensure rg
-        if "resourcegroup" not in self.target:
-            self.target["resourcegroup"] = self.discovery.get_target(
-                resource_name=self.target["entity"].split(".")[0]
-            )["resourcegroup"]
 
     def iot_hub_certificate_root_authority_show(self) -> Optional[Dict[str, str]]:
         return self._get_target_root_certificate()
@@ -83,7 +76,7 @@ class CertificateProvider(IoTHubProvider):
         )
         if not result.success():
             return
-        return result.as_json().get("properties").get("rootCertificate")
+        return result.as_json()["properties"].get("rootCertificate")
 
     def _get_target_root_certificate(self) -> Optional[Dict[str, str]]:
         result = self.cli.invoke(
@@ -97,6 +90,6 @@ class CertificateProvider(IoTHubProvider):
         if not result.success():
             # Error will already be printed out
             return
-        current_target = result.as_json().get("properties").get("rootCertificate")
+        current_target = result.as_json()["properties"].get("rootCertificate")
         # Since a newly created IoT Hub has empty rootCertificate property
         return current_target if current_target else DEFAULT_ROOT_AUTHORITY

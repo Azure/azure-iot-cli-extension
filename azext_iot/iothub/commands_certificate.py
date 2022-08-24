@@ -15,15 +15,11 @@ def certificate_root_authority_show(
     cmd,
     hub_name: Optional[str] = None,
     resource_group_name: Optional[str] = None,
-    login: Optional[str] = None,
-    auth_type_dataplane: Optional[str] = None
 ):
     resource = CertificateProvider(
         cmd=cmd,
         hub_name=hub_name,
         rg=resource_group_name,
-        login=login,
-        auth_type_dataplane=auth_type_dataplane
     )
     return resource.iot_hub_certificate_root_authority_show()
 
@@ -33,16 +29,12 @@ def certificate_root_authority_set(
     ca_version: str,
     hub_name: Optional[str] = None,
     resource_group_name: Optional[str] = None,
-    login: Optional[str] = None,
-    auth_type_dataplane: Optional[str] = None,
-    yes: Optional[str] = False
+    yes: bool = False
 ):
     resource = CertificateProvider(
         cmd=cmd,
         hub_name=hub_name,
         rg=resource_group_name,
-        login=login,
-        auth_type_dataplane=auth_type_dataplane
     )
     return resource.iot_hub_certificate_root_authority_set(
         ca_version=ca_version,

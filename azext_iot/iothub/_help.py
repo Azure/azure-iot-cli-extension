@@ -318,9 +318,9 @@ def load_iothub_help():
     helps["iot hub certificate root-authority set"] = """
         type: command
         short-summary: Set the certificate root-authority for an IoT Hub instance to a specific version.
-        long-summary: Transition this resource to a certificate on the DigiCert Global G2 root. Before making this
-          transition, please ensure all devices are updated to contain the public portion of the G2 root. Devices
-          will disconnect and reconnect using the new root.
+        long-summary: Transition this resource to a certificate on the DigiCert Global G2 root or revert to Baltimore root.
+          Before making this transition, please ensure all devices are updated to contain the public portion of the root
+          that the IoT Hub will be transitioned to. Devices will disconnect and reconnect using the new root.
           We suggest monitoring current connections but another metric may be more appropriate for your situation.
         examples:
         - name: Transition the target IoT Hub certificate root authority to Digicert.

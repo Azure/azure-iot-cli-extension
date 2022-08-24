@@ -7,6 +7,18 @@ unreleased
 +++++++++++++++
 
 
+0.17.1
++++++++++++++++
+
+**IoT Hub Update**
+
+* The root-authority migration feature is now avaliable. Since the Baltimore root will soon expire, IoT Hub will
+ transition to the DigiCert Global G2 root starting February 15, 2023. You will need to update all device certificates
+ to use the new G2 root. To learn more about this transition, visit http://aka.ms/iot-ca-updates.
+  - az iot hub certificate root-authority show
+  - az iot hub certificate root-authority set
+
+
 0.17.0
 +++++++++++++++
 
@@ -108,7 +120,7 @@ unreleased
 
 * Introducing the **in preview** Azure Device Update for IoT Hub root command group `az iot device-update`.
   To learn more about the service visit https://docs.microsoft.com/en-us/azure/iot-hub-device-update/.
- 
+
   - This command group is behind a feature flag environment variable. Set `IOT_CLI_ADU_ENABLED` to any value
     to activate the command group.
   - The Device Update command group supports all `account` and `instance` related functionality against
