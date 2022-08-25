@@ -7,6 +7,15 @@ unreleased
 +++++++++++++++
 
 
+0.17.1
++++++++++++++++
+
+**Device Update**
+
+* The Device Update control plane or infrastructure command groups `az iot device-update account` and
+  `az iot device-update instance` now use the GA API version of 2022-10-01.
+
+
 0.17.0
 +++++++++++++++
 
@@ -15,7 +24,7 @@ unreleased
 * The Device Update command group supports all data plane functionality via **in-preview** `update` and `device`
   sub-command groups. The data plane API version used is 2022-07-01-preview.
 
-**IoT Hub Update**
+**IoT Hub updates**
 
 * Updated the `az iot hub monitor-events` command to support an optional `--message-count` argument.
   The message-count defines the maximum number of messages received from the hub before the monitor automatically stops.
