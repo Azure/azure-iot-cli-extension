@@ -31,6 +31,7 @@ def load_deviceupdate_help():
     helps["iot device-update account create"] = """
         type: command
         short-summary: Create a Device Update account.
+        long-summary: This command may also be used to update the state of an existing account.
 
         examples:
         - name: Create a Device Update account in target resource group using the resource group location.
@@ -64,7 +65,7 @@ def load_deviceupdate_help():
     helps["iot device-update account update"] = """
         type: command
         short-summary: Update a Device Update account.
-        long-summary: Currently the following account properties can be updated - tags, identity, publicNetworkAccess.
+        long-summary: Currently the following account properties can be updated - identity, publicNetworkAccess and tags.
 
         examples:
         - name: Set a specific account tag attribute.
@@ -200,12 +201,23 @@ def load_deviceupdate_help():
     helps["iot device-update instance create"] = """
         type: command
         short-summary: Create a Device Update instance.
+        long-summary: This command may also be used to update the state of an existing instance.
+
+        examples:
+        - name: Create an instance with minimum configuration.
+          text: >
+            az iot device-update instance create -n {account_name} -i {instance_name} --iothub-ids {iothub_resource_id}
+
+        - name: Create an instance with diagnostics enabled, paired with a user provided storage account. Include tags.
+          text: >
+            az iot device-update instance create -n {account_name} -i {instance_name} --iothub-ids {iothub_resource_id} --enable-diagnostics
+            --diagnostics-storage-id {storage_account_resource_id} --tags a=b
     """
 
     helps["iot device-update instance update"] = """
         type: command
         short-summary: Update a Device Update instance.
-        long-summary: Currently the following instance properties can be updated - iotHubs, enableDiagnostics, diagnosticStorageProperties.
+        long-summary: Currently the following instance properties can be updated - iotHubs, enableDiagnostics, diagnosticStorageProperties and tags.
 
         examples:
         - name: Set a specific instance tag attribute.

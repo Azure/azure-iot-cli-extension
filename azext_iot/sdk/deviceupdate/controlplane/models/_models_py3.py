@@ -1,4 +1,5 @@
 # coding=utf-8
+# pylint: disable=too-many-lines
 # --------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
@@ -9,15 +10,14 @@
 import datetime
 from typing import Dict, List, Optional, TYPE_CHECKING, Union
 
-from azure.core.exceptions import HttpResponseError
-import msrest.serialization
+from .. import _serialization
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import,ungrouped-imports
-    import __init__ as _models
+    from .. import models as _models
 
 
-class Resource(msrest.serialization.Model):
+class Resource(_serialization.Model):
     """Common fields that are returned in the response for all Azure Resource Manager resources.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -32,7 +32,7 @@ class Resource(msrest.serialization.Model):
     :vartype type: str
     :ivar system_data: Azure Resource Manager metadata containing createdBy and modifiedBy
      information.
-    :vartype system_data: ~device_update.models.SystemData
+    :vartype system_data: ~deviceupdate.models.SystemData
     """
 
     _validation = {
@@ -43,10 +43,10 @@ class Resource(msrest.serialization.Model):
     }
 
     _attribute_map = {
-        'id': {'key': 'id', 'type': 'str'},
-        'name': {'key': 'name', 'type': 'str'},
-        'type': {'key': 'type', 'type': 'str'},
-        'system_data': {'key': 'systemData', 'type': 'SystemData'},
+        "id": {"key": "id", "type": "str"},
+        "name": {"key": "name", "type": "str"},
+        "type": {"key": "type", "type": "str"},
+        "system_data": {"key": "systemData", "type": "SystemData"},
     }
 
     def __init__(
@@ -55,7 +55,7 @@ class Resource(msrest.serialization.Model):
     ):
         """
         """
-        super(Resource, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.id = None
         self.name = None
         self.type = None
@@ -79,10 +79,10 @@ class TrackedResource(Resource):
     :vartype type: str
     :ivar system_data: Azure Resource Manager metadata containing createdBy and modifiedBy
      information.
-    :vartype system_data: ~device_update.models.SystemData
-    :ivar tags: A set of tags. Resource tags.
+    :vartype system_data: ~deviceupdate.models.SystemData
+    :ivar tags: Resource tags.
     :vartype tags: dict[str, str]
-    :ivar location: Required. The geo-location where the resource lives.
+    :ivar location: The geo-location where the resource lives. Required.
     :vartype location: str
     """
 
@@ -95,12 +95,12 @@ class TrackedResource(Resource):
     }
 
     _attribute_map = {
-        'id': {'key': 'id', 'type': 'str'},
-        'name': {'key': 'name', 'type': 'str'},
-        'type': {'key': 'type', 'type': 'str'},
-        'system_data': {'key': 'systemData', 'type': 'SystemData'},
-        'tags': {'key': 'tags', 'type': '{str}'},
-        'location': {'key': 'location', 'type': 'str'},
+        "id": {"key": "id", "type": "str"},
+        "name": {"key": "name", "type": "str"},
+        "type": {"key": "type", "type": "str"},
+        "system_data": {"key": "systemData", "type": "SystemData"},
+        "tags": {"key": "tags", "type": "{str}"},
+        "location": {"key": "location", "type": "str"},
     }
 
     def __init__(
@@ -111,17 +111,17 @@ class TrackedResource(Resource):
         **kwargs
     ):
         """
-        :keyword tags: A set of tags. Resource tags.
+        :keyword tags: Resource tags.
         :paramtype tags: dict[str, str]
-        :keyword location: Required. The geo-location where the resource lives.
+        :keyword location: The geo-location where the resource lives. Required.
         :paramtype location: str
         """
-        super(TrackedResource, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.tags = tags
         self.location = location
 
 
-class Account(TrackedResource):
+class Account(TrackedResource):  # pylint: disable=too-many-instance-attributes
     """Device Update account details.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -138,28 +138,28 @@ class Account(TrackedResource):
     :vartype type: str
     :ivar system_data: Azure Resource Manager metadata containing createdBy and modifiedBy
      information.
-    :vartype system_data: ~device_update.models.SystemData
-    :ivar tags: A set of tags. Resource tags.
+    :vartype system_data: ~deviceupdate.models.SystemData
+    :ivar tags: Resource tags.
     :vartype tags: dict[str, str]
-    :ivar location: Required. The geo-location where the resource lives.
+    :ivar location: The geo-location where the resource lives. Required.
     :vartype location: str
     :ivar identity: The type of identity used for the resource.
-    :vartype identity: ~device_update.models.ManagedServiceIdentity
+    :vartype identity: ~deviceupdate.models.ManagedServiceIdentity
     :ivar provisioning_state: Provisioning state. Known values are: "Succeeded", "Deleted",
-     "Failed", "Canceled", "Accepted", "Creating".
-    :vartype provisioning_state: str or ~device_update.models.ProvisioningState
+     "Failed", "Canceled", "Accepted", and "Creating".
+    :vartype provisioning_state: str or ~deviceupdate.models.ProvisioningState
     :ivar host_name: API host name.
     :vartype host_name: str
     :ivar public_network_access: Whether or not public network access is allowed for the account.
-     Known values are: "Enabled", "Disabled". Default value: "Enabled".
-    :vartype public_network_access: str or ~device_update.models.PublicNetworkAccess
+     Known values are: "Enabled" and "Disabled".
+    :vartype public_network_access: str or ~deviceupdate.models.PublicNetworkAccess
     :ivar private_endpoint_connections: List of private endpoint connections associated with the
      account.
-    :vartype private_endpoint_connections: list[~device_update.models.PrivateEndpointConnection]
-    :ivar sku: Device Update Sku. Known values are: "Free", "Standard". Default value: "Standard".
-    :vartype sku: str or ~device_update.models.SKU
+    :vartype private_endpoint_connections: list[~deviceupdate.models.PrivateEndpointConnection]
+    :ivar sku: Device Update Sku. Known values are: "Free" and "Standard".
+    :vartype sku: str or ~deviceupdate.models.SKU
     :ivar locations: Device Update account primary and failover location details.
-    :vartype locations: list[~device_update.models.Location]
+    :vartype locations: list[~deviceupdate.models.Location]
     """
 
     _validation = {
@@ -174,19 +174,19 @@ class Account(TrackedResource):
     }
 
     _attribute_map = {
-        'id': {'key': 'id', 'type': 'str'},
-        'name': {'key': 'name', 'type': 'str'},
-        'type': {'key': 'type', 'type': 'str'},
-        'system_data': {'key': 'systemData', 'type': 'SystemData'},
-        'tags': {'key': 'tags', 'type': '{str}'},
-        'location': {'key': 'location', 'type': 'str'},
-        'identity': {'key': 'identity', 'type': 'ManagedServiceIdentity'},
-        'provisioning_state': {'key': 'properties.provisioningState', 'type': 'str'},
-        'host_name': {'key': 'properties.hostName', 'type': 'str'},
-        'public_network_access': {'key': 'properties.publicNetworkAccess', 'type': 'str'},
-        'private_endpoint_connections': {'key': 'properties.privateEndpointConnections', 'type': '[PrivateEndpointConnection]'},
-        'sku': {'key': 'properties.sku', 'type': 'str'},
-        'locations': {'key': 'properties.locations', 'type': '[Location]'},
+        "id": {"key": "id", "type": "str"},
+        "name": {"key": "name", "type": "str"},
+        "type": {"key": "type", "type": "str"},
+        "system_data": {"key": "systemData", "type": "SystemData"},
+        "tags": {"key": "tags", "type": "{str}"},
+        "location": {"key": "location", "type": "str"},
+        "identity": {"key": "identity", "type": "ManagedServiceIdentity"},
+        "provisioning_state": {"key": "properties.provisioningState", "type": "str"},
+        "host_name": {"key": "properties.hostName", "type": "str"},
+        "public_network_access": {"key": "properties.publicNetworkAccess", "type": "str"},
+        "private_endpoint_connections": {"key": "properties.privateEndpointConnections", "type": "[PrivateEndpointConnection]"},
+        "sku": {"key": "properties.sku", "type": "str"},
+        "locations": {"key": "properties.locations", "type": "[Location]"},
     }
 
     def __init__(
@@ -195,29 +195,28 @@ class Account(TrackedResource):
         location: str,
         tags: Optional[Dict[str, str]] = None,
         identity: Optional["_models.ManagedServiceIdentity"] = None,
-        public_network_access: Optional[Union[str, "_models.PublicNetworkAccess"]] = "Enabled",
+        public_network_access: Union[str, "_models.PublicNetworkAccess"] = "Enabled",
         private_endpoint_connections: Optional[List["_models.PrivateEndpointConnection"]] = None,
-        sku: Optional[Union[str, "_models.SKU"]] = "Standard",
+        sku: Union[str, "_models.SKU"] = "Standard",
         **kwargs
     ):
         """
-        :keyword tags: A set of tags. Resource tags.
+        :keyword tags: Resource tags.
         :paramtype tags: dict[str, str]
-        :keyword location: Required. The geo-location where the resource lives.
+        :keyword location: The geo-location where the resource lives. Required.
         :paramtype location: str
         :keyword identity: The type of identity used for the resource.
-        :paramtype identity: ~device_update.models.ManagedServiceIdentity
+        :paramtype identity: ~deviceupdate.models.ManagedServiceIdentity
         :keyword public_network_access: Whether or not public network access is allowed for the
-         account. Known values are: "Enabled", "Disabled". Default value: "Enabled".
-        :paramtype public_network_access: str or ~device_update.models.PublicNetworkAccess
+         account. Known values are: "Enabled" and "Disabled".
+        :paramtype public_network_access: str or ~deviceupdate.models.PublicNetworkAccess
         :keyword private_endpoint_connections: List of private endpoint connections associated with the
          account.
-        :paramtype private_endpoint_connections: list[~device_update.models.PrivateEndpointConnection]
-        :keyword sku: Device Update Sku. Known values are: "Free", "Standard". Default value:
-         "Standard".
-        :paramtype sku: str or ~device_update.models.SKU
+        :paramtype private_endpoint_connections: list[~deviceupdate.models.PrivateEndpointConnection]
+        :keyword sku: Device Update Sku. Known values are: "Free" and "Standard".
+        :paramtype sku: str or ~deviceupdate.models.SKU
         """
-        super(Account, self).__init__(tags=tags, location=location, **kwargs)
+        super().__init__(tags=tags, location=location, **kwargs)
         self.identity = identity
         self.provisioning_state = None
         self.host_name = None
@@ -227,18 +226,18 @@ class Account(TrackedResource):
         self.locations = None
 
 
-class AccountList(msrest.serialization.Model):
+class AccountList(_serialization.Model):
     """List of Accounts.
 
     :ivar next_link: The link used to get the next page of Accounts list.
     :vartype next_link: str
     :ivar value: List of Accounts.
-    :vartype value: list[~device_update.models.Account]
+    :vartype value: list[~deviceupdate.models.Account]
     """
 
     _attribute_map = {
-        'next_link': {'key': 'nextLink', 'type': 'str'},
-        'value': {'key': 'value', 'type': '[Account]'},
+        "next_link": {"key": "nextLink", "type": "str"},
+        "value": {"key": "value", "type": "[Account]"},
     }
 
     def __init__(
@@ -252,23 +251,23 @@ class AccountList(msrest.serialization.Model):
         :keyword next_link: The link used to get the next page of Accounts list.
         :paramtype next_link: str
         :keyword value: List of Accounts.
-        :paramtype value: list[~device_update.models.Account]
+        :paramtype value: list[~deviceupdate.models.Account]
         """
-        super(AccountList, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.next_link = next_link
         self.value = value
 
 
-class TagUpdate(msrest.serialization.Model):
+class TagUpdate(_serialization.Model):
     """Request payload used to update an existing resource's tags.
 
-    :ivar tags: A set of tags. List of key value pairs that describe the resource. This will
-     overwrite the existing tags.
+    :ivar tags: List of key value pairs that describe the resource. This will overwrite the
+     existing tags.
     :vartype tags: dict[str, str]
     """
 
     _attribute_map = {
-        'tags': {'key': 'tags', 'type': '{str}'},
+        "tags": {"key": "tags", "type": "{str}"},
     }
 
     def __init__(
@@ -278,30 +277,30 @@ class TagUpdate(msrest.serialization.Model):
         **kwargs
     ):
         """
-        :keyword tags: A set of tags. List of key value pairs that describe the resource. This will
-         overwrite the existing tags.
+        :keyword tags: List of key value pairs that describe the resource. This will overwrite the
+         existing tags.
         :paramtype tags: dict[str, str]
         """
-        super(TagUpdate, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.tags = tags
 
 
 class AccountUpdate(TagUpdate):
     """Request payload used to update and existing Accounts.
 
-    :ivar tags: A set of tags. List of key value pairs that describe the resource. This will
-     overwrite the existing tags.
+    :ivar tags: List of key value pairs that describe the resource. This will overwrite the
+     existing tags.
     :vartype tags: dict[str, str]
     :ivar identity: The type of identity used for the resource.
-    :vartype identity: ~device_update.models.ManagedServiceIdentity
+    :vartype identity: ~deviceupdate.models.ManagedServiceIdentity
     :ivar location: The geo-location where the resource lives.
     :vartype location: str
     """
 
     _attribute_map = {
-        'tags': {'key': 'tags', 'type': '{str}'},
-        'identity': {'key': 'identity', 'type': 'ManagedServiceIdentity'},
-        'location': {'key': 'location', 'type': 'str'},
+        "tags": {"key": "tags", "type": "{str}"},
+        "identity": {"key": "identity", "type": "ManagedServiceIdentity"},
+        "location": {"key": "location", "type": "str"},
     }
 
     def __init__(
@@ -313,20 +312,20 @@ class AccountUpdate(TagUpdate):
         **kwargs
     ):
         """
-        :keyword tags: A set of tags. List of key value pairs that describe the resource. This will
-         overwrite the existing tags.
+        :keyword tags: List of key value pairs that describe the resource. This will overwrite the
+         existing tags.
         :paramtype tags: dict[str, str]
         :keyword identity: The type of identity used for the resource.
-        :paramtype identity: ~device_update.models.ManagedServiceIdentity
+        :paramtype identity: ~deviceupdate.models.ManagedServiceIdentity
         :keyword location: The geo-location where the resource lives.
         :paramtype location: str
         """
-        super(AccountUpdate, self).__init__(tags=tags, **kwargs)
+        super().__init__(tags=tags, **kwargs)
         self.identity = identity
         self.location = location
 
 
-class CheckNameAvailabilityRequest(msrest.serialization.Model):
+class CheckNameAvailabilityRequest(_serialization.Model):
     """The check availability request body.
 
     :ivar name: The name of the resource for which availability needs to be checked.
@@ -336,8 +335,8 @@ class CheckNameAvailabilityRequest(msrest.serialization.Model):
     """
 
     _attribute_map = {
-        'name': {'key': 'name', 'type': 'str'},
-        'type': {'key': 'type', 'type': 'str'},
+        "name": {"key": "name", "type": "str"},
+        "type": {"key": "type", "type": "str"},
     }
 
     def __init__(
@@ -353,27 +352,27 @@ class CheckNameAvailabilityRequest(msrest.serialization.Model):
         :keyword type: The resource type.
         :paramtype type: str
         """
-        super(CheckNameAvailabilityRequest, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.name = name
         self.type = type
 
 
-class CheckNameAvailabilityResponse(msrest.serialization.Model):
+class CheckNameAvailabilityResponse(_serialization.Model):
     """The check availability result.
 
     :ivar name_available: Indicates if the resource name is available.
     :vartype name_available: bool
-    :ivar reason: The reason why the given name is not available. Known values are: "Invalid",
+    :ivar reason: The reason why the given name is not available. Known values are: "Invalid" and
      "AlreadyExists".
-    :vartype reason: str or ~device_update.models.CheckNameAvailabilityReason
+    :vartype reason: str or ~deviceupdate.models.CheckNameAvailabilityReason
     :ivar message: Detailed reason why the given name is available.
     :vartype message: str
     """
 
     _attribute_map = {
-        'name_available': {'key': 'nameAvailable', 'type': 'bool'},
-        'reason': {'key': 'reason', 'type': 'str'},
-        'message': {'key': 'message', 'type': 'str'},
+        "name_available": {"key": "nameAvailable", "type": "bool"},
+        "reason": {"key": "reason", "type": "str"},
+        "message": {"key": "message", "type": "str"},
     }
 
     def __init__(
@@ -387,19 +386,19 @@ class CheckNameAvailabilityResponse(msrest.serialization.Model):
         """
         :keyword name_available: Indicates if the resource name is available.
         :paramtype name_available: bool
-        :keyword reason: The reason why the given name is not available. Known values are: "Invalid",
-         "AlreadyExists".
-        :paramtype reason: str or ~device_update.models.CheckNameAvailabilityReason
+        :keyword reason: The reason why the given name is not available. Known values are: "Invalid"
+         and "AlreadyExists".
+        :paramtype reason: str or ~deviceupdate.models.CheckNameAvailabilityReason
         :keyword message: Detailed reason why the given name is available.
         :paramtype message: str
         """
-        super(CheckNameAvailabilityResponse, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.name_available = name_available
         self.reason = reason
         self.message = message
 
 
-class ConnectionDetails(msrest.serialization.Model):
+class ConnectionDetails(_serialization.Model):
     """Private endpoint connection proxy object properties.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -425,11 +424,11 @@ class ConnectionDetails(msrest.serialization.Model):
     }
 
     _attribute_map = {
-        'id': {'key': 'id', 'type': 'str'},
-        'private_ip_address': {'key': 'privateIpAddress', 'type': 'str'},
-        'link_identifier': {'key': 'linkIdentifier', 'type': 'str'},
-        'group_id': {'key': 'groupId', 'type': 'str'},
-        'member_name': {'key': 'memberName', 'type': 'str'},
+        "id": {"key": "id", "type": "str"},
+        "private_ip_address": {"key": "privateIpAddress", "type": "str"},
+        "link_identifier": {"key": "linkIdentifier", "type": "str"},
+        "group_id": {"key": "groupId", "type": "str"},
+        "member_name": {"key": "memberName", "type": "str"},
     }
 
     def __init__(
@@ -438,7 +437,7 @@ class ConnectionDetails(msrest.serialization.Model):
     ):
         """
         """
-        super(ConnectionDetails, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.id = None
         self.private_ip_address = None
         self.link_identifier = None
@@ -446,16 +445,16 @@ class ConnectionDetails(msrest.serialization.Model):
         self.member_name = None
 
 
-class DiagnosticStorageProperties(msrest.serialization.Model):
+class DiagnosticStorageProperties(_serialization.Model):
     """Customer-initiated diagnostic log collection storage properties.
 
     All required parameters must be populated in order to send to Azure.
 
-    :ivar authentication_type: Required. Authentication Type. Known values are: "KeyBased".
-    :vartype authentication_type: str or ~device_update.models.AuthenticationType
+    :ivar authentication_type: Authentication Type. Required. "KeyBased"
+    :vartype authentication_type: str or ~deviceupdate.models.AuthenticationType
     :ivar connection_string: ConnectionString of the diagnostic storage account.
     :vartype connection_string: str
-    :ivar resource_id: Required. ResourceId of the diagnostic storage account.
+    :ivar resource_id: ResourceId of the diagnostic storage account. Required.
     :vartype resource_id: str
     """
 
@@ -465,9 +464,9 @@ class DiagnosticStorageProperties(msrest.serialization.Model):
     }
 
     _attribute_map = {
-        'authentication_type': {'key': 'authenticationType', 'type': 'str'},
-        'connection_string': {'key': 'connectionString', 'type': 'str'},
-        'resource_id': {'key': 'resourceId', 'type': 'str'},
+        "authentication_type": {"key": "authenticationType", "type": "str"},
+        "connection_string": {"key": "connectionString", "type": "str"},
+        "resource_id": {"key": "resourceId", "type": "str"},
     }
 
     def __init__(
@@ -479,20 +478,20 @@ class DiagnosticStorageProperties(msrest.serialization.Model):
         **kwargs
     ):
         """
-        :keyword authentication_type: Required. Authentication Type. Known values are: "KeyBased".
-        :paramtype authentication_type: str or ~device_update.models.AuthenticationType
+        :keyword authentication_type: Authentication Type. Required. "KeyBased"
+        :paramtype authentication_type: str or ~deviceupdate.models.AuthenticationType
         :keyword connection_string: ConnectionString of the diagnostic storage account.
         :paramtype connection_string: str
-        :keyword resource_id: Required. ResourceId of the diagnostic storage account.
+        :keyword resource_id: ResourceId of the diagnostic storage account. Required.
         :paramtype resource_id: str
         """
-        super(DiagnosticStorageProperties, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.authentication_type = authentication_type
         self.connection_string = connection_string
         self.resource_id = resource_id
 
 
-class ErrorAdditionalInfo(msrest.serialization.Model):
+class ErrorAdditionalInfo(_serialization.Model):
     """The resource management error additional info.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -500,7 +499,7 @@ class ErrorAdditionalInfo(msrest.serialization.Model):
     :ivar type: The additional info type.
     :vartype type: str
     :ivar info: The additional info.
-    :vartype info: any
+    :vartype info: JSON
     """
 
     _validation = {
@@ -509,8 +508,8 @@ class ErrorAdditionalInfo(msrest.serialization.Model):
     }
 
     _attribute_map = {
-        'type': {'key': 'type', 'type': 'str'},
-        'info': {'key': 'info', 'type': 'object'},
+        "type": {"key": "type", "type": "str"},
+        "info": {"key": "info", "type": "object"},
     }
 
     def __init__(
@@ -519,12 +518,12 @@ class ErrorAdditionalInfo(msrest.serialization.Model):
     ):
         """
         """
-        super(ErrorAdditionalInfo, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.type = None
         self.info = None
 
 
-class ErrorDetail(msrest.serialization.Model):
+class ErrorDetail(_serialization.Model):
     """The error detail.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -536,9 +535,9 @@ class ErrorDetail(msrest.serialization.Model):
     :ivar target: The error target.
     :vartype target: str
     :ivar details: The error details.
-    :vartype details: list[~device_update.models.ErrorDetail]
+    :vartype details: list[~deviceupdate.models.ErrorDetail]
     :ivar additional_info: The error additional info.
-    :vartype additional_info: list[~device_update.models.ErrorAdditionalInfo]
+    :vartype additional_info: list[~deviceupdate.models.ErrorAdditionalInfo]
     """
 
     _validation = {
@@ -550,11 +549,11 @@ class ErrorDetail(msrest.serialization.Model):
     }
 
     _attribute_map = {
-        'code': {'key': 'code', 'type': 'str'},
-        'message': {'key': 'message', 'type': 'str'},
-        'target': {'key': 'target', 'type': 'str'},
-        'details': {'key': 'details', 'type': '[ErrorDetail]'},
-        'additional_info': {'key': 'additionalInfo', 'type': '[ErrorAdditionalInfo]'},
+        "code": {"key": "code", "type": "str"},
+        "message": {"key": "message", "type": "str"},
+        "target": {"key": "target", "type": "str"},
+        "details": {"key": "details", "type": "[ErrorDetail]"},
+        "additional_info": {"key": "additionalInfo", "type": "[ErrorAdditionalInfo]"},
     }
 
     def __init__(
@@ -563,7 +562,7 @@ class ErrorDetail(msrest.serialization.Model):
     ):
         """
         """
-        super(ErrorDetail, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.code = None
         self.message = None
         self.target = None
@@ -571,15 +570,15 @@ class ErrorDetail(msrest.serialization.Model):
         self.additional_info = None
 
 
-class ErrorResponse(msrest.serialization.Model):
+class ErrorResponse(_serialization.Model):
     """Common error response for all Azure Resource Manager APIs to return error details for failed operations. (This also follows the OData error response format.).
 
     :ivar error: The error object.
-    :vartype error: ~device_update.models.ErrorDetail
+    :vartype error: ~deviceupdate.models.ErrorDetail
     """
 
     _attribute_map = {
-        'error': {'key': 'error', 'type': 'ErrorDetail'},
+        "error": {"key": "error", "type": "ErrorDetail"},
     }
 
     def __init__(
@@ -590,13 +589,13 @@ class ErrorResponse(msrest.serialization.Model):
     ):
         """
         :keyword error: The error object.
-        :paramtype error: ~device_update.models.ErrorDetail
+        :paramtype error: ~deviceupdate.models.ErrorDetail
         """
-        super(ErrorResponse, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.error = error
 
 
-class GroupConnectivityInformation(msrest.serialization.Model):
+class GroupConnectivityInformation(_serialization.Model):
     """Group connectivity details.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -622,12 +621,12 @@ class GroupConnectivityInformation(msrest.serialization.Model):
     }
 
     _attribute_map = {
-        'group_id': {'key': 'groupId', 'type': 'str'},
-        'member_name': {'key': 'memberName', 'type': 'str'},
-        'customer_visible_fqdns': {'key': 'customerVisibleFqdns', 'type': '[str]'},
-        'internal_fqdn': {'key': 'internalFqdn', 'type': 'str'},
-        'redirect_map_id': {'key': 'redirectMapId', 'type': 'str'},
-        'private_link_service_arm_region': {'key': 'privateLinkServiceArmRegion', 'type': 'str'},
+        "group_id": {"key": "groupId", "type": "str"},
+        "member_name": {"key": "memberName", "type": "str"},
+        "customer_visible_fqdns": {"key": "customerVisibleFqdns", "type": "[str]"},
+        "internal_fqdn": {"key": "internalFqdn", "type": "str"},
+        "redirect_map_id": {"key": "redirectMapId", "type": "str"},
+        "private_link_service_arm_region": {"key": "privateLinkServiceArmRegion", "type": "str"},
     }
 
     def __init__(
@@ -646,7 +645,7 @@ class GroupConnectivityInformation(msrest.serialization.Model):
         :keyword private_link_service_arm_region: PrivateLinkService ARM region.
         :paramtype private_link_service_arm_region: str
         """
-        super(GroupConnectivityInformation, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.group_id = None
         self.member_name = None
         self.customer_visible_fqdns = customer_visible_fqdns
@@ -670,7 +669,7 @@ class ProxyResource(Resource):
     :vartype type: str
     :ivar system_data: Azure Resource Manager metadata containing createdBy and modifiedBy
      information.
-    :vartype system_data: ~device_update.models.SystemData
+    :vartype system_data: ~deviceupdate.models.SystemData
     """
 
     _validation = {
@@ -681,10 +680,10 @@ class ProxyResource(Resource):
     }
 
     _attribute_map = {
-        'id': {'key': 'id', 'type': 'str'},
-        'name': {'key': 'name', 'type': 'str'},
-        'type': {'key': 'type', 'type': 'str'},
-        'system_data': {'key': 'systemData', 'type': 'SystemData'},
+        "id": {"key": "id", "type": "str"},
+        "name": {"key": "name", "type": "str"},
+        "type": {"key": "type", "type": "str"},
+        "system_data": {"key": "systemData", "type": "SystemData"},
     }
 
     def __init__(
@@ -693,7 +692,7 @@ class ProxyResource(Resource):
     ):
         """
         """
-        super(ProxyResource, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
 
 class GroupInformation(ProxyResource):
@@ -711,7 +710,7 @@ class GroupInformation(ProxyResource):
     :vartype type: str
     :ivar system_data: Azure Resource Manager metadata containing createdBy and modifiedBy
      information.
-    :vartype system_data: ~device_update.models.SystemData
+    :vartype system_data: ~deviceupdate.models.SystemData
     :ivar group_id: The private link resource group id.
     :vartype group_id: str
     :ivar required_members: The private link resource required member names.
@@ -719,8 +718,8 @@ class GroupInformation(ProxyResource):
     :ivar required_zone_names: The private link resource Private link DNS zone name.
     :vartype required_zone_names: list[str]
     :ivar provisioning_state: The provisioning state of private link group ID. Known values are:
-     "Succeeded", "Failed", "Canceled".
-    :vartype provisioning_state: str or ~device_update.models.GroupIdProvisioningState
+     "Succeeded", "Failed", and "Canceled".
+    :vartype provisioning_state: str or ~deviceupdate.models.GroupIdProvisioningState
     """
 
     _validation = {
@@ -734,14 +733,14 @@ class GroupInformation(ProxyResource):
     }
 
     _attribute_map = {
-        'id': {'key': 'id', 'type': 'str'},
-        'name': {'key': 'name', 'type': 'str'},
-        'type': {'key': 'type', 'type': 'str'},
-        'system_data': {'key': 'systemData', 'type': 'SystemData'},
-        'group_id': {'key': 'properties.groupId', 'type': 'str'},
-        'required_members': {'key': 'properties.requiredMembers', 'type': '[str]'},
-        'required_zone_names': {'key': 'properties.requiredZoneNames', 'type': '[str]'},
-        'provisioning_state': {'key': 'properties.provisioningState', 'type': 'str'},
+        "id": {"key": "id", "type": "str"},
+        "name": {"key": "name", "type": "str"},
+        "type": {"key": "type", "type": "str"},
+        "system_data": {"key": "systemData", "type": "SystemData"},
+        "group_id": {"key": "properties.groupId", "type": "str"},
+        "required_members": {"key": "properties.requiredMembers", "type": "[str]"},
+        "required_zone_names": {"key": "properties.requiredZoneNames", "type": "[str]"},
+        "provisioning_state": {"key": "properties.provisioningState", "type": "str"},
     }
 
     def __init__(
@@ -754,14 +753,14 @@ class GroupInformation(ProxyResource):
         :keyword required_zone_names: The private link resource Private link DNS zone name.
         :paramtype required_zone_names: list[str]
         """
-        super(GroupInformation, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.group_id = None
         self.required_members = None
         self.required_zone_names = required_zone_names
         self.provisioning_state = None
 
 
-class PrivateLinkResourceProperties(msrest.serialization.Model):
+class PrivateLinkResourceProperties(_serialization.Model):
     """Properties of a private link resource.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -780,9 +779,9 @@ class PrivateLinkResourceProperties(msrest.serialization.Model):
     }
 
     _attribute_map = {
-        'group_id': {'key': 'groupId', 'type': 'str'},
-        'required_members': {'key': 'requiredMembers', 'type': '[str]'},
-        'required_zone_names': {'key': 'requiredZoneNames', 'type': '[str]'},
+        "group_id": {"key": "groupId", "type": "str"},
+        "required_members": {"key": "requiredMembers", "type": "[str]"},
+        "required_zone_names": {"key": "requiredZoneNames", "type": "[str]"},
     }
 
     def __init__(
@@ -795,7 +794,7 @@ class PrivateLinkResourceProperties(msrest.serialization.Model):
         :keyword required_zone_names: The private link resource Private link DNS zone name.
         :paramtype required_zone_names: list[str]
         """
-        super(PrivateLinkResourceProperties, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.group_id = None
         self.required_members = None
         self.required_zone_names = required_zone_names
@@ -813,8 +812,8 @@ class GroupInformationProperties(PrivateLinkResourceProperties):
     :ivar required_zone_names: The private link resource Private link DNS zone name.
     :vartype required_zone_names: list[str]
     :ivar provisioning_state: The provisioning state of private link group ID. Known values are:
-     "Succeeded", "Failed", "Canceled".
-    :vartype provisioning_state: str or ~device_update.models.GroupIdProvisioningState
+     "Succeeded", "Failed", and "Canceled".
+    :vartype provisioning_state: str or ~deviceupdate.models.GroupIdProvisioningState
     """
 
     _validation = {
@@ -824,10 +823,10 @@ class GroupInformationProperties(PrivateLinkResourceProperties):
     }
 
     _attribute_map = {
-        'group_id': {'key': 'groupId', 'type': 'str'},
-        'required_members': {'key': 'requiredMembers', 'type': '[str]'},
-        'required_zone_names': {'key': 'requiredZoneNames', 'type': '[str]'},
-        'provisioning_state': {'key': 'provisioningState', 'type': 'str'},
+        "group_id": {"key": "groupId", "type": "str"},
+        "required_members": {"key": "requiredMembers", "type": "[str]"},
+        "required_zone_names": {"key": "requiredZoneNames", "type": "[str]"},
+        "provisioning_state": {"key": "provisioningState", "type": "str"},
     }
 
     def __init__(
@@ -840,11 +839,11 @@ class GroupInformationProperties(PrivateLinkResourceProperties):
         :keyword required_zone_names: The private link resource Private link DNS zone name.
         :paramtype required_zone_names: list[str]
         """
-        super(GroupInformationProperties, self).__init__(required_zone_names=required_zone_names, **kwargs)
+        super().__init__(required_zone_names=required_zone_names, **kwargs)
         self.provisioning_state = None
 
 
-class Instance(TrackedResource):
+class Instance(TrackedResource):  # pylint: disable=too-many-instance-attributes
     """Device Update instance details.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -861,23 +860,23 @@ class Instance(TrackedResource):
     :vartype type: str
     :ivar system_data: Azure Resource Manager metadata containing createdBy and modifiedBy
      information.
-    :vartype system_data: ~device_update.models.SystemData
-    :ivar tags: A set of tags. Resource tags.
+    :vartype system_data: ~deviceupdate.models.SystemData
+    :ivar tags: Resource tags.
     :vartype tags: dict[str, str]
-    :ivar location: Required. The geo-location where the resource lives.
+    :ivar location: The geo-location where the resource lives. Required.
     :vartype location: str
     :ivar provisioning_state: Provisioning state. Known values are: "Succeeded", "Deleted",
-     "Failed", "Canceled", "Accepted", "Creating".
-    :vartype provisioning_state: str or ~device_update.models.ProvisioningState
+     "Failed", "Canceled", "Accepted", and "Creating".
+    :vartype provisioning_state: str or ~deviceupdate.models.ProvisioningState
     :ivar account_name: Parent Device Update Account name which Instance belongs to.
     :vartype account_name: str
     :ivar iot_hubs: List of IoT Hubs associated with the account.
-    :vartype iot_hubs: list[~device_update.models.IotHubSettings]
+    :vartype iot_hubs: list[~deviceupdate.models.IotHubSettings]
     :ivar enable_diagnostics: Enables or Disables the diagnostic logs collection.
     :vartype enable_diagnostics: bool
     :ivar diagnostic_storage_properties: Customer-initiated diagnostic log collection storage
      properties.
-    :vartype diagnostic_storage_properties: ~device_update.models.DiagnosticStorageProperties
+    :vartype diagnostic_storage_properties: ~deviceupdate.models.DiagnosticStorageProperties
     """
 
     _validation = {
@@ -891,17 +890,17 @@ class Instance(TrackedResource):
     }
 
     _attribute_map = {
-        'id': {'key': 'id', 'type': 'str'},
-        'name': {'key': 'name', 'type': 'str'},
-        'type': {'key': 'type', 'type': 'str'},
-        'system_data': {'key': 'systemData', 'type': 'SystemData'},
-        'tags': {'key': 'tags', 'type': '{str}'},
-        'location': {'key': 'location', 'type': 'str'},
-        'provisioning_state': {'key': 'properties.provisioningState', 'type': 'str'},
-        'account_name': {'key': 'properties.accountName', 'type': 'str'},
-        'iot_hubs': {'key': 'properties.iotHubs', 'type': '[IotHubSettings]'},
-        'enable_diagnostics': {'key': 'properties.enableDiagnostics', 'type': 'bool'},
-        'diagnostic_storage_properties': {'key': 'properties.diagnosticStorageProperties', 'type': 'DiagnosticStorageProperties'},
+        "id": {"key": "id", "type": "str"},
+        "name": {"key": "name", "type": "str"},
+        "type": {"key": "type", "type": "str"},
+        "system_data": {"key": "systemData", "type": "SystemData"},
+        "tags": {"key": "tags", "type": "{str}"},
+        "location": {"key": "location", "type": "str"},
+        "provisioning_state": {"key": "properties.provisioningState", "type": "str"},
+        "account_name": {"key": "properties.accountName", "type": "str"},
+        "iot_hubs": {"key": "properties.iotHubs", "type": "[IotHubSettings]"},
+        "enable_diagnostics": {"key": "properties.enableDiagnostics", "type": "bool"},
+        "diagnostic_storage_properties": {"key": "properties.diagnosticStorageProperties", "type": "DiagnosticStorageProperties"},
     }
 
     def __init__(
@@ -915,19 +914,19 @@ class Instance(TrackedResource):
         **kwargs
     ):
         """
-        :keyword tags: A set of tags. Resource tags.
+        :keyword tags: Resource tags.
         :paramtype tags: dict[str, str]
-        :keyword location: Required. The geo-location where the resource lives.
+        :keyword location: The geo-location where the resource lives. Required.
         :paramtype location: str
         :keyword iot_hubs: List of IoT Hubs associated with the account.
-        :paramtype iot_hubs: list[~device_update.models.IotHubSettings]
+        :paramtype iot_hubs: list[~deviceupdate.models.IotHubSettings]
         :keyword enable_diagnostics: Enables or Disables the diagnostic logs collection.
         :paramtype enable_diagnostics: bool
         :keyword diagnostic_storage_properties: Customer-initiated diagnostic log collection storage
          properties.
-        :paramtype diagnostic_storage_properties: ~device_update.models.DiagnosticStorageProperties
+        :paramtype diagnostic_storage_properties: ~deviceupdate.models.DiagnosticStorageProperties
         """
-        super(Instance, self).__init__(tags=tags, location=location, **kwargs)
+        super().__init__(tags=tags, location=location, **kwargs)
         self.provisioning_state = None
         self.account_name = None
         self.iot_hubs = iot_hubs
@@ -935,18 +934,18 @@ class Instance(TrackedResource):
         self.diagnostic_storage_properties = diagnostic_storage_properties
 
 
-class InstanceList(msrest.serialization.Model):
+class InstanceList(_serialization.Model):
     """List of Instances.
 
     :ivar next_link: The link used to get the next page of Instances list.
     :vartype next_link: str
     :ivar value: List of Instances.
-    :vartype value: list[~device_update.models.Instance]
+    :vartype value: list[~deviceupdate.models.Instance]
     """
 
     _attribute_map = {
-        'next_link': {'key': 'nextLink', 'type': 'str'},
-        'value': {'key': 'value', 'type': '[Instance]'},
+        "next_link": {"key": "nextLink", "type": "str"},
+        "value": {"key": "value", "type": "[Instance]"},
     }
 
     def __init__(
@@ -960,19 +959,19 @@ class InstanceList(msrest.serialization.Model):
         :keyword next_link: The link used to get the next page of Instances list.
         :paramtype next_link: str
         :keyword value: List of Instances.
-        :paramtype value: list[~device_update.models.Instance]
+        :paramtype value: list[~deviceupdate.models.Instance]
         """
-        super(InstanceList, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.next_link = next_link
         self.value = value
 
 
-class IotHubSettings(msrest.serialization.Model):
+class IotHubSettings(_serialization.Model):
     """Device Update account integration with IoT Hub settings.
 
     All required parameters must be populated in order to send to Azure.
 
-    :ivar resource_id: Required. IoTHub resource ID.
+    :ivar resource_id: IoTHub resource ID. Required.
     :vartype resource_id: str
     """
 
@@ -981,7 +980,7 @@ class IotHubSettings(msrest.serialization.Model):
     }
 
     _attribute_map = {
-        'resource_id': {'key': 'resourceId', 'type': 'str'},
+        "resource_id": {"key": "resourceId", "type": "str"},
     }
 
     def __init__(
@@ -991,48 +990,48 @@ class IotHubSettings(msrest.serialization.Model):
         **kwargs
     ):
         """
-        :keyword resource_id: Required. IoTHub resource ID.
+        :keyword resource_id: IoTHub resource ID. Required.
         :paramtype resource_id: str
         """
-        super(IotHubSettings, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.resource_id = resource_id
 
 
-class Location(msrest.serialization.Model):
+class Location(_serialization.Model):
     """Location.
 
     :ivar name:
     :vartype name: str
-    :ivar role: Whether the location is primary or failover. Known values are: "Primary",
-     "Failover". Default value: "Primary".
-    :vartype role: str or ~device_update.models.Role
+    :ivar role: Whether the location is primary or failover. Known values are: "Primary" and
+     "Failover".
+    :vartype role: str or ~deviceupdate.models.Role
     """
 
     _attribute_map = {
-        'name': {'key': 'name', 'type': 'str'},
-        'role': {'key': 'role', 'type': 'str'},
+        "name": {"key": "name", "type": "str"},
+        "role": {"key": "role", "type": "str"},
     }
 
     def __init__(
         self,
         *,
         name: Optional[str] = None,
-        role: Optional[Union[str, "_models.Role"]] = "Primary",
+        role: Union[str, "_models.Role"] = "Primary",
         **kwargs
     ):
         """
         :keyword name:
         :paramtype name: str
-        :keyword role: Whether the location is primary or failover. Known values are: "Primary",
-         "Failover". Default value: "Primary".
-        :paramtype role: str or ~device_update.models.Role
+        :keyword role: Whether the location is primary or failover. Known values are: "Primary" and
+         "Failover".
+        :paramtype role: str or ~deviceupdate.models.Role
         """
-        super(Location, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.name = name
         self.role = role
 
 
-class ManagedServiceIdentity(msrest.serialization.Model):
+class ManagedServiceIdentity(_serialization.Model):
     """Managed service identity (system assigned and/or user assigned identities).
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -1045,15 +1044,15 @@ class ManagedServiceIdentity(msrest.serialization.Model):
     :ivar tenant_id: The tenant ID of the system assigned identity. This property will only be
      provided for a system assigned identity.
     :vartype tenant_id: str
-    :ivar type: Required. Type of managed service identity (where both SystemAssigned and
-     UserAssigned types are allowed). Known values are: "None", "SystemAssigned", "UserAssigned",
+    :ivar type: Type of managed service identity (where both SystemAssigned and UserAssigned types
+     are allowed). Required. Known values are: "None", "SystemAssigned", "UserAssigned", and
      "SystemAssigned,UserAssigned".
-    :vartype type: str or ~device_update.models.ManagedServiceIdentityType
+    :vartype type: str or ~deviceupdate.models.ManagedServiceIdentityType
     :ivar user_assigned_identities: The set of user assigned identities associated with the
      resource. The userAssignedIdentities dictionary keys will be ARM resource ids in the form:
      '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/{identityName}.
      The dictionary values can be empty objects ({}) in requests.
-    :vartype user_assigned_identities: dict[str, ~device_update.models.UserAssignedIdentity]
+    :vartype user_assigned_identities: dict[str, ~deviceupdate.models.UserAssignedIdentity]
     """
 
     _validation = {
@@ -1063,10 +1062,10 @@ class ManagedServiceIdentity(msrest.serialization.Model):
     }
 
     _attribute_map = {
-        'principal_id': {'key': 'principalId', 'type': 'str'},
-        'tenant_id': {'key': 'tenantId', 'type': 'str'},
-        'type': {'key': 'type', 'type': 'str'},
-        'user_assigned_identities': {'key': 'userAssignedIdentities', 'type': '{UserAssignedIdentity}'},
+        "principal_id": {"key": "principalId", "type": "str"},
+        "tenant_id": {"key": "tenantId", "type": "str"},
+        "type": {"key": "type", "type": "str"},
+        "user_assigned_identities": {"key": "userAssignedIdentities", "type": "{UserAssignedIdentity}"},
     }
 
     def __init__(
@@ -1077,24 +1076,24 @@ class ManagedServiceIdentity(msrest.serialization.Model):
         **kwargs
     ):
         """
-        :keyword type: Required. Type of managed service identity (where both SystemAssigned and
-         UserAssigned types are allowed). Known values are: "None", "SystemAssigned", "UserAssigned",
+        :keyword type: Type of managed service identity (where both SystemAssigned and UserAssigned
+         types are allowed). Required. Known values are: "None", "SystemAssigned", "UserAssigned", and
          "SystemAssigned,UserAssigned".
-        :paramtype type: str or ~device_update.models.ManagedServiceIdentityType
+        :paramtype type: str or ~deviceupdate.models.ManagedServiceIdentityType
         :keyword user_assigned_identities: The set of user assigned identities associated with the
          resource. The userAssignedIdentities dictionary keys will be ARM resource ids in the form:
          '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/{identityName}.
          The dictionary values can be empty objects ({}) in requests.
-        :paramtype user_assigned_identities: dict[str, ~device_update.models.UserAssignedIdentity]
+        :paramtype user_assigned_identities: dict[str, ~deviceupdate.models.UserAssignedIdentity]
         """
-        super(ManagedServiceIdentity, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.principal_id = None
         self.tenant_id = None
         self.type = type
         self.user_assigned_identities = user_assigned_identities
 
 
-class Operation(msrest.serialization.Model):
+class Operation(_serialization.Model):
     """Details of a REST API operation, returned from the Resource Provider Operations API.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -1106,14 +1105,14 @@ class Operation(msrest.serialization.Model):
      data-plane operations and "false" for ARM/control-plane operations.
     :vartype is_data_action: bool
     :ivar display: Localized display information for this particular operation.
-    :vartype display: ~device_update.models.OperationDisplay
+    :vartype display: ~deviceupdate.models.OperationDisplay
     :ivar origin: The intended executor of the operation; as in Resource Based Access Control
      (RBAC) and audit logs UX. Default value is "user,system". Known values are: "user", "system",
-     "user,system".
-    :vartype origin: str or ~device_update.models.Origin
+     and "user,system".
+    :vartype origin: str or ~deviceupdate.models.Origin
     :ivar action_type: Enum. Indicates the action type. "Internal" refers to actions that are for
-     internal only APIs. Known values are: "Internal".
-    :vartype action_type: str or ~device_update.models.ActionType
+     internal only APIs. "Internal"
+    :vartype action_type: str or ~deviceupdate.models.ActionType
     """
 
     _validation = {
@@ -1124,11 +1123,11 @@ class Operation(msrest.serialization.Model):
     }
 
     _attribute_map = {
-        'name': {'key': 'name', 'type': 'str'},
-        'is_data_action': {'key': 'isDataAction', 'type': 'bool'},
-        'display': {'key': 'display', 'type': 'OperationDisplay'},
-        'origin': {'key': 'origin', 'type': 'str'},
-        'action_type': {'key': 'actionType', 'type': 'str'},
+        "name": {"key": "name", "type": "str"},
+        "is_data_action": {"key": "isDataAction", "type": "bool"},
+        "display": {"key": "display", "type": "OperationDisplay"},
+        "origin": {"key": "origin", "type": "str"},
+        "action_type": {"key": "actionType", "type": "str"},
     }
 
     def __init__(
@@ -1139,9 +1138,9 @@ class Operation(msrest.serialization.Model):
     ):
         """
         :keyword display: Localized display information for this particular operation.
-        :paramtype display: ~device_update.models.OperationDisplay
+        :paramtype display: ~deviceupdate.models.OperationDisplay
         """
-        super(Operation, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.name = None
         self.is_data_action = None
         self.display = display
@@ -1149,7 +1148,7 @@ class Operation(msrest.serialization.Model):
         self.action_type = None
 
 
-class OperationDisplay(msrest.serialization.Model):
+class OperationDisplay(_serialization.Model):
     """Localized display information for this particular operation.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -1176,10 +1175,10 @@ class OperationDisplay(msrest.serialization.Model):
     }
 
     _attribute_map = {
-        'provider': {'key': 'provider', 'type': 'str'},
-        'resource': {'key': 'resource', 'type': 'str'},
-        'operation': {'key': 'operation', 'type': 'str'},
-        'description': {'key': 'description', 'type': 'str'},
+        "provider": {"key": "provider", "type": "str"},
+        "resource": {"key": "resource", "type": "str"},
+        "operation": {"key": "operation", "type": "str"},
+        "description": {"key": "description", "type": "str"},
     }
 
     def __init__(
@@ -1188,20 +1187,20 @@ class OperationDisplay(msrest.serialization.Model):
     ):
         """
         """
-        super(OperationDisplay, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.provider = None
         self.resource = None
         self.operation = None
         self.description = None
 
 
-class OperationListResult(msrest.serialization.Model):
+class OperationListResult(_serialization.Model):
     """A list of REST API operations supported by an Azure Resource Provider. It contains an URL link to get the next set of results.
 
     Variables are only populated by the server, and will be ignored when sending a request.
 
     :ivar value: List of operations supported by the resource provider.
-    :vartype value: list[~device_update.models.Operation]
+    :vartype value: list[~deviceupdate.models.Operation]
     :ivar next_link: URL to get the next set of operation list results (if there are any).
     :vartype next_link: str
     """
@@ -1212,8 +1211,8 @@ class OperationListResult(msrest.serialization.Model):
     }
 
     _attribute_map = {
-        'value': {'key': 'value', 'type': '[Operation]'},
-        'next_link': {'key': 'nextLink', 'type': 'str'},
+        "value": {"key": "value", "type": "[Operation]"},
+        "next_link": {"key": "nextLink", "type": "str"},
     }
 
     def __init__(
@@ -1222,12 +1221,12 @@ class OperationListResult(msrest.serialization.Model):
     ):
         """
         """
-        super(OperationListResult, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.value = None
         self.next_link = None
 
 
-class PrivateEndpoint(msrest.serialization.Model):
+class PrivateEndpoint(_serialization.Model):
     """The Private Endpoint resource.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -1241,7 +1240,7 @@ class PrivateEndpoint(msrest.serialization.Model):
     }
 
     _attribute_map = {
-        'id': {'key': 'id', 'type': 'str'},
+        "id": {"key": "id", "type": "str"},
     }
 
     def __init__(
@@ -1250,7 +1249,7 @@ class PrivateEndpoint(msrest.serialization.Model):
     ):
         """
         """
-        super(PrivateEndpoint, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.id = None
 
 
@@ -1271,19 +1270,19 @@ class PrivateEndpointConnection(Resource):
     :vartype type: str
     :ivar system_data: Azure Resource Manager metadata containing createdBy and modifiedBy
      information.
-    :vartype system_data: ~device_update.models.SystemData
+    :vartype system_data: ~deviceupdate.models.SystemData
     :ivar private_endpoint: The resource of private end point.
-    :vartype private_endpoint: ~device_update.models.PrivateEndpoint
-    :ivar private_link_service_connection_state: Required. A collection of information about the
-     state of the connection between service consumer and provider.
+    :vartype private_endpoint: ~deviceupdate.models.PrivateEndpoint
+    :ivar private_link_service_connection_state: A collection of information about the state of the
+     connection between service consumer and provider. Required.
     :vartype private_link_service_connection_state:
-     ~device_update.models.PrivateLinkServiceConnectionState
+     ~deviceupdate.models.PrivateLinkServiceConnectionState
     :ivar group_ids: Array of group IDs.
     :vartype group_ids: list[str]
     :ivar provisioning_state: The provisioning state of the private endpoint connection resource.
-     Known values are: "Succeeded", "Creating", "Deleting", "Failed".
+     Known values are: "Succeeded", "Creating", "Deleting", and "Failed".
     :vartype provisioning_state: str or
-     ~device_update.models.PrivateEndpointConnectionProvisioningState
+     ~deviceupdate.models.PrivateEndpointConnectionProvisioningState
     """
 
     _validation = {
@@ -1296,14 +1295,14 @@ class PrivateEndpointConnection(Resource):
     }
 
     _attribute_map = {
-        'id': {'key': 'id', 'type': 'str'},
-        'name': {'key': 'name', 'type': 'str'},
-        'type': {'key': 'type', 'type': 'str'},
-        'system_data': {'key': 'systemData', 'type': 'SystemData'},
-        'private_endpoint': {'key': 'properties.privateEndpoint', 'type': 'PrivateEndpoint'},
-        'private_link_service_connection_state': {'key': 'properties.privateLinkServiceConnectionState', 'type': 'PrivateLinkServiceConnectionState'},
-        'group_ids': {'key': 'properties.groupIds', 'type': '[str]'},
-        'provisioning_state': {'key': 'properties.provisioningState', 'type': 'str'},
+        "id": {"key": "id", "type": "str"},
+        "name": {"key": "name", "type": "str"},
+        "type": {"key": "type", "type": "str"},
+        "system_data": {"key": "systemData", "type": "SystemData"},
+        "private_endpoint": {"key": "properties.privateEndpoint", "type": "PrivateEndpoint"},
+        "private_link_service_connection_state": {"key": "properties.privateLinkServiceConnectionState", "type": "PrivateLinkServiceConnectionState"},
+        "group_ids": {"key": "properties.groupIds", "type": "[str]"},
+        "provisioning_state": {"key": "properties.provisioningState", "type": "str"},
     }
 
     def __init__(
@@ -1316,30 +1315,30 @@ class PrivateEndpointConnection(Resource):
     ):
         """
         :keyword private_endpoint: The resource of private end point.
-        :paramtype private_endpoint: ~device_update.models.PrivateEndpoint
-        :keyword private_link_service_connection_state: Required. A collection of information about the
-         state of the connection between service consumer and provider.
+        :paramtype private_endpoint: ~deviceupdate.models.PrivateEndpoint
+        :keyword private_link_service_connection_state: A collection of information about the state of
+         the connection between service consumer and provider. Required.
         :paramtype private_link_service_connection_state:
-         ~device_update.models.PrivateLinkServiceConnectionState
+         ~deviceupdate.models.PrivateLinkServiceConnectionState
         :keyword group_ids: Array of group IDs.
         :paramtype group_ids: list[str]
         """
-        super(PrivateEndpointConnection, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.private_endpoint = private_endpoint
         self.private_link_service_connection_state = private_link_service_connection_state
         self.group_ids = group_ids
         self.provisioning_state = None
 
 
-class PrivateEndpointConnectionListResult(msrest.serialization.Model):
+class PrivateEndpointConnectionListResult(_serialization.Model):
     """List of private endpoint connection associated with the specified storage account.
 
     :ivar value: Array of private endpoint connections.
-    :vartype value: list[~device_update.models.PrivateEndpointConnection]
+    :vartype value: list[~deviceupdate.models.PrivateEndpointConnection]
     """
 
     _attribute_map = {
-        'value': {'key': 'value', 'type': '[PrivateEndpointConnection]'},
+        "value": {"key": "value", "type": "[PrivateEndpointConnection]"},
     }
 
     def __init__(
@@ -1350,13 +1349,13 @@ class PrivateEndpointConnectionListResult(msrest.serialization.Model):
     ):
         """
         :keyword value: Array of private endpoint connections.
-        :paramtype value: list[~device_update.models.PrivateEndpointConnection]
+        :paramtype value: list[~deviceupdate.models.PrivateEndpointConnection]
         """
-        super(PrivateEndpointConnectionListResult, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.value = value
 
 
-class PrivateEndpointConnectionProxyProperties(msrest.serialization.Model):
+class PrivateEndpointConnectionProxyProperties(_serialization.Model):
     """Private endpoint connection proxy object properties.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -1364,7 +1363,7 @@ class PrivateEndpointConnectionProxyProperties(msrest.serialization.Model):
     :ivar e_tag: ETag from NRP.
     :vartype e_tag: str
     :ivar remote_private_endpoint: Remote private endpoint details.
-    :vartype remote_private_endpoint: ~device_update.models.RemotePrivateEndpoint
+    :vartype remote_private_endpoint: ~deviceupdate.models.RemotePrivateEndpoint
     :ivar status: Operation status.
     :vartype status: str
     """
@@ -1374,9 +1373,9 @@ class PrivateEndpointConnectionProxyProperties(msrest.serialization.Model):
     }
 
     _attribute_map = {
-        'e_tag': {'key': 'eTag', 'type': 'str'},
-        'remote_private_endpoint': {'key': 'remotePrivateEndpoint', 'type': 'RemotePrivateEndpoint'},
-        'status': {'key': 'status', 'type': 'str'},
+        "e_tag": {"key": "eTag", "type": "str"},
+        "remote_private_endpoint": {"key": "remotePrivateEndpoint", "type": "RemotePrivateEndpoint"},
+        "status": {"key": "status", "type": "str"},
     }
 
     def __init__(
@@ -1388,11 +1387,11 @@ class PrivateEndpointConnectionProxyProperties(msrest.serialization.Model):
     ):
         """
         :keyword remote_private_endpoint: Remote private endpoint details.
-        :paramtype remote_private_endpoint: ~device_update.models.RemotePrivateEndpoint
+        :paramtype remote_private_endpoint: ~deviceupdate.models.RemotePrivateEndpoint
         :keyword status: Operation status.
         :paramtype status: str
         """
-        super(PrivateEndpointConnectionProxyProperties, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.e_tag = None
         self.remote_private_endpoint = remote_private_endpoint
         self.status = status
@@ -1406,7 +1405,7 @@ class PrivateEndpointConnectionProxy(ProxyResource, PrivateEndpointConnectionPro
     :ivar e_tag: ETag from NRP.
     :vartype e_tag: str
     :ivar remote_private_endpoint: Remote private endpoint details.
-    :vartype remote_private_endpoint: ~device_update.models.RemotePrivateEndpoint
+    :vartype remote_private_endpoint: ~deviceupdate.models.RemotePrivateEndpoint
     :ivar status: Operation status.
     :vartype status: str
     :ivar id: Fully qualified resource ID for the resource. Ex -
@@ -1419,11 +1418,11 @@ class PrivateEndpointConnectionProxy(ProxyResource, PrivateEndpointConnectionPro
     :vartype type: str
     :ivar system_data: Azure Resource Manager metadata containing createdBy and modifiedBy
      information.
-    :vartype system_data: ~device_update.models.SystemData
+    :vartype system_data: ~deviceupdate.models.SystemData
     :ivar provisioning_state: The provisioning state of the private endpoint connection proxy
-     resource. Known values are: "Succeeded", "Creating", "Deleting", "Failed".
+     resource. Known values are: "Succeeded", "Creating", "Deleting", and "Failed".
     :vartype provisioning_state: str or
-     ~device_update.models.PrivateEndpointConnectionProxyProvisioningState
+     ~deviceupdate.models.PrivateEndpointConnectionProxyProvisioningState
     """
 
     _validation = {
@@ -1436,14 +1435,14 @@ class PrivateEndpointConnectionProxy(ProxyResource, PrivateEndpointConnectionPro
     }
 
     _attribute_map = {
-        'e_tag': {'key': 'eTag', 'type': 'str'},
-        'remote_private_endpoint': {'key': 'remotePrivateEndpoint', 'type': 'RemotePrivateEndpoint'},
-        'status': {'key': 'status', 'type': 'str'},
-        'id': {'key': 'id', 'type': 'str'},
-        'name': {'key': 'name', 'type': 'str'},
-        'type': {'key': 'type', 'type': 'str'},
-        'system_data': {'key': 'systemData', 'type': 'SystemData'},
-        'provisioning_state': {'key': 'properties.provisioningState', 'type': 'str'},
+        "e_tag": {"key": "eTag", "type": "str"},
+        "remote_private_endpoint": {"key": "remotePrivateEndpoint", "type": "RemotePrivateEndpoint"},
+        "status": {"key": "status", "type": "str"},
+        "id": {"key": "id", "type": "str"},
+        "name": {"key": "name", "type": "str"},
+        "type": {"key": "type", "type": "str"},
+        "system_data": {"key": "systemData", "type": "SystemData"},
+        "provisioning_state": {"key": "properties.provisioningState", "type": "str"},
     }
 
     def __init__(
@@ -1455,11 +1454,11 @@ class PrivateEndpointConnectionProxy(ProxyResource, PrivateEndpointConnectionPro
     ):
         """
         :keyword remote_private_endpoint: Remote private endpoint details.
-        :paramtype remote_private_endpoint: ~device_update.models.RemotePrivateEndpoint
+        :paramtype remote_private_endpoint: ~deviceupdate.models.RemotePrivateEndpoint
         :keyword status: Operation status.
         :paramtype status: str
         """
-        super(PrivateEndpointConnectionProxy, self).__init__(remote_private_endpoint=remote_private_endpoint, status=status, **kwargs)
+        super().__init__(remote_private_endpoint=remote_private_endpoint, status=status, **kwargs)
         self.e_tag = None
         self.remote_private_endpoint = remote_private_endpoint
         self.status = status
@@ -1470,19 +1469,19 @@ class PrivateEndpointConnectionProxy(ProxyResource, PrivateEndpointConnectionPro
         self.system_data = None
 
 
-class PrivateEndpointConnectionProxyListResult(msrest.serialization.Model):
+class PrivateEndpointConnectionProxyListResult(_serialization.Model):
     """The available private endpoint connection proxies for an Account (not to be used by anyone, here because of ARM requirements).
 
     :ivar value: The list of available private endpoint connection proxies for an Account.
-    :vartype value: list[~device_update.models.PrivateEndpointConnectionProxy]
+    :vartype value: list[~deviceupdate.models.PrivateEndpointConnectionProxy]
     :ivar next_link: The URI that can be used to request the next list of private endpoint
      connection proxies.
     :vartype next_link: str
     """
 
     _attribute_map = {
-        'value': {'key': 'value', 'type': '[PrivateEndpointConnectionProxy]'},
-        'next_link': {'key': 'nextLink', 'type': 'str'},
+        "value": {"key": "value", "type": "[PrivateEndpointConnectionProxy]"},
+        "next_link": {"key": "nextLink", "type": "str"},
     }
 
     def __init__(
@@ -1494,17 +1493,17 @@ class PrivateEndpointConnectionProxyListResult(msrest.serialization.Model):
     ):
         """
         :keyword value: The list of available private endpoint connection proxies for an Account.
-        :paramtype value: list[~device_update.models.PrivateEndpointConnectionProxy]
+        :paramtype value: list[~deviceupdate.models.PrivateEndpointConnectionProxy]
         :keyword next_link: The URI that can be used to request the next list of private endpoint
          connection proxies.
         :paramtype next_link: str
         """
-        super(PrivateEndpointConnectionProxyListResult, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.value = value
         self.next_link = next_link
 
 
-class PrivateEndpointUpdate(msrest.serialization.Model):
+class PrivateEndpointUpdate(_serialization.Model):
     """Private endpoint update details.
 
     :ivar id: Remote endpoint resource ID.
@@ -1520,17 +1519,17 @@ class PrivateEndpointUpdate(msrest.serialization.Model):
     """
 
     _attribute_map = {
-        'id': {'key': 'id', 'type': 'str'},
-        'location': {'key': 'location', 'type': 'str'},
-        'immutable_subscription_id': {'key': 'immutableSubscriptionId', 'type': 'str'},
-        'immutable_resource_id': {'key': 'immutableResourceId', 'type': 'str'},
-        'vnet_traffic_tag': {'key': 'vnetTrafficTag', 'type': 'str'},
+        "id": {"key": "id", "type": "str"},
+        "location": {"key": "location", "type": "str"},
+        "immutable_subscription_id": {"key": "immutableSubscriptionId", "type": "str"},
+        "immutable_resource_id": {"key": "immutableResourceId", "type": "str"},
+        "vnet_traffic_tag": {"key": "vnetTrafficTag", "type": "str"},
     }
 
     def __init__(
         self,
         *,
-        id: Optional[str] = None,
+        id: Optional[str] = None,  # pylint: disable=redefined-builtin
         location: Optional[str] = None,
         immutable_subscription_id: Optional[str] = None,
         immutable_resource_id: Optional[str] = None,
@@ -1549,7 +1548,7 @@ class PrivateEndpointUpdate(msrest.serialization.Model):
         :keyword vnet_traffic_tag: Virtual network traffic tag.
         :paramtype vnet_traffic_tag: str
         """
-        super(PrivateEndpointUpdate, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.id = id
         self.location = location
         self.immutable_subscription_id = immutable_subscription_id
@@ -1557,18 +1556,18 @@ class PrivateEndpointUpdate(msrest.serialization.Model):
         self.vnet_traffic_tag = vnet_traffic_tag
 
 
-class PrivateLinkResourceListResult(msrest.serialization.Model):
+class PrivateLinkResourceListResult(_serialization.Model):
     """The available private link resources for an Account.
 
     :ivar value: The list of available private link resources for an Account.
-    :vartype value: list[~device_update.models.GroupInformation]
+    :vartype value: list[~deviceupdate.models.GroupInformation]
     :ivar next_link: The URI that can be used to request the next list of private link resources.
     :vartype next_link: str
     """
 
     _attribute_map = {
-        'value': {'key': 'value', 'type': '[GroupInformation]'},
-        'next_link': {'key': 'nextLink', 'type': 'str'},
+        "value": {"key": "value", "type": "[GroupInformation]"},
+        "next_link": {"key": "nextLink", "type": "str"},
     }
 
     def __init__(
@@ -1580,17 +1579,17 @@ class PrivateLinkResourceListResult(msrest.serialization.Model):
     ):
         """
         :keyword value: The list of available private link resources for an Account.
-        :paramtype value: list[~device_update.models.GroupInformation]
+        :paramtype value: list[~deviceupdate.models.GroupInformation]
         :keyword next_link: The URI that can be used to request the next list of private link
          resources.
         :paramtype next_link: str
         """
-        super(PrivateLinkResourceListResult, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.value = value
         self.next_link = next_link
 
 
-class PrivateLinkServiceConnection(msrest.serialization.Model):
+class PrivateLinkServiceConnection(_serialization.Model):
     """Private link service connection details.
 
     :ivar name: Private link service connection name.
@@ -1602,9 +1601,9 @@ class PrivateLinkServiceConnection(msrest.serialization.Model):
     """
 
     _attribute_map = {
-        'name': {'key': 'name', 'type': 'str'},
-        'group_ids': {'key': 'groupIds', 'type': '[str]'},
-        'request_message': {'key': 'requestMessage', 'type': 'str'},
+        "name": {"key": "name", "type": "str"},
+        "group_ids": {"key": "groupIds", "type": "[str]"},
+        "request_message": {"key": "requestMessage", "type": "str"},
     }
 
     def __init__(
@@ -1623,18 +1622,18 @@ class PrivateLinkServiceConnection(msrest.serialization.Model):
         :keyword request_message: Request message.
         :paramtype request_message: str
         """
-        super(PrivateLinkServiceConnection, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.name = name
         self.group_ids = group_ids
         self.request_message = request_message
 
 
-class PrivateLinkServiceConnectionState(msrest.serialization.Model):
+class PrivateLinkServiceConnectionState(_serialization.Model):
     """A collection of information about the state of the connection between service consumer and provider.
 
     :ivar status: Indicates whether the connection has been Approved/Rejected/Removed by the owner
-     of the service. Known values are: "Pending", "Approved", "Rejected".
-    :vartype status: str or ~device_update.models.PrivateEndpointServiceConnectionStatus
+     of the service. Known values are: "Pending", "Approved", and "Rejected".
+    :vartype status: str or ~deviceupdate.models.PrivateEndpointServiceConnectionStatus
     :ivar description: The reason for approval/rejection of the connection.
     :vartype description: str
     :ivar actions_required: A message indicating if changes on the service provider require any
@@ -1643,9 +1642,9 @@ class PrivateLinkServiceConnectionState(msrest.serialization.Model):
     """
 
     _attribute_map = {
-        'status': {'key': 'status', 'type': 'str'},
-        'description': {'key': 'description', 'type': 'str'},
-        'actions_required': {'key': 'actionsRequired', 'type': 'str'},
+        "status": {"key": "status", "type": "str"},
+        "description": {"key": "description", "type": "str"},
+        "actions_required": {"key": "actionsRequired", "type": "str"},
     }
 
     def __init__(
@@ -1658,21 +1657,21 @@ class PrivateLinkServiceConnectionState(msrest.serialization.Model):
     ):
         """
         :keyword status: Indicates whether the connection has been Approved/Rejected/Removed by the
-         owner of the service. Known values are: "Pending", "Approved", "Rejected".
-        :paramtype status: str or ~device_update.models.PrivateEndpointServiceConnectionStatus
+         owner of the service. Known values are: "Pending", "Approved", and "Rejected".
+        :paramtype status: str or ~deviceupdate.models.PrivateEndpointServiceConnectionStatus
         :keyword description: The reason for approval/rejection of the connection.
         :paramtype description: str
         :keyword actions_required: A message indicating if changes on the service provider require any
          updates on the consumer.
         :paramtype actions_required: str
         """
-        super(PrivateLinkServiceConnectionState, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.status = status
         self.description = description
         self.actions_required = actions_required
 
 
-class PrivateLinkServiceProxy(msrest.serialization.Model):
+class PrivateLinkServiceProxy(_serialization.Model):
     """Private link service proxy details.
 
     :ivar id: NRP resource ID.
@@ -1680,26 +1679,26 @@ class PrivateLinkServiceProxy(msrest.serialization.Model):
     :ivar remote_private_link_service_connection_state: Remote private link service connection
      state.
     :vartype remote_private_link_service_connection_state:
-     ~device_update.models.PrivateLinkServiceConnectionState
+     ~deviceupdate.models.PrivateLinkServiceConnectionState
     :ivar remote_private_endpoint_connection: Remote private endpoint connection details.
     :vartype remote_private_endpoint_connection:
-     ~device_update.models.PrivateLinkServiceProxyRemotePrivateEndpointConnection
+     ~deviceupdate.models.PrivateLinkServiceProxyRemotePrivateEndpointConnection
     :ivar group_connectivity_information: Group connectivity information.
     :vartype group_connectivity_information:
-     list[~device_update.models.GroupConnectivityInformation]
+     list[~deviceupdate.models.GroupConnectivityInformation]
     """
 
     _attribute_map = {
-        'id': {'key': 'id', 'type': 'str'},
-        'remote_private_link_service_connection_state': {'key': 'remotePrivateLinkServiceConnectionState', 'type': 'PrivateLinkServiceConnectionState'},
-        'remote_private_endpoint_connection': {'key': 'remotePrivateEndpointConnection', 'type': 'PrivateLinkServiceProxyRemotePrivateEndpointConnection'},
-        'group_connectivity_information': {'key': 'groupConnectivityInformation', 'type': '[GroupConnectivityInformation]'},
+        "id": {"key": "id", "type": "str"},
+        "remote_private_link_service_connection_state": {"key": "remotePrivateLinkServiceConnectionState", "type": "PrivateLinkServiceConnectionState"},
+        "remote_private_endpoint_connection": {"key": "remotePrivateEndpointConnection", "type": "PrivateLinkServiceProxyRemotePrivateEndpointConnection"},
+        "group_connectivity_information": {"key": "groupConnectivityInformation", "type": "[GroupConnectivityInformation]"},
     }
 
     def __init__(
         self,
         *,
-        id: Optional[str] = None,
+        id: Optional[str] = None,  # pylint: disable=redefined-builtin
         remote_private_link_service_connection_state: Optional["_models.PrivateLinkServiceConnectionState"] = None,
         remote_private_endpoint_connection: Optional["_models.PrivateLinkServiceProxyRemotePrivateEndpointConnection"] = None,
         group_connectivity_information: Optional[List["_models.GroupConnectivityInformation"]] = None,
@@ -1711,22 +1710,22 @@ class PrivateLinkServiceProxy(msrest.serialization.Model):
         :keyword remote_private_link_service_connection_state: Remote private link service connection
          state.
         :paramtype remote_private_link_service_connection_state:
-         ~device_update.models.PrivateLinkServiceConnectionState
+         ~deviceupdate.models.PrivateLinkServiceConnectionState
         :keyword remote_private_endpoint_connection: Remote private endpoint connection details.
         :paramtype remote_private_endpoint_connection:
-         ~device_update.models.PrivateLinkServiceProxyRemotePrivateEndpointConnection
+         ~deviceupdate.models.PrivateLinkServiceProxyRemotePrivateEndpointConnection
         :keyword group_connectivity_information: Group connectivity information.
         :paramtype group_connectivity_information:
-         list[~device_update.models.GroupConnectivityInformation]
+         list[~deviceupdate.models.GroupConnectivityInformation]
         """
-        super(PrivateLinkServiceProxy, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.id = id
         self.remote_private_link_service_connection_state = remote_private_link_service_connection_state
         self.remote_private_endpoint_connection = remote_private_endpoint_connection
         self.group_connectivity_information = group_connectivity_information
 
 
-class RemotePrivateEndpointConnection(msrest.serialization.Model):
+class RemotePrivateEndpointConnection(_serialization.Model):
     """Remote private endpoint connection details.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -1740,7 +1739,7 @@ class RemotePrivateEndpointConnection(msrest.serialization.Model):
     }
 
     _attribute_map = {
-        'id': {'key': 'id', 'type': 'str'},
+        "id": {"key": "id", "type": "str"},
     }
 
     def __init__(
@@ -1749,7 +1748,7 @@ class RemotePrivateEndpointConnection(msrest.serialization.Model):
     ):
         """
         """
-        super(RemotePrivateEndpointConnection, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.id = None
 
 
@@ -1767,7 +1766,7 @@ class PrivateLinkServiceProxyRemotePrivateEndpointConnection(RemotePrivateEndpoi
     }
 
     _attribute_map = {
-        'id': {'key': 'id', 'type': 'str'},
+        "id": {"key": "id", "type": "str"},
     }
 
     def __init__(
@@ -1776,10 +1775,10 @@ class PrivateLinkServiceProxyRemotePrivateEndpointConnection(RemotePrivateEndpoi
     ):
         """
         """
-        super(PrivateLinkServiceProxyRemotePrivateEndpointConnection, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
 
-class RemotePrivateEndpoint(msrest.serialization.Model):
+class RemotePrivateEndpoint(_serialization.Model):
     """Remote private endpoint details.
 
     :ivar id: Remote endpoint resource ID.
@@ -1795,33 +1794,33 @@ class RemotePrivateEndpoint(msrest.serialization.Model):
     :ivar manual_private_link_service_connections: List of private link service connections that
      need manual approval.
     :vartype manual_private_link_service_connections:
-     list[~device_update.models.PrivateLinkServiceConnection]
+     list[~deviceupdate.models.PrivateLinkServiceConnection]
     :ivar private_link_service_connections: List of automatically approved private link service
      connections.
     :vartype private_link_service_connections:
-     list[~device_update.models.PrivateLinkServiceConnection]
+     list[~deviceupdate.models.PrivateLinkServiceConnection]
     :ivar private_link_service_proxies: List of private link service proxies.
-    :vartype private_link_service_proxies: list[~device_update.models.PrivateLinkServiceProxy]
+    :vartype private_link_service_proxies: list[~deviceupdate.models.PrivateLinkServiceProxy]
     :ivar connection_details: List of connection details.
-    :vartype connection_details: list[~device_update.models.ConnectionDetails]
+    :vartype connection_details: list[~deviceupdate.models.ConnectionDetails]
     """
 
     _attribute_map = {
-        'id': {'key': 'id', 'type': 'str'},
-        'location': {'key': 'location', 'type': 'str'},
-        'immutable_subscription_id': {'key': 'immutableSubscriptionId', 'type': 'str'},
-        'immutable_resource_id': {'key': 'immutableResourceId', 'type': 'str'},
-        'vnet_traffic_tag': {'key': 'vnetTrafficTag', 'type': 'str'},
-        'manual_private_link_service_connections': {'key': 'manualPrivateLinkServiceConnections', 'type': '[PrivateLinkServiceConnection]'},
-        'private_link_service_connections': {'key': 'privateLinkServiceConnections', 'type': '[PrivateLinkServiceConnection]'},
-        'private_link_service_proxies': {'key': 'privateLinkServiceProxies', 'type': '[PrivateLinkServiceProxy]'},
-        'connection_details': {'key': 'connectionDetails', 'type': '[ConnectionDetails]'},
+        "id": {"key": "id", "type": "str"},
+        "location": {"key": "location", "type": "str"},
+        "immutable_subscription_id": {"key": "immutableSubscriptionId", "type": "str"},
+        "immutable_resource_id": {"key": "immutableResourceId", "type": "str"},
+        "vnet_traffic_tag": {"key": "vnetTrafficTag", "type": "str"},
+        "manual_private_link_service_connections": {"key": "manualPrivateLinkServiceConnections", "type": "[PrivateLinkServiceConnection]"},
+        "private_link_service_connections": {"key": "privateLinkServiceConnections", "type": "[PrivateLinkServiceConnection]"},
+        "private_link_service_proxies": {"key": "privateLinkServiceProxies", "type": "[PrivateLinkServiceProxy]"},
+        "connection_details": {"key": "connectionDetails", "type": "[ConnectionDetails]"},
     }
 
     def __init__(
         self,
         *,
-        id: Optional[str] = None,
+        id: Optional[str] = None,  # pylint: disable=redefined-builtin
         location: Optional[str] = None,
         immutable_subscription_id: Optional[str] = None,
         immutable_resource_id: Optional[str] = None,
@@ -1846,17 +1845,17 @@ class RemotePrivateEndpoint(msrest.serialization.Model):
         :keyword manual_private_link_service_connections: List of private link service connections that
          need manual approval.
         :paramtype manual_private_link_service_connections:
-         list[~device_update.models.PrivateLinkServiceConnection]
+         list[~deviceupdate.models.PrivateLinkServiceConnection]
         :keyword private_link_service_connections: List of automatically approved private link service
          connections.
         :paramtype private_link_service_connections:
-         list[~device_update.models.PrivateLinkServiceConnection]
+         list[~deviceupdate.models.PrivateLinkServiceConnection]
         :keyword private_link_service_proxies: List of private link service proxies.
-        :paramtype private_link_service_proxies: list[~device_update.models.PrivateLinkServiceProxy]
+        :paramtype private_link_service_proxies: list[~deviceupdate.models.PrivateLinkServiceProxy]
         :keyword connection_details: List of connection details.
-        :paramtype connection_details: list[~device_update.models.ConnectionDetails]
+        :paramtype connection_details: list[~deviceupdate.models.ConnectionDetails]
         """
-        super(RemotePrivateEndpoint, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.id = id
         self.location = location
         self.immutable_subscription_id = immutable_subscription_id
@@ -1868,32 +1867,32 @@ class RemotePrivateEndpoint(msrest.serialization.Model):
         self.connection_details = connection_details
 
 
-class SystemData(msrest.serialization.Model):
+class SystemData(_serialization.Model):
     """Metadata pertaining to creation and last modification of the resource.
 
     :ivar created_by: The identity that created the resource.
     :vartype created_by: str
     :ivar created_by_type: The type of identity that created the resource. Known values are:
-     "User", "Application", "ManagedIdentity", "Key".
-    :vartype created_by_type: str or ~device_update.models.CreatedByType
+     "User", "Application", "ManagedIdentity", and "Key".
+    :vartype created_by_type: str or ~deviceupdate.models.CreatedByType
     :ivar created_at: The timestamp of resource creation (UTC).
     :vartype created_at: ~datetime.datetime
     :ivar last_modified_by: The identity that last modified the resource.
     :vartype last_modified_by: str
     :ivar last_modified_by_type: The type of identity that last modified the resource. Known values
-     are: "User", "Application", "ManagedIdentity", "Key".
-    :vartype last_modified_by_type: str or ~device_update.models.CreatedByType
+     are: "User", "Application", "ManagedIdentity", and "Key".
+    :vartype last_modified_by_type: str or ~deviceupdate.models.CreatedByType
     :ivar last_modified_at: The timestamp of resource last modification (UTC).
     :vartype last_modified_at: ~datetime.datetime
     """
 
     _attribute_map = {
-        'created_by': {'key': 'createdBy', 'type': 'str'},
-        'created_by_type': {'key': 'createdByType', 'type': 'str'},
-        'created_at': {'key': 'createdAt', 'type': 'iso-8601'},
-        'last_modified_by': {'key': 'lastModifiedBy', 'type': 'str'},
-        'last_modified_by_type': {'key': 'lastModifiedByType', 'type': 'str'},
-        'last_modified_at': {'key': 'lastModifiedAt', 'type': 'iso-8601'},
+        "created_by": {"key": "createdBy", "type": "str"},
+        "created_by_type": {"key": "createdByType", "type": "str"},
+        "created_at": {"key": "createdAt", "type": "iso-8601"},
+        "last_modified_by": {"key": "lastModifiedBy", "type": "str"},
+        "last_modified_by_type": {"key": "lastModifiedByType", "type": "str"},
+        "last_modified_at": {"key": "lastModifiedAt", "type": "iso-8601"},
     }
 
     def __init__(
@@ -1911,19 +1910,19 @@ class SystemData(msrest.serialization.Model):
         :keyword created_by: The identity that created the resource.
         :paramtype created_by: str
         :keyword created_by_type: The type of identity that created the resource. Known values are:
-         "User", "Application", "ManagedIdentity", "Key".
-        :paramtype created_by_type: str or ~device_update.models.CreatedByType
+         "User", "Application", "ManagedIdentity", and "Key".
+        :paramtype created_by_type: str or ~deviceupdate.models.CreatedByType
         :keyword created_at: The timestamp of resource creation (UTC).
         :paramtype created_at: ~datetime.datetime
         :keyword last_modified_by: The identity that last modified the resource.
         :paramtype last_modified_by: str
         :keyword last_modified_by_type: The type of identity that last modified the resource. Known
-         values are: "User", "Application", "ManagedIdentity", "Key".
-        :paramtype last_modified_by_type: str or ~device_update.models.CreatedByType
+         values are: "User", "Application", "ManagedIdentity", and "Key".
+        :paramtype last_modified_by_type: str or ~deviceupdate.models.CreatedByType
         :keyword last_modified_at: The timestamp of resource last modification (UTC).
         :paramtype last_modified_at: ~datetime.datetime
         """
-        super(SystemData, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.created_by = created_by
         self.created_by_type = created_by_type
         self.created_at = created_at
@@ -1932,7 +1931,7 @@ class SystemData(msrest.serialization.Model):
         self.last_modified_at = last_modified_at
 
 
-class UserAssignedIdentity(msrest.serialization.Model):
+class UserAssignedIdentity(_serialization.Model):
     """User assigned identity properties.
 
     Variables are only populated by the server, and will be ignored when sending a request.
@@ -1949,8 +1948,8 @@ class UserAssignedIdentity(msrest.serialization.Model):
     }
 
     _attribute_map = {
-        'principal_id': {'key': 'principalId', 'type': 'str'},
-        'client_id': {'key': 'clientId', 'type': 'str'},
+        "principal_id": {"key": "principalId", "type": "str"},
+        "client_id": {"key": "clientId", "type": "str"},
     }
 
     def __init__(
@@ -1959,6 +1958,6 @@ class UserAssignedIdentity(msrest.serialization.Model):
     ):
         """
         """
-        super(UserAssignedIdentity, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.principal_id = None
         self.client_id = None
