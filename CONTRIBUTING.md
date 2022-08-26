@@ -224,13 +224,11 @@ For all resources, if the environmental variable is not provided, a new instance
 
 ##### IoT Central
 
-IoT Central integration tests can be run against a specific available api version using command line argument "--api-version"
+`pytest azext_iot/tests/central/ -k "_int.py"`
 
-e.g. run tests against v 1.0
+Or run a single test:
 
-`pytest azext_iot/tests/central/ -k "_int.py" --api-version "1.0"`
-
-If the "--api-version" argument is not specified, all runs act against default api version for each tested command.
+`pytest azext_iot/tests/central/test_iot_central_int.py::TestIotCentral::test_central_api_token_methods_CRD`
 
 
 ### IoT Digital Twins

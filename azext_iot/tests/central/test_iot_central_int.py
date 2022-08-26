@@ -6,7 +6,10 @@
 
 
 import json
-from azext_iot.central.models.enum import ApiVersion, Role, get_enum_values
+import pytest
+from knack.log import get_logger
+
+from azext_iot.central.models.enum import Role, get_enum_values
 from azure.iot.device import Message
 from azext_iot.common import utility
 from azext_iot.monitor.parsers import strings
@@ -16,26 +19,16 @@ from azext_iot.tests.central import (
     DEFAULT_FILE_UPLOAD_TTL,
     sync_command_params,
 )
-import pytest
-from knack.log import get_logger
 
 
 logger = get_logger(__name__)
 
 
-IS_1_1_PREVIEW = True
-
-
 class TestIotCentral(CentralLiveScenarioTest):
     @pytest.fixture(autouse=True)
-    def fixture_api_version(self, request):
-        self._api_version = request.config.getoption("--api-version")
-        IS_1_1_PREVIEW = (
-            self._api_version == ApiVersion.v1_1_preview.value
-            or self._api_version is None
-        )  # either explicitely selected or omitted
-        if IS_1_1_PREVIEW:
-            logger.info("Testing 1.1-preview")
+    def fixture_api_version(self):
+        # No need to pass api version here
+        self._api_version = None
         yield
 
     @pytest.fixture(scope="class", autouse=True)
@@ -344,10 +337,6 @@ class TestIotCentral(CentralLiveScenarioTest):
         # check that run result and show result indeed match
         assert run_result["response"] == show_result["value"][0]["response"]
 
-    @pytest.mark.xfail(
-        condition=not IS_1_1_PREVIEW,
-        reason="Api version not supported",
-    )
     def test_central_fileupload_methods_CRUD_required(self):
         file_upload = self._create_fileupload(api_version=self._api_version)
 
@@ -413,10 +402,6 @@ class TestIotCentral(CentralLiveScenarioTest):
         assert result["state"] == "deleting"
         self._wait_for_storage_configured(api_version=self._api_version)
 
-    @pytest.mark.xfail(
-        condition=not IS_1_1_PREVIEW,
-        reason="Api version not supported",
-    )
     def test_central_organization_methods_CRUD(self):
         org = self._create_organization(api_version=self._api_version)
         command = "iot central organization show -n {} --org-id {}".format(
@@ -434,10 +419,6 @@ class TestIotCentral(CentralLiveScenarioTest):
         # DELETE
         self._delete_organization(org_id=org["id"], api_version=self._api_version)
 
-    @pytest.mark.xfail(
-        condition=not IS_1_1_PREVIEW,
-        reason="Api version not supported",
-    )
     def test_central_destination_export_methods_CRD(self):
         dest_id = "aztestdest0001"
         export_id = "aztestexport001"
@@ -462,10 +443,6 @@ class TestIotCentral(CentralLiveScenarioTest):
         self._delete_export(export_id=export["id"], api_version=self._api_version)
         self._delete_destination(dest_id=dest_id, api_version=self._api_version)
 
-    @pytest.mark.xfail(
-        condition=not IS_1_1_PREVIEW,
-        reason="Api version not supported",
-    )
     def test_central_query_methods_run(self):
         (template_id, _) = self._create_device_template(api_version=self._api_version)
         (device_id, _) = self._create_device(

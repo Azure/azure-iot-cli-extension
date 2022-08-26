@@ -17,6 +17,7 @@ from azext_iot.central.services import (
     query,
     destination,
     export,
+    enrollment_group,
 )
 
 
@@ -33,4 +34,5 @@ __all__ = [
     "query",
     "destination",
     "export",
+    "enrollment_group",
 ]

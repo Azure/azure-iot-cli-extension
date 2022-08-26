@@ -20,6 +20,8 @@ from azext_iot.central.providers.organization_provider import (
 from azext_iot.central.providers.query_provider import CentralQueryProvider
 from azext_iot.central.providers.destination_provider import CentralDestinationProvider
 from azext_iot.central.providers.export_provider import CentralExportProvider
+from azext_iot.central.providers.enrollment_group_provider import CentralEnrollmentGroupProvider
+from azext_iot.central.providers.scheduled_job_provider import CentralScheduledJobProvider
 
 
 __all__ = [
@@ -35,4 +37,6 @@ __all__ = [
     "CentralQueryProvider",
     "CentralDestinationProvider",
     "CentralExportProvider",
+    "CentralEnrollmentGroupProvider",
+    "CentralScheduledJobProvider",
 ]

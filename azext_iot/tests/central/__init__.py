@@ -8,14 +8,14 @@ import json
 import time
 from typing import Tuple
 
-from azure.cli.core.azclierror import CLIInternalError, InvalidArgumentValueError
+from azure.cli.core.azclierror import CLIInternalError
 from azext_iot.tests import CaptureOutputLiveScenarioTest
 from azext_iot.tests.conftest import get_context_path
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests.helpers import add_test_tag, create_storage_account
 from azext_iot.tests.settings import DynamoSettings
 from azext_iot.common import utility
-from azext_iot.central.models.enum import Role, UserTypePreview, UserTypeV1, ApiVersion
+from azext_iot.central.models.enum import Role, UserTypeV1
 from azext_iot.tests.test_constants import ResourceTypes
 from knack.log import get_logger
 
@@ -46,9 +46,6 @@ STORAGE_ACCOUNT = (
 
 # Device templates
 device_template_path = get_context_path(__file__, "json/device_template_int_test.json")
-device_template_path_preview = get_context_path(
-    __file__, "json/device_template_int_test_preview.json"
-)
 edge_template_path_preview = get_context_path(
     __file__, "json/device_template_edge.json"
 )
@@ -186,22 +183,12 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             self.check("id", device_id),
         ]
 
-        if api_version == ApiVersion.preview.value:
-            checks.append(self.check("approved", True))
-        else:
-            checks.append(self.check("enabled", True))
+        checks.append(self.check("enabled", True))
 
         template = kwargs.get("template")
         if template:
             command = command + " --template {}".format(template)
-            checks.append(
-                self.check(
-                    "instanceOf"
-                    if api_version == ApiVersion.preview.value
-                    else "template",
-                    template,
-                )
-            )
+            checks.append(self.check("template", template))
 
         simulated = bool(kwargs.get("simulated"))
         if simulated:
@@ -245,12 +232,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             checks = [
                 self.check("id", user_id),
                 self.check("email", email),
-                self.check(
-                    "type",
-                    UserTypePreview.email.value
-                    if api_version == ApiVersion.preview.value
-                    else UserTypeV1.email.value,
-                ),
+                self.check("type", UserTypeV1.email.value),
                 self.check("roles[0].role", role.value),
             ]
             users.append(
@@ -479,15 +461,8 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
 
     def _create_device_template(self, api_version, edge=False):
-        if edge and (api_version != ApiVersion.v1_1_preview.value and api_version != ApiVersion.ga_2022_05_31.value):
-            raise InvalidArgumentValueError(
-                "Edge template creation is only available for api version >= 1.1-preview."
-            )
-
         if edge:
             template_path = edge_template_path_preview
-        elif api_version == ApiVersion.preview.value:
-            template_path = device_template_path_preview
         else:
             template_path = device_template_path
 
@@ -564,31 +539,30 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
                 if devices:
                     for device in devices:
-                        device_template = device[
-                            "instanceOf"
-                            if api_version == ApiVersion.preview.value
-                            else "template"
-                        ]
+                        device_template = device["template"]
                         if device_template == template_id:
-                            if api_version == ApiVersion.v1_1_preview.value:
-                                # delete attached children devices if any
-                                list_children_command = "iot central device edge children list --app-id {} -d {}".format(
-                                    self.app_id, device["id"]
-                                )
+                            # delete attached children devices if any
+                            children = []
 
+                            list_children_command = "iot central device edge children list --app-id {} -d {}".format(
+                                self.app_id, device["id"]
+                            )
+                            try:
                                 children = self.cmd(
                                     list_children_command, api_version=api_version
                                 ).get_output_in_json()
+                            except Exception:
+                                pass
 
-                                for child in children:
-                                    self.cmd(
-                                        "iot central device delete --app-id {} --device-id {}".format(
-                                            self.app_id, child["id"]
-                                        ),
-                                        api_version=api_version,
-                                    )
+                            for child in children:
+                                self.cmd(
+                                    "iot central device delete --app-id {} --device-id {}".format(
+                                        self.app_id, child["id"]
+                                    ),
+                                    api_version=api_version,
+                                )
 
-                                time.sleep(10)
+                            time.sleep(10)
 
                             self.cmd(
                                 "iot central device delete --app-id {} --device-id {}".format(
@@ -852,13 +826,9 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         return command
 
     def _get_template_id(self, api_version, template):
-        if api_version == ApiVersion.preview.value:
-            return template["id"]
         return template["@id"]
 
     def _get_template_id_key(self, api_version):
-        if api_version == ApiVersion.preview.value:
-            return "id"
         return "@id"
 
     def tearDown(self):

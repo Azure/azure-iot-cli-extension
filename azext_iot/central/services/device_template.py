@@ -6,19 +6,14 @@
 # This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/devicetemplates
 
 import requests
-from typing import (
-    Union,
-    List,
-)
+from typing import List
 from knack.log import get_logger
 
 from azure.cli.core.azclierror import AzureResponseError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central.models.preview import TemplatePreview
-from azext_iot.central.models.v1 import TemplateV1
-from azext_iot.central.models.ga_2022_05_31 import TemplateGa20220531
-from azext_iot.central.models.v1_1_preview import TemplateV1_1_preview
+from azext_iot.central.models.v2022_06_30_preview import TemplatePreview
+from azext_iot.central.common import API_VERSION_PREVIEW
 
 logger = get_logger(__name__)
 
@@ -31,9 +26,9 @@ def get_device_template(
     app_id: str,
     device_template_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION_PREVIEW,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[TemplatePreview, TemplateV1, TemplateV1_1_preview, TemplateGa20220531]:
+) -> TemplatePreview:
     """
     Get a specific device template from IoTC
 
@@ -48,6 +43,8 @@ def get_device_template(
     Returns:
         device_template: dict
     """
+    api_version = API_VERSION_PREVIEW
+
     url = "https://{}.{}/{}/{}".format(
         app_id, central_dns_suffix, BASE_PATH, device_template_id
     )
@@ -66,10 +63,10 @@ def list_device_templates(
     cmd,
     app_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION_PREVIEW,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> List[Union[TemplatePreview, TemplateV1, TemplateV1_1_preview, TemplateGa20220531]]:
+) -> List[TemplatePreview]:
     """
     Get a list of all device templates in IoTC
 
@@ -83,6 +80,7 @@ def list_device_templates(
     Returns:
         device_templates: dict
     """
+    api_version = API_VERSION_PREVIEW
 
     device_templates = []
 
@@ -128,9 +126,9 @@ def create_device_template(
     device_template_id: str,
     payload: dict,
     token: str,
-    api_version: str,
+    api_version=API_VERSION_PREVIEW,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[TemplatePreview, TemplateV1, TemplateV1_1_preview, TemplateGa20220531]:
+) -> TemplatePreview:
     """
     Create a device template in IoTC
 
@@ -149,6 +147,7 @@ def create_device_template(
     Returns:
         device: dict
     """
+    api_version = API_VERSION_PREVIEW
 
     url = "https://{}.{}/{}/{}".format(
         app_id, central_dns_suffix, BASE_PATH, device_template_id
@@ -170,9 +169,9 @@ def update_device_template(
     device_template_id: str,
     payload: dict,
     token: str,
-    api_version: str,
+    api_version=API_VERSION_PREVIEW,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[TemplatePreview, TemplateV1, TemplateV1_1_preview, TemplateGa20220531]:
+) -> TemplatePreview:
     """
     Updates a device template in IoTC
 
@@ -191,6 +190,7 @@ def update_device_template(
     Returns:
         device: dict
     """
+    api_version = API_VERSION_PREVIEW
 
     url = "https://{}.{}/{}/{}".format(
         app_id, central_dns_suffix, BASE_PATH, device_template_id
@@ -213,7 +213,7 @@ def delete_device_template(
     app_id: str,
     device_template_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION_PREVIEW,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     """
@@ -230,6 +230,8 @@ def delete_device_template(
     Returns:
         device: dict
     """
+    api_version = API_VERSION_PREVIEW
+
     url = "https://{}.{}/{}/{}".format(
         app_id, central_dns_suffix, BASE_PATH, device_template_id
     )

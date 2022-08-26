@@ -5,26 +5,21 @@
 # --------------------------------------------------------------------------------------------
 
 import requests
-from typing import Union, List
+from typing import List
 from knack.log import get_logger
 
-from azure.cli.core.azclierror import AzureResponseError, BadRequestError
+from azure.cli.core.azclierror import AzureResponseError
 from azure.cli.core.util import should_disable_connection_verify
 from azext_iot.constants import CENTRAL_ENDPOINT
+from azext_iot.central.common import API_VERSION
 from azext_iot.central.services import _utility
 from azext_iot.central.models.enum import (
     Role,
-    ApiVersion,
-    UserTypePreview,
     UserTypeV1,
     get_enum_keys,
 )
-from azext_iot.central.models.v1 import UserV1
-from azext_iot.central.models.v1_1_preview import UserV1_1_preview
-from azext_iot.central.models.preview import UserPreview
+from azext_iot.central.models.ga_2022_07_31 import UserGa
 from re import search
-
-User = Union[UserV1, UserV1_1_preview, UserPreview]
 
 logger = get_logger(__name__)
 
@@ -41,7 +36,7 @@ def _make_call(
     payload: str,
     token: str,
     central_dns_suffix: str,
-    api_version: str,
+    api_version=API_VERSION,
     url=None,
 ) -> dict:
     if url is None:
@@ -68,7 +63,7 @@ def _make_call(
     return _utility.try_extract_result(response)
 
 
-def create_roles(roles: str, api_version: str):
+def _create_roles(roles: str):
     result_roles = []
     parsed_roles = roles.split(",")
     for role in parsed_roles:
@@ -76,11 +71,6 @@ def create_roles(roles: str, api_version: str):
         match = search(ROLE_PATTERN, role)
         if match and len(match.groups()) == 2:
             # role is an org role
-            if api_version != ApiVersion.v1_1_preview.value:
-                raise BadRequestError(
-                    f"Api Version {ApiVersion[api_version].value} does not support organizations."
-                    " Please use version >= 1.1-preview."
-                )
             org_id = match[1]
             role_id = (
                 Role[match[2]].value if match[2] in get_enum_keys(Role) else match[2]
@@ -104,10 +94,10 @@ def add_or_update_service_principal_user(
     object_id: str,
     roles: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     update=False,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> User:
+) -> UserGa:
     """
     Add or update a user to a Central app
 
@@ -123,18 +113,16 @@ def add_or_update_service_principal_user(
     Returns:
         user: dict
     """
+    api_version = API_VERSION
 
-    if api_version == ApiVersion.preview.value:
-        user_type = UserTypePreview.service_principal.value
-    else:
-        user_type = UserTypeV1.service_principal.value
+    user_type = UserTypeV1.service_principal.value
 
     payload = {
         "type": user_type,
     }
 
     if roles:
-        payload["roles"] = create_roles(roles, api_version=api_version)
+        payload["roles"] = _create_roles(roles)
 
     if tenant_id:
         payload["tenantId"] = tenant_id
@@ -163,10 +151,10 @@ def add_or_update_email_user(
     email: str,
     roles: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     update=False,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> User:
+) -> UserGa:
     """
     Add or update a user to a Central app
 
@@ -181,16 +169,14 @@ def add_or_update_email_user(
     Returns:
         user: dict
     """
+    api_version = API_VERSION
 
-    if api_version == ApiVersion.preview.value:
-        user_type = UserTypePreview.email.value
-    else:
-        user_type = UserTypeV1.email.value
+    user_type = UserTypeV1.email.value
 
     payload = {"type": user_type, "roles": []}
 
     if roles:
-        payload["roles"] = create_roles(roles, api_version=api_version)
+        payload["roles"] = _create_roles(roles)
 
     if email and not update:
         payload["email"] = email
@@ -213,10 +199,10 @@ def get_user_list(
     cmd,
     app_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> List[User]:
+) -> List[UserGa]:
     """
     Get the list of users for central app.
 
@@ -230,6 +216,8 @@ def get_user_list(
     Returns:
         users: dict
     """
+    api_version = API_VERSION
+
     users = []
 
     url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
@@ -265,9 +253,9 @@ def get_user(
     app_id: str,
     token: str,
     assignee: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> User:
+) -> UserGa:
     """
     Get information for the specified user.
 
@@ -282,6 +270,8 @@ def get_user(
     Returns:
         users: dict
     """
+    api_version = API_VERSION
+
     result = _make_call(
         cmd,
         app_id=app_id,
@@ -301,7 +291,7 @@ def delete_user(
     app_id: str,
     token: str,
     assignee: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     """
@@ -318,6 +308,8 @@ def delete_user(
     Returns:
         users: dict
     """
+    api_version = API_VERSION
+
     result = _make_call(
         cmd,
         app_id=app_id,

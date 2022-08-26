@@ -60,6 +60,8 @@ def load_central_help():
     _load_central_export_help()
     _load_central_c2d_message_help()
     _load_central_edge_help()
+    _load_central_enrollment_group_help()
+    _load_central_schedule_job_help()
 
 
 def _load_central_export_help():
@@ -360,9 +362,9 @@ def _load_central_devices_help():
         type: command
         short-summary: Update a device in IoT Central.
         long-summary: |
-                    Allows to change the following properties of a device: "displayName", "template" and "simulated" and "enabled" flags.
+                    Allows to change the following properties of a device:
+                    "displayName", "template", "simulated", "enabled" and "organizations".
                     Device Id cannot be changed.
-                    If specified api version is "1.1-preview", organizations for the device can also be updated.
 
         examples:
         - name: Update a device display name
@@ -1751,4 +1753,242 @@ def _load_central_edge_help():
             --app-id {appid}
             --device-id {deviceId}
             --children-ids {child_1} {child_2}
+    """
+
+
+def _load_central_enrollment_group_help():
+    helps[
+        "iot central enrollment-group"
+    ] = """
+          type: group
+          short-summary: Manage and configure IoT Central enrollment group
+      """
+
+    helps[
+        "iot central enrollment-group list"
+    ] = """
+    type: command
+    short-summary: Get the list of enrollment groups in an application
+    examples:
+      - name: Get the list of enrollment groups in an application
+        text: >
+          az iot central enrollment-group list
+          --app-id {appid}
+    """
+
+    helps[
+        "iot central enrollment-group show"
+    ] = """
+    type: command
+    short-summary: Get details about an enrollment group by ID
+    examples:
+      - name: Get details about an enrollment group by ID
+        text: >
+          az iot central enrollment-group show
+          --app-id {appid}
+          --id {enrollmentGroupId}
+    """
+
+    helps[
+        "iot central enrollment-group delete"
+    ] = """
+    type: command
+    short-summary: Delete an enrollment group by ID
+    examples:
+      - name: Delete an enrollment group by ID
+        text: >
+          az iot central enrollment-group delete
+          --app-id {appid}
+          --id {enrollmentGroupId}
+    """
+
+    helps[
+        "iot central enrollment-group create"
+    ] = """
+    type: command
+    short-summary: Create an enrollment group
+    examples:
+      - name: Create an enrollment group
+        text: >
+          az iot central enrollment-group create
+          --app-id {appid}
+          --id {enrollmentGroupId}
+    """
+
+    helps[
+        "iot central enrollment-group update"
+    ] = """
+    type: command
+    short-summary: Update an enrollment group
+    examples:
+      - name: Update an enrollment group
+        text: >
+          az iot central enrollment-group update
+          --app-id {appid}
+          --id {enrollmentGroupId}
+    """
+
+    helps[
+        "iot central enrollment-group x509 create"
+    ] = """
+    type: command
+    short-summary: Set the primary or secondary x509 certificate of an enrollment group
+    examples:
+      - name: Set the primary or secondary x509 certificate of an enrollment group
+        text: >
+          iot central enrollment-group x509 create
+          --app-id {appid}
+          --id {enrollmentGroupId}
+          --entry {certificateEntry}
+          --certificate	 {certificate}
+          --etag {etag}
+          --verified {verified}
+    """
+
+    helps[
+        "iot central enrollment-group x509 show"
+    ] = """
+    type: command
+    short-summary: Get the primary or secondary x509 certificate of an enrollment group
+    examples:
+      - name: Get the primary or secondary x509 certificate of an enrollment group
+        text: >
+          iot central enrollment-group x509 show
+          --app-id {appid}
+          --id {enrollmentGroupId}
+          --entry {certificateEntry}
+    """
+
+    helps[
+        "iot central enrollment-group x509 delete"
+    ] = """
+    type: command
+    short-summary: Removes the primary or secondary x509 certificate of an enrollment group
+    examples:
+      - name: Removes the primary or secondary x509 certificate of an enrollment group
+        text: >
+          iot central enrollment-group x509 delete
+          --app-id {appid}
+          --id {enrollmentGroupId}
+          --entry {certificateEntry}
+    """
+
+    helps[
+        "iot central enrollment-group x509 verify"
+    ] = """
+    type: command
+    long-summary: |
+                    Verify the primary or secondary x509 certificate of an enrollment group
+                    by providing a certificate with the signed verification code.
+    examples:
+      - name: Verify the primary or secondary x509 certificate of an enrollment group
+        text: >
+          iot central enrollment-group x509 verify
+          --app-id {appid}
+          --id {enrollmentGroupId}
+          --entry {certificateEntry}
+          --certificate	{certificate}
+    """
+
+    helps[
+        "iot central enrollment-group x509 generate"
+    ] = """
+    type: command
+    short-summary: Generate a verification code for the primary or secondary x509 certificate of an enrollment group
+    examples:
+      - name: Generate a verification code for the primary or secondary x509 certificate of an enrollment group
+        text: >
+          iot central enrollment-group x509 generate
+          --app-id {appid}
+          --id {enrollmentGroupId}
+          --entry {certificateEntry}
+    """
+
+
+def _load_central_schedule_job_help():
+    helps[
+        "iot central schedule-job"
+    ] = """
+          type: group
+          short-summary: Manage and configure IoT Central schedule job
+      """
+
+    helps[
+        "iot central schedule-job list"
+    ] = """
+    type: command
+    short-summary: Get the list of scheduled job definitions in an application
+    examples:
+      - name: Get the list of scheduled job definitions in an application
+        text: >
+          az iot central schedule-job list
+          --app-id {appid}
+    """
+
+    helps[
+        "iot central schedule-job show"
+    ] = """
+    type: command
+    short-summary: Get details about a scheduled job by ID
+    examples:
+      - name: Get details about a scheduled job by ID
+        text: >
+          az iot central schedule-job show
+          --app-id {appid}
+          --id {scheduledJobId}
+    """
+
+    helps[
+        "iot central schedule-job delete"
+    ] = """
+    type: command
+    short-summary: Delete an existing scheduled job by ID
+    examples:
+      - name: Delete an existing scheduled job by ID
+        text: >
+          az iot central schedule-job delete
+          --app-id {appid}
+          --id {scheduledJobId}
+    """
+
+    helps[
+        "iot central schedule-job create"
+    ] = """
+    type: command
+    short-summary: Create or update a scheduled job by ID
+    examples:
+      - name: Create a schedule job with name
+        text: >
+          az iot central schedule-job create
+          --app-id {appid}
+          --job-id {jobId}
+          --group-id {groupId}
+          --job-name {jobName}
+          --schedule	{jobScheduleJSONPatch}
+          --content {jobDataJSONPath}
+
+      - name: Create a scheduled job with name and batch configuration.
+        text: >
+          az iot central schedule-job create
+          --app-id {appid}
+          --job-id {jobId}
+          --group-id {groupId}
+          --job-name {jobName}
+          --schedule	{jobScheduleJSONPatch}
+          --content {jobDataJSONPath}
+          --batch {jobBatchValue}
+          --batch-type {jobBatchType}
+
+      - name: Create a scheduled job with name and cancellation threshold configuration with no batch.
+        text: >
+          az iot central schedule-job create
+          --app-id {appid}
+          --job-id {jobId}
+          --group-id {groupId}
+          --job-name {jobName}
+          --schedule	{jobScheduleJSONPatch}
+          --content {jobDataJSONPath}
+          --cancellation-threshold {jobCancellationThresholdValue}
+          --cancellation-threshold-type {jobCancellationThresholdType}
+          --description {jobDesc}
     """

@@ -33,10 +33,10 @@ class MonitorProvider:
         central_dns_suffix: str,
     ):
         central_device_provider = CentralDeviceProvider(
-            cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.v1.value
+            cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.ga.value
         )
         central_template_provider = CentralDeviceTemplateProvider(
-            cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.v1.value
+            cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.ga.value
         )
         self._targets = self._build_targets(
             cmd=cmd,

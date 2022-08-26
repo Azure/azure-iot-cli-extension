@@ -11,7 +11,12 @@ shared: Define shared data types
 
 from enum import Enum
 
+from azext_iot.central.models.enum import ApiVersion
+
 EDGE_ONLY_FILTER = "type eq 'GatewayDevice' or type eq 'EdgeDevice'"
+
+API_VERSION = ApiVersion.ga.value
+API_VERSION_PREVIEW = ApiVersion.preview.value
 
 
 class DestinationType(Enum):

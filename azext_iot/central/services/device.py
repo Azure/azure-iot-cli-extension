@@ -5,9 +5,9 @@
 # --------------------------------------------------------------------------------------------
 # This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/devices
 
-from typing import List, Union
+from typing import List
 import requests
-from azext_iot.central.common import EDGE_ONLY_FILTER
+from azext_iot.central.common import API_VERSION, API_VERSION_PREVIEW
 from azext_iot.central.models.edge import EdgeModule
 from azext_iot.common.auth import get_aad_token
 
@@ -21,13 +21,8 @@ from azure.cli.core.azclierror import (
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
 from azext_iot.central.models.devicetwin import DeviceTwin
-from azext_iot.central.models.preview import DevicePreview
-from azext_iot.central.models.v1 import DeviceV1
-from azext_iot.central.models.v1_1_preview import (
-    DeviceV1_1_preview,
-    RelationshipV1_1_preview,
-)
-from azext_iot.central.models.enum import ApiVersion, DeviceStatus
+from azext_iot.central.models.ga_2022_07_31 import (DeviceGa, RelationshipGa)
+from azext_iot.central.models.enum import DeviceStatus
 from azure.cli.core.util import should_disable_connection_verify
 from azext_iot.common.utility import dict_clean, parse_entity
 
@@ -43,9 +38,9 @@ def get_device(
     app_id: str,
     device_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[DeviceV1_1_preview, DeviceV1, DevicePreview]:
+) -> DeviceGa:
     """
     Get device info given a device id
 
@@ -60,6 +55,8 @@ def get_device(
     Returns:
         device: dict
     """
+    api_version = API_VERSION
+
     result = _utility.make_api_call(
         cmd,
         app_id=app_id,
@@ -79,17 +76,17 @@ def list_devices(
     app_id: str,
     filter: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION_PREVIEW,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> List[Union[DeviceV1, DeviceV1_1_preview, DevicePreview]]:
+) -> List[DeviceGa]:
     """
     Get a list of all devices in IoTC app
 
     Args:
         cmd: command passed into az
         app_id: name of app (used for forming request URL)
-        filter: only show filtered devices
+        filter: only show filtered devices (only in preview version now)
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
@@ -97,6 +94,8 @@ def list_devices(
     Returns:
         list of devices
     """
+    # Have to use preview version for $filter
+    api_version = API_VERSION_PREVIEW
 
     devices = []
 
@@ -104,21 +103,11 @@ def list_devices(
     headers = _utility.get_headers(token, cmd)
 
     # Construct parameters
-    query_parameters = (
-        {"$filter": filter} if api_version == ApiVersion.v1_1_preview.value else {}
-    )
-    query_parameters["api-version"] = api_version
+    query_parameters = {"api-version": api_version}
+    if filter is not None:
+        query_parameters["$filter"] = filter
 
     warning = "This command may take a long time to complete if your app contains a lot of devices."
-    if (
-        filter
-        and filter == EDGE_ONLY_FILTER
-        and api_version != ApiVersion.v1_1_preview.value
-    ):
-        warning += (
-            "\nAlso consider using Api Version 1.1-preview when listing edge devices "
-            "as it supports server filtering speeding up the process."
-        )
     logger.warning(warning)
 
     pages_processed = 0
@@ -150,7 +139,7 @@ def get_device_registration_summary(
     cmd,
     app_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     """
@@ -166,6 +155,7 @@ def get_device_registration_summary(
     Returns:
         registration summary
     """
+    api_version = API_VERSION
 
     registration_summary = {status.value: 0 for status in DeviceStatus}
 
@@ -207,9 +197,9 @@ def create_device(
     simulated: bool,
     organizations: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[DeviceV1, DeviceV1_1_preview, DevicePreview]:
+) -> DeviceGa:
     """
     Create a device in IoTC
 
@@ -228,6 +218,7 @@ def create_device(
     Returns:
         device: dict
     """
+    api_version = API_VERSION
 
     if not device_name:
         device_name = device_id
@@ -265,9 +256,9 @@ def update_device(
     enabled: bool,
     organizations: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[DeviceV1, DeviceV1_1_preview, DevicePreview]:
+) -> DeviceGa:
     """
     Update a device in IoTC
 
@@ -287,6 +278,7 @@ def update_device(
     Returns:
         device: dict
     """
+    api_version = API_VERSION
 
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, device_id)
     headers = _utility.get_headers(token, cmd, has_json_payload=True)
@@ -342,7 +334,7 @@ def delete_device(
     app_id: str,
     device_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     """
@@ -360,6 +352,8 @@ def delete_device(
         {"result": "success"} on success
         Raises error on failure
     """
+    api_version = API_VERSION
+
     return _utility.make_api_call(
         cmd,
         app_id=app_id,
@@ -377,10 +371,11 @@ def list_relationships(
     app_id: str,
     device_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> List[RelationshipV1_1_preview]:
+) -> List[RelationshipGa]:
+    api_version = API_VERSION
 
     url = "https://{}.{}/{}/{}/relationships".format(
         app_id, central_dns_suffix, BASE_PATH, device_id
@@ -425,9 +420,10 @@ def create_relationship(
     rel_id: str,
     rel_name: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
+    api_version = API_VERSION
 
     payload = {"id": rel_id, "name": rel_name, "source": device_id, "target": target_id}
     response = _utility.make_api_call(
@@ -453,8 +449,7 @@ def update_relationship(
     token: str,
     api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> RelationshipV1_1_preview:
-
+) -> RelationshipGa:
     """
     Update a relationship in IoTC
 
@@ -471,6 +466,7 @@ def update_relationship(
     Returns:
         device: dict
     """
+    api_version = API_VERSION
 
     payload = {"target": target_id}
 
@@ -494,7 +490,7 @@ def delete_relationship(
     device_id: str,
     rel_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     """
@@ -513,6 +509,7 @@ def delete_relationship(
         {"result": "success"} on success
         Raises error on failure
     """
+    api_version = API_VERSION
 
     return _utility.make_api_call(
         cmd,
@@ -531,7 +528,7 @@ def get_device_credentials(
     app_id: str,
     device_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
@@ -548,6 +545,8 @@ def get_device_credentials(
     Returns:
         device_credentials: dict
     """
+    api_version = API_VERSION
+
     return _utility.make_api_call(
         cmd,
         app_id=app_id,
@@ -569,7 +568,7 @@ def run_command(
     module_name: str,
     command_name: str,
     payload: dict,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
@@ -590,6 +589,8 @@ def run_command(
     Returns:
         result (currently a 201)
     """
+    api_version = API_VERSION
+
     url = "https://{}.{}/{}/{}".format(
         app_id, central_dns_suffix, BASE_PATH, device_id
     )
@@ -628,7 +629,7 @@ def get_command_history(
     component_name: str,
     module_name: str,
     command_name: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
@@ -648,6 +649,8 @@ def get_command_history(
     Returns:
         Command history (List) - currently limited to 1 item
     """
+    api_version = API_VERSION
+
     url = "https://{}.{}/{}/{}".format(
         app_id, central_dns_suffix, BASE_PATH, device_id
     )
@@ -680,7 +683,7 @@ def get_module_command_history(
     module_name: str,
     component_name: str,
     command_name: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
@@ -700,6 +703,8 @@ def get_module_command_history(
     Returns:
         Module command history (List)
     """
+    api_version = API_VERSION
+
     url = "https://{}.{}/{}/{}/modules/{}/components/{}/commands/{}".format(
         app_id, central_dns_suffix, BASE_PATH, device_id, module_name, component_name, command_name
     )
@@ -884,7 +889,7 @@ def list_device_modules(
     app_id: str,
     device_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> List[EdgeModule]:
     """
@@ -980,7 +985,7 @@ def get_device_attestation(
     app_id: str,
     device_id: str,
     token: str,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
@@ -997,6 +1002,8 @@ def get_device_attestation(
     Returns:
         device_attestation: dict
     """
+    api_version = API_VERSION
+
     return _utility.make_api_call(
         cmd,
         app_id=app_id,
@@ -1014,7 +1021,7 @@ def delete_device_attestation(
     app_id: str,
     device_id: str,
     token: str,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
@@ -1032,6 +1039,8 @@ def delete_device_attestation(
         {"result": "success"} on success
         Raises error on failure
     """
+    api_version = API_VERSION
+
     return _utility.make_api_call(
         cmd,
         app_id=app_id,
@@ -1050,7 +1059,7 @@ def update_device_attestation(
     device_id: str,
     payload: str,
     token: str,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
@@ -1069,6 +1078,8 @@ def update_device_attestation(
         {"result": "success"} on success
         Raises error on failure
     """
+    api_version = API_VERSION
+
     return _utility.make_api_call(
         cmd,
         app_id=app_id,
@@ -1087,7 +1098,7 @@ def create_device_attestation(
     device_id: str,
     payload: str,
     token: str,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
@@ -1106,6 +1117,8 @@ def create_device_attestation(
         {"result": "success"} on success
         Raises error on failure
     """
+    api_version = API_VERSION
+
     return _utility.make_api_call(
         cmd,
         app_id=app_id,
@@ -1124,7 +1137,7 @@ def list_device_components(
     device_id: str,
     module_name: str,
     token: str,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> List[dict]:
     """
@@ -1142,6 +1155,8 @@ def list_device_components(
     Returns:
         components: dict
     """
+    api_version = API_VERSION
+
     url = f"https://{app_id}.{central_dns_suffix}/api/devices/{device_id}"
 
     if module_name is not None:
@@ -1166,7 +1181,7 @@ def list_modules(
     app_id: str,
     device_id: str,
     token: str,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> List[dict]:
     """
@@ -1183,6 +1198,8 @@ def list_modules(
     Returns:
         modules: dict
     """
+    api_version = API_VERSION
+
     return _utility.make_api_call(
         cmd,
         app_id=app_id,
@@ -1203,7 +1220,7 @@ def get_device_properties_or_telemetry_value(
     component_name: str,
     telemetry_name: str,
     token: str,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
@@ -1222,6 +1239,8 @@ def get_device_properties_or_telemetry_value(
     Returns:
         properties/telemetry value: dict
     """
+    api_version = API_VERSION
+
     url = f"https://{app_id}.{central_dns_suffix}/api/devices/{device_id}"
 
     if module_name is not None:
@@ -1255,7 +1274,7 @@ def replace_properties(
     component_name: str,
     payload: str,
     token: str,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
@@ -1275,6 +1294,8 @@ def replace_properties(
     Returns:
         properties: dict
     """
+    api_version = API_VERSION
+
     url = f"https://{app_id}.{central_dns_suffix}/api/devices/{device_id}"
 
     if module_name is not None:
@@ -1305,7 +1326,7 @@ def update_properties(
     component_name: str,
     payload: str,
     token: str,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     """
@@ -1325,6 +1346,8 @@ def update_properties(
     Returns:
         properties: dict
     """
+    api_version = API_VERSION
+
     url = f"https://{app_id}.{central_dns_suffix}/api/devices/{device_id}"
 
     if module_name is not None:

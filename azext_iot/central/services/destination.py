@@ -8,14 +8,15 @@ from typing import List, Union
 from knack.log import get_logger
 
 from azure.cli.core.azclierror import AzureResponseError
-from azext_iot.central.models.enum import ApiVersion
 from azext_iot.constants import CENTRAL_ENDPOINT
-from azext_iot.central.models.v1_1_preview import (
-    DestinationV1_1_preview,
-    WebhookDestinationV1_1_preview,
-    AdxDestinationV1_1_preview,
+from azext_iot.central.models.v2022_06_30_preview import (
+    DestinationPreview,
+    WebhookDestinationPreview,
+    AdxDestinationPreview,
 )
 from azext_iot.central.services import _utility
+from azext_iot.central.common import API_VERSION_PREVIEW
+
 
 logger = get_logger(__name__)
 
@@ -28,10 +29,10 @@ def add_destination(
     destination_id: str,
     payload,
     token: str,
-    api_version: str,
+    api_version=API_VERSION_PREVIEW,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> Union[
-    DestinationV1_1_preview, WebhookDestinationV1_1_preview, AdxDestinationV1_1_preview
+    DestinationPreview, WebhookDestinationPreview, AdxDestinationPreview
 ]:
     """
     Add an data export destinations to IoT Central app
@@ -48,6 +49,7 @@ def add_destination(
     Returns:
         Destination
     """
+    api_version = API_VERSION_PREVIEW
 
     url = "https://{}.{}/{}/{}".format(
         app_id, central_dns_suffix, BASE_PATH, destination_id
@@ -71,10 +73,10 @@ def update_destination(
     destination_id: str,
     payload: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION_PREVIEW,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> Union[
-    DestinationV1_1_preview, WebhookDestinationV1_1_preview, AdxDestinationV1_1_preview
+    DestinationPreview, WebhookDestinationPreview, AdxDestinationPreview
 ]:
     """
     Update an data export destination in IoT Central app
@@ -91,6 +93,7 @@ def update_destination(
     Returns:
         Destination
     """
+    api_version = API_VERSION_PREVIEW
 
     url = "https://{}.{}/{}/{}".format(
         app_id, central_dns_suffix, BASE_PATH, destination_id
@@ -113,13 +116,13 @@ def list_destinations(
     app_id: str,
     token: str,
     max_pages=0,
-    api_version=ApiVersion.v1_1_preview.value,
+    api_version=API_VERSION_PREVIEW,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> List[
     Union[
-        DestinationV1_1_preview,
-        WebhookDestinationV1_1_preview,
-        AdxDestinationV1_1_preview,
+        DestinationPreview,
+        WebhookDestinationPreview,
+        AdxDestinationPreview,
     ]
 ]:
     """
@@ -136,6 +139,8 @@ def list_destinations(
     Returns:
         List of destinations
     """
+    api_version = API_VERSION_PREVIEW
+
     destinations = []
 
     url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
@@ -168,10 +173,10 @@ def get_destination(
     app_id: str,
     destination_id: str,
     token: str,
-    api_version=ApiVersion.v1_1_preview.value,
+    api_version=API_VERSION_PREVIEW,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> Union[
-    DestinationV1_1_preview, WebhookDestinationV1_1_preview, AdxDestinationV1_1_preview
+    DestinationPreview, WebhookDestinationPreview, AdxDestinationPreview
 ]:
     """
     Get information about a specified destination.
@@ -187,6 +192,7 @@ def get_destination(
     Returns:
         Destination
     """
+    api_version = API_VERSION_PREVIEW
 
     url = "https://{}.{}/{}/{}".format(
         app_id, central_dns_suffix, BASE_PATH, destination_id
@@ -209,7 +215,7 @@ def delete_destination(
     app_id: str,
     destination_id: str,
     token: str,
-    api_version=ApiVersion.v1.value,
+    api_version=API_VERSION_PREVIEW,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     """
@@ -226,6 +232,7 @@ def delete_destination(
     Returns:
         response dict
     """
+    api_version = API_VERSION_PREVIEW
 
     url = "https://{}.{}/{}/{}".format(
         app_id, central_dns_suffix, BASE_PATH, destination_id

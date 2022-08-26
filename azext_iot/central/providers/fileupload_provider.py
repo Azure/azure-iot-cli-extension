@@ -4,12 +4,11 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-
 from knack.log import get_logger
 from azure.cli.core.azclierror import ResourceNotFoundError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
-from azext_iot.central.models.v1_1_preview import FileUploadV1_1_preview
+from azext_iot.central.models.ga_2022_07_31 import FileUploadGa
 
 logger = get_logger(__name__)
 
@@ -37,7 +36,7 @@ class CentralFileUploadProvider:
     def get_fileupload(
         self,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> FileUploadV1_1_preview:
+    ) -> FileUploadGa:
         # get or add to cache
         if not self._fileupload:
             fileupload = central_services.file_upload.get_fileupload(
@@ -58,7 +57,7 @@ class CentralFileUploadProvider:
     def delete_fileupload(
         self,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> FileUploadV1_1_preview:
+    ) -> FileUploadGa:
         # get or add to cache
         res = central_services.file_upload.delete_fileupload(
             cmd=self._cmd,

@@ -38,7 +38,7 @@ style_type = CLIArgumentType(
 api_version = CLIArgumentType(
     options_list=["--api-version", "--av"],
     choices=CaseInsensitiveList([version.value for version in ApiVersion]),
-    default=ApiVersion.ga_2022_05_31.value,
+    default=ApiVersion.ga.value,
     help="The API version for the requested operation.",
 )
 
@@ -54,7 +54,13 @@ def load_central_arguments(self, _):
             help="The App ID of the IoT Central app you want to manage."
             ' You can find the App ID in the "About" page for your application under the help menu.',
         )
-        context.argument("api_version", arg_type=api_version)
+        context.argument(
+            "api_version",
+            arg_type=api_version,
+            help="This command parameter has been deprecated and will be ignored."
+            "In the future release, we will only support IoT Central APIs from latest GA version."
+            "If any API is not GA yet, we will call latest preview version.",
+            deprecate_info=context.deprecate())
         context.argument(
             "token",
             options_list=["--token"],
@@ -339,8 +345,8 @@ def load_central_arguments(self, _):
         context.argument(
             "api_version",
             options_list=["--api-version", "--av"],
-            choices=CaseInsensitiveList([ApiVersion.v1_1_preview.value]),
-            default=ApiVersion.v1_1_preview.value,
+            choices=CaseInsensitiveList([ApiVersion.ga.value]),
+            default=ApiVersion.ga.value,
             help="The API version for the requested operation.",
         )
 
@@ -399,8 +405,8 @@ def load_central_arguments(self, _):
         context.argument(
             "api_version",
             options_list=["--api-version", "--av"],
-            choices=CaseInsensitiveList([ApiVersion.v1_1_preview.value]),
-            default=ApiVersion.v1_1_preview.value,
+            choices=CaseInsensitiveList([ApiVersion.ga.value]),
+            default=ApiVersion.ga.value,
             help="The API version for the requested operation.",
         )
 
@@ -438,9 +444,9 @@ def load_central_arguments(self, _):
             "api_version",
             options_list=["--api-version", "--av"],
             choices=CaseInsensitiveList(
-                [ApiVersion.v1_1_preview.value, ApiVersion.preview.value]
+                [ApiVersion.ga.value]
             ),
-            default=ApiVersion.v1_1_preview.value,
+            default=ApiVersion.ga.value,
             help="The API version for the requested operation.",
         )
 
@@ -516,8 +522,8 @@ def load_central_arguments(self, _):
         context.argument(
             "api_version",
             options_list=["--api-version", "--av"],
-            choices=CaseInsensitiveList([ApiVersion.v1_1_preview.value]),
-            default=ApiVersion.v1_1_preview.value,
+            choices=CaseInsensitiveList([ApiVersion.preview.value]),
+            default=ApiVersion.preview.value,
             help="The API version for the requested operation.",
         )
 
@@ -530,8 +536,8 @@ def load_central_arguments(self, _):
         context.argument(
             "api_version",
             options_list=["--api-version", "--av"],
-            choices=CaseInsensitiveList([ApiVersion.v1_1_preview.value]),
-            default=ApiVersion.v1_1_preview.value,
+            choices=CaseInsensitiveList([ApiVersion.preview.value]),
+            default=ApiVersion.preview.value,
             help="The API version for the requested operation.",
         )
 
@@ -653,4 +659,260 @@ def load_central_arguments(self, _):
             nargs="+",
             options_list=["--children-ids"],
             help="Space-separated list of children device ids.",
+        )
+
+    with self.argument_context("iot central enrollment-group") as context:
+        context.argument(
+            "enrollment_group_id",
+            options_list=["--enrollment-group-id", "--id"],
+            help="Unique identifier for the enrollment group.",
+        )
+
+    with self.argument_context("iot central enrollment-group create") as context:
+        context.argument(
+            "attestation",
+            options_list=["--attestation", "-at"],
+            help="The attestation mechanism for the enrollment group. Provide path to JSON file or raw stringified JSON."
+            " [File Path Example:./path/to/attestation.json]"
+            " [Example of stringified JSON:[{<Attestation Data JSON>}]."
+            " The request body must contain GroupSymmetricKeyAttestation or GroupX509Attestation.",
+        )
+        context.argument(
+            "display_name",
+            options_list=["--display-name"],
+            help="Display name of the enrollment group."
+        )
+        context.argument(
+            "type",
+            options_list=["--type"],
+            help="Type of devices that connect through the group."
+        )
+        context.argument(
+            "enabled",
+            options_list=["--enabled"],
+            help="Whether the devices using the group are allowed to connect to IoT Central."
+        )
+        context.argument(
+            "etag",
+            options_list=["--etag"],
+            help="ETag used to prevent conflict in enrollment group updates."
+        )
+
+    with self.argument_context("iot central enrollment-group udpate") as context:
+        context.argument(
+            "attestation",
+            options_list=["--attestation", "-at"],
+            help="The attestation mechanism for the enrollment group. Provide path to JSON file or raw stringified JSON."
+            " [File Path Example:./path/to/attestation.json]"
+            " [Example of stringified JSON:[{<Attestation Data JSON>}]."
+            " The request body must contain GroupSymmetricKeyAttestation or GroupX509Attestation.",
+        )
+        context.argument(
+            "display_name",
+            options_list=["--display-name"],
+            help="Display name of the enrollment group."
+        )
+        context.argument(
+            "type",
+            options_list=["--type"],
+            help="Type of devices that connect through the group."
+        )
+        context.argument(
+            "enabled",
+            options_list=["--enabled"],
+            help="Whether the devices using the group are allowed to connect to IoT Central."
+        )
+        context.argument(
+            "etag",
+            options_list=["--etag"],
+            help="ETag used to prevent conflict in enrollment group updates."
+        )
+
+    with self.argument_context("iot central enrollment-group x509 create") as context:
+        context.argument(
+            "entry",
+            options_list=["--certificate-entry", "--entry"],
+            help="Entry of certificate only support primary and secondary.",
+        )
+        context.argument(
+            "certificate",
+            options_list=["--certificate", "--cert"],
+            help="The string representation of this certificate.",
+        )
+        context.argument(
+            "verified",
+            options_list=["--verified", "--v"],
+            help="Whether the certificate has been verified.",
+        )
+        context.argument(
+            "etag",
+            options_list=["--etag"],
+            help="ETag used to prevent conflict in enrollment group updates."
+        )
+
+    with self.argument_context("iot central enrollment-group x509 generate") as context:
+        context.argument(
+            "entry",
+            options_list=["--certificate-entry", "--entry"],
+            help="Entry of certificate only support primary and secondary.",
+        )
+
+    with self.argument_context("iot central enrollment-group x509 verify") as context:
+        context.argument(
+            "certificate",
+            options_list=["--certificate", "--cert"],
+            help="The string representation of this certificate.",
+        )
+
+    with self.argument_context("iot central schedule-job") as context:
+        context.argument(
+            "schedule_job_id",
+            options_list=["--schedule-job-id", "--id"],
+            help="Unique identifier for the scheduled job.",
+        )
+
+    with self.argument_context("iot central schedule-job create") as context:
+        context.argument(
+            "job_name",
+            options_list=["--job-name"],
+            help="Display name of the job.",
+        )
+        context.argument(
+            "group_id",
+            options_list=["--group-id", "-g"],
+            help="The ID of the device group on which to execute the job",
+        )
+        context.argument(
+            "schedule",
+            options_list=["--schedule"],
+            help="The schedule at which to execute the job. Provide path to JSON file or raw stringified JSON."
+            " [File Path Example:./path/to/file.json]"
+            " [Example of stringified JSON:[{<Schedule Data JSON>}].",
+        )
+        context.argument(
+            "content",
+            options_list=["--content", "-k"],
+            help="The job data definition. Provide path to JSON file or raw stringified JSON."
+            " [File Path Example:./path/to/file.json]"
+            " [Example of stringified JSON:[{<Job Data JSON>}]. The request body must contain array of JobData.",
+        )
+        context.argument(
+            "batch_type",
+            options_list=["--batch-type", "--bt"],
+            default=False,
+            help="Specify if batching is done on a number of devices or a percentage of the total.",
+        )
+        context.argument(
+            "batch",
+            type=int,
+            options_list=["--batch", "-b"],
+            help="The number or percentage of devices on which batching is done.",
+        )
+        context.argument(
+            "threshold",
+            type=int,
+            options_list=["--cancellation-threshold", "--cth"],
+            help="The number or percentage of devices on which the cancellation threshold is applied.",
+        )
+        context.argument(
+            "threshold_type",
+            options_list=["--cancellation-threshold-type", "--ctt"],
+            choices=CaseInsensitiveList(["number", "percentage"]),
+            default="number",
+            help="Specify if cancellation threshold applies for a number of devices or a percentage of the total.",
+        )
+        context.argument(
+            "threshold_batch",
+            options_list=["--cancellation-threshold-batch", "--ctb"],
+            default="number",
+            help="Whether the cancellation threshold applies per-batch or to the overall job.",
+        )
+        context.argument(
+            "description",
+            type=str,
+            options_list=["--description", "--desc"],
+            help="Detailed description of the job.",
+        )
+        context.argument(
+            "enabled",
+            options_list=["--enabled"],
+            help="Whether the scheduled job is enabled."
+        )
+        context.argument(
+            "organizations",
+            options_list=["--organizations", "--orgs"],
+            help="List of organizations of the job, only one organization is supported today.",
+        )
+
+    with self.argument_context("iot central schedule-job update") as context:
+        context.argument(
+            "job_name",
+            options_list=["--job-name"],
+            help="Display name of the job.",
+        )
+        context.argument(
+            "group_id",
+            options_list=["--group-id", "-g"],
+            help="The ID of the device group on which to execute the job",
+        )
+        context.argument(
+            "schedule",
+            options_list=["--schedule"],
+            help="The schedule at which to execute the job. Provide path to JSON file or raw stringified JSON."
+            " [File Path Example:./path/to/file.json]"
+            " [Example of stringified JSON:[{<Schedule Data JSON>}].",
+        )
+        context.argument(
+            "content",
+            options_list=["--content", "-k"],
+            help="The job data definition. Provide path to JSON file or raw stringified JSON."
+            " [File Path Example:./path/to/file.json]"
+            " [Example of stringified JSON:[{<Job Data JSON>}]. The request body must contain array of JobData.",
+        )
+        context.argument(
+            "batch_type",
+            options_list=["--batch-type", "--bt"],
+            default=False,
+            help="Specify if batching is done on a number of devices or a percentage of the total.",
+        )
+        context.argument(
+            "batch",
+            type=int,
+            options_list=["--batch", "-b"],
+            help="The number or percentage of devices on which batching is done.",
+        )
+        context.argument(
+            "threshold",
+            type=int,
+            options_list=["--cancellation-threshold", "--cth"],
+            help="The number or percentage of devices on which the cancellation threshold is applied.",
+        )
+        context.argument(
+            "threshold_type",
+            options_list=["--cancellation-threshold-type", "--ctt"],
+            choices=CaseInsensitiveList(["number", "percentage"]),
+            default="number",
+            help="Specify if cancellation threshold applies for a number of devices or a percentage of the total.",
+        )
+        context.argument(
+            "threshold_batch",
+            options_list=["--cancellation-threshold-batch", "--ctb"],
+            default="number",
+            help="Whether the cancellation threshold applies per-batch or to the overall job.",
+        )
+        context.argument(
+            "description",
+            type=str,
+            options_list=["--description", "--desc"],
+            help="Detailed description of the job.",
+        )
+        context.argument(
+            "enabled",
+            options_list=["--enabled"],
+            help="Whether the scheduled job is enabled."
+        )
+        context.argument(
+            "organizations",
+            options_list=["--organizations", "--orgs"],
+            help="List of organizations of the job, only one organization is supported today.",
         )
