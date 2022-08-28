@@ -35,7 +35,7 @@ class CentralEnrollmentGroupProvider:
 
     def get_enrollment_group(
         self,
-        enrollment_group_id: str,
+        group_id: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
         return central_services.enrollment_group.get_enrollment_group(
@@ -43,7 +43,7 @@ class CentralEnrollmentGroupProvider:
             app_id=self._app_id,
             token=self._token,
             api_version=self._api_version,
-            enrollment_group_id=enrollment_group_id,
+            group_id=group_id,
             central_dns_suffix=central_dns_suffix,
         )
 
@@ -61,7 +61,7 @@ class CentralEnrollmentGroupProvider:
 
     def create_enrollment_group(
         self,
-        enrollment_group_id: str,
+        group_id: str,
         attestation: str,
         display_name: str,
         type: str,
@@ -74,7 +74,7 @@ class CentralEnrollmentGroupProvider:
             app_id=self._app_id,
             token=self._token,
             api_version=self._api_version,
-            enrollment_group_id=enrollment_group_id,
+            group_id=group_id,
             attestation=attestation,
             display_name=display_name,
             type=type,
@@ -85,7 +85,7 @@ class CentralEnrollmentGroupProvider:
 
     def update_enrollment_group(
         self,
-        enrollment_group_id: str,
+        group_id: str,
         attestation: str = None,
         display_name: str = None,
         type: str = None,
@@ -98,7 +98,7 @@ class CentralEnrollmentGroupProvider:
             app_id=self._app_id,
             token=self._token,
             api_version=self._api_version,
-            enrollment_group_id=enrollment_group_id,
+            group_id=group_id,
             attestation=attestation,
             display_name=display_name,
             type=type,
@@ -109,7 +109,7 @@ class CentralEnrollmentGroupProvider:
 
     def delete_enrollment_group(
         self,
-        enrollment_group_id: str,
+        group_id: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
         return central_services.enrollment_group.delete_enrollment_group(
@@ -117,13 +117,13 @@ class CentralEnrollmentGroupProvider:
             app_id=self._app_id,
             token=self._token,
             api_version=self._api_version,
-            enrollment_group_id=enrollment_group_id,
+            group_id=group_id,
             central_dns_suffix=central_dns_suffix,
         )
 
     def create_x509(
         self,
-        enrollment_group_id: str,
+        group_id: str,
         entry: str,
         certificate: str,
         verified: bool,
@@ -135,7 +135,7 @@ class CentralEnrollmentGroupProvider:
             app_id=self._app_id,
             token=self._token,
             api_version=self._api_version,
-            enrollment_group_id=enrollment_group_id,
+            group_id=group_id,
             entry=entry,
             certificate=certificate,
             verified=verified,
@@ -145,7 +145,7 @@ class CentralEnrollmentGroupProvider:
 
     def get_x509(
         self,
-        enrollment_group_id: str,
+        group_id: str,
         entry: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
@@ -154,14 +154,14 @@ class CentralEnrollmentGroupProvider:
             app_id=self._app_id,
             token=self._token,
             api_version=self._api_version,
-            enrollment_group_id=enrollment_group_id,
+            group_id=group_id,
             entry=entry,
             central_dns_suffix=central_dns_suffix,
         )
 
     def delete_x509(
         self,
-        enrollment_group_id: str,
+        group_id: str,
         entry: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
@@ -170,14 +170,14 @@ class CentralEnrollmentGroupProvider:
             app_id=self._app_id,
             token=self._token,
             api_version=self._api_version,
-            enrollment_group_id=enrollment_group_id,
+            group_id=group_id,
             entry=entry,
             central_dns_suffix=central_dns_suffix,
         )
 
     def verify_x509(
         self,
-        enrollment_group_id: str,
+        group_id: str,
         entry: str,
         certificate: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
@@ -187,7 +187,7 @@ class CentralEnrollmentGroupProvider:
             app_id=self._app_id,
             token=self._token,
             api_version=self._api_version,
-            enrollment_group_id=enrollment_group_id,
+            group_id=group_id,
             entry=entry,
             certificate=certificate,
             central_dns_suffix=central_dns_suffix,
@@ -195,7 +195,7 @@ class CentralEnrollmentGroupProvider:
 
     def generate_verification_code(
         self,
-        enrollment_group_id: str,
+        group_id: str,
         entry: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
@@ -204,7 +204,7 @@ class CentralEnrollmentGroupProvider:
             app_id=self._app_id,
             token=self._token,
             api_version=self._api_version,
-            enrollment_group_id=enrollment_group_id,
+            group_id=group_id,
             entry=entry,
             central_dns_suffix=central_dns_suffix,
         )

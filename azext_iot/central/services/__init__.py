@@ -18,6 +18,7 @@ from azext_iot.central.services import (
     destination,
     export,
     enrollment_group,
+    scheduled_job,
 )
 
 
@@ -35,4 +36,5 @@ __all__ = [
     "destination",
     "export",
     "enrollment_group",
+    "scheduled_job",
 ]

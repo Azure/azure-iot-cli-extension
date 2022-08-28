@@ -6,6 +6,36 @@ Release History
 unreleased
 +++++++++++++++
 
+**IoT Central updates**
+
+* `--api-version` parameter will be deprecated and ignored. The IoT Central API will alway call latest GA version or latest preview version (if any API only exists in preview).
+
+* Add support for enrollment groups CRUD.
+
+  - az iot central enrollment-group
+    - az iot central enrollment-group list
+    - az iot central enrollment-group show
+    - az iot central enrollment-group create
+    - az iot central enrollment-group delete
+    - az iot central enrollment-group update
+
+  - az iot central enrollment-group x509
+    - az iot central enrollment-group x509 create
+    - az iot central enrollment-group x509 show
+    - az iot central enrollment-group x509 delete
+    - az iot central enrollment-group x509 verify
+    - az iot central enrollment-group x509 generate
+
+* Add support for scheduled jobs CRUD.
+
+  - az iot central scheduled-job
+    - az iot central scheduled-job list
+    - az iot central scheduled-job show
+    - az iot central scheduled-job create
+    - az iot central scheduled-job delete
+    - az iot central scheduled-job update
+    - az iot central scheduled-job list-jobs
+
 
 0.17.0
 +++++++++++++++

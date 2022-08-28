@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import json
+from operator import truediv
 import time
 from typing import Tuple
 
@@ -43,6 +44,7 @@ STORAGE_CONTAINER = (
 STORAGE_ACCOUNT = (
     settings.env.azext_iot_teststorageaccount or "iotstore" + generate_generic_id()[:4]
 )
+DEFAULT_FILE_UPLOAD_TTL = "PT1H"
 
 # Device templates
 device_template_path = get_context_path(__file__, "json/device_template_int_test.json")
@@ -50,11 +52,48 @@ edge_template_path_preview = get_context_path(
     __file__, "json/device_template_edge.json"
 )
 sync_command_params = get_context_path(__file__, "json/sync_command_args.json")
-device_attestation_path = get_context_path(__file__, "json/device_attestation.json")
-device_attestation2_path = get_context_path(__file__, "json/device_attestation2.json")
 device_updated_properties_path = get_context_path(__file__, "json/device_update_properties.json")
 device_updated_component_properties_path = get_context_path(__file__, "json/device_update_component_properties.json")
-DEFAULT_FILE_UPLOAD_TTL = "PT1H"
+
+# Device attestation
+attestation_payload = {
+    'type': 'symmetricKey',
+    'symmetricKey': {
+        # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="int test only")]
+        'primaryKey': 'ya9+G4ED+/g0BgLduhjETJnbeEWMl1HIUApWCCpGMAU=',
+        # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="int test only")]
+        'secondaryKey': 'D8jeWazxcCK+MAxrn9KlqDLb8trbuKs35KEbcLBnS48='
+    }
+}
+
+attestation_payload_update = {
+    'type': 'symmetricKey',
+    'symmetricKey': {
+        # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="int test only")]
+        'primaryKey': 'r9KdK+LBaLiZ0p+RfAVj6eu9umGE6VqJj+AMLHdw+io=',
+        # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="int test only")]
+        'secondaryKey': 'W7/4/oaMpA83RYfirH9vzic4ZeK2Piy0jO5rTOM5wxg='
+    }
+}
+
+scheduled_job_schedule = {
+    "start": "3022-05-24T22:29:01Z",
+    "recurrence": "daily"
+}
+
+scheduled_job_schedule_update = {
+    "start": "3022-05-24T22:29:01Z",
+    "recurrence": "daily"
+}
+
+scheduled_job_data = [
+    {
+        "type": "property",
+        "target": "",
+        "path": "testFirstProperty",
+        "value": "updated value"
+    }
+]
 
 
 class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
@@ -308,21 +347,11 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         )
 
     def _create_device_attestation(self, api_version, device_id):
-        payload = {
-            'type': 'symmetricKey',
-            'symmetricKey': {
-                # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="int test only")]
-                'primaryKey': 'ya9+G4ED+/g0BgLduhjETJnbeEWMl1HIUApWCCpGMAU=',
-                # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="int test only")]
-                'secondaryKey': 'D8jeWazxcCK+MAxrn9KlqDLb8trbuKs35KEbcLBnS48='
-            }
-        }
-
         command = f'''
             iot central device attestation create
             --app-id {self.app_id}
             --device-id {device_id}
-            --content '{json.dumps(payload).replace("{", "{{").replace("}", "}}")}'
+            --content '{json.dumps(attestation_payload).replace("{", "{{").replace("}", "}}")}'
         '''
 
         return self.cmd(
@@ -331,21 +360,11 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         ).get_output_in_json()
 
     def _update_device_attestation(self, api_version, device_id):
-        payload = {
-            'type': 'symmetricKey',
-            'symmetricKey': {
-                # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="int test only")]
-                'primaryKey': 'r9KdK+LBaLiZ0p+RfAVj6eu9umGE6VqJj+AMLHdw+io=',
-                # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="int test only")]
-                'secondaryKey': 'W7/4/oaMpA83RYfirH9vzic4ZeK2Piy0jO5rTOM5wxg='
-            }
-        }
-
         command = f'''
             iot central device attestation update
             --app-id {self.app_id}
             --device-id {device_id}
-            --content '{json.dumps(payload).replace("{", "{{").replace("}", "}}")}'
+            --content '{json.dumps(attestation_payload_update).replace("{", "{{").replace("}", "}}")}'
         '''
 
         return self.cmd(
@@ -691,6 +710,117 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def _delete_organization(self, api_version, org_id):
         command = "iot central organization delete --app-id {} --org-id {}".format(
             self.app_id, org_id
+        )
+        self.cmd(
+            command,
+            api_version=api_version,
+            checks=[
+                self.check("result", "success"),
+            ],
+        )
+
+    def _create_enrollment_group(self, api_version):
+        group_id = self.create_random_name(prefix="aztest", length=24)
+        display_name = self.create_random_name(prefix="aztest", length=10)
+
+        command = f'''
+            iot central enrollment-group create
+             --app-id {self.app_id}
+             --group-id {group_id}
+             --attestation '{json.dumps(attestation_payload).replace("{", "{{").replace("}", "}}")}'
+             --display-name {display_name}
+             --type 'iot'
+        '''
+
+        return self.cmd(
+            command,
+            api_version=api_version,
+            checks=[
+                self.check("id", group_id),
+            ],
+        ).get_output_in_json()
+
+    def _update_enrollment_group(self, api_version, group_id):
+        display_name = self.create_random_name(prefix="aztest", length=10)
+        command = "iot central enrollment-group update \
+            --app-id {} --group-id {}  --display-name {}".format(
+            self.app_id, group_id, display_name
+        )
+
+        return self.cmd(
+            command,
+            api_version=api_version,
+            checks=[
+                self.check("id", group_id),
+                self.check("displayName", display_name),
+            ],
+        ).get_output_in_json()
+
+    def _delete_enrollment_group(self, api_version, group_id):
+        command = "iot central enrollment-group delete --app-id {} --group-id {}".format(
+            self.app_id, group_id
+        )
+        self.cmd(
+            command,
+            api_version=api_version,
+            checks=[
+                self.check("result", "success"),
+            ],
+        )
+
+    def _create_scheduled_job(self, api_version):
+        # create a device group for scheduled job
+        (template_id, template_name) = self._create_device_template(api_version=api_version)
+        org = self._create_organization(api_version=api_version)
+        device_group = self._create_device_group(api_version=api_version, template_name=template_name, org_id=org["id"])
+  
+        group_id = device_group["id"]
+        job_id = self.create_random_name(prefix="aztest", length=10)
+        display_name = self.create_random_name(prefix="aztest", length=10)
+        scheduled_job_data[0]["target"] = template_id
+
+        command = f'''
+            iot central scheduled-job create
+             --app-id {self.app_id}
+             --job-id {job_id}
+             --group-id {group_id}
+             --job-name {display_name}
+             --content '{json.dumps(scheduled_job_data).replace("{", "{{").replace("}", "}}")}'
+             --schedule '{json.dumps(scheduled_job_schedule).replace("{", "{{").replace("}", "}}")}'
+        '''
+
+        return self.cmd(
+            command,
+            api_version=api_version,
+            checks=[
+                self.check("id", job_id),
+                self.check("displayName", display_name),
+                self.check("group", group_id),
+            ],
+        ).get_output_in_json()
+
+    def _update_scheduled_job(self, api_version, job_id):
+        display_name = self.create_random_name(prefix="aztest", length=10)
+        command = f'''
+            iot central scheduled-job update
+             --app-id {self.app_id}
+             --job-id {job_id}
+             --job-name {display_name}
+             --schedule '{json.dumps(scheduled_job_schedule_update).replace("{", "{{").replace("}", "}}")}'
+        '''
+
+        return self.cmd(
+            command,
+            api_version=api_version,
+            checks=[
+                self.check("id", job_id),
+                self.check("displayName", display_name),
+            ],
+        ).get_output_in_json()
+
+    def _delete_scheduled_job(self, api_version, job_id):
+        command = "iot central scheduled-job delete --app-id {} --job-id {}".format(
+            self.app_id, job_id
         )
         self.cmd(
             command,

@@ -74,7 +74,7 @@ def list_enrollment_groups(
 def get_enrollment_group(
     cmd,
     app_id: str,
-    enrollment_group_id: str,
+    group_id: str,
     token: str,
     api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
@@ -84,7 +84,7 @@ def get_enrollment_group(
 
     Args:
         cmd: command passed into az
-        enrollment_group_id: case sensitive enrollment group id,
+        group_id: case sensitive enrollment group id,
         app_id: name of app (used for forming request URL)
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
@@ -99,7 +99,7 @@ def get_enrollment_group(
         cmd,
         app_id=app_id,
         method="GET",
-        url="https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, enrollment_group_id),
+        url="https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, group_id),
         payload=None,
         token=token,
         api_version=api_version,
@@ -115,7 +115,7 @@ def create_enrollment_group(
     display_name: str,
     type: str,
     token: str,
-    enrollment_group_id: str,
+    group_id: str,
     enabled: bool = False,
     etag: str = None,
     api_version=API_VERSION,
@@ -127,7 +127,7 @@ def create_enrollment_group(
     Args:
         cmd: command passed into az
         app_id: name of app (used for forming request URL)
-        enrollment_group_id: case sensitive enrollment group id
+        group_id: case sensitive enrollment group id
         display_name: Display name of the enrollment group
         attestation: The attestation mechanism for the enrollment group
         type: Type of devices that connect through the group
@@ -158,7 +158,7 @@ def create_enrollment_group(
         cmd,
         app_id=app_id,
         method="PUT",
-        url="https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, enrollment_group_id),
+        url="https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, group_id),
         payload=payload,
         token=token,
         api_version=api_version,
@@ -174,7 +174,7 @@ def update_enrollment_group(
     display_name: str,
     type: str,
     token: str,
-    enrollment_group_id: str,
+    group_id: str,
     enabled: bool = False,
     etag : str = None,
     api_version=API_VERSION,
@@ -186,7 +186,7 @@ def update_enrollment_group(
     Args:
         cmd: command passed into az
         app_id: name of app (used for forming request URL)
-        enrollment_group_id: case sensitive enrollment group id
+        group_id: case sensitive enrollment group id
         display_name: Display name of the enrollment group
         attestation: The attestation mechanism for the enrollment group
         type: Type of devices that connect through the group
@@ -222,7 +222,7 @@ def update_enrollment_group(
         cmd,
         app_id=app_id,
         method="PATCH",
-        url="https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, enrollment_group_id),
+        url="https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, group_id),
         payload=payload,
         token=token,
         api_version=api_version,
@@ -234,7 +234,7 @@ def update_enrollment_group(
 def delete_enrollment_group(
     cmd,
     app_id: str,
-    enrollment_group_id: str,
+    group_id: str,
     token: str,
     api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
@@ -245,7 +245,7 @@ def delete_enrollment_group(
     Args:
         cmd: command passed into az
         app_id: name of app (used for forming request URL)
-        enrollment_group_id: case sensitive enrollment group id,
+        group_id: case sensitive enrollment group id,
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
@@ -259,7 +259,7 @@ def delete_enrollment_group(
         cmd,
         app_id=app_id,
         method="DELETE",
-        url="https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, enrollment_group_id),
+        url="https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, group_id),
         payload=None,
         token=token,
         api_version=api_version,
@@ -270,7 +270,7 @@ def delete_enrollment_group(
 def create_x509(
     cmd,
     app_id: str,
-    enrollment_group_id: str,
+    group_id: str,
     entry: str,
     verified: bool,
     certificate: str,
@@ -285,7 +285,7 @@ def create_x509(
     Args:
         cmd: command passed into az
         app_id: name of app (used for forming request URL)
-        enrollment_group_id: case sensitive enrollment group id
+        group_id: case sensitive enrollment group id
         entry: entry of certificate only support primary and secondary
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
@@ -309,7 +309,7 @@ def create_x509(
         app_id=app_id,
         method="PUT",
         url="https://{}.{}/{}/{}/certificates/{}".format(
-            app_id, central_dns_suffix, BASE_PATH, enrollment_group_id, entry),
+            app_id, central_dns_suffix, BASE_PATH, group_id, entry),
         payload=payload,
         token=token,
         api_version=api_version,
@@ -320,7 +320,7 @@ def create_x509(
 def get_x509(
     cmd,
     app_id: str,
-    enrollment_group_id: str,
+    group_id: str,
     entry: str,
     token: str,
     api_version=API_VERSION,
@@ -332,7 +332,7 @@ def get_x509(
     Args:
         cmd: command passed into az
         app_id: name of app (used for forming request URL)
-        enrollment_group_id: case sensitive enrollment group id
+        group_id: case sensitive enrollment group id
         entry: entry of certificate only support primary and secondary
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
@@ -348,7 +348,7 @@ def get_x509(
         app_id=app_id,
         method="GET",
         url="https://{}.{}/{}/{}/certificates/{}".format(
-            app_id, central_dns_suffix, BASE_PATH, enrollment_group_id, entry),
+            app_id, central_dns_suffix, BASE_PATH, group_id, entry),
         payload=None,
         token=token,
         api_version=api_version,
@@ -359,7 +359,7 @@ def get_x509(
 def delete_x509(
     cmd,
     app_id: str,
-    enrollment_group_id: str,
+    group_id: str,
     entry: str,
     token: str,
     api_version=API_VERSION,
@@ -371,7 +371,7 @@ def delete_x509(
     Args:
         cmd: command passed into az
         app_id: name of app (used for forming request URL)
-        enrollment_group_id: case sensitive enrollment group id
+        group_id: case sensitive enrollment group id
         entry: entry of certificate only support primary and secondary
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
@@ -387,7 +387,7 @@ def delete_x509(
         app_id=app_id,
         method="DELETE",
         url="https://{}.{}/{}/{}/certificates/{}".format(
-            app_id, central_dns_suffix, BASE_PATH, enrollment_group_id, entry),
+            app_id, central_dns_suffix, BASE_PATH, group_id, entry),
         payload=None,
         token=token,
         api_version=api_version,
@@ -398,7 +398,7 @@ def delete_x509(
 def verify_x509(
     cmd,
     app_id: str,
-    enrollment_group_id: str,
+    group_id: str,
     entry: str,
     certificate: str,
     token: str,
@@ -412,7 +412,7 @@ def verify_x509(
     Args:
         cmd: command passed into az
         app_id: name of app (used for forming request URL)
-        enrollment_group_id: case sensitive enrollment group id
+        group_id: case sensitive enrollment group id
         entry: entry of certificate only support primary and secondary
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
@@ -432,7 +432,7 @@ def verify_x509(
         app_id=app_id,
         method="POST ",
         url="https://{}.{}/{}/{}/certificates/{}/verify".format(
-            app_id, central_dns_suffix, BASE_PATH, enrollment_group_id, entry),
+            app_id, central_dns_suffix, BASE_PATH, group_id, entry),
         payload=payload,
         token=token,
         api_version=api_version,
@@ -443,7 +443,7 @@ def verify_x509(
 def generate_verification_code(
     cmd,
     app_id: str,
-    enrollment_group_id: str,
+    group_id: str,
     entry: str,
     token: str,
     api_version=API_VERSION,
@@ -456,7 +456,7 @@ def generate_verification_code(
     Args:
         cmd: command passed into az
         app_id: name of app (used for forming request URL)
-        enrollment_group_id: case sensitive enrollment group id
+        group_id: case sensitive enrollment group id
         entry: entry of certificate only support primary and secondary
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
@@ -472,7 +472,7 @@ def generate_verification_code(
         app_id=app_id,
         method="POST ",
         url="https://{}.{}/{}/{}/certificates/{}/generateVerificationCode".format(
-            app_id, central_dns_suffix, BASE_PATH, enrollment_group_id, entry),
+            app_id, central_dns_suffix, BASE_PATH, group_id, entry),
         payload=None,
         token=token,
         api_version=api_version,

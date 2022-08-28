@@ -460,3 +460,37 @@ class TestIotCentral(CentralLiveScenarioTest):
         self._delete_device_template(
             api_version=self._api_version, template_id=template_id
         )
+
+    def test_central_enrollment_group_methods_CRUD(self):
+        # create
+        group = self._create_enrollment_group(api_version=self._api_version)
+
+        # show
+        command = "iot central enrollment-group show -n {} --group-id {}".format(
+            self.app_id, group["id"]
+        )
+        result = self.cmd(command, api_version=self._api_version).get_output_in_json()
+        assert result["id"] == group["id"]
+
+        # update
+        self._update_enrollment_group(group_id=group["id"], api_version=self._api_version)
+
+        # delete
+        self._delete_enrollment_group(group_id=group["id"], api_version=self._api_version)
+
+    def test_central_scheduled_job_methods_CRUD(self):
+        # create
+        job = self._create_scheduled_job(api_version=self._api_version)
+
+        # show
+        command = "iot central scheduled-job show -n {} --job-id {}".format(
+            self.app_id, job["id"]
+        )
+        result = self.cmd(command, api_version=self._api_version).get_output_in_json()
+        assert result["id"] == job["id"]
+
+        # update
+        self._update_scheduled_job(job_id=job["id"], api_version=self._api_version)
+
+        # delete
+        self._delete_scheduled_job(job_id=job["id"], api_version=self._api_version)

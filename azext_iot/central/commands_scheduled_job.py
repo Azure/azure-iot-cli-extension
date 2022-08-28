@@ -18,7 +18,7 @@ from azext_iot.central.models.ga_2022_07_31 import ScheduledJobGa
 def get_scheduled_job(
     cmd,
     app_id: str,
-    schedule_job_id: str,
+    job_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=API_VERSION,
@@ -27,8 +27,8 @@ def get_scheduled_job(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
 
-    return provider.get_schedule_job(
-        schedule_job_id=schedule_job_id,
+    return provider.get_scheduled_job(
+        job_id=job_id,
         central_dns_suffix=central_dns_suffix,
     )
 
@@ -44,7 +44,7 @@ def list_scheduled_jobs(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
 
-    return provider.list_schedule_jobs(central_dns_suffix=central_dns_suffix)
+    return provider.list_scheduled_jobs(central_dns_suffix=central_dns_suffix)
 
 
 def create_scheduled_job(
@@ -103,9 +103,9 @@ def update_scheduled_job(
     cmd,
     app_id: str,
     job_id: str,
-    group_id: str = None,
-    schedule: str = None,
-    content: str = None,
+    group_id=None,
+    schedule=None,
+    content=None,
     job_name=None,
     description=None,
     batch_type=None,
@@ -117,11 +117,13 @@ def update_scheduled_job(
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=API_VERSION,
 ) -> ScheduledJobGa:
+    payload = None
     if content is not None:
         payload = utility.process_json_arg(content, argument_name="content")
 
+    schedule_payload = None
     if schedule is not None:
-        schedule = utility.process_json_arg(schedule, argument_name="schedule")
+        schedule_payload = utility.process_json_arg(schedule, argument_name="schedule")
 
     provider = CentralScheduledJobProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
@@ -132,7 +134,7 @@ def update_scheduled_job(
         job_name=job_name,
         group_id=group_id,
         content=payload,
-        schedule=schedule,
+        schedule=schedule_payload,
         description=description,
         batch_percentage=True
         if batch_type is not None and batch_type.lower() == "percentage"
@@ -150,7 +152,7 @@ def update_scheduled_job(
 def delete_scheduled_job(
     cmd,
     app_id: str,
-    schedule_job_id: str,
+    job_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=API_VERSION,
@@ -160,19 +162,15 @@ def delete_scheduled_job(
     )
 
     return provider.delete_scheduled_job(
-        schedule_job_id=schedule_job_id,
+        job_id=job_id,
         central_dns_suffix=central_dns_suffix,
     )
 
 
-def list_jobs_status(
+def list_jobs(
     cmd,
     app_id: str,
-    schedule_job_id: str,
-    entry: str,
-    certificate: str,
-    verified: bool,
-    etag: str = None,
+    job_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=API_VERSION,
@@ -181,11 +179,7 @@ def list_jobs_status(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
 
-    return provider.list_jobs_status(
-        schedule_job_id=schedule_job_id,
-        entry=entry,
-        certificate=certificate,
-        verified=verified,
-        etag=etag,
+    return provider.list_jobs(
+        job_id=job_id,
         central_dns_suffix=central_dns_suffix,
     )

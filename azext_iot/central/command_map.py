@@ -264,14 +264,14 @@ def load_central_commands(self, _):
         cmd_group.command("generate", "generate_verification_code")
 
     with self.command_group(
-        "iot central schedule-job", command_type=central_scheduled_jobs_ops,
+        "iot central scheduled-job", command_type=central_scheduled_jobs_ops,
     ) as cmd_group:
         cmd_group.show_command("show", "get_scheduled_job")
         cmd_group.command("list", "list_scheduled_jobs")
         cmd_group.command("create", "create_scheduled_job")
         cmd_group.command("delete", "delete_scheduled_job")
         cmd_group.command("update", "update_scheduled_job")
-        cmd_group.command("list-jobs", "list_jobs_status")
+        cmd_group.command("list-jobs", "list_jobs")
 
     with self.command_group(
         "iot central device edge children", command_type=central_device_ops

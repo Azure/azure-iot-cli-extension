@@ -478,7 +478,8 @@ def load_central_arguments(self, _):
         context.argument(
             "batch_type",
             options_list=["--batch-type", "--bt"],
-            default=False,
+            choices=CaseInsensitiveList(["number", "percentage"]),
+            default="number",
             help="Specify if batching is done on a number of devices or a percentage of the total.",
         )
         context.argument(
@@ -663,8 +664,8 @@ def load_central_arguments(self, _):
 
     with self.argument_context("iot central enrollment-group") as context:
         context.argument(
-            "enrollment_group_id",
-            options_list=["--enrollment-group-id", "--id"],
+            "group_id",
+            options_list=["--group-id", "--id"],
             help="Unique identifier for the enrollment group.",
         )
 
@@ -764,14 +765,14 @@ def load_central_arguments(self, _):
             help="The string representation of this certificate.",
         )
 
-    with self.argument_context("iot central schedule-job") as context:
+    with self.argument_context("iot central scheduled-job") as context:
         context.argument(
-            "schedule_job_id",
-            options_list=["--schedule-job-id", "--id"],
+            "job_id",
+            options_list=["--job-id", "--id"],
             help="Unique identifier for the scheduled job.",
         )
 
-    with self.argument_context("iot central schedule-job create") as context:
+    with self.argument_context("iot central scheduled-job create") as context:
         context.argument(
             "job_name",
             options_list=["--job-name"],
@@ -799,7 +800,8 @@ def load_central_arguments(self, _):
         context.argument(
             "batch_type",
             options_list=["--batch-type", "--bt"],
-            default=False,
+            choices=CaseInsensitiveList(["number", "percentage"]),
+            default="number",
             help="Specify if batching is done on a number of devices or a percentage of the total.",
         )
         context.argument(
@@ -844,7 +846,7 @@ def load_central_arguments(self, _):
             help="List of organizations of the job, only one organization is supported today.",
         )
 
-    with self.argument_context("iot central schedule-job update") as context:
+    with self.argument_context("iot central scheduled-job update") as context:
         context.argument(
             "job_name",
             options_list=["--job-name"],
@@ -872,7 +874,8 @@ def load_central_arguments(self, _):
         context.argument(
             "batch_type",
             options_list=["--batch-type", "--bt"],
-            default=False,
+            choices=CaseInsensitiveList(["number", "percentage"]),
+            default="number",
             help="Specify if batching is done on a number of devices or a percentage of the total.",
         )
         context.argument(

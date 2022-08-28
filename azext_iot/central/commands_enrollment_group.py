@@ -16,7 +16,7 @@ from azext_iot.central.models.ga_2022_07_31 import EnrollmentGroupGa
 def get_enrollment_group(
     cmd,
     app_id: str,
-    enrollment_group_id: str,
+    group_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=API_VERSION,
@@ -26,7 +26,7 @@ def get_enrollment_group(
     )
 
     return provider.get_enrollment_group(
-        enrollment_group_id=enrollment_group_id,
+        group_id=group_id,
         central_dns_suffix=central_dns_suffix,
     )
 
@@ -51,7 +51,7 @@ def create_enrollment_group(
     attestation: str,
     display_name: str,
     type: str,
-    enrollment_group_id: str,
+    group_id: str,
     enabled: bool = False,
     etag : str = None,
     token=None,
@@ -65,7 +65,7 @@ def create_enrollment_group(
     attestation = utility.process_json_arg(attestation, argument_name="attestation")
 
     return provider.create_enrollment_group(
-        enrollment_group_id=enrollment_group_id,
+        group_id=group_id,
         attestation=attestation,
         display_name=display_name,
         type=type,
@@ -78,10 +78,10 @@ def create_enrollment_group(
 def update_enrollment_group(
     cmd,
     app_id: str,
-    attestation: str,
-    display_name: str,
-    type: str,
-    enrollment_group_id: str,
+    group_id: str,
+    attestation: str = None,
+    display_name: str = None,
+    type: str = None,
     enabled: bool = False,
     etag : str = None,
     token=None,
@@ -92,10 +92,11 @@ def update_enrollment_group(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
 
-    attestation = utility.process_json_arg(attestation, argument_name="attestation")
+    if attestation is not None:
+        attestation = utility.process_json_arg(attestation, argument_name="attestation")
 
     return provider.update_enrollment_group(
-        enrollment_group_id=enrollment_group_id,
+        group_id=group_id,
         attestation=attestation,
         display_name=display_name,
         type=type,
@@ -108,7 +109,7 @@ def update_enrollment_group(
 def delete_enrollment_group(
     cmd,
     app_id: str,
-    enrollment_group_id: str,
+    group_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=API_VERSION,
@@ -118,7 +119,7 @@ def delete_enrollment_group(
     )
 
     return provider.delete_enrollment_group(
-        enrollment_group_id=enrollment_group_id,
+        group_id=group_id,
         central_dns_suffix=central_dns_suffix,
     )
 
@@ -126,7 +127,7 @@ def delete_enrollment_group(
 def create_x509(
     cmd,
     app_id: str,
-    enrollment_group_id: str,
+    group_id: str,
     entry: str,
     certificate: str,
     verified: bool,
@@ -140,7 +141,7 @@ def create_x509(
     )
 
     return provider.create_x509(
-        enrollment_group_id=enrollment_group_id,
+        group_id=group_id,
         entry=entry,
         certificate=certificate,
         verified=verified,
@@ -152,7 +153,7 @@ def create_x509(
 def get_x509(
     cmd,
     app_id: str,
-    enrollment_group_id: str,
+    group_id: str,
     entry: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
@@ -163,7 +164,7 @@ def get_x509(
     )
 
     return provider.get_x509(
-        enrollment_group_id=enrollment_group_id,
+        group_id=group_id,
         entry=entry,
         central_dns_suffix=central_dns_suffix,
     )
@@ -172,7 +173,7 @@ def get_x509(
 def delete_x509(
     cmd,
     app_id: str,
-    enrollment_group_id: str,
+    group_id: str,
     entry: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
@@ -183,7 +184,7 @@ def delete_x509(
     )
 
     return provider.delete_x509(
-        enrollment_group_id=enrollment_group_id,
+        group_id=group_id,
         entry=entry,
         central_dns_suffix=central_dns_suffix,
     )
@@ -192,7 +193,7 @@ def delete_x509(
 def verify_x509(
     cmd,
     app_id: str,
-    enrollment_group_id: str,
+    group_id: str,
     entry: str,
     certificate: str,
     token=None,
@@ -204,7 +205,7 @@ def verify_x509(
     )
 
     return provider.verify_x509(
-        enrollment_group_id=enrollment_group_id,
+        group_id=group_id,
         entry=entry,
         certificate=certificate,
         central_dns_suffix=central_dns_suffix,
@@ -214,7 +215,7 @@ def verify_x509(
 def generate_verification_code(
     cmd,
     app_id: str,
-    enrollment_group_id: str,
+    group_id: str,
     entry: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
@@ -225,7 +226,7 @@ def generate_verification_code(
     )
 
     return provider.generate_verification_code(
-        enrollment_group_id=enrollment_group_id,
+        group_id=group_id,
         entry=entry,
         central_dns_suffix=central_dns_suffix,
     )

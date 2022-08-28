@@ -23,7 +23,16 @@ from azext_iot.tests.helpers import load_json
 from azext_iot.tests.test_constants import FileNames
 from azext_iot.constants import PNP_DTDLV2_COMPONENT_MARKER
 from azext_iot.central.models.v2022_06_30_preview import QueryReponsePreview, TemplatePreview
-from azext_iot.central.models.ga_2022_07_31 import DeviceGroupGa, OrganizationGa, JobGa, FileUploadGa, RoleGa, UserGa
+from azext_iot.central.models.ga_2022_07_31 import (
+    DeviceGroupGa,
+    OrganizationGa,
+    JobGa,
+    FileUploadGa,
+    RoleGa,
+    UserGa,
+    ScheduledJobGa,
+    EnrollmentGroupGa,
+)
 from azext_iot.central.services._utility import get_object
 from azext_iot.central.models.edge import EdgeModule
 from azext_iot.central.providers import (
@@ -33,6 +42,8 @@ from azext_iot.central.providers import (
     CentralDeviceGroupProvider,
     CentralDeviceTemplateProvider,
     CentralJobProvider,
+    CentralScheduledJobProvider,
+    CentralEnrollmentGroupProvider,
     CentralUserProvider,
     CentralQueryProvider,
     CentralDestinationProvider,
@@ -295,17 +306,17 @@ class TestCentralDeviceProvider:
     def test_should_update_device_template_name(self, mock_device_template_svc):
         # setup
         provider = CentralDeviceTemplateProvider(
-            cmd=None, app_id=app_id, api_version=API_VERSION
+            cmd=None, app_id=app_id, api_version=API_VERSION_PREVIEW
         )
         existing = get_object(
-            self._device_template, "Template", api_version=API_VERSION
+            self._device_template, "Template", api_version=API_VERSION_PREVIEW
         )
         display_name = "NewName"
         mock_device_template_svc.get_device_template.return_value = existing
         updated_template_dict = deepcopy(self._device_template)
         updated_template_dict["displayName"] = display_name
         mock_device_template_svc.update_device_template.return_value = get_object(
-            updated_template_dict, "Template", api_version=API_VERSION
+            updated_template_dict, "Template", api_version=API_VERSION_PREVIEW
         )
 
         # act
@@ -1135,6 +1146,122 @@ class TestCentralPropertyMonitor:
             "'RS40OccupancySensorV36fy': ['component2prop', 'testComponent', 'component2PropReadonly', "
             "'component2Prop2', 'component1Telemetry']}'. "
         )
+
+
+class TestCentralScheduledJobProvider:
+    _scheduled_jobs = [ScheduledJobGa(job) for job in load_json(FileNames.central_scheduled_job_file)]
+    _provider = CentralScheduledJobProvider(
+        cmd=None, app_id=app_id, api_version=API_VERSION
+    )
+
+    @mock.patch("azext_iot.central.services.scheduled_job")
+    def test_should_return_scheduled_jobs(self, mock_scheduled_job_svc):
+        mock_scheduled_job_svc.list_scheduled_jobs.return_value = self._scheduled_jobs
+
+        # act
+        jobs = self._provider.list_scheduled_jobs()
+        # verify
+        assert mock_scheduled_job_svc.list_scheduled_jobs.call_count == 1
+        assert set(jobs) == set(self._scheduled_jobs)
+
+    @mock.patch("azext_iot.central.services.scheduled_job")
+    def test_should_return_scheduled_job(self, mock_scheduled_job_svc):
+        mock_scheduled_job_svc.get_scheduled_job.return_value = self._scheduled_jobs[0]
+
+        # act
+        job = self._provider.get_scheduled_job(self._scheduled_jobs[0].id)
+        # verify
+        assert mock_scheduled_job_svc.get_scheduled_job.call_count == 1
+        assert job.id == self._scheduled_jobs[0].id
+
+    @mock.patch("azext_iot.central.services.scheduled_job")
+    def test_should_create_scheduled_job(self, mock_scheduled_job_svc):
+        mock_scheduled_job_svc.create_scheduled_job.return_value = self._scheduled_jobs[0]
+
+        # act
+        scheduled_job = self._provider.create_scheduled_job(
+            self._scheduled_jobs[0].id,
+            self._scheduled_jobs[0].group,
+            self._scheduled_jobs[0].schedule,
+            self._scheduled_jobs[0].data,
+        )
+        # verify
+        assert mock_scheduled_job_svc.create_scheduled_job.call_count == 1
+        assert scheduled_job == self._scheduled_jobs[0]
+
+
+class TestCentralEnrollmentGroupProvider:
+    _enrollment_groups = [EnrollmentGroupGa(group) for group in load_json(FileNames.central_enrollment_group_file)]
+    _x509 = load_json(FileNames.central_enrollment_group_x509_file)
+
+    _provider = CentralEnrollmentGroupProvider(
+        cmd=None, app_id=app_id, api_version=API_VERSION
+    )
+
+    @mock.patch("azext_iot.central.services.enrollment_group")
+    def test_should_return_enrollment_groups(self, mock_enrollment_group_svc):
+        mock_enrollment_group_svc.list_enrollment_groups.return_value = self._enrollment_groups
+
+        # act
+        groups = self._provider.list_enrollment_groups()
+        # verify
+        assert mock_enrollment_group_svc.list_enrollment_groups.call_count == 1
+        assert set(groups) == set(self._enrollment_groups)
+
+    @mock.patch("azext_iot.central.services.enrollment_group")
+    def test_should_return_enrollment_group(self, mock_enrollment_group_svc):
+        mock_enrollment_group_svc.get_enrollment_group.return_value = self._enrollment_groups[0]
+
+        # act
+        group = self._provider.get_enrollment_group(self._enrollment_groups[0].id)
+        # verify
+        assert mock_enrollment_group_svc.get_enrollment_group.call_count == 1
+        assert group.id == self._enrollment_groups[0].id
+
+    @mock.patch("azext_iot.central.services.enrollment_group")
+    def test_should_create_enrollment_group(self, mock_enrollment_group_svc):
+        mock_enrollment_group_svc.create_enrollment_group.return_value = self._enrollment_groups[0]
+
+        # act
+        enrollment_group = self._provider.create_enrollment_group(
+            self._enrollment_groups[0].id,
+            self._enrollment_groups[0].attestation,
+            self._enrollment_groups[0].display_name,
+            self._enrollment_groups[0].type,
+        )
+        # verify
+        assert mock_enrollment_group_svc.create_enrollment_group.call_count == 1
+        assert enrollment_group == self._enrollment_groups[0]
+
+    @mock.patch("azext_iot.central.services.enrollment_group")
+    def test_should_return_x509(self, mock_enrollment_group_svc):
+        mock_enrollment_group_svc.get_x509.return_value = self._x509
+
+        # act
+        groups = self._provider.get_x509(self._enrollment_groups[0].id, 'primary')
+        # verify
+        assert mock_enrollment_group_svc.get_x509.call_count == 1
+        assert set(groups) == set(self._x509)
+
+    @mock.patch("azext_iot.central.services.enrollment_group")
+    def test_should_return_x509_code(self, mock_enrollment_group_svc):
+        mock_enrollment_group_svc.generate_verification_code.return_value = {
+            "verificationCode": "<certificate-verification-code>"
+        }
+
+        # act
+        self._provider.generate_verification_code(self._enrollment_groups[0].id, 'primary')
+        # verify
+        assert mock_enrollment_group_svc.generate_verification_code.call_count == 1
+
+    @mock.patch("azext_iot.central.services.enrollment_group")
+    def test_should_create_x509(self, mock_enrollment_group_svc):
+        mock_enrollment_group_svc.create_x509.return_value = self._x509
+
+        # act
+        self._provider.create_x509(self._enrollment_groups[0].id, 'primary', 'cert', True)
+        # verify
+        assert mock_enrollment_group_svc.create_x509.call_count == 1
 
 
 class TestFailover:

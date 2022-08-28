@@ -33,25 +33,25 @@ class CentralScheduledJobProvider:
         self._token = token
         self._api_version = api_version
 
-    def get_enrollment_group(
+    def get_scheduled_job(
         self,
-        enrollment_group_id: str,
+        job_id: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
-        return central_services.enrollment_group.get_enrollment_group(
+        return central_services.scheduled_job.get_scheduled_job(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
             api_version=self._api_version,
-            enrollment_group_id=enrollment_group_id,
+            job_id=job_id,
             central_dns_suffix=central_dns_suffix,
         )
 
-    def list_enrollment_groups(
+    def list_scheduled_jobs(
         self,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> List[dict]:
-        return central_services.enrollment_group.list_enrollment_groups(
+        return central_services.scheduled_job.list_scheduled_jobs(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
@@ -59,152 +59,98 @@ class CentralScheduledJobProvider:
             central_dns_suffix=central_dns_suffix,
         )
 
-    def create_enrollment_group(
+    def create_scheduled_job(
         self,
-        enrollment_group_id: str,
-        attestation: str,
-        display_name: str,
-        type: str,
-        enabled: bool = False,
-        etag : str = None,
+        job_id,
+        group_id,
+        schedule,
+        content,
+        job_name=None,
+        description=None,
+        batch_percentage=None,
+        threshold_percentage=None,
+        threshold_batch=None,
+        batch=None,
+        threshold=None,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
-        return central_services.enrollment_group.create_enrollment_group(
+        return central_services.scheduled_job.create_scheduled_job(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
             api_version=self._api_version,
-            enrollment_group_id=enrollment_group_id,
-            attestation=attestation,
-            display_name=display_name,
-            type=type,
-            enabled=enabled,
-            etag=etag,
+            job_id=job_id,
+            job_name=job_name,
+            group_id=group_id,
+            content=content,
+            schedule=schedule,
+            description=description,
+            batch_percentage=batch_percentage,
+            threshold_percentage=threshold_percentage,
+            threshold_batch=threshold_batch,
+            batch=batch,
+            threshold=threshold,
             central_dns_suffix=central_dns_suffix,
         )
 
-    def update_enrollment_group(
+    def update_scheduled_job(
         self,
-        enrollment_group_id: str,
-        attestation: str = None,
-        display_name: str = None,
-        type: str = None,
-        enabled: bool = False,
-        etag : str = None,
+        job_id,
+        group_id=None,
+        schedule=None,
+        content=None,
+        job_name=None,
+        description=None,
+        batch_percentage=None,
+        threshold_percentage=None,
+        threshold_batch=None,
+        batch=None,
+        threshold=None,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
-        return central_services.enrollment_group.update_enrollment_group(
+        return central_services.scheduled_job.update_scheduled_job(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
             api_version=self._api_version,
-            enrollment_group_id=enrollment_group_id,
-            attestation=attestation,
-            display_name=display_name,
-            type=type,
-            enabled=enabled,
-            etag=etag,
+            job_id=job_id,
+            job_name=job_name,
+            group_id=group_id,
+            content=content,
+            schedule=schedule,
+            description=description,
+            batch_percentage=batch_percentage,
+            threshold_percentage=threshold_percentage,
+            threshold_batch=threshold_batch,
+            batch=batch,
+            threshold=threshold,
             central_dns_suffix=central_dns_suffix,
         )
 
-    def delete_enrollment_group(
+    def delete_scheduled_job(
         self,
-        enrollment_group_id: str,
+        job_id: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
-        return central_services.enrollment_group.delete_enrollment_group(
+        return central_services.scheduled_job.delete_scheduled_job(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
             api_version=self._api_version,
-            enrollment_group_id=enrollment_group_id,
+            job_id=job_id,
             central_dns_suffix=central_dns_suffix,
         )
 
-    def create_x509(
+    def list_jobs(
         self,
-        enrollment_group_id: str,
-        entry: str,
-        certificate: str,
-        verified: bool,
-        etag: str = None,
+        job_id: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
-        return central_services.enrollment_group.create_x509(
+        return central_services.scheduled_job.list_jobs(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
             api_version=self._api_version,
-            enrollment_group_id=enrollment_group_id,
-            entry=entry,
-            certificate=certificate,
-            verified=verified,
-            etag=etag,
-            central_dns_suffix=central_dns_suffix,
-        )
-
-    def get_x509(
-        self,
-        enrollment_group_id: str,
-        entry: str,
-        central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> dict:
-        return central_services.enrollment_group.get_x509(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            token=self._token,
-            api_version=self._api_version,
-            enrollment_group_id=enrollment_group_id,
-            entry=entry,
-            central_dns_suffix=central_dns_suffix,
-        )
-
-    def delete_x509(
-        self,
-        enrollment_group_id: str,
-        entry: str,
-        central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> dict:
-        return central_services.enrollment_group.delete_x509(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            token=self._token,
-            api_version=self._api_version,
-            enrollment_group_id=enrollment_group_id,
-            entry=entry,
-            central_dns_suffix=central_dns_suffix,
-        )
-
-    def verify_x509(
-        self,
-        enrollment_group_id: str,
-        entry: str,
-        certificate: str,
-        central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> dict:
-        return central_services.enrollment_group.verify_x509(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            token=self._token,
-            api_version=self._api_version,
-            enrollment_group_id=enrollment_group_id,
-            entry=entry,
-            certificate=certificate,
-            central_dns_suffix=central_dns_suffix,
-        )
-
-    def generate_verification_code(
-        self,
-        enrollment_group_id: str,
-        entry: str,
-        central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> dict:
-        return central_services.enrollment_group.generate_verification_code(
-            cmd=self._cmd,
-            app_id=self._app_id,
-            token=self._token,
-            api_version=self._api_version,
-            enrollment_group_id=enrollment_group_id,
-            entry=entry,
+            job_id=job_id,
             central_dns_suffix=central_dns_suffix,
         )
