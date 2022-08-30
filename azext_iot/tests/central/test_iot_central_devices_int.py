@@ -832,6 +832,6 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
             if (device["provisioned"]) or retry > 11:
                 break
-    
+
         if device["provisioned"] is not True:
             raise CLIInternalError("Device is not provisioned in 60s.")

@@ -672,7 +672,7 @@ def load_central_arguments(self, _):
     with self.argument_context("iot central enrollment-group create") as context:
         context.argument(
             "attestation",
-            options_list=["--attestation", "-at"],
+            options_list=["--attestation", "--at"],
             help="The attestation mechanism for the enrollment group. Provide path to JSON file or raw stringified JSON."
             " [File Path Example:./path/to/attestation.json]"
             " [Example of stringified JSON:[{<Attestation Data JSON>}]."
@@ -699,10 +699,10 @@ def load_central_arguments(self, _):
             help="ETag used to prevent conflict in enrollment group updates."
         )
 
-    with self.argument_context("iot central enrollment-group udpate") as context:
+    with self.argument_context("iot central enrollment-group update") as context:
         context.argument(
             "attestation",
-            options_list=["--attestation", "-at"],
+            options_list=["--attestation", "--at"],
             help="The attestation mechanism for the enrollment group. Provide path to JSON file or raw stringified JSON."
             " [File Path Example:./path/to/attestation.json]"
             " [Example of stringified JSON:[{<Attestation Data JSON>}]."
@@ -727,6 +727,13 @@ def load_central_arguments(self, _):
             "etag",
             options_list=["--etag"],
             help="ETag used to prevent conflict in enrollment group updates."
+        )
+
+    with self.argument_context("iot central enrollment-group x509") as context:
+        context.argument(
+            "entry",
+            options_list=["--certificate-entry", "--entry"],
+            help="Entry of certificate only support primary and secondary.",
         )
 
     with self.argument_context("iot central enrollment-group x509 create") as context:
@@ -875,7 +882,6 @@ def load_central_arguments(self, _):
             "batch_type",
             options_list=["--batch-type", "--bt"],
             choices=CaseInsensitiveList(["number", "percentage"]),
-            default="number",
             help="Specify if batching is done on a number of devices or a percentage of the total.",
         )
         context.argument(
@@ -894,13 +900,11 @@ def load_central_arguments(self, _):
             "threshold_type",
             options_list=["--cancellation-threshold-type", "--ctt"],
             choices=CaseInsensitiveList(["number", "percentage"]),
-            default="number",
             help="Specify if cancellation threshold applies for a number of devices or a percentage of the total.",
         )
         context.argument(
             "threshold_batch",
             options_list=["--cancellation-threshold-batch", "--ctb"],
-            default="number",
             help="Whether the cancellation threshold applies per-batch or to the overall job.",
         )
         context.argument(

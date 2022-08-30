@@ -61,7 +61,7 @@ def load_central_help():
     _load_central_c2d_message_help()
     _load_central_edge_help()
     _load_central_enrollment_group_help()
-    _load_central_schedule_job_help()
+    _load_central_scheduled_job_help()
 
 
 def _load_central_export_help():
@@ -1813,6 +1813,9 @@ def _load_central_enrollment_group_help():
           az iot central enrollment-group create
           --app-id {appid}
           --id {enrollmentGroupId}
+          --at {attestation}
+          --display-name {displayName}
+          --type {type}
     """
 
     helps[
@@ -1826,7 +1829,18 @@ def _load_central_enrollment_group_help():
           az iot central enrollment-group update
           --app-id {appid}
           --id {enrollmentGroupId}
+          --at {attestation}
+          --display-name {displayName}
+          --type {type}
+          --enabled {enabled}
     """
+
+    helps[
+        "iot central enrollment-group x509"
+    ] = """
+          type: group
+          short-summary: Manage and configure IoT Central enrollment group x509 certificate
+      """
 
     helps[
         "iot central enrollment-group x509 create"
@@ -1905,75 +1919,75 @@ def _load_central_enrollment_group_help():
     """
 
 
-def _load_central_schedule_job_help():
+def _load_central_scheduled_job_help():
     helps[
-        "iot central schedule-job"
+        "iot central scheduled-job"
     ] = """
           type: group
           short-summary: Manage and configure IoT Central schedule job
       """
 
     helps[
-        "iot central schedule-job list"
+        "iot central scheduled-job list"
     ] = """
     type: command
     short-summary: Get the list of scheduled job definitions in an application
     examples:
       - name: Get the list of scheduled job definitions in an application
         text: >
-          az iot central schedule-job list
+          az iot central scheduled-job list
           --app-id {appid}
     """
 
     helps[
-        "iot central schedule-job show"
+        "iot central scheduled-job show"
     ] = """
     type: command
     short-summary: Get details about a scheduled job by ID
     examples:
       - name: Get details about a scheduled job by ID
         text: >
-          az iot central schedule-job show
+          az iot central scheduled-job show
           --app-id {appid}
           --id {scheduledJobId}
     """
 
     helps[
-        "iot central schedule-job delete"
+        "iot central scheduled-job delete"
     ] = """
     type: command
     short-summary: Delete an existing scheduled job by ID
     examples:
       - name: Delete an existing scheduled job by ID
         text: >
-          az iot central schedule-job delete
+          az iot central scheduled-job delete
           --app-id {appid}
           --id {scheduledJobId}
     """
 
     helps[
-        "iot central schedule-job create"
+        "iot central scheduled-job create"
     ] = """
     type: command
     short-summary: Create or update a scheduled job by ID
     examples:
       - name: Create a schedule job with name
         text: >
-          az iot central schedule-job create
+          az iot central scheduled-job create
           --app-id {appid}
           --job-id {jobId}
           --group-id {groupId}
-          --job-name {jobName}
+          --job-name {displayName}
           --schedule	{jobScheduleJSONPatch}
           --content {jobDataJSONPath}
 
       - name: Create a scheduled job with name and batch configuration.
         text: >
-          az iot central schedule-job create
+          az iot central scheduled-job create
           --app-id {appid}
           --job-id {jobId}
           --group-id {groupId}
-          --job-name {jobName}
+          --job-name {displayName}
           --schedule	{jobScheduleJSONPatch}
           --content {jobDataJSONPath}
           --batch {jobBatchValue}
@@ -1981,11 +1995,11 @@ def _load_central_schedule_job_help():
 
       - name: Create a scheduled job with name and cancellation threshold configuration with no batch.
         text: >
-          az iot central schedule-job create
+          az iot central scheduled-job create
           --app-id {appid}
           --job-id {jobId}
           --group-id {groupId}
-          --job-name {jobName}
+          --job-name {displayName}
           --schedule	{jobScheduleJSONPatch}
           --content {jobDataJSONPath}
           --cancellation-threshold {jobCancellationThresholdValue}

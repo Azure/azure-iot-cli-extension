@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 
 import json
-from operator import truediv
 import time
 from typing import Tuple
 
@@ -773,7 +772,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         (template_id, template_name) = self._create_device_template(api_version=api_version)
         org = self._create_organization(api_version=api_version)
         device_group = self._create_device_group(api_version=api_version, template_name=template_name, org_id=org["id"])
-  
+
         group_id = device_group["id"]
         job_id = self.create_random_name(prefix="aztest", length=10)
         display_name = self.create_random_name(prefix="aztest", length=10)
