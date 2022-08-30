@@ -1832,7 +1832,7 @@ def _load_central_enrollment_group_help():
           --at {attestation}
           --display-name {displayName}
           --type {type}
-          --enabled {enabled}
+          --enabled false
     """
 
     helps[
@@ -1850,7 +1850,7 @@ def _load_central_enrollment_group_help():
     examples:
       - name: Set the primary or secondary x509 certificate of an enrollment group
         text: >
-          iot central enrollment-group x509 create
+          az iot central enrollment-group x509 create
           --app-id {appid}
           --id {enrollmentGroupId}
           --entry {certificateEntry}
@@ -1867,7 +1867,7 @@ def _load_central_enrollment_group_help():
     examples:
       - name: Get the primary or secondary x509 certificate of an enrollment group
         text: >
-          iot central enrollment-group x509 show
+          az iot central enrollment-group x509 show
           --app-id {appid}
           --id {enrollmentGroupId}
           --entry {certificateEntry}
@@ -1881,7 +1881,7 @@ def _load_central_enrollment_group_help():
     examples:
       - name: Removes the primary or secondary x509 certificate of an enrollment group
         text: >
-          iot central enrollment-group x509 delete
+          az iot central enrollment-group x509 delete
           --app-id {appid}
           --id {enrollmentGroupId}
           --entry {certificateEntry}
@@ -1897,7 +1897,7 @@ def _load_central_enrollment_group_help():
     examples:
       - name: Verify the primary or secondary x509 certificate of an enrollment group
         text: >
-          iot central enrollment-group x509 verify
+          az iot central enrollment-group x509 verify
           --app-id {appid}
           --id {enrollmentGroupId}
           --entry {certificateEntry}
@@ -1912,7 +1912,7 @@ def _load_central_enrollment_group_help():
     examples:
       - name: Generate a verification code for the primary or secondary x509 certificate of an enrollment group
         text: >
-          iot central enrollment-group x509 generate
+          az iot central enrollment-group x509 generate
           --app-id {appid}
           --id {enrollmentGroupId}
           --entry {certificateEntry}
@@ -1969,7 +1969,7 @@ def _load_central_scheduled_job_help():
         "iot central scheduled-job create"
     ] = """
     type: command
-    short-summary: Create or update a scheduled job by ID
+    short-summary: Create a scheduled job by ID
     examples:
       - name: Create a schedule job with name
         text: >
@@ -2005,4 +2005,31 @@ def _load_central_scheduled_job_help():
           --cancellation-threshold {jobCancellationThresholdValue}
           --cancellation-threshold-type {jobCancellationThresholdType}
           --description {jobDesc}
+    """
+
+    helps[
+        "iot central scheduled-job update"
+    ] = """
+    type: command
+    short-summary: Update a scheduled job by ID
+    examples:
+      - name: Update a schedule job with name
+        text: >
+          az iot central scheduled-job create
+          --app-id {appid}
+          --job-id {jobId}
+          --job-name {displayName}
+    """
+
+    helps[
+        "iot central scheduled-job list-jobs"
+    ] = """
+    type: command
+    short-summary: Get the list of jobs for a scheduled job definition
+    examples:
+      - name: Get the list of jobs for a scheduled job definition
+        text: >
+          az iot central scheduled-job list-jobs
+          --app-id {appid}
+          --job-id {jobId}
     """
