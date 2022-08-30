@@ -1832,7 +1832,7 @@ def _load_central_enrollment_group_help():
           --at {attestation}
           --display-name {displayName}
           --type {type}
-          --enabled false
+          --enabled true
     """
 
     helps[
@@ -2015,7 +2015,7 @@ def _load_central_scheduled_job_help():
     examples:
       - name: Update a schedule job with name
         text: >
-          az iot central scheduled-job create
+          az iot central scheduled-job update
           --app-id {appid}
           --job-id {jobId}
           --job-name {displayName}

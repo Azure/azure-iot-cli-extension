@@ -691,7 +691,8 @@ def load_central_arguments(self, _):
         context.argument(
             "enabled",
             options_list=["--enabled"],
-            help="Whether the devices using the group are allowed to connect to IoT Central."
+            arg_type=get_three_state_flag(),
+            help="Whether the devices using the group are allowed to connect to IoT Central. True or False."
         )
         context.argument(
             "etag",
@@ -721,7 +722,8 @@ def load_central_arguments(self, _):
         context.argument(
             "enabled",
             options_list=["--enabled"],
-            help="Whether the devices using the group are allowed to connect to IoT Central."
+            arg_type=get_three_state_flag(),
+            help="Whether the devices using the group are allowed to connect to IoT Central. True or False."
         )
         context.argument(
             "etag",
@@ -845,7 +847,8 @@ def load_central_arguments(self, _):
         context.argument(
             "enabled",
             options_list=["--enabled"],
-            help="Whether the scheduled job is enabled."
+            arg_type=get_three_state_flag(),
+            help="Whether the scheduled job is enabled. True or False."
         )
         context.argument(
             "organizations",
@@ -916,7 +919,8 @@ def load_central_arguments(self, _):
         context.argument(
             "enabled",
             options_list=["--enabled"],
-            help="Whether the scheduled job is enabled."
+            arg_type=get_three_state_flag(),
+            help="Whether the scheduled job is enabled. True or False."
         )
         context.argument(
             "organizations",
