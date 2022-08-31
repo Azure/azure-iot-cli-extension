@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
 from typing import Dict, Optional
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.digitaltwins.common import ABORT_MSG
@@ -40,14 +41,15 @@ class CertificateProvider(IoTHubProvider):
 
     def iot_hub_certificate_root_authority_show(self) -> Optional[Dict[str, str]]:
         # Since a newly created IoT Hub has empty rootCertificate property
-        return self._get_target_root_certificate() or DEFAULT_ROOT_AUTHORITY
+        return self._get_target_properties().get("rootCertificate") or DEFAULT_ROOT_AUTHORITY
 
     def iot_hub_certificate_root_authority_set(
         self,
         ca_version: str,
         yes: bool = False
     ) -> Optional[Dict[str, str]]:
-        current_target = self._get_target_root_certificate()
+        properties = self._get_target_properties()
+        current_target = properties.get("rootCertificate")
         root_ca = current_target and current_target.get("enableRootCertificateV2")
 
         # Check if changes are needed
@@ -69,8 +71,10 @@ class CertificateProvider(IoTHubProvider):
             CA_TRANSITION_API_VERSION,
             HUB_PROVIDER
         )
+        import pdb; pdb.set_trace()
         if root_ca is None:
-            command += " --set properties='{\"rootCertificate\":{\"enableRootCertificateV2\":" + f"{not root_ca}" + "}}'"
+            properties["rootCertificate"] = {"enableRootCertificateV2": not root_ca}
+            command += f" --set properties='{json.dumps(properties)}'"
         else:
             command += f" --set properties.rootCertificate.enableRootCertificateV2={not root_ca}"
 
@@ -79,7 +83,7 @@ class CertificateProvider(IoTHubProvider):
             return
         return result.as_json()["properties"].get("rootCertificate")
 
-    def _get_target_root_certificate(self) -> Optional[Dict[str, str]]:
+    def _get_target_properties(self) -> Optional[Dict[str, str]]:
         result = self.cli.invoke(
             "resource show -n {} -g {} --api-version {} --resource-type {}".format(
                 self.target["entity"].split(".")[0],
@@ -91,4 +95,4 @@ class CertificateProvider(IoTHubProvider):
         if not result.success():
             # Error will already be printed out
             return
-        return result.as_json()["properties"].get("rootCertificate")
+        return result.as_json()["properties"]
