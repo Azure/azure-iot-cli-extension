@@ -200,7 +200,6 @@ class CentralDeviceProvider:
     def list_relationships(
         self,
         device_id,
-        rel_name=None,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> List[RelationshipGa]:
         relationships = central_services.device.list_relationships(
@@ -215,9 +214,6 @@ class CentralDeviceProvider:
         if relationships is None:
             return []
 
-        if rel_name:
-            relationships = [rel for rel in relationships if rel.name == rel_name]
-
         return relationships
 
     def add_relationship(
@@ -225,7 +221,6 @@ class CentralDeviceProvider:
         device_id,
         target_id,
         rel_id,
-        rel_name,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
         relationship = central_services.device.create_relationship(
@@ -233,7 +228,6 @@ class CentralDeviceProvider:
             app_id=self._app_id,
             device_id=device_id,
             rel_id=rel_id,
-            rel_name=rel_name,
             target_id=target_id,
             token=self._token,
             api_version=self._api_version,

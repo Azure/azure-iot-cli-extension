@@ -253,15 +253,8 @@ def load_central_commands(self, _):
         cmd_group.command("create", "create_enrollment_group")
         cmd_group.command("delete", "delete_enrollment_group")
         cmd_group.command("update", "update_enrollment_group")
-
-    with self.command_group(
-        "iot central enrollment-group x509", command_type=central_enrollment_groups_ops,
-    ) as cmd_group:
-        cmd_group.show_command("show", "get_x509")
-        cmd_group.command("create", "create_x509")
-        cmd_group.command("delete", "delete_x509")
-        cmd_group.command("verify", "verify_x509")
-        cmd_group.command("generate", "generate_verification_code")
+        cmd_group.command("verify-x509", "verify_x509")
+        cmd_group.command("verification-code", "generate_verification_code")
 
     with self.command_group(
         "iot central scheduled-job", command_type=central_scheduled_jobs_ops,

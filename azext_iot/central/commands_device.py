@@ -360,7 +360,6 @@ def add_children(
             device_id=device_id,
             target_id=child_id,
             rel_id=str(uuid4()),
-            rel_name=None,
             central_dns_suffix=central_dns_suffix,
         )
         for child_id in children_ids
@@ -382,7 +381,7 @@ def remove_children(
     )
 
     rels = provider.list_relationships(
-        device_id=device_id, rel_name=None, central_dns_suffix=central_dns_suffix
+        device_id=device_id, central_dns_suffix=central_dns_suffix
     )
     deleted = []
     for rel in rels:

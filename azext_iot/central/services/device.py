@@ -418,14 +418,13 @@ def create_relationship(
     device_id: str,
     target_id: str,
     rel_id: str,
-    rel_name: str,
     token: str,
     api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
     api_version = API_VERSION
 
-    payload = {"id": rel_id, "name": rel_name, "source": device_id, "target": target_id}
+    payload = {"id": rel_id, "source": device_id, "target": target_id}
     response = _utility.make_api_call(
         cmd,
         app_id=app_id,

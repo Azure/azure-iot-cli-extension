@@ -17,6 +17,7 @@ def get_enrollment_group(
     cmd,
     app_id: str,
     group_id: str,
+    entry: str = None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=API_VERSION,
@@ -25,10 +26,23 @@ def get_enrollment_group(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
 
-    return provider.get_enrollment_group(
+    response = provider.get_enrollment_group(
         group_id=group_id,
         central_dns_suffix=central_dns_suffix,
     )
+
+    if entry is not None:
+        response["x509"] = get_x509(
+            cmd=cmd,
+            app_id=app_id,
+            group_id=group_id,
+            entry=entry,
+            token=token,
+            central_dns_suffix=central_dns_suffix,
+            api_version=api_version,
+        )
+
+    return response
 
 
 def list_enrollment_groups(
@@ -53,6 +67,9 @@ def create_enrollment_group(
     type: str,
     group_id: str,
     enabled: bool = False,
+    entry: str = None,
+    certificate: str = None,
+    verified: bool = None,
     etag : str = None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
@@ -64,7 +81,7 @@ def create_enrollment_group(
 
     attestation = utility.process_json_arg(attestation, argument_name="attestation")
 
-    return provider.create_enrollment_group(
+    response = provider.create_enrollment_group(
         group_id=group_id,
         attestation=attestation,
         display_name=display_name,
@@ -73,6 +90,23 @@ def create_enrollment_group(
         etag=etag,
         central_dns_suffix=central_dns_suffix,
     )
+
+    if None not in (certificate, verified, entry):
+        # We need to set up the primary or secondary x509 certificate
+        response["x509"] = create_x509(
+            cmd=cmd,
+            app_id=app_id,
+            group_id=group_id,
+            entry=entry,
+            certificate=certificate,
+            verified=verified,
+            etag=etag,
+            token=token,
+            central_dns_suffix=central_dns_suffix,
+            api_version=api_version,
+        )
+
+    return response
 
 
 def update_enrollment_group(
@@ -83,6 +117,10 @@ def update_enrollment_group(
     display_name: str = None,
     type: str = None,
     enabled: bool = False,
+    entry: str = None,
+    certificate: str = None,
+    verified: bool = None,
+    remove_x509: bool = None,
     etag : str = None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
@@ -95,7 +133,7 @@ def update_enrollment_group(
     if attestation is not None:
         attestation = utility.process_json_arg(attestation, argument_name="attestation")
 
-    return provider.update_enrollment_group(
+    response = provider.update_enrollment_group(
         group_id=group_id,
         attestation=attestation,
         display_name=display_name,
@@ -104,6 +142,36 @@ def update_enrollment_group(
         etag=etag,
         central_dns_suffix=central_dns_suffix,
     )
+
+    if None not in (certificate, verified, entry):
+        # We need to set up the primary or secondary x509 certificate
+        response["x509"] = create_x509(
+            cmd=cmd,
+            app_id=app_id,
+            group_id=group_id,
+            entry=entry,
+            certificate=certificate,
+            verified=verified,
+            etag=etag,
+            token=token,
+            central_dns_suffix=central_dns_suffix,
+            api_version=api_version,
+        )
+    elif remove_x509 is True:
+        # We need to remove x509 from the group
+        response["x509"] = {
+            "remove": delete_x509(
+                cmd=cmd,
+                app_id=app_id,
+                group_id=group_id,
+                entry=entry,
+                token=token,
+                central_dns_suffix=central_dns_suffix,
+                api_version=api_version,
+            )
+        }
+
+    return response
 
 
 def delete_enrollment_group(

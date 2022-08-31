@@ -13,3 +13,4 @@ class EnrollmentGroup:
         self.type = group.get("type")
         self.attestation = group.get("attestation")
         self.etag = group.get("etag")
+        self.x509 = group.get("x509")
