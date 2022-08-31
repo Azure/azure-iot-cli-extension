@@ -28,15 +28,13 @@ def list_device_classes(
     data_manager = DeviceUpdateDataManager(
         cmd=cmd, account_name=name, instance_name=instance_name, resource_group=resource_group_name
     )
-    if filter and not device_group_id:
-        raise ArgumentUsageError("--group-id is required when using --filter")
 
     if device_group_id:
         return data_manager.data_client.device_management.list_device_class_subgroups_for_group(
             group_id=device_group_id, filter=filter
         )
     try:
-        return data_manager.data_client.device_management.list_device_classes()
+        return data_manager.data_client.device_management.list_device_classes(filter=filter)
     except AzureError as e:
         handle_service_exception(e)
 

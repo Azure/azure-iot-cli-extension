@@ -12,8 +12,11 @@ unreleased
 
 **Device Update**
 
-* The Device Update control plane or infrastructure command groups `az iot device-update account` and
+* The Device Update control plane (or infrastructure related) command groups `az iot device-update account` and
   `az iot device-update instance` now use the GA API version of 2022-10-01.
+
+* The Device Update data plane command groups `az iot device-update device` and
+  `az iot device-update update` now use the GA API version of 2022-10-01.
 
 
 0.17.0

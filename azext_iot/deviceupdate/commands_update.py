@@ -181,6 +181,9 @@ def import_update(
                 )
             elif lro.status() == "Failed":
                 try:
+                    logger.warning(
+                        "Cached contents (if any) from usage of --defer was not removed. "
+                        "Use 'az cache' command group to manage.")
                     logger.error(lro._pipeline_response.http_response.text())
                 except Exception:
                     pass
@@ -207,30 +210,3 @@ def delete_update(
     return data_manager.data_client.device_update.begin_delete_update(
         name=update_name, provider=update_provider, version=update_version
     )
-
-
-def list_operations(
-    cmd,
-    name: str,
-    instance_name: str,
-    filter=None,
-    top: Optional[int] = None,
-    resource_group_name: Optional[str] = None,
-):
-    data_manager = DeviceUpdateDataManager(
-        cmd=cmd, account_name=name, instance_name=instance_name, resource_group=resource_group_name
-    )
-    try:
-        return data_manager.data_client.device_update.list_operations(filter=filter, top=top)
-    except AzureError as e:
-        handle_service_exception(e)
-
-
-def show_operation(cmd, name: str, instance_name: str, operation_id: str, resource_group_name: Optional[str] = None):
-    data_manager = DeviceUpdateDataManager(
-        cmd=cmd, account_name=name, instance_name=instance_name, resource_group=resource_group_name
-    )
-    try:
-        return data_manager.data_client.device_update.get_operation(operation_id=operation_id)
-    except AzureError as e:
-        handle_service_exception(e)

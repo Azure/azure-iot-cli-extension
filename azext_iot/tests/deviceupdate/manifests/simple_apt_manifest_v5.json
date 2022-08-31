@@ -27,9 +27,9 @@
     },
     "files": [{
         "filename": "libcurl4-doc-apt-manifest.json",
-        "sizeInBytes": 169,
+        "sizeInBytes": 163,
         "hashes": {
-            "sha256": "cYhedpblfuRmq0fM7jbzBiI6FjDTqVb+U0qkdgd9+fk="
+            "sha256": "iFWTIaxp33tf5BR1w0fMmnnHpjsUjLRQ9eZFjw74LbU="
         }
     }],
     "createdDateTime": "2022-07-12T00:02:41.2100526Z",
