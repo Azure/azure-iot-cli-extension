@@ -1836,59 +1836,7 @@ def _load_central_enrollment_group_help():
     """
 
     helps[
-        "iot central enrollment-group x509"
-    ] = """
-          type: group
-          short-summary: Manage and configure IoT Central enrollment group x509 certificate
-      """
-
-    helps[
-        "iot central enrollment-group x509 create"
-    ] = """
-    type: command
-    short-summary: Set the primary or secondary x509 certificate of an enrollment group
-    examples:
-      - name: Set the primary or secondary x509 certificate of an enrollment group
-        text: >
-          az iot central enrollment-group x509 create
-          --app-id {appid}
-          --id {enrollmentGroupId}
-          --entry {certificateEntry}
-          --certificate	 {certificate}
-          --etag {etag}
-          --verified {verified}
-    """
-
-    helps[
-        "iot central enrollment-group x509 show"
-    ] = """
-    type: command
-    short-summary: Get the primary or secondary x509 certificate of an enrollment group
-    examples:
-      - name: Get the primary or secondary x509 certificate of an enrollment group
-        text: >
-          az iot central enrollment-group x509 show
-          --app-id {appid}
-          --id {enrollmentGroupId}
-          --entry {certificateEntry}
-    """
-
-    helps[
-        "iot central enrollment-group x509 delete"
-    ] = """
-    type: command
-    short-summary: Removes the primary or secondary x509 certificate of an enrollment group
-    examples:
-      - name: Removes the primary or secondary x509 certificate of an enrollment group
-        text: >
-          az iot central enrollment-group x509 delete
-          --app-id {appid}
-          --id {enrollmentGroupId}
-          --entry {certificateEntry}
-    """
-
-    helps[
-        "iot central enrollment-group x509 verify"
+        "iot central enrollment-group verify-x509"
     ] = """
     type: command
     long-summary: |
@@ -1897,7 +1845,7 @@ def _load_central_enrollment_group_help():
     examples:
       - name: Verify the primary or secondary x509 certificate of an enrollment group
         text: >
-          az iot central enrollment-group x509 verify
+          az iot central enrollment-group verify-x509
           --app-id {appid}
           --id {enrollmentGroupId}
           --entry {certificateEntry}
@@ -1905,14 +1853,14 @@ def _load_central_enrollment_group_help():
     """
 
     helps[
-        "iot central enrollment-group x509 generate"
+        "iot central enrollment-group verification-code"
     ] = """
     type: command
     short-summary: Generate a verification code for the primary or secondary x509 certificate of an enrollment group
     examples:
       - name: Generate a verification code for the primary or secondary x509 certificate of an enrollment group
         text: >
-          az iot central enrollment-group x509 generate
+          az iot central enrollment-group verification-code
           --app-id {appid}
           --id {enrollmentGroupId}
           --entry {certificateEntry}
