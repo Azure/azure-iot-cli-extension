@@ -17,7 +17,7 @@ class ActionType(str, Enum, metaclass=CaseInsensitiveEnumMeta):
     INTERNAL = "Internal"
 
 class AuthenticationType(str, Enum, metaclass=CaseInsensitiveEnumMeta):
-    """Authentication Type
+    """Authentication Type.
     """
 
     KEY_BASED = "KeyBased"
@@ -58,7 +58,7 @@ class ManagedServiceIdentityType(str, Enum, metaclass=CaseInsensitiveEnumMeta):
 
 class Origin(str, Enum, metaclass=CaseInsensitiveEnumMeta):
     """The intended executor of the operation; as in Resource Based Access Control (RBAC) and audit
-    logs UX. Default value is "user,system"
+    logs UX. Default value is "user,system".
     """
 
     USER = "user"
@@ -110,14 +110,14 @@ class PublicNetworkAccess(str, Enum, metaclass=CaseInsensitiveEnumMeta):
     DISABLED = "Disabled"
 
 class Role(str, Enum, metaclass=CaseInsensitiveEnumMeta):
-    """Whether the location is primary or failover
+    """Whether the location is primary or failover.
     """
 
     PRIMARY = "Primary"
     FAILOVER = "Failover"
 
 class SKU(str, Enum, metaclass=CaseInsensitiveEnumMeta):
-    """Device Update Sku
+    """Device Update Sku.
     """
 
     FREE = "Free"

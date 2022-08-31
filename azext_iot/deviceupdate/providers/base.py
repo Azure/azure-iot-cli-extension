@@ -3,7 +3,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-# flake8: noqa: E402
 
 from azext_iot.deviceupdate.providers.loaders import reload_modules
 
@@ -28,7 +27,8 @@ from azure.core.exceptions import AzureError, HttpResponseError
 from msrest.serialization import Model
 from pathlib import Path
 from typing import Any, NamedTuple, Union, List, Dict, Tuple, Optional
-import json, os
+import json
+import os
 
 
 logger = get_logger(__name__)
