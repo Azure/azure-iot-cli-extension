@@ -71,7 +71,7 @@ class CertificateProvider(IoTHubProvider):
             CA_TRANSITION_API_VERSION,
             HUB_PROVIDER
         )
-        import pdb; pdb.set_trace()
+
         if root_ca is None:
             properties["rootCertificate"] = {"enableRootCertificateV2": not root_ca}
             command += f" --set properties='{json.dumps(properties)}'"
