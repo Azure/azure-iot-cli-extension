@@ -50,10 +50,11 @@ ROLE_ASSIGNMENT_REFRESH_TIME = 120
 
 
 class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
-    def __init__(self, test_scenario):
+    def __init__(self, test_scenario, add_data_contributor=True):
         assert test_scenario
         self.entity_rg = ENTITY_RG
         self.entity_name = ENTITY_NAME
+        self.added_data_contributor = add_data_contributor
         super(IoTLiveScenarioTest, self).__init__(test_scenario)
 
         if hasattr(self, 'storage_cstring'):
@@ -90,31 +91,32 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg)
                 ).get_output_in_json()
 
-                account = self.cmd("account show").get_output_in_json()
-                user = account["user"]
+                if add_data_contributor:
+                    account = self.cmd("account show").get_output_in_json()
+                    user = account["user"]
 
-                if user["name"] is None:
-                    raise Exception("User not found")
+                    if user["name"] is None:
+                        raise Exception("User not found")
 
-                tries = 0
-                while tries < MAX_RBAC_ASSIGNMENT_TRIES:
-                    role_assignments = self.get_role_assignments(target_hub["id"], USER_ROLE)
-                    role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
-                    if user["name"] in role_assignment_principal_names:
-                        break
-                    # else assign IoT Hub Data Contributor role to current user and check again
-                    self.cmd(
-                        'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
-                            user["name"], USER_ROLE, target_hub["id"]
+                    tries = 0
+                    while tries < MAX_RBAC_ASSIGNMENT_TRIES:
+                        role_assignments = self.get_role_assignments(target_hub["id"], USER_ROLE)
+                        role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
+                        if user["name"] in role_assignment_principal_names:
+                            break
+                        # else assign IoT Hub Data Contributor role to current user and check again
+                        self.cmd(
+                            'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
+                                user["name"], USER_ROLE, target_hub["id"]
+                            )
                         )
-                    )
-                    sleep(10)
+                        sleep(10)
 
-                if tries == MAX_RBAC_ASSIGNMENT_TRIES:
-                    raise Exception(
-                        "Reached max ({}) number of tries to assign RBAC role. Please re-run the test later "
-                        "or with more max number of tries.".format(MAX_RBAC_ASSIGNMENT_TRIES)
-                    )
+                    if tries == MAX_RBAC_ASSIGNMENT_TRIES:
+                        raise Exception(
+                            "Reached max ({}) number of tries to assign RBAC role. Please re-run the test later "
+                            "or with more max number of tries.".format(MAX_RBAC_ASSIGNMENT_TRIES)
+                        )
 
         self.region = self.get_region()
         self.connection_string = self.get_hub_cstring()
@@ -229,21 +231,22 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             )
 
     def tearDown(self):
-        device_list = []
-        device_list.extend(d["deviceId"] for d in self.cmd(
-            f"iot hub device-identity list -n {self.entity_name} -g {self.entity_rg}"
-        ).get_output_in_json())
+        if self.added_data_contributor:
+            device_list = []
+            device_list.extend(d["deviceId"] for d in self.cmd(
+                f"iot hub device-identity list -n {self.entity_name} -g {self.entity_rg}"
+            ).get_output_in_json())
 
-        config_list = []
-        config_list.extend(c["id"] for c in self.cmd(
-            f"iot edge deployment list -n {self.entity_name} -g {self.entity_rg}"
-        ).get_output_in_json())
+            config_list = []
+            config_list.extend(c["id"] for c in self.cmd(
+                f"iot edge deployment list -n {self.entity_name} -g {self.entity_rg}"
+            ).get_output_in_json())
 
-        config_list.extend(c["id"] for c in self.cmd(
-            f"iot hub configuration list -n {self.entity_name} -g {self.entity_rg}"
-        ).get_output_in_json())
+            config_list.extend(c["id"] for c in self.cmd(
+                f"iot hub configuration list -n {self.entity_name} -g {self.entity_rg}"
+            ).get_output_in_json())
 
-        self.clean_up(device_ids=device_list, config_ids=config_list)
+            self.clean_up(device_ids=device_list, config_ids=config_list)
 
     def get_region(self):
         result = self.cmd(

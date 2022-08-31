@@ -39,7 +39,8 @@ class CertificateProvider(IoTHubProvider):
         self.cli = EmbeddedCLI()
 
     def iot_hub_certificate_root_authority_show(self) -> Optional[Dict[str, str]]:
-        return self._get_target_root_certificate()
+        # Since a newly created IoT Hub has empty rootCertificate property
+        return self._get_target_root_certificate() or DEFAULT_ROOT_AUTHORITY
 
     def iot_hub_certificate_root_authority_set(
         self,
@@ -47,9 +48,7 @@ class CertificateProvider(IoTHubProvider):
         yes: bool = False
     ) -> Optional[Dict[str, str]]:
         current_target = self._get_target_root_certificate()
-        if not current_target:
-            return
-        root_ca = current_target.get("enableRootCertificateV2") or False
+        root_ca = current_target and current_target.get("enableRootCertificateV2")
 
         # Check if changes are needed
         if ca_version == CertificateAuthorityVersions.v1.value and root_ca:
@@ -64,16 +63,18 @@ class CertificateProvider(IoTHubProvider):
             print(NO_CHANGE_MSG.format(ca_version))
             return
 
-        result = self.cli.invoke(
-            "resource update -n {} -g {} --api-version {} --set properties.rootCertificate.enableRootCertificateV2={} "
-            "--resource-type {}".format(
-                self.target["entity"].split(".")[0],
-                self.target['resourcegroup'],
-                CA_TRANSITION_API_VERSION,
-                not root_ca,
-                HUB_PROVIDER
-            )
+        command = "resource update -n {} -g {} --api-version {} --resource-type {}".format(
+            self.target["entity"].split(".")[0],
+            self.target['resourcegroup'],
+            CA_TRANSITION_API_VERSION,
+            HUB_PROVIDER
         )
+        if root_ca is None:
+            command += " --set properties='{\"rootCertificate\":{\"enableRootCertificateV2\":" + f"{not root_ca}" + "}}'"
+        else:
+            command += f" --set properties.rootCertificate.enableRootCertificateV2={not root_ca}"
+
+        result = self.cli.invoke(command)
         if not result.success():
             return
         return result.as_json()["properties"].get("rootCertificate")
@@ -90,6 +91,4 @@ class CertificateProvider(IoTHubProvider):
         if not result.success():
             # Error will already be printed out
             return
-        current_target = result.as_json()["properties"].get("rootCertificate")
-        # Since a newly created IoT Hub has empty rootCertificate property
-        return current_target if current_target else DEFAULT_ROOT_AUTHORITY
+        return result.as_json()["properties"].get("rootCertificate")
