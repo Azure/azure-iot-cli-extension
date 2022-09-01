@@ -22,7 +22,7 @@ settings = DynamoSettings(req_env_set=REQUIRED_TEST_ENV_VARS)
 
 ACCOUNT_RG = settings.env.azext_iot_testrg
 VALID_IDENTITY_MAP = {"system": 1, "user": 1}
-DEFAULT_ADU_RBAC_SLEEP_SEC = 90
+DEFAULT_ADU_RBAC_SLEEP_SEC = 120
 ADU_CLIENT_DTMI = "dtmi:azure:iot:deviceUpdateModel;1"
 
 
