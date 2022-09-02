@@ -182,7 +182,7 @@ def import_update(
             elif lro.status() == "Failed":
                 try:
                     logger.warning(
-                        "Cached contents (if any) from usage of --defer was not removed. "
+                        "Cached contents (if any) from usage of --defer were not removed. "
                         "Use 'az cache' command group to manage.")
                     logger.error(lro._pipeline_response.http_response.text())
                 except Exception:
