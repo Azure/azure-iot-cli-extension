@@ -110,7 +110,6 @@ def update_device_class(
         logger.warning("No patch body option values provided. Update device class has no work to be done.")
 
 
-# @digimaun, this operation doesn't work yet.
 def delete_device_class(
     cmd,
     name: str,
@@ -127,6 +126,7 @@ def delete_device_class(
             return data_manager.data_client.device_management.delete_device_class_subgroup(
                 device_class_id=device_class_id, group_id=device_group_id
             )
+        # @digimaun, this operation returns a 404 today.
         return data_manager.data_client.device_management.delete_device_class(device_class_id=device_class_id)
     except AzureError as e:
         handle_service_exception(e)

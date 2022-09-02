@@ -2,7 +2,7 @@
     "updateId": {
         "provider": "digimaun",
         "name": "simpleaptupdate",
-        "version": "1.0.0.0"
+        "version": "1.0.0"
     },
     "compatibility": [{
             "deviceManufacturer": "Contoso",

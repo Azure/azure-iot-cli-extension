@@ -410,22 +410,36 @@ def test_instance_update_lifecycle(provisioned_instances_module: Dict[str, dict]
         f"iot device-update device deployment delete -n {account_name} -i {instance_name} "
         f"--deployment-id {rollback_deployment_id} --group-id {device_group_id} --class-id {device_class_id} -y").success()
 
-    # Clean-up class and group
-    # TODO : Deleting a class Id does not work today.
-    assert cli.invoke(
-        f"iot device-update device class delete -n {account_name} -i {instance_name} --class-id {device_class_id} -y").success()
-    list_device_classes = cli.invoke(
-        f"iot device-update device class list -n {account_name} -i {instance_name}"
-    ).as_json()
-    assert len(list_device_classes) == 0
+    # Clean-up device class subgroup and group
+    # TODO : Deleting a class Id does not work today, but you are able to delete a class subgroup.
 
-    # TODO: You can't delete a device group that contains classes. Since we cannot delete the class we cannot delete the group :(
+    # First reset device state
+    assert cli.invoke(
+        f"iot hub device-twin update -n {iothub_name} -d {device_id} --tags '{json.dumps({'ADUGroup': None})}'"
+    ).success()
+    reset_device_state = {"deviceUpdate": None, "deviceInformation": None}
+    assert cli.invoke(
+        f"iot device simulate -n {iothub_name} -d {device_id} --irp '{json.dumps(reset_device_state)}' --mi 1 --mc 1"
+    ).success()
+
+    # Re-import device state
+    assert cli.invoke(f"iot device-update device import -n {account_name} -i {instance_name}").success()
+
+    # Delete device class subgroup
+    assert cli.invoke(
+        f"iot device-update device class delete -n {account_name} -i {instance_name} "
+        f"--class-id {device_class_id} --group-id {device_group_id} -y"
+    ).success()
+
+    # Delete device group, assert fallback to $default
     assert cli.invoke(
         f"iot device-update device group delete -n {account_name} -i {instance_name} --group-id {device_group_id} -y").success()
     list_device_groups = cli.invoke(
         f"iot device-update device group list -n {account_name} -i {instance_name}"
     ).as_json()
-    assert len(list_device_groups) == 0
+    if list_device_groups:
+        assert len(list_device_groups) == 1
+        assert list_device_groups[0]["groupId"] == "$default"
 
 
 def test_instance_update_nested(provisioned_instances_module: Dict[str, dict]):
