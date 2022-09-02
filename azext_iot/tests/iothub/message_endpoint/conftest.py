@@ -9,18 +9,15 @@ import pytest
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.settings import DynamoSettings
 from azext_iot.tests.generators import generate_generic_id
-from typing import List, Tuple, Optional, Dict, Any
+from typing import  Optional, TypeVar
 from knack.log import get_logger
 
 logger = get_logger(__name__)
-
-
+SubRequest = TypeVar('SubRequest')
+Mark = TypeVar('Mark')
 cli = EmbeddedCLI()
-
-
 REQUIRED_TEST_ENV_VARS = ["azext_iot_testrg"]
 settings = DynamoSettings(req_env_set=REQUIRED_TEST_ENV_VARS)
-
 RG = settings.env.azext_iot_testrg
 
 
@@ -30,6 +27,13 @@ def generate_hub_id() -> str:
 
 def generate_hub_depenency_id() -> str:
     return f"testhubdep{generate_generic_id()}"[:24]
+
+
+def get_closest_marker(request: SubRequest) -> Mark:
+    for item in request.session.items:
+        if item.get_closest_marker("hub_infrastructure"):
+            return item.get_closest_marker("hub_infrastructure")
+    return request.node.get_closest_marker("hub_infrastructure")
 
 
 def tags_to_dict(tags: str) -> dict:
@@ -43,39 +47,41 @@ def tags_to_dict(tags: str) -> dict:
 
 @pytest.fixture(scope="session")
 def provisioned_iot_hub_session(request, provisioned_user_identity_session) -> Optional[dict]:
-    print("provisioned_iot_hub_session")
     result = _iot_hub_provisioner(request, provisioned_user_identity_session)
     yield result
     if result:
         _iot_hub_removal(result["name"])
 
 
-@pytest.fixture
-def provisioned_iot_hub(request) -> Optional[dict]:
+@pytest.fixture(scope="session")
+def provisioned_only_iot_hub_session(request) -> Optional[dict]:
     result = _iot_hub_provisioner(request)
     yield result
     if result:
         _iot_hub_removal(result["name"])
 
-def _iot_hub_provisioner(request, provisioned_user_identity):
-    print("_iot_hub_provisioner")
-    print(request)
+
+@pytest.fixture
+def provisioned_iot_hub(request, provisioned_user_identity) -> Optional[dict]:
+    result = _iot_hub_provisioner(request, provisioned_user_identity)
+    yield result
+    if result:
+        _iot_hub_removal(result["name"])
+
+
+def _iot_hub_provisioner(request, provisioned_user_identity=None):
     name = generate_hub_id()
     base_create_command = f"iot hub create -n {name} -g {RG} --sku S1"
-    print(f"hub is {name} in {RG}")
 
-    hub_marker = request.node.get_closest_marker("hub_infrastructure")
-    import pdb; pdb.set_trace()
+    hub_marker = get_closest_marker(request)
     desired_location = None
     desired_tags = None
-    desired_sys_identity = True
-    desired_user_identity = True
-    desired_assign_data_user_role = None
+    desired_sys_identity = False
+    desired_user_identity = False
 
     if hub_marker:
-        print("found the marker")
         desired_location = hub_marker.kwargs.get("location")
-        desired_tags = hub_marker.kwargs.get("tags")
+        desired_tags = hub_marker.kwargs.get("desired_tags")
         desired_sys_identity = hub_marker.kwargs.get("sys_identity")
         desired_user_identity = hub_marker.kwargs.get("user_identity")
 
@@ -88,49 +94,38 @@ def _iot_hub_provisioner(request, provisioned_user_identity):
         base_create_command = base_create_command + f" --tags {desired_tags}"
     if desired_location:
         base_create_command = base_create_command + f" -l {desired_location}"
-    print(base_create_command)
-    # import pdb; pdb.set_trace()
 
-    result = cli.invoke(base_create_command).as_json()
-    print(result)
-    print(result["properties"]["state"])
-    if result["properties"]["state"].lower() != "active":
-        print("sleeping")
-        sleep(10)
-    return result
+    return cli.invoke(base_create_command).as_json()
 
 
 def _iot_hub_removal(name):
-    print("_iot_hub_removal")
     delete_result = cli.invoke(f"iot hub delete -n {name} -g {RG}")
     if not delete_result.success():
         logger.error(f"Failed to delete iot hub resource {name}.")
 
+
 @pytest.fixture(scope="session")
-def provisioned_user_identity_session(request) -> Optional[dict]:
-    print("provisioned_user_identity_session")
-    result = _user_identity_provisioner(request)
+def provisioned_user_identity_session() -> Optional[dict]:
+    result = _user_identity_provisioner()
     yield result
     if result:
         _user_identity_removal(result["name"])
 
 
 @pytest.fixture
-def provisioned_user_identity(request) -> Optional[dict]:
-    print("provisioned_user_identity")
-    result = _user_identity_provisioner(request)
+def provisioned_user_identity() -> Optional[dict]:
+    result = _user_identity_provisioner()
     yield result
     if result:
         _user_identity_removal(result["name"])
 
-def _user_identity_provisioner(request):
-    print("_user_identity_provisioner")
-    print( request.node.get_closest_marker("hub_infrastructure"))
-    import pdb; pdb.set_trace()
+
+def _user_identity_provisioner():
     name = generate_hub_depenency_id()
     return cli.invoke(
         f"identity create -n {name} -g {RG}"
     ).as_json()
+
 
 def _get_role_assignments(scope, role):
     return cli.invoke(
@@ -143,9 +138,8 @@ def _user_identity_removal(name):
     if not delete_result.success():
         logger.error(f"Failed to delete user identity resource {name}.")
 
+
 def _assign_rbac_role(assignee: str, scope: str, role: str, max_tries: int = 10):
-    print("_assign_rbac_role")
-    print(assignee, scope, role)
     tries = 0
     while tries < max_tries:
         role_assignments = _get_role_assignments(scope, role)
@@ -161,102 +155,141 @@ def _assign_rbac_role(assignee: str, scope: str, role: str, max_tries: int = 10)
         sleep(10)
         tries += 1
 
-# @pytest.fixture(scope="session")
-# def provisioned_storage_session(request) -> Optional[dict]:
-#     result = _storage_provisioner(request)
-#     yield result
-#     if result:
-#         _storage_removal(result)
+
+@pytest.fixture(scope="session")
+def provisioned_storage_with_identity_session(request, provisioned_iot_hub_session, provisioned_storage_session):
+    role = "Storage Blob Data Contributor"
+    scope = provisioned_storage_session["storage"]["id"]
+    hub_principal_id = provisioned_iot_hub_session["identity"]["principalId"]
+    user_identities = list(provisioned_iot_hub_session["identity"]["userAssignedIdentities"].values())
+    user_id = user_identities[0]["principalId"]
+    _assign_rbac_role(assignee=hub_principal_id, scope=scope, role=role)
+    _assign_rbac_role(assignee=user_id, scope=scope, role=role)
+    yield provisioned_iot_hub_session, provisioned_storage_session
 
 
-# @pytest.fixture
-# def provisioned_storage(request) -> Optional[dict]:
-#     result = _storage_provisioner(request)
-#     yield result
-#     if result:
-#         _storage_removal(result["name"])
-
-
-# def _storage_get_cstring(account_name):
-#     return cli.invoke(
-#         "storage account show-connection-string -n {} -g {}".format(
-#             account_name, RG
-#         )
-#     ).as_json()["connectionString"]
-
-
-# def _storage_provisioner(resource_name):
-#     """
-#     Create a storage account (if needed) and container and return storage connection string.
-#     """
-#     account_name = generate_hub_depenency_id()
-#     container_name = generate_hub_depenency_id()
-
-#     storage_list = cli.invoke(
-#         'storage account list -g "{}"'.format(RG)
-#     ).as_json()
-
-#     target_storage = None
-#     for storage in storage_list:
-#         if storage["name"] == account_name:
-#             target_storage = storage
-#             break
-
-#     if not target_storage:
-#         target_storage = cli.invoke(
-#             "storage account create -n {} -g {} --tags iot_resource={}".format(
-#                 account_name, RG, resource_name
-#             )
-#         ).as_json()
-
-#     storage_cstring = _storage_get_cstring(account_name)
-
-#     # Will not do anything if container exists.
-#     cli.invoke(
-#         "storage container create -n {} --connection-string '{}'".format(
-#             container_name, storage_cstring
-#         ),
-#     )
-
-#     return target_storage
-
-
-# def _storage_removal(account_name: str):
-#     delete_result = cli.invoke(f"storage account delete -g {RG} -n {account_name} -y")
-#     if not delete_result.success():
-#         logger.error(f"Failed to delete storage account resource {account_name}.")
+@pytest.fixture()
+def provisioned_storage_with_identity(provisioned_iot_hub, provisioned_storage):
+    role = "Storage Blob Data Contributor"
+    scope = provisioned_storage["storage"]["id"]
+    hub_principal_id = provisioned_iot_hub["identity"]["principalId"]
+    user_identities = list(provisioned_iot_hub["identity"]["userAssignedIdentities"].values())
+    user_id = user_identities[0]["principalId"]
+    _assign_rbac_role(assignee=hub_principal_id, scope=scope, role=role)
+    _assign_rbac_role(assignee=user_id, scope=scope, role=role)
+    yield provisioned_iot_hub, provisioned_storage
 
 
 @pytest.fixture(scope="session")
-def provisioned_event_hub_with_identity_session(request, provisioned_iot_hub_session, provisioned_event_hub_session):
-    print()
-    print("provisioned_event_hub_with_identity_session")
-    print( request.node.get_closest_marker("hub_infrastructure"))
-    # import pdb; pdb.set_trace()
+def provisioned_storage_session() -> Optional[dict]:
+    result = _storage_provisioner()
+    yield result
+    if result:
+        _storage_removal(result["storage"]["name"])
+
+
+@pytest.fixture
+def provisioned_storage() -> Optional[dict]:
+    result = _storage_provisioner()
+    yield result
+    if result:
+        _storage_removal(result["storage"]["name"])
+
+
+def _storage_get_cstring(account_name):
+    return cli.invoke(
+        "storage account show-connection-string -n {} -g {}".format(
+            account_name, RG
+        )
+    ).as_json()["connectionString"]
+
+
+def _storage_provisioner():
+    """
+    Create a storage account (if needed) and container and return storage connection string.
+    """
+    account_name = generate_hub_depenency_id()
+    container_name = generate_hub_depenency_id()
+
+    storage_list = cli.invoke(
+        'storage account list -g "{}"'.format(RG)
+    ).as_json()
+
+    target_storage = None
+    for storage in storage_list:
+        if storage["name"] == account_name:
+            target_storage = storage
+            break
+
+    if not target_storage:
+        target_storage = cli.invoke(
+            "storage account create -n {} -g {}".format(
+                account_name, RG
+            )
+        ).as_json()
+
+    storage_cstring = _storage_get_cstring(account_name)
+
+    # Will not do anything if container exists.
+    cli.invoke(
+        "storage container create -n {} --connection-string '{}'".format(
+            container_name, storage_cstring
+        ),
+    )
+    target_container = cli.invoke(
+        "storage container show -n {} --connection-string '{}'".format(
+            container_name, storage_cstring
+        ),
+    ).as_json()
+
+    return {
+        "storage": target_storage,
+        "container": target_container,
+        "connectionString": storage_cstring
+    }
+
+
+def _storage_removal(account_name: str):
+    delete_result = cli.invoke(f"storage account delete -g {RG} -n {account_name} -y")
+    if not delete_result.success():
+        logger.error(f"Failed to delete storage account resource {account_name}.")
+
+
+@pytest.fixture(scope="session")
+def provisioned_event_hub_with_identity_session(provisioned_iot_hub_session, provisioned_event_hub_session):
     role = "Azure Event Hubs Data Sender"
     scope = provisioned_event_hub_session["eventhub"]["id"]
     hub_principal_id = provisioned_iot_hub_session["identity"]["principalId"]
     user_identities = list(provisioned_iot_hub_session["identity"]["userAssignedIdentities"].values())
     user_id = user_identities[0]["principalId"]
-    print("adding roles")
     _assign_rbac_role(assignee=hub_principal_id, scope=scope, role=role)
     _assign_rbac_role(assignee=user_id, scope=scope, role=role)
     yield provisioned_iot_hub_session, provisioned_event_hub_session
 
 
+@pytest.fixture()
+def provisioned_event_hub_with_identity(provisioned_iot_hub, provisioned_event_hub):
+    role = "Azure Event Hubs Data Sender"
+    scope = provisioned_event_hub["eventhub"]["id"]
+    hub_principal_id = provisioned_iot_hub["identity"]["principalId"]
+    user_identities = list(provisioned_iot_hub["identity"]["userAssignedIdentities"].values())
+    user_id = user_identities[0]["principalId"]
+    _assign_rbac_role(assignee=hub_principal_id, scope=scope, role=role)
+    _assign_rbac_role(assignee=user_id, scope=scope, role=role)
+    yield provisioned_iot_hub, provisioned_event_hub
+
 
 @pytest.fixture(scope="session")
-def provisioned_event_hub_session(request) -> Optional[list]:
-    print("provisioned_event_hub_session")
-    result = _event_hub_provisioner(request)
+def provisioned_event_hub_session() -> Optional[list]:
+    result = _event_hub_provisioner()
     yield result
     if result:
         _event_hub_removal(result["namespace"]["name"])
 
 
 @pytest.fixture
-def provisioned_event_hub(request) -> Optional[list]:
-    result = _event_hub_provisioner(request)
+def provisioned_event_hub() -> Optional[list]:
+    result = _event_hub_provisioner()
     yield result
     if result:
         _event_hub_removal(result["namespace"]["name"])
@@ -271,16 +304,13 @@ def _event_hub_get_cstring(namespace_name, eventhub_name, policy_name):
     ).as_json()["primaryConnectionString"]
 
 
-def _event_hub_provisioner(request):
+def _event_hub_provisioner():
     """
     Create an event hub namespace, instance, and policy (if needed) and return the connection string for the policy.
     """
     namespace_name = generate_hub_depenency_id()
     eventhub_name = generate_hub_depenency_id()
     policy_name = generate_hub_depenency_id()
-    print("_event_hub_provisioner stuff")
-    print( request.node.get_closest_marker("hub_infrastructure"))
-    print(namespace_name, eventhub_name, policy_name)
     namespace_obj = cli.invoke(
         "eventhubs namespace create --name {} --resource-group {}".format(
             namespace_name, RG
@@ -314,37 +344,31 @@ def _event_hub_removal(account_name: str):
 
 
 @pytest.fixture(scope="session")
-def provisioned_service_bus_with_identity_session(request, provisioned_iot_hub_session, provisioned_service_bus_session):
-    print()
-    print("provisioned_service_bus_with_identity_session")
-    print( request.node.get_closest_marker("hub_infrastructure"))
-    # import pdb; pdb.set_trace()
+def provisioned_service_bus_with_identity_session(provisioned_iot_hub_session, provisioned_service_bus_session):
     role = "Azure Service Bus Data Sender"
     queue_scope = provisioned_service_bus_session["queue"]["id"]
     topic_scope = provisioned_service_bus_session["topic"]["id"]
     hub_principal_id = provisioned_iot_hub_session["identity"]["principalId"]
     user_identities = list(provisioned_iot_hub_session["identity"]["userAssignedIdentities"].values())
     user_id = user_identities[0]["principalId"]
-    print("adding roles")
     _assign_rbac_role(assignee=hub_principal_id, scope=queue_scope, role=role)
     _assign_rbac_role(assignee=user_id, scope=queue_scope, role=role)
     _assign_rbac_role(assignee=hub_principal_id, scope=topic_scope, role=role)
     _assign_rbac_role(assignee=user_id, scope=topic_scope, role=role)
-    # sleep(30)
     yield provisioned_iot_hub_session, provisioned_service_bus_session
 
 
 @pytest.fixture(scope="session")
-def provisioned_service_bus_session(request) -> Optional[list]:
-    result = _service_bus_provisioner(request)
+def provisioned_service_bus_session() -> Optional[list]:
+    result = _service_bus_provisioner()
     yield result
     if result:
         _service_bus_removal(result["namespace"]["name"])
 
 
 @pytest.fixture
-def provisioned_service_bus(request) -> Optional[list]:
-    result = _service_bus_provisioner(request)
+def provisioned_service_bus() -> Optional[list]:
+    result = _service_bus_provisioner()
     yield result
     if result:
         _service_bus_removal(result["namespace"]["name"])
@@ -368,7 +392,7 @@ def _service_bus_queue_get_cstring(namespace_name, eventhub_name, policy_name):
     ).as_json()["primaryConnectionString"]
 
 
-def _service_bus_provisioner(request):
+def _service_bus_provisioner():
     """
     Create an event hub namespace, instance, and policy (if needed) and return the connection string for the policy.
     """
@@ -376,10 +400,6 @@ def _service_bus_provisioner(request):
     queue_name = generate_hub_depenency_id()
     topic_name = generate_hub_depenency_id()
     policy_name = generate_hub_depenency_id()
-    print("service bus stuff")
-    print("_service_bus_provisioner")
-
-    print( request.node.get_closest_marker("hub_infrastructure"))
     namespace_obj = cli.invoke(
         "servicebus namespace create --name {} --resource-group {}".format(
             namespace_name, RG
@@ -422,65 +442,94 @@ def _service_bus_provisioner(request):
         "topicConnectionString": _service_bus_topic_get_cstring(namespace_name, topic_name, policy_name),
     }
 
+
 def _service_bus_removal(account_name: str):
     delete_result = cli.invoke(f"servicebus namespace delete -g {RG} -n {account_name}")
     if not delete_result.success():
         logger.error(f"Failed to delete servicebus namespace resource {account_name}.")
 
 
-
-# @pytest.fixture(scope="session")
-# def provisioned_cosmos_db_session(request) -> Optional[list]:
-#     result = _cosmos_db_provisioner(request)
-#     yield result
-#     if result:
-#         _cosmos_db_removal(result[0])
-
-# @pytest.fixture
-# def provisioned_cosmos_db(request) -> Optional[list]:
-#     result = _cosmos_db_provisioner(request)
-#     yield result
-#     if result:
-#         _cosmos_db_removal(result[0])
+@pytest.fixture(scope="session")
+def provisioned_cosmosdb_with_identity_session(provisioned_iot_hub_session, provisioned_cosmos_db_session):
+    role = "Cosmos DB Built-in Data Reader"
+    cosmosdb_rg = provisioned_cosmos_db_session["cosmosdb"]["resourceGroup"]
+    cosmosdb_account = provisioned_cosmos_db_session["cosmosdb"]["name"]
+    hub_principal_id = provisioned_iot_hub_session["identity"]["principalId"]
+    user_identities = list(provisioned_iot_hub_session["identity"]["userAssignedIdentities"].values())
+    user_id = user_identities[0]["principalId"]
+    assign_cosmos_db_role(principal_id=hub_principal_id, cosmos_db_account=cosmosdb_account, role=role, rg=cosmosdb_rg)
+    assign_cosmos_db_role(principal_id=user_id, cosmos_db_account=cosmosdb_account, role=role, rg=cosmosdb_rg)
+    yield provisioned_iot_hub_session, provisioned_cosmos_db_session
 
 
-# def _cosmos_db_get_cstring(account_name, database_name, collection_name):
-#     return cli.invoke(
-#         "eventhubs eventhub authorization-rule keys list --namespace-name {} --resource-group {} "
-#         "--eventhub-name {} --name {}".format(
-#             account_name, RG, database_name, collection_name
-#         )
-#     ).as_json()["primaryConnectionString"]
+def assign_cosmos_db_role(principal_id: str, role: str, cosmos_db_account: str, rg: str):
+    cli.invoke(
+        "cosmosdb sql role assignment create -a {} -g {} --scope '/' -n '{}' -p {}".format(
+            cosmos_db_account, rg, role, principal_id
+        )
+    )
 
 
-# def _cosmos_db_provisioner(resource_name):
-#     """
-#     Create an event hub namespace, instance, and policy (if needed) and return the connection string for the policy.
-#     """
-#     account_name = generate_hub_depenency_id()
-#     database_name = generate_hub_depenency_id()
-#     collection_name = generate_hub_depenency_id()
-#     partition_key_path = "/test"
-#     cli.invoke(
-#         "cosmosdb create --name {} --resource-group {} --tags iotresource={}".format(
-#             account_name, RG, resource_name
-#         )
-#     )
+@pytest.fixture(scope="session")
+def provisioned_cosmos_db_session() -> Optional[list]:
+    result = _cosmos_db_provisioner()
+    yield result
+    if result:
+        _cosmos_db_removal(result["cosmosdb"]["name"])
 
-#     cli.invoke(
-#         "cosmosdb sql database create --namespace-name {} --resource-group {} --name {}".format(
-#             account_name, RG, database_name
-#         )
-#     )
 
-#     cli.invoke(
-#         "cosmosdb sql container create --resource-group {} --account-name {} --database-name {} --name {} -p {}".format(
-#             account_name, RG, database_name, collection_name, partition_key_path
-#         )
-#     )
-#     return account_name, database_name, collection_name
+@pytest.fixture
+def provisioned_cosmos_db() -> Optional[list]:
+    result = _cosmos_db_provisioner()
+    yield result
+    if result:
+        _cosmos_db_removal(result["cosmosdb"]["name"])
 
-# def _cosmos_db_removal(account_name: str):
-#     delete_result = cli.invoke(f"eventhubs namespace delete -g {RG} -n {account_name} -y")
-#     if not delete_result.success():
-#         logger.error(f"Failed to delete eventhubs namespace resource {account_name}.")
+
+def _cosmos_db_get_cstring(account_name):
+    output = cli.invoke(
+        'cosmosdb keys list --resource-group {} --name {} --type connection-strings'.format(RG, account_name)
+    ).as_json()
+
+    for cs_object in output["connectionStrings"]:
+        if cs_object["description"] == "Primary SQL Connection String":
+            return cs_object["connectionString"]
+
+
+def _cosmos_db_provisioner():
+    """
+    Create an event hub namespace, instance, and policy (if needed) and return the connection string for the policy.
+    """
+    account_name = generate_hub_depenency_id()
+    database_name = generate_hub_depenency_id()
+    collection_name = generate_hub_depenency_id()
+    partition_key_path = "/test"
+    cosmos_obj = cli.invoke(
+        "cosmosdb create --name {} --resource-group {}".format(
+            account_name, RG
+        )
+    ).as_json()
+
+    database_obj = cli.invoke(
+        "cosmosdb sql database create --account-name {} --resource-group {} --name {}".format(
+            account_name, RG, database_name
+        )
+    ).as_json()
+
+    container_obj = cli.invoke(
+        "cosmosdb sql container create --account-name {} --resource-group {} --database-name {} --name {} -p {}".format(
+            account_name, RG, database_name, collection_name, partition_key_path
+        )
+    ).as_json()
+    return {
+        "cosmosdb": cosmos_obj,
+        "database": database_obj,
+        "container": container_obj,
+        "connectionString": _cosmos_db_get_cstring(account_name)
+    }
+
+
+def _cosmos_db_removal(account_name: str):
+    delete_result = cli.invoke(f"cosmosdb delete -g {RG} -n {account_name} -y")
+    if not delete_result.success():
+        logger.error(f"Failed to delete Cosmos DB resource {account_name}.")

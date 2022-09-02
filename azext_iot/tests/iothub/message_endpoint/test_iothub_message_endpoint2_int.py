@@ -9,45 +9,43 @@ from typing import Optional
 import pytest
 from azext_iot.iothub.common import AuthenticationType
 from azext_iot.common.embedded_cli import EmbeddedCLI
-from azext_iot.common._azure import _parse_connection_string
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.common._azure import _parse_connection_string, parse_cosmos_db_connection_string
 
 
 cli = EmbeddedCLI()
+pytestmark = pytest.mark.hub_infrastructure(
+    sys_identity=True,
+    user_identity=True,
+    desired_tags="test=message_endpoint")
 
-def generate_names(count=1):
+
+def generate_ep_names(count=1):
     names = [
-        "route" + generate_generic_id()[:10]
+        "ep" + generate_generic_id()[:10]
         for i in range(count)
     ]
     return names
 
 
-@pytest.mark.hub_infrastructure(sys_identity=True, user_identity=True, desired_tags="hello=world")
 def test_iot_eventhub_endpoint_lifecycle(provisioned_event_hub_with_identity_session):
-    # Flag to ensure that event hub resources get deleted
-    # self.ran_eventhub = True
-    print("test_iot_eventhub_endpoint_lifecycle")
     iot_hub_obj, event_hub_obj = provisioned_event_hub_with_identity_session
+
     iot_hub = iot_hub_obj["name"]
     iot_rg = iot_hub_obj["resourcegroup"]
     iot_sub = iot_hub_obj["subscriptionid"]
     user_id = list(iot_hub_obj["identity"]["userAssignedIdentities"].keys())[0]
-    # eventhub_namespace = event_hub_obj["namespace"]["name"]
     eventhub_instance = event_hub_obj["eventhub"]["name"]
-    # eventhub_policy = event_hub_obj["policy"]["name"]
-    endpoint_uri = "sb:" + event_hub_obj["namespace"]["serviceBusEndpoint"].split(":")[1] # f"sb://{eventhub_namespace}.servicebus.windows.net"
+    endpoint_uri = "sb:" + event_hub_obj["namespace"]["serviceBusEndpoint"].split(":")[1]
     eventhub_cs = event_hub_obj["connectionString"]
-    endpoint_names = generate_names(3)
-    print(iot_hub, iot_rg)
+    endpoint_names = generate_ep_names(3)
     # use connection string - note how the connection string needs to have entity path and the
     # endpoint uri and path are left blank
-    x = cli.invoke(
+    cli.invoke(
         "iot hub message-endpoint create eventhub -n {} -g {} --en {} --erg {} -c {}".format(
             iot_hub, iot_rg, endpoint_names[0], iot_rg, eventhub_cs
         )
     )
-    print(x.success())
 
     expected_cs_endpoint = build_expected_endpoint(
         endpoint_names[0], iot_rg, iot_sub, connection_string=eventhub_cs
@@ -62,14 +60,12 @@ def test_iot_eventhub_endpoint_lifecycle(provisioned_event_hub_with_identity_ses
     assert_endpoint_properties(endpoint_output, expected_cs_endpoint)
 
     # Use hub identity
-    x = cli.invoke(
+    cli.invoke(
         "iot hub message-endpoint create eventhub -n {} -g {} --en {} --erg {} --endpoint-uri {} --entity-path {} "
         "--identity [system] --auth-type identityBased".format(
             iot_hub, iot_rg, endpoint_names[1], iot_rg, endpoint_uri, eventhub_instance
         )
     )
-
-    print(x.success())
 
     expected_sys_endpoint = build_expected_endpoint(
         endpoint_names[1],
@@ -89,7 +85,7 @@ def test_iot_eventhub_endpoint_lifecycle(provisioned_event_hub_with_identity_ses
     assert_endpoint_properties(endpoint_output.as_json(), expected_sys_endpoint)
 
     # Use user identity
-    x = cli.invoke(
+    cli.invoke(
         "iot hub message-endpoint create eventhub -n {} -g {} --en {} --erg {} --endpoint-uri {} --entity-path {} "
         "--identity {} --auth-type identityBased".format(
             iot_hub,
@@ -169,7 +165,6 @@ def test_iot_eventhub_endpoint_lifecycle(provisioned_event_hub_with_identity_ses
     assert endpoint_list == []
 
 
-@pytest.mark.hub_infrastructure(sys_identity=True, user_identity=True, desired_tags="hello=world")
 def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity_session):
     # this test covers two endpoint types
     iot_hub_obj, servicebus_obj = provisioned_service_bus_with_identity_session
@@ -177,13 +172,14 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     iot_rg = iot_hub_obj["resourcegroup"]
     iot_sub = iot_hub_obj["subscriptionid"]
     user_id = list(iot_hub_obj["identity"]["userAssignedIdentities"].keys())[0]
+
     queue_instance = servicebus_obj["queue"]["name"]
     topic_instance = servicebus_obj["topic"]["name"]
-    endpoint_uri = "sb:" + servicebus_obj["namespace"]["serviceBusEndpoint"].split(":")[1] # f"sb://{eventhub_namespace}.servicebus.windows.net"
+    endpoint_uri = "sb:" + servicebus_obj["namespace"]["serviceBusEndpoint"].split(":")[1]
     queue_cs = servicebus_obj["queueConnectionString"]
     topic_cs = servicebus_obj["topicConnectionString"]
     # create 6 names, 2 types of service bus endpoints * 3 auth types
-    endpoint_names = generate_names(6)
+    endpoint_names = generate_ep_names(6)
 
     # create topic endpoint first - connection string
     cli.invoke(
@@ -423,6 +419,338 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
 
     assert endpoint_list == []
 
+
+def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_session):
+    iot_hub_obj, storage_obj = provisioned_storage_with_identity_session
+
+    iot_hub = iot_hub_obj["name"]
+    iot_rg = iot_hub_obj["resourcegroup"]
+    iot_sub = iot_hub_obj["subscriptionid"]
+    user_id = list(iot_hub_obj["identity"]["userAssignedIdentities"].keys())[0]
+
+    endpoint_names = generate_ep_names(3)
+    storage_cs = storage_obj["connectionString"]
+    endpoint_uri = storage_obj["storage"]["primaryEndpoints"]["blob"]
+    container_name = storage_obj["container"]["name"]
+    default_file_format = "{iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}"
+    # use connection string - note how the connection string needs to have entity path and the
+    # endpoint uri and path are left blank
+    cli.invoke(
+        "iot hub message-endpoint create storage-container -n {} -g {} --en {} --erg {} -c {} --container {}".format(
+            iot_hub, iot_rg, endpoint_names[0], iot_rg, storage_cs, container_name
+        )
+    )
+
+    # use defaults
+    expected_cs_endpoint = build_expected_endpoint(
+        endpoint_names[0],
+        iot_rg,
+        iot_sub,
+        connection_string=storage_cs,
+        container_name=container_name,
+        batch_frequency_in_seconds=300,
+        encoding="avro",
+        file_name_format=default_file_format,
+        max_chunk_size_in_bytes=300
+    )
+
+    endpoint_output = cli.invoke(
+        "iot hub message-endpoint show -n {} -g {} --en {}".format(
+            iot_hub, iot_rg, endpoint_names[0]
+        )
+    ).as_json()
+
+    assert_endpoint_properties(endpoint_output, expected_cs_endpoint)
+
+    # Use hub identity with no defaults
+    custom_file_format = default_file_format.replace("/", "_")
+    cli.invoke(
+        "iot hub message-endpoint create storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {} "
+        "--identity [system] --auth-type identityBased -b {} -w {} --encoding {} --ff {}".format(
+            iot_hub,
+            iot_rg,
+            endpoint_names[1],
+            iot_rg, endpoint_uri,
+            container_name,
+            60,
+            10,
+            "json",
+            custom_file_format
+        )
+    )
+
+    expected_sys_endpoint = build_expected_endpoint(
+        endpoint_names[1],
+        iot_rg,
+        iot_sub,
+        container_name=container_name,
+        authentication_type=AuthenticationType.IdentityBased.value,
+        endpoint_uri=endpoint_uri,
+        batch_frequency_in_seconds=60,
+        encoding="json",
+        file_name_format=custom_file_format,
+        max_chunk_size_in_bytes=10
+    )
+
+    endpoint_output = cli.invoke(
+        "iot hub message-endpoint show -n {} -g {} --en {}".format(
+            iot_hub, iot_rg, endpoint_names[1]
+        )
+    ).as_json()
+
+    assert_endpoint_properties(endpoint_output, expected_sys_endpoint)
+
+    # Use user identity
+    cli.invoke(
+        "iot hub message-endpoint create storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {} "
+        "--identity {} --auth-type identityBased -b {} -w {}".format(
+            iot_hub,
+            iot_rg,
+            endpoint_names[2],
+            iot_rg,
+            endpoint_uri,
+            container_name,
+            user_id,
+            720,
+            500
+        )
+    )
+
+    expected_user_endpoint = build_expected_endpoint(
+        endpoint_names[2],
+        iot_rg,
+        iot_sub,
+        container_name=container_name,
+        authentication_type=AuthenticationType.IdentityBased.value,
+        endpoint_uri=endpoint_uri,
+        identity=user_id,
+        batch_frequency_in_seconds=720,
+        encoding="avro",
+        file_name_format=default_file_format,
+        max_chunk_size_in_bytes=500
+    )
+
+    endpoint_output = cli.invoke(
+        "iot hub message-endpoint show -n {} -g {} --en {}".format(
+            iot_hub, iot_rg, endpoint_names[2]
+        )
+    ).as_json()
+
+    assert_endpoint_properties(endpoint_output, expected_user_endpoint)
+
+    endpoint_list = cli.invoke(
+        "iot hub message-endpoint list -n {} -g {}".format(
+            iot_hub, iot_rg
+        )
+    ).as_json()
+
+    storage_list = cli.invoke(
+        "iot hub message-endpoint list -n {} -g {} -t {}".format(
+            iot_hub, iot_rg, "storage-container"
+        )
+    ).as_json()
+
+    assert len(storage_list) == 3
+    assert endpoint_list["storageContainers"] == storage_list
+
+    # Delete one event hub endpoint
+    cli.invoke(
+        "iot hub message-endpoint delete -n {} -g {} --en {} -y".format(
+            iot_hub, iot_rg, endpoint_names[0]
+        )
+    )
+
+    # ensure that only one got deleted
+    storage_list = cli.invoke(
+        "iot hub message-endpoint list -n {} -g {} -t {}".format(
+            iot_hub, iot_rg, "storage-container"
+        )
+    ).as_json()
+
+    assert len(storage_list) == 2
+
+    # Delete all event hub endpoints
+    cli.invoke(
+        "iot hub message-endpoint delete -n {} -g {} -t {} -y".format(
+            iot_hub, iot_rg, "storage-container"
+        )
+    )
+
+    endpoint_list = cli.invoke(
+        "iot hub message-endpoint list -n {} -g {} -t {}".format(
+            iot_hub, iot_rg, "storage-container"
+        )
+    ).as_json()
+
+    assert endpoint_list == []
+
+
+def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_session):
+    iot_hub_obj, cosmosdb_obj = provisioned_cosmosdb_with_identity_session
+
+    iot_hub = iot_hub_obj["name"]
+    iot_rg = iot_hub_obj["resourcegroup"]
+    iot_sub = iot_hub_obj["subscriptionid"]
+    user_id = list(iot_hub_obj["identity"]["userAssignedIdentities"].keys())[0]
+
+    cosmos_cstring = cosmosdb_obj["connectionString"]
+    database = cosmosdb_obj["database"]["name"]
+    container = cosmosdb_obj["container"]["name"]
+    endpoint_names = generate_ep_names(3)
+    partition_template = "{iothub}-{device_id}-{DD}-{MM}-{YYYY}"
+    partition_template_default = "{deviceid}-{YYYY}-{MM}"
+    partition_path = "example"
+    # use connection string - no pkn or pkt
+    cli.invoke(
+        "iot hub message-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} -c {} --collection {} "
+        "--db {}".format(
+            iot_hub,
+            iot_rg,
+            endpoint_names[0],
+            iot_rg,
+            cosmos_cstring,
+            container,
+            database
+        )
+    )
+
+    parsed_cs = parse_cosmos_db_connection_string(cosmos_cstring)
+    endpoint_uri = parsed_cs["AccountEndpoint"]
+    expected_cs_endpoint = build_expected_endpoint(
+        endpoint_names[0],
+        iot_rg,
+        iot_sub,
+        primary_key=parsed_cs["AccountKey"],
+        secondary_key=parsed_cs["AccountKey"],
+        endpoint_uri=endpoint_uri,
+        collection_name=container,
+        database_name=database
+    )
+
+    endpoint_output = cli.invoke(
+        "iot hub message-endpoint show -n {} -g {} --en {}".format(
+            iot_hub, iot_rg, endpoint_names[0]
+        )
+    ).as_json()
+
+    assert_endpoint_properties(endpoint_output, expected_cs_endpoint)
+
+    # system assigned identity - pkn and default pkt
+    cli.invoke(
+        "iot hub message-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} --endpoint-uri {} "
+        "--identity [system] --auth-type identityBased --collection {} --db {} --pkn {}".format(
+            iot_hub,
+            iot_rg,
+            endpoint_names[1],
+            iot_rg,
+            endpoint_uri,
+            container,
+            database,
+            partition_path
+        )
+    )
+
+    expected_sys_endpoint = build_expected_endpoint(
+        endpoint_names[1],
+        iot_rg,
+        iot_sub,
+        endpoint_uri=endpoint_uri,
+        collection_name=container,
+        database_name=database,
+        partition_key_name=partition_path,
+        authentication_type="identityBased",
+        partition_key_template=partition_template_default
+    )
+
+    endpoint_output = cli.invoke(
+        "iot hub message-endpoint show -n {} -g {} --en {}".format(
+            iot_hub, iot_rg, endpoint_names[1]
+        )
+    ).as_json()
+
+    assert_endpoint_properties(endpoint_output, expected_sys_endpoint)
+
+    # user assigned identity - pkn and pkt
+    cli.invoke(
+        "iot hub message-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} --endpoint-uri {} "
+        "--identity {} --auth-type identityBased --collection {} --db {} --pkn {} --pkt {}".format(
+            iot_hub,
+            iot_rg,
+            endpoint_names[2],
+            iot_rg,
+            endpoint_uri,
+            user_id,
+            container,
+            database,
+            partition_path,
+            partition_template
+        )
+    )
+
+    expected_user_endpoint = build_expected_endpoint(
+        endpoint_names[2],
+        iot_rg,
+        iot_sub,
+        endpoint_uri=endpoint_uri,
+        collection_name=container,
+        database_name=database,
+        partition_key_name=partition_path,
+        authentication_type="identityBased",
+        partition_key_template=partition_template,
+        identity=user_id
+    )
+
+    endpoint_output = cli.invoke(
+        "iot hub message-endpoint show -n {} -g {} --en {}".format(
+            iot_hub, iot_rg, endpoint_names[2]
+        )
+    ).as_json()
+
+    assert_endpoint_properties(endpoint_output, expected_user_endpoint)
+
+    endpoint_list = cli.invoke(
+        "iot hub message-endpoint list -n {} -g {}".format(
+            iot_hub, iot_rg
+        )
+    ).as_json()
+
+    cosmos_list = cli.invoke(
+        "iot hub message-endpoint list -n {} -g {} -t {}".format(
+            iot_hub, iot_rg, "cosmosdb-collection"
+        )
+    ).as_json()
+
+    assert len(cosmos_list) == 3
+    assert endpoint_list["cosmosDbSqlCollections"] == cosmos_list
+
+    # Delete one cosmos endpoint
+    cli.invoke(
+        "iot hub message-endpoint delete -n {} -g {} --en {} -y".format(
+            iot_hub, iot_rg, endpoint_names[0]
+        )
+    )
+    cosmos_list = cli.invoke(
+        "iot hub message-endpoint list -n {} -g {} -t {}".format(
+            iot_hub, iot_rg, "cosmosdb-collection"
+        )
+    ).as_json()
+
+    assert len(cosmos_list) == 2
+
+    # Delete all cosmos endpoints
+    cli.invoke(
+        "iot hub message-endpoint delete -n {} -g {} -t {} -y".format(
+            iot_hub, iot_rg, "cosmosdb-collection"
+        )
+    )
+
+    endpoint_list = cli.invoke(
+        "iot hub message-endpoint list -n {} -g {} -t {}".format(
+            iot_hub, iot_rg, "cosmosdb-collection"
+        )
+    ).as_json()
+
+    assert endpoint_list == []
 
 
 def build_expected_endpoint(
