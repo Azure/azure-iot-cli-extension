@@ -130,7 +130,7 @@ jobs:
   steps:
   - template: run-tests-parallel.yml
     parameters:
-      path: 'azext_iot/tests/iothub/messaging_endpoint'
+      path: 'azext_iot/tests/iothub/message_endpoint'
       name: 'iot-hub-3'
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
       pythonVersion: $(python)
