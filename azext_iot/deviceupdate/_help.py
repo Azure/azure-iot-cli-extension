@@ -823,6 +823,11 @@ def load_deviceupdate_help():
             az iot device-update device show -n {account_name} -i {instance_name} -d {device_id}
     """
 
+    helps["iot device-update update init"] = """
+        type: group
+        short-summary: Utilities for initializing update import manifests.
+    """
+
     helps["iot device-update update init v5"] = """
         type: command
         short-summary: Initialize a v5 import manifest with the desired state.
