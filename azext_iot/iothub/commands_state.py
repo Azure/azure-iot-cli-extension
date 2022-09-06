@@ -1,0 +1,49 @@
+# coding=utf-8
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See License.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
+from azext_iot.iothub.providers.state import StateProvider
+from typing import Optional
+
+
+def state_export(
+    cmd,
+    filename: str,
+    hub_name: Optional[str] = None,
+    resource_group_name: Optional[str] = None,
+    login: Optional[str] = None,
+    auth_type_dataplane: Optional[str] = None,
+    overwrite_file: Optional[bool] = False
+):
+    sp = StateProvider(cmd=cmd, hub=hub_name, rg=resource_group_name, login=login, auth_type_dataplane=auth_type_dataplane)
+    sp.save_state(filename, overwrite_file)
+
+
+def state_import(
+    cmd,
+    filename: str,
+    hub_name: Optional[str] = None,
+    resource_group_name: Optional[str] = None,
+    login: Optional[str] = None,
+    auth_type_dataplane: Optional[str] = None,
+    replace: Optional[bool] = False
+):
+    sp = StateProvider(cmd=cmd, hub=hub_name, rg=resource_group_name, login=login, auth_type_dataplane=auth_type_dataplane)
+    sp.upload_state(filename, replace)
+
+
+def state_migrate(
+    cmd,
+    hub_name: Optional[str] = None,
+    resource_group_name: Optional[str] = None,
+    login: Optional[str] = None,
+    orig_hub: Optional[str] = None,
+    orig_resource_group_name: Optional[str] = None,
+    orig_hub_login: Optional[str] = None,
+    auth_type_dataplane: Optional[str] = None,
+    replace: Optional[bool] = False
+):
+    sp = StateProvider(cmd=cmd, hub=hub_name, rg=resource_group_name, login=login, auth_type_dataplane=auth_type_dataplane)
+    sp.migrate_devices(orig_hub, orig_resource_group_name, orig_hub_login, replace)
