@@ -326,8 +326,8 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
             api_version=self._api_version,
             device_id=device_id,
             module_name='testModule')
-        # Module properties update response is an empty object {}
-        assert update_device_properties == {}
+        assert update_device_properties['$metadata']['testFirstProperty']['desiredValue'] == 'updatedTestFirstProperty'
+        assert update_device_properties['$metadata']['testSecondProperty']['desiredValue'] == 'updatedTestSecondProperty'
 
         # Show module properties
         command = f'''
