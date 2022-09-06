@@ -10,7 +10,7 @@ from knack.log import get_logger
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.common.utility import process_json_arg
 from azext_iot.tests.conftest import get_context_path
-from azext_iot.tests.deviceupdate.conftest import DEFAULT_ADU_RBAC_SLEEP_SEC, ADU_CLIENT_DTMI
+from azext_iot.tests.deviceupdate.conftest import DEFAULT_ADU_RBAC_SLEEP_SEC, ADU_CLIENT_DTMI, ACCOUNT_RG
 from azext_iot.tests.generators import generate_generic_id
 from time import sleep
 from datetime import datetime, timedelta, timezone
@@ -170,25 +170,21 @@ def test_instance_update_lifecycle(provisioned_instances_module: Dict[str, dict]
         f"iot device-update device health list -n {account_name} -i {instance_name} "
         f"--filter \"state eq '{desired_health_state}'\""
     ).as_json()
-    assert (
-        len(list_device_health) == 1
-        and list_device_health[0]["deviceId"] == device_id
-        and list_device_health[0]["state"] == desired_health_state
-    )
+    assert len(list_device_health) == 1
+    assert list_device_health[0]["deviceId"] == device_id
+    assert list_device_health[0]["state"] == desired_health_state
 
     # Device Classes
 
     list_device_classes = cli.invoke(
         f"iot device-update device class list -n {account_name} -i {instance_name}"
     ).as_json()
-    assert (
-        len(list_device_classes) == 1
-        and list_device_classes[0]["deviceClassId"] == device_class_id
-        and list_device_classes[0]["bestCompatibleUpdate"]["updateId"]["name"] == show_simple_update["updateId"]["name"]
-        and list_device_classes[0]["bestCompatibleUpdate"]["updateId"]["provider"] == show_simple_update["updateId"]["provider"]
-        and list_device_classes[0]["bestCompatibleUpdate"]["updateId"]["version"] == show_simple_update["updateId"]["version"]
-        and list_device_classes[0]["bestCompatibleUpdate"]["friendlyName"] == show_simple_update["friendlyName"]
-    )
+    assert len(list_device_classes) == 1
+    assert list_device_classes[0]["deviceClassId"] == device_class_id
+    assert list_device_classes[0]["bestCompatibleUpdate"]["updateId"]["name"] == show_simple_update["updateId"]["name"]
+    assert list_device_classes[0]["bestCompatibleUpdate"]["updateId"]["provider"] == show_simple_update["updateId"]["provider"]
+    assert list_device_classes[0]["bestCompatibleUpdate"]["updateId"]["version"] == show_simple_update["updateId"]["version"]
+    assert list_device_classes[0]["bestCompatibleUpdate"]["friendlyName"] == show_simple_update["friendlyName"]
 
     list_device_class_subgroups = cli.invoke(
         f"iot device-update device class list -n {account_name} -i {instance_name} --group-id {device_group_id}"
@@ -215,6 +211,13 @@ def test_instance_update_lifecycle(provisioned_instances_module: Dict[str, dict]
         f"--friendly-name {class_friendly_name}"
     ).as_json()
     assert update_device_class["friendlyName"] == class_friendly_name
+    # Currently only friendlyName can be filtered on.
+    list_device_class_filter = cli.invoke(
+        f"iot device-update device class list -n {account_name} -i {instance_name} "
+        f"--filter \"friendlyName eq '{class_friendly_name}'\""
+    ).as_json()
+    assert len(list_device_class_filter) == 1
+    assert list_device_class_filter[0]["friendlyName"] == class_friendly_name
 
     device_class_subgroup_show_flags = ["--best-update", "--update-compliance"]
     show_device_class_template_cmd = (
@@ -407,22 +410,36 @@ def test_instance_update_lifecycle(provisioned_instances_module: Dict[str, dict]
         f"iot device-update device deployment delete -n {account_name} -i {instance_name} "
         f"--deployment-id {rollback_deployment_id} --group-id {device_group_id} --class-id {device_class_id} -y").success()
 
-    # Clean-up class and group
-    # TODO : Deleting a class Id does not work today.
-    # assert cli.invoke(
-    #     f"iot device-update device class delete -n {account_name} -i {instance_name} --class-id {device_class_id} -y").success()
-    # list_device_classes = cli.invoke(
-    #     f"iot device-update device class list -n {account_name} -i {instance_name}"
-    # ).as_json()
-    # assert len(list_device_classes) == 0
+    # Clean-up device class subgroup and group
+    # TODO : Deleting a class Id does not work today, but you are able to delete a class subgroup.
 
-    # TODO: You can't delete a device group that contains classes. Since we cannot delete the class we cannot delete the group :(
-    # assert cli.invoke(
-    #     f"iot device-update device group delete -n {account_name} -i {instance_name} --group-id {device_group_id} -y").success()
-    # list_device_groups = cli.invoke(
-    #     f"iot device-update device group list -n {account_name} -i {instance_name}"
-    # ).as_json()
-    # assert len(list_device_groups) == 0
+    # First reset device state
+    assert cli.invoke(
+        f"iot hub device-twin update -n {iothub_name} -d {device_id} --tags '{json.dumps({'ADUGroup': None})}'"
+    ).success()
+    reset_device_state = {"deviceUpdate": None, "deviceInformation": None}
+    assert cli.invoke(
+        f"iot device simulate -n {iothub_name} -d {device_id} --irp '{json.dumps(reset_device_state)}' --mi 1 --mc 1"
+    ).success()
+
+    # Re-import device state
+    assert cli.invoke(f"iot device-update device import -n {account_name} -i {instance_name}").success()
+
+    # Delete device class subgroup
+    assert cli.invoke(
+        f"iot device-update device class delete -n {account_name} -i {instance_name} "
+        f"--class-id {device_class_id} --group-id {device_group_id} -y"
+    ).success()
+
+    # Delete device group, assert fallback to $default
+    assert cli.invoke(
+        f"iot device-update device group delete -n {account_name} -i {instance_name} --group-id {device_group_id} -y").success()
+    list_device_groups = cli.invoke(
+        f"iot device-update device group list -n {account_name} -i {instance_name}"
+    ).as_json()
+    if list_device_groups:
+        assert len(list_device_groups) == 1
+        assert list_device_groups[0]["groupId"] == "$default"
 
 
 def test_instance_update_nested(provisioned_instances_module: Dict[str, dict]):
@@ -521,3 +538,26 @@ def _assign_rbac_if_needed(account_name: str):
             f"--assignee '{principal['user']['name']}' --scope '{account['id']}'"
         ).success()
         sleep(DEFAULT_ADU_RBAC_SLEEP_SEC)
+
+
+def test_adu_set_config_defaults(provisioned_instances_module: Dict[str, dict]):
+    account_name = list(provisioned_instances_module.keys())[0]
+    instance_name = list(provisioned_instances_module[account_name].keys())[0]
+    _assign_rbac_if_needed(account_name)
+
+    # Set defaults.
+    assert cli.invoke(f"config set defaults.adu_account={account_name} defaults.adu_instance={instance_name}").success()
+
+    # Assert prior required params use defaults.
+    account_result = cli.invoke("iot device-update account show").as_json()
+    assert account_result["name"] == account_name
+    assert cli.invoke("iot device-update device group list").success()
+    assert cli.invoke(f"config set defaults.adu_group={ACCOUNT_RG}").success()
+    assert cli.invoke("iot device-update device class list").success()
+
+    # Unset defaults
+    assert cli.invoke("config set defaults.adu_account='' defaults.adu_instance='' defaults.adu_group=''").success()
+
+    # Expect failure due to missing required param value.
+    assert not cli.invoke("iot device-update account show").success()
+    assert not cli.invoke("iot device-update device group list").success()

@@ -133,15 +133,12 @@ def show_update_compliance(cmd, name: str, instance_name: str, resource_group_na
         handle_service_exception(e)
 
 
-# @digimaun, pageable but not attributed correctly.
 def list_device_health(cmd, name: str, instance_name: str, filter: str, resource_group_name: Optional[str] = None):
     data_manager = DeviceUpdateDataManager(
         cmd=cmd, account_name=name, instance_name=instance_name, resource_group=resource_group_name
     )
 
     try:
-        # "deviceId eq 'd0'"
-        # "state eq 'Healthy'"
-        return data_manager.data_client.device_management.list_device_health(filter=filter)
+        return data_manager.data_client.device_management.list_health_of_devices(filter=filter)
     except AzureError as e:
         handle_service_exception(e)

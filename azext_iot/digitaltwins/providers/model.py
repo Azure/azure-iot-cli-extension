@@ -16,7 +16,7 @@ from tqdm import tqdm
 logger = get_logger(__name__)
 MAX_MODELS_API_LIMIT = 250
 # avagraw - Max number of models the API's dependency resolution can handle when models are created across multiple API calls.
-MAX_MODELS_PER_BATCH = 40
+MAX_MODELS_PER_BATCH = 35
 
 
 def get_model_dependencies(model, model_id_to_model_map=None):

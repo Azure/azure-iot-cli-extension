@@ -8,8 +8,6 @@
 # --------------------------------------------------------------------------
 from typing import Any, Callable, Dict, Iterable, Optional, TypeVar
 
-from msrest import Serializer
-
 from azure.core.exceptions import ClientAuthenticationError, HttpResponseError, ResourceExistsError, ResourceNotFoundError, map_error
 from azure.core.paging import ItemPaged
 from azure.core.pipeline import PipelineResponse
@@ -20,6 +18,7 @@ from azure.core.utils import case_insensitive_dict
 from azure.mgmt.core.exceptions import ARMErrorFormat
 
 from .. import models as _models
+from .._serialization import Serializer
 from .._vendor import MixinABC, _convert_request
 T = TypeVar('T')
 ClsType = Optional[Callable[[PipelineResponse[HttpRequest, HttpResponse], T, Dict[str, Any]], Any]]
@@ -33,7 +32,7 @@ def build_list_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version = kwargs.pop('api_version', _params.pop('api-version', "2022-04-01-preview"))  # type: str
+    api_version = kwargs.pop('api_version', _params.pop('api-version', "2022-10-01"))  # type: str
     accept = _headers.pop('Accept', "application/json")
 
     # Construct URL
@@ -59,7 +58,7 @@ class Operations:
         **DO NOT** instantiate this class directly.
 
         Instead, you should access the following operations through
-        :class:`~device_update.DeviceUpdate`'s
+        :class:`~deviceupdate.DeviceUpdate`'s
         :attr:`operations` attribute.
     """
 
@@ -77,18 +76,18 @@ class Operations:
     def list(
         self,
         **kwargs: Any
-    ) -> Iterable[_models.OperationListResult]:
+    ) -> Iterable["_models.Operation"]:
         """Returns list of operations for Microsoft.DeviceUpdate resource provider.
 
         :keyword callable cls: A custom type or function that will be passed the direct response
-        :return: An iterator like instance of either OperationListResult or the result of cls(response)
-        :rtype: ~azure.core.paging.ItemPaged[~device_update.models.OperationListResult]
-        :raises: ~azure.core.exceptions.HttpResponseError
+        :return: An iterator like instance of either Operation or the result of cls(response)
+        :rtype: ~azure.core.paging.ItemPaged[~deviceupdate.models.Operation]
+        :raises ~azure.core.exceptions.HttpResponseError:
         """
         _headers = kwargs.pop("headers", {}) or {}
         _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-        api_version = kwargs.pop('api_version', _params.pop('api-version', "2022-04-01-preview"))  # type: str
+        api_version = kwargs.pop('api_version', _params.pop('api-version', self._config.api_version))  # type: str
         cls = kwargs.pop('cls', None)  # type: ClsType[_models.OperationListResult]
 
         error_map = {
@@ -130,7 +129,7 @@ class Operations:
         def get_next(next_link=None):
             request = prepare_request(next_link)
 
-            pipeline_response = self._client._pipeline.run(  # pylint: disable=protected-access
+            pipeline_response = self._client._pipeline.run(  # type: ignore # pylint: disable=protected-access
                 request,
                 stream=False,
                 **kwargs
