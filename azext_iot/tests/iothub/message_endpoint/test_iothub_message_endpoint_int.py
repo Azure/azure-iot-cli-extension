@@ -357,6 +357,30 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     assert len(queue_list) == 3
     assert endpoint_list["serviceBusQueues"] == queue_list
 
+    # Delete mismatch name and type
+    cli.invoke(
+        "iot hub message-endpoint delete -n {} -g {} --en {} -t {} -y".format(
+            iot_hub, iot_rg, endpoint_names[0], "servicebus-queue"
+        )
+    )
+
+    # ensure others are not deleted
+    eventhub_list = cli.invoke(
+        "iot hub message-endpoint list -n {} -g {} -t {}".format(
+            iot_hub, iot_rg, "servicebus-topic"
+        )
+    ).as_json()
+
+    assert len(eventhub_list) == 3
+
+    queue_list = cli.invoke(
+        "iot hub message-endpoint list -n {} -g {} -t {}".format(
+            iot_hub, iot_rg, "servicebus-queue"
+        )
+    ).as_json()
+
+    assert len(queue_list) == 3
+
     # Delete one (topic)
     cli.invoke(
         "iot hub message-endpoint delete -n {} -g {} --en {} -y".format(

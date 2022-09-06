@@ -330,6 +330,9 @@ def load_iothub_help():
         type: command
         short-summary: Add a Cosmos DB Collection endpoint for an IoT Hub.
         examples:
+          - name: Create a key-based Cosmos DB Collection endpoint for an IoT Hub.
+            text: >
+                az iot hub message-endpoint create cosmosdb-collection -n {iothub_name} --en {endpoint_name} --collection {collection} --db {database} --account-name {account_name}
           - name: Create a Cosmos DB Collection endpoint for an IoT Hub using a connection string.
             text: >
                 az iot hub message-endpoint create cosmosdb-collection -n {iothub_name} --en {endpoint_name} -c {connection_string} --collection {collection} --db {database}
@@ -350,7 +353,10 @@ def load_iothub_help():
         type: command
         short-summary: Add an Event Hub endpoint for an IoT Hub.
         examples:
-          - name: Create an Event Hub endpoint for an IoT Hub using a connection string. The endpoint uri and entity path are omitted because they are in the connection string.
+          - name: Create a key-based Event Hub endpoint for an IoT Hub.
+            text: >
+                az iot hub message-endpoint create eventhub -n {iothub_name} --en {endpoint_name} --namespace-name {namespace_name} --entity-path {entity_path} --policy-name {policy_name}
+          - name: Create an Event Hub endpoint for an IoT Hub using a connection string. The endpoint uri and entity path are omitted.
             text: >
                 az iot hub message-endpoint create eventhub -n {iothub_name} --en {endpoint_name} -c {connection_string}
           - name: Create an Event Hub endpoint for an IoT Hub using system assigned identity. The endpoint and entity path must be specified.
@@ -367,7 +373,10 @@ def load_iothub_help():
         type: command
         short-summary: Add a Service Bus Queue endpoint for an IoT Hub.
         examples:
-          - name: Create a Service Bus Queue endpoint for an IoT Hub using a connection string. The endpoint uri and entity path are omitted because they are in the connection string.
+          - name: Create a key-based Service Bus Queue endpoint for an IoT Hub.
+            text: >
+                az iot hub message-endpoint create servicebus-queue -n {iothub_name} --en {endpoint_name} --namespace-name {namespace_name} --entity-path {entity_path} --policy-name {policy_name}
+          - name: Create a Service Bus Queue endpoint for an IoT Hub using a connection string. The endpoint uri and entity path are omitted.
             text: >
                 az iot hub message-endpoint create servicebus-queue -n {iothub_name} --en {endpoint_name} -c {connection_string}
           - name: Create a Service Bus Queue endpoint for an IoT Hub using system assigned identity. The endpoint and entity path must be specified.
@@ -384,7 +393,10 @@ def load_iothub_help():
         type: command
         short-summary: Add a Service Bus Topic endpoint for an IoT Hub.
         examples:
-          - name: Create a Service Bus Topic endpoint for an IoT Hub using a connection string. The endpoint uri and entity path are omitted because they are in the connection string.
+          - name: Create a key-based Service Bus Topic endpoint for an IoT Hub.
+            text: >
+                az iot hub message-endpoint create servicebus-topic -n {iothub_name} --en {endpoint_name} --namespace-name {namespace_name} --entity-path {entity_path} --policy-name {policy_name}
+          - name: Create a Service Bus Topic endpoint for an IoT Hub using a connection string. The endpoint uri and entity path are omitted.
             text: >
                 az iot hub message-endpoint create servicebus-topic -n {iothub_name} --en {endpoint_name} -c {connection_string}
           - name: Create a Service Bus Topic endpoint for an IoT Hub using system assigned identity. The endpoint and entity path must be specified.
@@ -401,7 +413,10 @@ def load_iothub_help():
         type: command
         short-summary: Add a Storage Container endpoint for an IoT Hub.
         examples:
-          - name: Create a Storage Container endpoint for an IoT Hub using a connection string. The endpoint uri is omitted because it is in the connection string.
+          - name: Create a key-based Storage Container endpoint for an IoT Hub.
+            text: >
+                az iot hub message-endpoint create cosmosdb-collection -n {iothub_name} --en {endpoint_name} --container {container_name} --account-name {account_name}
+          - name: Create a Storage Container endpoint for an IoT Hub using a connection string. The endpoint uri is omitted.
             text: >
                 az iot hub message-endpoint create storage-container -n {iothub_name} --en {endpoint_name} -c {connection_string} --container {container_name}
           - name: Create a Storage Container endpoint for an IoT Hub using system assigned identity with the given batch frequency, chunk size, and file name format. The endpoint must be specified.

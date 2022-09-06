@@ -221,7 +221,7 @@ def test_route_lifecycle(provisioned_only_iot_hub_session, provisioned_event_hub
     # test all routes
     test_result = cli.invoke(
         "iot hub message-route test -n {} -g {}".format(
-            iot_hub, iot_rg, route_names[0]
+            iot_hub, iot_rg
         )
     ).as_json()["routes"]
     assert len(test_result) == 1

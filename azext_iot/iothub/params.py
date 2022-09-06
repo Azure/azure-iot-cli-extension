@@ -306,6 +306,16 @@ def load_iothub_arguments(self, _):
             options_list=["--endpoint-uri"],
             help="The uri of the endpoint resource."
         )
+        context.argument(
+            "policy_name",
+            options_list=["--policy-name"],
+            help="The policy name for the endpoint resource connection string."
+        )
+        context.argument(
+            "endpoint_account_name",
+            options_list=["--endpoint-namespace"],
+            help="The namespace name for the endpoint resource."
+        )
 
     with self.argument_context("iot hub message-endpoint create storage-container") as context:
         context.argument(
@@ -338,6 +348,11 @@ def load_iothub_arguments(self, _):
             help='File name format for the blob. The file name format must contain {iothub},'
                  ' {partition}, {YYYY}, {MM}, {DD}, {HH} and {mm} fields. All parameters are'
                  ' mandatory but can be reordered with or without delimiters.'
+        )
+        context.argument(
+            "endpoint_account_name",
+            options_list=["--endpoint-account"],
+            help="The account name for the endpoint resource."
         )
 
     with self.argument_context("iot hub message-endpoint create cosmosdb-collection") as context:
@@ -376,6 +391,11 @@ def load_iothub_arguments(self, _):
                  'The template must include at least one of the following placeholders: {iothub}, {deviceid}, {DD}, {MM}, and '
                  '{YYYY}. Any one placeholder may be specified at most once, but order and non-placeholder components are '
                  'arbitrary. If partition key name is provided, partition key template defaults to {deviceid}-{YYYY}-{MM}',
+        )
+        context.argument(
+            "endpoint_account_name",
+            options_list=["--endpoint-account"],
+            help="The account name for the endpoint resource."
         )
 
     with self.argument_context("iot hub message-route") as context:

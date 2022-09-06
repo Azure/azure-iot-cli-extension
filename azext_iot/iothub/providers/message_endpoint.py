@@ -32,6 +32,7 @@ class MessageEndpoint(IoTHubProvider):
         hub_name: Optional[str] = None,
         rg: Optional[str] = None,
     ):
+        # TODO: Optimize and change once official sdk is out
         self.cmd = cmd
         self.api_version = "2022-04-30-preview"
         self.client = self.get_client()
@@ -62,8 +63,10 @@ class MessageEndpoint(IoTHubProvider):
         self,
         endpoint_name: str,
         endpoint_type: str,
+        endpoint_account_name: Optional[str] = None,
         endpoint_resource_group: Optional[str] = None,
         endpoint_subscription_id: Optional[str] = None,
+        endpoint_policy_name: Optional[str] = None,
         connection_string: Optional[str] = None,
         container_name: Optional[str] = None,
         encoding: Optional[str] = None,
@@ -96,11 +99,29 @@ class MessageEndpoint(IoTHubProvider):
             endpoint_identity = ManagedIdentity(
                 user_assigned_identity=identity
             )
-            # endpoint_identity = {"userAssignedIdentity" : identity}
+        elif authentication_type != AuthenticationType.IdentityBased.value and not connection_string:
+            # check for connection string args
+            error_msg = "Please provide a connection string '--connection-string/-c'"
+            if endpoint_type.lower() in [EndpointType.EventHub.value, EndpointType.ServiceBusQueue.value, EndpointType.ServiceBusTopic.value]:
+                raise ArgumentUsageError(
+                    error_msg + " or endpoint namespace '--endpoint-namespace', endpoint entity path '--entity-path', and policy name '--policy-name'."
+                )
+            else:
+                raise ArgumentUsageError(
+                    error_msg + " or endpoint account '--endpoint-account'."
+                )
 
         endpoints = self.hub_resource.properties.routing.endpoints
-
         if EndpointType.EventHub.value == endpoint_type.lower():
+            if authentication_type != AuthenticationType.IdentityBased.value and not connection_string:
+                connection_string = get_eventhub_cstring(
+                    cmd=self.cmd,
+                    namespace_name=endpoint_account_name,
+                    eventhub_name=entity_path,
+                    policy_name=endpoint_policy_name,
+                    rg=endpoint_resource_group,
+                    sub=endpoint_subscription_id
+                )
             endpoints.event_hubs.append({
                 "connectionString": connection_string,
                 "name": endpoint_name,
@@ -112,7 +133,15 @@ class MessageEndpoint(IoTHubProvider):
                 "identity": endpoint_identity
             })
         elif EndpointType.ServiceBusQueue.value == endpoint_type.lower():
-            # check connection string? Endpoint uri?
+            if authentication_type != AuthenticationType.IdentityBased.value and not connection_string:
+                connection_string = get_servicebus_queue_cstring(
+                    cmd=self.cmd,
+                    namespace_name=endpoint_account_name,
+                    queue_name=entity_path,
+                    policy_name=endpoint_policy_name,
+                    rg=endpoint_resource_group,
+                    sub=endpoint_subscription_id
+                )
             endpoints.service_bus_queues.append({
                 "connectionString": connection_string,
                 "name": endpoint_name,
@@ -124,6 +153,15 @@ class MessageEndpoint(IoTHubProvider):
                 "identity": endpoint_identity
             })
         elif EndpointType.ServiceBusTopic.value == endpoint_type.lower():
+            if authentication_type != AuthenticationType.IdentityBased.value and not connection_string:
+                connection_string = get_servicebus_topic_cstring(
+                    cmd=self.cmd,
+                    namespace_name=endpoint_account_name,
+                    topic_name=entity_path,
+                    policy_name=endpoint_policy_name,
+                    rg=endpoint_resource_group,
+                    sub=endpoint_subscription_id
+                )
             endpoints.service_bus_topics.append({
                 "connection_string": connection_string,
                 "name": endpoint_name,
@@ -135,6 +173,14 @@ class MessageEndpoint(IoTHubProvider):
                 "identity": endpoint_identity
             })
         elif EndpointType.CosmosDBCollection.value == endpoint_type.lower():
+            if authentication_type != AuthenticationType.IdentityBased.value and not connection_string:
+                # try to get connection string
+                get_cosmos_db_cstring(
+                    cmd=self.cmd,
+                    account_name=endpoint_account_name,
+                    rg=endpoint_resource_group,
+                    sub=endpoint_subscription_id
+                )
             if connection_string:
                 # parse out key from connection string
                 if not primary_key and not secondary_key:
@@ -174,6 +220,14 @@ class MessageEndpoint(IoTHubProvider):
                 "identity": endpoint_identity
             })
         elif EndpointType.AzureStorageContainer.value == endpoint_type.lower():
+            if authentication_type != AuthenticationType.IdentityBased.value and not connection_string:
+                # try to get connection string
+                get_storage_cstring(
+                    cmd=self.cmd,
+                    account_name=endpoint_account_name,
+                    rg=endpoint_resource_group,
+                    sub=endpoint_subscription_id
+                )
             if not container_name:
                 raise RequiredArgumentMissingError("Container name is required.")
             endpoints.storage_containers.append({
@@ -268,11 +322,64 @@ class MessageEndpoint(IoTHubProvider):
             endpoints.cosmos_db_sql_collections = []
             endpoints.storage_containers = []
 
-        # prob not necessary cause of pointers
-        # self.hub_resource.properties.routing.endpoints = endpoints
         return self.client.iot_hub_resource.begin_create_or_update(
             self.hub_resource.additional_properties['resourcegroup'],
             self.hub_resource.name,
             self.hub_resource,
             if_match=self.hub_resource.etag
         )
+
+
+def get_eventhub_cstring(
+    cmd, namespace_name: str, eventhub_name: str, policy_name: str, rg: str, sub: str
+) -> str:
+    return cmd(
+        "eventhubs eventhub authorization-rule keys list --namespace-name {} --resource-group {} "
+        "--eventhub-name {} --name {} --subscription {}".format(
+            namespace_name, rg, eventhub_name, policy_name, sub
+        )
+    ).get_output_as_json()["primaryConnectionString"]
+
+
+def get_servicebus_topic_cstring(
+    cmd, namespace_name: str, topic_name: str, policy_name: str, rg: str, sub: str
+) -> str:
+    return cmd(
+        "servicebus topic authorization-rule keys list --namespace-name {} --resource-group {} "
+        "--topic-name {} --name {}".format(
+            namespace_name, rg, topic_name, policy_name, sub
+        )
+    ).get_output_as_json()["primaryConnectionString"]
+
+
+def get_servicebus_queue_cstring(
+    cmd, namespace_name: str, queue_name: str, policy_name: str, rg: str, sub: str
+) -> str:
+    return cmd(
+        "servicebus queue authorization-rule keys list --namespace-name {} --resource-group {} "
+        "--queue-name {} --name {}".format(
+            namespace_name, rg, queue_name, policy_name, sub
+        )
+    ).get_output_as_json()["primaryConnectionString"]
+
+
+def get_cosmos_db_cstring(
+    cmd, account_name: str, rg: str, sub: str
+) -> str:
+    output = cmd(
+        'cosmosdb keys list --resource-group {} --name {} --type connection-strings'.format(
+            rg, account_name, sub
+        )
+    ).get_output_as_json()
+
+    for cs_object in output["connectionStrings"]:
+        if cs_object["description"] == "Primary SQL Connection String":
+            return cs_object["connectionString"]
+
+
+def get_storage_cstring(cmd, account_name: str, rg: str, sub: str) -> str:
+    return cmd(
+        "storage account show-connection-string -n {} -g {}".format(
+            account_name, rg, sub
+        )
+    ).get_output_as_json()["connectionString"]

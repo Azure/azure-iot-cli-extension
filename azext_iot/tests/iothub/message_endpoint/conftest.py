@@ -374,20 +374,20 @@ def provisioned_service_bus() -> Optional[list]:
         _service_bus_removal(result["namespace"]["name"])
 
 
-def _service_bus_topic_get_cstring(namespace_name, eventhub_name, policy_name):
+def _service_bus_topic_get_cstring(namespace_name, topic_name, policy_name):
     return cli.invoke(
         "servicebus topic authorization-rule keys list --namespace-name {} --resource-group {} "
         "--topic-name {} --name {}".format(
-            namespace_name, RG, eventhub_name, policy_name
+            namespace_name, RG, topic_name, policy_name
         )
     ).as_json()["primaryConnectionString"]
 
 
-def _service_bus_queue_get_cstring(namespace_name, eventhub_name, policy_name):
+def _service_bus_queue_get_cstring(namespace_name, queue_name, policy_name):
     return cli.invoke(
         "servicebus queue authorization-rule keys list --namespace-name {} --resource-group {} "
         "--queue-name {} --name {}".format(
-            namespace_name, RG, eventhub_name, policy_name
+            namespace_name, RG, queue_name, policy_name
         )
     ).as_json()["primaryConnectionString"]
 
