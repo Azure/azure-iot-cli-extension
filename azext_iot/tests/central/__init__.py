@@ -140,16 +140,6 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
             # Create the min version app and assign the correct roles
             if not target_app:
-                # note that sys identity is only part of azure cli 2.32+
-                # try:
-                #     self.cmd(
-                #         "iot central app create -n {} -g {} -s {} --mi-system-assigned -l {}".format(
-                #             self.app_id, APP_RG, self.app_id, "westus"
-                #         ),
-                #         include_opt_args=False,
-                #     )
-                # except Exception:
-                # failed so try making an app without sys identity
                 self.cmd(
                     "iot central app create -n {} -g {} -s {} -l {}".format(
                         self.app_id, APP_RG, self.app_id, "westus"
