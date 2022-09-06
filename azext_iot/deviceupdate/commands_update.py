@@ -12,7 +12,7 @@ from azext_iot.deviceupdate.providers.base import (
     AzureError,
     ARMPolling,
 )
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Dict
 
 logger = get_logger(__name__)
 
@@ -137,7 +137,7 @@ def import_update(
     if not size or not hashes:
         client_calculated_meta = data_manager.calculate_manifest_metadata(url)
 
-    hashes = data_manager.assemble_hashes(hash_list=hashes) or {"sha256": client_calculated_meta.hash}
+    hashes = data_manager.assemble_nargs_to_dict(hash_list=hashes) or {"sha256": client_calculated_meta.hash}
     size = size or client_calculated_meta.bytes
 
     manifest_metadata = DeviceUpdateDataModels.ImportManifestMetadata(url=url, size_in_bytes=size, hashes=hashes)
@@ -210,3 +210,175 @@ def delete_update(
     return data_manager.data_client.device_update.begin_delete_update(
         name=update_name, provider=update_provider, version=update_version
     )
+
+
+def manifest_init_v5(
+    cmd,
+    update_name: str,
+    update_provider: str,
+    update_version: str,
+    compatibility: List[List[str]],
+    steps: List[List[str]],
+    files: List[List[str]] = None,
+    related_files: List[List[str]] = None,
+    description: str = None,
+    deployable: bool = None,
+):
+    import json
+    from datetime import datetime
+    from pathlib import PurePath
+    from azure.cli.core.azclierror import ArgumentUsageError
+
+    def _sanitize_safe_params(safe_params: list, keep: list) -> list:
+        '''
+        Intended to filter un-related params,
+        leaving only related params with inherent positional indexing
+        to be used by the _associate_related function.
+        '''
+        result: List[str] = []
+        if not safe_params:
+            return result
+        for param in safe_params:
+            if param in keep:
+                result.append(param)
+        return result
+
+    def _associate_related(sanitized_params: list, key: str) -> dict:
+        '''
+        Intended to associate related param indexes. For example
+        associate --file with the nearest --step or associate --related-file
+        with the nearest --file.
+        '''
+        result: Dict[int, list] = {}
+        if not sanitized_params:
+            return result
+        params_len = len(sanitized_params)
+        key_index = 0
+        related_key_index = 0
+        for i in range(params_len):
+            if sanitized_params[i] == key:
+                result[key_index] = []
+                for j in range(i + 1, params_len):
+                    if sanitized_params[j] == key:
+                        break
+                    result[key_index].append(related_key_index)
+                    related_key_index = related_key_index + 1
+                key_index = key_index + 1
+        return result
+
+    payload = {}
+    payload["manifestVersion"] = "5.0"
+    payload["createdDateTime"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    payload["updateId"] = {}
+    payload["updateId"]["name"] = update_name
+    payload["updateId"]["provider"] = update_provider
+    payload["updateId"]["version"] = update_version
+    if deployable is False:
+        payload["isDeployable"] = False
+    if description:
+        payload["description"] = description
+    processed_compatibility = []
+    for compat in compatibility:
+        if not compat or not compat[0]:
+            continue
+        processed_compatibility.append(DeviceUpdateDataManager.assemble_nargs_to_dict(compat))
+    payload["compatibility"] = processed_compatibility
+
+    safe_params = cmd.cli_ctx.data.get("safe_params", [])
+    processed_steps = []
+    for s in range(len(steps)):
+        if not steps[s] or not steps[s][0]:
+            continue
+
+        step_file_params = _sanitize_safe_params(safe_params, ["--step", "--file"])
+        related_step_file_map = _associate_related(step_file_params, "--step")
+
+        assembled_step = DeviceUpdateDataManager.assemble_nargs_to_dict(steps[s])
+        if all(k in assembled_step for k in ("updateId.provider", "updateId.name", "updateId.version")):
+            # reference step
+            step = {
+                "type": "reference",
+                "updateId": {
+                    "provider": assembled_step["updateId.provider"],
+                    "name": assembled_step["updateId.name"],
+                    "version": assembled_step["updateId.version"],
+                },
+            }
+        elif "handler" in assembled_step:
+            # inline step
+            step = {
+                "type": "inline",
+                "handler": assembled_step["handler"],
+            }
+            step["files"] = [f.strip() for f in assembled_step["files"].split(",")] if "files" in assembled_step else []
+            if not step["files"]:
+                derived_step_files = []
+                for f in related_step_file_map[s]:
+                    step_file = files[f]
+                    if not step_file or not step_file[0]:
+                        continue
+                    assembled_step_file = DeviceUpdateDataManager.assemble_nargs_to_dict(step_file)
+                    if "path" in assembled_step_file:
+                        derived_step_files.append(PurePath(assembled_step_file["path"]).name)
+                step["files"] = derived_step_files
+
+            if "properties" in assembled_step:
+                step["handlerProperties"] = json.loads(assembled_step["properties"])
+
+        step_desc = assembled_step.get("description") or assembled_step.get("desc")
+        if step_desc:
+            step["description"] = step_desc
+        processed_steps.append(step)
+
+    payload["instructions"] = {}
+    payload["instructions"]["steps"] = processed_steps
+
+    if files:
+        file_params = _sanitize_safe_params(safe_params, ["--file", "--related-file"])
+        related_file_map = _associate_related(file_params, "--file")
+
+        processed_files = []
+        for f in range(len(files)):
+            if not files[f] or not files[f][0]:
+                continue
+            processed_file = {}
+            assembled_file = DeviceUpdateDataManager.assemble_nargs_to_dict(files[f])
+            if "path" not in assembled_file:
+                raise ArgumentUsageError("When using --file path is required.")
+            assembled_file_metadata = DeviceUpdateDataManager.calculate_file_metadata(assembled_file["path"])
+            processed_file["hashes"] = {"sha256": assembled_file_metadata.hash}
+            processed_file["filename"] = assembled_file_metadata.name
+            processed_file["sizeInBytes"] = assembled_file_metadata.bytes
+
+            if "downloadHandler" in assembled_file:
+                processed_file["downloadHandler"] = {"id": assembled_file["downloadHandler"]}
+
+            processed_related_files = []
+            for r in related_file_map[f]:
+                related_file = related_files[r]
+                if not related_file or not related_file[0]:
+                    continue
+                processed_related_file = {}
+                assembled_related_file = DeviceUpdateDataManager.assemble_nargs_to_dict(related_file)
+                if "path" not in assembled_related_file:
+                    raise ArgumentUsageError("When using --related-file path is required.")
+                related_file_metadata = DeviceUpdateDataManager.calculate_file_metadata(assembled_related_file["path"])
+                processed_related_file["hashes"] = {"sha256": related_file_metadata.hash}
+                processed_related_file["filename"] = related_file_metadata.name
+                processed_related_file["sizeInBytes"] = related_file_metadata.bytes
+
+                if "properties" in assembled_related_file:
+                    processed_related_file["properties"] = json.loads(assembled_related_file["properties"])
+
+                if processed_related_file:
+                    processed_related_files.append(processed_related_file)
+
+            if processed_related_files:
+                processed_file["relatedFiles"] = processed_related_files
+
+            if processed_file:
+                processed_files.append(processed_file)
+
+        payload["files"] = processed_files
+
+    return payload
