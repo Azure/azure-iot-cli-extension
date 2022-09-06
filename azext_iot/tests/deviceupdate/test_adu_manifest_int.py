@@ -164,12 +164,21 @@ def test_adu_manifest_init_v5(options, expected):
             "--step handler=microsoft/apt:1 "
             "--file downhandler=abcd/123",
         ),
-        (  # path key is required for --related-file
+        (
+            # path key is required for --related-file
             "--update-provider digimaun --update-name invalid --update-version 1.0.0 "
             "--compat deviceManufacturer=Contoso deviceModel=Vacuum "
             "--step handler=microsoft/apt:1 "
             f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\" "
             "--related-file properties='{\"a\": 1}'"
+        ),
+        (
+            # Usage of --step requires at least an entry of handler=<value> for an inline step or
+            # all of updateId.provider=<value>, updateId.name=<value>, updateId.version=<value> for a reference step.
+            "--update-provider digimaun --update-name invalid --update-version 1.0.0 "
+            "--compat deviceManufacturer=Contoso deviceModel=Vacuum "
+            "--step stuff=things "
+            f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\" "
         ),
     ],
 )

@@ -294,6 +294,7 @@ def manifest_init_v5(
         related_step_file_map = _associate_related(step_file_params, "--step")
 
         assembled_step = DeviceUpdateDataManager.assemble_nargs_to_dict(steps[s])
+        step = {}
         if all(k in assembled_step for k in ("updateId.provider", "updateId.name", "updateId.version")):
             # reference step
             step = {
@@ -324,6 +325,11 @@ def manifest_init_v5(
 
             if "properties" in assembled_step:
                 step["handlerProperties"] = json.loads(assembled_step["properties"])
+
+        if not step:
+            raise ArgumentUsageError(
+                "Usage of --step requires at least an entry of handler=<value> for an inline step or "
+                "all of updateId.provider=<value>, updateId.name=<value>, updateId.version=<value> for a reference step.")
 
         step_desc = assembled_step.get("description") or assembled_step.get("desc")
         if step_desc:

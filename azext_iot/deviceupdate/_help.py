@@ -832,7 +832,9 @@ def load_deviceupdate_help():
         type: command
         short-summary: Initialize a v5 import manifest with the desired state.
         long-summary: This command supports all attributes of the v5 import manifest. Review examples
-          and parameter descriptions for details on how to fully utilize the operation.
+          and parameter descriptions for details on how to fully utilize the operation. Note that
+          there is positional sensitivity between --step and --file, as well as --file and --related-file.
+          Review parameter help for more details.
 
         examples:
         - name: Initialize a minimum content import manifest.
@@ -857,7 +859,7 @@ def load_deviceupdate_help():
             --step handler=microsoft/script:1 properties='{"arguments": "--pre"}' description="Pre-install script"
             --file path=/my/update/scripts/preinstall.sh downloadHandler=microsoft/delta:1
             --related-file path=/my/update/scripts/related_preinstall.json properties='{"microsoft.sourceFileHashAlgorithm": "sha256"}'
-            --step provider=Microsoft name=SwUpdate version=1.1
+            --step updateId.provider=Microsoft updateId.name=SwUpdate updateId.version=1.1
             --step handler=microsoft/script:1 properties='{"arguments": "--post"}' description="Post-install script"
             --file path=/my/update/scripts/postinstall.sh
     """
