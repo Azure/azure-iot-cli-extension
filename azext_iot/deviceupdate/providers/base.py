@@ -44,6 +44,13 @@ class UpdateManifestMeta(NamedTuple):
     hash: str
 
 
+class FileMetadata(NamedTuple):
+    bytes: int
+    hash: str
+    name: str
+    path: str
+
+
 __all__ = [
     "DeviceUpdateClientHandler",
     "DeviceUpdateAccountManager",
@@ -53,6 +60,7 @@ __all__ = [
     "parse_account_rg",
     "AccountContainer",
     "UpdateManifestMeta",
+    "FileMetadata",
     "ARMPolling",
     "AzureError",
     "HttpResponseError",
@@ -231,15 +239,33 @@ class DeviceUpdateDataManager(DeviceUpdateAccountManager):
         The hash value is a base64 representation of a sha256 digest.
         """
         from urllib.request import urlopen
-        from base64 import b64encode
-        from hashlib import sha256
 
         with urlopen(url) as f:
             file_content: bytes = f.read()
-            hash = b64encode(sha256(file_content).digest()).decode("utf8")
+            hash = self.calculate_hash_from_bytes(file_content)
             return UpdateManifestMeta(len(file_content), hash)
 
-    def assemble_hashes(self, hash_list: List[str]) -> Dict[str, str]:
+    @classmethod
+    def calculate_file_metadata(cls, file_path) -> FileMetadata:
+        from pathlib import PurePath
+
+        file_pure_path = PurePath(file_path)
+        with open(file_pure_path.as_posix(), "rb") as file_path:
+            logger.debug("Attempting to read file %s as binary", file_path)
+            raw_bytes = file_path.read()
+            size_in_bytes = len(raw_bytes)
+            hash = cls.calculate_hash_from_bytes(raw_bytes)
+            return FileMetadata(size_in_bytes, hash, file_pure_path.name, file_pure_path)
+
+    @classmethod
+    def calculate_hash_from_bytes(cls, raw_bytes: bytes) -> str:
+        from base64 import b64encode
+        from hashlib import sha256
+
+        return b64encode(sha256(raw_bytes).digest()).decode("utf8")
+
+    @classmethod
+    def assemble_nargs_to_dict(cls, hash_list: List[str]) -> Dict[str, str]:
         result = {}
         if not hash_list:
             return result

@@ -440,3 +440,81 @@ def load_deviceupdate_arguments(self, _):
             options_list=["--description"],
             help="Description for the log collection operation.",
         )
+
+    with self.argument_context("iot device-update update init") as context:
+        context.argument(
+            "update_provider",
+            options_list=["--update-provider"],
+            help="The update provider as a component of updateId.",
+        )
+        context.argument(
+            "update_name",
+            options_list=["--update-name"],
+            help="The update name as a component of updateId.",
+        )
+        context.argument(
+            "update_version",
+            options_list=["--update-version"],
+            help="The update version as a component of updateId.",
+        )
+        context.argument(
+            "description",
+            options_list=["--description"],
+            help="Description for the import update manifest.",
+        )
+        context.argument(
+            "deployable",
+            options_list=["--is-deployable"],
+            arg_type=get_three_state_flag(),
+            help="Indicates whether the update is independently deployable.",
+        )
+        context.argument(
+            "compatibility",
+            options_list=["--compat"],
+            nargs="+",
+            action="append",
+            help="Space-separated key=value pairs corresponding to properties of a device this update is compatible with. "
+            "Typically used for defining properties such as deviceManufacturer and deviceModel. "
+            "--compat can be used 1 or more times. ",
+        )
+        context.argument(
+            "steps",
+            options_list=["--step"],
+            nargs="+",
+            action="append",
+            help="Space-separated key=value pairs corresponding to 'instructions.steps' element properties. "
+            "The client will determine if a step is an inline or reference step based on the provided "
+            "key value pairs. If either inline or reference step can be satisfied, the reference step will be prioritized. "
+            "Usage of --file will be associated with the nearest inline --step entry, deriving the value for 'files'. "
+            "The following reference step keys are supported: "
+            "`updateId.provider`, `updateId.name` `updateId.version` and `description`."
+            "The following inline step keys are supported: "
+            "`handler` (ex: 'microsoft/script:1' or 'microsoft/swupdate:1' or 'microsoft/apt:1'), "
+            "`properties` (in-line json object the agent will pass to the handler) and `description`. "
+            "--step can be used 1 or more times.",
+        )
+        context.argument(
+            "files",
+            options_list=["--file"],
+            nargs="+",
+            action="append",
+            help="Space-separated key=value pairs corresponding to 'files' element properties. "
+            "A --file entry can include the closest --related-file entries if provided. "
+            "The following keys are supported: "
+            "`path` [required] local file path to update file, "
+            "`downloadHandler` (ex: 'microsoft/delta:1') download handler for utilizing related files "
+            "to download payload file. "
+            "--file can be used 1 or more times."
+        )
+        context.argument(
+            "related_files",
+            options_list=["--related-file"],
+            nargs="+",
+            action="append",
+            help="Space-separated key=value pairs corresponding to 'files[*].relatedFiles' element properties. "
+            "A --related-file entry will be associated to the closest --file entry if it exists. "
+            "The following keys are supported: "
+            "`path` [required] local file path to related update file, "
+            "`properties` in-line json object passed to the download handler. "
+            "--related-file can be used 1 or more times."
+        )
