@@ -246,3 +246,35 @@ def load_iothub_arguments(self, _):
             options_list=["--content-type", "--ct"],
             help="MIME Type of file.",
         )
+
+    with self.argument_context("iot edge hierarchy") as context:
+        context.argument(
+            "devices",
+            options_list=["--device", "-d"],
+            nargs="+",
+            action="append",
+            help="Space-separated key=value pairs corresponding to properties of the edge device to create. "
+            "--device can be used 1 or more times. "
+        )
+        context.argument(
+            "clean",
+            options_list=["--clean"],
+            arg_type=get_three_state_flag(),
+            help="Deletes all devices before creating new hierarchies."
+        )
+        context.argument(
+            "visualize",
+            options_list=["--visualize", "--vis", "-v"],
+            arg_type=get_three_state_flag(),
+            help="Shows a visualization preview of the device structure. Will prompt for confirmation."
+        )
+        context.argument(
+            "config_file",
+            options_list=["--config-file", "--config", "-c"],
+            help="Path to device hierarchy config file"
+        )
+        context.argument(
+            "default_agent",
+            options_list=['--default-edge-agent', '--dea'],
+            help="Default edge agent for new devices"
+        )

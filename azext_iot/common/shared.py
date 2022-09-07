@@ -306,3 +306,15 @@ class SHAHashVersions(Enum):
     """
     SHA1 = 1
     SHA256 = 256
+
+class BulkDeviceImportMode(Enum):
+    """
+    Supported import modes for bulk device registry operations.
+    """
+    Create = "create"
+    Update = "update"
+    UpdateIfMatchETag = "updateIfMatchETag"
+    Delete = "delete"
+    DeleteIfMatchETag = "deleteIfMatchETag"
+    UpdateTwin = "updateTwin"
+    UpdateTwinIfMatchETag = "updateTwinIfMatchETag"

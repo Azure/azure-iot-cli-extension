@@ -52,6 +52,7 @@ DEPENDENCIES = [
     "importlib_metadata;python_version<'3.8'",
     "azure-iot-device~=2.11",
     "tqdm~=4.62",
+    "treelib",
     "packaging"
 ]
 EXTRAS = {"uamqp": ["uamqp~=1.2"]}

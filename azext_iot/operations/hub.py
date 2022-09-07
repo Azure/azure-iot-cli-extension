@@ -4,15 +4,25 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from tqdm import tqdm
+from time import sleep
 from os.path import exists
+from uuid import uuid4
+import pdb
+from azext_iot.sdk.iothub.service.models.configuration_content_py3 import ConfigurationContent
+from azext_iot.sdk.iothub.service.models.device_capabilities import DeviceCapabilities
+from azext_iot.sdk.iothub.service.models.device_py3 import Device
+from azext_iot.sdk.iothub.service.models.export_import_device import ExportImportDevice
 from knack.log import get_logger
 from enum import Enum, EnumMeta
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
+    AzureResponseError,
     CLIInternalError,
     ClientRequestError,
     FileOperationError,
     InvalidArgumentValueError,
+    MutuallyExclusiveArgumentError,
     RequiredArgumentMissingError,
     ResourceNotFoundError,
     ValidationError,
@@ -26,7 +36,9 @@ from azext_iot.constants import (
 )
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import (
+    BulkDeviceImportMode,
     DeviceAuthType,
+    JobType,
     SdkType,
     ConfigType,
     KeyType,
@@ -34,11 +46,12 @@ from azext_iot.common.shared import (
     IoTHubStateType,
     DeviceAuthApiType,
     ConnectionStringParser,
-    EntityStatusType
+    EntityStatusType,
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
     handle_service_exception,
+    process_yaml_arg,
     read_file_content,
     init_monitoring,
     process_json_arg,
@@ -49,12 +62,14 @@ from azext_iot._factory import SdkResolver, CloudError
 from azext_iot.operations.generic import _execute_query, _process_top
 from typing import Optional
 import pprint
+from typing import List, Dict
 
 logger = get_logger(__name__)
 printer = pprint.PrettyPrinter(indent=2)
 
 
 # Query
+
 
 def iot_query(
     cmd,
@@ -195,8 +210,12 @@ def iot_device_create(
             device_id=device_id,
             auth_method=auth_method,
             edge_enabled=edge_enabled,
-            pk=primary_thumbprint if auth_method == DeviceAuthType.x509_thumbprint.value else primary_key,
-            sk=secondary_thumbprint if auth_method == DeviceAuthType.x509_thumbprint.value else secondary_key,
+            pk=primary_thumbprint
+            if auth_method == DeviceAuthType.x509_thumbprint.value
+            else primary_key,
+            sk=secondary_thumbprint
+            if auth_method == DeviceAuthType.x509_thumbprint.value
+            else secondary_key,
             status=status,
             status_reason=status_reason,
             device_scope=device_scope,
@@ -275,7 +294,9 @@ def _assemble_auth(auth_method, pk, sk):
         DeviceAuthApiType.sas.value,
     ]:
         if any([pk, sk]) and not all([pk, sk]):
-            raise ValueError("When configuring symmetric key auth both primary and secondary keys are required.")
+            raise ValueError(
+                "When configuring symmetric key auth both primary and secondary keys are required."
+            )
 
         auth = AuthenticationMechanism(
             symmetric_key=SymmetricKey(primary_key=pk, secondary_key=sk),
@@ -286,7 +307,9 @@ def _assemble_auth(auth_method, pk, sk):
         DeviceAuthApiType.selfSigned.value,
     ]:
         if not pk:
-            raise ValueError("When configuring selfSigned auth the primary thumbprint is required.")
+            raise ValueError(
+                "When configuring selfSigned auth the primary thumbprint is required."
+            )
         auth = AuthenticationMechanism(
             x509_thumbprint=X509Thumbprint(
                 primary_thumbprint=pk, secondary_thumbprint=sk
@@ -336,7 +359,9 @@ def update_iot_device_custom(
             if (primary_key and not secondary_key) or (
                 not primary_key and secondary_key
             ):
-                raise RequiredArgumentMissingError("primary + secondary Key required with sas auth")
+                raise RequiredArgumentMissingError(
+                    "primary + secondary Key required with sas auth"
+                )
             instance["authentication"]["symmetricKey"]["primaryKey"] = primary_key
             instance["authentication"]["symmetricKey"]["secondaryKey"] = secondary_key
         elif auth_method == DeviceAuthType.x509_thumbprint.name:
@@ -830,8 +855,12 @@ def iot_device_module_create(
             device_id=device_id,
             module_id=module_id,
             auth_method=auth_method,
-            pk=primary_thumbprint if auth_method == DeviceAuthType.x509_thumbprint.value else primary_key,
-            sk=secondary_thumbprint if auth_method == DeviceAuthType.x509_thumbprint.value else secondary_key,
+            pk=primary_thumbprint
+            if auth_method == DeviceAuthType.x509_thumbprint.value
+            else primary_key,
+            sk=secondary_thumbprint
+            if auth_method == DeviceAuthType.x509_thumbprint.value
+            else secondary_key,
         )
         return service_sdk.modules.create_or_update_identity(
             id=device_id, mid=module_id, module=module
@@ -904,7 +933,9 @@ def _parse_auth(parameters):
     ]
     auth = parameters["authentication"].get("type")
     if auth not in valid_auth:
-        raise InvalidArgumentValueError("authentication.type must be one of {}".format(valid_auth))
+        raise InvalidArgumentValueError(
+            "authentication.type must be one of {}".format(valid_auth)
+        )
     pk = sk = None
     if auth == DeviceAuthApiType.sas.value:
         pk = parameters["authentication"]["symmetricKey"]["primaryKey"]
@@ -1415,7 +1446,9 @@ def _validate_payload_schema(content):
     import json
     from os.path import join
     from azext_iot.models.validators import JsonSchemaType, JsonSchemaValidator
-    from azext_iot.constants import EDGE_DEPLOYMENT_ROOT_SCHEMAS_PATH as root_schema_path
+    from azext_iot.constants import (
+        EDGE_DEPLOYMENT_ROOT_SCHEMAS_PATH as root_schema_path,
+    )
     from azext_iot.common.utility import shell_safe_json_parse
 
     EDGE_AGENT_SCHEMA_PATH = "azure-iot-edgeagent-deployment-{}.json"
@@ -1432,17 +1465,25 @@ def _validate_payload_schema(content):
         if sys_module in modules_content:
             if (
                 "properties.desired" in modules_content[sys_module]
-                and "schemaVersion"
-                in modules_content[sys_module]["properties.desired"]
+                and "schemaVersion" in modules_content[sys_module]["properties.desired"]
             ):
-                target_schema_ver = modules_content[sys_module][
-                    "properties.desired"
-                ]["schemaVersion"]
-                target_schema_def_path = join(root_schema_path, f"{EDGE_SCHEMA_PATH_DICT[sys_module].format(target_schema_ver)}")
+                target_schema_ver = modules_content[sys_module]["properties.desired"][
+                    "schemaVersion"
+                ]
+                target_schema_def_path = join(
+                    root_schema_path,
+                    f"{EDGE_SCHEMA_PATH_DICT[sys_module].format(target_schema_ver)}",
+                )
 
-                logger.info("Attempting to fetch schema content from %s...", target_schema_def_path)
+                logger.info(
+                    "Attempting to fetch schema content from %s...",
+                    target_schema_def_path,
+                )
                 if not exists(target_schema_def_path):
-                    logger.info("Invalid schema path %s, skipping validation...", target_schema_def_path)
+                    logger.info(
+                        "Invalid schema path %s, skipping validation...",
+                        target_schema_def_path,
+                    )
                     continue
 
                 try:
@@ -1455,12 +1496,15 @@ def _validate_payload_schema(content):
                     )
                     continue
 
-                logger.info(f"Validating {sys_module} of deployment payload against schema...")
-                to_validate_content = {
-                    sys_module: modules_content[sys_module]
-                }
+                logger.info(
+                    f"Validating {sys_module} of deployment payload against schema..."
+                )
+                to_validate_content = {sys_module: modules_content[sys_module]}
                 draft_version = JsonSchemaType.draft4
-                if "$schema" in target_schema_def and "/draft-07/" in target_schema_def["$schema"]:
+                if (
+                    "$schema" in target_schema_def
+                    and "/draft-07/" in target_schema_def["$schema"]
+                ):
                     draft_version = JsonSchemaType.draft7
 
                 v = JsonSchemaValidator(target_schema_def, draft_version)
@@ -2054,15 +2098,21 @@ def _iot_build_sas_token_from_cs(connection_string, duration=3600):
                     parsed_cs["HostName"], parsed_cs["DeviceId"], parsed_cs["ModuleId"]
                 )
             elif parser == ConnectionStringParser.Device:
-                uri = "{}/devices/{}".format(parsed_cs["HostName"], parsed_cs["DeviceId"])
+                uri = "{}/devices/{}".format(
+                    parsed_cs["HostName"], parsed_cs["DeviceId"]
+                )
             else:
-                raise InvalidArgumentValueError("Given Connection String was not in a supported format.")
+                raise InvalidArgumentValueError(
+                    "Given Connection String was not in a supported format."
+                )
 
             return SasTokenAuthentication(uri, policy, key, duration)
         except ValueError:
             continue
 
-    raise InvalidArgumentValueError("Given Connection String was not in a supported format.")
+    raise InvalidArgumentValueError(
+        "Given Connection String was not in a supported format."
+    )
 
 
 def _iot_build_sas_token(
@@ -2728,7 +2778,9 @@ def _validate_device_tracing(target, device_twin):
         )
     if device_twin["capabilities"]["iotEdge"]:
         raise ClientRequestError(
-            'The device "{}" should be a non-edge device.'.format(device_twin["deviceId"])
+            'The device "{}" should be a non-edge device.'.format(
+                device_twin["deviceId"]
+            )
         )
 
 
@@ -2752,3 +2804,394 @@ def _customize_device_tracing_output(device_id, desired, reported):
         ):
             output["isSynced"] = True
     return output
+
+## TODO - add overall default edge agent / config path
+def iot_edge_hierarchy_create(
+    cmd,
+    devices: List[List[str]]=None,
+    config_file: Optional[str]=None,
+    hub_name: Optional[str]=None,
+    resource_group_name: Optional[str]=None,
+    login=None,
+    auth_type_dataplane=None,
+    visualize=False,
+    clean=False,
+    default_agent=None
+):
+    """
+    Creates a nested edge hierarchy based on user nargs input.
+    Clean - parameter to determine if all devices are deleted first.
+    Visualize - parameter to show a visualization of the devices before creating.
+
+    If user does not select 'clean' - we try our best to validate that no duplicate deviceIds are created
+
+    STEPS
+    1 - process input hierarchy and validate
+    2 - show visualization
+    3 - flatten list but track parent-child hierarchy
+    4 - clean existing devices (maybe)
+    5 - create all devices
+    6 - get all device scopes
+    7 - set parent-child relationships
+    8 - set modules
+    """
+    from treelib import Tree
+    from treelib.exceptions import NodeIDAbsentError, LoopError, DuplicatedNodeIdError
+    config = None
+    if config_file:
+        # Cannot process config file and --devices nargs*
+        if devices:
+            raise MutuallyExclusiveArgumentError('Please either use a config file (-c) or in-line device arguments, both were provided')
+        
+        config_content = None
+        # Process Edge Config YAML
+        if config_file.endswith('.yml'):
+            # Process YAML file into config object dictionary
+            config_content = process_yaml_arg(config_file)
+        elif config_file.endsWith('.json'):
+            # Process JSON file into config object dictionary
+            config_content = process_json_arg(config_file)
+        else:
+            raise InvalidArgumentValueError('Config file must be JSON or YAML')
+        
+        config = process_edge_config_content(config_content)
+    elif devices:
+        # parse inputs
+        # Parse each device and add to the tree
+        config = {
+            'auth_method': DeviceAuthType.shared_private_key.value, # TODO - add input param for auth-type
+            'default_edge_agent': default_agent,
+            'devices': []
+        }
+        for device_input in devices:
+            if not device_input or device_input[0]:
+                pass
+            
+            # assemble device with params
+            device_params = assemble_nargs_to_dict(device_input)
+            device = parse_edge_attributes(device_params)
+            config['devices'].append(device)
+
+    # TODO - CHECK CONFIG
+
+    tree = Tree()
+    tree_root_node = "|root|"
+    tree.create_node("Devices", tree_root_node)
+
+    # dict of assembled devices
+    assembled_device_dict = {}
+    # dict of parents
+    device_to_parent_dict = {}
+    
+    # first pass to create flat tree
+    for device_obj in config['devices']:
+        device = device_obj['device']
+        device_id = device['device_id']
+        auth_method = config['auth_method']
+
+        # create device object
+        assembled_device = _assemble_device(is_update=False, device_id=device_id, auth_method=auth_method,edge_enabled=True)
+
+        # store in assembled device lookup
+        assembled_device_dict[device_id] = assembled_device
+
+        # add to flat tree
+        try:
+            tree.create_node(device_id, device_id, parent=tree_root_node)
+        except DuplicatedNodeIdError:
+            raise InvalidArgumentValueError(f"Duplicate deviceId '{device_id}' detected")
+
+    # second pass to move nodes and check hierarchy
+    for device_obj in config['devices']:
+        device = device_obj['device']
+        device_id = device['device_id']
+
+        # Move nodes to their correct parents, track device->parent in dict
+        device_parent = device_obj.get("parent", tree_root_node)
+        if device_parent != tree_root_node:
+            device_to_parent_dict[device_id] = device_parent
+        try:
+            tree.update_node(device_id, data=device_parent)
+            tree.move_node(device_id, device_parent)
+        except NodeIDAbsentError:
+            raise InvalidArgumentValueError(
+                f'Error building hierarchy, missing parent "{device_parent}"'
+            )
+        except LoopError:
+            raise InvalidArgumentValueError(
+                f'Error building hierarchy, found a loop - device "{device_id}" and "{device_parent}" cannot both be children of each other'
+            )
+    # Show the tree, break if user provides input
+    if visualize:
+        tree.show()
+        i = input("Press enter to continue. Entering any value will cancel the operation.")
+        if i != '':
+            raise KeyboardInterrupt
+
+    # Perform hub operations
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        resource_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
+    #region Delete or verify existing device IDs
+    existing_devices = service_sdk.devices.get_devices()
+    existing_device_ids = list(map(lambda x: x.device_id, existing_devices))
+    # Clear devices if necessary
+    if clean and len(existing_devices):
+        _sequential_delete_devices(service_sdk, existing_device_ids)
+    else:
+        # If not cleaning the hub, ensure no duplicate device ids
+        duplicates = list(filter(lambda id: id in assembled_device_dict, existing_device_ids))
+        if any(duplicates):
+            raise InvalidArgumentValueError(f'Duplicate deviceIds detected: {duplicates}. '
+            'To clear all devices before creating the hierarchy, please utilize the `--clean` switch.')
+    #endregion
+    
+    # Bulk add devices
+    _sequential_create_devices(service_sdk, list(assembled_device_dict.values()))
+
+    #region get device scopes
+    # Get all device ids and scopes (inconsistent timing, using basic retry)
+    all_devices = []
+    retries = 0
+    progress = tqdm([range(0, 5)], desc="Querying device scopes:")
+    progress.update(1)
+    while len(all_devices) < len(config['devices']) and retries < 5:
+        if retries > 0:
+            progress.update(1)
+            print('Retrying ({retries})')
+        sleep(2)
+        query_args = ["SELECT * FROM devices"]
+        query_method = service_sdk.query.get_twins
+        all_devices = _execute_query(query_args, query_method)
+        retries += 1
+    progress.close()
+
+    if retries == 5:
+        raise AzureResponseError(
+            "An error occurred - Failed to fetch device scopes for all devices"
+        )
+    #endregion
+    
+    assembled_device_dict = {}
+    for device_input in all_devices:
+        assembled_device_dict[device_input["deviceId"]] = device_input
+
+    # Set parent / child relationships
+    # TODO - this is not currently working with bulk update.
+    for device_id in tqdm(device_to_parent_dict, desc="Setting device parents"):
+        device_input = assembled_device_dict[device_id]
+        parent_id = device_to_parent_dict[device_id]
+        parent_scope = assembled_device_dict[parent_id]["deviceScope"]
+        device_input['parent_scopes'] = [parent_scope]
+        try:
+            _handle_rate_limiting(service_sdk.devices.create_or_update_identity)(
+                id=device_id,
+                device=device_input,
+                if_match="*")
+        except Exception as err:
+            ## TODO - handle timeouts / rate limiting
+            import pdb; pdb.set_trace()
+            print(dir(err))
+
+    # update config / set-modules
+    for device_obj in tqdm(config['devices'], desc="Setting edge module content"):
+        device = device_obj['device']
+        device_id = device['device_id']
+        deployment_content = device.get('deployment', None)
+        if deployment_content:
+            content = process_json_arg(deployment_content, argument_name="content")
+            processed_content = _process_config_content(
+                content, config_type=ConfigType.edge
+            )
+
+            content = ConfigurationContent(**processed_content)
+            _handle_rate_limiting(service_sdk.configuration.apply_on_edge_device)(id=device_id, content=content)
+
+def process_edge_config_content(content: dict):
+    # TODO version number is important here for schema validation
+    version = content['config_version']
+    hub_config = content['iothub']
+    agent_config = content['configuration']
+    devices_config = content['edgedevices']
+    auth_value = hub_config['authentication_method']
+    if auth_value not in ['symmetric_key', 'x509_certificate']:
+        raise InvalidArgumentValueError('Invalid authentication_method in edge config file, must be either symmetric_key or x509_certificate')
+    device_authentication_method = DeviceAuthType.shared_private_key.value if auth_value == 'symmetric_key' else DeviceAuthType.x509_thumbprint.value
+    default_edge_agent = agent_config.get('default_edge_agent', None)
+    all_devices= []
+
+    def _process_edge_device(device: dict, parent_id=None):
+        device_id = device.get('device_id', None)
+        if not device_id:
+            raise InvalidArgumentValueError('A device parameter is missing a device ID')
+        edge_agent = device.get('edge_agent', None)
+        deployment = device.get('deployment', None)
+        child_devices = device.get('child', [])
+        device_obj = {
+            'device': device,
+            'edge_agent': edge_agent,
+            'deployment': deployment
+        }
+        if parent_id:
+            device_obj['parent'] = parent_id
+        all_devices.append(device_obj)
+        for child_device in child_devices:
+            _process_edge_device(child_device, parent_id=device_id)
+    
+    for device in devices_config:
+        _process_edge_device(device)
+    return {
+        'version': version,
+        'auth_method': device_authentication_method,
+        'default_edge_agent': default_edge_agent,
+        "devices": all_devices
+    }
+        
+
+## TODO - verify attributes
+def parse_attributes(device_dict) -> Device:
+
+    auth_method = device_dict.get('auth_method', DeviceAuthType.shared_private_key.value)
+    return _assemble_device(
+        is_update=False,
+        device_id=device_dict['id'],
+        auth_method=auth_method,
+        edge_enabled=True,
+        pk=device_dict.get('primary_thumbprint', None)
+        if auth_method == DeviceAuthType.x509_thumbprint.value
+        else device_dict.get('primary_key', None),
+        sk=device_dict.get('secondary_thumbprint', None)
+        if auth_method == DeviceAuthType.x509_thumbprint.value
+        else device_dict.get('secondary_key', None),
+        status=device_dict.get('status', EntityStatusType.enabled.value),
+        status_reason=device_dict.get('status_reason', None)
+    )
+
+def parse_edge_attributes(device):
+    device_id = device.get('device_id', None)
+    if not device_id:
+        raise InvalidArgumentValueError('A device parameter is missing a device ID')
+    edge_agent = device.get('edge_agent', None)
+    deployment = device.get('deployment', None)
+    parent_id = device.get('parent', None)
+
+    device_obj = {
+        'device': device,
+        'edge_agent': edge_agent,
+        'deployment': deployment
+    }
+    if parent_id:
+        device_obj['parent'] = parent_id
+    return device_obj
+
+## TODO - revisit with "parse_nargs" from existing work
+def assemble_nargs_to_dict(hash_list: List[str]) -> dict[str, str]:
+    result = {}
+    if not hash_list:
+        return result
+    for hash in hash_list:
+        split_hash = hash.split("=", 1)
+        result[split_hash[0]] = split_hash[1]
+    return result
+
+
+def _sequential_delete_devices(service_sdk, device_ids, confirm=True):
+    for id in tqdm(device_ids, "Deleting existing device identities"):
+        try:
+            _handle_rate_limiting(service_sdk.devices.delete_identity)(id=id, if_match="*")
+        except Exception as err:
+            pdb.set_trace()
+            raise AzureResponseError(err)
+    if confirm:
+        existing_devices = service_sdk.devices.get_devices()
+        if len(existing_devices):
+            raise AzureResponseError(
+                "An error has occurred - Not all devices were deleted."
+            )
+
+
+def _sequential_create_devices(service_sdk, devices):
+    try:
+        for device in tqdm(devices, desc="Creating device identities"):
+            _handle_rate_limiting(service_sdk.devices.create_or_update_identity)(
+                id=device.device_id,
+                device=device
+            )
+    except Exception as err:
+            pdb.set_trace()
+            raise AzureResponseError(err)
+
+
+def _handle_rate_limiting(operation):
+    '''Decorator that handles individual service calls that are subject to rate limiting'''
+    def wrap(*args, **kwargs):
+        # print(f'wrapping {operation.__name__}')
+        try:
+            return operation(*args, **kwargs)
+        except CloudError as e:
+            print(f'{operation.__name__} threw an exception')
+            if e.status_code == 429:
+                print(f'{operation.__name__} was rate limited...waiting to retry')
+                sleep(5)
+                return wrap(*args, **kwargs)
+        except Exception as e:
+            print(f'{operation.__name__} encountered an unrecoverable error')
+            raise e
+    return wrap
+
+
+def _bulk_create_devices(service_sdk, devices, chunk_size=100):
+    # Creates chunked arrays of device ops of size "chunk_size"
+    bulk_device_chunks = [
+        devices[i : i + chunk_size] for i in range(0, len(devices), chunk_size)
+    ]
+    edge_enabled = DeviceCapabilities(iot_edge=True)
+    for chunk in bulk_device_chunks:
+        create_ops = list(
+            map(
+                lambda device: ExportImportDevice(
+                    id=device.device_id,
+                    import_mode=BulkDeviceImportMode.Create.value,
+                    capabilities=edge_enabled,
+                ),
+                chunk,
+            )
+        )
+        try:
+            service_sdk.bulk_registry.update_registry(create_ops)
+        except Exception as err:
+            raise AzureResponseError(err)
+
+
+def _bulk_delete_devices(service_sdk, device_ids, chunk_size=100, confirm=True):
+    # Creates chunked arrays of device ops of size "chunk_size"
+    bulk_delete_chunks = [
+        device_ids[i : i + chunk_size] for i in range(0, len(device_ids), chunk_size)
+    ]
+    for chunk in bulk_delete_chunks:
+        delete_ops = list(
+            map(
+                lambda id: ExportImportDevice(
+                    id=id, import_mode=BulkDeviceImportMode.Delete.value
+                ),
+                chunk,
+            )
+        )
+        try:
+            service_sdk.bulk_registry.update_registry(delete_ops)
+        except Exception as err:
+            import pdb; pdb.set_trace()
+            raise AzureResponseError(err)
+    if confirm:
+        existing_devices = service_sdk.devices.get_devices()
+        if len(existing_devices):
+            raise AzureResponseError(
+                "An error has occurred - Not all devices were deleted."
+            )

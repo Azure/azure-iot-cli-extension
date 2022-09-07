@@ -291,6 +291,7 @@ __pycache__/
 env/
 env27/
 env36/
+env310/
 .python-version
 
 # PTVS analysis

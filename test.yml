@@ -1,0 +1,44 @@
+config_version: "1.0"
+
+iothub:
+  iothub_hostname: IOTHUB_HOSTNAME
+  iothub_name: IOTHUB_NAME
+  ## Authentication method used by IoT Edge devices: symmetric_key or x509_certificate
+  authentication_method: symmetric_key
+
+## Root certificate used to generate device CA certificates. Optional. If not provided a self-signed CA will be generated
+# certificates:
+#   root_ca_cert_path: ""
+#   root_ca_cert_key_path: ""
+
+## IoT Edge configuration template to use
+configuration:
+  template_config_path: "./templates/purdue/device_config.toml"
+  default_edge_agent: "$upstream:443/azureiotedge-agent:1.2"
+
+## Hierarchy of IoT Edge devices to create
+edgedevices:
+  - device_id: device_1
+    edge_agent: "mcr.microsoft.com/azureiotedge-agent:1.2" ## Optional. If not provided, default_edge_agent will be used
+    deployment: "./templates/purdue/deployment-L5.json" ## Optional. If provided, the given deployment file will be applied to the newly created device
+    # hostname: "FQDN or IP" ## Optional. If provided, install.sh will not prompt user for this value
+    child:
+    - device_id: device_2
+      deployment: "./templates/purdue/deployment-L4.json" ## Optional. If provided, the given deployment file will be applied to the newly created device
+      # hostname: "FQDN or IP" ## Optional. If provided, install.sh will not prompt user for this value nor the parent_hostname value
+      child:
+        - device_id: device_3
+          deployment: "./templates/purdue/deployment-L3.json" ## Optional. If provided, the given deployment file will be applied to the newly created device
+          # hostname: "FQDN or IP" ## Optional. If provided, install.sh will not prompt user for this value nor the parent_hostname value
+    - device_id: device_4
+      deployment: "./templates/purdue/deployment-L3.json" ## Optional. If provided, the given deployment file will be applied to the newly created device
+      # hostname: "FQDN or IP" ## Optional. If provided, install.sh will not prompt user for this value nor the parent_hostname value
+      child:
+        - device_id: device_5
+          deployment: "./templates/purdue/deployment-L3.json" ## Optional. If provided, the given deployment file will be applied to the newly created device
+          # hostname: "FQDN or IP" ## Optional. If provided, install.sh will not prompt user for this value nor the parent_hostname value
+        - device_id: device_6
+          deployment: "./templates/purdue/deployment-L3.json" ## Optional. If provided, the given deployment file will be applied to the newly created device
+          # hostname: "FQDN or IP" ## Optional. If provided, install.sh will not prompt user for this value nor the parent_hostname value
+  - device_id: device_7
+  - device_id: device_1
