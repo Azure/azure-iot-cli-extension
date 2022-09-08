@@ -151,9 +151,9 @@ class StateProvider(IoTHubProvider):
                                           config_type=config_type)
 
         for i in tqdm(hub_state["devices"], desc="Uploading devices and modules"):
-
             # upload device identity and twin
             identity = hub_state["devices"][i]
+            print(f"upload device {identity}")
 
             self.upload_device_identity(identity)
 
@@ -164,6 +164,7 @@ class StateProvider(IoTHubProvider):
                 twin.pop("symmetricKey")
 
             _iot_device_twin_replace(target=self.target, device_id=identity["deviceId"], target_json=json.dumps(twin))
+            print(f"upload twin for device {identity}")
 
             # upload module identities and twins for the given device
 

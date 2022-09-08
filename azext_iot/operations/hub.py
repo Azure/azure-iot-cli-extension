@@ -715,14 +715,14 @@ def iot_device_children_list(
     login=None,
     auth_type_dataplane=None,
 ):
-    result = _iot_device_children_list(
-        cmd=cmd,
-        device_id=device_id,
-        hub_name=hub_name,
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        resource_name=hub_name,
         resource_group_name=resource_group_name,
         login=login,
-        auth_type_dataplane=auth_type_dataplane,
+        auth_type=auth_type_dataplane,
     )
+    result = _iot_device_children_list(target, device_id)
 
     return [device["deviceId"] for device in result]
 
