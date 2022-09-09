@@ -18,7 +18,9 @@ import sys
 import re
 import hmac
 import hashlib
+import io
 
+from contextlib import contextmanager
 from threading import Event, Thread
 from datetime import datetime
 from knack.log import get_logger
@@ -619,3 +621,24 @@ def is_valid_dtmi(dtmi):
     if not pattern.match(dtmi):
         return False
     return True
+
+
+@contextmanager
+def capture_stderr():
+    """
+    Suppresses stderr by redirecting to a text buffer, then writes the buffer contents to stderr all at once.
+    """
+
+    output = io.StringIO()
+    old_stderr = sys.stderr
+    sys.stderr = output
+
+    try:
+        yield
+    finally:
+        sys.stderr = old_stderr
+
+    contents = output.getvalue()
+    sys.stderr.write(contents)
+
+    output.close()

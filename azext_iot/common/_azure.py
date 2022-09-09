@@ -46,6 +46,16 @@ def parse_iot_device_module_connection_string(cs):
     return _parse_connection_string(cs, validate, "Module")
 
 
+def parse_iot_hub_message_endpoint_connection_string(cs):
+    validate = ["Endpoint", "SharedAccessKeyName", "SharedAccessKey"]
+    return _parse_connection_string(cs, validate, "Endpoint")
+
+
+def parse_storage_container_connection_string(cs):
+    validate = ["DefaultEndpointsProtocol", "EndpointSuffix", "AccountName", "AccountKey"]
+    return _parse_connection_string(cs, validate, "Storage Container")
+
+
 def get_iot_central_tokens(cmd, app_id, token, central_dns_suffix):
     import requests
 

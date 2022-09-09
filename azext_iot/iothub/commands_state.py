@@ -46,4 +46,4 @@ def state_migrate(
     replace: Optional[bool] = False
 ):
     sp = StateProvider(cmd=cmd, hub=hub_name, rg=resource_group_name, login=login, auth_type_dataplane=auth_type_dataplane)
-    sp.migrate_devices(orig_hub, orig_resource_group_name, orig_hub_login, replace)
+    sp.migrate_state(orig_hub, orig_resource_group_name, orig_hub_login, replace)
