@@ -205,8 +205,11 @@ def clean_up_hub(cstring):
     # gives the api enough time to update
     time.sleep(1)
 
+# TODO figure out better way to force two hubs to be made that wont make this test create
+# two hubs if ran by it
+# Make sure this is just dataplane to split up functionality
 @pytest.mark.hub_infrastructure()
-def test_export_import(setup_hub_states):
+def test_2export_import(setup_hub_states):
     filename = setup_hub_states[0]["filename"]
     hub_name = setup_hub_states[0]["name"]
     hub_rg = setup_hub_states[0]["rg"]
@@ -219,10 +222,11 @@ def test_export_import(setup_hub_states):
                 cstring=hub_cstring
             )
         )
-        compare_hub_to_file(filename, hub_cstring)
+        compare_hub_dataplane_to_file(filename, hub_cstring)
 
     for auth_phase in DATAPLANE_AUTH_TYPES:
         clean_up_hub(hub_cstring)
+        # TODO: change this to import empty file
         time.sleep(5)
         cli.invoke(
             set_cmd_auth_type(
@@ -232,11 +236,11 @@ def test_export_import(setup_hub_states):
             )
         )
         time.sleep(10)  # gives the hub time to update before the checks
-        compare_hub_to_file(filename, hub_cstring)
+        compare_hub_dataplane_to_file(filename, hub_cstring)
 
 
 @pytest.mark.hub_infrastructure(count=2)
-def test_migrate(setup_hub_states):
+def test_1migrate(setup_hub_states):
     origin_name = setup_hub_states[0]["name"]
     origin_rg = setup_hub_states[0]["rg"]
     origin_cstring = setup_hub_states[0]["connectionString"]
@@ -260,11 +264,11 @@ def test_migrate(setup_hub_states):
             )
 
         time.sleep(1)  # gives the hub time to update before the checks
-        compare_hubs(origin_cstring, dest_cstring)
+        compare_hubs_dataplane(origin_cstring, dest_cstring)
         clean_up_hub(dest_cstring)
 
-
-def compare_hubs(origin_cstring, dest_cstring):
+# Dataplane main compare commands
+def compare_hubs_dataplane(origin_cstring: str, dest_cstring: str):
     # compare configurations (there's only one)
     orig_hub_configs = cli.invoke(
         f"iot hub configuration list -l {origin_cstring}"
@@ -291,10 +295,20 @@ def compare_hubs(origin_cstring, dest_cstring):
         f"iot hub device-identity list -l {dest_cstring}"
     ).as_json()
 
+    if len(orig_hub_identities) != len(dest_hub_identities):
+        time.sleep(1)
+        print("sleeping for device identity list")
+        orig_hub_identities = cli.invoke(
+            f"iot hub device-identity list -l {origin_cstring}"
+        ).as_json()
+        dest_hub_identities = cli.invoke(
+            f"iot hub device-identity list -l {dest_cstring}"
+        ).as_json()
+
+    assert len(orig_hub_identities) == len(dest_hub_identities)
     dest_hub_identities_dict = {}
     for id in dest_hub_identities:
         dest_hub_identities_dict[id["deviceId"]] = id
-    assert(len(orig_hub_identities) == len(dest_hub_identities))
 
     for device in orig_hub_identities:
         assert device["deviceId"] in dest_hub_identities_dict
@@ -323,9 +337,9 @@ def compare_hubs(origin_cstring, dest_cstring):
         ).as_json()
 
         if device["capabilities"]["iotEdge"]:
-            assert(len(orig_modules) == len(dest_modules) == 3)
+            assert len(orig_modules) == len(dest_modules) == 3
         else:
-            assert(len(orig_modules) == len(dest_modules) == 1)
+            assert len(orig_modules) == len(dest_modules) == 1
 
         for module in orig_modules:
             target_module = None
@@ -336,7 +350,7 @@ def compare_hubs(origin_cstring, dest_cstring):
 
             assert target_module
 
-            assert(module["authentication"] == target_module["authentication"])
+            assert module["authentication"] == target_module["authentication"]
 
             module_twin = cli.invoke(
                 f"iot hub module-twin show -m {module['moduleId']} -d {device['deviceId']} -l {origin_cstring}"
@@ -356,9 +370,10 @@ def compare_hubs(origin_cstring, dest_cstring):
                 f"iot hub device-identity children list -d {device['deviceId']} -l {dest_cstring}"
             ).as_json()
 
-            assert(orig_children == dest_children)
+            assert orig_children == dest_children
 
-def compare_hub_to_file(filename, cstring):
+
+def compare_hub_dataplane_to_file(filename: str, cstring: str):
     with open(filename, 'r', encoding='utf-8') as f:
         hub_info = json.load(f)
 
@@ -394,7 +409,7 @@ def compare_hub_to_file(filename, cstring):
         ).as_json()
         print(len(hub_devices))
 
-    assert (len(file_devices) == len(hub_devices))
+    assert len(file_devices) == len(hub_devices)
 
     file_modules_list = hub_info["modules"]
     file_modules_dict = {}
@@ -438,9 +453,9 @@ def compare_hub_to_file(filename, cstring):
 
         # edge devices have two default modules that aren't saved to the file
         if device["capabilities"]["iotEdge"]:
-            assert(len(file_modules) == len(hub_modules) - 2)
+            assert len(file_modules) == len(hub_modules) - 2
         else:
-            assert(len(file_modules) == len(hub_modules))
+            assert len(file_modules) == len(hub_modules)
 
         for module in hub_modules:
             if module['moduleId'] in ["$edgeAgent", "$edgeHub"]:
@@ -482,6 +497,63 @@ def compare_hub_to_file(filename, cstring):
             assert file_children == dest_children
 
 
+def compare_hub_controlplane_to_file(filename: str, hub_name: str, rg: str):
+    with open(filename, 'r', encoding='utf-8') as f:
+        hub_info = json.load(f)
+
+    # compare certificates
+    file_certs = hub_info["certificates"]
+    hub_certs = cli.invoke(
+        "iot hub certificate list --hub-name {} -g {}".format(hub_name, rg)
+    ).as_json()["value"]
+    assert (len(file_certs) == len(hub_certs) == 1)
+    for i in range(len(file_certs)):
+        compare_certs(file_certs[i], hub_certs[i])
+
+    # compare endpoints
+    file_endpoints = hub_info["endpoints"]
+    hub_endpoints = cli.invoke(
+        f"iot hub routing-endpoint list --hub-name {hub_name} -g {rg}"
+    ).as_json()
+    for ep_type in ["eventHubs", "serviceBusQueues", "serviceBusTopics", "storageContainers"]:
+        assert len(file_endpoints[ep_type]) == len(hub_endpoints[ep_type])
+        compare_endpoints(file_endpoints[ep_type], hub_endpoints[ep_type], ep_type)
+
+    # compare routes
+    file_routes = hub_info["routes"]
+    hub_routes = cli.invoke(f"iot hub route list --hub-name {hub_name} -g {rg}").as_json()
+    compare_routes(file_routes, hub_routes)
+
+def compare_hubs(origin_hub_name: str, dest_hub_name: str, rg: str):
+    # compare certificates
+    orig_hub_certs = cli.invoke(
+        "iot hub certificate list --hub-name {} -g {}".format(origin_hub_name, rg)
+    ).as_json()["value"]
+    dest_hub_certs = cli.invoke(
+        "iot hub certificate list --hub-name {} -g {}".format(dest_hub_name, rg)
+    ).as_json()["value"]
+    assert (len(orig_hub_certs) == len(dest_hub_certs))
+    for i in range(len(orig_hub_certs)):
+        compare_certs(orig_hub_certs[i], dest_hub_certs[i])
+
+    # compare endpoints
+    orig_hub_endpoints = cli.invoke(
+        f"iot hub routing-endpoint list --hub-name {origin_hub_name} -g {rg}"
+    ).as_json()
+    dest_hub_endpoints = cli.invoke(
+        f"iot hub routing-endpoint list --hub-name {dest_hub_name} -g {rg}"
+    ).as_json()
+    for ep_type in ["eventHubs", "serviceBusQueues", "serviceBusTopics", "storageContainers"]:
+        assert len(orig_hub_endpoints[ep_type]) == len(dest_hub_endpoints[ep_type])
+        compare_endpoints(orig_hub_endpoints[ep_type], dest_hub_endpoints[ep_type], ep_type)
+
+    # compare routes
+
+    orig_hub_routes = cli.invoke(f"iot hub route list --hub-name {origin_hub_name} -g {rg}").as_json()
+    dest_hub_routes = cli.invoke(f"iot hub route list --hub-name {dest_hub_name} -g {rg}").as_json()
+    compare_routes(orig_hub_routes, dest_hub_routes)
+
+# Compare specific parts
 def compare_configs(configlist1, configlist2):
     assert len(configlist1) == len(configlist2)
 
@@ -536,3 +608,51 @@ def compare_module_twins(twin1, twin2):
     if "tags" in twin1:
         assert twin1["tags"] == twin2["tags"]
     assert twin1["status"] == twin2["status"]
+
+
+def compare_certs(cert1, cert2):
+    assert cert1["name"] == cert2["name"]
+    assert cert1["properties"]["certificate"] == cert2["properties"]["certificate"]
+    assert cert1["properties"]["isVerified"] == cert2["properties"]["isVerified"]
+
+
+def compare_endpoints(endpoints1, endpoints2, endpoint_type):
+    for endpoint in endpoints1:
+        target = None
+        for ep in endpoints2:
+            if endpoint["name"] == ep["name"]:
+                target = ep
+                break
+
+        assert target
+        assert endpoint["authenticationType"] == target["authenticationType"]
+        assert endpoint["identity"] == target["identity"]
+        assert endpoint["resourceGroup"] == target["resourceGroup"]
+        assert endpoint["subscriptionId"] == target["subscriptionId"]
+        assert endpoint["connectionString"] == target["connectionString"]
+        if "entityPath" in endpoint:
+            assert endpoint["entityPath"] == target["entityPath"]
+
+        if endpoint_type == "storageContainers":
+            assert endpoint["maxChunkSizeInBytes"] == target["maxChunkSizeInBytes"]
+            assert endpoint["batchFrequencyInSeconds"] == target["batchFrequencyInSeconds"]
+            assert endpoint["containerName"] == target["containerName"]
+            assert endpoint["encoding"] == target["encoding"]
+            assert endpoint["fileNameFormat"] == target["fileNameFormat"]
+
+
+def compare_routes(routes1, routes2):
+    assert len(routes1) == len(routes2)
+
+    for route in routes1:
+        target = None
+        for r in routes2:
+            if route["name"] == r["name"]:
+                target = r
+                break
+
+        assert target
+        assert route["condition"] == target["condition"]
+        assert route["endpointNames"] == target["endpointNames"]
+        assert route["isEnabled"] == target["isEnabled"]
+        assert route["source"] == target["source"]
