@@ -54,7 +54,6 @@ sync_command_params = get_context_path(__file__, "json/sync_command_args.json")
 device_updated_properties_path = get_context_path(__file__, "json/device_update_properties.json")
 device_updated_component_properties_path = get_context_path(__file__, "json/device_update_component_properties.json")
 x509_certificate_path = get_context_path(__file__, "json/x509_certificate.pem")
-x509_verified_certificate_path = get_context_path(__file__, "json/x509_verified_certificate.pem")
 
 # Device attestation
 attestation_payload = {
@@ -818,20 +817,6 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
              --app-id {self.app_id}
              --group-id {group_id}
              --entry 'primary'
-        '''
-        return self.cmd(
-            command,
-            api_version=api_version,
-        ).get_output_in_json()
-
-    def _verify_x509(self, group_id, api_version):
-        path = x509_verified_certificate_path.replace("/", "//").replace('\\', '\\\\')
-
-        command = f'''
-            iot central enrollment-group verify-certificate
-             --app-id {self.app_id}
-             --id {group_id}
-             --cp {path}
         '''
         return self.cmd(
             command,
