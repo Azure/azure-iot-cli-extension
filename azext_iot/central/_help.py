@@ -1816,6 +1816,16 @@ def _load_central_enrollment_group_help():
           --at {attestation}
           --display-name {displayName}
           --type {type}
+
+      - name: Create an enrollment group with x509 primary certification
+        text: >
+          az iot central enrollment-group create
+          --app-id {appid}
+          --id {enrollmentGroupId}
+          --at {attestation}
+          --display-name {displayName}
+          --type {type}
+          --cp {primayCertPath}
     """
 
     helps[
@@ -1832,35 +1842,35 @@ def _load_central_enrollment_group_help():
           --at {attestation}
           --display-name {displayName}
           --type {type}
-          --enabled true
+          --ps {enabled}
     """
 
     helps[
-        "iot central enrollment-group verify-x509"
+        "iot central enrollment-group verify-certificate"
     ] = """
     type: command
     long-summary: |
                     Verify the primary or secondary x509 certificate of an enrollment group
                     by providing a certificate with the signed verification code.
     examples:
-      - name: Verify the primary or secondary x509 certificate of an enrollment group
+      - name: Verify the primary x509 certificate of an enrollment group
         text: >
-          az iot central enrollment-group verify-x509
+          az iot central enrollment-group verify-certificate
           --app-id {appid}
           --id {enrollmentGroupId}
           --entry {certificateEntry}
-          --certificate	{certificate}
+          --cp {primayCertPath}
     """
 
     helps[
-        "iot central enrollment-group verification-code"
+        "iot central enrollment-group generate-verification-code"
     ] = """
     type: command
     short-summary: Generate a verification code for the primary or secondary x509 certificate of an enrollment group
     examples:
       - name: Generate a verification code for the primary or secondary x509 certificate of an enrollment group
         text: >
-          az iot central enrollment-group verification-code
+          az iot central enrollment-group generate-verification-code
           --app-id {appid}
           --id {enrollmentGroupId}
           --entry {certificateEntry}
@@ -1926,7 +1936,7 @@ def _load_central_scheduled_job_help():
           --job-id {jobId}
           --group-id {groupId}
           --job-name {displayName}
-          --schedule	{jobScheduleJSONPatch}
+          --schedule {jobScheduleJSONPatch}
           --content {jobDataJSONPath}
 
       - name: Create a scheduled job with name and batch configuration.

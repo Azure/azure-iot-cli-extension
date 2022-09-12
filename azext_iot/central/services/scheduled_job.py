@@ -302,7 +302,7 @@ def delete_scheduled_job(
     )
 
 
-def list_jobs(
+def list_runs(
     cmd,
     app_id: str,
     job_id: str,
@@ -311,7 +311,7 @@ def list_jobs(
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     """
-    Get the list of jobs for a scheduled job definition.
+    Get the list of job instances for a scheduled job definition.
 
     Args:
         cmd: command passed into az

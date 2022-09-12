@@ -15,7 +15,7 @@ from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests.helpers import add_test_tag, create_storage_account
 from azext_iot.tests.settings import DynamoSettings
 from azext_iot.common import utility
-from azext_iot.central.models.enum import Role, UserTypeV1
+from azext_iot.central.models.enum import Role, UserType
 from azext_iot.tests.test_constants import ResourceTypes
 from knack.log import get_logger
 
@@ -53,14 +53,14 @@ edge_template_path_preview = get_context_path(
 sync_command_params = get_context_path(__file__, "json/sync_command_args.json")
 device_updated_properties_path = get_context_path(__file__, "json/device_update_properties.json")
 device_updated_component_properties_path = get_context_path(__file__, "json/device_update_component_properties.json")
+x509_certificate_path = get_context_path(__file__, "json/x509_certificate.pem")
+x509_verified_certificate_path = get_context_path(__file__, "json/x509_verified_certificate.pem")
 
 # Device attestation
 attestation_payload = {
     'type': 'symmetricKey',
     'symmetricKey': {
-        # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="int test only")]
         'primaryKey': 'ya9+G4ED+/g0BgLduhjETJnbeEWMl1HIUApWCCpGMAU=',
-        # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="int test only")]
         'secondaryKey': 'D8jeWazxcCK+MAxrn9KlqDLb8trbuKs35KEbcLBnS48='
     }
 }
@@ -68,9 +68,7 @@ attestation_payload = {
 attestation_payload_update = {
     'type': 'symmetricKey',
     'symmetricKey': {
-        # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="int test only")]
         'primaryKey': 'r9KdK+LBaLiZ0p+RfAVj6eu9umGE6VqJj+AMLHdw+io=',
-        # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="int test only")]
         'secondaryKey': 'W7/4/oaMpA83RYfirH9vzic4ZeK2Piy0jO5rTOM5wxg='
     }
 }
@@ -270,7 +268,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             checks = [
                 self.check("id", user_id),
                 self.check("email", email),
-                self.check("type", UserTypeV1.email.value),
+                self.check("type", UserType.email.value),
                 self.check("roles[0].role", role.value),
             ]
             users.append(
@@ -726,7 +724,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             iot central enrollment-group create
              --app-id {self.app_id}
              --group-id {group_id}
-             --attestation '{json.dumps(attestation_payload).replace("{", "{{").replace("}", "}}")}'
+             --attestation 'symmetricKey'
              --display-name {display_name}
              --type 'iot'
         '''
@@ -766,6 +764,95 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 self.check("result", "success"),
             ],
         )
+
+    def _create_enrollment_group_with_x509(self, api_version):
+        group_id = self.create_random_name(prefix="aztest", length=24)
+        display_name = self.create_random_name(prefix="aztest", length=10)
+
+        path = x509_certificate_path.replace("/", "//").replace('\\', '\\\\')
+
+        command = f'''
+            iot central enrollment-group create
+             --app-id {self.app_id}
+             --group-id {group_id}
+             --attestation 'x509'
+             --cp {path}
+             --display-name {display_name}
+             --type 'iot'
+        '''
+
+        return self.cmd(
+            command,
+            api_version=api_version,
+            checks=[
+                self.check("id", group_id),
+            ],
+        ).get_output_in_json()
+
+    def _create_enrollment_group_with_symmetric_key(self, api_version):
+        group_id = self.create_random_name(prefix="aztest", length=24)
+        display_name = self.create_random_name(prefix="aztest", length=10)
+
+        command = f'''
+            iot central enrollment-group create
+             --app-id {self.app_id}
+             --group-id {group_id}
+             --attestation 'symmetricKey'
+             --cp {attestation_payload['symmetricKey']['primaryKey']}
+             --scp {attestation_payload['symmetricKey']['secondaryKey']}
+             --display-name {display_name}
+             --type 'iot'
+        '''
+
+        return self.cmd(
+            command,
+            api_version=api_version,
+            checks=[
+                self.check("id", group_id),
+            ],
+        ).get_output_in_json()
+
+    def _generate_x509_verification_code(self, group_id, api_version):
+        command = f'''
+            iot central enrollment-group generate-verification-code
+             --app-id {self.app_id}
+             --group-id {group_id}
+             --entry 'primary'
+        '''
+        return self.cmd(
+            command,
+            api_version=api_version,
+        ).get_output_in_json()
+
+    def _verify_x509(self, group_id, api_version):
+        path = x509_verified_certificate_path.replace("/", "//").replace('\\', '\\\\')
+
+        command = f'''
+            iot central enrollment-group verify-certificate
+             --app-id {self.app_id}
+             --id {group_id}
+             --cp {path}
+        '''
+        return self.cmd(
+            command,
+            api_version=api_version,
+        ).get_output_in_json()
+
+    def _remove_x509(self, group_id, api_version):
+        command = f'''
+            iot central enrollment-group update
+             --app-id {self.app_id}
+             --id {group_id}
+             --entry 'primary'
+             --remove-x509 'True'
+        '''
+        return self.cmd(
+            command,
+            api_version=api_version,
+            checks=[
+                self.check("id", group_id),
+            ],
+        ).get_output_in_json()
 
     def _create_scheduled_job(self, api_version):
         # create a device group for scheduled job

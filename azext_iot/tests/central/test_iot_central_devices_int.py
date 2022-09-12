@@ -818,6 +818,9 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         retry = 0
         device = None
         while True:
+            if (device["provisioned"]) or retry > 11:
+                break
+
             retry += 1
             time.sleep(5)
 
@@ -829,9 +832,6 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
                 api_version=self._api_version,
                 checks=[self.check("id", device_id)],
             ).get_output_in_json()
-
-            if (device["provisioned"]) or retry > 11:
-                break
 
         if device["provisioned"] is not True:
             raise CLIInternalError("Device is not provisioned in 60s.")

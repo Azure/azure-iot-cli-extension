@@ -483,7 +483,6 @@ def get_device_module(
 def get_edge_manifest(
     cmd, app_id: str, device_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT
 ):
-    # force API v1.1 for this to work
     template_provider = CentralDeviceTemplateProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=API_VERSION
     )

@@ -7,7 +7,6 @@
 
 from typing import List
 
-from azure.cli.core.azclierror import InvalidArgumentValueError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers import CentralScheduledJobProvider
 from azext_iot.common import utility
@@ -65,12 +64,6 @@ def create_scheduled_job(
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=API_VERSION,
 ) -> ScheduledJobGa:
-    if not isinstance(content, str):
-        raise InvalidArgumentValueError("content must be a string: {}".format(content))
-
-    if not isinstance(schedule, str):
-        raise InvalidArgumentValueError("content must be a string: {}".format(content))
-
     payload = utility.process_json_arg(content, argument_name="content")
 
     schedule = utility.process_json_arg(schedule, argument_name="schedule")
@@ -118,11 +111,11 @@ def update_scheduled_job(
     api_version=API_VERSION,
 ) -> ScheduledJobGa:
     payload = None
-    if content is not None:
+    if content:
         payload = utility.process_json_arg(content, argument_name="content")
 
     schedule_payload = None
-    if schedule is not None:
+    if schedule:
         schedule_payload = utility.process_json_arg(schedule, argument_name="schedule")
 
     provider = CentralScheduledJobProvider(
@@ -167,7 +160,7 @@ def delete_scheduled_job(
     )
 
 
-def list_jobs(
+def list_runs(
     cmd,
     app_id: str,
     job_id: str,
@@ -179,7 +172,7 @@ def list_jobs(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
 
-    return provider.list_jobs(
+    return provider.list_runs(
         job_id=job_id,
         central_dns_suffix=central_dns_suffix,
     )

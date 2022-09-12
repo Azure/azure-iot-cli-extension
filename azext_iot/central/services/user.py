@@ -15,7 +15,7 @@ from azext_iot.central.common import API_VERSION
 from azext_iot.central.services import _utility
 from azext_iot.central.models.enum import (
     Role,
-    UserTypeV1,
+    UserType,
     get_enum_keys,
 )
 from azext_iot.central.models.ga_2022_07_31 import UserGa
@@ -115,7 +115,7 @@ def add_or_update_service_principal_user(
     """
     api_version = API_VERSION
 
-    user_type = UserTypeV1.service_principal.value
+    user_type = UserType.service_principal.value
 
     payload = {
         "type": user_type,
@@ -171,7 +171,7 @@ def add_or_update_email_user(
     """
     api_version = API_VERSION
 
-    user_type = UserTypeV1.email.value
+    user_type = UserType.email.value
 
     payload = {"type": user_type, "roles": []}
 

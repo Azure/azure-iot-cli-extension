@@ -6,6 +6,7 @@
 
 
 import json
+from time import sleep
 import pytest
 from knack.log import get_logger
 
@@ -477,6 +478,34 @@ class TestIotCentral(CentralLiveScenarioTest):
 
         # delete
         self._delete_enrollment_group(group_id=group["id"], api_version=self._api_version)
+
+    def test_central_enrollment_group_with_certificate_methods_CRUD(self):
+        # create
+        symmetric_group = self._create_enrollment_group_with_symmetric_key(api_version=self._api_version)
+        x509_group = self._create_enrollment_group_with_x509(api_version=self._api_version)
+
+        # show
+        command = "iot central enrollment-group show -n {} --group-id {}".format(
+            self.app_id, symmetric_group["id"]
+        )
+        result = self.cmd(command, api_version=self._api_version).get_output_in_json()
+        assert result["id"] == symmetric_group["id"]
+
+        command = "iot central enrollment-group show -n {} --group-id {}".format(
+            self.app_id, x509_group["id"]
+        )
+        result = self.cmd(command, api_version=self._api_version).get_output_in_json()
+        assert result["id"] == x509_group["id"]
+
+        # generate x509 verification code
+        self._generate_x509_verification_code(group_id=x509_group["id"], api_version=self._api_version)
+
+        # remove x509
+        self._remove_x509(group_id=x509_group["id"], api_version=self._api_version)
+
+        # delete
+        self._delete_enrollment_group(group_id=symmetric_group["id"], api_version=self._api_version)
+        self._delete_enrollment_group(group_id=x509_group["id"], api_version=self._api_version)
 
     def test_central_scheduled_job_methods_CRUD(self):
         # create

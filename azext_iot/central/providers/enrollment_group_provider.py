@@ -65,7 +65,9 @@ class CentralEnrollmentGroupProvider:
         attestation: str,
         display_name: str,
         type: str,
-        enabled: bool = False,
+        primary_key: str = None,
+        secondary_key: str = None,
+        enabled: bool = True,
         etag : str = None,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
@@ -76,6 +78,8 @@ class CentralEnrollmentGroupProvider:
             api_version=self._api_version,
             group_id=group_id,
             attestation=attestation,
+            primary_key=primary_key,
+            secondary_key=secondary_key,
             display_name=display_name,
             type=type,
             enabled=enabled,
@@ -86,10 +90,9 @@ class CentralEnrollmentGroupProvider:
     def update_enrollment_group(
         self,
         group_id: str,
-        attestation: str = None,
         display_name: str = None,
         type: str = None,
-        enabled: bool = False,
+        enabled: bool = True,
         etag : str = None,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ):
@@ -99,7 +102,6 @@ class CentralEnrollmentGroupProvider:
             token=self._token,
             api_version=self._api_version,
             group_id=group_id,
-            attestation=attestation,
             display_name=display_name,
             type=type,
             enabled=enabled,
@@ -124,9 +126,8 @@ class CentralEnrollmentGroupProvider:
     def create_x509(
         self,
         group_id: str,
-        entry: str,
-        certificate: str,
-        verified: bool,
+        primary_cert: str = None,
+        secondary_cert: str = None,
         etag: str = None,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
@@ -136,9 +137,8 @@ class CentralEnrollmentGroupProvider:
             token=self._token,
             api_version=self._api_version,
             group_id=group_id,
-            entry=entry,
-            certificate=certificate,
-            verified=verified,
+            primary_cert=primary_cert,
+            secondary_cert=secondary_cert,
             etag=etag,
             central_dns_suffix=central_dns_suffix,
         )
@@ -146,7 +146,7 @@ class CentralEnrollmentGroupProvider:
     def get_x509(
         self,
         group_id: str,
-        entry: str,
+        certificate_entry: str = None,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
         return central_services.enrollment_group.get_x509(
@@ -155,14 +155,14 @@ class CentralEnrollmentGroupProvider:
             token=self._token,
             api_version=self._api_version,
             group_id=group_id,
-            entry=entry,
+            certificate_entry=certificate_entry,
             central_dns_suffix=central_dns_suffix,
         )
 
     def delete_x509(
         self,
         group_id: str,
-        entry: str,
+        certificate_entry: str = None,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
         return central_services.enrollment_group.delete_x509(
@@ -171,15 +171,15 @@ class CentralEnrollmentGroupProvider:
             token=self._token,
             api_version=self._api_version,
             group_id=group_id,
-            entry=entry,
+            certificate_entry=certificate_entry,
             central_dns_suffix=central_dns_suffix,
         )
 
     def verify_x509(
         self,
         group_id: str,
-        entry: str,
-        certificate: str,
+        primary_cert: str = None,
+        secondary_cert: str = None,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
         return central_services.enrollment_group.verify_x509(
@@ -188,15 +188,15 @@ class CentralEnrollmentGroupProvider:
             token=self._token,
             api_version=self._api_version,
             group_id=group_id,
-            entry=entry,
-            certificate=certificate,
+            primary_cert=primary_cert,
+            secondary_cert=secondary_cert,
             central_dns_suffix=central_dns_suffix,
         )
 
     def generate_verification_code(
         self,
         group_id: str,
-        entry: str,
+        certificate_entry: str = None,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
         return central_services.enrollment_group.generate_verification_code(
@@ -205,6 +205,6 @@ class CentralEnrollmentGroupProvider:
             token=self._token,
             api_version=self._api_version,
             group_id=group_id,
-            entry=entry,
+            certificate_entry=certificate_entry,
             central_dns_suffix=central_dns_suffix,
         )

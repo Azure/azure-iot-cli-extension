@@ -141,12 +141,12 @@ class CentralScheduledJobProvider:
             central_dns_suffix=central_dns_suffix,
         )
 
-    def list_jobs(
+    def list_runs(
         self,
         job_id: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
-        return central_services.scheduled_job.list_jobs(
+        return central_services.scheduled_job.list_runs(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,

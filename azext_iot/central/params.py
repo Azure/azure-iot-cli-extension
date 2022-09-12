@@ -9,7 +9,14 @@ CLI parameter definitions.
 """
 
 from knack.arguments import CLIArgumentType, CaseInsensitiveList
-from azext_iot.central.common import DestinationType, ExportSource
+from azext_iot.central.common import (
+    DestinationType,
+    ExportSource,
+    JobBatchType,
+    X509CertificateEntry,
+    EnrollmentGroupProvisionStatus,
+    EnrollmentGroupAttestationType,
+)
 from azure.cli.core.commands.parameters import get_three_state_flag, get_enum_type
 from azext_iot.monitor.models.enum import Severity
 from azext_iot.central.models.enum import ApiVersion
@@ -478,7 +485,7 @@ def load_central_arguments(self, _):
         context.argument(
             "batch_type",
             options_list=["--batch-type", "--bt"],
-            choices=CaseInsensitiveList(["number", "percentage"]),
+            arg_type=get_enum_type(JobBatchType),
             default="number",
             help="Specify if batching is done on a number of devices or a percentage of the total.",
         )
@@ -497,7 +504,7 @@ def load_central_arguments(self, _):
         context.argument(
             "threshold_type",
             options_list=["--cancellation-threshold-type", "--ctt"],
-            choices=CaseInsensitiveList(["number", "percentage"]),
+            arg_type=get_enum_type(JobBatchType),
             default="number",
             help="Specify if cancellation threshold applies for a number of devices or a percentage of the total.",
         )
@@ -669,19 +676,36 @@ def load_central_arguments(self, _):
             help="Unique identifier for the enrollment group.",
         )
         context.argument(
-            "entry",
-            options_list=["--entry"],
-            help="Entry of certificate only support primary and secondary.",
+            "certificate_entry",
+            options_list=["--certificate-entry", "--entry"],
+            arg_type=get_enum_type(X509CertificateEntry),
+            help="Entry type of the x509 certificate which only allows 'primary' and 'secondary'",
         )
-
-    with self.argument_context("iot central enrollment-group create") as context:
+        context.argument(
+            "primary_cert_path",
+            options_list=["--certificate-path", "--cp"],
+            help="The path to the file containing the primary certificate.",
+        )
+        context.argument(
+            "secondary_cert_path",
+            options_list=["--secondary-certificate-path", "--scp"],
+            help="The path to the file containing the secondary certificate.",
+        )
+        context.argument(
+            "primary_key",
+            options_list=["--primary-key", "--pk"],
+            help="The primary symmetric shared access key stored in base64 format.",
+        )
+        context.argument(
+            "secondary_key",
+            options_list=["--secondary-key", "--sk"],
+            help="The secondary symmetric shared access key stored in base64 format.",
+        )
         context.argument(
             "attestation",
-            options_list=["--attestation", "--at"],
-            help="The attestation mechanism for the enrollment group. Provide path to JSON file or raw stringified JSON."
-            " [File Path Example:./path/to/attestation.json]"
-            " [Example of stringified JSON:[{<Attestation Data JSON>}]."
-            " The request body must contain GroupSymmetricKeyAttestation or GroupX509Attestation.",
+            options_list=["--attestation-type", "--at"],
+            arg_type=get_enum_type(EnrollmentGroupAttestationType),
+            help="The attestation mechanism for the enrollment group. Only 'x509' or 'symmetricKey' are allowed."
         )
         context.argument(
             "display_name",
@@ -695,58 +719,13 @@ def load_central_arguments(self, _):
         )
         context.argument(
             "enabled",
-            options_list=["--enabled"],
-            arg_type=get_three_state_flag(),
+            options_list=["--provisioning-status", "--ps"],
+            arg_type=get_enum_type(EnrollmentGroupProvisionStatus),
+            default="enabled",
             help="Whether the devices using the group are allowed to connect to IoT Central. True or False."
-        )
-        context.argument(
-            "certificate",
-            options_list=["--certificate", "--cert"],
-            help="The string representation of this x509 certificate.",
-        )
-        context.argument(
-            "verified",
-            options_list=["--verified", "--v"],
-            arg_type=get_three_state_flag(),
-            help="Whether the x509 certificate has been verified. True or False.",
         )
 
     with self.argument_context("iot central enrollment-group update") as context:
-        context.argument(
-            "attestation",
-            options_list=["--attestation", "--at"],
-            help="The attestation mechanism for the enrollment group. Provide path to JSON file or raw stringified JSON."
-            " [File Path Example:./path/to/attestation.json]"
-            " [Example of stringified JSON:[{<Attestation Data JSON>}]."
-            " The request body must contain GroupSymmetricKeyAttestation or GroupX509Attestation.",
-        )
-        context.argument(
-            "display_name",
-            options_list=["--display-name"],
-            help="Display name of the enrollment group."
-        )
-        context.argument(
-            "type",
-            options_list=["--type"],
-            help="Type of devices that connect through the group."
-        )
-        context.argument(
-            "enabled",
-            options_list=["--enabled"],
-            arg_type=get_three_state_flag(),
-            help="Whether the devices using the group are allowed to connect to IoT Central. True or False."
-        )
-        context.argument(
-            "certificate",
-            options_list=["--certificate", "--cert"],
-            help="The string representation of this x509 certificate.",
-        )
-        context.argument(
-            "verified",
-            options_list=["--verified", "--v"],
-            arg_type=get_three_state_flag(),
-            help="Whether the x509 certificate has been verified. True or False.",
-        )
         context.argument(
             "remove_x509",
             options_list=["--remove-x509"],
@@ -757,13 +736,6 @@ def load_central_arguments(self, _):
             "etag",
             options_list=["--etag"],
             help="ETag used to prevent conflict in enrollment group updates."
-        )
-
-    with self.argument_context("iot central enrollment-group verify-x509") as context:
-        context.argument(
-            "certificate",
-            options_list=["--certificate", "--cert"],
-            help="The string representation of this x509 certificate.",
         )
 
     with self.argument_context("iot central scheduled-job") as context:
@@ -801,7 +773,7 @@ def load_central_arguments(self, _):
         context.argument(
             "batch_type",
             options_list=["--batch-type", "--bt"],
-            choices=CaseInsensitiveList(["number", "percentage"]),
+            arg_type=get_enum_type(JobBatchType),
             default="number",
             help="Specify if batching is done on a number of devices or a percentage of the total.",
         )
@@ -820,7 +792,7 @@ def load_central_arguments(self, _):
         context.argument(
             "threshold_type",
             options_list=["--cancellation-threshold-type", "--ctt"],
-            choices=CaseInsensitiveList(["number", "percentage"]),
+            arg_type=get_enum_type(JobBatchType),
             default="number",
             help="Specify if cancellation threshold applies for a number of devices or a percentage of the total.",
         )
@@ -876,7 +848,8 @@ def load_central_arguments(self, _):
         context.argument(
             "batch_type",
             options_list=["--batch-type", "--bt"],
-            choices=CaseInsensitiveList(["number", "percentage"]),
+            arg_type=get_enum_type(JobBatchType),
+            default="number",
             help="Specify if batching is done on a number of devices or a percentage of the total.",
         )
         context.argument(
@@ -894,7 +867,8 @@ def load_central_arguments(self, _):
         context.argument(
             "threshold_type",
             options_list=["--cancellation-threshold-type", "--ctt"],
-            choices=CaseInsensitiveList(["number", "percentage"]),
+            arg_type=get_enum_type(JobBatchType),
+            default="number",
             help="Specify if cancellation threshold applies for a number of devices or a percentage of the total.",
         )
         context.argument(

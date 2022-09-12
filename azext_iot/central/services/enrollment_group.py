@@ -112,11 +112,13 @@ def create_enrollment_group(
     cmd,
     app_id: str,
     attestation: str,
+    primary_key: str,
+    secondary_key: str,
     display_name: str,
     type: str,
     token: str,
     group_id: str,
-    enabled: bool = False,
+    enabled: bool = True,
     etag: str = None,
     api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
@@ -142,9 +144,17 @@ def create_enrollment_group(
     """
     api_version = API_VERSION
 
+    attestation_payload = {
+        "type": attestation
+    }
+    if attestation == 'symmetricKey' and (primary_key or secondary_key):
+        attestation_payload['symmetricKey'] = {}
+        attestation_payload['symmetricKey']['primaryKey'] = primary_key
+        attestation_payload['symmetricKey']['secondaryKey'] = secondary_key
+
     payload = {
         "displayName": display_name,
-        "attestation": attestation,
+        "attestation": attestation_payload,
         "type": type,
     }
 
@@ -170,12 +180,11 @@ def create_enrollment_group(
 def update_enrollment_group(
     cmd,
     app_id: str,
-    attestation: str,
     display_name: str,
     type: str,
     token: str,
     group_id: str,
-    enabled: bool = False,
+    enabled: bool = True,
     etag : str = None,
     api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
@@ -211,9 +220,6 @@ def update_enrollment_group(
 
     if etag is not None:
         payload['etag'] = etag
-
-    if attestation is not None:
-        payload["attestation"] = attestation
 
     if type is not None:
         payload["type"] = type
@@ -271,9 +277,8 @@ def create_x509(
     cmd,
     app_id: str,
     group_id: str,
-    entry: str,
-    verified: bool,
-    certificate: str,
+    primary_cert: str,
+    secondary_cert: str,
     etag: str,
     token: str,
     api_version=API_VERSION,
@@ -296,9 +301,10 @@ def create_x509(
     """
     api_version = API_VERSION
 
+    entry = 'primary' if primary_cert is not None else 'secondary'
+
     payload = {
-        "verified": verified,
-        "certificate": certificate,
+        "certificate": primary_cert if primary_cert is not None else secondary_cert,
     }
 
     if etag is not None:
@@ -321,7 +327,7 @@ def get_x509(
     cmd,
     app_id: str,
     group_id: str,
-    entry: str,
+    certificate_entry: str,
     token: str,
     api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
@@ -348,7 +354,7 @@ def get_x509(
         app_id=app_id,
         method="GET",
         url="https://{}.{}/{}/{}/certificates/{}".format(
-            app_id, central_dns_suffix, BASE_PATH, group_id, entry),
+            app_id, central_dns_suffix, BASE_PATH, group_id, certificate_entry),
         payload=None,
         token=token,
         api_version=api_version,
@@ -360,7 +366,7 @@ def delete_x509(
     cmd,
     app_id: str,
     group_id: str,
-    entry: str,
+    certificate_entry: str,
     token: str,
     api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
@@ -387,7 +393,7 @@ def delete_x509(
         app_id=app_id,
         method="DELETE",
         url="https://{}.{}/{}/{}/certificates/{}".format(
-            app_id, central_dns_suffix, BASE_PATH, group_id, entry),
+            app_id, central_dns_suffix, BASE_PATH, group_id, certificate_entry),
         payload=None,
         token=token,
         api_version=api_version,
@@ -399,8 +405,8 @@ def verify_x509(
     cmd,
     app_id: str,
     group_id: str,
-    entry: str,
-    certificate: str,
+    primary_cert: str,
+    secondary_cert: str,
     token: str,
     api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
@@ -423,14 +429,16 @@ def verify_x509(
     """
     api_version = API_VERSION
 
+    entry = 'primary' if primary_cert is not None else 'secondary'
+
     payload = {
-        "certificate": certificate,
+        "certificate": primary_cert if primary_cert is not None else secondary_cert,
     }
 
     return _utility.make_api_call(
         cmd,
         app_id=app_id,
-        method="POST ",
+        method="POST",
         url="https://{}.{}/{}/{}/certificates/{}/verify".format(
             app_id, central_dns_suffix, BASE_PATH, group_id, entry),
         payload=payload,
@@ -444,7 +452,7 @@ def generate_verification_code(
     cmd,
     app_id: str,
     group_id: str,
-    entry: str,
+    certificate_entry: str,
     token: str,
     api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
@@ -470,9 +478,9 @@ def generate_verification_code(
     return _utility.make_api_call(
         cmd,
         app_id=app_id,
-        method="POST ",
+        method="POST",
         url="https://{}.{}/{}/{}/certificates/{}/generateVerificationCode".format(
-            app_id, central_dns_suffix, BASE_PATH, group_id, entry),
+            app_id, central_dns_suffix, BASE_PATH, group_id, certificate_entry),
         payload=None,
         token=token,
         api_version=api_version,

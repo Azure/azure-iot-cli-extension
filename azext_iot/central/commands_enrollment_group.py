@@ -5,10 +5,12 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
-from typing import List
+import base64
+from typing import List, Optional
+
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers import CentralEnrollmentGroupProvider
-from azext_iot.common import utility
+from azext_iot.common.certops import open_certificate
 from azext_iot.central.common import API_VERSION
 from azext_iot.central.models.ga_2022_07_31 import EnrollmentGroupGa
 
@@ -17,8 +19,8 @@ def get_enrollment_group(
     cmd,
     app_id: str,
     group_id: str,
-    entry: str = None,
-    token=None,
+    certificate_entry: Optional[str] = None,
+    token: Optional[str] = None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=API_VERSION,
 ) -> EnrollmentGroupGa:
@@ -31,12 +33,12 @@ def get_enrollment_group(
         central_dns_suffix=central_dns_suffix,
     )
 
-    if entry is not None:
+    if certificate_entry:
         response["x509"] = get_x509(
             cmd=cmd,
             app_id=app_id,
             group_id=group_id,
-            entry=entry,
+            certificate_entry=certificate_entry,
             token=token,
             central_dns_suffix=central_dns_suffix,
             api_version=api_version,
@@ -66,45 +68,56 @@ def create_enrollment_group(
     display_name: str,
     type: str,
     group_id: str,
-    enabled: bool = False,
-    entry: str = None,
-    certificate: str = None,
-    verified: bool = None,
-    etag : str = None,
-    token=None,
+    enabled: Optional[str] = 'enabled',
+    primary_key: Optional[str] = None,
+    secondary_key: Optional[str] = None,
+    primary_cert_path: Optional[str] = None,
+    secondary_cert_path: Optional[str] = None,
+    etag: Optional[str] = None,
+    token: Optional[str] = None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=API_VERSION,
 ) -> EnrollmentGroupGa:
     provider = CentralEnrollmentGroupProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
-
-    attestation = utility.process_json_arg(attestation, argument_name="attestation")
-
     response = provider.create_enrollment_group(
         group_id=group_id,
         attestation=attestation,
+        primary_key=primary_key,
+        secondary_key=secondary_key,
         display_name=display_name,
         type=type,
-        enabled=enabled,
+        enabled=(enabled == 'enabled'),
         etag=etag,
         central_dns_suffix=central_dns_suffix,
     )
 
-    if None not in (certificate, verified, entry):
-        # We need to set up the primary or secondary x509 certificate
-        response["x509"] = create_x509(
-            cmd=cmd,
-            app_id=app_id,
-            group_id=group_id,
-            entry=entry,
-            certificate=certificate,
-            verified=verified,
-            etag=etag,
-            token=token,
-            central_dns_suffix=central_dns_suffix,
-            api_version=api_version,
-        )
+    # For x509 we need to call a seperate API
+    primary_cert = None
+    secondary_cert = None
+
+    if attestation == 'x509':
+        if primary_cert_path:
+            primary_cert = open_certificate(primary_cert_path)
+            primary_cert = base64.encodebytes((primary_cert.replace('\r', '') + '\n').encode()).decode().replace('\n', '')
+
+        if secondary_cert_path:
+            secondary_cert = open_certificate(secondary_cert_path)
+            secondary_cert = base64.encodebytes((secondary_cert.replace('\r', '') + '\n').encode()).decode().replace('\n', '')
+
+        if primary_cert_path or secondary_cert_path:
+            response["x509"] = create_x509(
+                cmd=cmd,
+                app_id=app_id,
+                group_id=group_id,
+                primary_cert=primary_cert,
+                secondary_cert=secondary_cert,
+                etag=etag,
+                token=token,
+                central_dns_suffix=central_dns_suffix,
+                api_version=api_version,
+            )
 
     return response
 
@@ -113,16 +126,15 @@ def update_enrollment_group(
     cmd,
     app_id: str,
     group_id: str,
-    attestation: str = None,
-    display_name: str = None,
-    type: str = None,
-    enabled: bool = False,
-    entry: str = None,
-    certificate: str = None,
-    verified: bool = None,
-    remove_x509: bool = None,
-    etag : str = None,
-    token=None,
+    display_name: Optional[str] = None,
+    type: Optional[str] = None,
+    remove_x509: Optional[bool] = None,
+    enabled: Optional[str] = 'enabled',
+    primary_cert_path: Optional[str] = None,
+    secondary_cert_path: Optional[str] = None,
+    certificate_entry: Optional[str] = None,
+    etag: Optional[str] = None,
+    token: Optional[str] = None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=API_VERSION,
 ):
@@ -130,41 +142,45 @@ def update_enrollment_group(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
 
-    if attestation is not None:
-        attestation = utility.process_json_arg(attestation, argument_name="attestation")
-
     response = provider.update_enrollment_group(
         group_id=group_id,
-        attestation=attestation,
         display_name=display_name,
         type=type,
-        enabled=enabled,
+        enabled=(enabled == 'enabled'),
         etag=etag,
         central_dns_suffix=central_dns_suffix,
     )
 
-    if None not in (certificate, verified, entry):
-        # We need to set up the primary or secondary x509 certificate
+    # Still can create/remove x509 during update
+    primary_cert = None
+    secondary_cert = None
+
+    if primary_cert_path:
+        primary_cert = open_certificate(primary_cert_path)
+
+    if secondary_cert_path:
+        secondary_cert = open_certificate(secondary_cert_path)
+
+    if primary_cert_path or secondary_cert_path:
         response["x509"] = create_x509(
             cmd=cmd,
             app_id=app_id,
             group_id=group_id,
-            entry=entry,
-            certificate=certificate,
-            verified=verified,
+            primary_cert=primary_cert,
+            secondary_cert=secondary_cert,
             etag=etag,
             token=token,
             central_dns_suffix=central_dns_suffix,
             api_version=api_version,
         )
-    elif remove_x509 is True:
+    elif remove_x509 is True and certificate_entry:
         # We need to remove x509 from the group
         response["x509"] = {
             "remove": delete_x509(
                 cmd=cmd,
                 app_id=app_id,
                 group_id=group_id,
-                entry=entry,
+                certificate_entry=certificate_entry,
                 token=token,
                 central_dns_suffix=central_dns_suffix,
                 api_version=api_version,
@@ -196,11 +212,10 @@ def create_x509(
     cmd,
     app_id: str,
     group_id: str,
-    entry: str,
-    certificate: str,
-    verified: bool,
-    etag: str = None,
-    token=None,
+    primary_cert: Optional[str] = None,
+    secondary_cert: Optional[str] = None,
+    etag: Optional[str] = None,
+    token: Optional[str] = None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=API_VERSION,
 ) -> dict:
@@ -210,10 +225,42 @@ def create_x509(
 
     return provider.create_x509(
         group_id=group_id,
-        entry=entry,
-        certificate=certificate,
-        verified=verified,
+        primary_cert=primary_cert,
+        secondary_cert=secondary_cert,
         etag=etag,
+        central_dns_suffix=central_dns_suffix,
+    )
+
+
+def verify_x509(
+    cmd,
+    app_id: str,
+    group_id: str,
+    primary_cert_path: Optional[str] = None,
+    secondary_cert_path: Optional[str] = None,
+    token: Optional[str] = None,
+    central_dns_suffix=CENTRAL_ENDPOINT,
+    api_version=API_VERSION,
+) -> dict:
+    provider = CentralEnrollmentGroupProvider(
+        cmd=cmd, app_id=app_id, token=token, api_version=api_version
+    )
+
+    primary_cert = None
+    secondary_cert = None
+
+    if primary_cert_path:
+        primary_cert = open_certificate(primary_cert_path)
+        primary_cert = base64.encodebytes((primary_cert.replace('\r', '') + '\n').encode()).decode().replace('\n', '')
+
+    if secondary_cert_path:
+        secondary_cert = open_certificate(secondary_cert_path)
+        secondary_cert = base64.encodebytes((secondary_cert.replace('\r', '') + '\n').encode()).decode().replace('\n', '')
+
+    return provider.verify_x509(
+        group_id=group_id,
+        primary_cert=primary_cert,
+        secondary_cert=secondary_cert,
         central_dns_suffix=central_dns_suffix,
     )
 
@@ -222,8 +269,8 @@ def get_x509(
     cmd,
     app_id: str,
     group_id: str,
-    entry: str,
-    token=None,
+    certificate_entry: Optional[str] = None,
+    token: Optional[str] = None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=API_VERSION,
 ) -> dict:
@@ -233,7 +280,7 @@ def get_x509(
 
     return provider.get_x509(
         group_id=group_id,
-        entry=entry,
+        certificate_entry=certificate_entry,
         central_dns_suffix=central_dns_suffix,
     )
 
@@ -242,8 +289,8 @@ def delete_x509(
     cmd,
     app_id: str,
     group_id: str,
-    entry: str,
-    token=None,
+    certificate_entry: Optional[str] = None,
+    token: Optional[str] = None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=API_VERSION,
 ) -> dict:
@@ -253,29 +300,7 @@ def delete_x509(
 
     return provider.delete_x509(
         group_id=group_id,
-        entry=entry,
-        central_dns_suffix=central_dns_suffix,
-    )
-
-
-def verify_x509(
-    cmd,
-    app_id: str,
-    group_id: str,
-    entry: str,
-    certificate: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=API_VERSION,
-) -> dict:
-    provider = CentralEnrollmentGroupProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=api_version
-    )
-
-    return provider.verify_x509(
-        group_id=group_id,
-        entry=entry,
-        certificate=certificate,
+        certificate_entry=certificate_entry,
         central_dns_suffix=central_dns_suffix,
     )
 
@@ -284,8 +309,8 @@ def generate_verification_code(
     cmd,
     app_id: str,
     group_id: str,
-    entry: str,
-    token=None,
+    certificate_entry: Optional[str] = None,
+    token: Optional[str] = None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=API_VERSION,
 ) -> dict:
@@ -295,6 +320,6 @@ def generate_verification_code(
 
     return provider.generate_verification_code(
         group_id=group_id,
-        entry=entry,
+        certificate_entry=certificate_entry,
         central_dns_suffix=central_dns_suffix,
     )

@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 
-class EnrollmentGroup:
+class EnrollmentGroup():
     def __init__(self, group: dict):
         self.id = group.get("id")
         self.display_name = group.get("displayName")
@@ -13,4 +13,7 @@ class EnrollmentGroup:
         self.type = group.get("type")
         self.attestation = group.get("attestation")
         self.etag = group.get("etag")
-        self.x509 = group.get("x509")
+
+    def __setitem__(self, key, newvalue):
+        if key == 'x509':
+            self.x509 = newvalue

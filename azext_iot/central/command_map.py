@@ -253,8 +253,8 @@ def load_central_commands(self, _):
         cmd_group.command("create", "create_enrollment_group")
         cmd_group.command("delete", "delete_enrollment_group")
         cmd_group.command("update", "update_enrollment_group")
-        cmd_group.command("verify-x509", "verify_x509")
-        cmd_group.command("verification-code", "generate_verification_code")
+        cmd_group.command("verify-certificate", "verify_x509")
+        cmd_group.command("generate-verification-code", "generate_verification_code")
 
     with self.command_group(
         "iot central scheduled-job", command_type=central_scheduled_jobs_ops,
@@ -264,7 +264,7 @@ def load_central_commands(self, _):
         cmd_group.command("create", "create_scheduled_job")
         cmd_group.command("delete", "delete_scheduled_job")
         cmd_group.command("update", "update_scheduled_job")
-        cmd_group.command("list-jobs", "list_jobs")
+        cmd_group.command("list-runs", "list_runs")
 
     with self.command_group(
         "iot central device edge children", command_type=central_device_ops

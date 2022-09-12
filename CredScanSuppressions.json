@@ -33,6 +33,34 @@
             "file": "azext_iot\\tests\\iothub\\core\\test_iot_ext_unit.py",
             "placeholder": "+XLy+MVZ+aTeOnVzN2kLeB16O+kSxmz6g3rS6fAf6rw=",
             "_justification": "Ensure made up policy key generates the proper SAS token."
+        },
+        {
+            "file": "azext_iot\\tests\\central\\__init__.py",
+            "placeholder": "ya9+G4ED+/g0BgLduhjETJnbeEWMl1HIUApWCCpGMAU=",
+            "_justification": "Completely made up keys for IoT central integration tests."
+        },
+        {
+            "file": "azext_iot\\tests\\central\\__init__.py",
+            "placeholder": "D8jeWazxcCK+MAxrn9KlqDLb8trbuKs35KEbcLBnS48=",
+            "_justification": "Completely made up keys for IoT central integration tests."
+        },
+        {
+            "file": "azext_iot\\tests\\central\\__init__.py",
+            "placeholder": "r9KdK+LBaLiZ0p+RfAVj6eu9umGE6VqJj+AMLHdw+io=",
+            "_justification": "Completely made up keys for IoT central integration tests."
+        },
+        {
+            "file": "azext_iot\\tests\\central\\__init__.py",
+            "placeholder": "W7/4/oaMpA83RYfirH9vzic4ZeK2Piy0jO5rTOM5wxg=",
+            "_justification": "Completely made up keys for IoT central integration tests."
+        },
+        {
+            "file": "azext_iot\\tests\\central\\json\\x509_certiciate.pem",
+            "_justification": "Completely made up x509 certificate for IoT central integration tests."
+        },
+        {
+            "file": "azext_iot\\tests\\central\\json\\x509_verified_certiciate.pem",
+            "_justification": "Completely made up x509 certificate for IoT central integration tests."
         }
     ]
 }
