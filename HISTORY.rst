@@ -37,6 +37,23 @@ unreleased
     - az iot central scheduled-job list-jobs
 
 
+0.17.1
++++++++++++++++
+
+**Device Update**
+
+* The Device Update control plane (or infrastructure related) command groups `az iot device-update account` and
+  `az iot device-update instance` now use the GA API version of 2022-10-01.
+* The Device Update data plane command groups `az iot device-update device` and
+  `az iot device-update update` now use the GA API version of 2022-10-01.
+* The command `az iot device-update device class list` adds support for `--filter` when no `--group-id` is provided.
+* The parameters `--account`, `--instance`, and `--resource-group` support setting default overridable values via config.
+  Use `az config set` i.e. `az config set defaults.adu_account=<name>` or `az configure` i.e. `az configure --defaults adu_account=<name>`.
+* Introducing the experimental command `az iot device-update update init v5` for initializing (or generating) an import manifest
+  with the desired state.
+* Improved built-in documentation.
+
+
 0.17.0
 +++++++++++++++
 
@@ -45,7 +62,7 @@ unreleased
 * The Device Update command group supports all data plane functionality via **in-preview** `update` and `device`
   sub-command groups. The data plane API version used is 2022-07-01-preview.
 
-**IoT Hub Update**
+**IoT Hub updates**
 
 * Updated the `az iot hub monitor-events` command to support an optional `--message-count` argument.
   The message-count defines the maximum number of messages received from the hub before the monitor automatically stops.

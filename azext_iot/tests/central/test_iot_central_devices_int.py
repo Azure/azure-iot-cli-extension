@@ -338,10 +338,9 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
             device_id=device_id,
             module_name='testModule',
             component_name='ModuleComponent')
-        assert update_device_component_properties['$metadata']['testComponentFirstProperty']['desiredValue'] == \
-            'updatedTestComponentFirstProperty'
-        assert update_device_component_properties['$metadata']['testComponentSecondProperty']['desiredValue'] == \
-            'updatedTestComponentSecondProperty'
+        metadata = update_device_component_properties['$metadata']
+        assert metadata['testComponentFirstProperty']['desiredValue'] == 'updatedTestComponentFirstProperty'
+        assert metadata['testComponentSecondProperty']['desiredValue'] == 'updatedTestComponentSecondProperty'
 
         # Show module component properties
         command = f'''

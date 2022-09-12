@@ -173,11 +173,12 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             # Create the min version app and assign the correct roles
             if not target_app:
                 self.cmd(
-                    "iot central app create -n {} -g {} -s {} --mi-system-assigned -l {}".format(
+                    "iot central app create -n {} -g {} -s {} -l {}".format(
                         self.app_id, APP_RG, self.app_id, "westus"
                     ),
                     include_opt_args=False,
                 )
+
             self.app_primary_key = None
             # Will be repopulated with get_app_scope_id for tests that need it
             self._scope_id = None

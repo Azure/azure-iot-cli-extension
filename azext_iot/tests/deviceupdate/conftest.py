@@ -22,8 +22,10 @@ settings = DynamoSettings(req_env_set=REQUIRED_TEST_ENV_VARS)
 
 ACCOUNT_RG = settings.env.azext_iot_testrg
 VALID_IDENTITY_MAP = {"system": 1, "user": 1}
-DEFAULT_ADU_RBAC_SLEEP_SEC = 90
-ADU_CLIENT_DTMI = "dtmi:azure:iot:deviceUpdateModel;1"
+DEFAULT_ADU_RBAC_SLEEP_SEC = 105
+
+# Manifest v4 will work with deviceUpdateModel;[1|2] but v5 only with deviceUpdateModel;2
+ADU_CLIENT_DTMI = "dtmi:azure:iot:deviceUpdateModel;2"
 
 
 def generate_account_id() -> str:
