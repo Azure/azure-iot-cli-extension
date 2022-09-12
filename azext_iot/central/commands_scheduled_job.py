@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
-from typing import List
+from typing import List, Optional
 
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers import CentralScheduledJobProvider
@@ -53,14 +53,14 @@ def create_scheduled_job(
     group_id: str,
     schedule: str,
     content: str,
-    job_name=None,
-    description=None,
-    batch_type=None,
-    threshold_type=None,
-    threshold_batch=None,
-    batch=None,
-    threshold=None,
-    token=None,
+    job_name: Optional[str] = None,
+    description: Optional[str] = None,
+    batch_type: Optional[str] = None,
+    threshold_type: Optional[str] = None,
+    threshold_batch: Optional[bool] = None,
+    batch: Optional[int] = None,
+    threshold: Optional[int] = None,
+    token: Optional[str] = None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=API_VERSION,
 ) -> ScheduledJobGa:
@@ -80,10 +80,10 @@ def create_scheduled_job(
         schedule=schedule,
         description=description,
         batch_percentage=True
-        if batch_type is not None and batch_type.lower() == "percentage"
+        if batch_type.lower() == "percentage"
         else False,
         threshold_percentage=True
-        if threshold_type is not None and threshold_type.lower() == "percentage"
+        if threshold_type.lower() == "percentage"
         else False,
         threshold_batch=threshold_batch,
         batch=batch,
@@ -96,17 +96,17 @@ def update_scheduled_job(
     cmd,
     app_id: str,
     job_id: str,
-    group_id=None,
-    schedule=None,
-    content=None,
-    job_name=None,
-    description=None,
-    batch_type=None,
-    threshold_type=None,
-    threshold_batch=None,
-    batch=None,
-    threshold=None,
-    token=None,
+    group_id: Optional[str] = None,
+    schedule: Optional[str] = None,
+    content: Optional[str] = None,
+    job_name: Optional[str] = None,
+    description: Optional[str] = None,
+    batch_type: Optional[str] = None,
+    threshold_type: Optional[str] = None,
+    threshold_batch: Optional[bool] = None,
+    batch: Optional[int] = None,
+    threshold: Optional[int] = None,
+    token: Optional[str] = None,
     central_dns_suffix=CENTRAL_ENDPOINT,
     api_version=API_VERSION,
 ) -> ScheduledJobGa:
@@ -130,10 +130,10 @@ def update_scheduled_job(
         schedule=schedule_payload,
         description=description,
         batch_percentage=True
-        if batch_type is not None and batch_type.lower() == "percentage"
+        if batch_type.lower() == "percentage"
         else False,
         threshold_percentage=True
-        if threshold_type is not None and threshold_type.lower() == "percentage"
+        if threshold_type.lower() == "percentage"
         else False,
         threshold_batch=threshold_batch,
         batch=batch,

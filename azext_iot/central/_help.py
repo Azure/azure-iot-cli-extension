@@ -1822,10 +1822,21 @@ def _load_central_enrollment_group_help():
           az iot central enrollment-group create
           --app-id {appid}
           --id {enrollmentGroupId}
-          --at {attestation}
+          --at 'x509'
           --display-name {displayName}
           --type {type}
           --cp {primayCertPath}
+
+      - name: Create an enrollment group with symmetric key certification
+        text: >
+          az iot central enrollment-group create
+          --app-id {appid}
+          --id {enrollmentGroupId}
+          --at 'symmetricKey'
+          --display-name {displayName}
+          --type {type}
+          --pk {primaryKey}
+          --sk {secondaryKey}
     """
 
     helps[
@@ -1980,14 +1991,14 @@ def _load_central_scheduled_job_help():
     """
 
     helps[
-        "iot central scheduled-job list-jobs"
+        "iot central scheduled-job list-runs"
     ] = """
     type: command
-    short-summary: Get the list of jobs for a scheduled job definition
+    short-summary: Get the list of job instances for a scheduled job definition
     examples:
-      - name: Get the list of jobs for a scheduled job definition
+      - name: Get the list of jobs instances for a scheduled job definition
         text: >
-          az iot central scheduled-job list-jobs
+          az iot central scheduled-job list-runs
           --app-id {appid}
           --job-id {jobId}
     """
