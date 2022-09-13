@@ -1,6 +1,6 @@
 steps:
   - task: PowerShell@2
-    displayName: 'Upgrade pip, install dev_requirements and cryptography'
+    displayName: 'Upgrade pip, install dev_requirements and cryptography, force update azure-mgmt-iothub'
     name: 'Install_Dev_tools'
     inputs:
       targetType: 'inline'
@@ -8,3 +8,4 @@ steps:
         python -m pip install --upgrade pip
         python -m pip install -r dev_requirements
         python -m pip install cryptography
+        python -m pip install -u azure-mgmt-iothub
