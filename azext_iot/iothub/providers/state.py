@@ -40,6 +40,7 @@ import sys
 import random
 
 logger = get_logger(__name__)
+cli = EmbeddedCLI()
 
 class EndpointType(Enum):
     """
@@ -50,6 +51,30 @@ class EndpointType(Enum):
     ServiceBusTopic = 'servicebustopic'
     AzureStorageContainer = 'azurestoragecontainer'
 
+
+class HubAspects(Enum):
+    """
+    Hub aspects to import or export.
+    """
+    Configurations = "configurations"
+    EdgeDeployments = "edgedeployments"
+    Devices = "devices"
+    Routes = "routes"
+    Certificates = "certificates"
+    Endpoints = "endpoints"
+    Identities = "identities"
+
+ALL_HUB_ASPECTS = [
+    HubAspects.Configurations.value,
+    HubAspects.EdgeDeployments.value,
+    HubAspects.Devices.value,
+    HubAspects.Routes.value,
+    HubAspects.Certificates.value,
+    HubAspects.Endpoints.value,
+    HubAspects.Identities.value,
+]
+
+# TODO: is file storage needed?
 
 class StateProvider(IoTHubProvider):
     def __init__(
@@ -69,48 +94,44 @@ class StateProvider(IoTHubProvider):
         )
         self.auth_type = auth_type_dataplane
 
-    def save_state(self, filename: str, overwrite_file=False):
+        if not self.hub_name:
+            self.hub_name = self.target["entity"].split('.')[0]
+        if not self.rg:
+            self.rg = self.target["resourcegroup"]
+
+    def save_state(self, filename: str, overwrite_file=False, hub_aspect = None):
         '''
-        Writes all hub configurations, device identities and device twins from the origin hub to a json file
-        {
-            "configurations": [{}, ...],
-            "edgeDeployments": [{}, ...],
-            "devices": {
-                "deviceId": {},
-                ...
-            }
-            "modules": {
-                "deviceId": [ [{identity}, {twin}], ... ],
-                ...
-            }
-        }
+        Writes hub state to file
         '''
         if os.path.exists(filename) and os.stat(filename).st_size and not overwrite_file:
             raise FileOperationError(f'File {filename} is not empty. Include the --overwrite-file flag to overwrite file.')
 
-        hub_state = self.process_hub(self.target)
+        if not hub_aspect:
+            hub_aspect = ALL_HUB_ASPECTS
+
+        hub_state = self.process_hub(self.target, hub_aspect)
 
         try:
             with open(filename, 'w', encoding='utf-8') as f:
-                json.dump(hub_state, f)
+                json.dump(hub_state, f, indent=4, sort_keys=True)
 
             logger.info("Saved state of IoT Hub '{}' to {}".format(self.hub_name, filename))
 
         except FileNotFoundError:
             raise FileOperationError(f'File {filename} does not exist.')
 
-    def upload_state(self, filename: str, replace: Optional[bool] = None):
+    def upload_state(self, filename: str, replace: Optional[bool] = None, hub_aspect = None):
         '''Uses device info from file to recreate the hub state'''
+        if not hub_aspect:
+            hub_aspect = ALL_HUB_ASPECTS
 
-        if replace:
-            self.delete_all_configs()
-            self.delete_all_devices()
+        self.delete_aspects(replace, hub_aspect)
 
         try:
             with open(filename, 'r', encoding='utf-8') as f:
                 hub_state = json.load(f)
 
-            self.upload_hub_from_dict(hub_state)
+            self.upload_hub_from_dict(hub_state, hub_aspect)
             logger.info("Uploaded state from '{}' to IoT Hub '{}'".format(filename, self.hub_name))
 
         except FileNotFoundError:
@@ -122,6 +143,7 @@ class StateProvider(IoTHubProvider):
         orig_rg: Optional[str] = None,
         orig_hub_login: Optional[str] = None,
         replace: Optional[bool] = False,
+        hub_aspect = None
     ):
         '''Migrates state from original hub to destination hub.'''
         orig_hub_target = self.discovery.get_target(
@@ -131,169 +153,263 @@ class StateProvider(IoTHubProvider):
             auth_type=self.auth_type
         )
 
-        if replace:
-            self.delete_all_configs()
-            self.delete_all_devices()
+        if not hub_aspect:
+            hub_aspect = ALL_HUB_ASPECTS
 
         hub_state = self.process_hub(orig_hub_target)
+        self.delete_aspects(replace, hub_aspect)
         self.upload_hub_from_dict(hub_state)
 
         logger.info("Migrated state from IoT Hub '{}' to {}".format(orig_hub, self.hub_name))
 
-    def process_hub(self, target: dict):
-        '''Returns a dictionary containing the hub state'''
+    def delete_aspects(self, replace, hub_aspect=[]):
+        """
+        Delete all necessary hub aspects.
 
+        If hub aspects is empty, delete all aspects. Otherwise, delete if it is present in given
+        hub aspects.
+        """
+        if replace:
+            if HubAspects.Configurations.value in hub_aspect or HubAspects.EdgeDeployments.value in hub_aspect:
+                self.delete_all_configs(
+                    delete_configs=HubAspects.Configurations.value in hub_aspect,
+                    delete_deployments=HubAspects.EdgeDeployments.value in hub_aspect
+                )
+            if HubAspects.Devices.value in hub_aspect:
+                self.delete_all_devices()
+            with capture_stderr():
+                if HubAspects.Routes.value in hub_aspect:
+                    self.delete_all_routes()
+                if HubAspects.Certificates.value in hub_aspect:
+                    self.delete_all_certificates()
+                if HubAspects.Endpoints.value in hub_aspect:
+                    self.delete_all_endpoints()
+                if HubAspects.Identities.value in hub_aspect:
+                    self.remove_identities()
+
+    def process_hub(self, target: dict, hub_aspects: list = []) -> dict:
+        '''Returns a dictionary containing the hub state'''
         hub_state = {}
 
-        all_configs = _iot_hub_configuration_list(target=target)
+        if HubAspects.Configurations.value in hub_aspects:
+            all_configs = _iot_hub_configuration_list(target=target)
+            adm_configs = []
+            for c in all_configs:
+                if c["content"].get("deviceContent") or c["content"].get("moduleContent"):
+                    for key in ["createdTimeUtc", "etag", "lastUpdatedTimeUtc", "schemaVersion"]:
+                        c.pop(key, None)
+                    adm_configs.append(c)
 
-        adm_configs = [
-            c for c in all_configs if (c["content"].get("deviceContent") or c["content"].get("moduleContent"))
-        ]
-        for c in adm_configs:
-            for key in ["createdTimeUtc", "etag", "lastUpdatedTimeUtc", "schemaVersion"]:
-                c.pop(key, None)
+            hub_state["configurations"] = adm_configs
+            num_configs = len(hub_state["configurations"])
+            pbar = tqdm(total=num_configs, desc="Saving configurations")
+            pbar.update(num_configs)
+            pbar.close()
 
-        hub_state["configurations"] = adm_configs
+        if HubAspects.EdgeDeployments.value in hub_aspects:
+            hub_state["edgeDeployments"] = [c for c in all_configs if c["content"].get("modulesContent")]
 
-        num_configs = len(hub_state["configurations"])
-        pbar = tqdm(total=num_configs, desc="Saving configurations")
-        pbar.update(num_configs)
-        pbar.close()
+            num_edge_deployments = len(hub_state["edgeDeployments"])
+            pbar = tqdm(total=num_edge_deployments, desc="Saving edge deployments")
+            pbar.update(num_edge_deployments)
+            pbar.close()
 
-        hub_state["edgeDeployments"] = [c for c in all_configs if c["content"].get("modulesContent")]
+        if HubAspects.Devices.value in hub_aspects:
+            hub_state["devices"] = {
+                "identities": [],
+                "children": {}
+            }
+            # TODO: figure out if modules should be a subgroup of devices or not
+            hub_state["modules"] = []
+            identities = _iot_device_list(target=target, top=-1)
 
-        num_edge_deployments = len(hub_state["edgeDeployments"])
-        pbar = tqdm(total=num_edge_deployments, desc="Saving edge deployments")
-        pbar.update(num_edge_deployments)
-        pbar.close()
+            for i in tqdm(range(len(identities)), desc="Saving devices and modules"):
 
-        identities = _iot_device_list(target=target, top=-1)
+                id = identities[i]
 
-        hub_state["devices"] = {
-            "identities": [],
-            "children": {}
-        }
-        hub_state["modules"] = []
+                module_objs = _iot_device_module_list(target=target, device_id=id["deviceId"])
 
-        for i in tqdm(range(len(identities)), desc="Saving devices and modules"):
+                # primary and secondary keys show up in the "show" output but not in the "list" output
+                if id["authenticationType"] == DeviceAuthApiType.sas.value:
+                    id2 = _iot_device_show(target=target, device_id=id["deviceId"])
+                    identities[i]["symmetricKey"] = id2["authentication"]["symmetricKey"]
 
-            id = identities[i]
+                if id["capabilities"]["iotEdge"]:
+                    children = _iot_device_children_list(target=target, device_id=id["deviceId"])
+                    hub_state["devices"]["children"][id["deviceId"]] = [c["deviceId"] for c in children]
 
-            module_objs = _iot_device_module_list(target=target, device_id=id["deviceId"])
+                identities[i]["properties"].pop("reported")
+                for key in ["$metadata", "$version"]:
+                    identities[i]["properties"]["desired"].pop(key)
+                for key in IMMUTABLE_DEVICE_IDENTITY_FIELDS:
+                    identities[i].pop(key, None)
+                hub_state["devices"]["identities"].append(identities[i])
 
-            # primary and secondary keys show up in the "show" output but not in the "list" output
-            if id["authenticationType"] == DeviceAuthApiType.sas.value:
-                id2 = _iot_device_show(target=target, device_id=id["deviceId"])
-                identities[i]["symmetricKey"] = id2["authentication"]["symmetricKey"]
+                for module in module_objs:
+                    module = vars(module)
 
-            if id["capabilities"]["iotEdge"]:
-                children = _iot_device_children_list(target=target, device_id=id["deviceId"])
-                hub_state["devices"]["children"][id["deviceId"]] = [c["deviceId"] for c in children]
+                    if module["module_id"] not in ["$edgeAgent", "$edgeHub"]:
+                        module_twin = _iot_device_module_twin_show(target=target, device_id=id["deviceId"],
+                                                                module_id=module["module_id"])
 
-            identities[i]["properties"].pop("reported")
-            for key in ["$metadata", "$version"]:
-                identities[i]["properties"]["desired"].pop(key)
-            for key in IMMUTABLE_DEVICE_IDENTITY_FIELDS:
-                identities[i].pop(key, None)
-            hub_state["devices"]["identities"].append(identities[i])
+                        module2 = _iot_device_module_show(target=target, device_id=id["deviceId"], module_id=module["module_id"])
+                        module["authentication"] = module2["authentication"]
 
-            for module in module_objs:
-                module = vars(module)
+                        for key in IMMUTABLE_MODULE_IDENTITY_FIELDS:
+                            module.pop(key)
+                        for key in IMMUTABLE_MODULE_TWIN_FIELDS:
+                            module_twin.pop(key)
+                        for key in ["$metadata", "$version"]:
+                            module_twin["properties"]["desired"].pop(key)
+                        module_twin["properties"].pop("reported")
 
-                if module["module_id"] not in ["$edgeAgent", "$edgeHub"]:
-                    module_twin = _iot_device_module_twin_show(target=target, device_id=id["deviceId"],
-                                                               module_id=module["module_id"])
+                        hub_state["modules"].append([module, module_twin])
 
-                    module2 = _iot_device_module_show(target=target, device_id=id["deviceId"], module_id=module["module_id"])
-                    module["authentication"] = module2["authentication"]
+        control_plane = None
+        if HubAspects.Certificates.value in hub_aspects:
+            hub_state["certificates"] = cli.invoke("iot hub certificate list --hub-name {} -g {}"
+                                                        .format(self.hub_name, self.rg)).as_json()["value"]
 
-                    for key in IMMUTABLE_MODULE_IDENTITY_FIELDS:
-                        module.pop(key)
-                    for key in IMMUTABLE_MODULE_TWIN_FIELDS:
-                        module_twin.pop(key)
-                    for key in ["$metadata", "$version"]:
-                        module_twin["properties"]["desired"].pop(key)
-                    module_twin["properties"].pop("reported")
+            pbar = tqdm(total=len(hub_state["certificates"]), desc="Saving certificates", file=sys.stdout)
+            pbar.update(len(hub_state["certificates"]))
+            pbar.close()
 
-                    hub_state["modules"].append([module, module_twin])
+        if HubAspects.Identities.value in hub_aspects:
+            control_plane = control_plane or cli.invoke("iot hub show -n {} -g {}".format(self.hub_name, self.rg)).as_json()
+            if control_plane["identity"]["userAssignedIdentities"]:
+                hub_state["identities"] = control_plane["identity"]["userAssignedIdentities"]
+            else:
+                hub_state["identities"] = []
+            num_identities = len(hub_state["identities"])
+
+            pbar = tqdm(total=num_identities, desc="Saving user-assigned identities", file=sys.stdout)
+            pbar.update(num_identities)
+            pbar.close()
+
+        if HubAspects.Endpoints.value in hub_aspects:
+            control_plane = control_plane or cli.invoke("iot hub show -n {} -g {}".format(self.hub_name, self.rg)).as_json()
+            hub_state["endpoints"] = control_plane["properties"]["routing"]["endpoints"]
+
+            eventHubs = hub_state["endpoints"]["eventHubs"]
+            serviceBusQueues = hub_state["endpoints"]["serviceBusQueues"]
+            serviceBusTopics = hub_state["endpoints"]["serviceBusTopics"]
+            storageContainers = hub_state["endpoints"]["storageContainers"]
+            num_endpoints = len(eventHubs) + len(serviceBusQueues) + len(serviceBusTopics) + len(storageContainers)
+
+            pbar = tqdm(total=num_endpoints, desc="Saving endpoints", file=sys.stdout)
+            pbar.update(num_endpoints)
+            pbar.close()
+
+        if HubAspects.Routes.value in hub_aspects:
+            control_plane = control_plane or cli.invoke("iot hub show -n {} -g {}".format(self.hub_name, self.rg)).as_json()
+            hub_state["routes"] = control_plane["properties"]["routing"]["routes"]
+
+            pbar = tqdm(total=len(hub_state["routes"]), desc="Saving routes", file=sys.stdout)
+            pbar.update(len(hub_state["routes"]))
+            pbar.close()
 
         return hub_state
 
-    def upload_hub_from_dict(self, hub_state: dict):
+    def upload_hub_from_dict(self, hub_state: dict, hub_aspects: list = []):
         # upload configurations
-        configs = hub_state["configurations"]
-        for i in tqdm(range(len(configs)), desc="Uploading hub configurations", file=sys.stdout):
-            c = configs[i]
-            _iot_hub_configuration_create(
-                target=self.target, config_id=c["id"], content=json.dumps(c["content"]),
-                target_condition=c["targetCondition"], priority=c["priority"],
-                labels=json.dumps(c["labels"]), metrics=json.dumps(c["metrics"])
-            )
+        if HubAspects.Configurations.value in hub_aspects and hub_state.get("configurations"):
+            configs = hub_state["configurations"]
+            for i in tqdm(range(len(configs)), desc="Uploading hub configurations", file=sys.stdout):
+                c = configs[i]
+                _iot_hub_configuration_create(
+                    target=self.target, config_id=c["id"], content=json.dumps(c["content"]),
+                    target_condition=c["targetCondition"], priority=c["priority"],
+                    labels=json.dumps(c["labels"]), metrics=json.dumps(c["metrics"])
+                )
 
-        edge_deployments = hub_state["edgeDeployments"]
+        if HubAspects.EdgeDeployments.value in hub_aspects and hub_state.get("edgeDeployments"):
+            edge_deployments = hub_state["edgeDeployments"]
 
-        for i in tqdm(range(len(edge_deployments)), desc="Uploading edge deployments", file=sys.stdout):
-            d = edge_deployments[i]
+            for i in tqdm(range(len(edge_deployments)), desc="Uploading edge deployments", file=sys.stdout):
+                d = edge_deployments[i]
 
-            if "properties.desired" in d["content"]["modulesContent"]["$edgeAgent"]:
-                config_type = ConfigType.edge
-            else:
-                config_type = ConfigType.layered
+                if "properties.desired" in d["content"]["modulesContent"]["$edgeAgent"]:
+                    config_type = ConfigType.edge
+                else:
+                    config_type = ConfigType.layered
 
-            _iot_hub_configuration_create(
-                target=self.target, config_id=d["id"], content=json.dumps(d["content"]),
-                target_condition=d["targetCondition"], priority=d["priority"],
-                labels=json.dumps(d["labels"]), metrics=json.dumps(d["metrics"]),
-                config_type=config_type
-            )
+                _iot_hub_configuration_create(
+                    target=self.target, config_id=d["id"], content=json.dumps(d["content"]),
+                    target_condition=d["targetCondition"], priority=d["priority"],
+                    labels=json.dumps(d["labels"]), metrics=json.dumps(d["metrics"]),
+                    config_type=config_type
+                )
 
-        for identity in tqdm(hub_state["devices"]["identities"], desc="Uploading devices", file=sys.stdout):
+        if HubAspects.Devices.value in hub_aspects and hub_state.get("devices"):
+            for identity in tqdm(hub_state["devices"]["identities"], desc="Uploading devices", file=sys.stdout):
+                # upload device identity and twin
+                self.upload_device_identity(identity)
 
-            # upload device identity and twin
-            self.upload_device_identity(identity)
+                # all necessary twin attributes are already included in the identity
+                # symmetricKey isn't a valid twin attribute
+                twin = identity
+                if identity["authenticationType"] == DeviceAuthApiType.sas.value:
+                    twin.pop("symmetricKey")
 
-            # all necessary twin attributes are already included in the identity
-            # symmetricKey isn't a valid twin attribute
-            twin = identity
-            if identity["authenticationType"] == DeviceAuthApiType.sas.value:
-                twin.pop("symmetricKey")
+                _iot_device_twin_replace(target=self.target, device_id=identity["deviceId"], target_json=json.dumps(twin))
 
-            _iot_device_twin_replace(target=self.target, device_id=identity["deviceId"], target_json=json.dumps(twin))
+            for module_info in tqdm(hub_state["modules"], desc="Uploading modules", file=sys.stdout):
+                module_identity = module_info[0]
+                module_twin = module_info[1]
 
-        for module_info in tqdm(hub_state["modules"], desc="Uploading modules", file=sys.stdout):
-            module_identity = module_info[0]
-            module_twin = module_info[1]
+                self.upload_module_identity(module_identity)
+                _iot_device_module_twin_replace(target=self.target, device_id=module_identity["device_id"],
+                                                module_id=module_identity["module_id"], target_json=json.dumps(module_twin))
 
-            self.upload_module_identity(module_identity)
-            _iot_device_module_twin_replace(target=self.target, device_id=module_identity["device_id"],
-                                            module_id=module_identity["module_id"], target_json=json.dumps(module_twin))
+            # set parent-child relationships
+            for parentId in hub_state["devices"]["children"]:
+                child_list = hub_state["devices"]["children"][parentId]
+                _iot_device_children_add(target=self.target, device_id=parentId, child_list=child_list)
 
-        # set parent-child relationships
-        for parentId in hub_state["devices"]["children"]:
-            child_list = hub_state["devices"]["children"][parentId]
-            _iot_device_children_add(target=self.target, device_id=parentId, child_list=child_list)
+        with capture_stderr():
+            if HubAspects.Certificates.value in hub_aspects and hub_state.get("certificates"):
+                temp_cert_file = f"cert{random.randrange(100000000)}.cer"
+
+                for c in tqdm(hub_state["certificates"], desc="Uploading certificates", file=sys.stdout):
+                    with open(temp_cert_file, 'w', encoding='utf-8') as f:
+                        f.write(c["properties"]["certificate"])
+                    self.cli.invoke(
+                        f"iot hub certificate create --name {c['name']} -g {self.rg} --hub-name {self.hub_name} --path "
+                        f"{temp_cert_file} -v {c['properties']['isVerified']}"
+                    )
+
+                if os.path.isfile(temp_cert_file):
+                    os.remove(temp_cert_file)
+
+            if HubAspects.Identities.value in hub_aspects and hub_state.get("identities"):
+                self.assign_identities_to_hub(hub_state["identities"])
+
+            if HubAspects.Endpoints.value in hub_aspects and hub_state.get("endpoints"):
+                self.upload_endpoints(hub_state["endpoints"])
+
+            if HubAspects.Routes.value in hub_aspects and hub_state.get("routes"):
+                for route in tqdm(hub_state["routes"], desc="Uploading routes", file=sys.stdout):
+                    self.cli.invoke(f"iot hub route create --endpoint {route['endpointNames'][0]} --hub-name {self.hub_name} "
+                                    f"-g {self.rg} --name {route['name']} --source {route['source']} "
+                                    f"--condition {route['condition']} --enabled {route['isEnabled']}")
 
     def assign_identities_to_hub(self, identities):
-
         pbar = tqdm(total=len(identities), desc="Assigning identities", file=sys.stdout)
 
         if identities:
             userIds = ""
             for userId in identities:
                 userIds += userId + " "
-            self.cli.invoke("iot hub identity assign --name {} -g {} --user-assigned {}".format(self.hub_name, self.rg, userIds))
+            cli.invoke("iot hub identity assign --name {} -g {} --user-assigned {}".format(self.hub_name, self.rg, userIds))
             pbar.update(len(identities))
 
         pbar.close()
 
     def upload_endpoint(self, ep, ep_type):
-
         if ep["connectionString"]:
-
             if ep_type == EndpointType.AzureStorageContainer.value:
                 cs = parse_storage_container_connection_string(ep["connectionString"])
-                ep["connectionString"] = self.cli.invoke("storage account show-connection-string --name {} -g {}".format(
+                ep["connectionString"] = cli.invoke("storage account show-connection-string --name {} -g {}".format(
                     cs["AccountName"], ep["resourceGroup"])).as_json()["connectionString"]
             else:
                 cs = parse_iot_hub_message_endpoint_connection_string(ep["connectionString"])
@@ -309,19 +425,16 @@ class StateProvider(IoTHubProvider):
                     type_str = "servicebus topic"
                     entity_str = "--topic-name"
 
-                keys = self.cli.invoke("{} authorization-rule keys list {} {} --namespace-name {} -g {} -n {}".format(type_str,
+                keys = cli.invoke("{} authorization-rule keys list {} {} --namespace-name {} -g {} -n {}".format(type_str,
                                        entity_str, cs["EntityPath"], namespace, ep["resourceGroup"], cs["SharedAccessKeyName"])
                                        ).as_json()
 
                 ep["connectionString"] = keys["primaryConnectionString"]
 
         if ep["authenticationType"] == "identityBased":
-
             parameters = "--endpoint-uri {} ".format(ep["endpointUri"])
-
             if ep_type != EndpointType.AzureStorageContainer.value:
                 parameters += "--entity-path {} ".format(ep["entityPath"])
-
             if ep["identity"]:
                 id = ep["identity"]["userAssignedIdentity"]
                 parameters += "--identity {} ".format(id)
@@ -338,7 +451,7 @@ class StateProvider(IoTHubProvider):
                           f"{ep['batchFrequencyInSeconds']} --chunk-size {max_chunk_size} --file-name-format " + \
                           ep['fileNameFormat']
 
-        self.cli.invoke(f"iot hub routing-endpoint create --hub-name {self.hub_name} -g {self.rg} --endpoint-name {ep['name']} "
+        cli.invoke(f"iot hub routing-endpoint create --hub-name {self.hub_name} -g {self.rg} --endpoint-name {ep['name']} "
                         f"--erg {ep['resourceGroup']} --endpoint-subscription-id {ep['subscriptionId']} --type {ep_type} "
                         f"{parameters}")
 
@@ -405,7 +518,6 @@ class StateProvider(IoTHubProvider):
             import pdb; pdb.set_trace()
 
     def upload_module_identity(self, identity: dict):
-
         device_id = identity["device_id"]
         module_id = identity["module_id"]
         auth_type = identity["authentication"]["type"]
@@ -432,14 +544,27 @@ class StateProvider(IoTHubProvider):
         else:
             logger.error("Authorization type for module '{0}' in device '{1}' not recognized.".format(module_id, device_id))
 
-    def delete_all_configs(self):
-        configs = _iot_hub_configuration_list(target=self.target)
-        for i in tqdm(range(len(configs)), desc="Deleting configurations and edge deployments from destination hub"):
-            c = configs[i]
-            try:
-                _iot_hub_configuration_delete(target=self.target, config_id=c["id"])
-            except ResourceNotFoundError:
-                logger.warning("Configuration '{0}' not found during hub clean-up.".format(c["id"]))
+    # Delete Commands
+    def delete_all_configs(self, delete_configs: bool = False, delete_deployments: bool = False):
+        all_configs = _iot_hub_configuration_list(target=self.target)
+        if delete_configs:
+            configurations = [
+                c for c in all_configs if (c["content"].get("deviceContent") or c["content"].get("moduleContent"))
+            ]
+            for i in tqdm(range(len(configurations)), desc="Deleting configurations from destination hub"):
+                c = configurations[i]
+                try:
+                    _iot_hub_configuration_delete(target=self.target, config_id=c["id"])
+                except ResourceNotFoundError:
+                    logger.warning("Configuration '{0}' not found during hub clean-up.".format(c["id"]))
+        if delete_deployments:
+            deployments = [c for c in all_configs if c["content"].get("modulesContent")]
+            for i in tqdm(range(len(deployments)), desc="Deleting edge deployments from destination hub"):
+                c = deployments[i]
+                try:
+                    _iot_hub_configuration_delete(target=self.target, config_id=c["id"])
+                except ResourceNotFoundError:
+                    logger.warning("Configuration '{0}' not found during hub clean-up.".format(c["id"]))
 
 
     def delete_all_devices(self):
@@ -452,14 +577,14 @@ class StateProvider(IoTHubProvider):
                 logger.warning("Device identity '{0}' not found during hub clean-up.".format(id["deviceId"]))
 
     def delete_all_certificates(self):
-        certificates = self.cli.invoke("iot hub certificate list --hub-name {} -g {}".format(self.hub_name, self.rg)).as_json()
+        certificates = cli.invoke("iot hub certificate list --hub-name {} -g {}".format(self.hub_name, self.rg)).as_json()
         for i in tqdm(range(len(certificates["value"])), desc="Deleting certificates from destination hub", file=sys.stdout):
             c = certificates["value"][i]
-            self.cli.invoke("iot hub certificate delete --name {} --etag {} --hub-name {} -g {}".format(c["name"], c["etag"],
+            cli.invoke("iot hub certificate delete --name {} --etag {} --hub-name {} -g {}".format(c["name"], c["etag"],
                                                                                                         self.hub_name, self.rg))
 
     def delete_all_endpoints(self):
-        endpoints = self.cli.invoke(f"iot hub routing-endpoint list --hub-name {self.hub_name} -g {self.rg}").as_json()
+        endpoints = cli.invoke(f"iot hub routing-endpoint list --hub-name {self.hub_name} -g {self.rg}").as_json()
         eventHubs = endpoints["eventHubs"]
         serviceBusQueues = endpoints["serviceBusQueues"]
         serviceBusTopics = endpoints["serviceBusTopics"]
@@ -469,34 +594,34 @@ class StateProvider(IoTHubProvider):
         pbar = tqdm(total=num_endpoints, desc="Deleting endpoints from destination hub", file=sys.stdout)
 
         for ep in eventHubs:
-            self.cli.invoke(f"iot hub routing-endpoint delete --hub-name {self.hub_name} -g {self.rg} --endpoint-name "
+            cli.invoke(f"iot hub routing-endpoint delete --hub-name {self.hub_name} -g {self.rg} --endpoint-name "
                             f"{ep['name']} --endpoint-type eventhub")
             pbar.update(1)
         for ep in serviceBusQueues:
-            self.cli.invoke(f"iot hub routing-endpoint delete --hub-name {self.hub_name} -g {self.rg} --endpoint-name "
+            cli.invoke(f"iot hub routing-endpoint delete --hub-name {self.hub_name} -g {self.rg} --endpoint-name "
                             f"{ep['name']} --endpoint-type servicebusqueue")
             pbar.update(1)
         for ep in serviceBusTopics:
-            self.cli.invoke(f"iot hub routing-endpoint delete --hub-name {self.hub_name} -g {self.rg} --endpoint-name "
+            cli.invoke(f"iot hub routing-endpoint delete --hub-name {self.hub_name} -g {self.rg} --endpoint-name "
                             f"{ep['name']} --endpoint-type servicebustopic")
             pbar.update(1)
         for ep in storageContainers:
-            self.cli.invoke(f"iot hub routing-endpoint delete --hub-name {self.hub_name} -g {self.rg} --endpoint-name "
+            cli.invoke(f"iot hub routing-endpoint delete --hub-name {self.hub_name} -g {self.rg} --endpoint-name "
                             f"{ep['name']} --endpoint-type azurestoragecontainer")
             pbar.update(1)
 
         pbar.close()
 
     def delete_all_routes(self):
-        routes = self.cli.invoke(f"iot hub route list --hub-name {self.hub_name} -g {self.rg}").as_json()
+        routes = cli.invoke(f"iot hub route list --hub-name {self.hub_name} -g {self.rg}").as_json()
         for i in tqdm(range(len(routes)), desc="Deleting routes from destination hub", file=sys.stdout):
             route = routes[i]
-            self.cli.invoke(f"iot hub route delete --hub-name {self.hub_name} -g {self.rg} --name {route['name']}")
+            cli.invoke(f"iot hub route delete --hub-name {self.hub_name} -g {self.rg} --name {route['name']}")
 
     def remove_identities(self):
-        userAssignedIds = self.cli.invoke(
+        userAssignedIds = cli.invoke(
             f"iot hub identity show -n {self.hub_name} -g {self.rg}"
         ).as_json()["userAssignedIdentities"]
         if userAssignedIds:
             userAssignedIds = " ".join(userAssignedIds.keys())
-            self.cli.invoke(f"iot hub identity remove -n {self.hub_name} -g {self.rg} --user-assigned {userAssignedIds}")
+            cli.invoke(f"iot hub identity remove -n {self.hub_name} -g {self.rg} --user-assigned {userAssignedIds}")
