@@ -19,7 +19,7 @@ from azext_iot.iothub.providers.base import IoTHubProvider
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common._azure import parse_cosmos_db_connection_string
 from azure.cli.core.commands.client_factory import get_subscription_id
-from azext_iot.sdk.iothub.controlplane.models import ManagedIdentity
+from azure.mgmt.iothub.models import ManagedIdentity
 
 
 logger = get_logger(__name__)
@@ -45,8 +45,12 @@ class MessageEndpoint(IoTHubProvider):
 
     def get_client(self):
         from azure.cli.core.commands.client_factory import get_mgmt_service_client
-        from azext_iot.sdk.iothub.controlplane import IotHubClient
-        client = get_mgmt_service_client(self.cmd.cli_ctx, IotHubClient, api_version=self.api_version)
+        from azure.cli.core.profiles import ResourceType
+        client = get_mgmt_service_client(
+            self.cmd.cli_ctx,
+            ResourceType.MGMT_IOTHUB,
+            api_version=self.api_version
+        )
 
         # Adding IoT Ext User-Agent is done with best attempt.
         try:

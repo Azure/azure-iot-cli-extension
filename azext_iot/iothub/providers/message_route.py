@@ -12,7 +12,6 @@ from azext_iot.constants import USER_AGENT
 from azext_iot.iothub.providers.base import IoTHubProvider
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azure.cli.core.commands.client_factory import get_subscription_id
-from azext_iot.sdk.iothub.controlplane.models import RouteProperties, RoutingMessage, TestRouteInput, TestAllRoutesInput
 
 
 logger = get_logger(__name__)
@@ -37,8 +36,12 @@ class MessageRoute(IoTHubProvider):
 
     def get_client(self):
         from azure.cli.core.commands.client_factory import get_mgmt_service_client
-        from azext_iot.sdk.iothub.controlplane import IotHubClient
-        client = get_mgmt_service_client(self.cmd.cli_ctx, IotHubClient, api_version=self.api_version)
+        from azure.cli.core.profiles import ResourceType
+        client = get_mgmt_service_client(
+            self.cmd.cli_ctx,
+            ResourceType.MGMT_IOTHUB,
+            api_version=self.api_version
+        )
 
         # Adding IoT Ext User-Agent is done with best attempt.
         try:
@@ -60,13 +63,13 @@ class MessageRoute(IoTHubProvider):
         condition: Optional[str] = None,
     ):
         self.hub_resource.properties.routing.routes.append(
-            RouteProperties(
-                source=source_type,
-                name=route_name,
-                endpoint_names=endpoint_name.split(),
-                condition=('true' if condition is None else condition),
-                is_enabled=enabled
-            )
+            {
+                "source":source_type,
+                "name":route_name,
+                "endpointNames":endpoint_name.split(),
+                "condition":('true' if condition is None else condition),
+                "isEnabled":enabled
+            }
         )
 
         return self.client.iot_hub_resource.begin_create_or_update(
@@ -140,30 +143,30 @@ class MessageRoute(IoTHubProvider):
             system_properties = process_json_arg(content=system_properties, argument_name="system_properties")
 
 
-        route_message = RoutingMessage(
-            body=body,
-            app_properties=app_properties,
-            system_properties=system_properties
-        )
+        route_message = {
+            "body": body,
+            "appProperties": app_properties,
+            "systemProperties": system_properties
+        }
 
         if route_name:
             route = self.show(route_name)
-            test_route_input = TestRouteInput(
-                message=route_message,
-                twin=None,
-                route=route
-            )
+            test_route_input = {
+                "message": route_message,
+                "twin": None,
+                "route": route
+            }
             return self.client.iot_hub_resource.test_route(
                 iot_hub_name=self.hub_resource.name,
                 resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
                 input=test_route_input
             )
 
-        test_all_routes_input = TestAllRoutesInput(
-            routing_source=source_type,
-            message=route_message,
-            twin=None
-        )
+        test_all_routes_input = {
+            "routingSource": source_type,
+            "message": route_message,
+            "twin": None
+        }
         return self.client.iot_hub_resource.test_all_routes(
             iot_hub_name=self.hub_resource.name,
             resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
