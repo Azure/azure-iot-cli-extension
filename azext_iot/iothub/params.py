@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from azext_iot.iothub.providers.state import HubAspects
 from azure.cli.core.commands.parameters import get_enum_type, get_three_state_flag
 from azext_iot.common.shared import SettleType, ProtocolType, AckType
 from azext_iot.assets.user_messages import info_param_properties_device
@@ -263,6 +264,13 @@ def load_iothub_arguments(self, _):
             "overwrite_file",
             options_list=["--overwrite-file", "--of"],
             help="If this flag is set, then the command will overwrite the contents of the output file."
+        )
+        context.argument(
+            "hub_aspects",
+            options_list=["--aspects"],
+            nargs="*",
+            arg_type=get_enum_type(HubAspects),
+            help="Hub Aspects (space seperated)."
         )
 
     with self.argument_context("iot hub state migrate") as context:

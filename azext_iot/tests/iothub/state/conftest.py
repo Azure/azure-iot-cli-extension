@@ -4,11 +4,13 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import os
 from time import sleep
 import pytest
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.settings import DynamoSettings
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.common.certops import create_self_signed_certificate
 from typing import  Optional, TypeVar
 from knack.log import get_logger
 
@@ -31,6 +33,10 @@ def generate_hub_id() -> str:
     return f"test-hub-{generate_generic_id()}"[:23]
 
 
+def generate_hub_depenency_id() -> str:
+    return f"testhubdep{generate_generic_id()}"[:24]
+
+
 def tags_to_dict(tags: str) -> dict:
     result = {}
     split_tags = tags.split()
@@ -49,23 +55,23 @@ def get_closest_marker(request: SubRequest) -> Mark:
 
 @pytest.fixture(scope="module")
 def provisioned_iothubs_module(request) -> Optional[dict]:
-    result = _iot_hub_provisioner(request)
+    result = _iot_hubs_provisioner(request)
     _assign_dataplane_rbac_role(result)
     yield result
     if result:
-        _iot_hub_removal(result)
+        _iot_hubs_removal(result)
 
 
 @pytest.fixture
 def provisioned_iothubs(request) -> Optional[dict]:
-    result = _iot_hub_provisioner(request)
+    result = _iot_hubs_provisioner(request)
     _assign_dataplane_rbac_role(result)
     yield result
     if result:
-        _iot_hub_removal(result)
+        _iot_hubs_removal(result)
 
 
-def _iot_hub_provisioner(request, provisioned_user_identity=None):
+def _iot_hubs_provisioner(request, provisioned_user_identity=None):
     hub_marker = get_closest_marker(request)
     desired_location = None
     desired_tags = None
@@ -103,7 +109,7 @@ def _iot_hub_provisioner(request, provisioned_user_identity=None):
             "hub": hub_obj,
             "name": name,
             "rg": RG,
-            "connectionString": _get_connection_string(name, RG)
+            "connectionString": _get_hub_connection_string(name, RG)
         })
     return hub_results
 
@@ -138,7 +144,7 @@ def _assign_dataplane_rbac_role(hub_results):
             )
 
 
-def _get_connection_string(name, rg, policy="iothubowner"):
+def _get_hub_connection_string(name, rg, policy="iothubowner"):
     return cli.invoke(
         "iot hub connection-string show -n {} -g {} --policy-name {}".format(
             name, rg, policy
@@ -153,9 +159,361 @@ def _get_role_assignments(scope, role):
         )
     ).as_json()
 
-def _iot_hub_removal(hub_result):
+def _iot_hubs_removal(hub_result):
     for hub in hub_result:
         name = hub["name"]
         delete_result = cli.invoke(f"iot hub delete -n {name} -g {RG}")
         if not delete_result.success():
             logger.error(f"Failed to delete iot hub resource {name}.")
+
+
+
+@pytest.fixture(scope="session")
+def provisioned_user_identity_session() -> Optional[dict]:
+    result = _user_identity_provisioner()
+    yield result
+    if result:
+        _user_identity_removal(result["name"])
+
+
+@pytest.fixture
+def provisioned_user_identity() -> Optional[dict]:
+    result = _user_identity_provisioner()
+    yield result
+    if result:
+        _user_identity_removal(result["name"])
+
+
+def _user_identity_provisioner():
+    name = generate_hub_depenency_id()
+    return cli.invoke(
+        f"identity create -n {name} -g {RG}"
+    ).as_json()
+
+
+def _get_role_assignments(scope, role):
+    return cli.invoke(
+        f'role assignment list --scope "{scope}" --role "{role}"'
+    ).as_json()
+
+
+def _user_identity_removal(name):
+    delete_result = cli.invoke(f"identity delete -n {name} -g {RG}")
+    if not delete_result.success():
+        logger.error(f"Failed to delete user identity resource {name}.")
+
+
+def _assign_rbac_role(assignee: str, scope: str, role: str, max_tries: int = 10):
+    tries = 0
+    while tries < max_tries:
+        role_assignments = _get_role_assignments(scope, role)
+        role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
+        if assignee in role_assignment_principal_ids:
+            break
+        # else assign role to scope and check again
+        cli.invoke(
+            'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
+                assignee, role, scope
+            )
+        )
+        sleep(10)
+        tries += 1
+
+# want to have 2 hubs, first hub have all the control plane stuff, both hubs to have permissions
+@pytest.fixture()
+def setup_hub_controlplane_states(provisioned_iot_hub, provisioned_storage, provisioned_event_hub, provisioned_service_bus):
+    hub_name = provisioned_iot_hub[0]["name"]
+    hub_rg = provisioned_iot_hub[0]["rg"]
+
+    # add endpoints - prob use dict of scope to role + for loop
+    hub_principal_id = provisioned_iot_hub[0]["identity"]["principalId"]
+    user_identities = list(provisioned_iot_hub[0]["identity"]["userAssignedIdentities"].values())
+    user_id = user_identities[0]["principalId"]
+
+    # mapping of scope to role
+    scope_dict = {
+        provisioned_storage["storage"]["id"]: "Storage Blob Data Contributor",
+        provisioned_event_hub["eventhub"]["id"]: "Azure Event Hubs Data Sender",
+        provisioned_service_bus["queue"]["id"]: "Azure Service Bus Data Sender",
+        provisioned_service_bus["topic"]["id"]: "Azure Service Bus Data Sender"
+    }
+    for scope, role in scope_dict.items():
+        _assign_rbac_role(assignee=hub_principal_id, scope=scope, role=role)
+        _assign_rbac_role(assignee=user_id, scope=scope, role=role)
+
+    # make sure to add permissions to new hub too; add endpoints
+
+    cli.invoke(f"iot hub routing-endpoint create -n eventhub-systemid -r {EP_RG} -g {entity_rg} -s "
+                    f"{subscription_id} -t eventhub --hub-name {entity_name} --endpoint-uri {eventhub_endpointuri}"
+                    f" --entity-path {EVENTHUB} --auth-type identityBased")
+
+    cli.invoke(f"iot hub routing-endpoint create -n queue-systemid -r {EP_RG} -g {entity_rg} -s "
+                    f"{subscription_id} -t servicebusqueue --hub-name {entity_name} --endpoint-uri "
+                    f"{servicebus_endpointuri} --entity-path {SERVICEBUS_QUEUE} --auth-type identityBased")
+
+    cli.invoke(f"iot hub routing-endpoint create -n topic-userid -r {EP_RG} -g {entity_rg} -s "
+                    f"{subscription_id} -t servicebustopic --hub-name {entity_name} --endpoint-uri "
+                    f"{servicebus_endpointuri} --entity-path {SERVICEBUS_TOPIC} --auth-type identityBased --identity "
+                    f"{uid}")
+
+    storage_cstring = cli.invoke(
+        f"storage account show-connection-string --name {STORAGE_ACCOUNT} -g {EP_RG}"
+    ).as_json()["connectionString"]
+    cli.invoke(f"iot hub routing-endpoint create -n storagecontainer-key -r {EP_RG} -g {entity_rg} -s "
+                    f"{subscription_id} -t azurestoragecontainer --hub-name {entity_name} -c {storage_cstring} "
+                    f"--container {STORAGE_CONTAINER}  -b 350 -w 250 --encoding json")
+
+    # add routes - prob change one to be custom endpoint
+    cli.invoke(
+        f"iot hub route create --endpoint events --hub-name {hub_name} -g {hub_rg}"
+        f" --name {generate_generic_id()} --source devicelifecycleevents --condition false --enabled true"
+    )
+    cli.invoke(
+        f"iot hub route create --endpoint events --hub-name {hub_name} -g {hub_rg}"
+        f" --name {generate_generic_id()} --source twinchangeevents --condition true --enabled false"
+    )
+
+    # add certificate
+    cert = create_self_signed_certificate(subject="aziotcli", valid_days=1, cert_output_dir=None)["certificate"]
+    cert_file = "testCert" + generate_generic_id() + ".cer"
+    with open(cert_file, 'w', encoding='utf-8') as f:
+        f.write(cert)
+
+    cli.invoke(
+        f"iot hub certificate create --hub-name {hub_name} --name cert1 --path {cert_file} -g {hub_rg} -v True"
+    )
+
+    if os.path.isfile(cert_file):
+        os.remove(cert_file)
+
+    yield provisioned_iothubs_module
+
+
+@pytest.fixture(scope="session")
+def provisioned_storage_session() -> Optional[dict]:
+    result = _storage_provisioner()
+    yield result
+    if result:
+        _storage_removal(result["storage"]["name"])
+
+
+@pytest.fixture
+def provisioned_storage() -> Optional[dict]:
+    result = _storage_provisioner()
+    yield result
+    if result:
+        _storage_removal(result["storage"]["name"])
+
+
+def _storage_get_cstring(account_name):
+    return cli.invoke(
+        "storage account show-connection-string -n {} -g {}".format(
+            account_name, RG
+        )
+    ).as_json()["connectionString"]
+
+
+def _storage_provisioner():
+    """
+    Create a storage account (if needed) and container and return storage connection string.
+    """
+    account_name = generate_hub_depenency_id()
+    container_name = generate_hub_depenency_id()
+
+    storage_list = cli.invoke(
+        'storage account list -g "{}"'.format(RG)
+    ).as_json()
+
+    target_storage = None
+    for storage in storage_list:
+        if storage["name"] == account_name:
+            target_storage = storage
+            break
+
+    if not target_storage:
+        target_storage = cli.invoke(
+            "storage account create -n {} -g {}".format(
+                account_name, RG
+            )
+        ).as_json()
+
+    storage_cstring = _storage_get_cstring(account_name)
+
+    # Will not do anything if container exists.
+    cli.invoke(
+        "storage container create -n {} --connection-string '{}'".format(
+            container_name, storage_cstring
+        ),
+    )
+    target_container = cli.invoke(
+        "storage container show -n {} --connection-string '{}'".format(
+            container_name, storage_cstring
+        ),
+    ).as_json()
+
+    return {
+        "storage": target_storage,
+        "container": target_container,
+        "connectionString": storage_cstring
+    }
+
+
+def _storage_removal(account_name: str):
+    delete_result = cli.invoke(f"storage account delete -g {RG} -n {account_name} -y")
+    if not delete_result.success():
+        logger.error(f"Failed to delete storage account resource {account_name}.")
+
+
+@pytest.fixture(scope="session")
+def provisioned_event_hub_session() -> Optional[list]:
+    result = _event_hub_provisioner()
+    yield result
+    if result:
+        _event_hub_removal(result["namespace"]["name"])
+
+
+@pytest.fixture
+def provisioned_event_hub() -> Optional[list]:
+    result = _event_hub_provisioner()
+    yield result
+    if result:
+        _event_hub_removal(result["namespace"]["name"])
+
+
+def _event_hub_get_cstring(namespace_name, eventhub_name, policy_name):
+    return cli.invoke(
+        "eventhubs eventhub authorization-rule keys list --namespace-name {} --resource-group {} "
+        "--eventhub-name {} --name {}".format(
+            namespace_name, RG, eventhub_name, policy_name
+        )
+    ).as_json()["primaryConnectionString"]
+
+
+def _event_hub_provisioner():
+    """
+    Create an event hub namespace, instance, and policy (if needed) and return the connection string for the policy.
+    """
+    namespace_name = generate_hub_depenency_id()
+    eventhub_name = generate_hub_depenency_id()
+    policy_name = generate_hub_depenency_id()
+    namespace_obj = cli.invoke(
+        "eventhubs namespace create --name {} --resource-group {}".format(
+            namespace_name, RG
+        )
+    ).as_json()
+
+    eventhub_obj = cli.invoke(
+        "eventhubs eventhub create --namespace-name {} --resource-group {} --name {}".format(
+            namespace_name, RG, eventhub_name
+        )
+    ).as_json()
+
+    policy_obj = cli.invoke(
+        "eventhubs eventhub authorization-rule create --namespace-name {} --resource-group {} "
+        "--eventhub-name {} --name {} --rights Send".format(
+            namespace_name, RG, eventhub_name, policy_name
+        )
+    ).as_json()
+    return {
+        "namespace": namespace_obj,
+        "eventhub": eventhub_obj,
+        "policy": policy_obj,
+        "connectionString": _event_hub_get_cstring(namespace_name, eventhub_name, policy_name)
+    }
+
+
+def _event_hub_removal(account_name: str):
+    delete_result = cli.invoke(f"eventhubs namespace delete -g {RG} -n {account_name}")
+    if not delete_result.success():
+        logger.error(f"Failed to delete eventhubs namespace resource {account_name}.")
+
+
+@pytest.fixture(scope="session")
+def provisioned_service_bus_session() -> Optional[list]:
+    result = _service_bus_provisioner()
+    yield result
+    if result:
+        _service_bus_removal(result["namespace"]["name"])
+
+
+@pytest.fixture
+def provisioned_service_bus() -> Optional[list]:
+    result = _service_bus_provisioner()
+    yield result
+    if result:
+        _service_bus_removal(result["namespace"]["name"])
+
+
+def _service_bus_topic_get_cstring(namespace_name, topic_name, policy_name):
+    return cli.invoke(
+        "servicebus topic authorization-rule keys list --namespace-name {} --resource-group {} "
+        "--topic-name {} --name {}".format(
+            namespace_name, RG, topic_name, policy_name
+        )
+    ).as_json()["primaryConnectionString"]
+
+
+def _service_bus_queue_get_cstring(namespace_name, queue_name, policy_name):
+    return cli.invoke(
+        "servicebus queue authorization-rule keys list --namespace-name {} --resource-group {} "
+        "--queue-name {} --name {}".format(
+            namespace_name, RG, queue_name, policy_name
+        )
+    ).as_json()["primaryConnectionString"]
+
+
+def _service_bus_provisioner():
+    """
+    Create an event hub namespace, instance, and policy (if needed) and return the connection string for the policy.
+    """
+    namespace_name = generate_hub_depenency_id()
+    queue_name = generate_hub_depenency_id()
+    topic_name = generate_hub_depenency_id()
+    policy_name = generate_hub_depenency_id()
+    namespace_obj = cli.invoke(
+        "servicebus namespace create --name {} --resource-group {}".format(
+            namespace_name, RG
+        )
+    ).as_json()
+
+    queue_obj = cli.invoke(
+        "servicebus queue create --namespace-name {} --resource-group {} --name {}".format(
+            namespace_name, RG, queue_name
+        )
+    ).as_json()
+
+    queue_policy = cli.invoke(
+        "servicebus queue authorization-rule create --namespace-name {} --resource-group {} "
+        "--queue-name {} --name {} --rights Send".format(
+            namespace_name, RG, queue_name, policy_name
+        )
+    ).as_json()
+
+    topic_obj = cli.invoke(
+        "servicebus topic create --namespace-name {} --resource-group {} --name {}".format(
+            namespace_name, RG, topic_name
+        )
+    ).as_json()
+
+    topic_policy = cli.invoke(
+        "servicebus topic authorization-rule create --namespace-name {} --resource-group {} "
+        "--topic-name {} --name {} --rights Send".format(
+            namespace_name, RG, topic_name, policy_name
+        )
+    ).as_json()
+
+    return {
+        "namespace": namespace_obj,
+        "queue": queue_obj,
+        "queuePolicy": queue_policy,
+        "queueConnectionString": _service_bus_queue_get_cstring(namespace_name, queue_name, policy_name),
+        "topic": topic_obj,
+        "topicPolicy": topic_policy,
+        "topicConnectionString": _service_bus_topic_get_cstring(namespace_name, topic_name, policy_name),
+    }
+
+
+def _service_bus_removal(account_name: str):
+    delete_result = cli.invoke(f"servicebus namespace delete -g {RG} -n {account_name}")
+    if not delete_result.success():
+        logger.error(f"Failed to delete servicebus namespace resource {account_name}.")

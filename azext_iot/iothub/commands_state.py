@@ -13,12 +13,13 @@ def state_export(
     filename: str,
     hub_name: Optional[str] = None,
     resource_group_name: Optional[str] = None,
+    hub_aspects=None,
     login: Optional[str] = None,
     auth_type_dataplane: Optional[str] = None,
     overwrite_file: Optional[bool] = False
 ):
     sp = StateProvider(cmd=cmd, hub=hub_name, rg=resource_group_name, login=login, auth_type_dataplane=auth_type_dataplane)
-    sp.save_state(filename, overwrite_file)
+    sp.save_state(filename, overwrite_file, hub_aspects)
 
 
 def state_import(
@@ -26,18 +27,20 @@ def state_import(
     filename: str,
     hub_name: Optional[str] = None,
     resource_group_name: Optional[str] = None,
+    hub_aspects=None,
     login: Optional[str] = None,
     auth_type_dataplane: Optional[str] = None,
     replace: Optional[bool] = False
 ):
     sp = StateProvider(cmd=cmd, hub=hub_name, rg=resource_group_name, login=login, auth_type_dataplane=auth_type_dataplane)
-    sp.upload_state(filename, replace)
+    sp.upload_state(filename, replace, hub_aspects)
 
 
 def state_migrate(
     cmd,
     hub_name: Optional[str] = None,
     resource_group_name: Optional[str] = None,
+    hub_aspects=None,
     login: Optional[str] = None,
     orig_hub: Optional[str] = None,
     orig_resource_group_name: Optional[str] = None,
@@ -46,4 +49,4 @@ def state_migrate(
     replace: Optional[bool] = False
 ):
     sp = StateProvider(cmd=cmd, hub=hub_name, rg=resource_group_name, login=login, auth_type_dataplane=auth_type_dataplane)
-    sp.migrate_state(orig_hub, orig_resource_group_name, orig_hub_login, replace)
+    sp.migrate_state(orig_hub, orig_resource_group_name, orig_hub_login, replace, hub_aspects)

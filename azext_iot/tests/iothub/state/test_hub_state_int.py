@@ -25,6 +25,9 @@ settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=
 CWD = os.path.dirname(os.path.abspath(__file__))
 cli = EmbeddedCLI()
 
+DATAPLANE = "configurations devices edgedeployments"
+CONTROLPLANE = "certificates endpoints identities routes"
+
 
 def generate_device_names(count, edge=False):
     prefix = "d" if not edge else "e"
@@ -156,6 +159,11 @@ def _setup_hub_state(cstring):
             )
 
 
+
+
+
+# Test with an empty hub to save all, upload all, migrate all - will need to have seperate hubs created
+
 @pytest.fixture()
 def setup_hub_states(provisioned_iothubs_module):
     filename = generate_generic_id() + ".json"
@@ -205,39 +213,6 @@ def clean_up_hub(cstring):
     # gives the api enough time to update
     time.sleep(1)
 
-# TODO figure out better way to force two hubs to be made that wont make this test create
-# two hubs if ran by it
-# Make sure this is just dataplane to split up functionality
-@pytest.mark.hub_infrastructure()
-def test_2export_import(setup_hub_states):
-    filename = setup_hub_states[0]["filename"]
-    hub_name = setup_hub_states[0]["name"]
-    hub_rg = setup_hub_states[0]["rg"]
-    hub_cstring = setup_hub_states[0]["connectionString"]
-    for auth_phase in DATAPLANE_AUTH_TYPES:
-        cli.invoke(
-            set_cmd_auth_type(
-                f"iot hub state export -n {hub_name} -f {filename} -g {hub_rg} --of",
-                auth_type=auth_phase,
-                cstring=hub_cstring
-            )
-        )
-        compare_hub_dataplane_to_file(filename, hub_cstring)
-
-    for auth_phase in DATAPLANE_AUTH_TYPES:
-        clean_up_hub(hub_cstring)
-        # TODO: change this to import empty file
-        time.sleep(5)
-        cli.invoke(
-            set_cmd_auth_type(
-                f"iot hub state import -n {hub_name} -f {filename} -g {hub_rg} -r",
-                auth_type=auth_phase,
-                cstring=hub_cstring
-            )
-        )
-        time.sleep(10)  # gives the hub time to update before the checks
-        compare_hub_dataplane_to_file(filename, hub_cstring)
-
 
 @pytest.mark.hub_infrastructure(count=2)
 def test_1migrate(setup_hub_states):
@@ -251,13 +226,13 @@ def test_1migrate(setup_hub_states):
         if auth_phase == "cstring":
             cli.invoke(
                 f"iot hub state migrate --origin-hub-login {origin_cstring} --destination-hub-login "
-                f"{dest_cstring} -r"
+                f"{dest_cstring} -r --aspects {DATAPLANE}"
             )
         else:
             cli.invoke(
                 set_cmd_auth_type(
                     f"iot hub state migrate --origin-hub {origin_name} --origin-resource-group {origin_rg} "
-                    f"--destination-hub {dest_name} --destination-resource-group {dest_rg} -r",
+                    f"--destination-hub {dest_name} --destination-resource-group {dest_rg} -r --aspects {DATAPLANE}",
                     auth_type=auth_phase,
                     cstring=None
                 )
@@ -266,6 +241,41 @@ def test_1migrate(setup_hub_states):
         time.sleep(1)  # gives the hub time to update before the checks
         compare_hubs_dataplane(origin_cstring, dest_cstring)
         clean_up_hub(dest_cstring)
+
+
+# TODO figure out better way to force two hubs to be made that wont make this test create
+# two hubs if ran by it
+# Make sure this is just dataplane to split up functionality
+@pytest.mark.hub_infrastructure()
+def test_2export_import(setup_hub_states):
+    filename = setup_hub_states[0]["filename"]
+    hub_name = setup_hub_states[0]["name"]
+    hub_rg = setup_hub_states[0]["rg"]
+    hub_cstring = setup_hub_states[0]["connectionString"]
+    for auth_phase in DATAPLANE_AUTH_TYPES:
+        cli.invoke(
+            set_cmd_auth_type(
+                f"iot hub state export -n {hub_name} -f {filename} -g {hub_rg} --of --aspects {DATAPLANE}",
+                auth_type=auth_phase,
+                cstring=hub_cstring
+            )
+        )
+        compare_hub_dataplane_to_file(filename, hub_cstring)
+
+    for auth_phase in DATAPLANE_AUTH_TYPES:
+        clean_up_hub(hub_cstring)
+        # TODO: change this to import empty file
+        time.sleep(5)
+        cli.invoke(
+            set_cmd_auth_type(
+                f"iot hub state import -n {hub_name} -f {filename} -g {hub_rg} -r --aspects {DATAPLANE}",
+                auth_type=auth_phase,
+                cstring=hub_cstring
+            )
+        )
+        time.sleep(10)  # gives the hub time to update before the checks
+        compare_hub_dataplane_to_file(filename, hub_cstring)
+
 
 # Dataplane main compare commands
 def compare_hubs_dataplane(origin_cstring: str, dest_cstring: str):
@@ -524,6 +534,7 @@ def compare_hub_controlplane_to_file(filename: str, hub_name: str, rg: str):
     hub_routes = cli.invoke(f"iot hub route list --hub-name {hub_name} -g {rg}").as_json()
     compare_routes(file_routes, hub_routes)
 
+
 def compare_hubs(origin_hub_name: str, dest_hub_name: str, rg: str):
     # compare certificates
     orig_hub_certs = cli.invoke(
@@ -548,10 +559,10 @@ def compare_hubs(origin_hub_name: str, dest_hub_name: str, rg: str):
         compare_endpoints(orig_hub_endpoints[ep_type], dest_hub_endpoints[ep_type], ep_type)
 
     # compare routes
-
     orig_hub_routes = cli.invoke(f"iot hub route list --hub-name {origin_hub_name} -g {rg}").as_json()
     dest_hub_routes = cli.invoke(f"iot hub route list --hub-name {dest_hub_name} -g {rg}").as_json()
     compare_routes(orig_hub_routes, dest_hub_routes)
+
 
 # Compare specific parts
 def compare_configs(configlist1, configlist2):
