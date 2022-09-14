@@ -705,7 +705,9 @@ def load_central_arguments(self, _):
             "attestation",
             options_list=["--attestation-type", "--at"],
             arg_type=get_enum_type(EnrollmentGroupAttestationType),
+            default="symmetricKey",
             help="The attestation mechanism for the enrollment group. Only 'x509' or 'symmetricKey' are allowed."
+            "By default 'symmetricKey' will be used for attestation."
         )
         context.argument(
             "display_name",

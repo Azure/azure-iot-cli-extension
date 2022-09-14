@@ -144,6 +144,9 @@ def create_enrollment_group(
     """
     api_version = API_VERSION
 
+    if attestation is None:
+        attestation = 'symmetricKey'
+
     attestation_payload = {
         "type": attestation
     }

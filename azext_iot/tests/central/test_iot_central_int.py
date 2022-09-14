@@ -6,7 +6,6 @@
 
 
 import json
-from time import sleep
 import pytest
 from knack.log import get_logger
 

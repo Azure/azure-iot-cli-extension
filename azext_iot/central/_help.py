@@ -1827,7 +1827,7 @@ def _load_central_enrollment_group_help():
           --type {type}
           --cp {primayCertPath}
 
-      - name: Create an enrollment group with symmetric key certification
+      - name: Create an enrollment group with given symmetric key certification
         text: >
           az iot central enrollment-group create
           --app-id {appid}
