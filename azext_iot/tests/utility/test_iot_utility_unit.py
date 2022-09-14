@@ -331,20 +331,31 @@ class TestEmbeddedCli(object):
         azclient.test_meta.error_code = request.param
         return azclient
 
+
     @pytest.mark.parametrize(
-        "command, subscription",
+        "command, user_subscription, subscription",
         [
-            ("iot hub device-identity create -n abcd -d dcba", None),
+            ("iot hub device-identity create -n abcd -d dcba", None, None),
             (
                 "iot hub device-twin show -n 'abcd' -d 'dcba'",
                 "20a300e5-a444-4130-bb5a-1abd08ad930a",
+                None
+            ),
+            ("iot hub device-identity create -n abcd -d dcba",
+                None,
+                "20a300e5-a444-4130-bb5a-1abd08ad930a"
+            ),
+            (
+                "iot hub device-twin show -n 'abcd' -d 'dcba'",
+                "20a300e5-a444-4130-bb5a-1abd08ad930a",
+                "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
             ),
         ],
     )
-    def test_embedded_cli(self, mocked_azclient, command, subscription):
+    def test_embedded_cli(self, mocked_azclient, command, user_subscription, subscription):
         import shlex
 
-        cli = EmbeddedCLI()
+        cli = EmbeddedCLI(user_subscription)
         cli.invoke(command=command, subscription=subscription)
 
         # Due to forced json output
@@ -352,6 +363,8 @@ class TestEmbeddedCli(object):
 
         if subscription:
             command += " --subscription '{}'".format(subscription)
+        elif user_subscription:
+            command += " --subscription '{}'".format(user_subscription)
 
         expected_args = shlex.split(command)
         call = mocked_azclient().invoke.call_args_list[0]
