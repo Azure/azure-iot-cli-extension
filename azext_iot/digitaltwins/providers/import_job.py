@@ -20,7 +20,7 @@ class ImportJobProvider(DigitalTwinsProvider):
     def __init__(self, cmd, name: str, rg: str = None):
         super(ImportJobProvider, self).__init__(cmd=cmd, name=name, rg=rg)
         self.sdk = self.get_sdk().import_jobs
-        self.cli = EmbeddedCLI()
+        self.cli = EmbeddedCLI(user_subscription=cmd.cli_ctx.data["subscription_id"])
 
     def _get_blob_url(self, blob_name: str, blob_container: str, storage_account: str):
         storage_account_cstring_op = self.cli.invoke(

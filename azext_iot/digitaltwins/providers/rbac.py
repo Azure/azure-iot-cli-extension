@@ -9,8 +9,8 @@ from azext_iot.common.embedded_cli import EmbeddedCLI
 
 
 class RbacProvider(object):
-    def __init__(self):
-        self.cli = EmbeddedCLI()
+    def __init__(self, user_subscription: str = None):
+        self.cli = EmbeddedCLI(user_subscription=user_subscription)
 
     def list_assignments(self, dt_scope, include_inherited=False, role_type=None):
         include_inherited_flag = ""
