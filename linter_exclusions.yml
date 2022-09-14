@@ -152,12 +152,21 @@ iot central enrollment-group update:
     central_dns_suffix:
       rule_exclusions:
       - no_parameter_defaults_for_update_commands
+    enabled:
+      rule_exclusions:
+      - no_parameter_defaults_for_update_commands
 iot central scheduled-job update:
   parameters:
     api_version:
       rule_exclusions:
       - no_parameter_defaults_for_update_commands
     central_dns_suffix:
+      rule_exclusions:
+      - no_parameter_defaults_for_update_commands
+    batch_type:
+      rule_exclusions:
+      - no_parameter_defaults_for_update_commands
+    threshold_type:
       rule_exclusions:
       - no_parameter_defaults_for_update_commands
 iot central device twin update:

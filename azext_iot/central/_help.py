@@ -1850,10 +1850,17 @@ def _load_central_enrollment_group_help():
           az iot central enrollment-group update
           --app-id {appid}
           --id {enrollmentGroupId}
-          --at {attestation}
           --display-name {displayName}
           --type {type}
           --ps {enabled}
+
+      - name: Remove x509 primary certificate from an enrollment group
+        text: >
+          az iot central enrollment-group update
+          --app-id {appid}
+          --id {enrollmentGroupId}
+          --remove-x509 'true'
+          --entry 'primary'
     """
 
     helps[
@@ -1869,7 +1876,6 @@ def _load_central_enrollment_group_help():
           az iot central enrollment-group verify-certificate
           --app-id {appid}
           --id {enrollmentGroupId}
-          --entry {certificateEntry}
           --cp {primayCertPath}
     """
 
@@ -1879,12 +1885,12 @@ def _load_central_enrollment_group_help():
     type: command
     short-summary: Generate a verification code for the primary or secondary x509 certificate of an enrollment group
     examples:
-      - name: Generate a verification code for the primary or secondary x509 certificate of an enrollment group
+      - name: Generate a verification code for the primary x509 certificate of an enrollment group
         text: >
           az iot central enrollment-group generate-verification-code
           --app-id {appid}
           --id {enrollmentGroupId}
-          --entry {certificateEntry}
+          --entry 'primary'
     """
 
 
