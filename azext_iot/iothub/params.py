@@ -302,6 +302,11 @@ def load_iothub_arguments(self, _):
             help="The entity path of the endpoint resource."
         )
         context.argument(
+            "endpoint_policy_name",
+            options_list=["--endpoint-policy-name", "--policy"],
+            help="The policy name for connection string retrieval."
+        )
+        context.argument(
             "endpoint_uri",
             options_list=["--endpoint-uri"],
             help="The uri of the endpoint resource."
@@ -313,7 +318,7 @@ def load_iothub_arguments(self, _):
         )
         context.argument(
             "endpoint_account_name",
-            options_list=["--endpoint-namespace"],
+            options_list=["--endpoint-namespace-name", "--namespace"],
             help="The namespace name for the endpoint resource."
         )
 

@@ -350,7 +350,7 @@ def get_servicebus_topic_cstring(
 ) -> str:
     return cmd(
         "servicebus topic authorization-rule keys list --namespace-name {} --resource-group {} "
-        "--topic-name {} --name {}".format(
+        "--topic-name {} --name {} --subscription {}".format(
             namespace_name, rg, topic_name, policy_name, sub
         )
     ).get_output_as_json()["primaryConnectionString"]
@@ -361,7 +361,7 @@ def get_servicebus_queue_cstring(
 ) -> str:
     return cmd(
         "servicebus queue authorization-rule keys list --namespace-name {} --resource-group {} "
-        "--queue-name {} --name {}".format(
+        "--queue-name {} --name {}  --subscription {}".format(
             namespace_name, rg, queue_name, policy_name, sub
         )
     ).get_output_as_json()["primaryConnectionString"]
@@ -371,7 +371,7 @@ def get_cosmos_db_cstring(
     cmd, account_name: str, rg: str, sub: str
 ) -> str:
     output = cmd(
-        'cosmosdb keys list --resource-group {} --name {} --type connection-strings'.format(
+        'cosmosdb keys list --resource-group {} --name {} --type connection-strings  --subscription {}'.format(
             rg, account_name, sub
         )
     ).get_output_as_json()
@@ -383,7 +383,7 @@ def get_cosmos_db_cstring(
 
 def get_storage_cstring(cmd, account_name: str, rg: str, sub: str) -> str:
     return cmd(
-        "storage account show-connection-string -n {} -g {}".format(
+        "storage account show-connection-string -n {} -g {}  --subscription {}".format(
             account_name, rg, sub
         )
     ).get_output_as_json()["connectionString"]

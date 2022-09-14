@@ -355,7 +355,7 @@ def load_iothub_help():
         examples:
           - name: Create a key-based Event Hub endpoint for an IoT Hub.
             text: >
-                az iot hub message-endpoint create eventhub -n {iothub_name} --en {endpoint_name} --namespace-name {namespace_name} --entity-path {entity_path} --policy-name {policy_name}
+                az iot hub message-endpoint create eventhub -n {iothub_name} --en {endpoint_name} --namespace {namespace_name} --entity-path {entity_path} --policy {policy_name}
           - name: Create an Event Hub endpoint for an IoT Hub using a connection string. The endpoint uri and entity path are omitted.
             text: >
                 az iot hub message-endpoint create eventhub -n {iothub_name} --en {endpoint_name} -c {connection_string}
@@ -375,7 +375,7 @@ def load_iothub_help():
         examples:
           - name: Create a key-based Service Bus Queue endpoint for an IoT Hub.
             text: >
-                az iot hub message-endpoint create servicebus-queue -n {iothub_name} --en {endpoint_name} --namespace-name {namespace_name} --entity-path {entity_path} --policy-name {policy_name}
+                az iot hub message-endpoint create servicebus-queue -n {iothub_name} --en {endpoint_name} --namespace {namespace_name} --entity-path {entity_path} --policy {policy_name}
           - name: Create a Service Bus Queue endpoint for an IoT Hub using a connection string. The endpoint uri and entity path are omitted.
             text: >
                 az iot hub message-endpoint create servicebus-queue -n {iothub_name} --en {endpoint_name} -c {connection_string}
@@ -395,7 +395,7 @@ def load_iothub_help():
         examples:
           - name: Create a key-based Service Bus Topic endpoint for an IoT Hub.
             text: >
-                az iot hub message-endpoint create servicebus-topic -n {iothub_name} --en {endpoint_name} --namespace-name {namespace_name} --entity-path {entity_path} --policy-name {policy_name}
+                az iot hub message-endpoint create servicebus-topic -n {iothub_name} --en {endpoint_name} --namespace {namespace_name} --entity-path {entity_path} --policy {policy_name}
           - name: Create a Service Bus Topic endpoint for an IoT Hub using a connection string. The endpoint uri and entity path are omitted.
             text: >
                 az iot hub message-endpoint create servicebus-topic -n {iothub_name} --en {endpoint_name} -c {connection_string}
@@ -415,7 +415,7 @@ def load_iothub_help():
         examples:
           - name: Create a key-based Storage Container endpoint for an IoT Hub.
             text: >
-                az iot hub message-endpoint create cosmosdb-collection -n {iothub_name} --en {endpoint_name} --container {container_name} --account-name {account_name}
+                az iot hub message-endpoint create storage-container -n {iothub_name} --en {endpoint_name} --container {container_name} --account-name {account_name}
           - name: Create a Storage Container endpoint for an IoT Hub using a connection string. The endpoint uri is omitted.
             text: >
                 az iot hub message-endpoint create storage-container -n {iothub_name} --en {endpoint_name} -c {connection_string} --container {container_name}
