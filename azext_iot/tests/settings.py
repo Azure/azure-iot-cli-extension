@@ -55,6 +55,9 @@ class DynamoSettings(object):
     def _build_config(self, env_set: list, optional: bool = False):
         for key in env_set:
             value = environ.get(key)
+            # Null out value if it is set to default pipeline value
+            if value == "sentinel":
+                value = None
             if not value:
                 if not optional:
                     raise RuntimeError(
