@@ -3,11 +3,7 @@
 Release History
 ===============
 
-unreleased
-+++++++++++++++
-
-
-0.17.1
+0.17.2
 +++++++++++++++
 
 **IoT Hub Update**
@@ -19,6 +15,10 @@ unreleased
 
   - az iot hub certificate root-authority show
   - az iot hub certificate root-authority set
+
+
+0.17.1
++++++++++++++++
 
 **Device Update**
 
