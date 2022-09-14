@@ -6,6 +6,7 @@
 
 
 import json
+from time import sleep
 import pytest
 from azext_iot.iothub.common import RouteSourceType
 from azext_iot.common.embedded_cli import EmbeddedCLI
@@ -38,7 +39,7 @@ def test_route_lifecycle(provisioned_only_iot_hub_session, provisioned_event_hub
             iot_hub, iot_rg, route_names[0], endpoint_name, RouteSourceType.DeviceMessages.value
         )
     )
-    assert result.success() == False
+    assert not result.success()
 
     # Create said endpoint
     cli.invoke(
@@ -319,6 +320,8 @@ def test_route_lifecycle(provisioned_only_iot_hub_session, provisioned_event_hub
     ).as_json()
     assert len(routes) == 3
 
+    # Wait for deletes to ensure test doesnt pick up deleted routes
+    sleep(1)
     # Return no routes that are successful, ignore fallback
     test_result = cli.invoke(
         "iot hub message-route test -n {} -g {}".format(
