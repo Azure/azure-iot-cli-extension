@@ -421,11 +421,15 @@ def load_deviceupdate_help():
           text: >
             az iot device-update device class list -n {account_name} -i {instance_name}
 
+        - name: List instance device classes filtered by friendly name.
+          text: >
+            az iot device-update device class list -n {account_name} -i {instance_name} --filter "friendlyName eq 'my-favorite-class'"
+
         - name: List device class subgroups for the group.
           text: >
             az iot device-update device class list -n {account_name} -i {instance_name} --group-id {device_group_id}
 
-        - name: List device class subgroups for the group, filtered by compatProperties/manufacturer
+        - name: List device class subgroups for the group, filtered by compatProperties/manufacturer.
           text: >
             az iot device-update device class list -n {account_name} -i {instance_name} --group-id {device_group_id} --filter "compatProperties/manufacturer eq 'Contoso'"
     """
@@ -471,7 +475,7 @@ def load_deviceupdate_help():
         type: command
         short-summary: Delete a device class or device class subgroup.
         long-summary: >
-          Device classes are created automatically when Device Update-enabled devices are connected to
+          Device classes are automatically created when Device Update-enabled devices are connected to
           the hub but are not automatically cleaned up since they are referenced by device class subgroups.
           If all device class subgroups for a target device class are deleted then the device class itself can also be deleted
           to remove the records from the system and to stop checking the compatibility of the device class with new
@@ -817,4 +821,45 @@ def load_deviceupdate_help():
         - name: Show a device identity within a target instance.
           text: >
             az iot device-update device show -n {account_name} -i {instance_name} -d {device_id}
+    """
+
+    helps["iot device-update update init"] = """
+        type: group
+        short-summary: Utilities for initializing update import manifests.
+    """
+
+    helps["iot device-update update init v5"] = """
+        type: command
+        short-summary: Initialize a v5 import manifest with the desired state.
+        long-summary: This command supports all attributes of the v5 import manifest. Review examples
+          and parameter descriptions for details on how to fully utilize the operation. Note that
+          there is positional sensitivity between --step and --file, as well as --file and --related-file.
+          Review parameter help for more details.
+
+        examples:
+        - name: Initialize a minimum content import manifest.
+          text: >
+            az iot device-update update init v5 --update-provider Microsoft --update-name AptUpdate --update-version 1.0.0
+            --description "My minimum update"
+            --compat deviceManufacturer=Contoso deviceModel=Vacuum
+            --step handler=microsoft/apt:1 --file path=/my/apt/manifest/file
+
+        - name: Initialize a non-deployable leaf update to be referenced in a bundled update.
+          text: >
+            az iot device-update update init v5 --update-provider Microsoft --update-name SwUpdate --update-version 1.1
+            --compat deviceManufacturer=Contoso deviceModel=Microphone --step handler=microsoft/swupdate:1 description="Deploy Update"
+            --file path=/my/update/image/file1 --file path=/my/update/image/file2
+            --is-deployable false
+
+        - name: Initialize a bundled update referencing a leaf update as well as defining independent steps. Inline json examples
+            compatible with bash-like shells.
+          text: >
+            az iot device-update update init v5 --update-provider Microsoft --update-name Bundled --update-version 2.0
+            --compat deviceManufacturer=Contoso deviceModel=SpaceStation
+            --step handler=microsoft/script:1 properties='{"arguments": "--pre"}' description="Pre-install script"
+            --file path=/my/update/scripts/preinstall.sh downloadHandler=microsoft/delta:1
+            --related-file path=/my/update/scripts/related_preinstall.json properties='{"microsoft.sourceFileHashAlgorithm": "sha256"}'
+            --step updateId.provider=Microsoft updateId.name=SwUpdate updateId.version=1.1
+            --step handler=microsoft/script:1 properties='{"arguments": "--post"}' description="Post-install script"
+            --file path=/my/update/scripts/postinstall.sh
     """

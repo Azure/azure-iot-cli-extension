@@ -31,17 +31,25 @@ def load_deviceupdate_arguments(self, _):
             "resource_group_name",
             arg_type=resource_group_name_type,
             help="Device Update account resource group name. "
-            "You can configure the default group using `az configure --defaults group=<name>`.",
+            "You can configure the default group using `az config set defaults.adu_group=<name>`.",
             arg_group="Account Identifier",
+            configured_default="adu_group",
         )
         context.argument(
-            "name", options_list=["-n", "--account"], help="Device Update account name.", arg_group="Account Identifier"
+            "name",
+            options_list=["-n", "--account"],
+            help="Device Update account name. "
+            "You can configure the default account name using `az config set defaults.adu_account=<name>`.",
+            arg_group="Account Identifier",
+            configured_default="adu_account",
         )
         context.argument(
             "instance_name",
             options_list=["-i", "--instance"],
-            help="Device Update instance name.",
+            help="Device Update instance name."
+            "You can configure the default instance name using `az config set defaults.adu_instance=<name>`.",
             arg_group="Account Identifier",
+            configured_default="adu_instance",
         )
         context.argument(
             "public_network_access",
@@ -169,14 +177,14 @@ def load_deviceupdate_arguments(self, _):
             "search",
             options_list=["--search"],
             help="Request updates matching a free-text search expression. "
-            "Supported by list updates with no constraints.",
+            "Supported when listing updates with no constraints.",
             arg_group="Filter",
         )
         context.argument(
             "filter",
             options_list=["--filter"],
             help="Restricts the set of updates returned by property values. "
-            "Supported by list update versions and list updates with no constraints.",
+            "Supported when listing updates with no constraints or when listing by version.",
             arg_group="Filter",
         )
 
@@ -211,8 +219,18 @@ def load_deviceupdate_arguments(self, _):
         )
 
     with self.argument_context("iot device-update device") as context:
-        context.argument("device_group_id", options_list=["--group-id", "--gid"], help="Device group Id.")
-        context.argument("device_class_id", options_list=["--class-id", "--cid"], help="Device class Id.")
+        context.argument(
+            "device_group_id",
+            options_list=["--group-id", "--gid"],
+            help="Device group Id. This is created from the value of the ADUGroup tag in the connected IoT Hub's "
+            "device/module twin or $default for devices with no tag.",
+        )
+        context.argument(
+            "device_class_id",
+            options_list=["--class-id", "--cid"],
+            help="Device class Id. This is generated from the model Id and the compat properties reported by the "
+            "device update agent in the Device Update PnP interface in IoT Hub. It is a hex-encoded SHA1 hash.",
+        )
 
     with self.argument_context("iot device-update device list") as context:
         context.argument(
@@ -243,7 +261,7 @@ def load_deviceupdate_arguments(self, _):
             options_list=["--best-update"],
             help="Flag indicating the command should fetch the best available update for the device class subgroup including "
             "a count of how many devices need the update. Group Id is required for this flag. "
-            "A best update is the lastest update that meets all compatibility specifications of a device class. ",
+            "A best update is the latest update that meets all compatibility specifications of a device class. ",
             arg_group="Update",
             arg_type=get_three_state_flag(),
         )
@@ -259,15 +277,17 @@ def load_deviceupdate_arguments(self, _):
         context.argument(
             "friendly_name",
             options_list=["--friendly-name"],
-            help="Friendly name associated with the device class.",
+            help="The device class friendly name. The friendly name must be 1 - 100 characters and supports "
+            "alphanumeric, dot and dash values.",
         )
 
     with self.argument_context("iot device-update device class list") as context:
         context.argument(
             "filter",
             options_list=["--filter"],
-            help="Filters device class subgroups based on device class compat property names and values. "
-            "For example \"compatProperties/manufacturer eq 'Contoso'\". --group-id is required to use --filter."
+            help="If provided with --group-id, supports filtering based on device class compat property names "
+            "and values. For example \"compatProperties/manufacturer eq 'Contoso'\". "
+            "Otherwise supports filtering by class friendly name.",
         )
 
     with self.argument_context("iot device-update device group") as context:
@@ -276,7 +296,7 @@ def load_deviceupdate_arguments(self, _):
             options_list=["--best-updates"],
             help="Flag indicating the command should fetch the best available updates for the device group including "
             "a count of how many devices need each update. "
-            "A best update is the lastest update that meets all compatibility specifications of a device class. ",
+            "A best update is the latest update that meets all compatibility specifications of a device class. ",
             arg_group="Update",
             arg_type=get_three_state_flag(),
         )
@@ -305,7 +325,13 @@ def load_deviceupdate_arguments(self, _):
         )
 
     with self.argument_context("iot device-update device deployment") as context:
-        context.argument("deployment_id", options_list=["--deployment-id", "--did"], help="Deployment Id.")
+        context.argument(
+            "deployment_id",
+            options_list=["--deployment-id", "--did"],
+            help="The caller-provided deployment Id. This cannot be longer than 73 characters, "
+            "must be all lower-case, and cannot contain '&', '^', '[', ']', '{', '}', '|', '<', '>', "
+            "forward slash, backslash, or double quote.",
+        )
         context.argument(
             "status",
             options_list=["--status"],
@@ -413,4 +439,82 @@ def load_deviceupdate_arguments(self, _):
             "description",
             options_list=["--description"],
             help="Description for the log collection operation.",
+        )
+
+    with self.argument_context("iot device-update update init") as context:
+        context.argument(
+            "update_provider",
+            options_list=["--update-provider"],
+            help="The update provider as a component of updateId.",
+        )
+        context.argument(
+            "update_name",
+            options_list=["--update-name"],
+            help="The update name as a component of updateId.",
+        )
+        context.argument(
+            "update_version",
+            options_list=["--update-version"],
+            help="The update version as a component of updateId.",
+        )
+        context.argument(
+            "description",
+            options_list=["--description"],
+            help="Description for the import update manifest.",
+        )
+        context.argument(
+            "deployable",
+            options_list=["--is-deployable"],
+            arg_type=get_three_state_flag(),
+            help="Indicates whether the update is independently deployable.",
+        )
+        context.argument(
+            "compatibility",
+            options_list=["--compat"],
+            nargs="+",
+            action="append",
+            help="Space-separated key=value pairs corresponding to properties of a device this update is compatible with. "
+            "Typically used for defining properties such as deviceManufacturer and deviceModel. "
+            "--compat can be used 1 or more times. ",
+        )
+        context.argument(
+            "steps",
+            options_list=["--step"],
+            nargs="+",
+            action="append",
+            help="Space-separated key=value pairs corresponding to 'instructions.steps' element properties. "
+            "The client will determine if a step is an inline or reference step based on the provided "
+            "key value pairs. If either inline or reference step can be satisfied, the reference step will be prioritized. "
+            "Usage of --file will be associated with the nearest inline --step entry, deriving the value for 'files'. "
+            "The following reference step keys are supported: "
+            "`updateId.provider`, `updateId.name` `updateId.version` and `description`."
+            "The following inline step keys are supported: "
+            "`handler` (ex: 'microsoft/script:1' or 'microsoft/swupdate:1' or 'microsoft/apt:1'), "
+            "`properties` (in-line json object the agent will pass to the handler) and `description`. "
+            "--step can be used 1 or more times.",
+        )
+        context.argument(
+            "files",
+            options_list=["--file"],
+            nargs="+",
+            action="append",
+            help="Space-separated key=value pairs corresponding to 'files' element properties. "
+            "A --file entry can include the closest --related-file entries if provided. "
+            "The following keys are supported: "
+            "`path` [required] local file path to update file, "
+            "`downloadHandler` (ex: 'microsoft/delta:1') download handler for utilizing related files "
+            "to download payload file. "
+            "--file can be used 1 or more times."
+        )
+        context.argument(
+            "related_files",
+            options_list=["--related-file"],
+            nargs="+",
+            action="append",
+            help="Space-separated key=value pairs corresponding to 'files[*].relatedFiles' element properties. "
+            "A --related-file entry will be associated to the closest --file entry if it exists. "
+            "The following keys are supported: "
+            "`path` [required] local file path to related update file, "
+            "`properties` in-line json object passed to the download handler. "
+            "--related-file can be used 1 or more times."
         )
