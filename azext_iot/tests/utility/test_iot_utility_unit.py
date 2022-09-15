@@ -331,7 +331,6 @@ class TestEmbeddedCli(object):
         azclient.test_meta.error_code = request.param
         return azclient
 
-
     @pytest.mark.parametrize(
         "command, user_subscription, subscription",
         [
@@ -341,7 +340,8 @@ class TestEmbeddedCli(object):
                 "20a300e5-a444-4130-bb5a-1abd08ad930a",
                 None
             ),
-            ("iot hub device-identity create -n abcd -d dcba",
+            (
+                "iot hub device-identity create -n abcd -d dcba",
                 None,
                 "20a300e5-a444-4130-bb5a-1abd08ad930a"
             ),
