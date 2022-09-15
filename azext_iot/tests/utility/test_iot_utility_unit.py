@@ -352,10 +352,14 @@ class TestEmbeddedCli(object):
             ),
         ],
     )
-    def test_embedded_cli(self, mocked_azclient, command, user_subscription, subscription):
+    def test_embedded_cli(self, mocker, mocked_azclient, command, user_subscription, subscription):
         import shlex
 
-        cli = EmbeddedCLI(user_subscription)
+        cli_ctx = mocker.MagicMock()
+        cli_ctx.data = {}
+        if user_subscription:
+            cli_ctx.data["subscription_id"] = user_subscription
+        cli = EmbeddedCLI(cli_ctx)
         cli.invoke(command=command, subscription=subscription)
 
         # Due to forced json output

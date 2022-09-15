@@ -15,12 +15,12 @@ logger = get_logger(__name__)
 
 
 class EmbeddedCLI(object):
-    def __init__(self, user_subscription: str = None):
+    def __init__(self, cli_ctx=None):
         super(EmbeddedCLI, self).__init__()
         self.output = ""
         self.error_code = 0
         self.az_cli = get_default_cli()
-        self.user_subscription = user_subscription
+        self.user_subscription = cli_ctx.data.get('subscription_id') if cli_ctx else None
 
     def invoke(self, command: str, subscription: str = None):
         output_file = StringIO()

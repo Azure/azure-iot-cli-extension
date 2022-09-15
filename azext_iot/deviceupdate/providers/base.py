@@ -109,7 +109,7 @@ class DeviceUpdateAccountManager(DeviceUpdateClientHandler):
     def __init__(self, cmd):
         super().__init__(cmd=cmd)
         self.mgmt_client = self.get_mgmt_client()
-        self.cli = EmbeddedCLI(user_subscription=cmd.cli_ctx.data["subscription_id"])
+        self.cli = EmbeddedCLI(cli_ctx=cmd.cli_ctx)
 
     def find_account(self, target_name: str, target_rg: Optional[str] = None) -> AccountContainer:
         def find_account_rg(id: str):

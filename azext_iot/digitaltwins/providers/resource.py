@@ -38,7 +38,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
     def __init__(self, cmd):
         super(ResourceProvider, self).__init__(cmd=cmd)
         self.mgmt_sdk = self.get_mgmt_sdk()
-        self.rbac = RbacProvider(user_subscription=cmd.cli_ctx.data["subscription_id"])
+        self.rbac = RbacProvider(cmd.cli_ctx)
 
 
     def create(
@@ -55,11 +55,8 @@ class ResourceProvider(DigitalTwinsResourceManager):
     ):
         if not location:
             from azext_iot.common.embedded_cli import EmbeddedCLI
-            # check correct subscription if provided
-            subscription = self.cmd.cli_ctx.data["subscription_id"]
-
             resource_group_meta = (
-                EmbeddedCLI(user_subscription=subscription)
+                EmbeddedCLI(cli_ctx=self.cmd.cli_ctx)
                 .invoke("group show --name {}".format(resource_group_name))
                 .as_json()
             )
