@@ -3,8 +3,16 @@
 Release History
 ===============
 
-unreleased
+0.17.2
 +++++++++++++++
+
+**General Updates**
+
+* Hotfix for ensuring the global subscription parameter (`--subscription`) passes through sub-commands. Affected commands include:
+
+  - az dt create
+  - az dt job import
+  - az iot device-update account create
 
 
 0.17.1
@@ -125,7 +133,7 @@ unreleased
 
 * Introducing the **in preview** Azure Device Update for IoT Hub root command group `az iot device-update`.
   To learn more about the service visit https://docs.microsoft.com/en-us/azure/iot-hub-device-update/.
- 
+
   - This command group is behind a feature flag environment variable. Set `IOT_CLI_ADU_ENABLED` to any value
     to activate the command group.
   - The Device Update command group supports all `account` and `instance` related functionality against
