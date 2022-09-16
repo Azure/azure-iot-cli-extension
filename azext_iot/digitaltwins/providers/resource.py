@@ -40,7 +40,6 @@ class ResourceProvider(DigitalTwinsResourceManager):
         self.mgmt_sdk = self.get_mgmt_sdk()
         self.rbac = RbacProvider(cmd.cli_ctx)
 
-
     def create(
         self,
         name,
