@@ -572,3 +572,36 @@ def load_iothub_help():
             text: >
                 az iot hub message-route test -n {iothub_name} -b {body} --ap {app_properties} --sp {system_properties}
     """
+
+    helps[
+        "iot hub message-route fallback"
+    ] = """
+        type: group
+        short-summary: Manage the fallback route of an IoT hub.
+    """
+
+
+    helps[
+        "iot hub message-route fallback show"
+    ] = """
+        type: command
+        short-summary: Show the fallback route of an IoT Hub
+        examples:
+          - name: Show the fallback route from an IoT Hub.
+            text: >
+                az iot hub message-route fallback show -n {iothub_name}
+    """
+
+    helps[
+        "iot hub message-route fallback set"
+    ] = """
+        type: command
+        short-summary: Enable or disable the fallback route in an IoT Hub.
+        examples:
+          - name: Enable the fallback route in an IoT Hub
+            text: >
+                az iot hub message-route fallback set -n {iothub_name} --enabled true
+          - name: Disable the fallback route in an IoT Hub.
+            text: >
+                az iot hub message-route fallback set -n {iothub_name} --enabled false
+    """

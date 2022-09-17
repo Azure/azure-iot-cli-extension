@@ -108,3 +108,26 @@ def message_route_test(
     return messaging_provider.test(
         route_name=route_name, source_type=source_type, body=body, app_properties=app_properties, system_properties=system_properties
     )
+
+
+def message_fallback_route_show(
+    cmd,
+    hub_name: str,
+    resource_group_name: Optional[str] = None,
+):
+    messaging_provider = MessageRoute(
+        cmd=cmd, hub_name=hub_name, rg=resource_group_name
+    )
+    return messaging_provider.show_fallback()
+
+
+def message_fallback_route_set(
+    cmd,
+    hub_name: str,
+    enabled: bool,
+    resource_group_name: Optional[str] = None,
+):
+    messaging_provider = MessageRoute(
+        cmd=cmd, hub_name=hub_name, rg=resource_group_name
+    )
+    return messaging_provider.set_fallback(enabled=enabled)

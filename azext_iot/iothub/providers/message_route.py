@@ -9,6 +9,7 @@ from knack.log import get_logger
 from azure.cli.core.azclierror import ResourceNotFoundError
 from azext_iot.common.utility import process_json_arg
 from azext_iot.constants import USER_AGENT
+from azext_iot.iothub.common import RouteSourceType
 from azext_iot.iothub.providers.base import IoTHubProvider
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azure.cli.core.commands.client_factory import get_subscription_id
@@ -162,14 +163,62 @@ class MessageRoute(IoTHubProvider):
                 input=test_route_input
             )
 
-        test_all_routes_input = {
-            "routingSource": source_type,
-            "message": route_message,
-            "twin": None
-        }
-        return self.client.iot_hub_resource.test_all_routes(
-            iot_hub_name=self.hub_resource.name,
-            resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
-            input=test_all_routes_input
-        )
+        if source_type:
+            test_all_routes_input = {
+                "routingSource": source_type,
+                "message": route_message,
+                "twin": None
+            }
+            return self.client.iot_hub_resource.test_all_routes(
+                iot_hub_name=self.hub_resource.name,
+                resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
+                input=test_all_routes_input
+            )
 
+        # for all types, need to test all types one by one
+        routes = []
+        all_route_types = [
+            RouteSourceType.DeviceConnectionStateEvents.value,
+            RouteSourceType.DeviceJobLifecycleEvents.value,
+            RouteSourceType.DeviceLifecycleEvents.value,
+            RouteSourceType.DeviceMessages.value,
+            RouteSourceType.DigitalTwinChangeEvents.value,
+            RouteSourceType.TwinChangeEvents.value
+        ]
+        fallback = None
+        for type in all_route_types:
+            test_all_routes_input = {
+                "routingSource": type,
+                "message": route_message,
+                "twin": None
+            }
+            result = self.client.iot_hub_resource.test_all_routes(
+                iot_hub_name=self.hub_resource.name,
+                resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
+                input=test_all_routes_input
+            ).routes
+
+            # Fallback for if no routes pass
+            if len(result) == 1 and result[0].properties.name == "$fallback":
+                fallback = result
+            else:
+                routes.extend(result)
+
+        if len(routes) == 0 and fallback:
+            routes = fallback
+        return {"routes": routes}
+
+    def show_fallback(self):
+        return self.hub_resource.properties.routing.fallback_route
+
+    def set_fallback(self, enabled: bool):
+        fallback_route = self.hub_resource.properties.routing.fallback_route
+        fallback_route.is_enabled = enabled
+
+        self.client.iot_hub_resource.begin_create_or_update(
+            resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
+            resource_name=self.hub_resource.name,
+            iot_hub_description=self.hub_resource,
+            if_match=self.hub_resource.etag
+        )
+        return self.show_fallback()

@@ -13,6 +13,7 @@ from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
 
 cli = EmbeddedCLI()
+MAX_HUB_RETRIES = 30
 
 
 def generate_names(prefix: str = "", count: int = 1):
@@ -225,8 +226,16 @@ def test_route_lifecycle(provisioned_only_iot_hub_session, provisioned_event_hub
             iot_hub, iot_rg
         )
     ).as_json()["routes"]
-    assert len(test_result) == 1
-    assert test_result[0]["properties"]["source"].lower() == RouteSourceType.DeviceMessages.value
+    test_result = remove_fallback_route(test_result)
+    assert len(test_result) == 4
+    source_types = set(route["properties"]["source"].lower() for route in test_result)
+    expected_types = set([
+        RouteSourceType.DeviceConnectionStateEvents.value,
+        RouteSourceType.DeviceLifecycleEvents.value,
+        RouteSourceType.DeviceMessages.value,
+        RouteSourceType.DigitalTwinChangeEvents.value
+    ])
+    assert source_types == expected_types
 
     # test by source type
     test_result = cli.invoke(
@@ -234,18 +243,20 @@ def test_route_lifecycle(provisioned_only_iot_hub_session, provisioned_event_hub
             iot_hub, iot_rg, RouteSourceType.DeviceMessages.value
         )
     ).as_json()["routes"]
+    test_result = remove_fallback_route(test_result)
     assert len(test_result) == 1
     assert test_result[0]["properties"]["source"].lower() == RouteSourceType.DeviceMessages.value
 
     # for some reason, if you try to test a source that has no successful routes, it returns all routes
     # that are successful - if you put in DeviceJobLifecycleEvents - it will return devicemessages...
+    # update 9/16 - service changed how this works?
     test_result = cli.invoke(
         "iot hub message-route test -n {} -g {} -t {}".format(
-            iot_hub, iot_rg, RouteSourceType.DeviceLifecycleEvents.value
+            iot_hub, iot_rg, RouteSourceType.DeviceJobLifecycleEvents.value
         )
     ).as_json()["routes"]
-    assert len(test_result) == 1
-    assert test_result[0]["properties"]["source"].lower() == RouteSourceType.DeviceLifecycleEvents.value
+    test_result = remove_fallback_route(test_result)
+    assert len(test_result) == 0
 
     # update route
     condition = "$connectionDeviceId = 'Device_temp_1' AND processingPath = 'hot' AND $body.hello = 4"
@@ -291,6 +302,7 @@ def test_route_lifecycle(provisioned_only_iot_hub_session, provisioned_event_hub
             iot_hub, iot_rg, msg_body, app_properties, system_properties
         )
     ).as_json()["routes"]
+    test_result = remove_fallback_route(test_result)
     assert len(test_result) == 1
 
     # delete routes by name
@@ -351,6 +363,91 @@ def test_route_lifecycle(provisioned_only_iot_hub_session, provisioned_event_hub
         )
     ).as_json()
     assert len(routes) == 0
+
+@pytest.mark.hub_infrastructure(desired_tags="test=message_route")
+def test_route_fallback_lifecycle(provisioned_only_iot_hub_session):
+    iot_hub = provisioned_only_iot_hub_session["name"]
+    iot_rg = provisioned_only_iot_hub_session["resourcegroup"]
+    fallback_name = "$fallback"
+
+    expected_fallback_route = build_expected_route(
+        name=fallback_name,
+        source_type=RouteSourceType.DeviceMessages.value,
+    )
+    fallback_route = cli.invoke(
+        f"iot hub message-route fallback show -n {iot_hub} -g {iot_rg}"
+    ).as_json()
+
+    assert_route_properties(fallback_route, expected_fallback_route)
+
+    # Test by type and test all should return fallback route
+    test_result = cli.invoke(
+        "iot hub message-route test -n {} -g {} -t {}".format(
+            iot_hub, iot_rg, RouteSourceType.TwinChangeEvents.value
+        )
+    ).as_json()["routes"]
+    assert len(test_result) == 1
+    assert test_result[0]["properties"]["name"] == fallback_name
+
+    test_result = cli.invoke(
+        f"iot hub message-route test -n {iot_hub} -g {iot_rg}"
+    ).as_json()["routes"]
+    assert len(test_result) == 1
+    assert test_result[0]["properties"]["name"] == fallback_name
+
+    # Disable fallback route
+    expected_fallback_route = build_expected_route(
+        name=fallback_name,
+        source_type=RouteSourceType.DeviceMessages.value,
+        enabled=False
+    )
+
+    print("disable")
+    fallback_route = cli.invoke(
+        f"iot hub message-route fallback set -n {iot_hub} -g {iot_rg} -e false"
+    ).as_json()
+    assert_route_properties(fallback_route, expected_fallback_route)
+    wait_till_hub_state_is_active(iot_hub, iot_rg)
+
+    # Test by type and test all should return nothing
+    test_result = cli.invoke(
+        "iot hub message-route test -n {} -g {} -t {}".format(
+            iot_hub, iot_rg, RouteSourceType.TwinChangeEvents.value
+        )
+    ).as_json()["routes"]
+    assert len(test_result) == 0
+
+    test_result = cli.invoke(
+        f"iot hub message-route test -n {iot_hub} -g {iot_rg}"
+    ).as_json()["routes"]
+    assert len(test_result) == 0
+
+    # Re-enable fallback
+    expected_fallback_route = build_expected_route(
+        name=fallback_name,
+        source_type=RouteSourceType.DeviceMessages.value
+    )
+    print("enable")
+    fallback_route = cli.invoke(
+        f"iot hub message-route fallback set -n {iot_hub} -g {iot_rg} -e true"
+    ).as_json()
+
+    assert_route_properties(fallback_route, expected_fallback_route)
+    wait_till_hub_state_is_active(iot_hub, iot_rg)
+
+
+def wait_till_hub_state_is_active(iot_hub: str, iot_rg: str):
+    state = None
+    retries = 0
+    while state != "active" and retries < MAX_HUB_RETRIES:
+        sleep(1)
+        retries += 1
+        state = cli.invoke(
+            f"iot hub show -n {iot_hub} -g {iot_rg}"
+        ).as_json()["properties"]["state"].lower()
+        print(state)
+
+    sleep(1)
 
 
 def build_expected_route(

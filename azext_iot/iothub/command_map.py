@@ -104,6 +104,10 @@ def load_iothub_commands(self, _):
         )
         cmd_group.command('test', 'message_route_test')
 
+    with self.command_group("iot hub message-route fallback", command_type=iothub_message_route_ops) as cmd_group:
+        cmd_group.command("show", "message_fallback_route_show")
+        cmd_group.command("set", "message_fallback_route_set")
+
     with self.command_group("iot device", command_type=device_messaging_ops) as cmd_group:
         cmd_group.command("send-d2c-message", "iot_device_send_message")
         cmd_group.command("simulate", "iot_simulate_device", is_experimental=True)

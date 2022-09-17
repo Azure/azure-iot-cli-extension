@@ -55,7 +55,7 @@ class RouteSourceType(Enum):
     """
     Type of the route source.
     """
-    Invalid = 'invalid'
+    # Invalid = 'invalid'
     DeviceMessages = 'devicemessages'
     TwinChangeEvents = 'twinchangeevents'
     DeviceLifecycleEvents = 'devicelifecycleevents'
