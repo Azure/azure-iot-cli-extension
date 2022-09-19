@@ -11,57 +11,25 @@ from azure.cli.core.azclierror import (
     RequiredArgumentMissingError,
     ResourceNotFoundError
 )
-from azext_iot.constants import USER_AGENT
 from azext_iot.iothub.common import (
     SYSTEM_ASSIGNED_IDENTITY, AuthenticationType, EncodingFormat, EndpointType, IdentityType
 )
-from azext_iot.iothub.providers.base import IoTHubProvider
-from azext_iot.iothub.providers.discovery import IotHubDiscovery
+from azext_iot.iothub.providers.base import IoTHubResourceProvider
 from azext_iot.common._azure import parse_cosmos_db_connection_string
-from azure.cli.core.commands.client_factory import get_subscription_id
 from azure.mgmt.iothub.models import ManagedIdentity
 
 
 logger = get_logger(__name__)
 
 
-class MessageEndpoint(IoTHubProvider):
+class MessageEndpoint(IoTHubResourceProvider):
     def __init__(
         self,
         cmd,
         hub_name: Optional[str] = None,
         rg: Optional[str] = None,
     ):
-        # TODO: Optimize and change once official sdk is out
-        self.cmd = cmd
-        self.api_version = "2022-04-30-preview"
-        self.client = self.get_client()
-        self.discovery = IotHubDiscovery(cmd)
-        self.discovery.track2 = True
-        self.discovery.client = self.client.iot_hub_resource
-        self.discovery.sub_id = get_subscription_id(self.cmd.cli_ctx)
-        # Need to get the direct resource
-        self.hub_resource = self.get_iot_hub_resource(hub_name, rg)
-
-    def get_client(self):
-        from azure.cli.core.commands.client_factory import get_mgmt_service_client
-        from azure.cli.core.profiles import ResourceType
-        client = get_mgmt_service_client(
-            self.cmd.cli_ctx,
-            ResourceType.MGMT_IOTHUB,
-            api_version=self.api_version
-        )
-
-        # Adding IoT Ext User-Agent is done with best attempt.
-        try:
-            client._config.user_agent_policy.add_user_agent(USER_AGENT)
-        except Exception:
-            pass
-
-        return client
-
-    def get_iot_hub_resource(self, hub_name, rg):
-        return self.discovery.find_resource(hub_name, rg)
+        super(MessageEndpoint).__init__(cmd, hub_name, rg)
 
     def create(
         self,
@@ -106,9 +74,12 @@ class MessageEndpoint(IoTHubProvider):
         elif authentication_type != AuthenticationType.IdentityBased.value and not connection_string:
             # check for connection string args
             error_msg = "Please provide a connection string '--connection-string/-c'"
-            if endpoint_type.lower() in [EndpointType.EventHub.value, EndpointType.ServiceBusQueue.value, EndpointType.ServiceBusTopic.value]:
+            if endpoint_type.lower() in [
+                EndpointType.EventHub.value, EndpointType.ServiceBusQueue.value, EndpointType.ServiceBusTopic.value
+            ]:
                 raise ArgumentUsageError(
-                    error_msg + " or endpoint namespace '--endpoint-namespace', endpoint entity path '--entity-path', and policy name '--policy-name'."
+                    error_msg + " or endpoint namespace '--endpoint-namespace', endpoint "
+                    "entity path '--entity-path', and policy name '--policy-name'."
                 )
             else:
                 raise ArgumentUsageError(

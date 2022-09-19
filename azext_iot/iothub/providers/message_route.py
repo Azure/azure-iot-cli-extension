@@ -8,52 +8,22 @@ from typing import Optional
 from knack.log import get_logger
 from azure.cli.core.azclierror import ResourceNotFoundError
 from azext_iot.common.utility import process_json_arg
-from azext_iot.constants import USER_AGENT
 from azext_iot.iothub.common import RouteSourceType
-from azext_iot.iothub.providers.base import IoTHubProvider
+from azext_iot.iothub.providers.base import IoTHubResourceProvider
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
-from azure.cli.core.commands.client_factory import get_subscription_id
 
 
 logger = get_logger(__name__)
 
 
-class MessageRoute(IoTHubProvider):
+class MessageRoute(IoTHubResourceProvider):
     def __init__(
         self,
         cmd,
-        hub_name: Optional[str] = None,
+        hub_name: str,
         rg: Optional[str] = None,
     ):
-        self.cmd = cmd
-        self.api_version = "2022-04-30-preview"
-        self.client = self.get_client()
-        self.discovery = IotHubDiscovery(cmd)
-        self.discovery.track2 = True
-        self.discovery.client = self.client.iot_hub_resource
-        self.discovery.sub_id = get_subscription_id(self.cmd.cli_ctx)
-        # Need to get the direct resource
-        self.hub_resource = self.get_iot_hub_resource(hub_name, rg)
-
-    def get_client(self):
-        from azure.cli.core.commands.client_factory import get_mgmt_service_client
-        from azure.cli.core.profiles import ResourceType
-        client = get_mgmt_service_client(
-            self.cmd.cli_ctx,
-            ResourceType.MGMT_IOTHUB,
-            api_version=self.api_version
-        )
-
-        # Adding IoT Ext User-Agent is done with best attempt.
-        try:
-            client._config.user_agent_policy.add_user_agent(USER_AGENT)
-        except Exception:
-            pass
-
-        return client
-
-    def get_iot_hub_resource(self, hub_name, rg):
-        return self.discovery.find_resource(hub_name, rg)
+        super(MessageRoute).__init__(cmd, hub_name, rg)
 
     def create(
         self,
@@ -65,11 +35,11 @@ class MessageRoute(IoTHubProvider):
     ):
         self.hub_resource.properties.routing.routes.append(
             {
-                "source":source_type,
-                "name":route_name,
-                "endpointNames":endpoint_name.split(),
-                "condition":('true' if condition is None else condition),
-                "isEnabled":enabled
+                "source": source_type,
+                "name": route_name,
+                "endpointNames": endpoint_name.split(),
+                "condition": ('true' if condition is None else condition),
+                "isEnabled": enabled
             }
         )
 
@@ -142,7 +112,6 @@ class MessageRoute(IoTHubProvider):
             app_properties = process_json_arg(content=app_properties, argument_name="app_properties")
         if system_properties:
             system_properties = process_json_arg(content=system_properties, argument_name="system_properties")
-
 
         route_message = {
             "body": body,

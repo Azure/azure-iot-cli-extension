@@ -9,7 +9,7 @@ import pytest
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.settings import DynamoSettings
 from azext_iot.tests.generators import generate_generic_id
-from typing import  Optional, TypeVar
+from typing import Optional, TypeVar
 from knack.log import get_logger
 
 logger = get_logger(__name__)

@@ -106,7 +106,11 @@ def message_route_test(
         cmd=cmd, hub_name=hub_name, rg=resource_group_name
     )
     return messaging_provider.test(
-        route_name=route_name, source_type=source_type, body=body, app_properties=app_properties, system_properties=system_properties
+        route_name=route_name,
+        source_type=source_type,
+        body=body,
+        app_properties=app_properties,
+        system_properties=system_properties
     )
 
 

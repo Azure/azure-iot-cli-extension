@@ -332,7 +332,7 @@ def load_iothub_help():
         examples:
           - name: Create a key-based Cosmos DB Collection endpoint for an IoT Hub.
             text: >
-                az iot hub message-endpoint create cosmosdb-collection -n {iothub_name} --en {endpoint_name} --collection {collection} --db {database} --account-name {account_name}
+                az iot hub message-endpoint create cosmosdb-collection -n {iothub_name} --en {endpoint_name} --collection {collection} --db {database} --endpoint-account {account_name}
           - name: Create a Cosmos DB Collection endpoint for an IoT Hub using a connection string.
             text: >
                 az iot hub message-endpoint create cosmosdb-collection -n {iothub_name} --en {endpoint_name} -c {connection_string} --collection {collection} --db {database}
@@ -415,7 +415,7 @@ def load_iothub_help():
         examples:
           - name: Create a key-based Storage Container endpoint for an IoT Hub.
             text: >
-                az iot hub message-endpoint create storage-container -n {iothub_name} --en {endpoint_name} --container {container_name} --account-name {account_name}
+                az iot hub message-endpoint create storage-container -n {iothub_name} --en {endpoint_name} --container {container_name} --endpoint-account {account_name}
           - name: Create a Storage Container endpoint for an IoT Hub using a connection string. The endpoint uri is omitted.
             text: >
                 az iot hub message-endpoint create storage-container -n {iothub_name} --en {endpoint_name} -c {connection_string} --container {container_name}
@@ -579,7 +579,6 @@ def load_iothub_help():
         type: group
         short-summary: Manage the fallback route of an IoT hub.
     """
-
 
     helps[
         "iot hub message-route fallback show"
