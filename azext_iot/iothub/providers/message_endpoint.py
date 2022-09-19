@@ -29,7 +29,7 @@ class MessageEndpoint(IoTHubResourceProvider):
         hub_name: Optional[str] = None,
         rg: Optional[str] = None,
     ):
-        super(MessageEndpoint).__init__(cmd, hub_name, rg)
+        super(MessageEndpoint, self).__init__(cmd, hub_name, rg)
 
     def create(
         self,

@@ -303,7 +303,7 @@ def test_route_lifecycle(provisioned_only_iot_hub_session, provisioned_event_hub
         )
     ).as_json()["routes"]
     test_result = remove_fallback_route(test_result)
-    assert len(test_result) == 1
+    assert len(test_result) == 3
 
     # delete routes by name
     cli.invoke(
@@ -334,14 +334,13 @@ def test_route_lifecycle(provisioned_only_iot_hub_session, provisioned_event_hub
 
     # Wait for deletes to ensure test doesnt pick up deleted routes
     sleep(1)
-    # Return no routes that are successful, ignore fallback
     test_result = cli.invoke(
         "iot hub message-route test -n {} -g {}".format(
             iot_hub, iot_rg,
         )
     ).as_json()["routes"]
     test_result = remove_fallback_route(test_result)
-    assert len(test_result) == 0
+    assert len(test_result) == 2
 
     test_result = cli.invoke(
         "iot hub message-route test -n {} -g {} -t {}".format(
@@ -363,6 +362,7 @@ def test_route_lifecycle(provisioned_only_iot_hub_session, provisioned_event_hub
         )
     ).as_json()
     assert len(routes) == 0
+
 
 @pytest.mark.hub_infrastructure(desired_tags="test=message_route")
 def test_route_fallback_lifecycle(provisioned_only_iot_hub_session):

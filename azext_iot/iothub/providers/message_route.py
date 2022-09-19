@@ -10,7 +10,6 @@ from azure.cli.core.azclierror import ResourceNotFoundError
 from azext_iot.common.utility import process_json_arg
 from azext_iot.iothub.common import RouteSourceType
 from azext_iot.iothub.providers.base import IoTHubResourceProvider
-from azext_iot.iothub.providers.discovery import IotHubDiscovery
 
 
 logger = get_logger(__name__)
@@ -23,7 +22,7 @@ class MessageRoute(IoTHubResourceProvider):
         hub_name: str,
         rg: Optional[str] = None,
     ):
-        super(MessageRoute).__init__(cmd, hub_name, rg)
+        super(MessageRoute, self).__init__(cmd, hub_name, rg)
 
     def create(
         self,
