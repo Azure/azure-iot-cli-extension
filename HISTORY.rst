@@ -3,7 +3,7 @@
 Release History
 ===============
 
-0.17.2
+0.17.3
 +++++++++++++++
 
 **IoT Hub Update**
@@ -15,6 +15,18 @@ Release History
 
   - az iot hub certificate root-authority show
   - az iot hub certificate root-authority set
+
+
+0.17.2
++++++++++++++++
+
+**General Updates**
+
+* Hotfix for ensuring the global subscription parameter (`--subscription`) passes through sub-commands. Affected commands include:
+
+  - az dt create
+  - az dt job import
+  - az iot device-update account create
 
 
 0.17.1
