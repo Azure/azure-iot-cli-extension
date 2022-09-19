@@ -402,7 +402,6 @@ def test_route_fallback_lifecycle(provisioned_only_iot_hub_session):
         enabled=False
     )
 
-    print("disable")
     fallback_route = cli.invoke(
         f"iot hub message-route fallback set -n {iot_hub} -g {iot_rg} -e false"
     ).as_json()
@@ -427,7 +426,6 @@ def test_route_fallback_lifecycle(provisioned_only_iot_hub_session):
         name=fallback_name,
         source_type=RouteSourceType.DeviceMessages.value
     )
-    print("enable")
     fallback_route = cli.invoke(
         f"iot hub message-route fallback set -n {iot_hub} -g {iot_rg} -e true"
     ).as_json()
@@ -445,9 +443,6 @@ def wait_till_hub_state_is_active(iot_hub: str, iot_rg: str):
         state = cli.invoke(
             f"iot hub show -n {iot_hub} -g {iot_rg}"
         ).as_json()["properties"]["state"].lower()
-        print(state)
-
-    sleep(1)
 
 
 def build_expected_route(
