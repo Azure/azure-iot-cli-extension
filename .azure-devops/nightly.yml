@@ -18,10 +18,11 @@ parameters:
   default: 'aziotcli_test_nightly'
 - name: vmImage
   type: string
-  default: 'ubuntu-18.04'
+  default: 'ubuntu-20.04'
   values:
-  - 'ubuntu-18.04'
+  - 'ubuntu-20.04'
   - 'ubuntu-latest'
+  - 'ubuntu-22.04'
 - name: pythonVersion
   displayName: 'Python version for building wheel, KPIs'
   type: string
