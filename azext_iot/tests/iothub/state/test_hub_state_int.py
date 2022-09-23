@@ -8,18 +8,16 @@ from azext_iot.common.shared import DeviceAuthApiType
 
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
-from azext_iot.tests.iothub import IoTLiveScenarioTest
-from azext_iot.tests.test_constants import ResourceTypes
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.utility import generate_key, read_file_content
 from azext_iot.common.certops import create_self_signed_certificate
-from azext_iot.tests.helpers import add_test_tag
 from azext_iot.tests.iothub import (
     PRIMARY_THUMBPRINT,
     SECONDARY_THUMBPRINT,
     DATAPLANE_AUTH_TYPES,
     DEVICE_TYPES,
 )
+from azext_iot.common._azure import parse_iot_hub_message_endpoint_connection_string, parse_storage_container_connection_string
 
 settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL)
 CWD = os.path.dirname(os.path.abspath(__file__))
@@ -27,6 +25,8 @@ cli = EmbeddedCLI()
 
 DATAPLANE = "configurations devices edgedeployments"
 CONTROLPLANE = "certificates endpoints identities routes"
+MAX_RETRIES = 5
+# DATAPLANE_AUTH_TYPES = ["cstring"]
 
 
 def generate_device_names(count, edge=False):
@@ -174,6 +174,14 @@ def setup_hub_states(provisioned_iothubs_module):
     if os.path.isfile(filename):
         os.remove(filename)
 
+@pytest.fixture()
+def setup_hub_states_controlplane(setup_hub_controlplane_states):
+    filename = generate_generic_id() + ".json"
+    setup_hub_controlplane_states[0]["filename"] = filename
+    yield setup_hub_controlplane_states
+    if os.path.isfile(filename):
+        os.remove(filename)
+
 
 def set_cmd_auth_type(command: str, auth_type: str, cstring: str) -> str:
     if auth_type not in DATAPLANE_AUTH_TYPES:
@@ -185,7 +193,16 @@ def set_cmd_auth_type(command: str, auth_type: str, cstring: str) -> str:
 
     return f"{command} --auth-type {auth_type}"
 
-def clean_up_hub(cstring):
+def clean_up_hub(hub_name, hub_rg):
+    empty_filename = generate_generic_id() + ".json"
+    with open(empty_filename, 'w', encoding='utf-8') as f:
+        f.write("{}")
+    cli.invoke(
+        f"iot hub state import -n {hub_name} -f {empty_filename} -g {hub_rg} -r"
+    )
+    os.remove(empty_filename)
+
+def clean_up_hub_dataplane(cstring):
     dest_hub_configs = cli.invoke(
         f"iot hub configuration list -l {cstring}"
     ).as_json()
@@ -214,8 +231,47 @@ def clean_up_hub(cstring):
     time.sleep(1)
 
 
+@pytest.mark.hub_infrastructure(count=2, sys_identity=True, user_identity=True)
+def test_migrate_controlplane(setup_hub_states_controlplane):
+    origin_name = setup_hub_states_controlplane[0]["name"]
+    origin_rg = setup_hub_states_controlplane[0]["rg"]
+    dest_name = setup_hub_states_controlplane[1]["name"]
+    # dest_rg = setup_hub_states_controlplane[1]["rg"]
+    # assume origin_rg == dest_rg
+
+    cli.invoke(
+        f"iot hub state migrate --origin-hub {origin_name} --origin-resource-group {origin_rg} "
+        f"--destination-hub {dest_name} --destination-resource-group {origin_rg} -r --aspects {CONTROLPLANE}"
+    )
+
+    time.sleep(1)  # gives the hub time to update before the checks
+    compare_hubs_controlplane(origin_name, dest_name, origin_rg)
+
+
+# TODO figure out better way to force two hubs to be made that wont make this test create
+# two hubs if ran by it
+@pytest.mark.hub_infrastructure(count=2, sys_identity=True, user_identity=True)
+def test_export_import_controlplane(setup_hub_states_controlplane):
+    filename = setup_hub_states_controlplane[0]["filename"]
+    hub_name = setup_hub_states_controlplane[0]["name"]
+    hub_rg = setup_hub_states_controlplane[0]["rg"]
+
+    cli.invoke(
+            f"iot hub state export -n {hub_name} -f {filename} -g {hub_rg} --of --aspects {CONTROLPLANE}"
+    )
+    compare_hub_controlplane_to_file(filename, hub_name, hub_rg)
+    clean_up_hub(hub_name, hub_rg)
+    # TODO: change this to import empty file
+    time.sleep(5)
+    cli.invoke(
+        f"iot hub state import -n {hub_name} -f {filename} -g {hub_rg} -r --aspects {CONTROLPLANE}"
+    )
+    time.sleep(10)  # gives the hub time to update before the checks
+    compare_hub_controlplane_to_file(filename, hub_name, hub_rg)
+
+
 @pytest.mark.hub_infrastructure(count=2)
-def test_1migrate(setup_hub_states):
+def test_migrate_dataplane(setup_hub_states):
     origin_name = setup_hub_states[0]["name"]
     origin_rg = setup_hub_states[0]["rg"]
     origin_cstring = setup_hub_states[0]["connectionString"]
@@ -240,14 +296,14 @@ def test_1migrate(setup_hub_states):
 
         time.sleep(1)  # gives the hub time to update before the checks
         compare_hubs_dataplane(origin_cstring, dest_cstring)
-        clean_up_hub(dest_cstring)
+        clean_up_hub_dataplane(dest_cstring)
 
 
 # TODO figure out better way to force two hubs to be made that wont make this test create
 # two hubs if ran by it
 # Make sure this is just dataplane to split up functionality
-@pytest.mark.hub_infrastructure()
-def test_2export_import(setup_hub_states):
+@pytest.mark.hub_infrastructure(count=1)
+def test_export_import_dataplane(setup_hub_states):
     filename = setup_hub_states[0]["filename"]
     hub_name = setup_hub_states[0]["name"]
     hub_rg = setup_hub_states[0]["rg"]
@@ -263,7 +319,7 @@ def test_2export_import(setup_hub_states):
         compare_hub_dataplane_to_file(filename, hub_cstring)
 
     for auth_phase in DATAPLANE_AUTH_TYPES:
-        clean_up_hub(hub_cstring)
+        clean_up_hub_dataplane(hub_cstring)
         # TODO: change this to import empty file
         time.sleep(5)
         cli.invoke(
@@ -276,46 +332,54 @@ def test_2export_import(setup_hub_states):
         time.sleep(10)  # gives the hub time to update before the checks
         compare_hub_dataplane_to_file(filename, hub_cstring)
 
-
 # Dataplane main compare commands
 def compare_hubs_dataplane(origin_cstring: str, dest_cstring: str):
     # compare configurations (there's only one)
-    orig_hub_configs = cli.invoke(
-        f"iot hub configuration list -l {origin_cstring}"
-    ).as_json()
-    dest_hub_configs = cli.invoke(
-        f"iot hub configuration list -l {dest_cstring}"
-    ).as_json()
-    compare_configs(orig_hub_configs, dest_hub_configs)
+    tries = 0
+    while tries < MAX_RETRIES:
+        try:
+            orig_hub_configs = cli.invoke(
+                f"iot hub configuration list -l {origin_cstring}"
+            ).as_json()
+            dest_hub_configs = cli.invoke(
+                f"iot hub configuration list -l {dest_cstring}"
+            ).as_json()
+            compare_configs(orig_hub_configs, dest_hub_configs)
+            break
+        except AssertionError:
+            tries += 1
+            time.sleep(1)
 
     # compare edge deployments
-    orig_hub_deploys = cli.invoke(
-        f"iot edge deployment list -l {origin_cstring}"
-    ).as_json()
-    dest_hub_deploys = cli.invoke(
-        f"iot edge deployment list -l {dest_cstring}"
-    ).as_json()
-    compare_configs(orig_hub_deploys, dest_hub_deploys)
+    tries = 0
+    while tries < MAX_RETRIES:
+        try:
+            orig_hub_deploys = cli.invoke(
+                f"iot edge deployment list -l {origin_cstring}"
+            ).as_json()
+            dest_hub_deploys = cli.invoke(
+                f"iot edge deployment list -l {dest_cstring}"
+            ).as_json()
+            compare_configs(orig_hub_deploys, dest_hub_deploys)
+            break
+        except AssertionError:
+            tries += 1
+            time.sleep(1)
 
     # compare devices
-    orig_hub_identities = cli.invoke(
-        f"iot hub device-identity list -l {origin_cstring}"
-    ).as_json()
-    dest_hub_identities = cli.invoke(
-        f"iot hub device-identity list -l {dest_cstring}"
-    ).as_json()
-
-    if len(orig_hub_identities) != len(dest_hub_identities):
-        time.sleep(1)
-        print("sleeping for device identity list")
+    tries = 0
+    while tries < MAX_RETRIES:
         orig_hub_identities = cli.invoke(
             f"iot hub device-identity list -l {origin_cstring}"
         ).as_json()
         dest_hub_identities = cli.invoke(
             f"iot hub device-identity list -l {dest_cstring}"
         ).as_json()
+        if len(orig_hub_identities) == len(dest_hub_identities):
+            break
+        tries += 1
+        time.sleep(1)
 
-    assert len(orig_hub_identities) == len(dest_hub_identities)
     dest_hub_identities_dict = {}
     for id in dest_hub_identities:
         dest_hub_identities_dict[id["deviceId"]] = id
@@ -389,17 +453,31 @@ def compare_hub_dataplane_to_file(filename: str, cstring: str):
 
     # compare configurations
     file_configs = hub_info["configurations"]
-    hub_configs = cli.invoke(
-        f"iot hub configuration list -l {cstring}"
-    ).as_json()
-    compare_configs(file_configs, hub_configs)
+    tries = 0
+    while tries < MAX_RETRIES:
+        try:
+            hub_configs = cli.invoke(
+                f"iot hub configuration list -l {cstring}"
+            ).as_json()
+            compare_configs(file_configs, hub_configs)
+            break
+        except AssertionError:
+            tries += 1
+            time.sleep(1)
 
     # compare edge deployments
     file_deploys = hub_info["edgeDeployments"]
-    hub_deploys = cli.invoke(
-        f"iot edge deployment list -l {cstring}"
-    ).as_json()
-    compare_configs(file_deploys, hub_deploys)
+    tries = 0
+    while tries < MAX_RETRIES:
+        try:
+            hub_deploys = cli.invoke(
+                f"iot edge deployment list -l {cstring}"
+            ).as_json()
+            compare_configs(file_deploys, hub_deploys)
+            break
+        except AssertionError:
+            tries += 1
+            time.sleep(1)
 
     # compare devices
     file_devices = hub_info["devices"]["identities"]
@@ -407,17 +485,15 @@ def compare_hub_dataplane_to_file(filename: str, cstring: str):
         f"iot hub device-identity list -l {cstring}"
     ).as_json()
 
-    retries = 0
-    # sometimes the service doesnt return the right amount - wait and retry
-    while len(hub_devices) < len(file_devices) and retries < 3:
-        time.sleep(1)
-        retries += 1
-        print(f"retry fetch devices {retries}")
-        print(len(hub_devices))
+    tries = 0
+    while tries < MAX_RETRIES:
         hub_devices = cli.invoke(
             f"iot hub device-identity list -l {cstring}"
         ).as_json()
-        print(len(hub_devices))
+        if len(file_devices) == len(hub_devices):
+            break
+        tries += 1
+        time.sleep(1)
 
     assert len(file_devices) == len(hub_devices)
 
@@ -535,7 +611,7 @@ def compare_hub_controlplane_to_file(filename: str, hub_name: str, rg: str):
     compare_routes(file_routes, hub_routes)
 
 
-def compare_hubs(origin_hub_name: str, dest_hub_name: str, rg: str):
+def compare_hubs_controlplane(origin_hub_name: str, dest_hub_name: str, rg: str):
     # compare certificates
     orig_hub_certs = cli.invoke(
         "iot hub certificate list --hub-name {} -g {}".format(origin_hub_name, rg)
@@ -640,7 +716,22 @@ def compare_endpoints(endpoints1, endpoints2, endpoint_type):
         assert endpoint["identity"] == target["identity"]
         assert endpoint["resourceGroup"] == target["resourceGroup"]
         assert endpoint["subscriptionId"] == target["subscriptionId"]
-        assert endpoint["connectionString"] == target["connectionString"]
+
+        # Ignore keys for connection string
+        if endpoint.get("connectionString"):
+            if endpoint_type == "storageContainers":
+                cstring_props = parse_storage_container_connection_string(endpoint["connectionString"])
+                target_props = parse_storage_container_connection_string(target["connectionString"])
+                cstring_props.pop("AccountKey")
+                target_props.pop("AccountKey")
+                assert cstring_props == target_props
+            else:
+                cstring_props = parse_iot_hub_message_endpoint_connection_string(endpoint["connectionString"])
+                target_props = parse_iot_hub_message_endpoint_connection_string(target["connectionString"])
+                cstring_props.pop("SharedAccessKey")
+                target_props.pop("SharedAccessKey")
+                assert cstring_props == target_props
+
         if "entityPath" in endpoint:
             assert endpoint["entityPath"] == target["entityPath"]
 

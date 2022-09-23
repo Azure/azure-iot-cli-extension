@@ -8,6 +8,7 @@ import os
 from time import sleep
 import pytest
 from azext_iot.common.embedded_cli import EmbeddedCLI
+from azext_iot.iothub.providers.state import EndpointType
 from azext_iot.tests.settings import DynamoSettings
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.certops import create_self_signed_certificate
@@ -65,6 +66,15 @@ def provisioned_iothubs_module(request) -> Optional[dict]:
 @pytest.fixture
 def provisioned_iothubs(request) -> Optional[dict]:
     result = _iot_hubs_provisioner(request)
+    _assign_dataplane_rbac_role(result)
+    yield result
+    if result:
+        _iot_hubs_removal(result)
+
+
+@pytest.fixture
+def provisioned_iothubs_with_user_identity(request, provisioned_user_identity) -> Optional[dict]:
+    result = _iot_hubs_provisioner(request, provisioned_user_identity)
     _assign_dataplane_rbac_role(result)
     yield result
     if result:
@@ -221,14 +231,25 @@ def _assign_rbac_role(assignee: str, scope: str, role: str, max_tries: int = 10)
 
 # want to have 2 hubs, first hub have all the control plane stuff, both hubs to have permissions
 @pytest.fixture()
-def setup_hub_controlplane_states(provisioned_iot_hub, provisioned_storage, provisioned_event_hub, provisioned_service_bus):
-    hub_name = provisioned_iot_hub[0]["name"]
-    hub_rg = provisioned_iot_hub[0]["rg"]
+def setup_hub_controlplane_states(provisioned_iothubs_with_user_identity, provisioned_storage, provisioned_event_hub, provisioned_service_bus):
+    hub_name = provisioned_iothubs_with_user_identity[0]["name"]
+    hub_rg = provisioned_iothubs_with_user_identity[0]["rg"]
+    eventhub_name = provisioned_event_hub["eventhub"]["name"]
+    eventhub_endpoint_uri = "sb:" + provisioned_event_hub["namespace"]["serviceBusEndpoint"].split(":")[1]
+    servicebus_queue = provisioned_service_bus["queue"]["name"]
+    servicebus_topic = provisioned_service_bus["topic"]["name"]
+    servicebus_endpoint_uri = "sb:" + provisioned_service_bus["namespace"]["serviceBusEndpoint"].split(":")[1]
+
+    storage_cstring = provisioned_storage["connectionString"]
+    storage_container = provisioned_storage["container"]["name"]
 
     # add endpoints - prob use dict of scope to role + for loop
-    hub_principal_id = provisioned_iot_hub[0]["identity"]["principalId"]
-    user_identities = list(provisioned_iot_hub[0]["identity"]["userAssignedIdentities"].values())
-    user_id = user_identities[0]["principalId"]
+    hub_principal_ids = [hub_obj["hub"]["identity"]["principalId"] for hub_obj in provisioned_iothubs_with_user_identity]
+    user_identities = list(provisioned_iothubs_with_user_identity[0]["hub"]["identity"]["userAssignedIdentities"].values())
+    user_principal_id = user_identities[0]["principalId"]
+    user_id = list(provisioned_iothubs_with_user_identity[0]["hub"]["identity"]["userAssignedIdentities"].keys())[0]
+    sub_id = provisioned_iothubs_with_user_identity[0]["hub"]["subscriptionid"]
+
 
     # mapping of scope to role
     scope_dict = {
@@ -238,30 +259,34 @@ def setup_hub_controlplane_states(provisioned_iot_hub, provisioned_storage, prov
         provisioned_service_bus["topic"]["id"]: "Azure Service Bus Data Sender"
     }
     for scope, role in scope_dict.items():
-        _assign_rbac_role(assignee=hub_principal_id, scope=scope, role=role)
-        _assign_rbac_role(assignee=user_id, scope=scope, role=role)
+        _assign_rbac_role(assignee=user_principal_id, scope=scope, role=role)
+        for hub_principal_id in hub_principal_ids:
+            _assign_rbac_role(assignee=hub_principal_id, scope=scope, role=role)
 
     # make sure to add permissions to new hub too; add endpoints
+    sleep(30)
 
-    cli.invoke(f"iot hub routing-endpoint create -n eventhub-systemid -r {EP_RG} -g {entity_rg} -s "
-                    f"{subscription_id} -t eventhub --hub-name {entity_name} --endpoint-uri {eventhub_endpointuri}"
-                    f" --entity-path {EVENTHUB} --auth-type identityBased")
+    cli.invoke(
+        f"iot hub routing-endpoint create -n eventhub-systemid -r {hub_rg} -g {hub_rg} -s {sub_id}"
+        f" -t {EndpointType.EventHub.value} --hub-name {hub_name} --endpoint-uri {eventhub_endpoint_uri}"
+        f" --entity-path {eventhub_name} --auth-type identityBased"
+    )
 
-    cli.invoke(f"iot hub routing-endpoint create -n queue-systemid -r {EP_RG} -g {entity_rg} -s "
-                    f"{subscription_id} -t servicebusqueue --hub-name {entity_name} --endpoint-uri "
-                    f"{servicebus_endpointuri} --entity-path {SERVICEBUS_QUEUE} --auth-type identityBased")
+    cli.invoke(
+        f"iot hub routing-endpoint create -n queue-systemid -r {hub_rg} -g {hub_rg} -s {sub_id}"
+        f" -t {EndpointType.ServiceBusQueue.value} --hub-name {hub_name} --endpoint-uri "
+        f"{servicebus_endpoint_uri} --entity-path {servicebus_queue} --auth-type identityBased"
+    )
 
-    cli.invoke(f"iot hub routing-endpoint create -n topic-userid -r {EP_RG} -g {entity_rg} -s "
-                    f"{subscription_id} -t servicebustopic --hub-name {entity_name} --endpoint-uri "
-                    f"{servicebus_endpointuri} --entity-path {SERVICEBUS_TOPIC} --auth-type identityBased --identity "
-                    f"{uid}")
+    cli.invoke(
+        f"iot hub routing-endpoint create -n topic-userid -r {hub_rg} -g {hub_rg} -t {EndpointType.ServiceBusTopic.value} --hub-name {hub_name} -s {sub_id} --endpoint-uri "
+        f"{servicebus_endpoint_uri} --entity-path {servicebus_topic} --auth-type identityBased --identity "
+        f"{user_id}"
+    )
 
-    storage_cstring = cli.invoke(
-        f"storage account show-connection-string --name {STORAGE_ACCOUNT} -g {EP_RG}"
-    ).as_json()["connectionString"]
-    cli.invoke(f"iot hub routing-endpoint create -n storagecontainer-key -r {EP_RG} -g {entity_rg} -s "
-                    f"{subscription_id} -t azurestoragecontainer --hub-name {entity_name} -c {storage_cstring} "
-                    f"--container {STORAGE_CONTAINER}  -b 350 -w 250 --encoding json")
+    cli.invoke(
+        f"iot hub routing-endpoint create -n storagecontainer-key -r {hub_rg} -g {hub_rg} -t {EndpointType.AzureStorageContainer.value} --hub-name {hub_name} -c {storage_cstring} -s {sub_id} "
+        f"--container {storage_container}  -b 350 -w 250 --encoding json")
 
     # add routes - prob change one to be custom endpoint
     cli.invoke(
@@ -275,6 +300,7 @@ def setup_hub_controlplane_states(provisioned_iot_hub, provisioned_storage, prov
 
     # add certificate
     cert = create_self_signed_certificate(subject="aziotcli", valid_days=1, cert_output_dir=None)["certificate"]
+    print(cert)
     cert_file = "testCert" + generate_generic_id() + ".cer"
     with open(cert_file, 'w', encoding='utf-8') as f:
         f.write(cert)
@@ -286,7 +312,7 @@ def setup_hub_controlplane_states(provisioned_iot_hub, provisioned_storage, prov
     if os.path.isfile(cert_file):
         os.remove(cert_file)
 
-    yield provisioned_iothubs_module
+    yield provisioned_iothubs_with_user_identity
 
 
 @pytest.fixture(scope="session")
