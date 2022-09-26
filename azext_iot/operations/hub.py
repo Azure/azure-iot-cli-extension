@@ -2286,7 +2286,7 @@ def iot_device_export(
     cmd,
     hub_name: str,
     blob_container_uri: str,
-    include_keys: bool =False,
+    include_keys: bool = False,
     storage_authentication_type: str = None,
     identity: str = None,
     resource_group_name: str = None,
