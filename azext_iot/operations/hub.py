@@ -2222,8 +2222,8 @@ def iot_get_module_connection_string(
 
 def _create_iot_hub_job_manager(
     cmd,
-    hub_name,
-    resource_group_name=None,
+    hub_name: str,
+    resource_group_name: str = None,
 ):
     from azure.iot.hub import IoTHubJobManager
 
@@ -2284,12 +2284,12 @@ def _create_export_import_job_properties(
 
 def iot_device_export(
     cmd,
-    hub_name,
-    blob_container_uri,
-    include_keys=False,
-    storage_authentication_type=None,
-    identity=None,
-    resource_group_name=None,
+    hub_name: str,
+    blob_container_uri: str,
+    include_keys: bool =False,
+    storage_authentication_type: str = None,
+    identity: str = None,
+    resource_group_name: str = None,
 ):
     iot_hub_job_manager = _create_iot_hub_job_manager(
         cmd, hub_name, resource_group_name
@@ -2306,12 +2306,12 @@ def iot_device_export(
 
 def iot_device_import(
     cmd,
-    hub_name,
-    input_blob_container_uri,
-    output_blob_container_uri,
-    storage_authentication_type=None,
-    resource_group_name=None,
-    identity=None,
+    hub_name: str,
+    input_blob_container_uri: str,
+    output_blob_container_uri: str,
+    storage_authentication_type: str = None,
+    resource_group_name: str = None,
+    identity: str = None,
 ):
     iot_hub_job_manager = _create_iot_hub_job_manager(
         cmd, hub_name, resource_group_name
