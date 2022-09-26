@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 
 import os
-import pytest
 from time import sleep
 from knack.util import CLIError
 from pathlib import Path
@@ -13,11 +12,10 @@ from knack.log import get_logger
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.settings import UserTypes
-from azext_iot.common.utility import ensure_iothub_sdk_min_version, ensure_azure_namespace_path
+from azext_iot.common.utility import ensure_azure_namespace_path
 
 from azext_iot.tests.generators import generate_generic_id
 # TODO: assert DEVICE_DEVICESCOPE_PREFIX format in parent device twin.
-from azext_iot.constants import IOTHUB_TRACK_2_SDK_MIN_VERSION
 from azure.cli.core._profile import Profile
 from azure.cli.core.mock import DummyCli
 
@@ -212,9 +210,6 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 if attempts >= SETUP_MAX_ATTEMPTS:
                     raise x
 
-    @pytest.mark.skipif(
-        not ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION),
-        reason="Skipping track 2 tests because SDK is track 1")
     def test_system_identity_storage(self):
         identity_type_enable = "SystemAssigned"
 
@@ -307,9 +302,6 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 )
             )
 
-    @pytest.mark.skipif(
-        not ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION),
-        reason="Skipping track 2 tests because SDK is track 1")
     def test_user_identity_storage(self):
         # User Assigned Managed Identity
         user_identity = self.get_managed_identity()
