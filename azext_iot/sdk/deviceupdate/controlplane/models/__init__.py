@@ -50,22 +50,20 @@ from ._models_py3 import TrackedResource
 from ._models_py3 import UserAssignedIdentity
 
 
-from ._device_update_enums import (
-    ActionType,
-    AuthenticationType,
-    CheckNameAvailabilityReason,
-    CreatedByType,
-    GroupIdProvisioningState,
-    ManagedServiceIdentityType,
-    Origin,
-    PrivateEndpointConnectionProvisioningState,
-    PrivateEndpointConnectionProxyProvisioningState,
-    PrivateEndpointServiceConnectionStatus,
-    ProvisioningState,
-    PublicNetworkAccess,
-    Role,
-    SKU,
-)
+from ._device_update_enums import ActionType
+from ._device_update_enums import AuthenticationType
+from ._device_update_enums import CheckNameAvailabilityReason
+from ._device_update_enums import CreatedByType
+from ._device_update_enums import GroupIdProvisioningState
+from ._device_update_enums import ManagedServiceIdentityType
+from ._device_update_enums import Origin
+from ._device_update_enums import PrivateEndpointConnectionProvisioningState
+from ._device_update_enums import PrivateEndpointConnectionProxyProvisioningState
+from ._device_update_enums import PrivateEndpointServiceConnectionStatus
+from ._device_update_enums import ProvisioningState
+from ._device_update_enums import PublicNetworkAccess
+from ._device_update_enums import Role
+from ._device_update_enums import SKU
 from ._patch import __all__ as _patch_all
 from ._patch import *  # type: ignore # pylint: disable=unused-wildcard-import
 from ._patch import patch_sdk as _patch_sdk
