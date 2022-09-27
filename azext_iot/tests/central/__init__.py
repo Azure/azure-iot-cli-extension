@@ -582,21 +582,26 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                                 pass
 
                             for child in children:
+                                try:
+                                    self.cmd(
+                                        "iot central device delete --app-id {} --device-id {}".format(
+                                            self.app_id, child["id"]
+                                        ),
+                                        api_version=api_version,
+                                    )
+                                except Exception:
+                                    pass
+
+                            time.sleep(10)
+                            try:
                                 self.cmd(
                                     "iot central device delete --app-id {} --device-id {}".format(
-                                        self.app_id, child["id"]
+                                        self.app_id, device["id"]
                                     ),
                                     api_version=api_version,
                                 )
-
-                            time.sleep(10)
-
-                            self.cmd(
-                                "iot central device delete --app-id {} --device-id {}".format(
-                                    self.app_id, device["id"]
-                                ),
-                                api_version=api_version,
-                            )
+                            except Exception:
+                                pass
                 time.sleep(10)
 
         raise CLIInternalError(

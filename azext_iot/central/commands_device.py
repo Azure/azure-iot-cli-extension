@@ -325,7 +325,7 @@ def list_children(
     # list all application device twins
     devices = provider.list_devices(central_dns_suffix=central_dns_suffix)
     for device in devices:
-        if device.provisioned:
+        try:
             twin = provider.get_device_twin(
                 device.id, central_dns_suffix=central_dns_suffix
             )
@@ -336,6 +336,8 @@ def list_children(
                 and device.id != device_id  # skip current device
             ):
                 children.append(device)
+        except Exception:
+            pass
 
     return children
 
