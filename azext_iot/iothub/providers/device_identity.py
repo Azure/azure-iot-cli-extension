@@ -50,7 +50,6 @@ class DeviceIdentityProvider(IoTHubProvider):
         config_file: Optional[str]=None,
         visualize: Optional[bool]=False,
         clean: Optional[bool]=False,
-        default_agent: Optional[str]=None
     ):
         """
         Creates a nested edge hierarchy based on user nargs input.
@@ -94,7 +93,6 @@ class DeviceIdentityProvider(IoTHubProvider):
             # Parse each device and add to the tree
             config = {
                 'auth_method': DeviceAuthType.shared_private_key.value, # TODO - add input param for auth-type
-                'default_edge_agent': default_agent,
                 'devices': []
             }
             for device_input in devices:
@@ -247,7 +245,6 @@ class DeviceIdentityProvider(IoTHubProvider):
         if auth_value not in ['symmetric_key', 'x509_certificate']:
             raise InvalidArgumentValueError('Invalid authentication_method in edge config file, must be either symmetric_key or x509_certificate')
         device_authentication_method = DeviceAuthType.shared_private_key.value if auth_value == 'symmetric_key' else DeviceAuthType.x509_thumbprint.value
-        default_edge_agent = agent_config.get('default_edge_agent', None)
         all_devices= []
 
         def _process_edge_device(device: dict, parent_id=None):
@@ -273,7 +270,6 @@ class DeviceIdentityProvider(IoTHubProvider):
         return {
             'version': version,
             'auth_method': device_authentication_method,
-            'default_edge_agent': default_edge_agent,
             "devices": all_devices
         }
 
