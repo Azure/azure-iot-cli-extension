@@ -512,7 +512,7 @@ class TestIotCentral(CentralLiveScenarioTest):
         # delete
         self._delete_enrollment_group(group_id=symmetric_group["id"], api_version=self._api_version)
         self._delete_enrollment_group(group_id=x509_group["id"], api_version=self._api_version)
-        self._delete_test_certs_folder()
+        self._delete_test_certs()
 
     def test_central_scheduled_job_methods_CRUD(self):
         # create

@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 
 import json
-import shutil
 import time
 import os
 from typing import Tuple
@@ -58,7 +57,7 @@ device_updated_properties_path = get_context_path(__file__, "json/device_update_
 device_updated_component_properties_path = get_context_path(__file__, "json/device_update_component_properties.json")
 
 # Create certificate
-cert_output_dir = os.getcwd() + '/azext_iot/tests/central/certs'
+cert_output_dir = os.getcwd()
 if not os.path.isdir(cert_output_dir):
     os.makedirs(cert_output_dir)
 
@@ -786,7 +785,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
              --app-id {self.app_id}
              --group-id {group_id}
              --attestation 'x509'
-             --cp {"./azext_iot/tests/central/certs/" + cert_name + CERT_ENDING}
+             --cp {cert_name + CERT_ENDING}
              --display-name {display_name}
              --type 'iot'
         '''
@@ -847,7 +846,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             iot central enrollment-group verify-certificate
              --app-id {self.app_id}
              --group-id {group_id}
-             --cp {"./azext_iot/tests/central/certs/" + verification_code + CERT_ENDING}
+             --cp {verification_code + CERT_ENDING}
         '''
         return self.cmd(
             command,
@@ -870,8 +869,11 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             ],
         ).get_output_in_json()
 
-    def _delete_test_certs_folder(self):
-        shutil.rmtree(cert_output_dir)
+    def _delete_test_certs(self):
+        files_in_directory = os.listdir(cert_output_dir)
+        filtered_files = [file for file in files_in_directory if file.endswith(".pem")]
+        for file in filtered_files:
+            os.remove(os.path.join(cert_output_dir, file))
 
     def _create_scheduled_job(self, api_version):
         # create a device group for scheduled job
