@@ -1946,6 +1946,7 @@ def _load_central_scheduled_job_help():
     ] = """
     type: command
     short-summary: Create a scheduled job by ID
+    long-summary: --schedule and --content can be inline json or file path.
     examples:
       - name: Create a schedule job with name
         text: >

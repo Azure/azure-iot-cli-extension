@@ -762,15 +762,12 @@ def load_central_arguments(self, _):
             "schedule",
             options_list=["--schedule"],
             help="The schedule at which to execute the job. Provide path to JSON file or raw stringified JSON."
-            " [File Path Example:./path/to/file.json]"
-            " [Example of stringified JSON:[{<Schedule Data JSON>}].",
         )
         context.argument(
             "content",
             options_list=["--content", "-k"],
             help="The job data definition. Provide path to JSON file or raw stringified JSON."
-            " [File Path Example:./path/to/file.json]"
-            " [Example of stringified JSON:[{<Job Data JSON>}]. The request body must contain array of JobData.",
+            " The request body must contain array of JobData.",
         )
         context.argument(
             "batch_type",
@@ -837,15 +834,12 @@ def load_central_arguments(self, _):
             "schedule",
             options_list=["--schedule"],
             help="The schedule at which to execute the job. Provide path to JSON file or raw stringified JSON."
-            " [File Path Example:./path/to/file.json]"
-            " [Example of stringified JSON:[{<Schedule Data JSON>}].",
         )
         context.argument(
             "content",
             options_list=["--content", "-k"],
             help="The job data definition. Provide path to JSON file or raw stringified JSON."
-            " [File Path Example:./path/to/file.json]"
-            " [Example of stringified JSON:[{<Job Data JSON>}]. The request body must contain array of JobData.",
+            " The request body must contain array of JobData.",
         )
         context.argument(
             "batch_type",
