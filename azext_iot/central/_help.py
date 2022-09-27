@@ -1867,6 +1867,7 @@ def _load_central_enrollment_group_help():
         "iot central enrollment-group verify-certificate"
     ] = """
     type: command
+    short-summary: Verify the primary or secondary x509 certificate of an enrollment group
     long-summary: |
                     Verify the primary or secondary x509 certificate of an enrollment group
                     by providing a certificate with the signed verification code.

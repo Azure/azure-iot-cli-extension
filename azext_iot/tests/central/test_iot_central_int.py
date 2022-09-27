@@ -497,7 +497,14 @@ class TestIotCentral(CentralLiveScenarioTest):
         assert result["id"] == x509_group["id"]
 
         # generate x509 verification code
-        self._generate_x509_verification_code(group_id=x509_group["id"], api_version=self._api_version)
+        verification_code = self._generate_x509_verification_code(group_id=x509_group["id"], api_version=self._api_version)
+
+        # verify x509 certification
+        self._verify_x509_certification(
+            group_id=x509_group["id"],
+            api_version=self._api_version,
+            verification_code=verification_code
+        )
 
         # remove x509
         self._remove_x509(group_id=x509_group["id"], api_version=self._api_version)
@@ -505,6 +512,7 @@ class TestIotCentral(CentralLiveScenarioTest):
         # delete
         self._delete_enrollment_group(group_id=symmetric_group["id"], api_version=self._api_version)
         self._delete_enrollment_group(group_id=x509_group["id"], api_version=self._api_version)
+        self._delete_test_certs_folder()
 
     def test_central_scheduled_job_methods_CRUD(self):
         # create

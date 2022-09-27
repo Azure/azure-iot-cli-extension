@@ -5,15 +5,18 @@
 # --------------------------------------------------------------------------------------------
 
 import json
+import shutil
 import time
+import os
 from typing import Tuple
 
 from azure.cli.core.azclierror import CLIInternalError
 from azext_iot.tests import CaptureOutputLiveScenarioTest
 from azext_iot.tests.conftest import get_context_path
 from azext_iot.tests.generators import generate_generic_id
-from azext_iot.tests.helpers import add_test_tag, create_storage_account
+from azext_iot.tests.helpers import add_test_tag, create_storage_account, CERT_ENDING
 from azext_iot.tests.settings import DynamoSettings
+from azext_iot.tests.test_utils import create_certificate
 from azext_iot.common import utility
 from azext_iot.central.models.enum import Role, UserType
 from azext_iot.tests.test_constants import ResourceTypes
@@ -53,22 +56,31 @@ edge_template_path_preview = get_context_path(
 sync_command_params = get_context_path(__file__, "json/sync_command_args.json")
 device_updated_properties_path = get_context_path(__file__, "json/device_update_properties.json")
 device_updated_component_properties_path = get_context_path(__file__, "json/device_update_component_properties.json")
-x509_certificate_path = get_context_path(__file__, "json/x509_certificate.pem")
+
+# Create certificate
+cert_output_dir = os.getcwd() + '/azext_iot/tests/central/certs'
+if not os.path.isdir(cert_output_dir):
+    os.makedirs(cert_output_dir)
+
+cert_name = "central_x509_" + generate_generic_id()
+root_cert_obj = create_certificate(
+    subject=cert_name, valid_days=1, cert_output_dir=cert_output_dir
+)
 
 # Device attestation
 attestation_payload = {
     'type': 'symmetricKey',
     'symmetricKey': {
-        'primaryKey': 'ya9+G4ED+/g0BgLduhjETJnbeEWMl1HIUApWCCpGMAU=',
-        'secondaryKey': 'D8jeWazxcCK+MAxrn9KlqDLb8trbuKs35KEbcLBnS48='
+        'primaryKey': utility.generate_key(),
+        'secondaryKey': utility.generate_key()
     }
 }
 
 attestation_payload_update = {
     'type': 'symmetricKey',
     'symmetricKey': {
-        'primaryKey': 'r9KdK+LBaLiZ0p+RfAVj6eu9umGE6VqJj+AMLHdw+io=',
-        'secondaryKey': 'W7/4/oaMpA83RYfirH9vzic4ZeK2Piy0jO5rTOM5wxg='
+        'primaryKey': utility.generate_key(),
+        'secondaryKey': utility.generate_key()
     }
 }
 
@@ -769,14 +781,12 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         group_id = self.create_random_name(prefix="aztest", length=24)
         display_name = self.create_random_name(prefix="aztest", length=10)
 
-        path = x509_certificate_path.replace("/", "//").replace('\\', '\\\\')
-
         command = f'''
             iot central enrollment-group create
              --app-id {self.app_id}
              --group-id {group_id}
              --attestation 'x509'
-             --cp {path}
+             --cp {"./azext_iot/tests/central/certs/" + cert_name + CERT_ENDING}
              --display-name {display_name}
              --type 'iot'
         '''
@@ -822,6 +832,26 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         return self.cmd(
             command,
             api_version=api_version,
+        ).get_output_in_json()['verificationCode']
+
+    def _verify_x509_certification(self, group_id, api_version, verification_code):
+        # Create verified certification
+        create_certificate(
+            subject=verification_code,
+            valid_days=1,
+            cert_output_dir=cert_output_dir,
+            cert_object=root_cert_obj,
+        )
+
+        command = f'''
+            iot central enrollment-group verify-certificate
+             --app-id {self.app_id}
+             --group-id {group_id}
+             --cp {"./azext_iot/tests/central/certs/" + verification_code + CERT_ENDING}
+        '''
+        return self.cmd(
+            command,
+            api_version=api_version,
         ).get_output_in_json()
 
     def _remove_x509(self, group_id, api_version):
@@ -839,6 +869,9 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 self.check("id", group_id),
             ],
         ).get_output_in_json()
+
+    def _delete_test_certs_folder(self):
+        shutil.rmtree(cert_output_dir)
 
     def _create_scheduled_job(self, api_version):
         # create a device group for scheduled job
