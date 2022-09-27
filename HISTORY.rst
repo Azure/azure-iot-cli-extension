@@ -18,13 +18,8 @@ unreleased
     - az iot central enrollment-group create
     - az iot central enrollment-group delete
     - az iot central enrollment-group update
-
-  - az iot central enrollment-group x509
-    - az iot central enrollment-group x509 create
-    - az iot central enrollment-group x509 show
-    - az iot central enrollment-group x509 delete
-    - az iot central enrollment-group x509 verify
-    - az iot central enrollment-group x509 generate
+    - az iot central enrollment-group verify-certificate
+    - az iot central enrollment-group generate-verification-code
 
 * Add support for scheduled jobs CRUD.
 
@@ -34,7 +29,18 @@ unreleased
     - az iot central scheduled-job create
     - az iot central scheduled-job delete
     - az iot central scheduled-job update
-    - az iot central scheduled-job list-jobs
+    - az iot central scheduled-job list-runs
+
+0.17.2
++++++++++++++++
+
+**General Updates**
+
+* Hotfix for ensuring the global subscription parameter (`--subscription`) passes through sub-commands. Affected commands include:
+
+  - az dt create
+  - az dt job import
+  - az iot device-update account create
 
 
 0.17.1
@@ -155,7 +161,7 @@ unreleased
 
 * Introducing the **in preview** Azure Device Update for IoT Hub root command group `az iot device-update`.
   To learn more about the service visit https://docs.microsoft.com/en-us/azure/iot-hub-device-update/.
- 
+
   - This command group is behind a feature flag environment variable. Set `IOT_CLI_ADU_ENABLED` to any value
     to activate the command group.
   - The Device Update command group supports all `account` and `instance` related functionality against
