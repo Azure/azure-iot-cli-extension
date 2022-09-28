@@ -56,16 +56,6 @@ sync_command_params = get_context_path(__file__, "json/sync_command_args.json")
 device_updated_properties_path = get_context_path(__file__, "json/device_update_properties.json")
 device_updated_component_properties_path = get_context_path(__file__, "json/device_update_component_properties.json")
 
-# Create certificate
-cert_output_dir = os.getcwd()
-if not os.path.isdir(cert_output_dir):
-    os.makedirs(cert_output_dir)
-
-cert_name = "central_x509_" + generate_generic_id()
-root_cert_obj = create_certificate(
-    subject=cert_name, valid_days=1, cert_output_dir=cert_output_dir
-)
-
 # Device attestation
 attestation_payload = {
     'type': 'symmetricKey',
@@ -781,7 +771,23 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             ],
         )
 
-    def _create_enrollment_group_with_x509(self, api_version):
+    def _create_certs(self) -> dict:
+        cert_output_dir = os.getcwd()
+        if not os.path.isdir(cert_output_dir):
+            os.makedirs(cert_output_dir)
+
+        cert_name = "central_x509_" + generate_generic_id()
+        root_cert_obj = create_certificate(
+            subject=cert_name, valid_days=1, cert_output_dir=cert_output_dir
+        )
+
+        return {
+            'cert_name': cert_name,
+            'cert_output_dir': cert_output_dir,
+            'root_cert_obj': root_cert_obj
+        }
+
+    def _create_enrollment_group_with_x509(self, api_version, cert_name):
         group_id = self.create_random_name(prefix="aztest", length=24)
         display_name = self.create_random_name(prefix="aztest", length=10)
 
@@ -838,7 +844,14 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             api_version=api_version,
         ).get_output_in_json()['verificationCode']
 
-    def _verify_x509_certification(self, group_id, api_version, verification_code):
+    def _verify_x509_certification(
+        self,
+        group_id,
+        api_version,
+        cert_output_dir,
+        root_cert_obj,
+        verification_code
+    ):
         # Create verified certification
         create_certificate(
             subject=verification_code,
@@ -874,7 +887,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             ],
         ).get_output_in_json()
 
-    def _delete_test_certs(self):
+    def _delete_test_certs(self, cert_output_dir):
         files_in_directory = os.listdir(cert_output_dir)
         filtered_files = [file for file in files_in_directory if file.endswith(".pem")]
         for file in filtered_files:

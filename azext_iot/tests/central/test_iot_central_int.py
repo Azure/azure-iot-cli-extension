@@ -479,9 +479,15 @@ class TestIotCentral(CentralLiveScenarioTest):
         self._delete_enrollment_group(group_id=group["id"], api_version=self._api_version)
 
     def test_central_enrollment_group_with_certificate_methods_CRUD(self):
+        cert_info = self._create_certs()
+
+        cert_name = cert_info['cert_name']
+        cert_output_dir = cert_info['cert_output_dir']
+        root_cert_obj = cert_info['root_cert_obj']
+
         # create
         symmetric_group = self._create_enrollment_group_with_symmetric_key(api_version=self._api_version)
-        x509_group = self._create_enrollment_group_with_x509(api_version=self._api_version)
+        x509_group = self._create_enrollment_group_with_x509(api_version=self._api_version, cert_name=cert_name)
 
         # show
         command = "iot central enrollment-group show -n {} --group-id {}".format(
@@ -503,6 +509,8 @@ class TestIotCentral(CentralLiveScenarioTest):
         self._verify_x509_certification(
             group_id=x509_group["id"],
             api_version=self._api_version,
+            cert_output_dir=cert_output_dir,
+            root_cert_obj=root_cert_obj,
             verification_code=verification_code
         )
 
@@ -512,7 +520,7 @@ class TestIotCentral(CentralLiveScenarioTest):
         # delete
         self._delete_enrollment_group(group_id=symmetric_group["id"], api_version=self._api_version)
         self._delete_enrollment_group(group_id=x509_group["id"], api_version=self._api_version)
-        self._delete_test_certs()
+        self._delete_test_certs(cert_output_dir)
 
     def test_central_scheduled_job_methods_CRUD(self):
         # create

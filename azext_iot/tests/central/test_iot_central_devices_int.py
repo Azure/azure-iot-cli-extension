@@ -398,8 +398,8 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         assert children[0]["source"] == device_id
         assert children[0]["target"] == child_id
 
-        # wait for relationship to be established
-        time.sleep(30)
+        # wait for relationship to be established, yes, 5 min for worst case
+        time.sleep(300)
 
         command = "iot central device edge children list --app-id {} -d {}".format(
             self.app_id, device_id
