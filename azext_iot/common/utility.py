@@ -145,6 +145,7 @@ def process_json_arg(content: str, argument_name: str = "content", preserve_orde
             )
         )
 
+
 def process_yaml_arg(path: str) -> dict:
     """Primary processor of yaml input"""
 

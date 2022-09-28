@@ -307,6 +307,7 @@ class SHAHashVersions(Enum):
     SHA1 = 1
     SHA256 = 256
 
+
 class BulkDeviceImportMode(Enum):
     """
     Supported import modes for bulk device registry operations.
