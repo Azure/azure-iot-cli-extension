@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/deviceGroups
 
-from typing import List, Union
+from typing import List
 import requests
 
 from knack.log import get_logger
@@ -13,10 +13,8 @@ from knack.log import get_logger
 from azure.cli.core.azclierror import AzureResponseError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central.models.preview import DeviceGroupPreview
-from azext_iot.central.models.v1_1_preview import DeviceGroupV1_1_preview
-from azext_iot.central.models.ga_2022_05_31 import DeviceGroupGa20220531
-from azext_iot.central.models.enum import ApiVersion
+from azext_iot.central.models.ga_2022_07_31 import DeviceGroupGa
+from azext_iot.central.common import API_VERSION
 
 logger = get_logger(__name__)
 
@@ -28,10 +26,10 @@ def list_device_groups(
     cmd,
     app_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> List[Union[DeviceGroupPreview, DeviceGroupV1_1_preview, DeviceGroupGa20220531]]:
+) -> List[DeviceGroupGa]:
     """
     Get a list of all device groups.
 
@@ -45,6 +43,7 @@ def list_device_groups(
     Returns:
         list of device groups
     """
+    api_version = API_VERSION
 
     device_groups = []
 
@@ -64,12 +63,7 @@ def list_device_groups(
             raise AzureResponseError("Value is not present in body: {}".format(result))
 
         for device_group in result["value"]:
-            if api_version == ApiVersion.preview.value:
-                device_groups.append(DeviceGroupPreview(device_group))
-            elif api_version == ApiVersion.v1_1_preview.value:
-                device_groups.append(DeviceGroupV1_1_preview(device_group))
-            else:
-                device_groups.append(DeviceGroupGa20220531(device_group))
+            device_groups.append(DeviceGroupGa(device_group))
 
         url = result.get("nextLink", None)
         pages_processed = pages_processed + 1
@@ -82,9 +76,9 @@ def get_device_group(
     app_id: str,
     device_group_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview, DeviceGroupGa20220531]:
+) -> DeviceGroupGa:
     """
     Get a specific device group.
 
@@ -99,6 +93,8 @@ def get_device_group(
     Returns:
         device_group: dict
     """
+    api_version = API_VERSION
+
     result = _utility.make_api_call(
         cmd,
         app_id=app_id,
@@ -122,9 +118,9 @@ def create_device_group(
     etag: str,
     organizations: List[str],
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview, DeviceGroupGa20220531]:
+) -> DeviceGroupGa:
     """
     Create a device group.
 
@@ -145,6 +141,8 @@ def create_device_group(
     Returns:
         device_group: dict
     """
+    api_version = API_VERSION
+
     payload = {"displayName": display_name, "filter": filter}
 
     if description is not None:
@@ -178,9 +176,9 @@ def update_device_group(
     description: str,
     organizations: List[str],
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[DeviceGroupPreview, DeviceGroupV1_1_preview, DeviceGroupGa20220531]:
+) -> DeviceGroupGa:
     """
     Updates a device group.
 
@@ -201,6 +199,8 @@ def update_device_group(
     Returns:
         device_group: dict
     """
+    api_version = API_VERSION
+
     payload = {}
     if display_name is not None:
         payload["displayName"] = display_name
@@ -232,7 +232,7 @@ def delete_device_group(
     app_id: str,
     device_group_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     """
@@ -249,6 +249,8 @@ def delete_device_group(
     Returns:
         device_group: dict
     """
+    api_version = API_VERSION
+
     return _utility.make_api_call(
         cmd,
         app_id=app_id,

@@ -221,18 +221,6 @@ For all resources, if the environmental variable is not provided, a new instance
 | `job_display_name`	| IoT Hub, DPS, and Central Tagging	| Job Display Name populated by an internal pipeline run. Can be manually set to customize the pipeline name tag. Please see "Test Resource Tagging" for more details.	|
 | `job_id`	| IoT Hub, DPS, and Central Tagging	| Job Id populated by an internal pipeline run. Can be manually set to customize the pipeline name tag. Please see "Test Resource Tagging" for more details.	|
 
-
-##### IoT Central
-
-IoT Central integration tests can be run against a specific available api version using command line argument "--api-version"
-
-e.g. run tests against v 1.0
-
-`pytest azext_iot/tests/central/ -k "_int.py" --api-version "1.0"`
-
-If the "--api-version" argument is not specified, all runs act against default api version for each tested command.
-
-
 ### IoT Digital Twins
 
 IoT Digital Twins test for creation of larger ontologies require ontology submodules to be cloned.

@@ -7,9 +7,9 @@
 
 from typing import List
 from azext_iot.constants import CENTRAL_ENDPOINT
+from azext_iot.central.common import API_VERSION
 from azext_iot.central.providers import CentralOrganizationProvider
-from azext_iot.central.models.enum import ApiVersion
-from azext_iot.central.models.v1_1_preview import OrganizationV1_1_preview
+from azext_iot.central.models.ga_2022_07_31 import OrganizationGa
 
 
 def get_org(
@@ -18,8 +18,8 @@ def get_org(
     org_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> OrganizationV1_1_preview:
+    api_version=API_VERSION,
+) -> OrganizationGa:
     provider = CentralOrganizationProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -35,8 +35,8 @@ def delete_org(
     org_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> OrganizationV1_1_preview:
+    api_version=API_VERSION,
+) -> OrganizationGa:
     provider = CentralOrganizationProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -51,8 +51,8 @@ def list_orgs(
     app_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> List[OrganizationV1_1_preview]:
+    api_version=API_VERSION,
+) -> List[OrganizationGa]:
     provider = CentralOrganizationProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -68,8 +68,8 @@ def create_org(
     parent_org=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> OrganizationV1_1_preview:
+    api_version=API_VERSION,
+) -> OrganizationGa:
     provider = CentralOrganizationProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -90,8 +90,8 @@ def update_org(
     parent_org=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> OrganizationV1_1_preview:
+    api_version=API_VERSION,
+) -> OrganizationGa:
     provider = CentralOrganizationProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )

@@ -5,11 +5,12 @@
 # --------------------------------------------------------------------------------------------
 
 from knack.log import get_logger
-from azure.cli.core.azclierror import RequiredArgumentMissingError
 from typing import List
-from azext_iot.central.models.enum import ApiVersion
+
+from azure.cli.core.azclierror import RequiredArgumentMissingError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
+from azext_iot.central.models.ga_2022_07_31 import UserGa
 
 
 logger = get_logger(__name__)
@@ -42,14 +43,14 @@ class CentralUserProvider:
         role: str,
         org_id: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> central_services.user.User:
+    ) -> UserGa:
         if not tenant_id:
             raise RequiredArgumentMissingError("Must specify --tenant-id when adding a service principal")
 
         if not object_id:
             raise RequiredArgumentMissingError("Must specify --object-id when adding a service principal")
 
-        if org_id and self._api_version == ApiVersion.v1_1_preview.value:
+        if org_id:
             roles = rf"{org_id}\{role}"
         else:
             roles = role
@@ -73,7 +74,7 @@ class CentralUserProvider:
         object_id: str,
         roles: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> central_services.user.User:
+    ) -> UserGa:
         if not tenant_id:
             raise RequiredArgumentMissingError("Must specify --tenant-id when adding a service principal")
 
@@ -96,7 +97,7 @@ class CentralUserProvider:
     def get_user_list(
         self,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> List[central_services.user.User]:
+    ) -> List[UserGa]:
         return central_services.user.get_user_list(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -109,7 +110,7 @@ class CentralUserProvider:
         self,
         assignee,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> central_services.user.User:
+    ) -> UserGa:
         return central_services.user.get_user(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -140,11 +141,11 @@ class CentralUserProvider:
         role: str,
         org_id: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> central_services.user.User:
+    ) -> UserGa:
         if not email:
             raise RequiredArgumentMissingError("Must specify --email when adding a user by email")
 
-        if org_id and self._api_version == ApiVersion.v1_1_preview.value:
+        if org_id:
             roles = rf"{org_id}\{role}"
         else:
             roles = role
@@ -166,7 +167,7 @@ class CentralUserProvider:
         email: str,
         roles: str,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> central_services.user.User:
+    ) -> UserGa:
         if not email:
             raise RequiredArgumentMissingError("Must specify --email when adding a user by email")
 
