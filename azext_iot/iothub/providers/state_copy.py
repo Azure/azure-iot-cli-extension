@@ -14,7 +14,7 @@ from azext_iot.common._azure import parse_iot_hub_message_endpoint_connection_st
 from azure.cli.core.azclierror import FileOperationError, ResourceNotFoundError
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.common.utility import capture_stderr
-# from azext_iot.constants import IMMUTABLE_DEVICE_IDENTITY_FIELDS, IMMUTABLE_MODULE_IDENTITY_FIELDS, IMMUTABLE_MODULE_TWIN_FIELDS
+from azext_iot.constants import IMMUTABLE_DEVICE_IDENTITY_FIELDS, IMMUTABLE_MODULE_IDENTITY_FIELDS, IMMUTABLE_MODULE_TWIN_FIELDS
 from azext_iot.operations.hub import (
     _iot_device_show,
     _iot_device_module_twin_show,
@@ -75,34 +75,6 @@ import base64
 
 logger = get_logger(__name__)
 cli = EmbeddedCLI()
-
-
-IMMUTABLE_DEVICE_IDENTITY_FIELDS = [
-    "cloudToDeviceMessageCount",
-    "configurations",
-    "deviceEtag",
-    "deviceScope",
-    "lastActivityTime",
-    "modelId",
-    "parentScopes",
-    "statusUpdateTime",
-    "etag",
-    "version"
-]
-IMMUTABLE_MODULE_IDENTITY_FIELDS = [
-    "connectionStateUpdatedTime",
-    "lastActivityTime",
-    "cloudToDeviceMessageCount",
-    "etag"
-]
-IMMUTABLE_MODULE_TWIN_FIELDS = [
-    "deviceEtag",
-    "lastActivityTime",
-    "etag",
-    "version",
-    "cloudToDeviceMessageCount",
-    "statusUpdateTime"
-]
 
 class EndpointType(Enum):
     """
@@ -263,6 +235,100 @@ class StateProvider(IoTHubProvider):
                 )
             if HubAspects.Devices.value in hub_aspects:
                 self.delete_all_devices()
+            # with capture_stderr():
+            control_plane = self.discovery.find_resource(self.hub_name, self.rg)
+            if not self.rg:
+                self.rg = control_plane["resourcegroup"]
+            if HubAspects.Routes.value in hub_aspects:
+                control_plane.properties.routing.routes = []
+            if HubAspects.Certificates.value in hub_aspects:
+                cert_client = self.get_client().certificates
+                certificates = cert_client.list_by_iot_hub(self.rg, self.hub_name).serialize()
+                # import pdb; pdb.set_trace()
+                for c in certificates["value"]:
+                    cert_client.delete(self.rg, self.hub_name, c["name"], c["etag"])
+                # self.delete_all_certificates()
+            if HubAspects.Endpoints.value in hub_aspects:
+                endpoints = control_plane.properties.routing.endpoints
+                endpoints.service_bus_queues = []
+                endpoints.service_bus_topics = []
+                endpoints.storage_containers = []
+                endpoints.event_hubs = []
+            if HubAspects.Identities.value in hub_aspects:
+                # self.remove_identities()
+                if control_plane.identity.type == IdentityType.SystemAndUserAssigned.value:
+                    control_plane.identity.type = IdentityType.SystemAssigned.value
+                elif control_plane.identity.type == IdentityType.UserAssigned.value:
+                    control_plane.identity.type == IdentityType.NoneAssigned.value
+                if control_plane.identity.user_assigned_identities:
+                    control_plane.identity.user_assigned_identities = None
+            if HubAspects.BuiltIn.value in hub_aspects:
+                control_plane.tags = {}
+                control_plane.properties.cloudToDevice = {
+                    "defaultTtlAsIso8601": "1:00:00",
+                    "feedback": {
+                        "lockDurationAsIso8601": "0:01:00",
+                        "maxDeliveryCount": 10,
+                        "ttlAsIso8601": "1:00:00"
+                    },
+                    "maxDeliveryCount": 10
+                }
+                control_plane.properties.disableDeviceSas = None
+                control_plane.properties.disableLocalAuth = False
+                control_plane.properties.disableModuleSas = None
+                control_plane.properties.enableFileUploadNotifications = False
+
+                control_plane.properties.messagingEndpoints = {
+                    "fileNotifications": {
+                        "lockDurationAsIso8601": "0:01:00",
+                        "maxDeliveryCount": 10,
+                        "ttlAsIso8601": "1:00:00"
+                    }
+                }
+                control_plane.properties.storageEndpoints = {
+                    "$default": {
+                        "authenticationType": None,
+                        "connectionString": "",
+                        "containerName": "",
+                        "identity": None,
+                        "sasTtlAsIso8601": "1:00:00"
+                    }
+                }
+                control_plane.properties.event_hub_endpoints["events"].retentionTimeInDays = 1
+            if HubAspects.Network.value in hub_aspects:
+                control_plane.properties.networkRuleSets = None
+                control_plane.properties.ipFilterRules = []
+                # IP filters
+                # public
+                control_plane.properties.publicNetworkAccess = None
+
+            if "policy" in hub_aspects:
+                control_plane.properties.authorization_policies = [
+                    {
+                        "keyName": "iothubowner",
+                        "rights": "RegistryWrite, ServiceConnect, DeviceConnect"
+                    },
+                    {
+                        "keyName": "service",
+                        "rights": "ServiceConnect"
+                    },
+                    {
+                        "keyName": "device",
+                        "rights": "DeviceConnect"
+                    },
+                    {
+                        "keyName": "registryRead",
+                        "rights": "RegistryRead"
+                    },
+                    {
+                        "keyName": "registryReadWrite",
+                        "rights": "RegistryWrite"
+                    }
+                ]
+
+            self.discovery.client.begin_create_or_update(
+                self.rg, self.hub_name, control_plane, {'IF-MATCH': control_plane.etag}
+            )
 
     def process_hub_to_dict(self, target: dict, hub_aspects: list = []) -> dict:
         '''Returns a dictionary containing the hub state'''
@@ -271,57 +337,68 @@ class StateProvider(IoTHubProvider):
         if HubAspects.Configurations.value in hub_aspects:
             hub_aspects.remove(HubAspects.Configurations.value)
             all_configs = _iot_hub_configuration_list(target=target)
-            hub_state["configurations"] = {}
-            # if HubAspects.Configurations.value in hub_aspects:
-            adm_configs = {}
+            adm_configs = []
             for c in all_configs:
                 if c["content"].get("deviceContent") or c["content"].get("moduleContent"):
                     for key in ["createdTimeUtc", "etag", "lastUpdatedTimeUtc", "schemaVersion"]:
                         c.pop(key, None)
-                    adm_configs[c["id"]] = c
+                    adm_configs.append(c)
 
-            hub_state["configurations"]["admConfigurations"] = adm_configs
+            hub_state["configurations"] = adm_configs
+            num_configs = len(hub_state["configurations"])
+            pbar = tqdm(total=num_configs, desc="Saving configurations")
+            pbar.update(num_configs)
+            pbar.close()
 
-            # if HubAspects.EdgeDeployments.value in hub_aspects:
-            hub_state["configurations"]["edgeDeployments"] = {
-                c["id"]: c for c in all_configs if c["content"].get("modulesContent")
-            }
+        if HubAspects.EdgeDeployments.value in hub_aspects:
+            hub_aspects.remove(HubAspects.EdgeDeployments.value)
+            hub_state["edgeDeployments"] = [c for c in all_configs if c["content"].get("modulesContent")]
+
+            num_edge_deployments = len(hub_state["edgeDeployments"])
+            pbar = tqdm(total=num_edge_deployments, desc="Saving edge deployments")
+            pbar.update(num_edge_deployments)
+            pbar.close()
 
         if HubAspects.Devices.value in hub_aspects:
             hub_aspects.remove(HubAspects.Devices.value)
-            hub_state["devices"] = {}
+            hub_state["devices"] = {
+                "identities": [],
+                "children": {}
+            }
+            # TODO: figure out if modules should be a subgroup of devices or not
+            hub_state["modules"] = []
             identities = _iot_device_list(target=target, top=-1)
 
             for i in tqdm(range(len(identities)), desc="Saving devices and modules"):
+
                 id = identities[i]
-                device_obj = {}
+
+                module_objs = _iot_device_module_list(target=target, device_id=id["deviceId"])
 
                 # primary and secondary keys show up in the "show" output but not in the "list" output
                 if id["authenticationType"] == DeviceAuthApiType.sas.value:
                     id2 = _iot_device_show(target=target, device_id=id["deviceId"])
-                    id["symmetricKey"] = id2["authentication"]["symmetricKey"]
+                    identities[i]["symmetricKey"] = id2["authentication"]["symmetricKey"]
 
-                id["properties"].pop("reported")
+                if id["capabilities"]["iotEdge"]:
+                    children = _iot_device_children_list(target=target, device_id=id["deviceId"])
+                    hub_state["devices"]["children"][id["deviceId"]] = [c["deviceId"] for c in children]
+
+                identities[i]["properties"].pop("reported")
                 for key in ["$metadata", "$version"]:
-                    id["properties"]["desired"].pop(key)
+                    identities[i]["properties"]["desired"].pop(key)
                 for key in IMMUTABLE_DEVICE_IDENTITY_FIELDS:
-                    id.pop(key, None)
+                    identities[i].pop(key, None)
+                hub_state["devices"]["identities"].append(identities[i])
 
-                device_obj["identity"] = id
-
-                module_objs = _iot_device_module_list(target=target, device_id=id["deviceId"])
-                if module_objs:
-                    device_obj["modules"] = {}
                 for module in module_objs:
-                    module = module.serialize()
+                    module = vars(module)
 
-                    if module["moduleId"] not in ["$edgeAgent", "$edgeHub"]:
+                    if module["module_id"] not in ["$edgeAgent", "$edgeHub"]:
                         module_twin = _iot_device_module_twin_show(target=target, device_id=id["deviceId"],
-                                                                module_id=module["moduleId"])
+                                                                module_id=module["module_id"])
 
-                        module2 = _iot_device_module_show(
-                            target=target, device_id=id["deviceId"], module_id=module["moduleId"]
-                        )
+                        module2 = _iot_device_module_show(target=target, device_id=id["deviceId"], module_id=module["module_id"])
                         module["authentication"] = module2["authentication"]
 
                         for key in IMMUTABLE_MODULE_IDENTITY_FIELDS:
@@ -332,26 +409,182 @@ class StateProvider(IoTHubProvider):
                             module_twin["properties"]["desired"].pop(key)
                         module_twin["properties"].pop("reported")
 
-                        device_obj["modules"][module["moduleId"]] = {
-                            "identity": module,
-                            "twin": module_twin
-                        }
-                hub_state["devices"][id["deviceId"]] = device_obj
+                        hub_state["modules"].append([module, module_twin])
 
-
+        control_plane = None
         hub_name = target.get("entity").split(".")[0]
         hub_rg = target.get("resourcegroup")
+        if not hub_rg and hub_aspects:
+            control_plane = self.discovery.find_resource(hub_name).serialize()
+            # control_plane = cli.invoke(f"iot hub show -n {hub_name}").as_json()
+            hub_rg = control_plane["resourcegroup"]
 
-        control_plane_obj = self.discovery.find_resource(hub_name, hub_rg)
+        # seperate from control_plane_obj
+        if HubAspects.Certificates.value in hub_aspects:
+            hub_aspects.remove(HubAspects.Certificates.value)
+            # TODO: get sdk + run list
+            #  client.certificates.list_by_iot_hub(hub_rg, hub_name).serialize()
+            hub_state["certificates"] = cli.invoke(
+                "iot hub certificate list --hub-name {} -g {}".format(hub_name, hub_rg)
+            ).as_json()["value"]
 
-        if not hub_rg:
-            hub_rg = control_plane_obj.additional_properties["resourcegroup"]
-        hub_resource_id = control_plane_obj.id
+            pbar = tqdm(total=len(hub_state["certificates"]), desc="Saving certificates", file=sys.stdout)
+            pbar.update(len(hub_state["certificates"]))
+            pbar.close()
+
+        if HubAspects.Identities.value in hub_aspects:
+            hub_aspects.remove(HubAspects.Identities.value)
+            control_plane = control_plane or self.discovery.find_resource(hub_name, hub_rg).serialize()
+            if control_plane["identity"]["userAssignedIdentities"]:
+                hub_state["identities"] = control_plane["identity"]["userAssignedIdentities"]
+            else:
+                hub_state["identities"] = []
+            num_identities = len(hub_state["identities"])
+
+            pbar = tqdm(total=num_identities, desc="Saving user-assigned identities", file=sys.stdout)
+            pbar.update(num_identities)
+            pbar.close()
+
+        if HubAspects.Endpoints.value in hub_aspects:
+            hub_aspects.remove(HubAspects.Endpoints.value)
+            control_plane = control_plane or self.discovery.find_resource(hub_name, hub_rg).serialize()
+            hub_state["endpoints"] = control_plane["properties"]["routing"]["endpoints"]
+
+            # TODO: add fallback routes - not possible yet but can be skipped over with sdk
+            hub_state["fallbackRoute"] = control_plane["properties"]["routing"]["fallbackRoute"]
+            # TODO: add enrichments
+            hub_state["messageEnrichments"] = control_plane["properties"]["routing"].get("enrichments")
+
+            # Retrieve the connection strings if needed
+            eventHubs = hub_state["endpoints"]["eventHubs"]
+            for endpoint in eventHubs:
+                if endpoint.get("authenticationType") != "identityBased":
+                    endpoint_props = parse_iot_hub_message_endpoint_connection_string(endpoint["connectionString"])
+                    namespace = endpoint_props ["Endpoint"].strip("sb://").split(".")[0]
+                    endpoint["connectionString"] = cli.invoke(
+                        "eventhubs eventhub authorization-rule keys list --namespace-name {} --resource-group {} "
+                        "--eventhub-name {} --name {}".format(
+                            namespace,
+                            endpoint["resourceGroup"],
+                            endpoint_props["EntityPath"],
+                            endpoint_props["SharedAccessKeyName"]
+                        )
+                    ).as_json()["primaryConnectionString"]
+            serviceBusQueues = hub_state["endpoints"]["serviceBusQueues"]
+            for endpoint in serviceBusQueues:
+                if endpoint.get("authenticationType") != "identityBased":
+                    endpoint_props = parse_iot_hub_message_endpoint_connection_string(endpoint["connectionString"])
+                    namespace = endpoint_props ["Endpoint"].strip("sb://").split(".")[0]
+                    endpoint["connectionString"] = cli.invoke(
+                        "servicebus queue authorization-rule keys list --namespace-name {} --resource-group {} "
+                        "--queue-name {} --name {}".format(
+                            namespace,
+                            endpoint["resourceGroup"],
+                            endpoint_props["EntityPath"],
+                            endpoint_props["SharedAccessKeyName"]
+                        )
+                    ).as_json()["primaryConnectionString"]
+            serviceBusTopics = hub_state["endpoints"]["serviceBusTopics"]
+            for endpoint in serviceBusTopics:
+                if endpoint.get("authenticationType") != "identityBased":
+                    endpoint_props = parse_iot_hub_message_endpoint_connection_string(endpoint["connectionString"])
+                    namespace = endpoint_props ["Endpoint"].strip("sb://").split(".")[0]
+                    endpoint["connectionString"] = cli.invoke(
+                        "servicebus topic authorization-rule keys list --namespace-name {} --resource-group {} "
+                        "--topic-name {} --name {}".format(
+                            namespace,
+                            endpoint["resourceGroup"],
+                            endpoint_props["EntityPath"],
+                            endpoint_props["SharedAccessKeyName"]
+                        )
+                    ).as_json()["primaryConnectionString"]
+            storageContainers = hub_state["endpoints"]["storageContainers"]
+            for endpoint in storageContainers:
+                if endpoint.get("authenticationType") != "identityBased":
+                    endpoint_props = parse_storage_container_connection_string(endpoint["connectionString"])
+                    endpoint["connectionString"] = cli.invoke(
+                        "storage account show-connection-string -n {} -g {}".format(
+                            endpoint_props["AccountName"],
+                            endpoint["resourceGroup"],
+                        )
+                    ).as_json()["connectionString"]
+            num_endpoints = len(eventHubs) + len(serviceBusQueues) + len(serviceBusTopics) + len(storageContainers)
+
+            pbar = tqdm(total=num_endpoints, desc="Saving endpoints", file=sys.stdout)
+            pbar.update(num_endpoints)
+            pbar.close()
 
         if HubAspects.Routes.value in hub_aspects:
-            hub_arm = cli.invoke(f"group export -n {hub_rg} --resource-ids {hub_resource_id}").as_json()
-            import pdb; pdb.set_trace()
-            hub_state["arm"] = hub_arm
+            hub_aspects.remove(HubAspects.Routes.value)
+            control_plane = control_plane or self.discovery.find_resource(hub_name, hub_rg).serialize()
+            hub_state["routes"] = control_plane["properties"]["routing"]["routes"]
+
+            pbar = tqdm(total=len(hub_state["routes"]), desc="Saving routes", file=sys.stdout)
+            pbar.update(len(hub_state["routes"]))
+            pbar.close()
+
+        if HubAspects.BuiltIn.value in hub_aspects:
+            hub_aspects.remove(HubAspects.BuiltIn.value)
+            control_plane = control_plane or self.discovery.find_resource(hub_name, hub_rg).serialize()
+            hub_state["tags"] = control_plane["tags"]
+            hub_state["cloudToDevice"] = control_plane["properties"].get("cloudToDevice")
+            # TODO: figure out if null is ok
+            hub_state["disableDeviceSas"] = control_plane["properties"].get("disableDeviceSas")
+            hub_state["disableLocalAuth"] = control_plane["properties"].get("disableLocalAuth")
+            hub_state["disableModuleSas"] = control_plane["properties"].get("disableModuleSas")
+            hub_state["enableFileUploadNotifications"] = control_plane["properties"]["enableFileUploadNotifications"]
+
+            hub_state["messagingEndpoints"] = control_plane["properties"]["messagingEndpoints"]
+
+            file_upload = control_plane["properties"]["storageEndpoints"]
+            # Get connection string if needed
+            if file_upload.get("authenticationType") == "keyBased":
+                endpoint_props = parse_storage_container_connection_string(file_upload["connectionString"])
+                file_upload["connectionString"] = cli.invoke(
+                    f"storage account show-connection-string -n {endpoint_props['AccountName']}"
+                ).as_json()["connectionString"]
+
+            hub_state["fileUpload"] = file_upload
+
+            built_in_eventhub = control_plane["properties"]["eventHubEndpoints"]
+            # scrub unneeded stuff
+            # built_in_eventhub["events"].pop("endpoint")
+            # built_in_eventhub["events"].pop("path")
+            for eventhub in built_in_eventhub.keys():
+                consumer_groups = self.discovery.client.list_event_hub_consumer_groups(
+                    hub_rg, hub_name, eventhub
+                )
+                # import pdb; pdb.set_trace()
+                consumer_groups = [c for c in consumer_groups]
+                # built_in_eventhub[eventhub]["consumerGroups"] = [consumer["name"] for consumer in consumer_groups]
+            hub_state["builtInEventHub"] = built_in_eventhub
+
+            # TODO: should we include skus?
+            # When uploading, need to check if sku is updatable
+            # hub_state["sku"] = control_plane["properties"]["sku"]
+
+        if HubAspects.Network.value in hub_aspects:
+            control_plane = control_plane or self.discovery.find_resource(hub_name, hub_rg).serialize()
+            hub_state["network"] = {}
+            hub_state["network"]["networkRuleSets"] = control_plane["properties"]["networkRuleSets"]
+            # IP filters
+            hub_state["network"]["ipFilterRules"] = control_plane["properties"]["ipFilterRules"]
+
+            # public
+            hub_state["network"]["publicNetworkAccess"] = control_plane["properties"]["publicNetworkAccess"]
+            # private endpoints - sdk list seems broken?
+            #private links - what is this
+            # client.private_link_resources.list(hub_rg, hub_name)
+
+        if "policy" in hub_aspects:
+            policies = [p.serialize() for p in self.discovery.client.list_keys(hub_rg, hub_name)]
+            # policies = cli.invoke(
+            #     f"iot hub policy list --hub-name {hub_name} -g {hub_rg}"
+            # ).as_json()
+            for policy in policies:
+                policy.pop("primaryKey")
+                policy.pop("secondaryKey")
+            hub_state["policy"] = policies
 
         return hub_state
 
@@ -414,7 +647,60 @@ class StateProvider(IoTHubProvider):
                 child_list = hub_state["devices"]["children"][parentId]
                 _iot_device_children_add(target=self.target, device_id=parentId, child_list=child_list)
 
+        if not hub_aspects:
+            return
 
+        # with capture_stderr():
+        # better to keep as object to avoid managedidentity weirdness
+        control_plane = self.discovery.find_resource(self.hub_name, self.rg)
+        retries = 0
+        while control_plane.properties.state == "Transitioning" and retries < 10:
+            sleep(1)
+            retries += 1
+            control_plane = self.discovery.find_resource(self.hub_name, self.rg)
+        if not self.rg:
+            self.rg = control_plane["resourcegroup"]
+
+        if HubAspects.Certificates.value in hub_aspects and hub_state.get("certificates"):
+            hub_aspects.remove(HubAspects.Certificates.value)
+            temp_cert_file = f"cert{random.randrange(100000000)}.cer"
+
+            for cert in tqdm(hub_state["certificates"], desc="Uploading certificates", file=sys.stdout):
+                with open(temp_cert_file, 'w', encoding='utf-8') as f:
+                    cert_body = base64.b64decode(cert["properties"]["certificate"]).decode("utf-8")
+                    cert_body = "".join(cert_body.split("\r"))
+                    f.write(cert_body)
+                cli.invoke(
+                    f"iot hub certificate create --name {cert['name']} -g {self.rg} --hub-name {self.hub_name} --path "
+                    f"{temp_cert_file} -v {cert['properties']['isVerified']}"
+                )
+
+            if os.path.isfile(temp_cert_file):
+                os.remove(temp_cert_file)
+
+        if HubAspects.Identities.value in hub_aspects and hub_state.get("identities"):
+            hub_aspects.remove(HubAspects.Identities.value)
+            self.assign_identities_to_hub(control_plane, hub_state["identities"])
+
+        if HubAspects.Endpoints.value in hub_aspects and hub_state.get("endpoints"):
+            hub_aspects.remove(HubAspects.Endpoints.value)
+            self.upload_endpoints(control_plane, hub_state["endpoints"])
+
+        if HubAspects.Routes.value in hub_aspects and hub_state.get("routes"):
+            hub_aspects.remove(HubAspects.Routes.value)
+            for route in tqdm(hub_state["routes"], desc="Uploading routes", file=sys.stdout):
+                control_plane.properties.routing.routes.append(
+                    {
+                        "source": route["source"],
+                        "name": route["name"],
+                        "endpointNames": route["endpointNames"],
+                        "condition": route["condition"],
+                        "isEnabled": route["isEnabled"]
+                    }
+                )
+        self.discovery.client.begin_create_or_update(
+            self.rg, self.hub_name, control_plane, {'IF-MATCH': control_plane.etag}
+        )
 
     def assign_identities_to_hub(self, control_plane, identities):
         # pbar = tqdm(total=len(identities), desc="Assigning identities", file=sys.stdout)

@@ -53,30 +53,3 @@ IOTHUB_TRACK_2_SDK_MIN_VERSION = "2.0.0"
 # Initial Track 2 SDK version for DPS
 IOTDPS_MGMT_SDK_PACKAGE_NAME = "azure-mgmt-iothubprovisioningservice"
 IOTDPS_TRACK_2_SDK_MIN_VERSION = "1.0.0"
-
-IMMUTABLE_DEVICE_IDENTITY_FIELDS = [
-    "cloudToDeviceMessageCount",
-    "configurations",
-    "deviceEtag",
-    "deviceScope",
-    "lastActivityTime",
-    "modelId",
-    "parentScopes",
-    "statusUpdateTime",
-    "etag",
-    "version"
-]
-IMMUTABLE_MODULE_IDENTITY_FIELDS = [
-    "connection_state_updated_time",
-    "last_activity_time",
-    "cloud_to_device_message_count",
-    "etag"
-]
-IMMUTABLE_MODULE_TWIN_FIELDS = [
-    "deviceEtag",
-    "lastActivityTime",
-    "etag",
-    "version",
-    "cloudToDeviceMessageCount",
-    "statusUpdateTime"
-]
