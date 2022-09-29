@@ -5,17 +5,16 @@
 # --------------------------------------------------------------------------------------------
 # This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/roles
 
-from typing import List, Union
+from typing import List
 import requests
 
 from knack.log import get_logger
 
 from azure.cli.core.azclierror import AzureResponseError
 from azext_iot.constants import CENTRAL_ENDPOINT
+from azext_iot.central.common import API_VERSION
 from azext_iot.central.services import _utility
-from azext_iot.central.models.v1 import RoleV1
-from azext_iot.central.models.v1_1_preview import RoleV1_1_preview
-from azext_iot.central.models.preview import RolePreview
+from azext_iot.central.models.ga_2022_07_31 import RoleGa
 from azure.cli.core.util import should_disable_connection_verify
 
 
@@ -29,9 +28,9 @@ def get_role(
     app_id: str,
     role_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[RoleV1, RoleV1_1_preview, RolePreview]:
+) -> RoleGa:
     """
     Get role info given a role id
 
@@ -46,6 +45,7 @@ def get_role(
     Returns:
         role: dict
     """
+    api_version = API_VERSION
 
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, role_id)
     headers = _utility.get_headers(token, cmd)
@@ -69,10 +69,10 @@ def list_roles(
     cmd,
     app_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> List[Union[RoleV1, RoleV1_1_preview, RolePreview]]:
+) -> List[RoleGa]:
     """
     Get a list of all roles in IoTC app
 
@@ -86,6 +86,7 @@ def list_roles(
     Returns:
         list of roles
     """
+    api_version = API_VERSION
 
     roles = []
 

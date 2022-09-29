@@ -14,7 +14,8 @@ from azext_iot.central.providers import (
     CentralDeviceProvider,
     CentralDeviceTemplateProvider,
 )
-from azext_iot.central.models.v1 import TemplateV1, DeviceV1
+from azext_iot.central.models.v2022_06_30_preview import TemplatePreview
+from azext_iot.central.models.ga_2022_07_31 import DeviceGa
 from azext_iot.monitor.parsers import common_parser, central_parser
 from azext_iot.monitor.parsers import strings
 from azext_iot.monitor.models.arguments import CommonParserArguments
@@ -444,7 +445,7 @@ class TestCentralParser:
 
     def test_validate_against_invalid_component_template_should_fail(self):
         # setup
-        device_template = TemplateV1(
+        device_template = TemplatePreview(
             load_json(FileNames.central_property_validation_template_file)
         )
 
@@ -491,7 +492,7 @@ class TestCentralParser:
 
     def test_validate_invalid_telmetry_component_template_should_fail(self):
         # setup
-        device_template = TemplateV1(
+        device_template = TemplatePreview(
             load_json(FileNames.central_property_validation_template_file)
         )
 
@@ -559,7 +560,7 @@ class TestCentralParser:
 
         # haven't found a better way to force the error to occur within parser
         parser._central_template_provider.get_device_template = (
-            lambda x, central_dns_suffix: TemplateV1(device_template)
+            lambda x, central_dns_suffix: TemplatePreview(device_template)
         )
 
         # act
@@ -610,21 +611,21 @@ class TestCentralParser:
         _validate_issues(parser, Severity.error, 1, 1, [expected_details])
 
     def _get_template(self):
-        return TemplateV1(load_json(FileNames.central_device_template_file))
+        return TemplatePreview(load_json(FileNames.central_device_template_file))
 
     def _create_parser(
         self,
-        device_template: TemplateV1,
+        device_template: TemplatePreview,
         message: Message,
         args: CommonParserArguments,
     ):
         device_provider = CentralDeviceProvider(
-            cmd=None, app_id=None, api_version=ApiVersion.v1.value
+            cmd=None, app_id=None, api_version=ApiVersion.ga.value
         )
         template_provider = CentralDeviceTemplateProvider(
-            cmd=None, app_id=None, api_version=ApiVersion.v1.value
+            cmd=None, app_id=None, api_version=ApiVersion.ga.value
         )
-        device_provider.get_device = mock.MagicMock(return_value=DeviceV1({}))
+        device_provider.get_device = mock.MagicMock(return_value=DeviceGa({}))
         template_provider.get_device_template = mock.MagicMock(
             return_value=device_template
         )

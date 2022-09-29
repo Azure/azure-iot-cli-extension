@@ -5,13 +5,11 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
-from typing import List, Optional, Union
+from typing import List, Optional
 from azext_iot.constants import CENTRAL_ENDPOINT
-from azext_iot.central.models.preview import DeviceGroupPreview
-from azext_iot.central.models.v1_1_preview import DeviceGroupV1_1_preview
-from azext_iot.central.models.ga_2022_05_31 import DeviceGroupGa20220531
+from azext_iot.central.models.ga_2022_07_31 import DeviceGroupGa
 from azext_iot.central.providers import CentralDeviceGroupProvider
-from azext_iot.central.models.enum import ApiVersion
+from azext_iot.central.common import API_VERSION
 
 
 def list_device_groups(
@@ -19,8 +17,8 @@ def list_device_groups(
     app_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> List[Union[DeviceGroupPreview, DeviceGroupV1_1_preview, DeviceGroupGa20220531]]:
+    api_version=API_VERSION,
+) -> List[DeviceGroupGa]:
     provider = CentralDeviceGroupProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
@@ -33,8 +31,8 @@ def get_device_group(
     device_group_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> DeviceGroupGa20220531:
+    api_version=API_VERSION,
+) -> DeviceGroupGa:
     provider = CentralDeviceGroupProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
@@ -51,8 +49,8 @@ def create_device_group(
     organizations: List[str] = None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> DeviceGroupGa20220531:
+    api_version=API_VERSION,
+) -> DeviceGroupGa:
     provider = CentralDeviceGroupProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
@@ -78,8 +76,8 @@ def update_device_group(
     organizations: List[str] = None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> DeviceGroupGa20220531:
+    api_version=API_VERSION,
+) -> DeviceGroupGa:
     provider = CentralDeviceGroupProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
@@ -101,7 +99,7 @@ def delete_device_group(
     device_group_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
 ):
     provider = CentralDeviceGroupProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version

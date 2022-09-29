@@ -1,0 +1,16 @@
+[
+  {
+    "id": "myEnrollmentGroupId",
+    "displayName": "My group",
+    "enabled": true,
+    "type": "iot",
+    "attestation": {
+      "type": "symmetricKey",
+      "symmetricKey": {
+        "primaryKey": "<primary-symmetric-key>",
+        "secondaryKey": "<secondary-symmetric-key>"
+      }
+    },
+    "etag": "IjA4MDUwMTJiLTAwMDAtMDcwMC0wMDAwLTYyODJhOWVjMDAwMCI="
+  }
+]
