@@ -67,6 +67,7 @@ def reload_modules() -> None:
         "azure.core": [],
         "azure.core.utils": ["azure.core.utils._utils"],
         "azure.mgmt.core": [],
+        "azure.core.exceptions": [],
     }
 
     # Import modules with best attempt

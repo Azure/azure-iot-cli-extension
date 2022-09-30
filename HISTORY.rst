@@ -6,6 +6,15 @@ Release History
 unreleased
 +++++++++++++++
 
+
+0.17.3
++++++++++++++++
+
+**Device Update**
+
+* Adds the command `az iot device-update update init calculate-hash` used to calculate the
+  base64 hash representation of a file.
+
 **IoT Central updates**
 
 * `--api-version` parameter will be deprecated and ignored. The IoT Central API will alway call latest GA version or latest preview version (if any API only exists in preview).
@@ -30,6 +39,7 @@ unreleased
     - az iot central scheduled-job delete
     - az iot central scheduled-job update
     - az iot central scheduled-job list-runs
+
 
 0.17.2
 +++++++++++++++

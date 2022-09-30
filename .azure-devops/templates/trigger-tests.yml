@@ -122,7 +122,7 @@ jobs:
       serviceConnection: $(AzureServiceConnection)
 
 - job: 'testADU'
-  timeoutInMinutes: 90
+  timeoutInMinutes: 120
   displayName: 'Test Azure Device Update'
   condition: and(succeeded(), eq('${{ parameters.testADU }}', true))
   strategy:
@@ -136,7 +136,7 @@ jobs:
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
       pythonVersion: $(python)
       num_reruns: 0
-      num_threads: 3
+      num_threads: 4
       serviceConnection: $(AzureServiceConnectionAlt)
 
 - job: 'unitTests'
