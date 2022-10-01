@@ -225,6 +225,7 @@ def manifest_init_v5(
     related_files: List[List[str]] = None,
     description: str = None,
     deployable: bool = None,
+    validate: Optional[bool] = None,
 ):
     import json
     from datetime import datetime
@@ -392,6 +393,18 @@ def manifest_init_v5(
                 processed_files.append(processed_file)
 
         payload["files"] = processed_files
+
+    if validate:
+        import jsonschema
+        from azure.cli.core.azclierror import ValidationError
+        from azext_iot.deviceupdate.schemas import DEVICE_UPDATE_MANIFEST_V5, DEVICE_UPDATE_MANIFEST_V5_DEFS
+        validator = jsonschema.Draft7Validator(DEVICE_UPDATE_MANIFEST_V5)
+        validator.resolver.store[DEVICE_UPDATE_MANIFEST_V5_DEFS["$id"]] = DEVICE_UPDATE_MANIFEST_V5_DEFS
+
+        try:
+            validator.validate(payload)
+        except jsonschema.ValidationError as ve:
+            raise ValidationError(ve)
 
     return payload
 

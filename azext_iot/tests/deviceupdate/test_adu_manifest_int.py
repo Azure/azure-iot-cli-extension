@@ -250,6 +250,48 @@ def test_adu_manifest_init_v5_invalid_path_required(options):
 
 
 @pytest.mark.parametrize(
+    "options",
+    [
+        (
+            # No files array provided for in-line step.
+            "--update-provider digimaun --update-name invalid --update-version 1.0 "
+            "--compat deviceManufacturer=Contoso deviceModel=Vacuum "
+            "--step handler=microsoft/apt:1 "
+        ),
+        (
+            # Too long of a provider value.
+            "--update-provider digimaundigimaundigimaundigimaundigimaundigimaundigimaundigimaunn "
+            "--update-name invalid --update-version 1.0 "
+            "--compat deviceManufacturer=Contoso deviceModel=Vacuum "
+            "--step handler=microsoft/apt:1 files=hello.json"
+        ),
+        (
+            # Too long of a compat property value.
+            "--update-provider digimaun --update-name invalid --update-version 1.0 "
+            "--compat deviceManufacturer=ContosoContosoContosoContosoContosoContosoContosoContosoContosooo "
+            "--step handler=microsoft/apt:1 files=hello.json"
+        ),
+        (
+            # Bad version value.
+            "--update-provider digimaun --update-name invalid --update-version 1 "
+            "--compat deviceManufacturer=Contoso deviceModel=Vacuum "
+            "--step handler=microsoft/apt:1 "
+        ),
+        (
+            # Too short file downloadHandler value.
+            "--update-provider digimaun --update-name invalid --update-version 1.0 "
+            "--compat deviceManufacturer=ContosoContosoContosoContosoContosoContoso deviceModel=Vacuum "
+            "--step handler=microsoft/apt:1 "
+            f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\" "
+            "downloadHandler=abc"
+        )
+    ],
+)
+def test_adu_manifest_init_v5_validate_errors(options):
+    assert not cli.invoke(f"iot device-update update init v5 {options} --validate").success()
+
+
+@pytest.mark.parametrize(
     "files_count, expected_bytes",
     [
         (1, 1024),

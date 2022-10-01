@@ -534,3 +534,9 @@ def load_deviceupdate_arguments(self, _):
             arg_type=get_enum_type(ADUValidHashAlgorithmType),
             type=str,
         )
+        context.argument(
+            "validate",
+            options_list=["--validate"],
+            arg_type=get_three_state_flag(),
+            help="Apply json schema validation to the import manifest content.",
+        )
