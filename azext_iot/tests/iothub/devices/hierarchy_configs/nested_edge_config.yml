@@ -1,0 +1,29 @@
+config_version: "1.0"
+# We don't need iothub info from the config schema
+iothub:
+  # This should probably be moved into configuration section
+  authentication_method: symmetric_key
+
+## IoT Edge configuration template to use
+configuration:
+  template_config_path: "./templates/purdue/device_config.toml"
+
+## Hierarchy of IoT Edge devices to create
+edgedevices:
+  - device_id: device_1
+    edge_agent: "mcr.microsoft.com/azureiotedge-agent:1.2"
+    deployment: "./hierarchy_configs/deploymentTopLayer.json"
+    child:
+    - device_id: device_2
+      deployment: "./hierarchy_configs/deploymentLowerLayer.json"
+      child:
+        - device_id: device_3
+          deployment: "./hierarchy_configs/deploymentLowerLayer.json"
+    - device_id: device_4
+      deployment: "./hierarchy_configs/deploymentTopLayer.json"
+      child:
+        - device_id: device_5
+          deployment: "./hierarchy_configs/deploymentLowerLayer.json"
+        - device_id: device_6
+          deployment: "./hierarchy_configs/deploymentLowerLayer.json"
+  - device_id: device_7

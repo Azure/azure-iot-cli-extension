@@ -98,7 +98,7 @@ class DeviceIdentityProvider(IoTHubProvider):
             if config_file.endswith(".yml"):
                 # Process YAML file into config object dictionary
                 config_content = process_yaml_arg(config_file)
-            elif config_file.endsWith(".json"):
+            elif config_file.endswith(".json"):
                 # Process JSON file into config object dictionary
                 config_content = process_json_arg(config_file)
             else:
@@ -120,6 +120,10 @@ class DeviceIdentityProvider(IoTHubProvider):
                 device_params = self._assemble_nargs_to_dict(device_input)
                 device = self._parse_edge_config_device_param_dict(device_params)
                 config["devices"].append(device)
+
+        if not config or not len(config['devices']):
+            raise InvalidArgumentValueError("No devices found in input. "
+            "Please check your input arguments or config file and try the command again")
 
         tree = Tree()
         tree_root_node = "|root|"

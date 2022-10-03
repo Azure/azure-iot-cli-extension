@@ -273,8 +273,3 @@ def load_iothub_arguments(self, _):
             options_list=["--config-file", "--config", "-c"],
             help="Path to device hierarchy config file"
         )
-        context.argument(
-            "default_agent",
-            options_list=['--default-edge-agent', '--dea'],
-            help="Default edge agent for new devices"
-        )
