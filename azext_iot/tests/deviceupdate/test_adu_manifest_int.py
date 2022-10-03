@@ -17,7 +17,7 @@ cli = EmbeddedCLI()
 
 logger = get_logger(__name__)
 
-unique_description = f"{generate_generic_id()} {generate_generic_id()}"
+unique_description = f"{generate_generic_id()} {generate_generic_id()}"[:-2]
 unique_properties = {generate_generic_id(): generate_generic_id(), generate_generic_id(): unique_description}
 
 
@@ -50,7 +50,7 @@ unique_properties = {generate_generic_id(): generate_generic_id(), generate_gene
             },
         ),
         (
-            "--update-provider digimaun0 --update-name simplescriptupdate --update-version 1 "
+            "--update-provider digimaun0 --update-name simplescriptupdate --update-version 1.0 "
             f"--description '{unique_description}' "
             "--compat manufacturer=Contoso model=Vacuum "
             f"--step handler=microsoft/script:1 description='{unique_description}' "
@@ -61,7 +61,7 @@ unique_properties = {generate_generic_id(): generate_generic_id(), generate_gene
             f"--related-file path=\"{get_context_path(__file__, 'manifests', 'surface15', 'parent.importmanifest.json')}\" "
             f"--file path=\"{get_context_path(__file__, 'manifests', 'surface15', 'action.sh')}\" ",
             {
-                "updateId": {"provider": "digimaun0", "name": "simplescriptupdate", "version": "1"},
+                "updateId": {"provider": "digimaun0", "name": "simplescriptupdate", "version": "1.0"},
                 "description": unique_description,
                 "compatibility": [
                     {"manufacturer": "Contoso", "model": "Vacuum"},
@@ -250,32 +250,36 @@ def test_adu_manifest_init_v5_invalid_path_required(options):
 
 
 @pytest.mark.parametrize(
-    "options",
+    "options, no_validation",
     [
         (
             # No files array provided for in-line step.
             "--update-provider digimaun --update-name invalid --update-version 1.0 "
             "--compat deviceManufacturer=Contoso deviceModel=Vacuum "
-            "--step handler=microsoft/apt:1 "
+            "--step handler=microsoft/apt:1 ",
+            False
         ),
         (
             # Too long of a provider value.
             "--update-provider digimaundigimaundigimaundigimaundigimaundigimaundigimaundigimaunn "
             "--update-name invalid --update-version 1.0 "
             "--compat deviceManufacturer=Contoso deviceModel=Vacuum "
-            "--step handler=microsoft/apt:1 files=hello.json"
+            "--step handler=microsoft/apt:1 files=hello.json",
+            False
         ),
         (
             # Too long of a compat property value.
             "--update-provider digimaun --update-name invalid --update-version 1.0 "
             "--compat deviceManufacturer=ContosoContosoContosoContosoContosoContosoContosoContosoContosooo "
-            "--step handler=microsoft/apt:1 files=hello.json"
+            "--step handler=microsoft/apt:1 files=hello.json",
+            False,
         ),
         (
             # Bad version value.
             "--update-provider digimaun --update-name invalid --update-version 1 "
             "--compat deviceManufacturer=Contoso deviceModel=Vacuum "
-            "--step handler=microsoft/apt:1 "
+            "--step handler=microsoft/apt:1 ",
+            False
         ),
         (
             # Too short file downloadHandler value.
@@ -283,12 +287,25 @@ def test_adu_manifest_init_v5_invalid_path_required(options):
             "--compat deviceManufacturer=ContosoContosoContosoContosoContosoContoso deviceModel=Vacuum "
             "--step handler=microsoft/apt:1 "
             f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\" "
-            "downloadHandler=abc"
+            "downloadHandler=abc",
+            False
+        ),
+        (
+            # Same as prior test case but disable client-side validation.
+            "--update-provider digimaun --update-name invalid --update-version 1.0 "
+            "--compat deviceManufacturer=ContosoContosoContosoContosoContosoContoso deviceModel=Vacuum "
+            "--step handler=microsoft/apt:1 "
+            f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\" "
+            "downloadHandler=abc",
+            True
         )
     ],
 )
-def test_adu_manifest_init_v5_validate_errors(options):
-    assert not cli.invoke(f"iot device-update update init v5 {options} --validate").success()
+def test_adu_manifest_init_v5_validate_errors(options, no_validation):
+    if no_validation:
+        assert cli.invoke(f"iot device-update update init v5 {options} --no-validation").success()
+    else:
+        assert not cli.invoke(f"iot device-update update init v5 {options}").success()
 
 
 @pytest.mark.parametrize(

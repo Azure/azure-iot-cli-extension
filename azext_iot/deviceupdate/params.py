@@ -177,8 +177,7 @@ def load_deviceupdate_arguments(self, _):
         context.argument(
             "search",
             options_list=["--search"],
-            help="Request updates matching a free-text search expression. "
-            "Supported when listing updates with no constraints.",
+            help="Request updates matching a free-text search expression. Supported when listing updates with no constraints.",
             arg_group="Filter",
         )
         context.argument(
@@ -505,7 +504,7 @@ def load_deviceupdate_arguments(self, _):
             "`path` [required] local file path to update file, "
             "`downloadHandler` (ex: 'microsoft/delta:1') handler for utilizing related files to download payload file, "
             "`properties` (in-line json object the agent will pass to the handler). "
-            "--file can be used 1 or more times."
+            "--file can be used 1 or more times.",
         )
         context.argument(
             "related_files",
@@ -517,15 +516,14 @@ def load_deviceupdate_arguments(self, _):
             "The following keys are supported: "
             "`path` [required] local file path to related update file, "
             "`properties` (in-line json object passed to the download handler). "
-            "--related-file can be used 1 or more times."
+            "--related-file can be used 1 or more times.",
         )
         context.argument(
             "file_paths",
             options_list=["--file-path"],
             nargs="+",
             action="append",
-            help="Local path to target file for hash calculation. "
-            "--file-path can be used 1 or more times."
+            help="Local path to target file for hash calculation. --file-path can be used 1 or more times.",
         )
         context.argument(
             "hash_algo",
@@ -535,8 +533,8 @@ def load_deviceupdate_arguments(self, _):
             type=str,
         )
         context.argument(
-            "validate",
-            options_list=["--validate"],
+            "no_validation",
+            options_list=["--no-validation"],
             arg_type=get_three_state_flag(),
-            help="Apply json schema validation to the import manifest content.",
+            help="Disables client-side json schema validation of the import manifest content.",
         )
