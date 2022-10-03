@@ -22,6 +22,7 @@ unreleased
 * Add support for enrollment groups CRUD.
 
   - az iot central enrollment-group
+ 
     - az iot central enrollment-group list
     - az iot central enrollment-group show
     - az iot central enrollment-group create
@@ -33,6 +34,7 @@ unreleased
 * Add support for scheduled jobs CRUD.
 
   - az iot central scheduled-job
+ 
     - az iot central scheduled-job list
     - az iot central scheduled-job show
     - az iot central scheduled-job create
