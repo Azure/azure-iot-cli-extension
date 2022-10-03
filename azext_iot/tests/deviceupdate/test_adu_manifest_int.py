@@ -17,8 +17,10 @@ cli = EmbeddedCLI()
 
 logger = get_logger(__name__)
 
-unique_description = f"{generate_generic_id()} {generate_generic_id()}"[:-2]
-unique_properties = {generate_generic_id(): generate_generic_id(), generate_generic_id(): unique_description}
+# TODO: Research https://github.com/pytest-dev/pytest-xdist/issues/432
+# unique_description = f"{generate_generic_id()} {generate_generic_id()}"[:-2]
+# unique_properties = {generate_generic_id(): generate_generic_id(), generate_generic_id(): unique_description}
+sample_properties = {"property1": "value1", "property2": 2, "property3": {"a": "b"}}
 
 
 @pytest.mark.parametrize(
@@ -51,18 +53,18 @@ unique_properties = {generate_generic_id(): generate_generic_id(), generate_gene
         ),
         (
             "--update-provider digimaun0 --update-name simplescriptupdate --update-version 1.0 "
-            f"--description '{unique_description}' "
+            f"--description 'my update description' "
             "--compat manufacturer=Contoso model=Vacuum "
-            f"--step handler=microsoft/script:1 description='{unique_description}' "
+            f"--step handler=microsoft/script:1 description='my step description' "
             f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\" "
-            f"properties='{json.dumps(unique_properties)}' "
+            f"properties='{json.dumps(sample_properties)}' "
             f"--related-file path=\"{get_context_path(__file__, 'manifests', 'simple_apt_manifest_v5.json')}\" "
-            f"properties='{json.dumps(unique_properties)}' "
+            f"properties='{json.dumps(sample_properties)}' "
             f"--related-file path=\"{get_context_path(__file__, 'manifests', 'surface15', 'parent.importmanifest.json')}\" "
             f"--file path=\"{get_context_path(__file__, 'manifests', 'surface15', 'action.sh')}\" ",
             {
                 "updateId": {"provider": "digimaun0", "name": "simplescriptupdate", "version": "1.0"},
-                "description": unique_description,
+                "description": "my update description",
                 "compatibility": [
                     {"manufacturer": "Contoso", "model": "Vacuum"},
                 ],
@@ -72,7 +74,7 @@ unique_properties = {generate_generic_id(): generate_generic_id(), generate_gene
                             "handler": "microsoft/script:1",
                             "files": ["libcurl4-doc-apt-manifest.json", "action.sh"],
                             "type": "inline",
-                            "description": unique_description,
+                            "description": "my step description",
                         }
                     ]
                 },
@@ -81,13 +83,13 @@ unique_properties = {generate_generic_id(): generate_generic_id(), generate_gene
                         "filename": "libcurl4-doc-apt-manifest.json",
                         "sizeInBytes": 163,
                         "hashes": {"sha256": "iFWTIaxp33tf5BR1w0fMmnnHpjsUjLRQ9eZFjw74LbU="},
-                        "properties": unique_properties,
+                        "properties": sample_properties,
                         "relatedFiles": [
                             {
                                 "filename": "simple_apt_manifest_v5.json",
                                 "sizeInBytes": 1031,
                                 "hashes": {"sha256": "L+ZKmOOT3xRfHsFK7pcTXBLjeI2OFCW0855qIcV5sts="},
-                                "properties": unique_properties,
+                                "properties": sample_properties,
                             },
                             {
                                 "filename": "parent.importmanifest.json",
