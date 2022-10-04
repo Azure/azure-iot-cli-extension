@@ -455,6 +455,19 @@ def load_arguments(self, _):
             "can be inline or from a file path.",
         )
         context.argument(
+            "blob_container_name",
+            options_list=["--blob-container", "--bc"],
+            help="This blob container is used to output the status of the device identity import job and the results. "
+            "Parameter is ignored when blob_container_uri is provided. Write access is required for this blob container.",
+        )
+
+        context.argument(
+            "storage_account_name",
+            options_list=["--storage-account", "--sa"],
+            help="Name of Azure Storage account containing the output blob container."
+            "Parameter is ignored when blob_container_uri is provided. Write access is required.",
+        )
+        context.argument(
             "include_keys",
             options_list=["--include-keys", "--ik"],
             arg_type=get_three_state_flag(),
@@ -495,6 +508,31 @@ def load_arguments(self, _):
             "the job and the results. Note: when using Identity-based "
             "authentication an https:// URI without the SAS token is still required. "
             "Input for this argument can be inline or from a file path.",
+        )
+        context.argument(
+            "input_blob_container_name",
+            options_list=["--input-blob-container", "--ibc"],
+            help="This blob container stores the file which defines operations to be performed on the identity registry. "
+            "Parameter is ignored when input_blob_container_uri is provided. Read access is required for this blob container.",
+        )
+
+        context.argument(
+            "input_storage_account_name",
+            options_list=["--input-storage-account", "--isa"],
+            help="Name of Azure Storage account containing the input blob container."
+            "Only required when input_blob_container_uri is not provided. Read access is required.",
+        )
+        context.argument(
+            "output_blob_container_name",
+            options_list=["--output-blob-container", "--obc"],
+            help="This blob container is used to output the status of the device identity import job and the results. "
+            "Only required when input_blob_container_uri is not provided. Write access is required for this blob container.",
+        )
+        context.argument(
+            "output_storage_account_name",
+            options_list=["--output-storage-account", "--osa"],
+            help="Name of Azure Storage account containing the output blob container."
+            "Parameter is ignored when output_blob_container_uri is provided. Write access is required.",
         )
         context.argument(
             "storage_authentication_type",

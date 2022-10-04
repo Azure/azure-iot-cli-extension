@@ -259,6 +259,10 @@ helps[
     long-summary: For more information, see
                   https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
     examples:
+    - name: Export all device identities to a configured blob container and include device keys.
+            The blob container name and storage account name are provided as parameters to the command.
+      text: >
+        az iot hub device-identity export -n {iothub_name} --ik --bc {blob_container_name} --sa {storage_account_name}
     - name: Export all device identities to a configured blob container and include device keys. Uses an inline SAS uri example.
       text: >
         az iot hub device-identity export -n {iothub_name} --ik --bcu
@@ -288,6 +292,11 @@ helps[
     long-summary: For more information, see
                   https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
     examples:
+    - name: Import all device identities from a blob by providing command parameters for
+            input blob container and storage account as well as output blob container and storage account.
+      text: >
+        az iot hub device-identity import -n {iothub_name} --ibc {input_blob_container_name} --isa {input_storage_account_name}
+        --obc {output_blob_container_name} --osa {output_storage_account_name}
     - name: Import all device identities from a blob using an inline SAS uri.
       text: >
         az iot hub device-identity import -n {iothub_name} --ibcu {input_sas_uri} --obcu {output_sas_uri}

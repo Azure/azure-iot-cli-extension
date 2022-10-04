@@ -43,6 +43,7 @@ from azext_iot.common.utility import (
     init_monitoring,
     process_json_arg,
     generate_key,
+    generate_container_sas_token,
 )
 from azext_iot._factory import SdkResolver, CloudError
 from azext_iot.operations.generic import _execute_query, _process_top
@@ -2220,18 +2221,42 @@ def iot_get_module_connection_string(
     return result
 
 
-def _create_iot_hub_job_manager(
+def _get_service_sdk(
     cmd,
     hub_name: str,
     resource_group_name: str = None,
 ):
-    from azure.iot.hub import IoTHubJobManager
-
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         resource_name=hub_name, resource_group_name=resource_group_name
     )
-    return IoTHubJobManager.from_connection_string(target["cs"])
+    resolver = SdkResolver(target=target)
+    return resolver.get_sdk(SdkType.service_sdk)
+
+
+def _generate_blob_container_uri(
+    cmd,
+    storage_account_name: str,
+    blob_container_name: str
+):
+    from azext_iot.common.embedded_cli import EmbeddedCLI
+    if blob_container_name is None or storage_account_name is None:
+        raise ClientRequestError(
+            "Storage account and Blob container names are required to generate blob container uri"
+        )
+
+    cli = EmbeddedCLI(cli_ctx=cmd.cli_ctx)
+    storage_cstring = cli.invoke(
+        "storage account show-connection-string -n '{}'".format(
+            storage_account_name
+        )
+    ).as_json()["connectionString"]
+
+    sas_token = generate_container_sas_token(storage_cstring)
+    container_sas_url = (
+        "https://" + storage_account_name + ".blob.core.windows.net" + "/" + blob_container_name + "?" + sas_token
+    )
+    return container_sas_url
 
 
 def _create_export_import_job_properties(
@@ -2243,7 +2268,7 @@ def _create_export_import_job_properties(
     identity: str = None,
 ):
     from azext_iot.common.shared import AuthenticationType
-    from azure.iot.hub.models import (
+    from azext_iot.sdk.iothub.service.models import (
         JobProperties,
         ManagedIdentity
     )
@@ -2285,13 +2310,18 @@ def _create_export_import_job_properties(
 def iot_device_export(
     cmd,
     hub_name: str,
-    blob_container_uri: str,
+    blob_container_uri: str = None,
+    blob_container_name: str = None,
+    storage_account_name: str = None,
     include_keys: bool = False,
     storage_authentication_type: str = None,
     identity: str = None,
     resource_group_name: str = None,
 ):
-    iot_hub_job_manager = _create_iot_hub_job_manager(
+    if blob_container_uri is None:
+        blob_container_uri = _generate_blob_container_uri(cmd, storage_account_name, blob_container_name)
+
+    service_sdk = _get_service_sdk(
         cmd, hub_name, resource_group_name
     )
     export_job_properties = _create_export_import_job_properties(
@@ -2301,19 +2331,28 @@ def iot_device_export(
         storage_authentication_type=storage_authentication_type,
         identity=identity
     )
-    return iot_hub_job_manager.create_import_export_job(export_job_properties)
+    return service_sdk.jobs.create_import_export_job(export_job_properties)
 
 
 def iot_device_import(
     cmd,
     hub_name: str,
-    input_blob_container_uri: str,
-    output_blob_container_uri: str,
+    input_blob_container_uri: str = None,
+    input_blob_container_name: str = None,
+    input_storage_account_name: str = None,
+    output_blob_container_uri: str = None,
+    output_blob_container_name: str = None,
+    output_storage_account_name: str = None,
     storage_authentication_type: str = None,
     resource_group_name: str = None,
     identity: str = None,
 ):
-    iot_hub_job_manager = _create_iot_hub_job_manager(
+    if input_blob_container_uri is None:
+        input_blob_container_uri = _generate_blob_container_uri(cmd, input_storage_account_name, input_blob_container_name)
+    if output_blob_container_uri is None:
+        output_blob_container_uri = _generate_blob_container_uri(cmd, output_storage_account_name, output_blob_container_name)
+
+    service_sdk = _get_service_sdk(
         cmd, hub_name, resource_group_name
     )
     import_job_properties = _create_export_import_job_properties(
@@ -2323,7 +2362,7 @@ def iot_device_import(
         storage_authentication_type=storage_authentication_type,
         identity=identity
     )
-    return iot_hub_job_manager.create_import_export_job(import_job_properties)
+    return service_sdk.jobs.create_import_export_job(import_job_properties)
 
 
 def iot_hub_monitor_events(

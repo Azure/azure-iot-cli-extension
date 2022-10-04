@@ -12,7 +12,7 @@ from knack.log import get_logger
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.settings import UserTypes
-from azext_iot.common.utility import ensure_azure_namespace_path
+from azext_iot.common.utility import generate_container_sas_token
 
 from azext_iot.tests.generators import generate_generic_id
 # TODO: assert DEVICE_DEVICESCOPE_PREFIX format in parent device twin.
@@ -49,26 +49,10 @@ class TestIoTStorage(IoTLiveScenarioTest):
         self.live_storage_id = storage_account["id"]
 
     def get_container_sas_url(self):
-        from datetime import datetime, timedelta
-        ensure_azure_namespace_path()
-        from azure.storage.blob import ResourceTypes, AccountSasPermissions, generate_account_sas, BlobServiceClient
-
-        blob_service_client = BlobServiceClient.from_connection_string(conn_str=self.storage_cstring)
-
-        sas_token = generate_account_sas(
-            blob_service_client.account_name,
-            account_key=blob_service_client.credential.account_key,
-            resource_types=ResourceTypes(object=True),
-            permission=AccountSasPermissions(
-                read=True, add=True, create=True, delete=True, filter=True, list=True, update=True, write=True
-            ),
-            expiry=datetime.utcnow() + timedelta(hours=1)
-        )
-
+        sas_token = generate_container_sas_token(self.storage_cstring)
         container_sas_url = (
             "https://" + self.storage_account_name + ".blob.core.windows.net" + "/" + self.storage_container + "?" + sas_token
         )
-
         return container_sas_url
 
     def get_managed_identity(self):
@@ -160,11 +144,11 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 self.check_for_running_import_export()
 
                 job_id = self.cmd(
-                    'iot hub device-identity export -n {} --bcu "{}"'.format(
-                        self.entity_name, self.live_storage_uri
+                    'iot hub device-identity export -n {} --bc "{}" --sa "{}"'.format(
+                        self.entity_name, self.storage_container, self.storage_account_name
                     ),
                     checks=[
-                        self.check("outputBlobContainerUri", self.live_storage_uri),
+                        self.exists("outputBlobContainerUri"),
                         self.check("failureReason", None),
                         self.check("type", "export"),
                         self.check("excludeKeysInExport", True),
@@ -192,12 +176,13 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 self.wait_till_job_completion(job_id)
 
                 self.cmd(
-                    'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --auth-type {}'.format(
-                        self.entity_name, self.live_storage_uri, self.live_storage_uri, "key"
+                    'iot hub device-identity import -n {} --ibc "{}" --isa "{}" --obc "{}" --osa "{}" --auth-type {}'.format(
+                        self.entity_name, self.storage_container, self.storage_account_name,
+                        self.storage_container, self.storage_account_name, "key"
                     ),
                     checks=[
-                        self.check("outputBlobContainerUri", self.live_storage_uri),
-                        self.check("inputBlobContainerUri", self.live_storage_uri),
+                        self.exists("outputBlobContainerUri"),
+                        self.exists("inputBlobContainerUri"),
                         self.check("failureReason", None),
                         self.check("type", "import"),
                         self.check("storageAuthenticationType", "keyBased"),

@@ -619,3 +619,23 @@ def is_valid_dtmi(dtmi):
     if not pattern.match(dtmi):
         return False
     return True
+
+
+def generate_container_sas_token(storage_cstring):
+    from datetime import datetime, timedelta
+    ensure_azure_namespace_path()
+    from azure.storage.blob import ResourceTypes, AccountSasPermissions, generate_account_sas, BlobServiceClient
+
+    blob_service_client = BlobServiceClient.from_connection_string(conn_str=storage_cstring)
+
+    sas_token = generate_account_sas(
+        blob_service_client.account_name,
+        account_key=blob_service_client.credential.account_key,
+        resource_types=ResourceTypes(object=True),
+        permission=AccountSasPermissions(
+            read=True, add=True, create=True, delete=True, filter=True, list=True, update=True, write=True
+        ),
+        expiry=datetime.utcnow() + timedelta(hours=1)
+    )
+
+    return sas_token
