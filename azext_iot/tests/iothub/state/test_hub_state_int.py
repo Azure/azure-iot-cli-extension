@@ -23,8 +23,8 @@ settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=
 CWD = os.path.dirname(os.path.abspath(__file__))
 cli = EmbeddedCLI()
 
-DATAPLANE = "configurations devices edgedeployments"
-CONTROLPLANE = "certificates endpoints identities routes"
+DATAPLANE = "configurations devices"
+CONTROLPLANE = "arm"
 MAX_RETRIES = 5
 # DATAPLANE_AUTH_TYPES = ["cstring"]
 
@@ -159,9 +159,6 @@ def _setup_hub_state(cstring):
             )
 
 
-
-
-
 # Test with an empty hub to save all, upload all, migrate all - will need to have seperate hubs created
 
 @pytest.fixture()
@@ -193,6 +190,7 @@ def set_cmd_auth_type(command: str, auth_type: str, cstring: str) -> str:
 
     return f"{command} --auth-type {auth_type}"
 
+
 def clean_up_hub(hub_name, hub_rg):
     empty_filename = generate_generic_id() + ".json"
     with open(empty_filename, 'w', encoding='utf-8') as f:
@@ -201,6 +199,7 @@ def clean_up_hub(hub_name, hub_rg):
         f"iot hub state import -n {hub_name} -f {empty_filename} -g {hub_rg} -r"
     )
     os.remove(empty_filename)
+
 
 def clean_up_hub_dataplane(cstring):
     dest_hub_configs = cli.invoke(
@@ -452,7 +451,7 @@ def compare_hub_dataplane_to_file(filename: str, cstring: str):
         hub_info = json.load(f)
 
     # compare configurations
-    file_configs = hub_info["configurations"]
+    file_configs = list(hub_info["configurations"]["admConfigurations"].values())
     tries = 0
     while tries < MAX_RETRIES:
         try:
@@ -466,7 +465,7 @@ def compare_hub_dataplane_to_file(filename: str, cstring: str):
             time.sleep(1)
 
     # compare edge deployments
-    file_deploys = hub_info["edgeDeployments"]
+    file_deploys = list(hub_info["configurations"]["edgeDeployments"].values())
     tries = 0
     while tries < MAX_RETRIES:
         try:
@@ -480,7 +479,7 @@ def compare_hub_dataplane_to_file(filename: str, cstring: str):
             time.sleep(1)
 
     # compare devices
-    file_devices = hub_info["devices"]["identities"]
+    file_devices = hub_info["devices"]
     hub_devices = cli.invoke(
         f"iot hub device-identity list -l {cstring}"
     ).as_json()
@@ -497,90 +496,73 @@ def compare_hub_dataplane_to_file(filename: str, cstring: str):
 
     assert len(file_devices) == len(hub_devices)
 
-    file_modules_list = hub_info["modules"]
-    file_modules_dict = {}
-    for module in file_modules_list:
-        if module[0]["device_id"] in file_modules_dict:
-            file_modules_dict[module[0]["device_id"]].append(module)
-        else:
-            file_modules_dict[module[0]["device_id"]] = [module]
+    # file_modules_list = hub_info["modules"]
+    # file_modules_dict = {}
+    # for module in file_modules_list:
+    #     if module[0]["device_id"] in file_modules_dict:
+    #         file_modules_dict[module[0]["device_id"]].append(module)
+    #     else:
+    #         file_modules_dict[module[0]["device_id"]] = [module]
 
     for device in hub_devices:
         id = cli.invoke(
-            "iot hub device-identity show -l {} -d {}".format(cstring, device['deviceId'])
+            f"iot hub device-identity show -l {cstring} -d {device['deviceId']}"
         ).as_json()
         device["symmetricKey"] = id["authentication"]["symmetricKey"]
 
-        file_device = None
-        for d in file_devices:
-            if device["deviceId"] == d["deviceId"]:
-                file_device = d
-                break
+        file_device = file_devices[device["deviceId"]]
+        file_device_identity = {**file_device["identity"], **file_device["twin"]}
+        # convert auth type to twin style for easier comparisons
+        file_device_identity["authenticationType"] = file_device_identity["authentication"]["type"]
+        if file_device_identity["authenticationType"] == DeviceAuthApiType.sas.value:
+            file_device_identity["symmetricKey"] = file_device_identity["authentication"]["symmetricKey"]
+        elif file_device_identity["authenticationType"] == DeviceAuthApiType.selfSigned.value:
+            file_device_identity["x509Thumbprint"] = file_device_identity["authentication"]["x509Thumbprint"]
 
-        assert file_device
+        assert file_device_identity
+
         for key in ["$metadata", "$version"]:
                 device["properties"]["desired"].pop(key)
 
-        try:
-            compare_devices(device, file_device)
-        except AssertionError:
-            # device retrieved was not updated correctly
-            print(f" fetch device {device['deviceId']} again.")
-            time.sleep(1)
-            hub_devices = cli.invoke(
-                f"iot hub device-identity list -l {cstring}"
-            ).as_json()
+        compare_devices(device, file_device_identity)
+        # try:
+        #     compare_devices(device, file_device)
+        # except AssertionError:
+        #     # device retrieved was not updated correctly
+        #     print(f" fetch device {device['deviceId']} again.")
+        #     time.sleep(1)
+        #     hub_devices = cli.invoke(
+        #         f"iot hub device-identity list -l {cstring}"
+        #     ).as_json()
 
 
-        file_modules = file_modules_dict[device['deviceId']]
+        file_modules = file_device.get("modules", {})
         hub_modules = cli.invoke(
             "iot hub module-identity list -d {} -l {}".format(device["deviceId"], cstring)
         ).as_json()
 
-        # edge devices have two default modules that aren't saved to the file
-        if device["capabilities"]["iotEdge"]:
-            assert len(file_modules) == len(hub_modules) - 2
-        else:
-            assert len(file_modules) == len(hub_modules)
+        assert len(file_modules) == len(hub_modules)
 
         for module in hub_modules:
-            if module['moduleId'] in ["$edgeAgent", "$edgeHub"]:
-                continue
 
             module_twin = cli.invoke(
                 f"iot hub module-twin show -m {module['moduleId']} -d {device['deviceId']} -l {cstring}"
             ).as_json()
 
-            target_module = None
-            for mod in file_modules:
-                if module["moduleId"] == mod[0]["module_id"]:
-                    target_module = mod[0]
-                    target_module_twin = mod[1]
-                    break
+            target_module = file_modules[module["moduleId"]]["identity"]
+            target_module_twin = file_modules[module["moduleId"]]["twin"]
 
             assert target_module
-
             assert module["authentication"] == target_module["authentication"]
             for key in ["$metadata", "$version"]:
                 module_twin["properties"]["desired"].pop(key)
 
             compare_module_twins(module_twin, target_module_twin)
 
-        # compare children
-        if device["capabilities"]["iotEdge"]:
-            file_children = hub_info["devices"]["children"][device["deviceId"]]
-            dest_children = cli.invoke(
-                f"iot hub device-identity children list -d {device['deviceId']} -l {cstring}"
-            ).as_json()
-            if len(dest_children) < len(file_children):
-                time.sleep(1)
-                print(f"{len(dest_children)} of children for {device['deviceId']}")
-                dest_children = cli.invoke(
-                    f"iot hub device-identity children list -d {device['deviceId']} -l {cstring}"
-                ).as_json()
-                print(f"New: {len(dest_children)} of children for {device['deviceId']}")
-
-            assert file_children == dest_children
+        # compare parent
+        if device.get("parentScopes"):
+            device_parent = device["parentScopes"][0].split("://")[1]
+            assert file_device["parent"] == device_parent[:device_parent.rfind("-")]
 
 
 def compare_hub_controlplane_to_file(filename: str, hub_name: str, rg: str):
@@ -661,13 +643,11 @@ def compare_configs(configlist1, configlist2):
 
 
 def compare_devices(device1, device2):
+    # Shared and identity only props
     assert device1["authenticationType"] == device2["authenticationType"]
     assert device1["capabilities"]["iotEdge"] == device2["capabilities"]["iotEdge"]
     assert device1["connectionState"] == device2["connectionState"]
     assert device1["status"] == device2["status"]
-
-    if "tags" in device1:
-        assert device1["tags"] == device2["tags"]
 
     if device1["authenticationType"] == DeviceAuthApiType.sas.value:
         assert device1["symmetricKey"]["primaryKey"] == device2["symmetricKey"]["primaryKey"]
@@ -677,6 +657,10 @@ def compare_devices(device1, device2):
         assert device1["x509Thumbprint"]["primaryThumbprint"] == device2["x509Thumbprint"]["primaryThumbprint"]
         assert device1["x509Thumbprint"]["secondaryThumbprint"] == device2["x509Thumbprint"]["secondaryThumbprint"]
 
+    # Twin only props
+    if "tags" in device1:
+        assert device1["tags"] == device2["tags"]
+
     assert len(device1["properties"]["desired"]) == len(device2["properties"]["desired"])
 
     for prop in device1["properties"]["desired"]:
@@ -685,7 +669,25 @@ def compare_devices(device1, device2):
             assert device1["properties"]["desired"][prop] == device2["properties"]["desired"][prop]
 
 
+def compare_module_identities(module1, module2):
+    """Focus on shared props and identity only props"""
+    assert module1["managedBy"] == module2["managedBy"]
+    assert module1["connectionState"] == module2["connectionState"]
+
+    assert module1["authentication"]["type"] == module2["authentication"]["type"]
+
+    if module1["authentication"]["type"] == DeviceAuthApiType.sas.value:
+        assert module1["authentication"]["symmetricKey"]["primaryKey"] == module2["authentication"]["symmetricKey"]["primaryKey"]
+        assert module1["authentication"]["symmetricKey"]["secondaryKey"] == module2["authentication"]["symmetricKey"]["secondaryKey"]
+
+    if module1["authentication"]["type"] == DeviceAuthApiType.selfSigned.value:
+        assert module1["authentication"]["x509Thumbprint"]["primaryThumbprint"] == module2["authentication"]["x509Thumbprint"]["primaryThumbprint"]
+        assert module1["authentication"]["x509Thumbprint"]["secondaryThumbprint"] == module2["authentication"]["x509Thumbprint"]["secondaryThumbprint"]
+
+
 def compare_module_twins(twin1, twin2):
+    """Focus only on twin only props"""
+    assert twin1["modelId"] == twin2["modelId"]
     assert len(twin1["properties"]["desired"]) == len(twin2["properties"]["desired"])
     for prop in twin1["properties"]["desired"]:
         if prop not in ["$metadata", "$version"]:
@@ -694,7 +696,6 @@ def compare_module_twins(twin1, twin2):
 
     if "tags" in twin1:
         assert twin1["tags"] == twin2["tags"]
-    assert twin1["status"] == twin2["status"]
 
 
 def compare_certs(cert1, cert2):

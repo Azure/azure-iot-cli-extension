@@ -597,6 +597,10 @@ def iot_device_set_parent(
         login=login,
         auth_type=auth_type_dataplane,
     )
+    _iot_device_set_parent(target, parent_id, device_id, force)
+
+
+def _iot_device_set_parent(target, parent_id, device_id, force=False):
     parent_device = _iot_device_show(target, parent_id)
     _validate_edge_device(parent_device)
     child_device = _iot_device_show(target, device_id)
@@ -1147,8 +1151,6 @@ def iot_device_module_twin_update(
     etag=None,
     auth_type_dataplane=None,
 ):
-    from azext_iot.common.utility import verify_transform
-
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         resource_name=hub_name,
@@ -1156,6 +1158,11 @@ def iot_device_module_twin_update(
         login=login,
         auth_type=auth_type_dataplane,
     )
+    return _iot_device_module_twin_update(target, device_id, module_id, parameters, etag)
+
+
+def _iot_device_module_twin_update(target, device_id, module_id, parameters, etag=None):
+    from azext_iot.common.utility import verify_transform
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
@@ -1229,7 +1236,6 @@ def iot_edge_set_modules(
     login=None,
     auth_type_dataplane=None,
 ):
-    from azext_iot.sdk.iothub.service.models import ConfigurationContent
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
@@ -1238,6 +1244,11 @@ def iot_edge_set_modules(
         login=login,
         auth_type=auth_type_dataplane,
     )
+    _iot_edge_set_modules(target, device_id, content)
+
+
+def _iot_edge_set_modules(target, device_id, content):
+    from azext_iot.sdk.iothub.service.models import ConfigurationContent
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
@@ -1249,7 +1260,7 @@ def iot_edge_set_modules(
 
         content = ConfigurationContent(**processed_content)
         service_sdk.configuration.apply_on_edge_device(id=device_id, content=content)
-        return iot_device_module_list(cmd, device_id, hub_name=hub_name, login=login)
+        return _iot_device_module_list(target, device_id)
     except CloudError as e:
         handle_service_exception(e)
 
