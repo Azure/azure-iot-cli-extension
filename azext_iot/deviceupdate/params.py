@@ -19,6 +19,7 @@ from azext_iot.deviceupdate.common import (
     ADUPrivateLinkServiceConnectionStatus,
     ADUAccountSKUType,
     ADUManageDeviceImportType,
+    ADUValidHashAlgorithmType,
 )
 
 
@@ -176,8 +177,7 @@ def load_deviceupdate_arguments(self, _):
         context.argument(
             "search",
             options_list=["--search"],
-            help="Request updates matching a free-text search expression. "
-            "Supported when listing updates with no constraints.",
+            help="Request updates matching a free-text search expression. Supported when listing updates with no constraints.",
             arg_group="Filter",
         )
         context.argument(
@@ -474,7 +474,7 @@ def load_deviceupdate_arguments(self, _):
             nargs="+",
             action="append",
             help="Space-separated key=value pairs corresponding to properties of a device this update is compatible with. "
-            "Typically used for defining properties such as deviceManufacturer and deviceModel. "
+            "Typically used for defining properties such as manufacturer and model. "
             "--compat can be used 1 or more times. ",
         )
         context.argument(
@@ -490,7 +490,7 @@ def load_deviceupdate_arguments(self, _):
             "`updateId.provider`, `updateId.name` `updateId.version` and `description`."
             "The following inline step keys are supported: "
             "`handler` (ex: 'microsoft/script:1' or 'microsoft/swupdate:1' or 'microsoft/apt:1'), "
-            "`properties` (in-line json object the agent will pass to the handler) and `description`. "
+            "`properties` (in-line json object the agent will pass to the handler), and `description`. "
             "--step can be used 1 or more times.",
         )
         context.argument(
@@ -502,9 +502,9 @@ def load_deviceupdate_arguments(self, _):
             "A --file entry can include the closest --related-file entries if provided. "
             "The following keys are supported: "
             "`path` [required] local file path to update file, "
-            "`downloadHandler` (ex: 'microsoft/delta:1') download handler for utilizing related files "
-            "to download payload file. "
-            "--file can be used 1 or more times."
+            "`downloadHandler` (ex: 'microsoft/delta:1') handler for utilizing related files to download payload file, "
+            "`properties` (in-line json object the agent will pass to the handler). "
+            "--file can be used 1 or more times.",
         )
         context.argument(
             "related_files",
@@ -515,6 +515,26 @@ def load_deviceupdate_arguments(self, _):
             "A --related-file entry will be associated to the closest --file entry if it exists. "
             "The following keys are supported: "
             "`path` [required] local file path to related update file, "
-            "`properties` in-line json object passed to the download handler. "
-            "--related-file can be used 1 or more times."
+            "`properties` (in-line json object passed to the download handler). "
+            "--related-file can be used 1 or more times.",
+        )
+        context.argument(
+            "file_paths",
+            options_list=["--file-path"],
+            nargs="+",
+            action="append",
+            help="Local path to target file for hash calculation. --file-path can be used 1 or more times.",
+        )
+        context.argument(
+            "hash_algo",
+            options_list=["--hash-algo"],
+            help="Cryptographic algorithm to use for hashing.",
+            arg_type=get_enum_type(ADUValidHashAlgorithmType),
+            type=str,
+        )
+        context.argument(
+            "no_validation",
+            options_list=["--no-validation"],
+            arg_type=get_three_state_flag(),
+            help="Disables client-side json schema validation of the import manifest content.",
         )
