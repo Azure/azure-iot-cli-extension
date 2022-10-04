@@ -58,40 +58,4 @@ def load_iothub_commands(self, _):
     with self.command_group(
         "iot edge hierarchy", command_type=device_identity_ops
     ) as cmd_group:
-        cmd_group.command("create", "iot_edge_hierarchy_create")
-
-    # with self.command_group(
-    #     "iot hub device-identity", command_type=device_identity_ops
-    # ) as cmd_group:
-    #     cmd_group.command("create", "iot_device_create")
-    #     cmd_group.show_command("show", "iot_device_show")
-    #     cmd_group.command("list", "iot_device_list")
-    #     cmd_group.command("delete", "iot_device_delete")
-    #     cmd_group.generic_update_command(
-    #         "update",
-    #         getter_name="iot_device_show",
-    #         custom_func_type=device_identity_ops,
-    #         setter_name="iot_device_update",
-    #         custom_func_name="update_iot_device_custom"
-    #     )
-    #     cmd_group.command("renew-key", "iot_device_key_regenerate")
-    #     cmd_group.command("import", "iot_device_import")
-    #     cmd_group.command("export", "iot_device_export")
-
-    # with self.command_group(
-    #     "iot hub device-identity children", command_type=device_identity_ops
-    # ) as cmd_group:
-    #     cmd_group.show_command("add", "iot_device_children_add")
-    #     cmd_group.show_command("remove", "iot_device_children_remove")
-    #     cmd_group.show_command("list", "iot_device_children_list")
-
-    # with self.command_group(
-    #     "iot hub device-identity parent", command_type=device_identity_ops
-    # ) as cmd_group:
-    #     cmd_group.show_command("show", "iot_device_get_parent")
-    #     cmd_group.show_command("set", "iot_device_set_parent")
-
-    # with self.command_group(
-    #     "iot hub device-identity connection-string", command_type=device_identity_ops
-    # ) as cmd_group:
-    #     cmd_group.show_command("show", "iot_get_device_connection_string")
+        cmd_group.command("create", "iot_edge_hierarchy_create", is_experimental=True)

@@ -37,7 +37,7 @@ def iot_edge_hierarchy_create(
     )
 
 
-def iot_bulk_delete_devices(
+def iot_delete_devices(
     cmd,
     device_ids: List[str],
     confirm: Optional[bool] = True,
@@ -53,7 +53,7 @@ def iot_bulk_delete_devices(
         login=login,
         auth_type_dataplane=auth_type_dataplane,
     )
-    return device_identity_provider._bulk_delete_devices(
+    return device_identity_provider.delete_device_identities(
         device_ids=device_ids,
         confirm=confirm
     )

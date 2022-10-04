@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 from tqdm import tqdm
 from time import sleep
-from typing import Any, List
+from typing import Dict, List, NamedTuple
 from knack.log import get_logger
 from typing import Optional
 from azext_iot._factory import SdkResolver
@@ -13,9 +13,8 @@ from azext_iot.common.shared import (
     ConfigType,
     DeviceAuthType,
     SdkType,
-    BulkDeviceImportMode,
 )
-from azext_iot.iothub.providers.base import IoTHubProvider, CloudError
+from azext_iot.iothub.providers.base import IoTHubProvider
 from azext_iot.common.utility import process_json_arg, process_yaml_arg
 from azext_iot.operations.generic import _execute_query
 from azure.cli.core.azclierror import (
@@ -27,11 +26,22 @@ from azext_iot.operations.hub import _assemble_device, _process_config_content
 from azext_iot.sdk.iothub.service.models.configuration_content_py3 import (
     ConfigurationContent,
 )
-from azext_iot.sdk.iothub.service.models.device_capabilities import DeviceCapabilities
-from azext_iot.sdk.iothub.service.models.device_py3 import Device
-from azext_iot.sdk.iothub.service.models.export_import_device import ExportImportDevice
+from azext_iot.sdk.iothub.service.models import Device
 
 logger = get_logger(__name__)
+
+
+# Utility classes for edge config file values and device arguments
+class NestedEdgeDeviceConfig(NamedTuple):
+    device_params: Dict[str, str]
+    deployment: str
+    parent: Optional[str] = None
+
+
+class NestedEdgeConfig(NamedTuple):
+    version: str
+    auth_method: DeviceAuthType
+    devices: List[NestedEdgeDeviceConfig]
 
 
 class DeviceIdentityProvider(IoTHubProvider):
@@ -62,21 +72,18 @@ class DeviceIdentityProvider(IoTHubProvider):
         clean: Optional[bool] = False,
     ):
         """
-        Creates a nested edge hierarchy based on user nargs input.
-        Clean - parameter to determine if all devices are deleted first.
-        Visualize - parameter to show a visualization of the devices before creating.
+        Creates a nested edge hierarchy of devices
 
-        If user does not select 'clean' - we try our best to validate that no duplicate deviceIds are created
-
-        STEPS
-        1 - process input hierarchy and validate
-        2 - show visualization
-        3 - flatten list but track parent-child hierarchy
-        4 - clean existing devices (maybe)
-        5 - create all devices
-        6 - get all device scopes
-        7 - set parent-child relationships
-        8 - set modules
+        Parameters
+        ----------
+            devices : List[List[str]]
+                List of [List of device creation parameters]
+            config_file : str
+                Path to nested edge config file
+            clean : bool
+                Whether to delete all devices in hub before creating new devices.
+            visualize: bool
+                Whether to show a visualization of hierarchy and operation progress.
         """
         from treelib import Tree
         from treelib.exceptions import (
@@ -85,60 +92,72 @@ class DeviceIdentityProvider(IoTHubProvider):
             DuplicatedNodeIdError,
         )
 
-        config = None
+        config: NestedEdgeConfig = None
+        # If user has provided a path to a configuration file
         if config_file:
-            # Cannot process config file and --devices nargs*
+            # Cannot process both config file and --devices nargs*
             if devices:
                 raise MutuallyExclusiveArgumentError(
-                    "Please either use a config file (-c) or in-line device arguments, both were provided"
+                    "Please either use a --config-file argument or inline --device arguments, both were provided."
                 )
 
             config_content = None
-            # Process Edge Config YAML
+            # Process Edge Config file into object dictionary
             if config_file.endswith(".yml"):
-                # Process YAML file into config object dictionary
                 config_content = process_yaml_arg(config_file)
             elif config_file.endswith(".json"):
-                # Process JSON file into config object dictionary
                 config_content = process_json_arg(config_file)
             else:
                 raise InvalidArgumentValueError("Config file must be JSON or YAML")
 
             config = self._process_nested_edge_config_file_content(config_content)
         elif devices:
-            # parse inputs
+            # Process --device arguments
+            config = NestedEdgeConfig(
+                version="1.0",
+                auth_method=DeviceAuthType.shared_private_key.value,  # TODO - add input param for auth-type
+                devices=[],
+            )
             # Parse each device and add to the tree
-            config = {
-                "auth_method": DeviceAuthType.shared_private_key.value,  # TODO - add input param for auth-type
-                "devices": [],
-            }
             for device_input in devices:
-                if not device_input or device_input[0]:
-                    pass
+                # assemble device params from nArgs strings
+                device_params = self.assemble_nargs_to_dict(device_input)
+                device_id = device_params.get("device_id", None)
+                if not device_id:
+                    raise InvalidArgumentValueError(
+                        "A device parameter is missing required parameter 'device_id'"
+                    )
+                deployment = device_params.get("deployment", None)
+                parent_id = device_params.get("parent", None)
 
-                # assemble device with params
-                device_params = self._assemble_nargs_to_dict(device_input)
-                device = self._parse_edge_config_device_param_dict(device_params)
-                config["devices"].append(device)
+                config.devices.append(
+                    NestedEdgeDeviceConfig(
+                        device_params=device_params,
+                        deployment=deployment,
+                        parent=parent_id,
+                    )
+                )
 
-        if not config or not len(config['devices']):
-            raise InvalidArgumentValueError("No devices found in input. "
-            "Please check your input arguments or config file and try the command again")
+        if not config or not len(config.devices):
+            raise InvalidArgumentValueError(
+                "No devices found in input. "
+                "Please check your input arguments or config file and try the command again"
+            )
 
         tree = Tree()
-        tree_root_node = "|root|"
-        tree.create_node("Devices", tree_root_node)
+        tree_root_node_id = "|root|"
+        tree.create_node("Devices", tree_root_node_id)
 
-        # dict of assembled devices
-        assembled_device_dict = {}
-        # dict of parents
-        device_to_parent_dict = {}
+        # dict of assembled Device objects by ID
+        assembled_device_dict: Dict[str, Device] = {}
+        # dict of device parents by ID
+        device_to_parent_dict: Dict[str, str] = {}
 
         # first pass to create flat tree
-        for device_obj in config["devices"]:
-            device = device_obj["device"]
-            device_id = device["device_id"]
-            auth_method = config["auth_method"]
+        for device_config in config.devices:
+            device_params = device_config.device_params
+            device_id = device_params["device_id"]
+            auth_method = config.auth_method
 
             # create device object
             assembled_device = _assemble_device(
@@ -153,42 +172,37 @@ class DeviceIdentityProvider(IoTHubProvider):
 
             # add to flat tree
             try:
-                tree.create_node(device_id, device_id, parent=tree_root_node)
+                tree.create_node(device_id, device_id, parent=tree_root_node_id)
             except DuplicatedNodeIdError:
                 raise InvalidArgumentValueError(
                     f"Duplicate deviceId '{device_id}' detected"
                 )
 
         # second pass to move nodes and check hierarchy
-        for device_obj in config["devices"]:
-            device = device_obj["device"]
-            device_id = device["device_id"]
+        for device_config in config.devices:
+            device_params = device_config.device_params
+            device_id = device_params.get("device_id", None)
 
             # Move nodes to their correct parents, track device->parent in dict
-            device_parent = device_obj.get("parent", tree_root_node)
-            if device_parent != tree_root_node:
+            device_parent = device_config.parent or tree_root_node_id
+            if device_parent != tree_root_node_id:
                 device_to_parent_dict[device_id] = device_parent
             try:
                 tree.update_node(device_id, data=device_parent)
                 tree.move_node(device_id, device_parent)
             except NodeIDAbsentError:
                 raise InvalidArgumentValueError(
-                    f'Error building hierarchy, missing parent "{device_parent}"'
+                    f"Error building device hierarchy, missing parent '{device_parent}'"
                 )
             except LoopError:
                 raise InvalidArgumentValueError(
-                    'Error building hierarchy, found a loop.'
-                    f'Device "{device_id}" and "{device_parent}" cannot both be children of each other.'
+                    "Error building device hierarchy, found a loop between "
+                    f"devices '{device_id}' and '{device_parent}'."
                 )
 
-        # Show the tree, break if user provides input
+        # Show the tree
         if visualize:
             tree.show()
-            i = input(
-                "Press enter to continue. Entering any value will cancel the operation."
-            )
-            if i != "":
-                raise KeyboardInterrupt
 
         # Delete or verify existing device IDs
         query_args = ["SELECT deviceId FROM devices"]
@@ -198,7 +212,12 @@ class DeviceIdentityProvider(IoTHubProvider):
 
         # Clear devices if necessary
         if clean and len(existing_device_ids):
-            self.delete_device_identities(existing_device_ids)
+            delete_iterator = (
+                tqdm(existing_device_ids, "Deleting existing device identities")
+                if visualize
+                else existing_device_ids
+            )
+            self.delete_device_identities(delete_iterator, confirm=True)
         else:
             # If not cleaning the hub, ensure no duplicate device ids
             duplicates = list(
@@ -206,29 +225,29 @@ class DeviceIdentityProvider(IoTHubProvider):
             )
             if any(duplicates):
                 raise InvalidArgumentValueError(
-                    f"Duplicate deviceIds detected: {duplicates}. "
+                    f"The following devices already exist on hub '{self.hub_name}': {duplicates}. "
                     "To clear all devices before creating the hierarchy, please utilize the `--clean` switch."
                 )
 
         # Bulk add devices
-        self.create_device_identities(list(assembled_device_dict.values()))
+        device_list = list(assembled_device_dict.values())
+        device_iterator = (
+            tqdm(device_list, desc="Creating device identities")
+            if visualize
+            else device_list
+        )
+        self.create_device_identities(device_iterator)
 
-        # Get all device ids and scopes (inconsistent timing, using basic retry)
-        all_devices = []
-        retries = 0
-        progress = tqdm([range(0, 5)], desc="Querying device scopes:")
-        progress.update(1)
-        while len(all_devices) < len(config["devices"]) and retries < 5:
-            if retries > 0:
-                progress.update(1)
-            sleep(2)
-            query_args = ["SELECT deviceId, deviceScope FROM devices"]
-            query_method = self.service_sdk.query.get_twins
-            all_devices = _execute_query(query_args, query_method)
-            retries += 1
-        progress.close()
+        # Give device registry a chance to catch up
+        sleep(1)
 
-        if len(all_devices) < len(config["devices"]):
+        # Get all device ids and scopes (inconsistent timing, hence sleep)
+        query_args = ["SELECT deviceId, deviceScope FROM devices"]
+        query_method = self.service_sdk.query.get_twins
+        all_devices = _execute_query(query_args, query_method)
+
+        # Throw an error if we don't get the same number of desired devices back
+        if len(all_devices) < len(config.devices):
             raise AzureResponseError(
                 "An error occurred - Failed to fetch device scopes for all devices"
             )
@@ -239,38 +258,48 @@ class DeviceIdentityProvider(IoTHubProvider):
             assembled_device_dict[id].device_scope = device["deviceScope"]
 
         # Set parent / child relationships
-        # TODO - this is not currently working with bulk update.
-        for device_id in tqdm(device_to_parent_dict, desc="Setting device parents"):
+        device_to_parent_iterator = (
+            tqdm(device_to_parent_dict, desc="Setting device parents")
+            if visualize
+            else device_to_parent_dict
+        )
+        for device_id in device_to_parent_iterator:
             device = assembled_device_dict[device_id]
             parent_id = device_to_parent_dict[device_id]
             parent_scope = assembled_device_dict[parent_id].device_scope
             device.parent_scopes = [parent_scope]
-            try:
-                self._handle_rate_limiting(
-                    self.service_sdk.devices.create_or_update_identity
-                )(id=device_id, device=device, if_match="*")
-            except Exception as err:
-                # TODO - handle timeouts / rate limiting
-                raise err
+            self.service_sdk.devices.create_or_update_identity(
+                id=device_id, device=device, if_match="*"
+            )
 
-        # # update config / set-modules
-        for device_obj in tqdm(config["devices"], desc="Setting edge module content"):
-            device = device_obj["device"]
-            device_id = device["device_id"]
-            deployment_content = device.get("deployment", None)
+        # update edge config / set-modules
+        devices_config_iterator = (
+            tqdm(config.devices, desc="Setting edge module content")
+            if visualize
+            else config.devices
+        )
+        for device_config in devices_config_iterator:
+            device_params = device_config.device_params
+            device_id = device_params["device_id"]
+            deployment_content = device_params.get("deployment", None)
             if deployment_content:
+                # TODO - replace with iot_edge_set_modules once it's moved into provider
                 content = process_json_arg(deployment_content, argument_name="content")
                 processed_content = _process_config_content(
                     content, config_type=ConfigType.edge
                 )
-
                 content = ConfigurationContent(**processed_content)
-                self._handle_rate_limiting(
-                    self.service_sdk.configuration.apply_on_edge_device
-                )(id=device_id, content=content)
+                self.service_sdk.configuration.apply_on_edge_device(
+                    id=device_id, content=content
+                )
 
-    def _process_nested_edge_config_file_content(self, content: dict) -> dict[str, Any]:
-        # TODO version number is important here for schema validation
+    def _process_nested_edge_config_file_content(
+        self, content: dict
+    ) -> NestedEdgeConfig:
+        """
+        Process edge config file schema dictionary
+        """
+        # TODO version / schema validation
         version = content["config_version"]
         hub_config = content["iothub"]
         devices_config = content["edgedevices"]
@@ -286,66 +315,47 @@ class DeviceIdentityProvider(IoTHubProvider):
         )
         all_devices = []
 
-        def _process_edge_device(device: dict, parent_id=None):
+        def _process_edge_config_device(device: dict, parent_id=None):
             device_id = device.get("device_id", None)
             if not device_id:
                 raise InvalidArgumentValueError(
-                    "A device parameter is missing a device ID"
+                    "A device parameter is missing required attribute 'device_id'"
                 )
-            edge_agent = device.get("edge_agent", None)
             deployment = device.get("deployment", None)
             child_devices = device.get("child", [])
-            device_obj = {
-                "device": device,
-                "edge_agent": edge_agent,
-                "deployment": deployment,
-            }
-            if parent_id:
-                device_obj["parent"] = parent_id
+            device_obj = NestedEdgeDeviceConfig(
+                device_params=device, deployment=deployment, parent=parent_id
+            )
             all_devices.append(device_obj)
             for child_device in child_devices:
-                _process_edge_device(child_device, parent_id=device_id)
+                _process_edge_config_device(child_device, parent_id=device_id)
 
         for device in devices_config:
-            _process_edge_device(device)
-        return {
-            "version": version,
-            "auth_method": device_authentication_method,
-            "devices": all_devices,
-        }
+            _process_edge_config_device(device)
+        return NestedEdgeConfig(
+            version=version,
+            auth_method=device_authentication_method,
+            devices=all_devices,
+        )
 
-    def _parse_edge_config_device_param_dict(self, device) -> dict[str, Any]:
-        device_id = device.get("device_id", None)
-        if not device_id:
-            raise InvalidArgumentValueError("A device parameter is missing a device ID")
-        edge_agent = device.get("edge_agent", None)
-        deployment = device.get("deployment", None)
-        parent_id = device.get("parent", None)
-
-        device_obj = {
-            "device": device,
-            "edge_agent": edge_agent,
-            "deployment": deployment,
-        }
-        if parent_id:
-            device_obj["parent"] = parent_id
-        return device_obj
-
-    def _assemble_nargs_to_dict(self, hash_list: List[str]) -> dict[str, str]:
+    def assemble_nargs_to_dict(self, hash_list: List[str]) -> Dict[str, str]:
         result = {}
-        if not hash_list:
+        if not hash_list or not hash_list[0]:
             return result
         for hash in hash_list:
+            # filter for malformed nArg input (no = value assigned)
+            if "=" not in hash:
+                return result
             split_hash = hash.split("=", 1)
             result[split_hash[0]] = split_hash[1]
         return result
 
-    def delete_device_identities(self, device_ids, confirm=True):
-        for id in tqdm(device_ids, "Deleting existing device identities"):
+    def delete_device_identities(
+        self, device_ids: List[str], confirm: Optional[bool] = False
+    ):
+        for id in device_ids:
             try:
-                self._handle_rate_limiting(self.service_sdk.devices.delete_identity)(
-                    id=id, if_match="*"
-                )
+                self.service_sdk.devices.delete_identity(id=id, if_match="*")
             except Exception as err:
                 raise AzureResponseError(err)
         if confirm:
@@ -357,85 +367,9 @@ class DeviceIdentityProvider(IoTHubProvider):
 
     def create_device_identities(self, devices: List[Device]):
         try:
-            for device in tqdm(devices, desc="Creating device identities"):
-                self._handle_rate_limiting(
-                    self.service_sdk.devices.create_or_update_identity
-                )(id=device.device_id, device=device)
+            for device in devices:
+                self.service_sdk.devices.create_or_update_identity(
+                    id=device.device_id, device=device
+                )
         except Exception as err:
             raise AzureResponseError(err)
-
-    def _handle_rate_limiting(self, operation):
-        """Decorator that handles individual service calls that are subject to rate limiting"""
-
-        def wrap(*args, **kwargs):
-            # print(f'wrapping {operation.__name__}')
-            try:
-                return operation(*args, **kwargs)
-            except CloudError as e:
-                if e.status_code == 409:
-                    logger.log(e)
-                    logger.log(args)
-                    logger.log(kwargs)
-                if e.status_code == 429:
-                    logger.log(
-                        f"{operation.__name__} was rate limited...waiting to retry"
-                    )
-                    sleep(5)
-                    return wrap(*args, **kwargs)
-            except Exception as e:
-                raise e
-
-        return wrap
-
-    def _bulk_create_devices(self, device_ids, chunk_size=100, edge=False):
-        # Creates chunked arrays of device ops of size "chunk_size"
-        bulk_device_chunks = [
-            device_ids[i : i + chunk_size]
-            for i in range(0, len(device_ids), chunk_size)
-        ]
-
-        edge_enabled = DeviceCapabilities(iot_edge=edge)
-        for chunk in bulk_device_chunks:
-            create_ops = list(
-                map(
-                    lambda device_id: ExportImportDevice(
-                        id=device_id,
-                        import_mode=BulkDeviceImportMode.Create.value,
-                        capabilities=edge_enabled,
-                    ),
-                    chunk,
-                )
-            )
-            try:
-                self.service_sdk.bulk_registry.update_registry(create_ops)
-            except Exception as err:
-                raise AzureResponseError(err)
-
-    def _bulk_delete_devices(self, device_ids, chunk_size=100, confirm=True):
-        # Creates chunked arrays of device ops of size "chunk_size"
-        bulk_delete_chunks = [
-            device_ids[i : i + chunk_size]
-            for i in range(0, len(device_ids), chunk_size)
-        ]
-        for chunk in bulk_delete_chunks:
-            delete_ops = list(
-                map(
-                    lambda id: ExportImportDevice(
-                        id=id, import_mode=BulkDeviceImportMode.Delete.value
-                    ),
-                    chunk,
-                )
-            )
-            try:
-                self.service_sdk.bulk_registry.update_registry(delete_ops)
-            except Exception as err:
-                import pdb
-
-                pdb.set_trace()
-                raise AzureResponseError(err)
-        if confirm:
-            existing_devices = self.service_sdk.devices.get_devices()
-            if len(existing_devices):
-                raise AzureResponseError(
-                    "An error has occurred - Not all devices were deleted."
-                )

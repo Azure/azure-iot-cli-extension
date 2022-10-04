@@ -154,7 +154,7 @@ def process_yaml_arg(path: str) -> dict:
 
     try:
         import yaml
-        with open(path) as f:
+        with open(path, "rb") as f:
             return yaml.load(f, Loader=yaml.FullLoader)
     except CLIInternalError as ex:
         raise CLIInternalError(

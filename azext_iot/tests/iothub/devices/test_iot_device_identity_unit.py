@@ -9,9 +9,7 @@ import json
 import responses
 import re
 from azext_iot.iothub import commands_device_identity as subject
-from azext_iot.common.utility import validate_key_value_pairs
-from azext_iot.iothub.providers import device_identity as provider
-from azext_iot.tests.conftest import fixture_cmd, fixture_ghcs, fixture_sas, mock_target
+from azext_iot.tests.conftest import fixture_cmd, mock_target
 
 from azure.cli.core.azclierror import (
     InvalidArgumentValueError,
@@ -20,7 +18,6 @@ from azure.cli.core.azclierror import (
 
 
 hub_name = 'myhub'
-#myhub.azuredevices.net
 hub_entity = mock_target["entity"]
 resource_group_name = "RESOURCEGROUP"
 
@@ -48,9 +45,9 @@ class TestEdgeHierarchyCreateArgs:
         # delete any existing devices
         mocked_response.add(
             method=responses.DELETE,
-            url=re.compile("{}/dev\d+".format(devices_url)),
+            url=re.compile(r"{}/dev\d+".format(devices_url)),
             body="{}",
-            status=200,
+            status=204,
             content_type="application/json",
             match_querystring=False,
         )
@@ -68,7 +65,7 @@ class TestEdgeHierarchyCreateArgs:
         # Create / Update device-identity
         mocked_response.add(
             method=responses.PUT,
-            url=re.compile("{}/dev\d+".format(devices_url)),
+            url=re.compile(r"{}/dev\d+".format(devices_url)),
             body="{}",
             status=200,
             content_type="application/json",
@@ -91,6 +88,7 @@ class TestEdgeHierarchyCreateArgs:
             visualize=visualize,
             clean=clean,
         )
+
 
 class TestHierarchyCreateFailures:
     @pytest.mark.parametrize(
@@ -193,6 +191,7 @@ class TestHierarchyCreateFailures:
                 config_file=config,
             )
 
+
 class TestHierarchyCreateConfig:
     @pytest.fixture()
     def service_client(self, mocked_response, fixture_ghcs, fixture_sas):
@@ -221,9 +220,9 @@ class TestHierarchyCreateConfig:
         # delete any existing devices
         mocked_response.add(
             method=responses.DELETE,
-            url=re.compile("{}/device_\d+".format(devices_url)),
+            url=re.compile(r"{}/device_\d+".format(devices_url)),
             body="{}",
-            status=200,
+            status=204,
             content_type="application/json",
             match_querystring=False,
         )
@@ -241,7 +240,7 @@ class TestHierarchyCreateConfig:
         # Create / Update device-identity
         mocked_response.add(
             method=responses.PUT,
-            url=re.compile("{}/device_\d+".format(devices_url)),
+            url=re.compile(r"{}/device_\d+".format(devices_url)),
             body="{}",
             status=200,
             content_type="application/json",
@@ -251,7 +250,7 @@ class TestHierarchyCreateConfig:
         # Update config content / set modules
         mocked_response.add(
             method=responses.POST,
-            url=re.compile("{}/device_\d+/applyConfigurationContent".format(devices_url)),
+            url=re.compile(r"{}/device_\d+/applyConfigurationContent".format(devices_url)),
             body="{}",
             status=200,
             content_type="application/json",
@@ -276,40 +275,4 @@ class TestHierarchyCreateConfig:
             config_file=config,
             visualize=visualize,
             clean=clean,
-        )
-
-@pytest.mark.skip('Not yet used')
-class TestBulkDeviceCRUD:
-    @pytest.fixture()
-    def service_client(self, mocked_response, fixture_ghcs, fixture_sas):
-        devices_url = f"https://{hub_entity}/devices"
-
-        yield mocked_response
-
-    @pytest.mark.parametrize(
-        "device_ids, confirm", 
-        [
-            (['device_1', 'device_2'], True),
-            (['device_1', 'device_2'], False)
-        ]
-    )
-    def test_bulk_delete_devices(self, fixture_cmd, service_client, device_ids, confirm):
-        subject.iot_bulk_delete_devices(
-            cmd=fixture_cmd,
-            device_ids=device_ids,
-            confirm=confirm
-        )
-
-    @pytest.mark.parametrize(
-        "device_ids, confirm", 
-        [
-            (['device_1', 'device_2'], True),
-            (['device_1', 'device_2'], False)
-        ]
-    )
-    def test_bulk_delete_devices(self, fixture_cmd, service_client, device_ids, confirm):
-        subject.iot_bulk_delete_devices(
-            cmd=fixture_cmd,
-            device_ids=device_ids,
-            confirm=confirm
         )

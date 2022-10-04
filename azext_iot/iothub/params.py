@@ -258,18 +258,19 @@ def load_iothub_arguments(self, _):
         )
         context.argument(
             "clean",
-            options_list=["--clean"],
+            options_list=["--clean", "-c"],
             arg_type=get_three_state_flag(),
-            help="Deletes all devices before creating new hierarchies."
+            help="Deletes all devices in target hub before creating new hierarchy."
         )
         context.argument(
             "visualize",
             options_list=["--visualize", "--vis", "-v"],
             arg_type=get_three_state_flag(),
-            help="Shows a visualization preview of the device structure. Will prompt for confirmation."
+            help="Shows visualizations of device hierarchy and progress of various tasks "
+            "(device creation, setting parents, updating configs, etc)."
         )
         context.argument(
             "config_file",
-            options_list=["--config-file", "--config", "-c"],
+            options_list=["--config-file", "--config", "--cfg"],
             help="Path to device hierarchy config file"
         )
