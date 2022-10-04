@@ -6,6 +6,15 @@ Release History
 unreleased
 +++++++++++++++
 
+
+0.17.3
++++++++++++++++
+
+**Device Update**
+
+* Adds `az iot device-update update init calculate-hash`, a utility command used to calculate the base64 hash representation of one or more files.
+* The `update init v5` command will by default validate the generated import manifest using the official json schema definition. Client-side validation can be skipped by using `--no-validation`.
+
 **IoT Central updates**
 
 * `--api-version` parameter will be deprecated and ignored. The IoT Central API will alway call latest GA version or latest preview version (if any API only exists in preview).
@@ -13,6 +22,7 @@ unreleased
 * Add support for enrollment groups CRUD.
 
   - az iot central enrollment-group
+ 
     - az iot central enrollment-group list
     - az iot central enrollment-group show
     - az iot central enrollment-group create
@@ -24,12 +34,14 @@ unreleased
 * Add support for scheduled jobs CRUD.
 
   - az iot central scheduled-job
+ 
     - az iot central scheduled-job list
     - az iot central scheduled-job show
     - az iot central scheduled-job create
     - az iot central scheduled-job delete
     - az iot central scheduled-job update
     - az iot central scheduled-job list-runs
+
 
 0.17.2
 +++++++++++++++
