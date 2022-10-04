@@ -23,6 +23,7 @@ resource_group_name = "RESOURCEGROUP"
 managed_identity = "EXAMPLEMANAGEDIDENTITY"
 generic_job_response = {"JobResponse": generate_generic_id()}
 qualified_hostname = "{}.subdomain.domain".format(hub_name)
+hub_policy = "test_policy"
 
 
 @pytest.fixture
@@ -34,7 +35,10 @@ def get_mgmt_client(mocker, fixture_cmd):
     )
     patch_discovery.return_value = {
         "resourcegroup": resource_group_name,
-        "cs": hub_connection_string
+        "cs": hub_connection_string,
+        "entity": hub_name,
+        "policy": hub_policy,
+        "primarykey": shared_access_key
     }
 
     return patch_discovery
