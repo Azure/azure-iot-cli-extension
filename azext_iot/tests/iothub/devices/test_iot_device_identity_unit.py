@@ -12,6 +12,7 @@ from azext_iot.iothub import commands_device_identity as subject
 from azext_iot.tests.conftest import fixture_cmd, mock_target
 
 from azure.cli.core.azclierror import (
+    FileOperationError,
     InvalidArgumentValueError,
     MutuallyExclusiveArgumentError,
 )
@@ -137,10 +138,28 @@ class TestHierarchyCreateFailures:
                 "path-to-config.yml",
                 MutuallyExclusiveArgumentError,
             ),
+            # invalid deployment path
+            (
+                [
+                    ["id=dev1", "parent=dev2", "deployment=path_does_not_exist.json"],
+                    ["id=dev2"],
+                ],
+                None,
+                FileOperationError,
+            ),
+            # invalid deployment JSON
+            (
+                [
+                    ["id=dev1", "parent=dev2", "deployment=./hierarchy_configs/invalid/invalid_deployment.json"],
+                    ["id=dev2"],
+                ],
+                None,
+                InvalidArgumentValueError,
+            ),
         ],
     )
     def test_edge_hierarchy_create_arg_failures(
-        self, fixture_cmd, fixture_ghcs, devices, config, exception
+        self, fixture_cmd, fixture_ghcs, set_cwd, devices, config, exception
     ):
         with pytest.raises(exception):
             subject.iot_edge_hierarchy_create(

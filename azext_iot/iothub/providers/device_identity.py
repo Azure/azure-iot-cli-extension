@@ -19,6 +19,8 @@ from azext_iot.common.utility import process_json_arg, process_yaml_arg
 from azext_iot.operations.generic import _execute_query
 from azure.cli.core.azclierror import (
     AzureResponseError,
+    CLIInternalError,
+    FileOperationError,
     InvalidArgumentValueError,
     MutuallyExclusiveArgumentError,
 )
@@ -34,7 +36,7 @@ logger = get_logger(__name__)
 # Utility classes for edge config file values and device arguments
 class NestedEdgeDeviceConfig(NamedTuple):
     device_id: str
-    deployment: str
+    deployment: ConfigurationContent
     parent: Optional[str] = None
 
 
@@ -64,6 +66,7 @@ class DeviceIdentityProvider(IoTHubProvider):
         self.hub_resolver = SdkResolver(target=self.target)
         self.service_sdk = self.hub_resolver.get_sdk(SdkType.service_sdk)
 
+    # TODO - add input param for auth-types
     def create_edge_hierarchy(
         self,
         devices: Optional[List[List[str]]] = None,
@@ -115,7 +118,7 @@ class DeviceIdentityProvider(IoTHubProvider):
             # Process --device arguments
             config = NestedEdgeConfig(
                 version="1.0",
-                auth_method=DeviceAuthType.shared_private_key.value,  # TODO - add input param for auth-type
+                auth_method=DeviceAuthType.shared_private_key.value,
                 devices=[],
             )
             # Parse each device and add to the tree
@@ -128,6 +131,8 @@ class DeviceIdentityProvider(IoTHubProvider):
                         "A device parameter is missing required parameter 'id'"
                     )
                 deployment = device_params.get("deployment", None)
+                if deployment:
+                    deployment = self._try_parse_valid_deployment_config(deployment)
                 parent_id = device_params.get("parent", None)
 
                 config.devices.append(
@@ -281,15 +286,8 @@ class DeviceIdentityProvider(IoTHubProvider):
             device_id = device_config.device_id
             deployment_content = device_config.deployment
             if deployment_content:
-                # TODO - replace with iot_edge_set_modules once it's moved into provider
-                # TODO - check module validity *before* deleting devices
-                content = process_json_arg(deployment_content, argument_name="content")
-                processed_content = _process_config_content(
-                    content, config_type=ConfigType.edge
-                )
-                content = ConfigurationContent(**processed_content)
                 self.service_sdk.configuration.apply_on_edge_device(
-                    id=device_id, content=content
+                    id=device_id, content=deployment_content
                 )
 
     def _process_nested_edge_config_file_content(
@@ -321,6 +319,8 @@ class DeviceIdentityProvider(IoTHubProvider):
                     "A device parameter is missing required attribute 'device_id'"
                 )
             deployment = device.get("deployment", None)
+            if deployment:
+                deployment = self._try_parse_valid_deployment_config(deployment)
             child_devices = device.get("child", [])
             device_obj = NestedEdgeDeviceConfig(
                 device_id=device_id, deployment=deployment, parent=parent_id
@@ -372,3 +372,20 @@ class DeviceIdentityProvider(IoTHubProvider):
                 )
         except Exception as err:
             raise AzureResponseError(err)
+
+    def _try_parse_valid_deployment_config(self, deployment_path):
+        try:
+            deployment_content = process_json_arg(
+                deployment_path, argument_name="deployment"
+            )
+            processed_content = _process_config_content(
+                deployment_content, config_type=ConfigType.edge
+            )
+            return ConfigurationContent(**processed_content)
+        except CLIInternalError:
+            raise FileOperationError(
+                f"Please ensure a deployment file exists at path: '{deployment_path}'"
+            )
+        except Exception as ex:
+            logger.warning(f"Error processing config file at '{deployment_path}'")
+            raise InvalidArgumentValueError(ex)
