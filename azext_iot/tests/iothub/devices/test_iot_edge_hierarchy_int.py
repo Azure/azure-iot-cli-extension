@@ -7,12 +7,6 @@
 import pytest
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 
-"""
-Tests:
-
-multi-command (no clean) to ensure deviceID checks, no deletions without --clean, etc
-"""
-
 
 @pytest.mark.usefixtures("set_cwd")
 class TestNestedEdgeHierarchy(IoTLiveScenarioTest):

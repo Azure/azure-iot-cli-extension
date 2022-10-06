@@ -26,7 +26,6 @@ from azext_iot.constants import (
 )
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import (
-
     DeviceAuthType,
     SdkType,
     ConfigType,
@@ -35,7 +34,7 @@ from azext_iot.common.shared import (
     IoTHubStateType,
     DeviceAuthApiType,
     ConnectionStringParser,
-    EntityStatusType,
+    EntityStatusType
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
@@ -56,7 +55,6 @@ printer = pprint.PrettyPrinter(indent=2)
 
 
 # Query
-
 
 def iot_query(
     cmd,
@@ -197,12 +195,8 @@ def iot_device_create(
             device_id=device_id,
             auth_method=auth_method,
             edge_enabled=edge_enabled,
-            pk=primary_thumbprint
-            if auth_method == DeviceAuthType.x509_thumbprint.value
-            else primary_key,
-            sk=secondary_thumbprint
-            if auth_method == DeviceAuthType.x509_thumbprint.value
-            else secondary_key,
+            pk=primary_thumbprint if auth_method == DeviceAuthType.x509_thumbprint.value else primary_key,
+            sk=secondary_thumbprint if auth_method == DeviceAuthType.x509_thumbprint.value else secondary_key,
             status=status,
             status_reason=status_reason,
             device_scope=device_scope,
@@ -281,9 +275,7 @@ def _assemble_auth(auth_method, pk, sk):
         DeviceAuthApiType.sas.value,
     ]:
         if any([pk, sk]) and not all([pk, sk]):
-            raise ValueError(
-                "When configuring symmetric key auth both primary and secondary keys are required."
-            )
+            raise ValueError("When configuring symmetric key auth both primary and secondary keys are required.")
 
         auth = AuthenticationMechanism(
             symmetric_key=SymmetricKey(primary_key=pk, secondary_key=sk),
@@ -294,9 +286,7 @@ def _assemble_auth(auth_method, pk, sk):
         DeviceAuthApiType.selfSigned.value,
     ]:
         if not pk:
-            raise ValueError(
-                "When configuring selfSigned auth the primary thumbprint is required."
-            )
+            raise ValueError("When configuring selfSigned auth the primary thumbprint is required.")
         auth = AuthenticationMechanism(
             x509_thumbprint=X509Thumbprint(
                 primary_thumbprint=pk, secondary_thumbprint=sk
@@ -346,9 +336,7 @@ def update_iot_device_custom(
             if (primary_key and not secondary_key) or (
                 not primary_key and secondary_key
             ):
-                raise RequiredArgumentMissingError(
-                    "primary + secondary Key required with sas auth"
-                )
+                raise RequiredArgumentMissingError("primary + secondary Key required with sas auth")
             instance["authentication"]["symmetricKey"]["primaryKey"] = primary_key
             instance["authentication"]["symmetricKey"]["secondaryKey"] = secondary_key
         elif auth_method == DeviceAuthType.x509_thumbprint.name:
@@ -842,12 +830,8 @@ def iot_device_module_create(
             device_id=device_id,
             module_id=module_id,
             auth_method=auth_method,
-            pk=primary_thumbprint
-            if auth_method == DeviceAuthType.x509_thumbprint.value
-            else primary_key,
-            sk=secondary_thumbprint
-            if auth_method == DeviceAuthType.x509_thumbprint.value
-            else secondary_key,
+            pk=primary_thumbprint if auth_method == DeviceAuthType.x509_thumbprint.value else primary_key,
+            sk=secondary_thumbprint if auth_method == DeviceAuthType.x509_thumbprint.value else secondary_key,
         )
         return service_sdk.modules.create_or_update_identity(
             id=device_id, mid=module_id, module=module
@@ -920,9 +904,7 @@ def _parse_auth(parameters):
     ]
     auth = parameters["authentication"].get("type")
     if auth not in valid_auth:
-        raise InvalidArgumentValueError(
-            "authentication.type must be one of {}".format(valid_auth)
-        )
+        raise InvalidArgumentValueError("authentication.type must be one of {}".format(valid_auth))
     pk = sk = None
     if auth == DeviceAuthApiType.sas.value:
         pk = parameters["authentication"]["symmetricKey"]["primaryKey"]
@@ -1433,9 +1415,7 @@ def _validate_payload_schema(content):
     import json
     from os.path import join
     from azext_iot.models.validators import JsonSchemaType, JsonSchemaValidator
-    from azext_iot.constants import (
-        EDGE_DEPLOYMENT_ROOT_SCHEMAS_PATH as root_schema_path,
-    )
+    from azext_iot.constants import EDGE_DEPLOYMENT_ROOT_SCHEMAS_PATH as root_schema_path
     from azext_iot.common.utility import shell_safe_json_parse
 
     EDGE_AGENT_SCHEMA_PATH = "azure-iot-edgeagent-deployment-{}.json"
@@ -1452,25 +1432,17 @@ def _validate_payload_schema(content):
         if sys_module in modules_content:
             if (
                 "properties.desired" in modules_content[sys_module]
-                and "schemaVersion" in modules_content[sys_module]["properties.desired"]
+                and "schemaVersion"
+                in modules_content[sys_module]["properties.desired"]
             ):
-                target_schema_ver = modules_content[sys_module]["properties.desired"][
-                    "schemaVersion"
-                ]
-                target_schema_def_path = join(
-                    root_schema_path,
-                    f"{EDGE_SCHEMA_PATH_DICT[sys_module].format(target_schema_ver)}",
-                )
+                target_schema_ver = modules_content[sys_module][
+                    "properties.desired"
+                ]["schemaVersion"]
+                target_schema_def_path = join(root_schema_path, f"{EDGE_SCHEMA_PATH_DICT[sys_module].format(target_schema_ver)}")
 
-                logger.info(
-                    "Attempting to fetch schema content from %s...",
-                    target_schema_def_path,
-                )
+                logger.info("Attempting to fetch schema content from %s...", target_schema_def_path)
                 if not exists(target_schema_def_path):
-                    logger.info(
-                        "Invalid schema path %s, skipping validation...",
-                        target_schema_def_path,
-                    )
+                    logger.info("Invalid schema path %s, skipping validation...", target_schema_def_path)
                     continue
 
                 try:
@@ -1483,15 +1455,12 @@ def _validate_payload_schema(content):
                     )
                     continue
 
-                logger.info(
-                    f"Validating {sys_module} of deployment payload against schema..."
-                )
-                to_validate_content = {sys_module: modules_content[sys_module]}
+                logger.info(f"Validating {sys_module} of deployment payload against schema...")
+                to_validate_content = {
+                    sys_module: modules_content[sys_module]
+                }
                 draft_version = JsonSchemaType.draft4
-                if (
-                    "$schema" in target_schema_def
-                    and "/draft-07/" in target_schema_def["$schema"]
-                ):
+                if "$schema" in target_schema_def and "/draft-07/" in target_schema_def["$schema"]:
                     draft_version = JsonSchemaType.draft7
 
                 v = JsonSchemaValidator(target_schema_def, draft_version)
@@ -2085,21 +2054,15 @@ def _iot_build_sas_token_from_cs(connection_string, duration=3600):
                     parsed_cs["HostName"], parsed_cs["DeviceId"], parsed_cs["ModuleId"]
                 )
             elif parser == ConnectionStringParser.Device:
-                uri = "{}/devices/{}".format(
-                    parsed_cs["HostName"], parsed_cs["DeviceId"]
-                )
+                uri = "{}/devices/{}".format(parsed_cs["HostName"], parsed_cs["DeviceId"])
             else:
-                raise InvalidArgumentValueError(
-                    "Given Connection String was not in a supported format."
-                )
+                raise InvalidArgumentValueError("Given Connection String was not in a supported format.")
 
             return SasTokenAuthentication(uri, policy, key, duration)
         except ValueError:
             continue
 
-    raise InvalidArgumentValueError(
-        "Given Connection String was not in a supported format."
-    )
+    raise InvalidArgumentValueError("Given Connection String was not in a supported format.")
 
 
 def _iot_build_sas_token(
@@ -2765,9 +2728,7 @@ def _validate_device_tracing(target, device_twin):
         )
     if device_twin["capabilities"]["iotEdge"]:
         raise ClientRequestError(
-            'The device "{}" should be a non-edge device.'.format(
-                device_twin["deviceId"]
-            )
+            'The device "{}" should be a non-edge device.'.format(device_twin["deviceId"])
         )
 
 
