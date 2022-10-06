@@ -4,12 +4,12 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-
-from sys import api_version
 import time
 import pytest
 import json
-from azext_iot.central.models.enum import DeviceStatus, ApiVersion
+
+from azure.cli.core.azclierror import CLIInternalError
+from azext_iot.central.models.enum import DeviceStatus
 from azext_iot.tests import helpers
 from azext_iot.tests.central import (
     CentralLiveScenarioTest,
@@ -22,14 +22,9 @@ logger = get_logger(__name__)
 
 class TestIotCentralDevices(CentralLiveScenarioTest):
     @pytest.fixture(autouse=True)
-    def fixture_api_version(self, request):
-        self._api_version = request.config.getoption("--api-version")
-        IS_1_1_PREVIEW = (
-            self._api_version == ApiVersion.v1_1_preview.value
-            or self._api_version is None
-        )  # either explicitely selected or omitted
-        if IS_1_1_PREVIEW:
-            logger.info("Testing 1.1-preview")
+    def fixture_api_version(self):
+        # No neeed to pass api version
+        self._api_version = None
         yield
 
     def __init__(self, test_scenario):
@@ -63,7 +58,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         )
 
         # wait about a few seconds for simulator to kick in so that provisioning completes
-        time.sleep(60)
+        self._check_device_provisioned(device_id)
 
         command = (
             "iot central device c2d-message purge --app-id {} --device-id {}".format(
@@ -135,10 +130,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
             self.check("id", device_id),
             self.check("simulated", False),
         ]
-        if self._api_version == ApiVersion.preview.value:
-            checks.append(self.check("approved", True))
-        else:
-            checks.append(self.check("enabled", True))
+        checks.append(self.check("enabled", True))
 
         self.cmd(command, api_version=self._api_version, checks=checks)
 
@@ -249,17 +241,17 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         # create edge template
         (template_id, _) = self._create_device_template(
-            api_version=ApiVersion.v1_1_preview.value, edge=True
+            api_version=self._api_version, edge=True
         )
 
         (device_id, _) = self._create_device(
             template=template_id,
-            api_version=ApiVersion.v1_1_preview.value,
+            api_version=self._api_version,
             simulated=True,
         )
 
         # wait about a few seconds for simulator to kick in so that provisioning completes
-        time.sleep(60)
+        self._check_device_provisioned(device_id)
 
         command = "iot central device list --app-id {}".format(self.app_id)
         total_devs_list = self.cmd(command).get_output_in_json()
@@ -271,7 +263,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         # check edge device appears in general list
         assert all(x in total_devs_list for x in edge_list)
 
-        # MODULES
+        # modules
         command = "iot central device edge module list --app-id {} -d {}".format(
             self.app_id, device_id
         )
@@ -299,17 +291,17 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
     def test_central_device_module_properties_methods(self):
         (template_id, _) = self._create_device_template(
-            api_version=ApiVersion.ga_2022_05_31.value, edge=True
+            api_version=self._api_version, edge=True
         )
 
         (device_id, _) = self._create_device(
             template=template_id,
-            api_version=ApiVersion.ga_2022_05_31.value,
+            api_version=self._api_version,
             simulated=True,
         )
 
         # wait about a few seconds for simulator to kick in so that provisioning completes
-        time.sleep(60)
+        self._check_device_provisioned(device_id)
 
         # List module components
         command = f'''
@@ -326,8 +318,8 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
             api_version=self._api_version,
             device_id=device_id,
             module_name='testModule')
-        # Module properties update response is an empty object {}
-        assert update_device_properties == {}
+        assert update_device_properties['$metadata']['testFirstProperty']['desiredValue'] == 'updatedTestFirstProperty'
+        assert update_device_properties['$metadata']['testSecondProperty']['desiredValue'] == 'updatedTestSecondProperty'
 
         # Show module properties
         command = f'''
@@ -346,8 +338,9 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
             device_id=device_id,
             module_name='testModule',
             component_name='ModuleComponent')
-        # Module properties update response is an empty object {}
-        assert update_device_component_properties == {}
+        metadata = update_device_component_properties['$metadata']
+        assert metadata['testComponentFirstProperty']['desiredValue'] == 'updatedTestComponentFirstProperty'
+        assert metadata['testComponentSecondProperty']['desiredValue'] == 'updatedTestComponentSecondProperty'
 
         # Show module component properties
         command = f'''
@@ -368,49 +361,51 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
 
         # create child template
         (child_template_id, _) = self._create_device_template(
-            api_version=ApiVersion.v1_1_preview.value
+            api_version=self._api_version
         )
 
         # create edge template
         (template_id, _) = self._create_device_template(
-            api_version=ApiVersion.v1_1_preview.value, edge=True
+            api_version=self._api_version, edge=True
         )
 
         (device_id, _) = self._create_device(
             template=template_id,
-            api_version=ApiVersion.v1_1_preview.value,
+            api_version=self._api_version,
             simulated=True,
         )
 
         (child_id, _) = self._create_device(
             template=child_template_id,
-            api_version=ApiVersion.v1_1_preview.value,
+            api_version=self._api_version,
             simulated=True,
         )
 
         # wait about a few seconds for simulator to kick in so that provisioning completes
-        time.sleep(60)
+        self._check_device_provisioned(device_id)
+        self._check_device_provisioned(child_id)
 
-        if api_version == ApiVersion.v1_1_preview.value:
-            # check if device appears as edge
-            command = "iot central device list --app-id {} --edge-only"
-            devs_list = self.cmd(command).get_output_in_json()
-            assert device_id in [dev.id for dev in devs_list]
+        # check if device appears as edge
+        command = "iot central device list --app-id {} --edge-only".format(self.app_id)
+        devs_list = self.cmd(command).get_output_in_json()
+        assert device_id in [dev["id"] for dev in devs_list]
 
-        # CHILDREN
+        # children
         command = "iot central device edge children add --app-id {} -d {} --children-ids {}".format(
             self.app_id, device_id, child_id
         )
-        self.cmd(command, api_version=ApiVersion.v1_1_preview.value)
-        # wait for relationship to be established
-        time.sleep(10)
+        children = self.cmd(command, api_version=self._api_version).get_output_in_json()
+        assert children[0]["source"] == device_id
+        assert children[0]["target"] == child_id
+
+        # wait for relationship to be established, yes, 5 min for worst case
+        time.sleep(300)
 
         command = "iot central device edge children list --app-id {} -d {}".format(
             self.app_id, device_id
         )
-
         children = self.cmd(
-            command, api_version=ApiVersion.v1_1_preview.value
+            command, api_version=self._api_version
         ).get_output_in_json()
         assert len(children) == 1
         assert children[0]["id"] == child_id
@@ -670,12 +665,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         assert device_registration_info.get("id") == device_id
         assert device_registration_info.get("display_name") == device_name
         assert (
-            device_registration_info.get(
-                "instance_of"
-                if self._api_version == ApiVersion.preview.value
-                else "template"
-            )
-            == template_id
+            device_registration_info.get("template") == template_id
         )
         assert not device_registration_info.get("simulated")
 
@@ -711,14 +701,7 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
         assert device_registration_info.get("device_status") == "unassociated"
         assert device_registration_info.get("id") == device_id
         assert device_registration_info.get("display_name") == device_name
-        assert (
-            device_registration_info.get(
-                "instance_of"
-                if self._api_version == ApiVersion.preview.value
-                else "template"
-            )
-            is None
-        )
+        assert (device_registration_info.get("template") is None)
         assert not device_registration_info.get("simulated")
 
         # Validation - dps state
@@ -829,3 +812,23 @@ class TestIotCentralDevices(CentralLiveScenarioTest):
             return sorted(self._ordered(x) for x in obj)
         else:
             return obj
+
+    def _check_device_provisioned(self, device_id):
+        retry = 0
+        provisioned = False
+        while retry < 10 and not provisioned:
+            command = "iot central device show --app-id {} -d {}".format(
+                self.app_id, device_id
+            )
+            device = self.cmd(
+                command,
+                api_version=self._api_version,
+                checks=[self.check("id", device_id)],
+            ).get_output_in_json()
+
+            provisioned = device["provisioned"]
+            retry += 1
+            time.sleep(5)
+
+        if provisioned is not True:
+            raise CLIInternalError("Device is not provisioned in expected time.")

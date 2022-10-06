@@ -7,9 +7,9 @@
 
 from azure.cli.core.azclierror import RequiredArgumentMissingError
 from azext_iot.constants import CENTRAL_ENDPOINT
+from azext_iot.central.common import API_VERSION
 from azext_iot.central.providers import CentralFileUploadProvider
-from azext_iot.central.models.enum import ApiVersion
-from azext_iot.central.models.v1_1_preview import FileUploadV1_1_preview
+from azext_iot.central.models.ga_2022_07_31 import FileUploadGa
 
 
 def get_fileupload(
@@ -17,8 +17,8 @@ def get_fileupload(
     app_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> FileUploadV1_1_preview:
+    api_version=API_VERSION,
+) -> FileUploadGa:
     provider = CentralFileUploadProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -31,8 +31,8 @@ def delete_fileupload(
     app_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> FileUploadV1_1_preview:
+    api_version=API_VERSION,
+) -> FileUploadGa:
     provider = CentralFileUploadProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -49,8 +49,8 @@ def create_fileupload(
     sasTtl=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> FileUploadV1_1_preview:
+    api_version=API_VERSION,
+) -> FileUploadGa:
     provider = CentralFileUploadProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -73,8 +73,8 @@ def update_fileupload(
     sasTtl=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> FileUploadV1_1_preview:
+    api_version=API_VERSION,
+) -> FileUploadGa:
     provider = CentralFileUploadProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )

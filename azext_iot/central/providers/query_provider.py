@@ -6,7 +6,7 @@
 
 from knack.log import get_logger
 
-from azext_iot.central.models.v1_1_preview import QueryReponseV1_1_preview
+from azext_iot.central.models.v2022_06_30_preview import QueryReponsePreview
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 
@@ -36,7 +36,7 @@ class CentralQueryProvider:
 
     def query_run(
         self, central_dns_suffix=CENTRAL_ENDPOINT
-    ) -> QueryReponseV1_1_preview:
+    ) -> QueryReponsePreview:
         response = central_services.query.query_run(
             cmd=self._cmd,
             app_id=self._app_id,

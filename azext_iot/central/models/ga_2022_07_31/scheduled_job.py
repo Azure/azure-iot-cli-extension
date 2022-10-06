@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 
-class Job:
+class ScheduledJob:
     def __init__(self, job: dict):
         self.display_name = job.get("displayName")
         self.id = job.get("id")
@@ -15,3 +15,4 @@ class Job:
         self.description = job.get("description")
         self.batch = job.get("batch")
         self.cancellation_threshold = job.get("cancellationThreshold")
+        self.schedule = job.get("schedule")

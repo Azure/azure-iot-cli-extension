@@ -12,6 +12,7 @@ from azext_iot.deviceupdate.providers.base import (
     AzureError,
     ARMPolling,
 )
+from azext_iot.deviceupdate.common import ADUValidHashAlgorithmType
 from typing import Optional, List, Union, Dict
 
 logger = get_logger(__name__)
@@ -36,8 +37,8 @@ def list_updates(
         if by_provider:
             if any([search, filter, update_name, update_provider]):
                 logger.warning(
-                    "--search, --filter, --update-name and --update-provider are not applicable "
-                    "when using --by-provider.")
+                    "--search, --filter, --update-name and --update-provider are not applicable when using --by-provider."
+                )
             return data_manager.data_client.device_update.list_providers()
         if update_provider:
             if update_name:
@@ -183,7 +184,8 @@ def import_update(
                 try:
                     logger.warning(
                         "Cached contents (if any) from usage of --defer were not removed. "
-                        "Use 'az cache' command group to manage.")
+                        "Use 'az cache' command group to manage."
+                    )
                     logger.error(lro._pipeline_response.http_response.text())
                 except Exception:
                     pass
@@ -223,6 +225,7 @@ def manifest_init_v5(
     related_files: List[List[str]] = None,
     description: str = None,
     deployable: bool = None,
+    no_validation: Optional[bool] = None,
 ):
     import json
     from datetime import datetime
@@ -230,11 +233,11 @@ def manifest_init_v5(
     from azure.cli.core.azclierror import ArgumentUsageError
 
     def _sanitize_safe_params(safe_params: list, keep: list) -> list:
-        '''
+        """
         Intended to filter un-related params,
         leaving only related params with inherent positional indexing
         to be used by the _associate_related function.
-        '''
+        """
         result: List[str] = []
         if not safe_params:
             return result
@@ -244,11 +247,11 @@ def manifest_init_v5(
         return result
 
     def _associate_related(sanitized_params: list, key: str) -> dict:
-        '''
+        """
         Intended to associate related param indexes. For example
         associate --file with the nearest --step or associate --related-file
         with the nearest --file.
-        '''
+        """
         result: Dict[int, list] = {}
         if not sanitized_params:
             return result
@@ -329,7 +332,8 @@ def manifest_init_v5(
         if not step:
             raise ArgumentUsageError(
                 "Usage of --step requires at least an entry of handler=<value> for an inline step or "
-                "all of updateId.provider=<value>, updateId.name=<value>, updateId.version=<value> for a reference step.")
+                "all of updateId.provider=<value>, updateId.name=<value>, updateId.version=<value> for a reference step."
+            )
 
         step_desc = assembled_step.get("description") or assembled_step.get("desc")
         if step_desc:
@@ -355,6 +359,9 @@ def manifest_init_v5(
             processed_file["hashes"] = {"sha256": assembled_file_metadata.hash}
             processed_file["filename"] = assembled_file_metadata.name
             processed_file["sizeInBytes"] = assembled_file_metadata.bytes
+
+            if "properties" in assembled_file:
+                processed_file["properties"] = json.loads(assembled_file["properties"])
 
             if "downloadHandler" in assembled_file:
                 processed_file["downloadHandler"] = {"id": assembled_file["downloadHandler"]}
@@ -387,4 +394,34 @@ def manifest_init_v5(
 
         payload["files"] = processed_files
 
+    if not no_validation:
+        import jsonschema
+        from azure.cli.core.azclierror import ValidationError
+        from azext_iot.deviceupdate.schemas import DEVICE_UPDATE_MANIFEST_V5, DEVICE_UPDATE_MANIFEST_V5_DEFS
+        validator = jsonschema.Draft7Validator(DEVICE_UPDATE_MANIFEST_V5)
+        validator.resolver.store[DEVICE_UPDATE_MANIFEST_V5_DEFS["$id"]] = DEVICE_UPDATE_MANIFEST_V5_DEFS
+
+        try:
+            validator.validate(payload)
+        except jsonschema.ValidationError as ve:
+            raise ValidationError(ve)
+
     return payload
+
+
+def calculate_hash(
+    file_paths: List[List[str]],
+    hash_algo: str = ADUValidHashAlgorithmType.SHA256.value,
+):
+    result = []
+    for path in file_paths:
+        file_metadata = DeviceUpdateDataManager.calculate_file_metadata(path[0])
+        result.append(
+            {
+                "bytes": file_metadata.bytes,
+                "hash": file_metadata.hash,
+                "hashAlgorithm": hash_algo,
+                "uri": file_metadata.path.as_uri(),
+            }
+        )
+    return result
