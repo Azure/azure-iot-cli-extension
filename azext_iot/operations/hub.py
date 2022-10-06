@@ -2237,7 +2237,8 @@ def _get_service_sdk(
 def _generate_blob_container_uri(
     cmd,
     storage_account_name: str,
-    blob_container_name: str
+    blob_container_name: str,
+    identity: str = None,
 ):
     from azext_iot.common.embedded_cli import EmbeddedCLI
     if blob_container_name is None or storage_account_name is None:
@@ -2246,16 +2247,23 @@ def _generate_blob_container_uri(
         )
 
     cli = EmbeddedCLI(cli_ctx=cmd.cli_ctx)
-    storage_cstring = cli.invoke(
-        "storage account show-connection-string -n '{}'".format(
+    storage_endpoint = cli.invoke(
+        "storage account show -n '{}'".format(
             storage_account_name
         )
-    ).as_json()["connectionString"]
+    ).as_json()["primaryEndpoints"]["blob"]
 
-    sas_token = generate_container_sas_token(storage_cstring)
-    container_sas_url = (
-        "https://" + storage_account_name + ".blob.core.windows.net" + "/" + blob_container_name + "?" + sas_token
-    )
+    container_sas_url = storage_endpoint + blob_container_name
+
+    if not identity:
+        storage_cstring = cli.invoke(
+            "storage account show-connection-string -n '{}'".format(
+                storage_account_name
+            )
+        ).as_json()["connectionString"]
+        sas_token = generate_container_sas_token(storage_cstring)
+        container_sas_url = container_sas_url + "?" + sas_token
+
     return container_sas_url
 
 
@@ -2264,7 +2272,6 @@ def _create_export_import_job_properties(
     input_blob_container_uri: str = None,
     output_blob_container_uri: str = None,
     include_keys: bool = False,
-    storage_authentication_type: str = None,
     identity: str = None,
 ):
     from azext_iot.common.shared import AuthenticationType
@@ -2289,20 +2296,12 @@ def _create_export_import_job_properties(
         output_blob_container_uri = read_file_content(output_blob_container_uri)
     job_properties.output_blob_container_uri = output_blob_container_uri
 
-    storage_authentication_type = (
-        AuthenticationType(storage_authentication_type).name
-        if storage_authentication_type
-        else None
-    )
-    job_properties.storage_authentication_type = storage_authentication_type
-
-    user_identity = identity not in [None, "[system]"]
-    if user_identity:
-        if storage_authentication_type != AuthenticationType.identityBased.name:
-            raise ClientRequestError(
-                "Device export with user-assigned identities requires identity-based authentication [--storage-auth-type]"
-            )
-        job_properties.identity = ManagedIdentity(user_assigned_identity=identity)
+    if identity is None:
+        job_properties.storage_authentication_type = AuthenticationType.keyBased.name
+    else:
+        job_properties.storage_authentication_type = AuthenticationType.identityBased.name
+        if identity != "[system]":
+            job_properties.identity = ManagedIdentity(user_assigned_identity=identity)
 
     return job_properties
 
@@ -2319,7 +2318,13 @@ def iot_device_export(
     resource_group_name: str = None,
 ):
     if blob_container_uri is None:
-        blob_container_uri = _generate_blob_container_uri(cmd, storage_account_name, blob_container_name)
+        blob_container_uri = _generate_blob_container_uri(
+            cmd, storage_account_name, blob_container_name, identity
+        )
+    if storage_authentication_type is not None:
+        logger.warning(
+            "The parameter --auth-type/--storage-authentication-type has been deprecated and should not be provided"
+        )
 
     service_sdk = _get_service_sdk(
         cmd, hub_name, resource_group_name
@@ -2328,7 +2333,6 @@ def iot_device_export(
         job_type=JobType.exportDevices.value,
         output_blob_container_uri=blob_container_uri,
         include_keys=include_keys,
-        storage_authentication_type=storage_authentication_type,
         identity=identity
     )
     return service_sdk.jobs.create_import_export_job(export_job_properties)
@@ -2348,9 +2352,17 @@ def iot_device_import(
     identity: str = None,
 ):
     if input_blob_container_uri is None:
-        input_blob_container_uri = _generate_blob_container_uri(cmd, input_storage_account_name, input_blob_container_name)
+        input_blob_container_uri = _generate_blob_container_uri(
+            cmd, input_storage_account_name, input_blob_container_name, identity
+        )
     if output_blob_container_uri is None:
-        output_blob_container_uri = _generate_blob_container_uri(cmd, output_storage_account_name, output_blob_container_name)
+        output_blob_container_uri = _generate_blob_container_uri(
+            cmd, output_storage_account_name, output_blob_container_name, identity
+        )
+    if storage_authentication_type is not None:
+        logger.warning(
+            "The parameter --auth-type/--storage-authentication-type has been deprecated and should not be provided"
+        )
 
     service_sdk = _get_service_sdk(
         cmd, hub_name, resource_group_name
@@ -2359,7 +2371,6 @@ def iot_device_import(
         job_type=JobType.importDevices.value,
         input_blob_container_uri=input_blob_container_uri,
         output_blob_container_uri=output_blob_container_uri,
-        storage_authentication_type=storage_authentication_type,
         identity=identity
     )
     return service_sdk.jobs.create_import_export_job(import_job_properties)

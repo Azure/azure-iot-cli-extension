@@ -458,14 +458,15 @@ def load_arguments(self, _):
             "blob_container_name",
             options_list=["--blob-container", "--bc"],
             help="This blob container is used to output the status of the device identity import job and the results. "
-            "Parameter is ignored when blob_container_uri is provided. Write access is required for this blob container.",
+            "Parameter is ignored when blob_container_uri is provided. "
+            "Write, read and delete access is required for this blob container.",
         )
 
         context.argument(
             "storage_account_name",
             options_list=["--storage-account", "--sa"],
             help="Name of Azure Storage account containing the output blob container."
-            "Parameter is ignored when blob_container_uri is provided. Write access is required.",
+            "Parameter is ignored when blob_container_uri is provided. Write, read and delete access is required.",
         )
         context.argument(
             "include_keys",
@@ -478,6 +479,7 @@ def load_arguments(self, _):
             "storage_authentication_type",
             options_list=["--auth-type", "--storage-authentication-type"],
             arg_type=get_enum_type(AuthenticationType),
+            deprecate_info=context.deprecate(hide=True),
             help="Authentication type for communicating with the storage container.",
         )
         context.argument(
@@ -538,6 +540,7 @@ def load_arguments(self, _):
             "storage_authentication_type",
             options_list=["--auth-type", "--storage-authentication-type"],
             arg_type=get_enum_type(AuthenticationType),
+            deprecate_info=context.deprecate(hide=True),
             help="Authentication type for communicating with the storage container.",
         )
         context.argument(
