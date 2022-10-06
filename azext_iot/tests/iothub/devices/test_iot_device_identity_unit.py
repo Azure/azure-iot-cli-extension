@@ -263,7 +263,7 @@ class TestHierarchyCreateConfig:
         "devices, config, visualize, clean",
         [
             (None, "hierarchy_configs/nested_edge_config.yml", False, True),
-            (None, "hierarchy_configs/nested_edge_config.json", False, True)
+            (None, "hierarchy_configs/nested_edge_config.json", True, True)
         ],
     )
     def test_edge_hierarchy_create_config(

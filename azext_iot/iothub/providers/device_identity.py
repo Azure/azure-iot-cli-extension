@@ -103,7 +103,7 @@ class DeviceIdentityProvider(IoTHubProvider):
 
             config_content = None
             # Process Edge Config file into object dictionary
-            if config_file.endswith(".yml"):
+            if config_file.endswith((".yaml", ".yml")):
                 config_content = process_yaml_arg(config_file)
             elif config_file.endswith(".json"):
                 config_content = process_json_arg(config_file)
@@ -255,7 +255,8 @@ class DeviceIdentityProvider(IoTHubProvider):
         # set all device scopes
         for device in all_devices:
             id = device["deviceId"]
-            assembled_device_dict[id].device_scope = device["deviceScope"]
+            if assembled_device_dict.get(id, None):
+                assembled_device_dict[id].device_scope = device["deviceScope"]
 
         # Set parent / child relationships
         device_to_parent_iterator = (
@@ -284,6 +285,7 @@ class DeviceIdentityProvider(IoTHubProvider):
             deployment_content = device_params.get("deployment", None)
             if deployment_content:
                 # TODO - replace with iot_edge_set_modules once it's moved into provider
+                # TODO - check module validity *before* deleting devices
                 content = process_json_arg(deployment_content, argument_name="content")
                 processed_content = _process_config_content(
                     content, config_type=ConfigType.edge
