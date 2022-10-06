@@ -147,18 +147,18 @@ def process_json_arg(content: str, argument_name: str = "content", preserve_orde
 
 
 def process_yaml_arg(path: str) -> dict:
-    """Primary processor of yaml input"""
+    """Primary processor of yaml file input"""
 
     if not os.path.exists(path):
-        raise FileOperationError('YAML file not found - Please ensure the path `{}` is correct.')
+        raise FileOperationError(f"YAML file not found - Please ensure the path '{path}' is correct.")
 
     try:
         import yaml
         with open(path, "rb") as f:
             return yaml.load(f, Loader=yaml.FullLoader)
-    except CLIInternalError as ex:
-        raise CLIInternalError(
-            "Failed to parse yaml for file '{}' with exception:\n\t{}".format(
+    except Exception as ex:
+        raise InvalidArgumentValueError(
+            "Failed to parse yaml for file '{}' with exception:\n{}".format(
                 path, ex
             )
         )
