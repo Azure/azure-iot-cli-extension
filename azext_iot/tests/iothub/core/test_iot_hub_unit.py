@@ -10,7 +10,10 @@ import json
 from knack.cli import CLIError
 from azext_iot.operations import hub as subject
 from azext_iot.tests.generators import generate_generic_id
-from azext_iot.common.shared import JobType
+from azext_iot.common.shared import (
+    JobType,
+    AuthenticationType,
+)
 
 hub_name = "hubname"
 shared_access_key_name = "TEST_SAS_KEY_NAME"
@@ -44,10 +47,9 @@ def get_mgmt_client(mocker, fixture_cmd):
     return patch_discovery
 
 
-def generate_device_identity(include_keys=False, auth_type=None, identity=None, rg=None):
+def generate_device_identity(include_keys=False, identity=None, rg=None):
     return {
         "include_keys": include_keys,
-        "storage_authentication_type": auth_type,
         "identity": identity,
         "resource_group_name": rg
     }
@@ -85,12 +87,9 @@ class TestIoTHubDeviceIdentityExport(object):
         [
             generate_device_identity(),
             generate_device_identity(include_keys=True),
-            generate_device_identity(auth_type="identity"),
-            generate_device_identity(auth_type="key"),
             generate_device_identity(rg=resource_group_name),
-            generate_device_identity(auth_type="identity", identity="[system]"),
-            generate_device_identity(auth_type="identity", identity="system"),
-            generate_device_identity(auth_type="identity", identity="managed_identity"),
+            generate_device_identity(identity="[system]"),
+            generate_device_identity(identity="managed_identity"),
         ]
     )
     def test_device_identity_export(self, fixture_cmd, service_client, req):
@@ -99,7 +98,6 @@ class TestIoTHubDeviceIdentityExport(object):
             hub_name=hub_name,
             blob_container_uri=blob_container_uri,
             include_keys=req["include_keys"],
-            storage_authentication_type=req["storage_authentication_type"],
             identity=req["identity"],
             resource_group_name=req["resource_group_name"],
         )
@@ -109,18 +107,20 @@ class TestIoTHubDeviceIdentityExport(object):
         assert request_body["type"] == JobType.exportDevices.value
         assert request_body["outputBlobContainerUri"] == blob_container_uri
         assert request_body["excludeKeysInExport"] == (not req["include_keys"])
-        if req["storage_authentication_type"]:
-            assert request_body["storageAuthenticationType"] == req["storage_authentication_type"] + "Based"
-        if req["storage_authentication_type"] == "identity" and req["identity"] not in (None, "[system]"):
-            assert request_body["identity"]["userAssignedIdentity"] == req["identity"]
+        if req["identity"] is None:
+            assert request_body["storageAuthenticationType"] == AuthenticationType.keyBased.name
+        else:
+            assert request_body["storageAuthenticationType"] == AuthenticationType.identityBased.name
+            if req["identity"] != "[system]":
+                assert request_body["identity"]["userAssignedIdentity"] == req["identity"]
 
         assert_device_identity_result(result, generic_job_response)
 
     @pytest.mark.parametrize(
         "req",
         [
-            generate_device_identity(auth_type="key", identity="[system]"),
-            generate_device_identity(auth_type="key", identity="system"),
+            generate_device_identity(identity="[system]"),
+            generate_device_identity(identity="system"),
         ]
     )
     def test_device_identity_export_input(self, fixture_cmd, req):
@@ -130,7 +130,6 @@ class TestIoTHubDeviceIdentityExport(object):
                 hub_name=hub_name,
                 blob_container_uri=blob_container_uri,
                 include_keys=req["include_keys"],
-                storage_authentication_type=req["storage_authentication_type"],
                 identity=req["identity"],
                 resource_group_name=req["resource_group_name"],
             )
@@ -156,11 +155,9 @@ class TestIoTHubDeviceIdentityImport(object):
         "req",
         [
             generate_device_identity(),
-            generate_device_identity(auth_type="identity"),
-            generate_device_identity(auth_type="key"),
             generate_device_identity(rg=resource_group_name),
-            generate_device_identity(auth_type="identity", identity="[system]"),
-            generate_device_identity(auth_type="identity", identity="managed_identity"),
+            generate_device_identity(identity="[system]"),
+            generate_device_identity(identity="managed_identity"),
         ]
     )
     def test_device_identity_import(self, fixture_cmd, service_client, req):
@@ -169,7 +166,6 @@ class TestIoTHubDeviceIdentityImport(object):
             hub_name=hub_name,
             input_blob_container_uri=blob_container_uri,
             output_blob_container_uri=blob_container_uri + "2",
-            storage_authentication_type=req["storage_authentication_type"],
             identity=req["identity"],
             resource_group_name=req["resource_group_name"],
         )
@@ -179,18 +175,20 @@ class TestIoTHubDeviceIdentityImport(object):
         assert request_body["type"] == JobType.importDevices.value
         assert request_body["inputBlobContainerUri"] == blob_container_uri
         assert request_body["outputBlobContainerUri"] == blob_container_uri + "2"
-        if req["storage_authentication_type"]:
-            assert request_body["storageAuthenticationType"] == req["storage_authentication_type"] + "Based"
-        if req["storage_authentication_type"] == "identity" and req["identity"] not in (None, "[system]"):
-            assert request_body["identity"]["userAssignedIdentity"] == req["identity"]
+        if req["identity"] is None:
+            assert request_body["storageAuthenticationType"] == AuthenticationType.keyBased.name
+        else:
+            assert request_body["storageAuthenticationType"] == AuthenticationType.identityBased.name
+            if req["identity"] != "[system]":
+                assert request_body["identity"]["userAssignedIdentity"] == req["identity"]
 
         assert_device_identity_result(result, generic_job_response)
 
     @pytest.mark.parametrize(
         "req",
         [
-            generate_device_identity(auth_type="key", identity="[system]"),
-            generate_device_identity(auth_type="key", identity="managed_identity"),
+            generate_device_identity(identity="[system]"),
+            generate_device_identity(identity="managed_identity"),
         ]
     )
     def test_device_identity_import_input(self, fixture_cmd, req):
@@ -200,7 +198,6 @@ class TestIoTHubDeviceIdentityImport(object):
                 hub_name=hub_name,
                 input_blob_container_uri=blob_container_uri,
                 output_blob_container_uri=blob_container_uri + "2",
-                storage_authentication_type=req["storage_authentication_type"],
                 identity=req["identity"],
                 resource_group_name=req["resource_group_name"],
             )
