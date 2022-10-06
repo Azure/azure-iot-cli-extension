@@ -6,10 +6,11 @@
 
 import os
 import sys
+import importlib
 from azext_iot.common.utility import ensure_azure_namespace_path
+from azext_iot.constants import INTERNAL_AZURE_CORE_NAMESPACE
 from knack.log import get_logger
 from typing import List
-
 
 logger = get_logger(__name__)
 
@@ -28,7 +29,6 @@ def reload_modules() -> None:
 
     from azure.cli.core.extension import get_extension_path
     from azext_iot.constants import EXTENSION_NAME
-    import importlib
 
     ext_path = get_extension_path(EXTENSION_NAME)
     if not ext_path:
@@ -76,3 +76,31 @@ def reload_modules() -> None:
                 reload_module_state(mod, mods_for_reload[mod])
         except Exception as e:
             logger.warning("Failed to reload module: %s, error: %s", mod, str(e))
+
+    init_internal_azure_core(azure_path=ext_azure_dir)
+
+
+def init_internal_azure_core(azure_path: str, namespace: str = INTERNAL_AZURE_CORE_NAMESPACE):
+    root_spec = importlib.machinery.PathFinder.find_spec("azure.core", [azure_path])
+    root_module = importlib.util.module_from_spec(root_spec)
+    root_spec.loader.exec_module(root_module)
+    sys.modules[namespace] = root_module
+
+    # child-parent mapping
+    todo_submodule_map = {
+        "azure.core.exceptions": {
+            "path": os.path.join(azure_path, "core"),
+            "parent": root_module,
+            "namespace": f"{INTERNAL_AZURE_CORE_NAMESPACE}.exceptions",
+        },
+    }
+
+    for todo_submodule in todo_submodule_map:
+        todo_submodule_spec = importlib.machinery.PathFinder.find_spec(
+            todo_submodule, path=[todo_submodule_map[todo_submodule]["path"]], target=root_module
+        )
+        todo_submodule_module = importlib.util.module_from_spec(todo_submodule_spec)
+        todo_submodule_spec.loader.exec_module(todo_submodule_module)
+        _, _, child_seg = todo_submodule.rpartition(".")
+        setattr(root_module, child_seg, todo_submodule_module)
+        sys.modules[todo_submodule_map[todo_submodule]["namespace"]] = todo_submodule_module
