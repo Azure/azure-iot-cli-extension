@@ -309,3 +309,32 @@ def load_iothub_help():
         type: command
         short-summary: Upload a local file as a device to a pre-configured blob storage container.
     """
+
+    helps["iot edge hierarchy"] = """
+        type: group
+        short-summary: Commands to deploy and manage nested IoT Edge device hierarchies.
+    """
+
+    helps["iot edge hierarchy create"] = """
+        type: command
+        short-summary: |
+          Deploy nested edge hierarchies to an IoT Hub. This can be done with inline
+          device arguments or by supplying a nested edge configuration file in YAML or JSON format.
+          Review examples and parameter descriptions for details on how to fully utilize the operation.
+
+        examples:
+        - name: Delete all existing devices in the Hub, and create a simple nested edge device hierarchy
+            containing 2 parent devices with 1 child device each. Also specifies module deployments
+            to configure the devices and visualizes the operations as they progress.
+          text: |
+            az iot edge hierarchy create -n {hub_name} --clean --visualize
+            --device id=parent1 deployment=/path/to/parentDeployment1.json
+            --device id=child1 parent=parent1 deployment=/path/to/child_deployment1.json
+            --device id=parent2 deployment=/path/to/parentDeployment2.json
+            --device id=child2 parent=parent2 deployment=/path/to/child_deployment2.json
+
+        - name: Create a new nested edge device hierarchy (without deleting existing devices)
+            from a configuration file without any output / visualization.
+          text: >
+            az iot edge hierarchy create -n {hub_name} --cfg path/to/config_yml_or_json
+    """

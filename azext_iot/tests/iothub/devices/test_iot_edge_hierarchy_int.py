@@ -213,7 +213,7 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
             device_id = device_tuple[0]
             parent_id = device_tuple[1]
             deployment = device_tuple[2]
-            args = [f"device_id={device_id}"]
+            args = [f"id={device_id}"]
             if parent_id:
                 args.append(f"parent={parent_id}")
             if deployment:

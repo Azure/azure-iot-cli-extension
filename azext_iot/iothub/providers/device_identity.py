@@ -33,7 +33,7 @@ logger = get_logger(__name__)
 
 # Utility classes for edge config file values and device arguments
 class NestedEdgeDeviceConfig(NamedTuple):
-    device_params: Dict[str, str]
+    device_id: str
     deployment: str
     parent: Optional[str] = None
 
@@ -122,17 +122,17 @@ class DeviceIdentityProvider(IoTHubProvider):
             for device_input in devices:
                 # assemble device params from nArgs strings
                 device_params = self.assemble_nargs_to_dict(device_input)
-                device_id = device_params.get("device_id", None)
+                device_id = device_params.get("id", None)
                 if not device_id:
                     raise InvalidArgumentValueError(
-                        "A device parameter is missing required parameter 'device_id'"
+                        "A device parameter is missing required parameter 'id'"
                     )
                 deployment = device_params.get("deployment", None)
                 parent_id = device_params.get("parent", None)
 
                 config.devices.append(
                     NestedEdgeDeviceConfig(
-                        device_params=device_params,
+                        device_id=device_id,
                         deployment=deployment,
                         parent=parent_id,
                     )
@@ -155,8 +155,7 @@ class DeviceIdentityProvider(IoTHubProvider):
 
         # first pass to create flat tree
         for device_config in config.devices:
-            device_params = device_config.device_params
-            device_id = device_params["device_id"]
+            device_id = device_config.device_id
             auth_method = config.auth_method
 
             # create device object
@@ -180,8 +179,7 @@ class DeviceIdentityProvider(IoTHubProvider):
 
         # second pass to move nodes and check hierarchy
         for device_config in config.devices:
-            device_params = device_config.device_params
-            device_id = device_params.get("device_id", None)
+            device_id = device_config.device_id
 
             # Move nodes to their correct parents, track device->parent in dict
             device_parent = device_config.parent or tree_root_node_id
@@ -280,9 +278,8 @@ class DeviceIdentityProvider(IoTHubProvider):
             else config.devices
         )
         for device_config in devices_config_iterator:
-            device_params = device_config.device_params
-            device_id = device_params["device_id"]
-            deployment_content = device_params.get("deployment", None)
+            device_id = device_config.device_id
+            deployment_content = device_config.deployment
             if deployment_content:
                 # TODO - replace with iot_edge_set_modules once it's moved into provider
                 # TODO - check module validity *before* deleting devices
@@ -326,7 +323,7 @@ class DeviceIdentityProvider(IoTHubProvider):
             deployment = device.get("deployment", None)
             child_devices = device.get("child", [])
             device_obj = NestedEdgeDeviceConfig(
-                device_params=device, deployment=deployment, parent=parent_id
+                device_id=device_id, deployment=deployment, parent=parent_id
             )
             all_devices.append(device_obj)
             for child_device in child_devices:

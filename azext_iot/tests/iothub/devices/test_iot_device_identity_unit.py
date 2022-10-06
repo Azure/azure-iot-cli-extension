@@ -76,7 +76,7 @@ class TestEdgeHierarchyCreateArgs:
 
     @pytest.mark.parametrize(
         "devices, config, visualize, clean",
-        [([["device_id=dev1", "parent=dev2"], ["device_id=dev2"]], None, False, True)],
+        [([["id=dev1", "parent=dev2"], ["id=dev2"]], None, False, True)],
     )
     def test_edge_hierarchy_create_args(
         self, fixture_cmd, service_client, devices, config, visualize, clean
@@ -98,22 +98,22 @@ class TestHierarchyCreateFailures:
             (None, None, InvalidArgumentValueError),
             # Missing Device Id
             (
-                [["parent=dev2"], ["device_id=dev2"]],
+                [["parent=dev2"], ["id=dev2"]],
                 None,
                 InvalidArgumentValueError
             ),
             # Loop
             (
-                [["device_id=dev1", "parent=dev2"], ["device_id=dev2", "parent=dev1"]],
+                [["id=dev1", "parent=dev2"], ["id=dev2", "parent=dev1"]],
                 None,
                 InvalidArgumentValueError,
             ),
             # duplicate device
             (
                 [
-                    ["device_id=dev1", "parent=dev2"],
-                    ["device_id=dev2"],
-                    ["device_id=dev1"],
+                    ["id=dev1", "parent=dev2"],
+                    ["id=dev2"],
+                    ["id=dev1"],
                 ],
                 None,
                 InvalidArgumentValueError,
@@ -121,9 +121,9 @@ class TestHierarchyCreateFailures:
             # missing parent
             (
                 [
-                    ["device_id=dev1", "parent=dev3"],
-                    ["device_id=dev2"],
-                    ["device_id=dev4"],
+                    ["id=dev1", "parent=dev3"],
+                    ["id=dev2"],
+                    ["id=dev4"],
                 ],
                 None,
                 InvalidArgumentValueError,
@@ -131,8 +131,8 @@ class TestHierarchyCreateFailures:
             # devices AND config
             (
                 [
-                    ["device_id=dev1", "parent=dev2"],
-                    ["device_id=dev2"],
+                    ["id=dev1", "parent=dev2"],
+                    ["id=dev2"],
                 ],
                 "path-to-config.yml",
                 MutuallyExclusiveArgumentError,
@@ -169,8 +169,8 @@ class TestHierarchyCreateFailures:
             # devices AND config
             (
                 [
-                    ["device_id=dev1", "parent=dev2"],
-                    ["device_id=dev2"],
+                    ["id=dev1", "parent=dev2"],
+                    ["id=dev2"],
                 ],
                 "hierarchy_configs/nested_edge_config.yml",
                 MutuallyExclusiveArgumentError,
