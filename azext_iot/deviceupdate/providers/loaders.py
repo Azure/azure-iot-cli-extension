@@ -86,12 +86,13 @@ def init_internal_azure_core(azure_path: str, namespace: str = INTERNAL_AZURE_CO
     root_spec.loader.exec_module(root_module)
     sys.modules[namespace] = root_module
 
-    # child-parent mapping
+    # Child-parent mapping. As of Py 3.7 insertion order for dictionaries are guaranteed.
     todo_submodule_map = {
         "azure.core.exceptions": {
             "path": os.path.join(azure_path, "core"),
             "parent": root_module,
             "namespace": f"{INTERNAL_AZURE_CORE_NAMESPACE}.exceptions",
+            # "module": will be set at runtime.
         },
     }
 
@@ -102,5 +103,11 @@ def init_internal_azure_core(azure_path: str, namespace: str = INTERNAL_AZURE_CO
         todo_submodule_module = importlib.util.module_from_spec(todo_submodule_spec)
         todo_submodule_spec.loader.exec_module(todo_submodule_module)
         _, _, child_seg = todo_submodule.rpartition(".")
-        setattr(root_module, child_seg, todo_submodule_module)
+        parent = todo_submodule_map[todo_submodule].get("parent")
+        if parent:
+            # If the parent is str, then look up the module set at runtime.
+            if isinstance(parent, str):
+                parent = todo_submodule_map[parent]["module"]
+            setattr(parent, child_seg, todo_submodule_module)
+        todo_submodule_map[todo_submodule]["module"] = todo_submodule_module
         sys.modules[todo_submodule_map[todo_submodule]["namespace"]] = todo_submodule_module
