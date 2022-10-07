@@ -23,7 +23,7 @@ class DevicesOperations(object):
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: Version of the Api. Constant value: "2020-09-30".
+    :ivar api_version: Version of the Api. Constant value: "2021-04-12".
     """
 
     models = models
@@ -33,7 +33,7 @@ class DevicesOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2020-09-30"
+        self.api_version = "2021-04-12"
 
         self.config = config
 

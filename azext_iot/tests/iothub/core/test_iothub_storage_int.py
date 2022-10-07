@@ -160,8 +160,8 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 self.wait_till_job_completion(job_id)
 
                 job_id = self.cmd(
-                    'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --ik true'.format(
-                        self.entity_name, self.live_storage_uri, "key"
+                    'iot hub device-identity export -n {} --bcu "{}" --ik true'.format(
+                        self.entity_name, self.live_storage_uri
                     ),
                     checks=[
                         self.check("outputBlobContainerUri", self.live_storage_uri),
@@ -176,9 +176,9 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 self.wait_till_job_completion(job_id)
 
                 self.cmd(
-                    'iot hub device-identity import -n {} --ibc "{}" --isa "{}" --obc "{}" --osa "{}" --auth-type {}'.format(
+                    'iot hub device-identity import -n {} --ibc "{}" --isa "{}" --obc "{}" --osa "{}"'.format(
                         self.entity_name, self.storage_container, self.storage_account_name,
-                        self.storage_container, self.storage_account_name, "key"
+                        self.storage_container, self.storage_account_name
                     ),
                     checks=[
                         self.exists("outputBlobContainerUri"),
@@ -227,8 +227,8 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 self.check_for_running_import_export()
 
                 job_id = self.cmd(
-                    'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {} --ik true'.format(
-                        self.entity_name, self.live_storage_uri, "identity", "[system]"
+                    'iot hub device-identity export -n {} --bcu "{}" --ik true'.format(
+                        self.entity_name, self.live_storage_uri, "identity"
                     ),
                     checks=[
                         self.check("outputBlobContainerUri", self.live_storage_uri),
@@ -244,8 +244,8 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 self.wait_till_job_completion(job_id)
 
                 job_id = self.cmd(
-                    'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --auth-type {} --identity {}'.format(
-                        self.entity_name, self.live_storage_uri, self.live_storage_uri, "identity", "[system]"
+                    'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --identity {}'.format(
+                        self.entity_name, self.live_storage_uri, self.live_storage_uri, "identity"
                     ),
                     checks=[
                         self.check("outputBlobContainerUri", self.live_storage_uri),
@@ -261,8 +261,8 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 self.wait_till_job_completion(job_id)
 
                 self.cmd(
-                    'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {}'.format(
-                        self.entity_name, self.live_storage_uri, "identity", "fake_managed_identity"
+                    'iot hub device-identity export -n {} --bcu "{}" --identity {}'.format(
+                        self.entity_name, self.live_storage_uri, "fake_managed_identity"
                     ),
                     expect_failure=True
                 )
@@ -319,8 +319,8 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
                 # identity-based device-identity export
                 job_id = self.cmd(
-                    'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {} --ik true'.format(
-                        self.entity_name, self.live_storage_uri, "identity", identity_id
+                    'iot hub device-identity export -n {} --bcu "{}" --identity {} --ik true'.format(
+                        self.entity_name, self.live_storage_uri, identity_id
                     ),
                     checks=[
                         self.check("outputBlobContainerUri", self.live_storage_uri),
@@ -336,8 +336,8 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 self.wait_till_job_completion(job_id)
 
                 job_id = self.cmd(
-                    'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --auth-type {} --identity {}'.format(
-                        self.entity_name, self.live_storage_uri, self.live_storage_uri, "identity", identity_id
+                    'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --identity {}'.format(
+                        self.entity_name, self.live_storage_uri, self.live_storage_uri, identity_id
                     ),
                     checks=[
                         self.check("outputBlobContainerUri", self.live_storage_uri),
@@ -353,8 +353,8 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 self.wait_till_job_completion(job_id)
 
                 self.cmd(
-                    'iot hub device-identity export -n {} --bcu "{}" --auth-type {} --identity {}'.format(
-                        self.entity_name, self.live_storage_uri, "identity", "fake_managed_identity"
+                    'iot hub device-identity export -n {} --bcu "{}" --identity {}'.format(
+                        self.entity_name, self.live_storage_uri, "fake_managed_identity"
                     ),
                     expect_failure=True
                 )
