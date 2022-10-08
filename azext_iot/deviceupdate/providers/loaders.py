@@ -77,7 +77,10 @@ def reload_modules() -> None:
         except Exception as e:
             logger.warning("Failed to reload module: %s, error: %s", mod, str(e))
 
-    init_internal_azure_core(azure_path=ext_azure_dir)
+    try:
+        init_internal_azure_core(azure_path=ext_azure_dir)
+    except Exception as e:
+        logger.warning("Failed to build internal module cache, error: %s", str(e))
 
 
 def init_internal_azure_core(azure_path: str, namespace: str = INTERNAL_AZURE_CORE_NAMESPACE):
