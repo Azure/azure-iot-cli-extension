@@ -129,7 +129,7 @@ class TestDeviceCreate:
         url = args[0][0].url
         assert "{}/devices/{}?".format(mock_target["entity"], device_id) in url
         assert args[0][0].method == "PUT"
-        body = json.loads(args[0][0].body)
+        body = args[0][2]
 
         assert body["deviceId"] == req["device_id"]
         assert body["status"] == req["status"]
@@ -302,7 +302,7 @@ class TestDeviceUpdate:
         )
         assert args[0][0].method == "PUT"
 
-        body = json.loads(args[0][0].body)
+        body = args[0][2]
         assert body["deviceId"] == req["deviceId"]
         assert body["status"] == req["status"]
         assert body["capabilities"]["iotEdge"] == req["capabilities"]["iotEdge"]
@@ -314,7 +314,7 @@ class TestDeviceUpdate:
             assert body["authentication"]["x509Thumbprint"]["primaryThumbprint"]
             assert body["authentication"]["x509Thumbprint"]["secondaryThumbprint"]
 
-        headers = args[0][0].headers
+        headers = args[0][1]
         target_etag = req.get("etag")
         assert headers["If-Match"] == '"{}"'.format(target_etag if target_etag else "*")
 
@@ -560,7 +560,7 @@ class TestDeviceRegenerateKey:
         )
         assert args[0][0].method == "PUT"
 
-        body = json.loads(args[0][0].body)
+        body = args[0][2]
         if req == "primary":
             assert body["authentication"]["symmetricKey"]["primaryKey"] != "123"
         if req == "secondary":
@@ -569,7 +569,7 @@ class TestDeviceRegenerateKey:
             assert body["authentication"]["symmetricKey"]["primaryKey"] == "321"
             assert body["authentication"]["symmetricKey"]["secondaryKey"] == "123"
 
-        headers = args[0][0].headers
+        headers = args[0][1]
         assert headers["If-Match"] == '"{}"'.format(etag if etag else "*")
 
     @pytest.fixture(params=[200])
@@ -630,7 +630,7 @@ class TestDeviceDelete:
         url = args[0][0].url
         assert "{}/devices/{}?".format(mock_target["entity"], device_id) in url
         assert args[0][0].method == "DELETE"
-        headers = args[0][0].headers
+        headers = args[0][1]
         assert headers["If-Match"] == '"{}"'.format(target_etag if target_etag else "*")
 
     def test_device_delete_error(self, serviceclient_generic_error):
@@ -776,7 +776,7 @@ class TestDeviceModuleCreate:
         )
         assert args[0][0].method == "PUT"
 
-        body = json.loads(args[0][0].body)
+        body = args[0][2]
         assert body["deviceId"] == req["device_id"]
         assert body["moduleId"] == req["module_id"]
 
@@ -895,7 +895,7 @@ class TestDeviceModuleUpdate:
         args = serviceclient.call_args
         url = args[0][0].url
         method = args[0][0].method
-        body = json.loads(args[0][0].body)
+        body = args[0][2]
 
         assert (
             "{}/devices/{}/modules/{}?".format(
@@ -916,7 +916,7 @@ class TestDeviceModuleUpdate:
             assert body["authentication"]["x509Thumbprint"]["secondaryThumbprint"]
 
         target_etag = req.get("etag")
-        headers = args[0][0].headers
+        headers = args[0][1]
         assert headers["If-Match"] == '"{}"'.format(target_etag if target_etag else "*")
 
     @pytest.mark.parametrize(
@@ -984,7 +984,7 @@ class TestDeviceModuleDelete:
         args = serviceclient.call_args
         url = args[0][0].url
         method = args[0][0].method
-        headers = args[0][0].headers
+        headers = args[0][1]
 
         assert "devices/{}/modules/{}?".format(device_id, module_id) in url
         assert method == "DELETE"
@@ -1136,12 +1136,12 @@ class TestDeviceTwinUpdate:
             etag=req.get("etag"),
         )
         args = serviceclient.call_args
-        body = json.loads(args[0][0].body)
+        body = args[0][2]
         assert body == req
         assert "twins/{}".format(device_id) in args[0][0].url
 
         target_etag = req.get("etag")
-        headers = args[0][0].headers
+        headers = args[0][1]
         assert headers["If-Match"] == '"{}"'.format(target_etag if target_etag else "*")
 
     @pytest.mark.parametrize("req", [generate_device_twin_show()])
@@ -1194,7 +1194,7 @@ class TestDeviceTwinReplace:
             etag=etag,
         )
         args = serviceclient.call_args
-        body = json.loads(args[0][0].body)
+        body = args[0][2]
         if isfile:
             content = str(read_file_content(req))
             assert body == json.loads(content)
@@ -1203,7 +1203,7 @@ class TestDeviceTwinReplace:
         assert "{}/twins/{}?".format(mock_target["entity"], device_id) in args[0][0].url
         assert args[0][0].method == "PUT"
 
-        headers = args[0][0].headers
+        headers = args[0][1]
         assert headers["If-Match"] == '"{}"'.format(etag if etag else "*")
 
     @pytest.mark.parametrize("req", [(generate_device_twin_show(moduleId=module_id))])
@@ -1282,14 +1282,14 @@ class TestDeviceModuleTwinUpdate:
             etag=req.get("etag"),
         )
         args = serviceclient.call_args
-        body = json.loads(args[0][0].body)
+        body = args[0][2]
         assert body == req
         assert (
             "twins/{}/modules/{}?".format(req["deviceId"], module_id) in args[0][0].url
         )
 
         target_etag = req.get("etag")
-        headers = args[0][0].headers
+        headers = args[0][1]
         assert headers["If-Match"] == '"{}"'.format(target_etag if target_etag else "*")
 
     @pytest.mark.parametrize("req", [(generate_device_twin_show(moduleId=module_id))])
@@ -1344,7 +1344,7 @@ class TestDeviceModuleTwinReplace:
             etag=etag,
         )
         args = serviceclient.call_args
-        body = json.loads(args[0][0].body)
+        body = args[0][2]
         if isfile:
             content = str(read_file_content(req))
             assert body == json.loads(content)
@@ -1353,7 +1353,7 @@ class TestDeviceModuleTwinReplace:
         assert "twins/{}/modules/{}?".format(device_id, module_id) in args[0][0].url
         assert args[0][0].method == "PUT"
 
-        headers = args[0][0].headers
+        headers = args[0][1]
         assert headers["If-Match"] == '"{}"'.format(etag if etag else "*")
 
     @pytest.mark.parametrize("req", [(generate_device_twin_show(moduleId=module_id))])
@@ -1431,15 +1431,15 @@ class TestQuery:
                 assert serviceclient.call_count == int(targetcount / pagesize) + 1
 
         args = serviceclient.call_args_list[0]
-        headers = args[0][0].headers
-        body = json.loads(args[0][0].body)
+        headers = args[0][1]
+        body = args[0][2]
         assert body["query"] == query
 
         if top:
             targetcount = top
             if pagesize < top:
                 for i in range(1, len(serviceclient.call_args_list)):
-                    headers = serviceclient.call_args_list[i][0][0].headers
+                    headers = serviceclient.call_args_list[i][0][1]
                     targetcount = targetcount - pagesize
                     assert headers["x-ms-max-item-count"] == str(targetcount)
             else:
@@ -1484,7 +1484,7 @@ class TestDeviceMethodInvoke:
             timeout=timeout,
         )
         args = serviceclient.call_args
-        body = json.loads(args[0][0].body)
+        body = args[0][2]
         url = args[0][0].url
         method = args[0][0].method
 
@@ -1493,7 +1493,7 @@ class TestDeviceMethodInvoke:
 
         if methodbody:
             assert body["payload"] == json.loads(payload)
-        else:
+        elif "payload" in body.keys():
             # We must ensure null is passed for payload.
             assert body["payload"] is None
 
@@ -1565,7 +1565,7 @@ class TestDeviceModuleMethodInvoke:
             timeout=timeout,
         )
         args = serviceclient.call_args
-        body = json.loads(args[0][0].body)
+        body = args[0][2]
         url = args[0][0].url
         method = args[0][0].method
 
@@ -1576,7 +1576,7 @@ class TestDeviceModuleMethodInvoke:
             assert body["payload"] == json.loads(payload)
         else:
             # We must ensure null is passed for payload.
-            assert body["payload"] is None
+            assert "payload" not in body.keys()
 
         assert body["responseTimeoutInSeconds"] == timeout
         assert body["connectTimeoutInSeconds"] == timeout
@@ -1874,7 +1874,7 @@ class TestEdgeOffline:
         )
         args = sc_setparent.call_args
         url = args[0][0].url
-        body = json.loads(args[0][0].body)
+        body = args[0][2]
         assert "{}/devices/{}?".format(mock_target["entity"], child_device_id) in url
         assert args[0][0].method == "PUT"
         assert body["deviceId"] == child_device_id
@@ -1970,7 +1970,7 @@ class TestEdgeOffline:
         )
         args = sc_addchildren.call_args
         url = args[0][0].url
-        body = json.loads(args[0][0].body)
+        body = args[0][2]
         assert "{}/devices/{}?".format(mock_target["entity"], child_device_id) in url
         assert args[0][0].method == "PUT"
         assert body["deviceId"] == child_device_id
