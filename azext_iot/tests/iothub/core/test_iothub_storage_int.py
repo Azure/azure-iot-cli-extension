@@ -228,7 +228,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
                 job_id = self.cmd(
                     'iot hub device-identity export -n {} --bcu "{}" --ik true'.format(
-                        self.entity_name, self.live_storage_uri, "identity"
+                        self.entity_name, self.live_storage_uri
                     ),
                     checks=[
                         self.check("outputBlobContainerUri", self.live_storage_uri),
