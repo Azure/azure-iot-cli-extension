@@ -9,6 +9,7 @@ wheel==0.30.0
 pre-commit
 pylint<=2.13.8
 flake8
+azure-storage-blob
 pytest-xdist
 pytest-rerunfailures
 tox
