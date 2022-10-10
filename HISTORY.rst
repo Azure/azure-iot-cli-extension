@@ -14,7 +14,7 @@ unreleased
 
 * Adds `az iot device-update update init calculate-hash`, a utility command used to calculate the base64 hash representation of one or more files.
 * The `update init v5` command will by default validate the generated import manifest using the official json schema definition. Client-side validation can be skipped by using `--no-validation`.
-* The `update init v5` command support level has changed from `experimental`` to `preview`.
+* The `update init v5` command support level has changed from `experimental` to `preview`.
 
 **IoT Central updates**
 
