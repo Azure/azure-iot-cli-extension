@@ -15,6 +15,7 @@ from azext_iot.tests.settings import UserTypes
 from azext_iot.common.utility import generate_container_sas_token
 
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.common.shared import AuthenticationType
 # TODO: assert DEVICE_DEVICESCOPE_PREFIX format in parent device twin.
 from azure.cli.core._profile import Profile
 from azure.cli.core.mock import DummyCli
@@ -185,7 +186,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
                         self.exists("inputBlobContainerUri"),
                         self.check("failureReason", None),
                         self.check("type", "import"),
-                        self.check("storageAuthenticationType", "keyBased"),
+                        self.check("storageAuthenticationType", AuthenticationType.keyBased.name),
                         self.exists("jobId"),
                     ],
                 )
@@ -235,7 +236,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
                         self.check("failureReason", None),
                         self.check("type", "export"),
                         self.check("excludeKeysInExport", False),
-                        self.check("storageAuthenticationType", "identityBased"),
+                        self.check("storageAuthenticationType", AuthenticationType.keyBased.name),
                         self.exists("jobId"),
                     ],
                 ).get_output_in_json()["jobId"]
@@ -245,14 +246,14 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
                 job_id = self.cmd(
                     'iot hub device-identity import -n {} --ibcu "{}" --obcu "{}" --identity {}'.format(
-                        self.entity_name, self.live_storage_uri, self.live_storage_uri, "identity"
+                        self.entity_name, self.live_storage_uri, self.live_storage_uri, "[system]"
                     ),
                     checks=[
                         self.check("outputBlobContainerUri", self.live_storage_uri),
                         self.check("inputBlobContainerUri", self.live_storage_uri),
                         self.check("failureReason", None),
                         self.check("type", "import"),
-                        self.check("storageAuthenticationType", "identityBased"),
+                        self.check("storageAuthenticationType", AuthenticationType.identityBased.name),
                         self.exists("jobId"),
                     ],
                 ).get_output_in_json()["jobId"]
@@ -327,7 +328,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
                         self.check("failureReason", None),
                         self.check("type", "export"),
                         self.check("excludeKeysInExport", False),
-                        self.check("storageAuthenticationType", "identityBased"),
+                        self.check("storageAuthenticationType", AuthenticationType.identityBased.name),
                         self.exists("jobId"),
                     ],
                 ).get_output_in_json()["jobId"]
@@ -344,7 +345,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
                         self.check("inputBlobContainerUri", self.live_storage_uri),
                         self.check("failureReason", None),
                         self.check("type", "import"),
-                        self.check("storageAuthenticationType", "identityBased"),
+                        self.check("storageAuthenticationType", AuthenticationType.identityBased.name),
                         self.exists("jobId"),
                     ],
                 ).get_output_in_json()["jobId"]
