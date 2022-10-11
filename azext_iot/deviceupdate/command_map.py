@@ -109,7 +109,7 @@ def load_deviceupdate_commands(self, _):
         "iot device-update update init",
         command_type=deviceupdate_update_ops,
     ) as cmd_group:
-        cmd_group.command("v5", "manifest_init_v5", is_experimental=True)
+        cmd_group.command("v5", "manifest_init_v5")
         cmd_group.show_command("calculate-hash", "calculate_hash")
 
     with self.command_group(
