@@ -452,7 +452,7 @@ class StateProvider(IoTHubProvider):
             hub_state["arm"]["resources"] = hub_resources
 
             filename = f"arm_deployment{self.hub_name}.json"
-            with open(filename, "w") as f:
+            with open(filename, "w", encoding='utf-8') as f:
                 json.dump(hub_state["arm"], f)
 
             arm_result = cli.invoke(

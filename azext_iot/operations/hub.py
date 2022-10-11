@@ -1244,7 +1244,7 @@ def iot_edge_set_modules(
         login=login,
         auth_type=auth_type_dataplane,
     )
-    _iot_edge_set_modules(target, device_id, content)
+    return _iot_edge_set_modules(target, device_id, content)
 
 
 def _iot_edge_set_modules(target, device_id, content):

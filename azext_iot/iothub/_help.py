@@ -316,6 +316,7 @@ def load_iothub_help():
         type: group
         short-summary: Manage the state of an IoT Hub.
     """
+
     helps[
         "iot hub state export"
     ] = """
@@ -334,6 +335,7 @@ def load_iothub_help():
           text: >
             az iot hub state export -n {iothub_name} -f {filename} --aspects devices configurations
     """
+
     helps[
         "iot hub state import"
     ] = """
@@ -347,6 +349,8 @@ def load_iothub_help():
 
                        For imported endpoints with system assigned identity authentication, the specified hub must have
                        the correct permissions. Otherwise the command will fail.
+
+                       Private endpoints will be ignored in the import process.
         examples:
         - name: Import the state from the specified file to the specified hub.
           text: >
@@ -364,13 +368,24 @@ def load_iothub_help():
           text: >
             az iot hub state import -n {iothub_name} -f {filename} --aspects devices configurations
     """
+
     helps[
         "iot hub state migrate"
     ] = """
         type: command
         short-summary: Copy the state of one hub to another hub without saving to a file.
-        long-summary: The migrated state will include hub configurations, edge deployments, device identities and twins, and module
-                      identities and twins.
+        long-summary: |
+                       If the arm aspect is specified, the hub will be created if it does not exist.
+
+                       The migrated state will include: arm template for hub, certificates, hub configurations, edge deployments,
+                       device identities and twins, and module identities and twins.
+
+                       For migrated endpoints with system assigned identity authentication, the specified hub must have
+                       the correct permissions. Otherwise the command will fail.
+
+                       Private endpoints will be ignored in the migration process.
+
+                       If you have trouble migrating, please use the export and import commands to have a file as a backup.
         examples:
         - name: Migrate the state of the original hub to the destination hub.
           text: >
