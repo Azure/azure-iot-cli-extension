@@ -54,3 +54,42 @@ IOTHUB_TRACK_2_SDK_MIN_VERSION = "2.0.0"
 # Initial Track 2 SDK version for DPS
 IOTDPS_MGMT_SDK_PACKAGE_NAME = "azure-mgmt-iothubprovisioningservice"
 IOTDPS_TRACK_2_SDK_MIN_VERSION = "1.0.0"
+
+# Edge device TOML default values
+DEVICE_CONFIG_TOML = {
+  "hostname": "",
+  "parent_hostname": "",
+  "provisioning": {
+    "device_id": "",
+    "iothub_hostname": "",
+    "source": "manual",
+    "authentication": {
+      "device_id_pk": "",
+      "method": "sas",
+      "trust_bundle_cert": ""
+    }
+  },
+  "edge_ca": {
+    "cert": "file:///",
+    "pk": "file:///"
+  },
+  "agent": {
+    "config": {
+      "image": ""
+    },
+    "name": "edgeAgent",
+    "type": "docker"
+  },
+  "connect": {
+    "management_uri": "unix:///var/run/iotedge/mgmt.sock",
+    "workload_uri": "unix:///var/run/iotedge/workload.sock"
+  },
+  "listen": {
+    "management_uri": "fd://aziot-edged.mgmt.socket",
+    "workload_uri": "fd://aziot-edged.workload.socket"
+  },
+  "moby_runtime": {
+    "network": "azure-iot-edge",
+    "uri": "unix:///var/run/docker.sock"
+  }
+}

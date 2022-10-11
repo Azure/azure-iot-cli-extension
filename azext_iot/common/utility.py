@@ -164,6 +164,23 @@ def process_yaml_arg(path: str) -> dict:
         )
 
 
+def process_toml_content(path: str) -> dict[str, Any]:
+    """Primary processor of TOML file input"""
+
+    if not os.path.exists(path):
+        raise FileOperationError(f"TOML file not found - Please ensure the path '{path}' is correct.")
+
+    try:
+        import toml
+        with open(path, "rb") as f:
+            return toml.loads(f)
+    except Exception as ex:
+        raise InvalidArgumentValueError(
+            "Failed to parse TOML for file '{}' with exception:\n{}".format(
+                path, ex
+            )
+        )
+
 def shell_safe_json_parse(json_or_dict_string, preserve_order=False):
     """Allows the passing of JSON or Python dictionary strings. This is needed because certain
     JSON strings in CMD shell are not received in main's argv. This allows the user to specify
