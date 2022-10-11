@@ -1,0 +1,76 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {},
+  "resources": [
+    {
+      "apiVersion": "2022-04-30-preview",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "location": "eastus",
+      "name": "test-hub",
+      "properties": {
+        "allowedFqdnList": [],
+        "cloudToDevice": {
+          "defaultTtlAsIso8601": "PT1H",
+          "feedback": {
+            "lockDurationAsIso8601": "PT1M",
+            "maxDeliveryCount": 10,
+            "ttlAsIso8601": "PT1H"
+          },
+          "maxDeliveryCount": 10
+        },
+        "enableFileUploadNotifications": false,
+        "eventHubEndpoints": {
+          "events": {
+            "partitionCount": 4,
+            "retentionTimeInDays": 1
+          }
+        },
+        "features": "None",
+        "ipFilterRules": [],
+        "messagingEndpoints": {
+          "fileNotifications": {
+            "lockDurationAsIso8601": "PT5S",
+            "maxDeliveryCount": 10,
+            "ttlAsIso8601": "PT1H"
+          }
+        },
+        "routing": {
+          "endpoints": {
+            "cosmosDBSqlCollections": [],
+            "eventHubs": [],
+            "serviceBusQueues": [],
+            "serviceBusTopics": [],
+            "storageContainers": []
+          },
+          "fallbackRoute": {
+            "condition": "true",
+            "endpointNames": [
+              "events"
+            ],
+            "isEnabled": true,
+            "name": "$fallback",
+            "source": "DeviceMessages"
+          },
+          "routes": []
+        },
+        "storageEndpoints": {
+          "$default": {
+            "connectionString": null,
+            "containerName": null,
+            "sasTtlAsIso8601": "PT1H"
+          }
+        }
+      },
+      "sku": {
+        "capacity": 1,
+        "name": "S1",
+        "tier": "Standard"
+      },
+      "type": "Microsoft.Devices/IotHubs"
+    }
+  ],
+  "variables": {}
+}

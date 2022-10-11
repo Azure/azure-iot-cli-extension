@@ -324,20 +324,29 @@ def load_iothub_help():
         long-summary: The exported state will include hub configurations, edge deployments, device identities and twins, and module
                       identities and twins.
         examples:
-        - name: Export the state of the specified hub to the specified file.
+        - name: Export the full state of the specified hub to the specified file.
           text: >
             az iot hub state export -n {iothub_name} -f {filename}
-        - name: Export the state of the specified hub to the specified file, overwriting the file contents.
+        - name: Export the full state of the specified hub to the specified file, overwriting the file contents.
           text: >
             az iot hub state export -n {iothub_name} -f {filename} --of
+        - name: Export only the devices and configurations of the specified hub to the specified file.
+          text: >
+            az iot hub state export -n {iothub_name} -f {filename} --aspects devices configurations
     """
     helps[
         "iot hub state import"
     ] = """
         type: command
         short-summary: Import a Hub state from a file to an IoT Hub.
-        long-summary: The imported state will include hub configurations, edge deployments, device identities and twins, and module
-                      identities and twins.
+        long-summary: |
+                       If the arm aspect is specified, the hub will be created if it does not exist.
+
+                       The imported state will include: arm template for hub, certificates, hub configurations, edge deployments,
+                       device identities and twins, and module identities and twins.
+
+                       For imported endpoints with system assigned identity authentication, the specified hub must have
+                       the correct permissions. Otherwise the command will fail.
         examples:
         - name: Import the state from the specified file to the specified hub.
           text: >
@@ -345,6 +354,15 @@ def load_iothub_help():
         - name: Import the state from the default file to the specified hub, overwriting the previous state of the hub.
           text: >
             az iot hub state import -n {iothub_name} -f {filename} -r
+        - name: Import only the arm template from the specified file to the specified hub. Note that this will create a new hub if
+                it does not exist. The file may contain the devices and configurations but those will be ignored.
+          text: >
+            az iot hub state import -n {iothub_name} -f {filename} --aspects arm
+        - name: Import only the devices and configurations from the specified file to the specified hub. Note that this will NOT
+                create a new hub if it does not exist and the command will fail. The file may contain the arm template but that
+                will be ignored.
+          text: >
+            az iot hub state import -n {iothub_name} -f {filename} --aspects devices configurations
     """
     helps[
         "iot hub state migrate"

@@ -11,7 +11,7 @@ from knack.log import get_logger
 from azext_iot.common.shared import DeviceAuthApiType, DeviceAuthType, ConfigType
 from azext_iot.iothub.providers.base import IoTHubProvider
 from azext_iot.common._azure import parse_iot_hub_message_endpoint_connection_string, parse_storage_container_connection_string
-from azure.cli.core.azclierror import FileOperationError, ResourceNotFoundError
+from azure.cli.core.azclierror import FileOperationError, ResourceNotFoundError, BadRequestError, AzCLIError
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.common.utility import capture_stderr
 from azext_iot.operations.hub import (
@@ -227,19 +227,22 @@ class StateProvider(IoTHubProvider):
 
     def delete_aspects(self, replace, hub_aspects=[]):
         """
-        Delete all necessary hub aspects.
+        Delete all necessary hub aspects if the hub exists.
 
-        If hub aspects is empty, delete all aspects. Otherwise, delete if it is present in given
-        hub aspects.
+        Delete dataplane aspects only present in hub_aspects.
         """
-        if replace:
+        if self.target and replace:
             if HubAspects.Configurations.value in hub_aspects:
-                self.delete_all_configs(
-                    delete_configs=True,
-                    delete_deployments=True
-                )
+                self.delete_all_configs()
             if HubAspects.Devices.value in hub_aspects:
                 self.delete_all_devices()
+            if HubAspects.Arm.value in hub_aspects:
+                cert_client = self.get_client().certificates
+                # serialize strips name and etag - use as_dict instead
+                certificates = cert_client.list_by_iot_hub(self.rg, self.hub_name).as_dict()
+
+                for cert in tqdm(certificates["value"], desc="Deleting certificates from destination hub"):
+                    cert_client.delete(self.rg, self.hub_name, cert["name"], cert["etag"])
 
     def process_hub_to_dict(self, target: dict, hub_aspects: list = []) -> dict:
         '''Returns a dictionary containing the hub state'''
@@ -346,7 +349,7 @@ class StateProvider(IoTHubProvider):
             if not hub_rg:
                 hub_rg = control_plane_obj.additional_properties["resourcegroup"]
             hub_resource_id = control_plane_obj.id
-            hub_arm = cli.invoke(f"group export -n {hub_rg} --resource-ids {hub_resource_id} --skip-all-params").as_json()
+            hub_arm = cli.invoke(f"group export -n {hub_rg} --resource-ids '{hub_resource_id}' --skip-all-params").as_json()
             hub_state["arm"] = hub_arm
             hub_resource = hub_state["arm"]["resources"][0]
             # get connection strings if needed
@@ -415,84 +418,125 @@ class StateProvider(IoTHubProvider):
 
     def upload_hub_from_dict(self, hub_state: dict, hub_aspects: list = []):
         # Control plane
-        if HubAspects.Arm.value in hub_aspects:
+        if HubAspects.Arm.value in hub_aspects and hub_state.get("arm"):
+            hub_aspects.remove(HubAspects.Arm.value)
+            hub_resources = []
             hub_resource = hub_state["arm"]["resources"][0]
             hub_resource["name"] = self.hub_name
-            # try uploading the arm template onto the hub - replace hub_name and rg if provided
-
             if self.target:
                 # remove/overwrite attributes that cannot be changed
                 current_hub_resource = self.discovery.find_resource(self.hub_name, self.rg)
                 if not self.rg:
                     self.rg = current_hub_resource.additional_properties["resourcegroup"]
-
                 #location
                 hub_resource["location"] = current_hub_resource.location
                 # sku
-                hub_resource["sku"] = current_hub_resource.sku
+                hub_resource["sku"] = current_hub_resource.sku.serialize()
                 # other props
+
+            hub_resources.append(hub_resource)
+
+            hub_certs = [res for res in hub_state["arm"]["resources"][1:] if res["type"].endswith("certificates")]
+            if len(hub_certs) < len(hub_state["arm"]["resources"]) - 1:
+                logger.warning("Private endpoints for IoT Hub will be ignored for state import.")
+
+            for res in hub_certs:
+                res["name"] = self.hub_name + "/" + res["name"].split("/")[1]
+                # elif res["type"].endswith("PrivateEndpointConnections"):
+                #     res["name"] = self.hub_name + "/" + self.hub_name + "." + res["name"].split("/")[1]
+
+                depends_on = res["dependsOn"][0].split("'")
+                depends_on[3] = self.hub_name
+                res["dependsOn"][0] = "'".join(depends_on)
+            hub_resources.extend(hub_certs)
+            hub_state["arm"]["resources"] = hub_resources
 
             filename = f"arm_deployment{self.hub_name}.json"
             with open(filename, "w") as f:
-                f.write(json.dumps(hub_state["arm"]))
+                json.dump(hub_state["arm"], f)
 
             arm_result = cli.invoke(
-                f"deployment group create --template-file {filename} -g {self.rg} --rollback-on-error"
-            ).as_json()
-
+                f"deployment group create --template-file {filename} -g {self.rg}"
+            )
             os.remove(filename)
+
+            if not arm_result.success():
+                raise BadRequestError(f"Arm deployment for IoT Hub {self.hub_name} failed.")
+
             if not self.target:
-                self.target = self.discovery.get_target(resource_group_name=arm_result["resourceGroup"])
+                self.target = self.discovery.get_target(
+                    hub_resource["name"],
+                    resource_group_name=arm_result.as_json()["resourceGroup"]
+                )
+                print(f"Created IoT Hub {self.hub_name}.")
+            else:
+                print(f"Updated IoT Hub {self.hub_name}.")
+
         # Data plane
         # upload configurations
         if HubAspects.Configurations.value in hub_aspects and hub_state.get("configurations"):
             hub_aspects.remove(HubAspects.Configurations.value)
             configs = hub_state["configurations"]["admConfigurations"]
-            for config_id, config_obj in configs.items():
-                _iot_hub_configuration_create(
-                    target=self.target,
-                    config_id=config_id,
-                    content=json.dumps(config_obj["content"]),
-                    target_condition=config_obj["targetCondition"],
-                    priority=config_obj["priority"],
-                    labels=json.dumps(config_obj["labels"]),
-                    metrics=json.dumps(config_obj["metrics"])
-                )
+            for config_id, config_obj in tqdm(configs.items(), desc="Uploading ADM Configurations"):
+                try:
+                    _iot_hub_configuration_create(
+                        target=self.target,
+                        config_id=config_id,
+                        content=json.dumps(config_obj["content"]),
+                        target_condition=config_obj["targetCondition"],
+                        priority=config_obj["priority"],
+                        labels=json.dumps(config_obj["labels"]),
+                        metrics=json.dumps(config_obj["metrics"])
+                    )
+                except AzCLIError as e:
+                    logger.error(f" Failed to upload ADM configuration {config_id}. Error Message: {e}")
 
             edge_deployments = hub_state["configurations"]["edgeDeployments"]
-            for config_id, config_obj in edge_deployments.items():
+            for config_id, config_obj in tqdm(edge_deployments.items(), desc="Uploading Edge Deployments"):
                 if "properties.desired" in config_obj["content"]["modulesContent"]["$edgeAgent"]:
                     config_type = ConfigType.edge
                 else:
                     config_type = ConfigType.layered
 
-                _iot_hub_configuration_create(
-                    target=self.target,
-                    config_id=config_id,
-                    content=json.dumps(config_obj["content"]),
-                    target_condition=config_obj["targetCondition"],
-                    priority=config_obj["priority"],
-                    labels=json.dumps(config_obj["labels"]),
-                    metrics=json.dumps(config_obj["metrics"]),
-                    config_type=config_type
-                )
+                try:
+                    _iot_hub_configuration_create(
+                        target=self.target,
+                        config_id=config_id,
+                        content=json.dumps(config_obj["content"]),
+                        target_condition=config_obj["targetCondition"],
+                        priority=config_obj["priority"],
+                        labels=json.dumps(config_obj["labels"]),
+                        metrics=json.dumps(config_obj["metrics"]),
+                        config_type=config_type
+                    )
+                except AzCLIError as e:
+                    logger.error(f" Failed to upload Edge Deployment {config_id}. Error Message: {e}")
 
         if HubAspects.Devices.value in hub_aspects and hub_state.get("devices"):
             hub_aspects.remove(HubAspects.Devices.value)
             # for identity in tqdm(hub_state["devices"]["identities"], desc="Uploading devices", file=sys.stdout):
             child_to_parent = {}
-            for device_id, device_obj in hub_state["devices"].items():
+            for device_id, device_obj in tqdm(hub_state["devices"].items(), desc="Uploading devices and modules"):
                 # upload device identity and twin
-                self.upload_device_identity(device_id, device_obj["identity"])
+                try:
+                    self.upload_device_identity(device_id, device_obj["identity"])
+                except AzCLIError as e:
+                    logger.error(f" Failed to upload device identity for {device_id}. Proceeding to next device. Error Message: {e}")
+                    continue
 
-                _iot_device_twin_update(
-                    target=self.target, device_id=device_id, parameters=device_obj["twin"]
-                )
+                try:
+                    _iot_device_twin_update(
+                        target=self.target, device_id=device_id, parameters=device_obj["twin"]
+                    )
+                except AzCLIError as e:
+                    logger.error(f" Failed to upload device twin for {device_id}. Proceeding to next device. Error Message: {e}")
+                    continue
 
                 edge_modules = {}
 
                 for module_id, module_obj in device_obj.get("modules", {}).items():
-                    if module_id.startswith("$"):
+                    # upload will fail for modules that start with $ or have no auth
+                    if module_id.startswith("$") or module_obj["identity"]["authentication"]["type"] == "none":
                         edge_modules[module_id] = {
                             "properties.desired": module_obj["twin"]["properties"]["desired"]
                         }
@@ -500,24 +544,45 @@ class StateProvider(IoTHubProvider):
                         module_identity = module_obj["identity"]
                         module_twin = module_obj["twin"]
 
-                        self.upload_module_identity(device_id, module_id, module_identity)
-                        _iot_device_module_twin_update(
-                            target=self.target,
-                            device_id=device_id,
-                            module_id=module_id,
-                            parameters=module_twin
-                        )
+                        try:
+                            self.upload_module_identity(device_id, module_id, module_identity)
+                        except AzCLIError as e:
+                            logger.error(f" Failed to upload module identity for {module_id} for the device {device_id}. Proceeding to next module. Error Message: {e}")
+                            continue
+                        try:
+                            _iot_device_module_twin_update(
+                                target=self.target,
+                                device_id=device_id,
+                                module_id=module_id,
+                                parameters=module_twin
+                            )
+                        except AzCLIError as e:
+                            logger.error(f" Failed to upload module identity for {module_id} for the device {device_id}. Proceeding to next module. Error Message: {e}")
+                            continue
+
                 if edge_modules:
-                    _iot_edge_set_modules(
-                        target=self.target, device_id=device_id, content=json.dumps({"modulesContent": edge_modules})
-                    )
+                    try:
+                        _iot_edge_set_modules(
+                            target=self.target, device_id=device_id, content=json.dumps({"modulesContent": edge_modules})
+                        )
+                    except AzCLIError as e:
+                        logger.error(f" Failed to upload edge modules for the device {device_id}. Proceeding to next device. Error Message: {e}")
+                        continue
 
                 if device_obj.get("parent"):
                     child_to_parent[device_id] = device_obj["parent"]
 
             # set parent-child relationships after all devices are created
             for device_id in child_to_parent:
-                _iot_device_set_parent(target=self.target, parent_id=child_to_parent[device_id], device_id=device_id)
+                try:
+                    _iot_device_set_parent(target=self.target, parent_id=child_to_parent[device_id], device_id=device_id)
+                except AzCLIError as e:
+                    logger.error(f" Failed to set parent-child relationship for the parent device {child_to_parent[device_id]} to the child device {device_id}. Error Message: {e}")
+                    continue
+
+        # Leftover aspects
+        if hub_aspects:
+            logger.warning(f"Some hub aspects ({', '.join(hub_aspects)}) were not uploaded because the necessary aspects were not found in the file.")
 
     def upload_device_identity(self, device_id: str, identity: dict):
         auth_type = identity["authentication"]["type"]
@@ -571,10 +636,8 @@ class StateProvider(IoTHubProvider):
 
         else:
             logger.error("Authorization type for device '{0}' not recognized.".format(device_id))
-        try:
-            _iot_device_show(target=self.target, device_id=device_id)
-        except ResourceNotFoundError:
-            import pdb; pdb.set_trace()
+
+        _iot_device_show(target=self.target, device_id=device_id)
 
     def upload_module_identity(self, device_id: str, module_id: str, identity: dict):
         auth_type = identity["authentication"]["type"]
@@ -602,39 +665,18 @@ class StateProvider(IoTHubProvider):
             logger.error("Authorization type for module '{0}' in device '{1}' not recognized.".format(module_id, device_id))
 
     # Delete Commands
-    def delete_all_configs(self, delete_configs: bool = False, delete_deployments: bool = False):
+    def delete_all_configs(self):
         all_configs = _iot_hub_configuration_list(target=self.target)
-        if delete_configs:
-            configurations = [
-                c for c in all_configs if (c["content"].get("deviceContent") or c["content"].get("moduleContent"))
-            ]
-            for i in tqdm(range(len(configurations)), desc="Deleting configurations from destination hub"):
-                c = configurations[i]
-                try:
-                    _iot_hub_configuration_delete(target=self.target, config_id=c["id"])
-                except ResourceNotFoundError:
-                    logger.warning("Configuration '{0}' not found during hub clean-up.".format(c["id"]))
-        if delete_deployments:
-            deployments = [c for c in all_configs if c["content"].get("modulesContent")]
-            for i in tqdm(range(len(deployments)), desc="Deleting edge deployments from destination hub"):
-                c = deployments[i]
-                try:
-                    _iot_hub_configuration_delete(target=self.target, config_id=c["id"])
-                except ResourceNotFoundError:
-                    logger.warning("Configuration '{0}' not found during hub clean-up.".format(c["id"]))
+        for config in tqdm(all_configs, desc="Deleting configurations from destination hub"):
+            try:
+                _iot_hub_configuration_delete(target=self.target, config_id=config["id"])
+            except ResourceNotFoundError:
+                logger.warning("Configuration '{0}' not found during hub clean-up.".format(config["id"]))
 
     def delete_all_devices(self):
         identities = _iot_device_list(target=self.target, top=-1)
-        for i in tqdm(range(len(identities)), desc="Deleting device identities from destination hub"):
-            id = identities[i]
+        for d in tqdm(identities, desc="Deleting device identities from destination hub"):
             try:
-                _iot_device_delete(target=self.target, device_id=id["deviceId"])
+                _iot_device_delete(target=self.target, device_id=d["deviceId"])
             except ResourceNotFoundError:
-                logger.warning("Device identity '{0}' not found during hub clean-up.".format(id["deviceId"]))
-
-    def delete_all_certificates(self):
-        certificates = cli.invoke("iot hub certificate list --hub-name {} -g {}".format(self.hub_name, self.rg)).as_json()
-        for i in tqdm(range(len(certificates["value"])), desc="Deleting certificates from destination hub", file=sys.stdout):
-            c = certificates["value"][i]
-            cli.invoke("iot hub certificate delete --name {} --etag {} --hub-name {} -g {}".format(c["name"], c["etag"],
-                                                                                                        self.hub_name, self.rg))
+                logger.warning("Device identity '{0}' not found during hub clean-up.".format(d["deviceId"]))

@@ -54,165 +54,6 @@ def get_closest_marker(request: SubRequest) -> Mark:
     return request.node.get_closest_marker("hub_infrastructure")
 
 
-@pytest.fixture(scope="module")
-def provisioned_iothubs_module(request) -> Optional[dict]:
-    result = _iot_hubs_provisioner(request)
-    _assign_dataplane_rbac_role(result)
-    yield result
-    if result:
-        _iot_hubs_removal(result)
-
-
-@pytest.fixture
-def provisioned_iothubs(request) -> Optional[dict]:
-    result = _iot_hubs_provisioner(request)
-    _assign_dataplane_rbac_role(result)
-    yield result
-    if result:
-        _iot_hubs_removal(result)
-
-
-@pytest.fixture
-def provisioned_iothubs_with_user_identity(request, provisioned_user_identity) -> Optional[dict]:
-    result = _iot_hubs_provisioner(request, provisioned_user_identity)
-    _assign_dataplane_rbac_role(result)
-    yield result
-    if result:
-        _iot_hubs_removal(result)
-
-
-def _iot_hubs_provisioner(request, provisioned_user_identity=None):
-    hub_marker = get_closest_marker(request)
-    desired_location = None
-    desired_tags = None
-    desired_sys_identity = False
-    desired_user_identity = False
-    desired_storage = None
-    desired_count = 1
-
-    if hub_marker:
-        desired_location = hub_marker.kwargs.get("location")
-        desired_tags = hub_marker.kwargs.get("desired_tags")
-        desired_sys_identity = hub_marker.kwargs.get("sys_identity")
-        desired_user_identity = hub_marker.kwargs.get("user_identity")
-        desired_storage = hub_marker.kwargs.get("storage")
-        desired_count = hub_marker.kwargs.get("count", 1)
-
-    print("number of hubs to provision")
-
-    hub_results = []
-    for _ in range(desired_count):
-        name = generate_hub_id()
-        base_create_command = f"iot hub create -n {name} -g {RG} --sku S1"
-        if desired_sys_identity:
-            base_create_command += " --mi-system-assigned"
-        if desired_user_identity and provisioned_user_identity:
-            user_identity_id = provisioned_user_identity["id"]
-            base_create_command += f" --mi-user-assigned {user_identity_id}"
-        if desired_tags:
-            base_create_command = base_create_command + f" --tags {desired_tags}"
-        if desired_location:
-            base_create_command = base_create_command + f" -l {desired_location}"
-
-        hub_obj = cli.invoke(base_create_command).as_json()
-        hub_results.append({
-            "hub": hub_obj,
-            "name": name,
-            "rg": RG,
-            "connectionString": _get_hub_connection_string(name, RG)
-        })
-    return hub_results
-
-
-def _assign_dataplane_rbac_role(hub_results):
-    for hub in hub_results:
-        target_hub_id = hub["hub"]["id"]
-        account = cli.invoke("account show").as_json()
-        user = account["user"]
-
-        if user["name"] is None:
-            raise Exception("User not found")
-
-        tries = 0
-        while tries < MAX_RBAC_ASSIGNMENT_TRIES:
-            role_assignments = _get_role_assignments(target_hub_id, USER_ROLE)
-            role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
-            if user["name"] in role_assignment_principal_names:
-                break
-            # else assign IoT Hub Data Contributor role to current user and check again
-            cli.invoke(
-                'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
-                    user["name"], USER_ROLE, target_hub_id
-                )
-            )
-            sleep(10)
-
-        if tries == MAX_RBAC_ASSIGNMENT_TRIES:
-            raise Exception(
-                "Reached max ({}) number of tries to assign RBAC role. Please re-run the test later "
-                "or with more max number of tries.".format(MAX_RBAC_ASSIGNMENT_TRIES)
-            )
-
-
-def _get_hub_connection_string(name, rg, policy="iothubowner"):
-    return cli.invoke(
-        "iot hub connection-string show -n {} -g {} --policy-name {}".format(
-            name, rg, policy
-        )
-    ).as_json()["connectionString"]
-
-
-def _get_role_assignments(scope, role):
-    return cli.invoke(
-        'role assignment list --scope "{}" --role "{}"'.format(
-            scope, role
-        )
-    ).as_json()
-
-def _iot_hubs_removal(hub_result):
-    for hub in hub_result:
-        name = hub["name"]
-        delete_result = cli.invoke(f"iot hub delete -n {name} -g {RG}")
-        if not delete_result.success():
-            logger.error(f"Failed to delete iot hub resource {name}.")
-
-
-
-@pytest.fixture(scope="session")
-def provisioned_user_identity_session() -> Optional[dict]:
-    result = _user_identity_provisioner()
-    yield result
-    if result:
-        _user_identity_removal(result["name"])
-
-
-@pytest.fixture
-def provisioned_user_identity() -> Optional[dict]:
-    result = _user_identity_provisioner()
-    yield result
-    if result:
-        _user_identity_removal(result["name"])
-
-
-def _user_identity_provisioner():
-    name = generate_hub_depenency_id()
-    return cli.invoke(
-        f"identity create -n {name} -g {RG}"
-    ).as_json()
-
-
-def _get_role_assignments(scope, role):
-    return cli.invoke(
-        f'role assignment list --scope "{scope}" --role "{role}"'
-    ).as_json()
-
-
-def _user_identity_removal(name):
-    delete_result = cli.invoke(f"identity delete -n {name} -g {RG}")
-    if not delete_result.success():
-        logger.error(f"Failed to delete user identity resource {name}.")
-
-
 def _assign_rbac_role(assignee: str, scope: str, role: str, max_tries: int = 10):
     tries = 0
     while tries < max_tries:
@@ -229,27 +70,34 @@ def _assign_rbac_role(assignee: str, scope: str, role: str, max_tries: int = 10)
         sleep(10)
         tries += 1
 
-# want to have 2 hubs, first hub have all the control plane stuff, both hubs to have permissions
-@pytest.fixture()
-def setup_hub_controlplane_states(provisioned_iothubs_with_user_identity, provisioned_storage, provisioned_event_hub, provisioned_service_bus):
-    hub_name = provisioned_iothubs_with_user_identity[0]["name"]
-    hub_rg = provisioned_iothubs_with_user_identity[0]["rg"]
+
+# IoT Hub with control plane
+@pytest.fixture(scope="module")
+def setup_hub_controlplane_states(
+    provisioned_iothubs, provisioned_event_hub, provisioned_service_bus
+) -> Optional[dict]:
+    """
+    Set up so that first hub will have all permissions, endpoints, etc and the other one(s) have correct
+    permissions.
+    """
+    hub_name = provisioned_iothubs[0]["name"]
+    hub_rg = provisioned_iothubs[0]["rg"]
     eventhub_name = provisioned_event_hub["eventhub"]["name"]
     eventhub_endpoint_uri = "sb:" + provisioned_event_hub["namespace"]["serviceBusEndpoint"].split(":")[1]
     servicebus_queue = provisioned_service_bus["queue"]["name"]
     servicebus_topic = provisioned_service_bus["topic"]["name"]
     servicebus_endpoint_uri = "sb:" + provisioned_service_bus["namespace"]["serviceBusEndpoint"].split(":")[1]
 
+    provisioned_storage = provisioned_iothubs[0]["storage"]
     storage_cstring = provisioned_storage["connectionString"]
     storage_container = provisioned_storage["container"]["name"]
 
     # add endpoints - prob use dict of scope to role + for loop
-    hub_principal_ids = [hub_obj["hub"]["identity"]["principalId"] for hub_obj in provisioned_iothubs_with_user_identity]
-    user_identities = list(provisioned_iothubs_with_user_identity[0]["hub"]["identity"]["userAssignedIdentities"].values())
+    hub_principal_ids = [hub_obj["hub"]["identity"]["principalId"] for hub_obj in provisioned_iothubs]
+    user_identities = list(provisioned_iothubs[0]["hub"]["identity"]["userAssignedIdentities"].values())
     user_principal_id = user_identities[0]["principalId"]
-    user_id = list(provisioned_iothubs_with_user_identity[0]["hub"]["identity"]["userAssignedIdentities"].keys())[0]
-    sub_id = provisioned_iothubs_with_user_identity[0]["hub"]["subscriptionid"]
-
+    user_id = list(provisioned_iothubs[0]["hub"]["identity"]["userAssignedIdentities"].keys())[0]
+    sub_id = provisioned_iothubs[0]["hub"]["subscriptionid"]
 
     # mapping of scope to role
     scope_dict = {
@@ -262,8 +110,6 @@ def setup_hub_controlplane_states(provisioned_iothubs_with_user_identity, provis
         _assign_rbac_role(assignee=user_principal_id, scope=scope, role=role)
         for hub_principal_id in hub_principal_ids:
             _assign_rbac_role(assignee=hub_principal_id, scope=scope, role=role)
-
-    # make sure to add permissions to new hub too; add endpoints
     sleep(30)
 
     cli.invoke(
@@ -312,20 +158,150 @@ def setup_hub_controlplane_states(provisioned_iothubs_with_user_identity, provis
     if os.path.isfile(cert_file):
         os.remove(cert_file)
 
-    yield provisioned_iothubs_with_user_identity
+    yield provisioned_iothubs
 
 
-@pytest.fixture(scope="session")
-def provisioned_storage_session() -> Optional[dict]:
-    result = _storage_provisioner()
+# Iot Hub
+@pytest.fixture(scope="module")
+def provisioned_iothubs(
+    request, provisioned_user_identity, provisioned_storage
+) -> Optional[dict]:
+    result = _iot_hubs_provisioner(request, provisioned_user_identity, provisioned_storage)
+    _assign_dataplane_rbac_role(result)
     yield result
     if result:
-        _storage_removal(result["storage"]["name"])
+        _iot_hubs_removal(result)
 
 
-@pytest.fixture
-def provisioned_storage() -> Optional[dict]:
-    result = _storage_provisioner()
+def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_storage=None):
+    hub_marker = get_closest_marker(request)
+    desired_location = None
+    desired_tags = None
+    desired_sys_identity = False
+    desired_user_identity = False
+    desired_storage = None
+    desired_count = 1
+
+    if hub_marker:
+        desired_location = hub_marker.kwargs.get("location")
+        desired_tags = hub_marker.kwargs.get("desired_tags")
+        desired_sys_identity = hub_marker.kwargs.get("sys_identity")
+        desired_user_identity = hub_marker.kwargs.get("user_identity")
+        desired_storage = hub_marker.kwargs.get("storage")
+        desired_count = hub_marker.kwargs.get("count", 1)
+
+    hub_results = []
+    for _ in range(desired_count):
+        name = generate_hub_id()
+        base_create_command = f"iot hub create -n {name} -g {RG} --sku S1"
+        if desired_sys_identity:
+            base_create_command += " --mi-system-assigned"
+        if desired_user_identity and provisioned_user_identity:
+            user_identity_id = provisioned_user_identity["id"]
+            base_create_command += f" --mi-user-assigned {user_identity_id}"
+        if desired_tags:
+            base_create_command += f" --tags {desired_tags}"
+        if desired_location:
+            base_create_command += f" -l {desired_location}"
+        if desired_storage and provisioned_storage:
+            storage_cstring = provisioned_storage["connectionString"]
+            base_create_command += f" --fcs {storage_cstring} --fc fileupload"
+
+        hub_obj = cli.invoke(base_create_command).as_json()
+        hub_results.append({
+            "hub": hub_obj,
+            "name": name,
+            "rg": RG,
+            "connectionString": _get_hub_connection_string(name, RG),
+            "storage": provisioned_storage
+        })
+    return hub_results
+
+
+def _assign_dataplane_rbac_role(hub_results):
+    for hub in hub_results:
+        target_hub_id = hub["hub"]["id"]
+        account = cli.invoke("account show").as_json()
+        user = account["user"]
+
+        if user["name"] is None:
+            raise Exception("User not found")
+
+        tries = 0
+        while tries < MAX_RBAC_ASSIGNMENT_TRIES:
+            role_assignments = _get_role_assignments(target_hub_id, USER_ROLE)
+            role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
+            if user["name"] in role_assignment_principal_names:
+                break
+            # else assign IoT Hub Data Contributor role to current user and check again
+            cli.invoke(
+                'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
+                    user["name"], USER_ROLE, target_hub_id
+                )
+            )
+            sleep(10)
+
+        if tries == MAX_RBAC_ASSIGNMENT_TRIES:
+            raise Exception(
+                "Reached max ({}) number of tries to assign RBAC role. Please re-run the test later "
+                "or with more max number of tries.".format(MAX_RBAC_ASSIGNMENT_TRIES)
+            )
+
+
+def _get_hub_connection_string(name, rg, policy="iothubowner"):
+    return cli.invoke(
+        "iot hub connection-string show -n {} -g {} --policy-name {}".format(
+            name, rg, policy
+        )
+    ).as_json()["connectionString"]
+
+
+def _iot_hubs_removal(hub_result):
+    for hub in hub_result:
+        name = hub["name"]
+        delete_result = cli.invoke(f"iot hub delete -n {name} -g {RG}")
+        if not delete_result.success():
+            logger.error(f"Failed to delete iot hub resource {name}.")
+
+
+# User Identity
+@pytest.fixture(scope="module")
+def provisioned_user_identity(request) -> Optional[dict]:
+    hub_marker = get_closest_marker(request)
+    result = None
+    if hub_marker and hub_marker.kwargs.get("storage"):
+        result = _user_identity_provisioner()
+    yield result
+    if result:
+        _user_identity_removal(result["name"])
+
+
+def _user_identity_provisioner():
+    name = generate_hub_depenency_id()
+    return cli.invoke(
+        f"identity create -n {name} -g {RG}"
+    ).as_json()
+
+
+def _get_role_assignments(scope, role):
+    return cli.invoke(
+        f'role assignment list --scope "{scope}" --role "{role}"'
+    ).as_json()
+
+
+def _user_identity_removal(name):
+    delete_result = cli.invoke(f"identity delete -n {name} -g {RG}")
+    if not delete_result.success():
+        logger.error(f"Failed to delete user identity resource {name}.")
+
+
+# Storage Account
+@pytest.fixture(scope="module")
+def provisioned_storage(request) -> Optional[dict]:
+    hub_marker = get_closest_marker(request)
+    result = None
+    if hub_marker and hub_marker.kwargs.get("storage"):
+        result = _storage_provisioner()
     yield result
     if result:
         _storage_removal(result["storage"]["name"])
@@ -390,15 +366,8 @@ def _storage_removal(account_name: str):
         logger.error(f"Failed to delete storage account resource {account_name}.")
 
 
-@pytest.fixture(scope="session")
-def provisioned_event_hub_session() -> Optional[list]:
-    result = _event_hub_provisioner()
-    yield result
-    if result:
-        _event_hub_removal(result["namespace"]["name"])
-
-
-@pytest.fixture
+# Event Hub
+@pytest.fixture(scope="module")
 def provisioned_event_hub() -> Optional[list]:
     result = _event_hub_provisioner()
     yield result
@@ -454,15 +423,8 @@ def _event_hub_removal(account_name: str):
         logger.error(f"Failed to delete eventhubs namespace resource {account_name}.")
 
 
-@pytest.fixture(scope="session")
-def provisioned_service_bus_session() -> Optional[list]:
-    result = _service_bus_provisioner()
-    yield result
-    if result:
-        _service_bus_removal(result["namespace"]["name"])
-
-
-@pytest.fixture
+# Service Bus
+@pytest.fixture(scope="module")
 def provisioned_service_bus() -> Optional[list]:
     result = _service_bus_provisioner()
     yield result
