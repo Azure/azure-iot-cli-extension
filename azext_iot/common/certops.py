@@ -94,13 +94,20 @@ def create_self_signed_certificate(
     if cert_output_dir and exists(cert_output_dir):
         cert_file = (file_prefix or subject) + "-cert.pem"
         key_file = (file_prefix or subject) + "-key.pem"
-
-        with open(join(cert_output_dir, cert_file), "wt", encoding="utf-8") as f:
-            f.write(cert_dump)
+        write_content_to_file(
+            content=cert_dump,
+            destination=cert_output_dir,
+            file_name=cert_file,
+            overwrite=True,
+        )
 
         if not cert_only:
-            with open(join(cert_output_dir, key_file), "wt", encoding="utf-8") as f:
-                f.write(key_dump)
+            write_content_to_file(
+                content=key_dump,
+                destination=cert_output_dir,
+                file_name=key_file,
+                overwrite=True,
+            )
 
     result = CertInfo(
         certificate=cert_dump,
@@ -136,12 +143,16 @@ def open_certificate(certificate_path: str) -> str:
     return certificate.rstrip()
 
 
-def create_edge_root_ca_certificate(cert_output_dir: str, cert_name: str) -> CertInfo:
+def create_edge_root_ca_certificate(
+    subject: Optional[str] = "Azure_IoT_Config_Cli_Cert",
+    output_path: Optional[str] = None,
+    cert_name: Optional[str] = "iotedge_config_cli_root",
+) -> CertInfo:
     key = rsa.generate_private_key(public_exponent=65537, key_size=4096)
 
     subject_name = x509.Name(
         [
-            x509.NameAttribute(NameOID.COMMON_NAME, "Azure_IoT_Config_Cli_Cert"),
+            x509.NameAttribute(NameOID.COMMON_NAME, subject),
         ]
     )
 
@@ -155,12 +166,13 @@ def create_edge_root_ca_certificate(cert_output_dir: str, cert_name: str) -> Cer
         digital_signature=True,
         crl_sign=True,
         key_cert_sign=True,
-        content_commitment=None,
-        data_encipherment=None,
-        decipher_only=None,
-        encipher_only=None,
-        key_agreement=None,
-        key_encipherment=None)
+        content_commitment=False,
+        data_encipherment=False,
+        decipher_only=False,
+        encipher_only=False,
+        key_agreement=False,
+        key_encipherment=False,
+    )
     cert = (
         x509.CertificateBuilder()
         .subject_name(subject_name)
@@ -183,14 +195,21 @@ def create_edge_root_ca_certificate(cert_output_dir: str, cert_name: str) -> Cer
         encryption_algorithm=serialization.NoEncryption(),
     ).decode("utf-8")
 
-    if cert_output_dir and exists(cert_output_dir):
+    if output_path and exists(output_path):
         cert_file = cert_name + ".cert.pem"
         key_file = cert_name + ".key.pem"
-        with open(join(cert_output_dir, cert_file), "wt", encoding="utf-8") as f:
-            f.write(certificate)
-
-        with open(join(cert_output_dir, key_file), "wt", encoding="utf-8") as f:
-            f.write(private_key)
+        write_content_to_file(
+            content=certificate,
+            destination=output_path,
+            file_name=cert_file,
+            overwrite=True,
+        )
+        write_content_to_file(
+            content=private_key,
+            destination=output_path,
+            file_name=key_file,
+            overwrite=True,
+        )
 
     return CertInfo(
         certificate=certificate,
@@ -199,9 +218,13 @@ def create_edge_root_ca_certificate(cert_output_dir: str, cert_name: str) -> Cer
     )
 
 
-def create_signed_device_cert(device_id, ca_public, ca_private, cert_output_dir) -> CertInfo:
+def create_signed_device_cert(
+    device_id, ca_public, ca_private, cert_output_dir
+) -> CertInfo:
     ca_public_key = bytes(ca_public, "utf-8")
-    ca_private_key =  serialization.load_pem_private_key(bytes(ca_private, "utf-8"), None)
+    ca_private_key = serialization.load_pem_private_key(
+        bytes(ca_private, "utf-8"), None
+    )
     key = rsa.generate_private_key(public_exponent=65537, key_size=4096)
     subject_name = x509.Name(
         [
@@ -215,19 +238,16 @@ def create_signed_device_cert(device_id, ca_public, ca_private, cert_output_dir)
     )
     ca = x509.load_pem_x509_certificate(ca_public_key)
 
-    cert = x509.CertificateBuilder().subject_name(
-        csr.subject
-    ).issuer_name(
-        ca.subject
-    ).public_key(
-        csr.public_key()
-    ).serial_number(
-        x509.random_serial_number()
-    ).not_valid_before(
-        datetime.datetime.utcnow()
-    ).not_valid_after(
-        datetime.datetime.utcnow() + datetime.timedelta(days=365)
-    ).sign(ca_private_key, hashes.SHA256())
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(csr.subject)
+        .issuer_name(ca.subject)
+        .public_key(csr.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.datetime.utcnow())
+        .not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=365))
+        .sign(ca_private_key, hashes.SHA256())
+    )
     certificate = cert.public_bytes(serialization.Encoding.PEM).decode("utf-8")
     thumbprint = cert.fingerprint(hashes.SHA256()).hex().upper()
     privateKey = key.private_bytes(
@@ -245,9 +265,7 @@ def create_signed_device_cert(device_id, ca_public, ca_private, cert_output_dir)
         with open(join(cert_output_dir, key_file), "wt", encoding="utf-8") as f:
             f.write(privateKey)
     return CertInfo(
-        certificate=certificate,
-        thumbprint=thumbprint,
-        privateKey=privateKey
+        certificate=certificate, thumbprint=thumbprint, privateKey=privateKey
     )
 
 
@@ -255,34 +273,49 @@ def load_ca_cert_info(cert_path: str, key_path: str) -> CertInfo:
     for path in [cert_path, key_path]:
         if not exists(path):
             raise FileOperationError(
-                "Error loading certificates. "
-                f"No file found at path '{path}'"
+                "Error loading certificates. " f"No file found at path '{path}'"
             )
-    certificate = x509.load_pem_x509_certificate(cert_path)
+    cert = open_certificate(cert_path)
+    key = open_certificate(key_path)
+    certificate = x509.load_pem_x509_certificate(cert)
     thumbprint = certificate.fingerprint(hashes.SHA256()).hex().upper()
-    privateKey = x509.load_pem_x509_certificate(key_path)
     return CertInfo(
         certificate=certificate.public_bytes(serialization.Encoding.PEM),
         thumbprint=thumbprint,
-        privateKey=privateKey
+        privateKey=key,
     )
 
 
-def make_cert_chain(certs: List[str], output_dir: Optional[str]=None, output_file: Optional[str]="cert-chain.pem"):
+def make_cert_chain(
+    certs: List[str],
+    output_dir: Optional[str] = None,
+    output_file: Optional[str] = "cert-chain.pem",
+):
+    cert_content = "".join(certs)
     if output_dir and exists(output_dir) and len(certs):
-        with open(join(output_dir, output_file), "wt", encoding="utf-8") as f:
-            for cert in certs:
-                f.write(cert)
-    return "\n".join(certs)
+        write_content_to_file(
+            content=cert_content,
+            destination=output_dir,
+            file_name=output_file,
+            overwrite=True,
+        )
+    return cert_content
 
 
-def write_content_to_file(content: Union[str, bytes], destination: str, file_name: str, overwrite: Optional[bool]=False):
+def write_content_to_file(
+    content: Union[str, bytes],
+    destination: str,
+    file_name: str,
+    overwrite: Optional[bool] = False,
+):
     dest_path = PurePath(destination)
     file_path = dest_path.joinpath(file_name)
-    
+
     if exists(file_path) and not overwrite:
         raise FileOperationError(f"File already exists at path: {file_path}")
     if overwrite:
         makedirs(destination, exist_ok=True)
-    with open(file_path, "wt" if isinstance(content, str) else "wb", encoding="utf-8") as f:
+    with open(
+        file_path, "wt" if isinstance(content, str) else "wb", encoding="utf-8"
+    ) as f:
         f.write(content)

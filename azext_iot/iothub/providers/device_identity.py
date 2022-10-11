@@ -5,6 +5,8 @@
 # --------------------------------------------------------------------------------------------
 from pathlib import PurePath
 from os import getcwd, makedirs
+from os.path import exists
+from shutil import rmtree
 from azext_iot.common.certops import (
     CertInfo,
     create_edge_root_ca_certificate,
@@ -12,11 +14,16 @@ from azext_iot.common.certops import (
     create_signed_device_cert,
     load_ca_cert_info,
     make_cert_chain,
+    write_content_to_file,
 )
-from azext_iot.constants import DEVICE_CONFIG_TOML
+from azext_iot.constants import DEVICE_CONFIG_TOML, DEVICE_README
+from azext_iot.sdk.iothub.service.models.authentication_mechanism_py3 import (
+    AuthenticationMechanism,
+)
 from tqdm import tqdm
 from time import sleep
-from typing import Dict, List, NamedTuple
+from typing import Any, Dict, List, NamedTuple
+import toml
 from knack.log import get_logger
 from typing import Optional
 from azext_iot._factory import SdkResolver
@@ -27,6 +34,7 @@ from azext_iot.common.shared import (
 )
 from azext_iot.iothub.providers.base import IoTHubProvider
 from azext_iot.common.utility import (
+    create_edge_configuration_script,
     process_json_arg,
     process_toml_content,
     process_yaml_arg,
@@ -37,6 +45,7 @@ from azure.cli.core.azclierror import (
     CLIInternalError,
     FileOperationError,
     InvalidArgumentValueError,
+    RequiredArgumentMissingError,
     MutuallyExclusiveArgumentError,
 )
 from azext_iot.operations.hub import (
@@ -63,6 +72,7 @@ class EdgeContainerAuth(NamedTuple):
 class NestedEdgeDeviceConfig(NamedTuple):
     device_id: str
     deployment: ConfigurationContent
+    config: Optional[Any] = None
     parent_id: Optional[str] = None
     hostname: Optional[str] = None
     parent_hostname: Optional[str] = None
@@ -99,31 +109,17 @@ class DeviceIdentityProvider(IoTHubProvider):
         self.hub_resolver = SdkResolver(target=self.target)
         self.service_sdk = self.hub_resolver.get_sdk(SdkType.service_sdk)
 
-    # TODO - add input param for device auth type
-    # TODO - add input param for root cert and key
-    # TODO - add input param for cert output directory
-    # TODO - create device TOML
     def create_edge_hierarchy(
         self,
         devices: Optional[List[List[str]]] = None,
         config_file: Optional[str] = None,
         visualize: Optional[bool] = False,
         clean: Optional[bool] = False,
+        auth_type: Optional[DeviceAuthType] = None,
+        root_cert_path: Optional[str] = None,
+        root_key_path: Optional[str] = None,
+        output_path: Optional[str] = None,
     ):
-        """
-        Creates a nested edge hierarchy of devices
-
-        Parameters
-        ----------
-            devices : List[List[str]]
-                List of [List of device creation parameters]
-            config_file : str
-                Path to nested edge config file
-            clean : bool
-                Whether to delete all devices in hub before creating new devices.
-            visualize: bool
-                Whether to show a visualization of hierarchy and operation progress.
-        """
         from treelib import Tree
         from treelib.exceptions import (
             NodeIDAbsentError,
@@ -132,10 +128,14 @@ class DeviceIdentityProvider(IoTHubProvider):
         )
 
         config: NestedEdgeConfig = None
-        cert_output_directory = PurePath.joinpath(
-            PurePath(getcwd()), "device_certificates"
-        )
-        root_cert_name = "iotedge_config_cli_root"
+
+        # configuration for root cert and output directories
+        root_cert_name = "iotedge_config_cli_root.pem"
+        if output_path and exists(output_path):
+            cert_output_directory = PurePath(output_path)
+        else:
+            cert_output_directory = PurePath(getcwd()).joinpath("device_bundles")
+            makedirs(cert_output_directory, exist_ok=True)
 
         # If user has provided a path to a configuration file
         if config_file:
@@ -156,17 +156,25 @@ class DeviceIdentityProvider(IoTHubProvider):
 
             config = self._process_nested_edge_config_file_content(config_content)
         elif devices:
-            # Process --device arguments
-            # TODO - process root cert from --root-cert arg
+            # raise error if only key or cert provided
+            if root_cert_path ^ root_key_path:
+                raise RequiredArgumentMissingError(
+                    "You must provide a path to both the root cert public and private keys."
+                )
+            # create cert if one isn't provided
+            root_cert = (
+                load_ca_cert_info(root_cert_path, root_key_path)
+                if all([root_cert_path, root_key_path])
+                else create_edge_root_ca_certificate()
+            )
+
             config = NestedEdgeConfig(
                 version="1.0",
-                auth_method=DeviceAuthType.shared_private_key.value,
+                auth_method=auth_type,
                 devices=[],
-                root_cert=create_edge_root_ca_certificate(
-                    cert_output_dir=cert_output_directory,
-                    cert_name=root_cert_name,
-                ),
+                root_cert=root_cert,
             )
+            # Process --device arguments
             # Parse each device and add to the tree
             for device_input in devices:
                 # assemble device params from nArgs strings
@@ -174,7 +182,7 @@ class DeviceIdentityProvider(IoTHubProvider):
                 device_id = device_params.get("id", None)
                 if not device_id:
                     raise InvalidArgumentValueError(
-                        "A device parameter is missing required parameter 'id'"
+                        "A device argument is missing required parameter 'id'"
                     )
                 deployment = device_params.get("deployment", None)
                 if deployment:
@@ -187,64 +195,64 @@ class DeviceIdentityProvider(IoTHubProvider):
                     parent_id=parent_id,
                 )
                 config.devices.append(device_config)
-                device_config_obj = self.create_edge_device_config(
-                    device_id=device_id, edgeConfig=config, deviceConfig=device_config
-                )
 
         if not config or not len(config.devices):
             raise InvalidArgumentValueError(
                 "No devices found in input. "
                 "Please check your input arguments or config file and try the command again"
             )
-
         tree = Tree()
         tree_root_node_id = "|root|"
         tree.create_node("Devices", tree_root_node_id)
-
-        # Certs needed in bundle
-
-        # --- root cert ---
-        # iotedge_config_cli_root.key.pem
-        # iotedge_config_cli_root.pem
-
-        # --- device cert ---
-        # device-id.cert.pem
-        # device-id.key.pem
-        # device-id.full-chain.cert.pem
-
-        # --- depends on auth type ---
-        # device-id.hub-auth.cert.pem
-        # device-id.hub-auth.key.pem
 
         # dict of assembled Device objects by ID
         assembled_device_dict: Dict[str, Device] = {}
         # dict of device parents by ID
         device_to_parent_dict: Dict[str, str] = {}
 
-        # first pass to create devices in flat tree
-        for device_config in config.devices:
+        # first pass to create devices and certs in flat tree
+        config_devices_iterator = (
+            tqdm(
+                config.devices,
+                desc="Creating device structure and certificates",
+            )
+            if visualize
+            else config.devices
+        )
+        for device_config in config_devices_iterator:
             device_id = device_config.device_id
             pk = None
             sk = None
             device_cert_output_directory = cert_output_directory.joinpath(device_id)
+            # if the device folder already exists, remove it
+            if exists(device_cert_output_directory):
+                rmtree(device_cert_output_directory)
+            # create fresh device folder
             makedirs(device_cert_output_directory)
+
             # write root cert to device directory
-            with open(
-                PurePath(device_cert_output_directory).joinpath(
-                    root_cert_name + ".pem"
-                ),
-                "wt",
-                encoding="utf-8",
-            ) as f:
-                f.write(config.root_cert["certificate"])
+            write_content_to_file(
+                content=config.root_cert["certificate"],
+                destination=device_cert_output_directory,
+                file_name=root_cert_name,
+            )
+            # signed device cert (device_id.cert.pem and device_id.key.pem)
             signed_device_cert = create_signed_device_cert(
                 device_id,
                 config.root_cert["certificate"],
                 config.root_cert["privateKey"],
                 device_cert_output_directory,
             )
-            if config.auth_method == DeviceAuthType.x509_ca.value:
-
+            make_cert_chain(
+                certs=[
+                    signed_device_cert["certificate"],
+                    config.root_cert["certificate"],
+                ],
+                output_dir=device_cert_output_directory,
+                output_file=f"{device_id}.full-chain.cert.pem",
+            )
+            hub_auth = (config.auth_method == DeviceAuthType.x509_ca.value)
+            if hub_auth:
                 device_hub_cert = create_self_signed_certificate(
                     subject=device_id,
                     valid_days=365,
@@ -253,15 +261,24 @@ class DeviceIdentityProvider(IoTHubProvider):
                 )
                 pk = signed_device_cert["thumbprint"]
                 sk = device_hub_cert["thumbprint"]
-                make_cert_chain(
-                    certs=[
-                        signed_device_cert["certificate"],
-                        config.root_cert["certificate"],
-                    ],
-                    output_dir=device_cert_output_directory,
-                    output_file=f"{device_id}.full-chain.pem",
-                )
+            write_content_to_file(
+                content=create_edge_configuration_script(
+                    device_id=device_id,
+                    hub_auth=hub_auth,
+                    hostname=device_config.hostname,
+                    parent_hostname=device_config.parent_hostname
+                ),
+                destination=device_cert_output_directory,
+                file_name='install.sh',
+                overwrite=True
+            )
 
+            write_content_to_file(
+                content=DEVICE_README,
+                destination=device_cert_output_directory,
+                file_name='README.md',
+                overwrite=True
+            )
             # create device object
             assembled_device = _assemble_device(
                 is_update=False,
@@ -333,14 +350,31 @@ class DeviceIdentityProvider(IoTHubProvider):
                     "To clear all devices before creating the hierarchy, please utilize the `--clean` switch."
                 )
 
-        # Bulk add devices
+        # Create all devices and configs
         device_list = list(assembled_device_dict.values())
         device_iterator = (
-            tqdm(device_list, desc="Creating device identities")
+            tqdm(device_list, desc="Creating device identities and configs")
             if visualize
             else device_list
         )
-        self.create_device_identities(device_iterator)
+        for device in device_iterator:
+            device_id = device.device_id
+            device_result: Device = self.service_sdk.devices.create_or_update_identity(
+                id=device_id, device=device
+            )
+            device_keys = device_result.authentication.symmetric_key
+            device_pk = device_keys.primary_key if device_keys else None
+            device_cert_output_directory = cert_output_directory.joinpath(device_id)
+            self.create_edge_device_config(
+                device_id=device_id,
+                auth_method=config.auth_method,
+                default_edge_agent=config.default_edge_agent,
+                deviceConfig=device_config,
+                device_config_path=config.template_config_path,
+                device_pk=device_pk,
+                output_path=device_cert_output_directory,
+            )
+            hub_auth = (config.auth_method==DeviceAuthType.x509_ca.value)
 
         # Give device registry a chance to catch up
         sleep(1)
@@ -415,13 +449,7 @@ class DeviceIdentityProvider(IoTHubProvider):
                 )
             root_cert = load_ca_cert_info(root_ca_cert, root_ca_key)
         else:
-            cert_output_directory = PurePath.joinpath(
-                PurePath(getcwd()), "device_certificates"
-            )
-            root_cert = create_edge_root_ca_certificate(
-                cert_output_dir=cert_output_directory,
-                cert_name="iotedge_config_cli_root",
-            )
+            root_cert = create_edge_root_ca_certificate()
 
         # device auth
         auth_value = hub_config["authentication_method"]
@@ -442,7 +470,9 @@ class DeviceIdentityProvider(IoTHubProvider):
             default_edge_agent = edge_config.get("default_edge_agent", None)
         all_devices = []
 
-        def _process_edge_config_device(device: dict, parent_id=None, parent_hostname=None):
+        def _process_edge_config_device(
+            device: dict, parent_id=None, parent_hostname=None
+        ):
             device_id = device.get("device_id", None)
             if not device_id:
                 raise InvalidArgumentValueError(
@@ -470,7 +500,9 @@ class DeviceIdentityProvider(IoTHubProvider):
             )
             all_devices.append(device_obj)
             for child_device in child_devices:
-                _process_edge_config_device(child_device, parent_id=device_id, parent_hostname=hostname)
+                _process_edge_config_device(
+                    child_device, parent_id=device_id, parent_hostname=hostname
+                )
 
         for device in devices_config:
             _process_edge_config_device(device)
@@ -513,15 +545,6 @@ class DeviceIdentityProvider(IoTHubProvider):
                     "An error has occurred - Not all devices were deleted."
                 )
 
-    def create_device_identities(self, devices: List[Device]):
-        try:
-            for device in devices:
-                self.service_sdk.devices.create_or_update_identity(
-                    id=device.device_id, device=device
-                )
-        except Exception as err:
-            raise AzureResponseError(err)
-
     def _try_parse_valid_deployment_config(self, deployment_path):
         try:
             deployment_content = process_json_arg(
@@ -542,21 +565,66 @@ class DeviceIdentityProvider(IoTHubProvider):
     def create_edge_device_config(
         self,
         device_id: str,
-        edgeConfig: NestedEdgeConfig,
+        auth_method: DeviceAuthType,
         deviceConfig: NestedEdgeDeviceConfig,
+        default_edge_agent: str,
+        device_config_path: Optional[str] = None,
+        device_pk: Optional[str] = None,
+        output_path: Optional[str] = None,
     ):
-        device_config_toml_path = edgeConfig.template_config_path
+        # load default device TOML object or custom path
         device_toml = (
-            process_toml_content(device_config_toml_path)
-            if device_config_toml_path
+            process_toml_content(device_config_path)
+            if device_config_path
             else DEVICE_CONFIG_TOML
         )
 
-        # trust bundle
         device_toml[
             "trust_bundle_cert"
-        ] = f"file://etc/aziot/certificates/iotedge_config_cli_root.pem"
-        device_toml["hostname"] = deviceConfig.hostname if deviceConfig.hostname else ""
-        device_toml["parent_hostname"] = deviceConfig.parent_hostname if deviceConfig.parent_hostname else ""
-
+        ] = "file://etc/aziot/certificates/iotedge_config_cli_root.pem"
+        # Dynamic, AlwaysOnStartup, OnErrorOnly
+        device_toml["auto_reprovisioning_mode"] = "Dynamic"
+        device_toml["hostname"] = (
+            deviceConfig.hostname if deviceConfig.hostname else "{{HOSTNAME}}"
+        )
+        device_toml["parent_hostname"] = (
+            deviceConfig.parent_hostname
+            if deviceConfig.parent_hostname
+            else "{{PARENT_HOSTNAME}}"
+        )
+        device_toml["provisioning"] = {
+            "device_id": device_id,
+            "iothub_hostname": self.target["entity"],
+            "source": "manual",
+            "authentication": {"device_id_pk": {"value": device_pk}, "method": "sas"}
+            if auth_method == DeviceAuthType.shared_private_key.value
+            else {
+                "method": "x509",
+                "identity_cert": f"file:///etc/aziot/certificates/{device_id}.hub-auth.cert.pem",
+                "identity_pk": f"file:///etc/aziot/certificates/{device_id}.hub-auth.key.pem",
+            },
+        }
+        device_toml["edge_ca"] = {
+            "cert": f"file:///etc/aziot/certificates/{device_id}.full-chain.cert.pem",
+            "pk": f"file:///etc/aziot/certificates/{device_id}.full-chain.key.pem",
+        }
+        device_toml["agent"] = {
+            "config": {
+                "image": deviceConfig.edge_agent or default_edge_agent,
+                "auth": {
+                    "serveraddress": deviceConfig.container_auth.serveraddress,
+                    "username": deviceConfig.container_auth.username,
+                    "password": deviceConfig.container_auth.password,
+                }
+                if deviceConfig.container_auth
+                else {},
+            }
+        }
+        if output_path:
+            write_content_to_file(
+                toml.dumps(device_toml),
+                output_path,
+                "config.toml",
+                overwrite=True,
+            )
         return device_toml

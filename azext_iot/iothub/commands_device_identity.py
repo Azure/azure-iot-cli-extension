@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from typing import List, Optional
+from azext_iot.common.shared import DeviceAuthType
 from azext_iot.iothub.providers.device_identity import DeviceIdentityProvider
 from knack.log import get_logger
 
@@ -17,6 +18,10 @@ def iot_edge_hierarchy_create(
     config_file: Optional[str] = None,
     visualize: Optional[bool] = False,
     clean: Optional[bool] = False,
+    device_auth_type: Optional[DeviceAuthType] = None,
+    root_cert_path: Optional[str] = None,
+    root_key_path: Optional[str] = None,
+    output_path: Optional[str] = None,
     hub_name: Optional[str] = None,
     resource_group_name: Optional[str] = None,
     login: Optional[str] = None,
@@ -34,6 +39,10 @@ def iot_edge_hierarchy_create(
         config_file=config_file,
         clean=clean,
         visualize=visualize,
+        auth_type=device_auth_type,
+        root_cert_path=root_cert_path,
+        root_key_path=root_key_path,
+        output_path=output_path,
     )
 
 

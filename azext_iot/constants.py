@@ -93,3 +93,97 @@ DEVICE_CONFIG_TOML = {
     "uri": "unix:///var/run/docker.sock"
   }
 }
+
+EDGE_CONFIG_SCRIPT_HEADERS = """
+# This script will attempt to configure a pre-installed iotedge as a nested node.
+# It must be run as sudo, and will modify the ca
+
+device_id="{}"
+cp config.toml /etc/aziot/config.toml
+"""
+EDGE_CONFIG_SCRIPT_HOSTNAME = """
+# ======================= Set Hostname =======================================
+
+read -p "Enter the hostname to use: " hostname
+if [ -z "$hostname" ]
+then
+    echo "Invalid hostname $hostname"
+    exit 1
+fi
+
+sed -i "s/{{HOSTNAME}}/$hostname/" /etc/aziot/config.toml
+"""
+EDGE_CONFIG_SCRIPT_PARENT_HOSTNAME = """
+# ======================= Set Parent Hostname =======================================
+
+read -p "Enter the parent hostname to use: " parent_hostname
+if [ -z "$parent_hostname" ]
+then
+    echo "Invalid parent hostname $parent_hostname"
+    exit 1
+fi
+
+sed -i "s/{{PARENT_HOSTNAME}}/$parent_hostname/" /etc/aziot/config.toml
+"""
+EDGE_CONFIG_SCRIPT_CA_CERTS= """
+# ======================= Install nested root CA =======================================
+if [ -f /etc/os-release ]
+then
+        . /etc/os-release
+        if [[ "$NAME" == "Common Base Linux Mariner"* ]];
+        then
+                cp iotedge_config_cli_root.pem /etc/pki/ca-trust/source/anchors/iotedge_config_cli_root.pem.crt
+                update-ca-trust
+        else
+                cp iotedge_config_cli_root.pem /usr/local/share/ca-certificates/iotedge_config_cli_root.pem.crt
+                update-ca-certificates
+        fi
+else
+        cp iotedge_config_cli_root.pem /usr/local/share/ca-certificates/iotedge_config_cli_root.pem.crt
+        update-ca-certificates
+fi
+
+systemctl restart docker
+
+# ======================= Copy device certs  =======================================
+cert_dir="/etc/aziot/certificates"
+mkdir -p $cert_dir
+cp "iotedge_config_cli_root.pem" "$cert_dir/iotedge_config_cli_root.pem"
+cp "$device_id.full-chain.cert.pem" "$cert_dir/$device_id.full-chain.cert.pem"
+cp "$device_id.key.pem" "$cert_dir/$device_id.key.pem"
+"""
+EDGE_CONFIG_SCRIPT_HUB_AUTH_CERTS= """
+# ======================= Copy hub auth certs  =======================================
+cert_dir="/etc/aziot/certificates"
+mkdir -p $cert_dir
+cp "$device_id.hub-auth.cert.pem" "$cert_dir/$device_id.hub-auth.cert.pem"
+cp "$device_id.hub-auth.key.pem" "$cert_dir/$device_id.hub-auth.key.pem"
+"""
+EDGE_CONFIG_SCRIPT_APPLY= """
+# ======================= Read User Input =======================================
+iotedge config apply -c /etc/aziot/config.toml
+
+echo "To check the edge runtime status, run 'iotedge system status'. To validate the configuration, run 'sudo iotedge check'"
+"""
+
+DEVICE_README="""
+# Prerequisites
+Each device must have IoT Edge (must be v1.2 or later) installed. Pick the [supported OS](https://docs.microsoft.com/en-us/azure/iot-edge/support?view=iotedge-2020-11) and follow the [tutorial](https://docs.microsoft.com/en-us/azure/iot-edge/support?view=iotedge-2020-11) to install Azure IoT Edge.
+
+# Steps
+
+1. After install and configure IoT Edge to Azure IoT Hub or Azure IoT Central, copy the zip file for each device created, named [[device-id]].zip. 
+2. Transfer each zip to its respective device. A good option for this is to use [scp](https://man7.org/linux/man-pages/man1/scp.1.html).
+3. Unzip the zip file by running following commands
+
+```Unzip
+    sudo apt install zip
+    unzip ~/<PATH_TO_CONFIGURATION_BUNDLE>/<CONFIGURATION_BUNDLE>.zip
+```
+4. Run the script
+```Run
+    sudo ./install.sh
+```
+5. If the hostname was not provided in the configuration file, it will prompt for hostname. Follow the prompt by entering the hostname (FQDN or IP address). On the parent device, it may prompt its own hostname and on the child deivce, it may prompt the hostname of both the child and parent device.
+
+"""

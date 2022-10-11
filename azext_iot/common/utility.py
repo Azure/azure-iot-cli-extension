@@ -11,6 +11,14 @@ utility: Defines common utility functions and components.
 
 import ast
 import base64
+from azext_iot.constants import (
+    EDGE_CONFIG_SCRIPT_APPLY,
+    EDGE_CONFIG_SCRIPT_CA_CERTS,
+    EDGE_CONFIG_SCRIPT_HEADERS,
+    EDGE_CONFIG_SCRIPT_HOSTNAME,
+    EDGE_CONFIG_SCRIPT_HUB_AUTH_CERTS,
+    EDGE_CONFIG_SCRIPT_PARENT_HOSTNAME,
+)
 import isodate
 import json
 import os
@@ -18,6 +26,8 @@ import sys
 import re
 import hmac
 import hashlib
+
+from typing import Any, Dict
 
 from threading import Event, Thread
 from datetime import datetime
@@ -119,7 +129,9 @@ def validate_key_value_pairs(string):
     return result
 
 
-def process_json_arg(content: str, argument_name: str = "content", preserve_order=False):
+def process_json_arg(
+    content: str, argument_name: str = "content", preserve_order=False
+):
     """Primary processor of json input"""
 
     json_from_file = None
@@ -150,36 +162,39 @@ def process_yaml_arg(path: str) -> dict:
     """Primary processor of yaml file input"""
 
     if not os.path.exists(path):
-        raise FileOperationError(f"YAML file not found - Please ensure the path '{path}' is correct.")
+        raise FileOperationError(
+            f"YAML file not found - Please ensure the path '{path}' is correct."
+        )
 
     try:
         import yaml
+
         with open(path, "rb") as f:
             return yaml.load(f, Loader=yaml.SafeLoader)
     except Exception as ex:
         raise InvalidArgumentValueError(
-            "Failed to parse yaml for file '{}' with exception:\n{}".format(
-                path, ex
-            )
+            "Failed to parse yaml for file '{}' with exception:\n{}".format(path, ex)
         )
 
 
-def process_toml_content(path: str) -> dict[str, Any]:
+def process_toml_content(path: str) -> Dict[str, Any]:
     """Primary processor of TOML file input"""
 
     if not os.path.exists(path):
-        raise FileOperationError(f"TOML file not found - Please ensure the path '{path}' is correct.")
+        raise FileOperationError(
+            f"TOML file not found - Please ensure the path '{path}' is correct."
+        )
 
     try:
         import toml
-        with open(path, "rb") as f:
-            return toml.loads(f)
+
+        with open(path, "rt") as f:
+            return toml.load(f)
     except Exception as ex:
         raise InvalidArgumentValueError(
-            "Failed to parse TOML for file '{}' with exception:\n{}".format(
-                path, ex
-            )
+            "Failed to parse TOML for file '{}' with exception:\n{}".format(path, ex)
         )
+
 
 def shell_safe_json_parse(json_or_dict_string, preserve_order=False):
     """Allows the passing of JSON or Python dictionary strings. This is needed because certain
@@ -447,7 +462,15 @@ def calculate_millisec_since_unix_epoch_utc(offset_seconds: int = 0):
     return int(1000 * ((now - epoch).total_seconds() + offset_seconds))
 
 
-def init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes, message_count: Optional[int] = None):
+def init_monitoring(
+    cmd,
+    timeout,
+    properties,
+    enqueued_time,
+    repair,
+    yes,
+    message_count: Optional[int] = None,
+):
     from azext_iot.common.deps import ensure_uamqp
 
     if timeout < 0:
@@ -457,9 +480,7 @@ def init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes, messag
     timeout = timeout * 1000
 
     if message_count and message_count <= 0:
-        raise InvalidArgumentValueError(
-            "Message count must be greater than 0."
-        )
+        raise InvalidArgumentValueError("Message count must be greater than 0.")
 
     config = cmd.cli_ctx.config
     output = cmd.cli_ctx.invocation.data.get("output", None)
@@ -684,3 +705,19 @@ def generate_storage_account_sas_token(
     )
 
     return sas_token
+
+
+def create_edge_configuration_script(
+    device_id: str,
+    hub_auth: Optional[bool] = False,
+    hostname: Optional[str] = None,
+    parent_hostname: Optional[str] = None,
+):
+    return "\n".join(
+        [EDGE_CONFIG_SCRIPT_HEADERS.format(device_id)]
+        + ([EDGE_CONFIG_SCRIPT_HOSTNAME] if not hostname else [])
+        + ([EDGE_CONFIG_SCRIPT_PARENT_HOSTNAME] if not parent_hostname else [])
+        + [EDGE_CONFIG_SCRIPT_CA_CERTS]
+        + ([EDGE_CONFIG_SCRIPT_HUB_AUTH_CERTS] if hub_auth else [])
+        + [EDGE_CONFIG_SCRIPT_APPLY]
+    )
