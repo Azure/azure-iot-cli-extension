@@ -5,15 +5,11 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
-from typing import List, Union
+from typing import List
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers import CentralUserProvider
-from azext_iot.central.models.enum import ApiVersion
-from azext_iot.central.models.v1 import UserV1
-from azext_iot.central.models.preview import UserPreview
-from azext_iot.central.models.v1_1_preview import UserV1_1_preview
-
-UserType = Union[UserV1, UserPreview, UserV1_1_preview]
+from azext_iot.central.common import API_VERSION
+from azext_iot.central.models.ga_2022_07_31 import UserGa
 
 
 def add_user(
@@ -27,8 +23,8 @@ def add_user(
     org_id=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> UserType:
+    api_version=API_VERSION,
+) -> UserGa:
     provider = CentralUserProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -62,8 +58,8 @@ def update_user(
     object_id=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> UserType:
+    api_version=API_VERSION,
+) -> UserGa:
     provider = CentralUserProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -90,8 +86,8 @@ def list_users(
     app_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> List[UserType]:
+    api_version=API_VERSION,
+) -> List[UserGa]:
     provider = CentralUserProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -107,8 +103,8 @@ def get_user(
     assignee: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> UserType:
+    api_version=API_VERSION,
+) -> UserGa:
     provider = CentralUserProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
     )
@@ -125,7 +121,7 @@ def delete_user(
     assignee: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
 ) -> dict:
     provider = CentralUserProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token

@@ -5,8 +5,15 @@
 # --------------------------------------------------------------------------------------------
 
 
-class DeviceGroup:
+class EnrollmentGroup():
     def __init__(self, group: dict):
-        self.display_name = group.get("displayName")
         self.id = group.get("id")
-        self.organizations = group.get("organizations")
+        self.display_name = group.get("displayName")
+        self.enabled = group.get("enabled")
+        self.type = group.get("type")
+        self.attestation = group.get("attestation")
+        self.etag = group.get("etag")
+
+    def __setitem__(self, key, newvalue):
+        if key == 'x509':
+            self.x509 = newvalue

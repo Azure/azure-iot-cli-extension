@@ -12,7 +12,8 @@ from typing import List, Union
 from azure.cli.core.azclierror import AzureResponseError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central.models.v1_1_preview import OrganizationV1_1_preview
+from azext_iot.central.models.ga_2022_07_31 import OrganizationGa
+from azext_iot.central.common import API_VERSION
 from azure.cli.core.util import should_disable_connection_verify
 
 
@@ -30,9 +31,9 @@ def _make_call(
     payload: str,
     token: str,
     central_dns_suffix: str,
-    api_version: str,
+    api_version=API_VERSION,
     url=None,
-) -> Union[dict, OrganizationV1_1_preview]:
+) -> Union[dict, OrganizationGa]:
     if url is None:
         url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
 
@@ -62,9 +63,9 @@ def get_org(
     app_id: str,
     org_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> OrganizationV1_1_preview:
+) -> OrganizationGa:
     """
     Get organization info given an organization id
 
@@ -79,6 +80,7 @@ def get_org(
     Returns:
         role: dict
     """
+    api_version = API_VERSION
 
     result = _make_call(
         cmd,
@@ -98,10 +100,10 @@ def list_orgs(
     cmd,
     app_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> List[OrganizationV1_1_preview]:
+) -> List[OrganizationGa]:
     """
     Get a list of all organizations in IoTC app
 
@@ -115,6 +117,7 @@ def list_orgs(
     Returns:
         list of organizations
     """
+    api_version = API_VERSION
 
     orgs = []
 
@@ -154,9 +157,9 @@ def create_or_update_org(
     parent_org: str,
     token: str,
     update: bool,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> OrganizationV1_1_preview:
+) -> OrganizationGa:
 
     """
     Create an organization in IoTC
@@ -174,6 +177,7 @@ def create_or_update_org(
     Returns:
         organization: dict
     """
+    api_version = API_VERSION
 
     if not org_name:
         org_name = org_id
@@ -203,9 +207,9 @@ def delete_org(
     app_id: str,
     org_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> OrganizationV1_1_preview:
+) -> OrganizationGa:
     """
     Delete an organization
 
@@ -220,6 +224,7 @@ def delete_org(
     Returns:
         role: dict
     """
+    api_version = API_VERSION
 
     result = _make_call(
         cmd,

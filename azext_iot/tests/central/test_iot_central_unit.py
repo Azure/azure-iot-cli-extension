@@ -4,20 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from azext_iot.central.models.edge import EdgeModule
-from azext_iot.central.providers import (
-    CentralFileUploadProvider,
-    CentralOrganizationProvider,
-    CentralRoleProvider,
-    CentralDeviceGroupProvider,
-    CentralDeviceTemplateProvider,
-    CentralJobProvider,
-    CentralUserProvider,
-    CentralQueryProvider,
-    CentralDestinationProvider,
-    CentralExportProvider,
-)
-from azext_iot.central.models.enum import ApiVersion
 import pytest
 import json
 import responses
@@ -25,6 +11,7 @@ from copy import deepcopy
 from unittest import mock
 from datetime import datetime
 from knack.util import CLIError, todict
+
 from azure.cli.core.mock import DummyCli
 from azext_iot.central import commands_device
 from azext_iot.central import commands_monitor
@@ -35,15 +22,34 @@ from azext_iot.monitor.models.enum import Severity
 from azext_iot.tests.helpers import load_json
 from azext_iot.tests.test_constants import FileNames
 from azext_iot.constants import PNP_DTDLV2_COMPONENT_MARKER
-from azext_iot.central.models.v1_1_preview import (
-    DeviceGroupV1_1_preview,
-    OrganizationV1_1_preview,
-    JobV1_1_preview,
-    FileUploadV1_1_preview,
-    QueryReponseV1_1_preview,
+from azext_iot.central.models.v2022_06_30_preview import QueryReponsePreview, TemplatePreview
+from azext_iot.central.models.ga_2022_07_31 import (
+    DeviceGroupGa,
+    OrganizationGa,
+    JobGa,
+    FileUploadGa,
+    RoleGa,
+    UserGa,
+    ScheduledJobGa,
+    EnrollmentGroupGa,
 )
-from azext_iot.central.models.v1 import RoleV1, TemplateV1, UserV1
 from azext_iot.central.services._utility import get_object
+from azext_iot.central.models.edge import EdgeModule
+from azext_iot.central.providers import (
+    CentralFileUploadProvider,
+    CentralOrganizationProvider,
+    CentralRoleProvider,
+    CentralDeviceGroupProvider,
+    CentralDeviceTemplateProvider,
+    CentralJobProvider,
+    CentralScheduledJobProvider,
+    CentralEnrollmentGroupProvider,
+    CentralUserProvider,
+    CentralQueryProvider,
+    CentralDestinationProvider,
+    CentralExportProvider,
+)
+from azext_iot.central.common import API_VERSION, API_VERSION_PREVIEW
 
 device_id = "mydevice"
 app_id = "myapp"
@@ -163,10 +169,10 @@ class TestCentralDeviceProvider:
     def test_should_return_device(self, mock_device_svc, mock_device_template_svc):
         # setup
         provider = CentralDeviceProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.ga_2022_05_31.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
         mock_device_svc.get_device.return_value = get_object(
-            self._device, "Device", api_version=ApiVersion.ga_2022_05_31.value
+            self._device, "Device", api_version=API_VERSION
         )
         mock_device_template_svc.get_device_template.return_value = (
             self._device_template
@@ -188,11 +194,11 @@ class TestCentralDeviceProvider:
     def test_should_return_list_edge(self, mock_device_svc):
         # setup
         provider = CentralDeviceProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
 
         devices = [
-            get_object(device, "Device", api_version=ApiVersion.v1_1_preview.value)
+            get_object(device, "Device", api_version=API_VERSION)
             for device in self._edge_devices
         ]
         mock_device_svc.list_devices.return_value = devices
@@ -212,11 +218,11 @@ class TestCentralDeviceProvider:
     def test_should_return_list_children(self, mock_device_svc):
         # setup
         provider = CentralDeviceProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
 
         children = [
-            get_object(device, "Device", api_version=ApiVersion.v1_1_preview.value)
+            get_object(device, "Device", api_version=API_VERSION)
             for device in self._edge_children
         ]
         mock_device_svc.list_devices.return_value = children
@@ -235,7 +241,7 @@ class TestCentralDeviceProvider:
     def test_should_list_device_modules(self, get_aad_token_svc, req_svc):
         # setup
         provider = CentralDeviceProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.ga_2022_05_31.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
         response = mock.MagicMock()
         response.status_code = 200
@@ -259,7 +265,7 @@ class TestCentralDeviceProvider:
     def test_should_list_components(self, mock_device_svc):
         # setup
         provider = CentralDeviceProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.ga_2022_05_31.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
         mock_device_svc.list_device_components.return_value = self._device_component
 
@@ -279,7 +285,7 @@ class TestCentralDeviceProvider:
     ):
         # setup
         provider = CentralDeviceTemplateProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.ga_2022_05_31.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
         mock_device_svc.get_device.return_value = self._device
         mock_device_template_svc.get_device_template.return_value = (
@@ -300,17 +306,17 @@ class TestCentralDeviceProvider:
     def test_should_update_device_template_name(self, mock_device_template_svc):
         # setup
         provider = CentralDeviceTemplateProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.ga_2022_05_31.value
+            cmd=None, app_id=app_id, api_version=API_VERSION_PREVIEW
         )
         existing = get_object(
-            self._device_template, "Template", api_version=ApiVersion.ga_2022_05_31.value
+            self._device_template, "Template", api_version=API_VERSION_PREVIEW
         )
         display_name = "NewName"
         mock_device_template_svc.get_device_template.return_value = existing
         updated_template_dict = deepcopy(self._device_template)
         updated_template_dict["displayName"] = display_name
         mock_device_template_svc.update_device_template.return_value = get_object(
-            updated_template_dict, "Template", api_version=ApiVersion.ga_2022_05_31.value
+            updated_template_dict, "Template", api_version=API_VERSION_PREVIEW
         )
 
         # act
@@ -328,9 +334,9 @@ class TestCentralDeviceProvider:
     def test_should_update_device_name(self, mock_device_svc, mock_device_template_svc):
         # setup
         provider = CentralDeviceProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.ga_2022_05_31.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
-        existing = get_object(self._device, "Device", api_version=ApiVersion.ga_2022_05_31.value)
+        existing = get_object(self._device, "Device", api_version=API_VERSION)
         display_name = "NewName"
         mock_device_svc.get_device.return_value = existing
         updated_device = deepcopy(existing)
@@ -353,10 +359,10 @@ class TestCentralDeviceProvider:
     def test_should_return_correct_device_version(self, mock_device_svc):
         # setup
         provider = CentralDeviceProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.preview.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
         existing = get_object(
-            self._device, "Device", api_version=ApiVersion.preview.value
+            self._device, "Device", api_version=API_VERSION
         )
         mock_device_svc.get_device.return_value = existing
 
@@ -366,12 +372,12 @@ class TestCentralDeviceProvider:
         # verify
         # call counts should be at most 1 since the provider has a cache
         assert mock_device_svc.get_device.call_count == 1
-        assert device.instance_of == self._device["template"]
+        assert device.template == self._device["template"]
 
     @mock.patch("azext_iot.central.services.device")
     def test_device_twin_show_calls_get_twin(self, mock_device_svc):
         provider = CentralDeviceProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.ga_2022_05_31.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
         mock_device_svc.get_device_twin.return_value = self._device_twin
 
@@ -388,7 +394,7 @@ class TestCentralDeviceProvider:
             }
         }
         provider = CentralDeviceProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.ga_2022_05_31.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
         mock_device_svc.get_device_attestation.return_value = device_attestation
         attestation = provider.get_device_attestation("someDeviceId")
@@ -397,7 +403,7 @@ class TestCentralDeviceProvider:
     @mock.patch("azext_iot.central.services.device")
     def test_should_return_properties(self, mock_device_svc):
         provider = CentralDeviceProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.ga_2022_05_31.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
         mock_device_svc.get_device_properties_or_telemetry_value.return_value = self._device_properties
 
@@ -407,7 +413,7 @@ class TestCentralDeviceProvider:
 
 class TestCentralDeviceGroupProvider:
     _device_groups = [
-        DeviceGroupV1_1_preview(group)
+        DeviceGroupGa(group)
         for group in load_json(FileNames.central_device_group_file)
     ]
     _device_group = load_json(FileNames.central_device_group_file)[0]
@@ -417,7 +423,7 @@ class TestCentralDeviceGroupProvider:
 
         # setup
         provider = CentralDeviceGroupProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
         mock_device_group_svc.list_device_groups.return_value = self._device_groups
 
@@ -433,7 +439,7 @@ class TestCentralDeviceGroupProvider:
 
         # setup
         provider = CentralDeviceGroupProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.ga_2022_05_31.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
         mock_device_group_svc.list_device_groups.return_value = self._device_groups
 
@@ -448,17 +454,17 @@ class TestCentralDeviceGroupProvider:
     def test_should_update_device_group_name(self, mock_device_group_svc):
         # setup
         provider = CentralDeviceGroupProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.ga_2022_05_31.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
         existing = get_object(
-            self._device_group, "DeviceGroup", api_version=ApiVersion.ga_2022_05_31.value
+            self._device_group, "DeviceGroup", api_version=API_VERSION
         )
         display_name = "NewDeviceGroupName"
         mock_device_group_svc.get_device_group.return_value = existing
         updated_device_group_dict = deepcopy(self._device_group)
         updated_device_group_dict["displayName"] = display_name
         mock_device_group_svc.update_device_group.return_value = get_object(
-            updated_device_group_dict, "DeviceGroup", api_version=ApiVersion.ga_2022_05_31.value
+            updated_device_group_dict, "DeviceGroup", api_version=API_VERSION
         )
 
         # act
@@ -474,14 +480,14 @@ class TestCentralDeviceGroupProvider:
 
 
 class TestCentralRoleProvider:
-    _roles = [RoleV1(role) for role in load_json(FileNames.central_role_file)]
+    _roles = [RoleGa(role) for role in load_json(FileNames.central_role_file)]
 
     @mock.patch("azext_iot.central.services.role")
     def test_should_return_roles(self, mock_role_svc):
 
         # setup
         provider = CentralRoleProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.ga_2022_05_31.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
         mock_role_svc.list_roles.return_value = self._roles
 
@@ -496,7 +502,7 @@ class TestCentralRoleProvider:
     def test_should_return_role(self, mock_role_svc):
         # setup
         provider = CentralRoleProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.ga_2022_05_31.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
         mock_role_svc.get_role.return_value = self._roles[0]
 
@@ -509,14 +515,14 @@ class TestCentralRoleProvider:
 
 
 class TestCentralUserProvider:
-    _users = [UserV1(user) for user in load_json(FileNames.central_user_file)]
+    _users = [UserGa(user) for user in load_json(FileNames.central_user_file)]
 
     @mock.patch("azext_iot.central.services.user")
     def test_should_return_users(self, mock_user_svc):
 
         # setup
         provider = CentralUserProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.ga_2022_05_31.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
         mock_user_svc.get_user_list.return_value = self._users
 
@@ -531,7 +537,7 @@ class TestCentralUserProvider:
     def test_should_return_user(self, mock_user_svc):
         # setup
         provider = CentralUserProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.ga_2022_05_31.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
         mock_user_svc.get_user.return_value = self._users[0]
 
@@ -549,7 +555,7 @@ class TestCentralUserProvider:
         updated_user.roles[0]["role"] = "new_role"
         # setup
         provider = CentralUserProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.ga_2022_05_31.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
         mock_user_svc.add_or_update_email_user.return_value = updated_user
 
@@ -570,7 +576,7 @@ class TestCentralUserProvider:
         updated_user.roles[0]["organization"] = "new_org"
         # setup
         provider = CentralUserProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.ga_2022_05_31.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
         mock_user_svc.add_or_update_email_user.return_value = updated_user
 
@@ -587,7 +593,7 @@ class TestCentralUserProvider:
 
 class TestCentralOrganizationProvider:
     _orgs = [
-        OrganizationV1_1_preview(org)
+        OrganizationGa(org)
         for org in load_json(FileNames.central_organization_file)
     ]
 
@@ -596,7 +602,7 @@ class TestCentralOrganizationProvider:
 
         # setup
         provider = CentralOrganizationProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
         mock_org_svc.list_orgs.return_value = self._orgs
 
@@ -611,7 +617,7 @@ class TestCentralOrganizationProvider:
     def test_should_return_org(self, mock_org_svc):
         # setup
         provider = CentralOrganizationProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
         mock_org_svc.get_org.return_value = self._orgs[0]
 
@@ -629,7 +635,7 @@ class TestCentralOrganizationProvider:
         updated_org.display_name = "new_name"
         # setup
         provider = CentralOrganizationProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.ga_2022_05_31.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
         mock_org_svc.create_or_update_org.return_value = updated_org
 
@@ -644,14 +650,14 @@ class TestCentralOrganizationProvider:
 
 
 class TestCentralJobProvider:
-    _jobs = [JobV1_1_preview(job) for job in load_json(FileNames.central_job_file)]
+    _jobs = [JobGa(job) for job in load_json(FileNames.central_job_file)]
 
     @mock.patch("azext_iot.central.services.job")
     def test_should_return_jobs(self, mock_job_svc):
 
         # setup
         provider = CentralJobProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
         mock_job_svc.list_jobs.return_value = self._jobs
 
@@ -666,7 +672,7 @@ class TestCentralJobProvider:
     def test_should_return_job(self, mock_job_svc):
         # setup
         provider = CentralJobProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
         mock_job_svc.get_job.return_value = self._jobs[0]
 
@@ -679,13 +685,13 @@ class TestCentralJobProvider:
 
 
 class TestCentralFileuploadProvider:
-    _fileupload = FileUploadV1_1_preview(load_json(FileNames.central_fileupload_file))
+    _fileupload = FileUploadGa(load_json(FileNames.central_fileupload_file))
 
     @mock.patch("azext_iot.central.services.file_upload")
     def test_should_return_fileupload(self, mock_fileupload_svc):
         # setup
         provider = CentralFileUploadProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
         mock_fileupload_svc.get_fileupload.return_value = self._fileupload
 
@@ -703,7 +709,7 @@ class TestCentralFileuploadProvider:
         updated_file_upload.container = "new_container"
         # setup
         provider = CentralFileUploadProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+            cmd=None, app_id=app_id, api_version=API_VERSION
         )
         mock_fileupload_svc.createorupdate_fileupload.return_value = updated_file_upload
 
@@ -718,7 +724,7 @@ class TestCentralFileuploadProvider:
 
 
 class TestCentralQueryProvider:
-    _query_response = QueryReponseV1_1_preview(
+    _query_response = QueryReponsePreview(
         load_json(FileNames.central_query_response_file)
     )
 
@@ -729,7 +735,7 @@ class TestCentralQueryProvider:
             cmd=None,
             query=None,
             app_id=app_id,
-            api_version=ApiVersion.v1_1_preview.value,
+            api_version=API_VERSION_PREVIEW,
         )
         mock_query_svc.query_run.return_value = self._query_response
 
@@ -747,7 +753,7 @@ class TestCentralDestinationProvider:
     def test_should_return_list_destinations(self, mock_destination_svc):
         # setup
         provider = CentralDestinationProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+            cmd=None, app_id=app_id, api_version=API_VERSION_PREVIEW
         )
         mock_destination_svc.list_destinations.return_value = self._destinations
 
@@ -761,7 +767,7 @@ class TestCentralDestinationProvider:
     def test_should_return_get_destination(self, mock_destination_svc):
         # setup
         provider = CentralDestinationProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+            cmd=None, app_id=app_id, api_version=API_VERSION_PREVIEW
         )
         mock_destination_svc.get_destination.return_value = self._destinations[0]
 
@@ -775,7 +781,7 @@ class TestCentralDestinationProvider:
     def test_should_success_add_destinatio(self, mock_destination_svc):
         # setup
         provider = CentralDestinationProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+            cmd=None, app_id=app_id, api_version=API_VERSION_PREVIEW
         )
         mock_destination_svc.add_destination.return_value = self._destinations[0]
 
@@ -791,7 +797,7 @@ class TestCentralDestinationProvider:
     def test_should_success_update_destination(self, mock_destination_svc):
         # setup
         provider = CentralDestinationProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+            cmd=None, app_id=app_id, api_version=API_VERSION_PREVIEW
         )
         mock_destination_svc.update_destination.return_value = self._destinations[0]
 
@@ -807,7 +813,7 @@ class TestCentralDestinationProvider:
     def test_should_success_delete_destination(self, mock_destination_svc):
         # setup
         provider = CentralDestinationProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+            cmd=None, app_id=app_id, api_version=API_VERSION_PREVIEW
         )
         mock_destination_svc.add_destination.return_value = self._destinations[0]
 
@@ -827,7 +833,7 @@ class TestCentralExportProvider:
     def test_should_return_list_exports(self, mock_export_svc):
         # setup
         provider = CentralExportProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+            cmd=None, app_id=app_id, api_version=API_VERSION_PREVIEW
         )
         mock_export_svc.list_exports.return_value = self._exports
 
@@ -841,7 +847,7 @@ class TestCentralExportProvider:
     def test_should_return_get_export(self, mock_export_svc):
         # setup
         provider = CentralExportProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+            cmd=None, app_id=app_id, api_version=API_VERSION_PREVIEW
         )
         mock_export_svc.get_export.return_value = self._exports[0]
 
@@ -855,7 +861,7 @@ class TestCentralExportProvider:
     def test_should_success_add_export(self, mock_export_svc):
         # setup
         provider = CentralExportProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+            cmd=None, app_id=app_id, api_version=API_VERSION_PREVIEW
         )
         mock_export_svc.add_export.return_value = self._exports[0]
 
@@ -870,7 +876,7 @@ class TestCentralExportProvider:
     def test_should_success_update_export(self, mock_export_svc):
         # setup
         provider = CentralExportProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+            cmd=None, app_id=app_id, api_version=API_VERSION_PREVIEW
         )
         mock_export_svc.update_export.return_value = self._exports[0]
 
@@ -886,7 +892,7 @@ class TestCentralExportProvider:
     def test_should_success_delete_export(self, mock_export_svc):
         # setup
         provider = CentralExportProvider(
-            cmd=None, app_id=app_id, api_version=ApiVersion.v1_1_preview.value
+            cmd=None, app_id=app_id, api_version=API_VERSION_PREVIEW
         )
         mock_export_svc.add_export.return_value = self._exports[0]
 
@@ -974,7 +980,7 @@ class TestCentralPropertyMonitor:
     ):
 
         # setup
-        mock_device_template_svc.get_device_template.return_value = TemplateV1(
+        mock_device_template_svc.get_device_template.return_value = TemplatePreview(
             self._duplicate_property_template
         )
 
@@ -1019,7 +1025,7 @@ class TestCentralPropertyMonitor:
     ):
 
         # setup
-        mock_device_template_svc.get_device_template.return_value = TemplateV1(
+        mock_device_template_svc.get_device_template.return_value = TemplatePreview(
             self._duplicate_property_template
         )
 
@@ -1058,7 +1064,7 @@ class TestCentralPropertyMonitor:
     ):
 
         # setup
-        mock_device_template_svc.get_device_template.return_value = TemplateV1(
+        mock_device_template_svc.get_device_template.return_value = TemplatePreview(
             self._duplicate_property_template
         )
 
@@ -1107,7 +1113,7 @@ class TestCentralPropertyMonitor:
     ):
 
         # setup
-        mock_device_template_svc.get_device_template.return_value = TemplateV1(
+        mock_device_template_svc.get_device_template.return_value = TemplatePreview(
             self._duplicate_property_template
         )
 
@@ -1140,6 +1146,122 @@ class TestCentralPropertyMonitor:
             "'RS40OccupancySensorV36fy': ['component2prop', 'testComponent', 'component2PropReadonly', "
             "'component2Prop2', 'component1Telemetry']}'. "
         )
+
+
+class TestCentralScheduledJobProvider:
+    _scheduled_jobs = [ScheduledJobGa(job) for job in load_json(FileNames.central_scheduled_job_file)]
+    _provider = CentralScheduledJobProvider(
+        cmd=None, app_id=app_id, api_version=API_VERSION
+    )
+
+    @mock.patch("azext_iot.central.services.scheduled_job")
+    def test_should_return_scheduled_jobs(self, mock_scheduled_job_svc):
+        mock_scheduled_job_svc.list_scheduled_jobs.return_value = self._scheduled_jobs
+
+        # act
+        jobs = self._provider.list_scheduled_jobs()
+        # verify
+        assert mock_scheduled_job_svc.list_scheduled_jobs.call_count == 1
+        assert set(jobs) == set(self._scheduled_jobs)
+
+    @mock.patch("azext_iot.central.services.scheduled_job")
+    def test_should_return_scheduled_job(self, mock_scheduled_job_svc):
+        mock_scheduled_job_svc.get_scheduled_job.return_value = self._scheduled_jobs[0]
+
+        # act
+        job = self._provider.get_scheduled_job(self._scheduled_jobs[0].id)
+        # verify
+        assert mock_scheduled_job_svc.get_scheduled_job.call_count == 1
+        assert job.id == self._scheduled_jobs[0].id
+
+    @mock.patch("azext_iot.central.services.scheduled_job")
+    def test_should_create_scheduled_job(self, mock_scheduled_job_svc):
+        mock_scheduled_job_svc.create_scheduled_job.return_value = self._scheduled_jobs[0]
+
+        # act
+        scheduled_job = self._provider.create_scheduled_job(
+            self._scheduled_jobs[0].id,
+            self._scheduled_jobs[0].group,
+            self._scheduled_jobs[0].schedule,
+            self._scheduled_jobs[0].data,
+        )
+        # verify
+        assert mock_scheduled_job_svc.create_scheduled_job.call_count == 1
+        assert scheduled_job == self._scheduled_jobs[0]
+
+
+class TestCentralEnrollmentGroupProvider:
+    _enrollment_groups = [EnrollmentGroupGa(group) for group in load_json(FileNames.central_enrollment_group_file)]
+    _x509 = load_json(FileNames.central_enrollment_group_x509_file)
+
+    _provider = CentralEnrollmentGroupProvider(
+        cmd=None, app_id=app_id, api_version=API_VERSION
+    )
+
+    @mock.patch("azext_iot.central.services.enrollment_group")
+    def test_should_return_enrollment_groups(self, mock_enrollment_group_svc):
+        mock_enrollment_group_svc.list_enrollment_groups.return_value = self._enrollment_groups
+
+        # act
+        groups = self._provider.list_enrollment_groups()
+        # verify
+        assert mock_enrollment_group_svc.list_enrollment_groups.call_count == 1
+        assert set(groups) == set(self._enrollment_groups)
+
+    @mock.patch("azext_iot.central.services.enrollment_group")
+    def test_should_return_enrollment_group(self, mock_enrollment_group_svc):
+        mock_enrollment_group_svc.get_enrollment_group.return_value = self._enrollment_groups[0]
+
+        # act
+        group = self._provider.get_enrollment_group(self._enrollment_groups[0].id)
+        # verify
+        assert mock_enrollment_group_svc.get_enrollment_group.call_count == 1
+        assert group.id == self._enrollment_groups[0].id
+
+    @mock.patch("azext_iot.central.services.enrollment_group")
+    def test_should_create_enrollment_group(self, mock_enrollment_group_svc):
+        mock_enrollment_group_svc.create_enrollment_group.return_value = self._enrollment_groups[0]
+
+        # act
+        enrollment_group = self._provider.create_enrollment_group(
+            self._enrollment_groups[0].id,
+            self._enrollment_groups[0].attestation,
+            self._enrollment_groups[0].display_name,
+            self._enrollment_groups[0].type,
+        )
+        # verify
+        assert mock_enrollment_group_svc.create_enrollment_group.call_count == 1
+        assert enrollment_group == self._enrollment_groups[0]
+
+    @mock.patch("azext_iot.central.services.enrollment_group")
+    def test_should_return_x509(self, mock_enrollment_group_svc):
+        mock_enrollment_group_svc.get_x509.return_value = self._x509
+
+        # act
+        groups = self._provider.get_x509(self._enrollment_groups[0].id, 'primary')
+        # verify
+        assert mock_enrollment_group_svc.get_x509.call_count == 1
+        assert set(groups) == set(self._x509)
+
+    @mock.patch("azext_iot.central.services.enrollment_group")
+    def test_should_return_x509_code(self, mock_enrollment_group_svc):
+        mock_enrollment_group_svc.generate_verification_code.return_value = {
+            "verificationCode": "<certificate-verification-code>"
+        }
+
+        # act
+        self._provider.generate_verification_code(self._enrollment_groups[0].id, 'primary')
+        # verify
+        assert mock_enrollment_group_svc.generate_verification_code.call_count == 1
+
+    @mock.patch("azext_iot.central.services.enrollment_group")
+    def test_should_create_x509(self, mock_enrollment_group_svc):
+        mock_enrollment_group_svc.create_x509.return_value = self._x509
+
+        # act
+        self._provider.create_x509(self._enrollment_groups[0].id, 'primary', 'cert', True)
+        # verify
+        assert mock_enrollment_group_svc.create_x509.call_count == 1
 
 
 class TestFailover:

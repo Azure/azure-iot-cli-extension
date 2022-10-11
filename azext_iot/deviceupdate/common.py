@@ -56,5 +56,12 @@ class ADUManageDeviceImportType(Enum):
     ALL = "All"
 
 
+class ADUValidHashAlgorithmType(Enum):
+    """
+    ADU valid cryptographic hash algorithms.
+    """
+    SHA256 = "sha256"
+
+
 SYSTEM_IDENTITY_ARG = "[system]"
 AUTH_RESOURCE_ID = "https://api.adu.microsoft.com/"
