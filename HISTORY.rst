@@ -7,6 +7,55 @@ unreleased
 +++++++++++++++
 
 
+0.17.3
++++++++++++++++
+
+**Device Update**
+
+* Adds `az iot device-update update init calculate-hash`, a utility command used to calculate the base64 hash representation of one or more files.
+* The `update init v5` command will by default validate the generated import manifest using the official json schema definition. Client-side validation can be skipped by using `--no-validation`.
+* The `update init v5` command support level has changed from `experimental` to `preview`.
+
+**IoT Central updates**
+
+* `--api-version` parameter will be deprecated and ignored. The IoT Central API will alway call latest GA version or latest preview version (if any API only exists in preview).
+
+* Add support for enrollment groups CRUD.
+
+  - az iot central enrollment-group
+ 
+    - az iot central enrollment-group list
+    - az iot central enrollment-group show
+    - az iot central enrollment-group create
+    - az iot central enrollment-group delete
+    - az iot central enrollment-group update
+    - az iot central enrollment-group verify-certificate
+    - az iot central enrollment-group generate-verification-code
+
+* Add support for scheduled jobs CRUD.
+
+  - az iot central scheduled-job
+ 
+    - az iot central scheduled-job list
+    - az iot central scheduled-job show
+    - az iot central scheduled-job create
+    - az iot central scheduled-job delete
+    - az iot central scheduled-job update
+    - az iot central scheduled-job list-runs
+
+
+0.17.2
++++++++++++++++
+
+**General Updates**
+
+* Hotfix for ensuring the global subscription parameter (`--subscription`) passes through sub-commands. Affected commands include:
+
+  - az dt create
+  - az dt job import
+  - az iot device-update account create
+
+
 0.17.1
 +++++++++++++++
 
@@ -19,6 +68,8 @@ unreleased
 * The command `az iot device-update device class list` adds support for `--filter` when no `--group-id` is provided.
 * The parameters `--account`, `--instance`, and `--resource-group` support setting default overridable values via config.
   Use `az config set` i.e. `az config set defaults.adu_account=<name>` or `az configure` i.e. `az configure --defaults adu_account=<name>`.
+* Introducing the experimental command `az iot device-update update init v5` for initializing (or generating) an import manifest
+  with the desired state.
 * Improved built-in documentation.
 
 
@@ -123,7 +174,7 @@ unreleased
 
 * Introducing the **in preview** Azure Device Update for IoT Hub root command group `az iot device-update`.
   To learn more about the service visit https://docs.microsoft.com/en-us/azure/iot-hub-device-update/.
- 
+
   - This command group is behind a feature flag environment variable. Set `IOT_CLI_ADU_ENABLED` to any value
     to activate the command group.
   - The Device Update command group supports all `account` and `instance` related functionality against

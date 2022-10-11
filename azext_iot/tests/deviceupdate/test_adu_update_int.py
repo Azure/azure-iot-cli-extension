@@ -165,14 +165,14 @@ def test_instance_update_lifecycle(provisioned_instances_module: Dict[str, dict]
     assert show_compliance["onLatestUpdateDeviceCount"] == 0
 
     # List device health requires --filter >:|
-    desired_health_state = "Healthy"
     list_device_health = cli.invoke(
         f"iot device-update device health list -n {account_name} -i {instance_name} "
-        f"--filter \"state eq '{desired_health_state}'\""
+        f"--filter \"deviceId eq '{device_id}'\""
     ).as_json()
     assert len(list_device_health) == 1
     assert list_device_health[0]["deviceId"] == device_id
-    assert list_device_health[0]["state"] == desired_health_state
+    assert list_device_health[0]["digitalTwinModelId"] == ADU_CLIENT_DTMI
+    assert len(list_device_health[0]["healthChecks"]) > 0
 
     # Device Classes
 

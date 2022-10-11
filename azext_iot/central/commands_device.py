@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 # Dev note - think of this as a controller
 
-from azext_iot.central.common import EDGE_ONLY_FILTER
+from azext_iot.central.common import API_VERSION, EDGE_ONLY_FILTER
 from azext_iot.central.models.devicetwin import DeviceTwin
 from azext_iot.central.models.edge import EdgeModule
 from azext_iot.central.providers import (
@@ -13,24 +13,19 @@ from azext_iot.central.providers import (
     CentralDeviceTemplateProvider,
 )
 
-from typing import Optional, Union, List, Any
+from typing import Optional, List, Any
 from azure.cli.core.azclierror import (
     InvalidArgumentValueError,
     RequiredArgumentMissingError,
     ResourceNotFoundError,
     ForbiddenError,
 )
-from azext_iot.central.models.v1 import DeviceV1
-from azext_iot.central.models.preview import DevicePreview
-from azext_iot.central.models.v1_1_preview import DeviceV1_1_preview
+from azext_iot.central.models.ga_2022_07_31 import DeviceGa
 from azext_iot.common import utility
 from azext_iot.constants import CENTRAL_ENDPOINT
-from azext_iot.central.models.enum import ApiVersion
 from knack.log import get_logger
 
 logger = get_logger(__name__)
-
-DeviceType = Union[DevicePreview, DeviceV1, DeviceV1_1_preview]
 
 
 def list_devices(
@@ -39,8 +34,8 @@ def list_devices(
     edge_only=False,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> List[DeviceType]:
+    api_version=API_VERSION,
+) -> List[DeviceGa]:
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
@@ -49,14 +44,14 @@ def list_devices(
         central_dns_suffix=central_dns_suffix,
     )
 
-    if edge_only and api_version != ApiVersion.v1_1_preview.value:
+    if edge_only:
         template_provider = CentralDeviceTemplateProvider(
             cmd=cmd, app_id=app_id, token=token, api_version=api_version
         )
         templates = {}
         filtered = []
         for device in devices:
-            template_id = get_template_id(device, api_version=api_version)
+            template_id = get_template_id(device)
             if template_id is None:
                 continue
             if template_id not in templates:
@@ -77,8 +72,8 @@ def get_device(
     device_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> DeviceType:
+    api_version=API_VERSION,
+) -> DeviceGa:
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
@@ -95,7 +90,7 @@ def get_device_twin(
 ) -> DeviceTwin:
 
     provider = CentralDeviceProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.v1.value
+        cmd=cmd, app_id=app_id, token=token, api_version=API_VERSION
     )
 
     return provider.get_device_twin(
@@ -113,8 +108,8 @@ def create_device(
     organizations=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
-) -> DeviceType:
+    api_version=API_VERSION,
+) -> DeviceGa:
     if simulated and not template:
         raise RequiredArgumentMissingError(
             "Error: if you supply --simulated you must also specify --template"
@@ -145,8 +140,8 @@ def update_device(
     organizations=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
-) -> DeviceType:
+    api_version=API_VERSION,
+) -> DeviceGa:
 
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -169,7 +164,7 @@ def delete_device(
     device_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
 ) -> dict:
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -183,7 +178,7 @@ def registration_info(
     app_id: str,
     device_id,
     token=None,
-    api_version=ApiVersion.v1.value,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     provider = CentralDeviceProvider(
@@ -208,7 +203,7 @@ def run_command(
     interface_id: Optional[str] = None,
     token: Optional[str] = None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
 ) -> dict:
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -233,7 +228,7 @@ def run_manual_failover(
     device_id: str,
     ttl_minutes=None,
     token=None,
-    api_version=ApiVersion.v1.value,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     if ttl_minutes and ttl_minutes < 1:
@@ -256,7 +251,7 @@ def run_manual_failback(
     app_id: str,
     device_id: str,
     token=None,
-    api_version=ApiVersion.v1.value,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     provider = CentralDeviceProvider(
@@ -275,7 +270,7 @@ def purge_c2d_messages(
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     provider = CentralDeviceProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.v1.value
+        cmd=cmd, app_id=app_id, token=token, api_version=API_VERSION
     )
     return provider.purge_c2d_messages(
         device_id=device_id, central_dns_suffix=central_dns_suffix
@@ -292,7 +287,7 @@ def get_command_history(
     module_name: Optional[str] = None,
     token: Optional[str] = None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
 ) -> dict:
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -314,42 +309,12 @@ def list_children(
     device_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
-) -> List[DeviceType]:
+    api_version=API_VERSION,
+) -> List[DeviceGa]:
     children = []
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
-
-    # use new apis
-    if api_version == ApiVersion.v1_1_preview.value:
-        rel_name = get_downstream_rel_name(
-            cmd,
-            app_id=app_id,
-            device_id=device_id,
-            token=token,
-            central_dns_suffix=central_dns_suffix,
-            api_version=api_version,
-        )
-        rels = provider.list_relationships(
-            device_id=device_id,
-            rel_name=rel_name,
-            central_dns_suffix=central_dns_suffix,
-        )
-        # only show children info
-        for idx, rel in enumerate(rels):
-            if idx == 0:
-                filter = f"id eq '{rel.target}'"
-            else:
-                filter += f" or id eq '{rel.target}'"
-        return provider.list_devices(filter=filter)
-
-    warning = (
-        "This command may take a long time to complete when running with this api version."
-        "\nConsider using Api Version 1.1-preview when listing edge devices "
-        "as it supports server filtering speeding up the process."
-    )
-    logger.warning(warning)
 
     # get iotedge device
     edge_twin = provider.get_device_twin(
@@ -360,7 +325,7 @@ def list_children(
     # list all application device twins
     devices = provider.list_devices(central_dns_suffix=central_dns_suffix)
     for device in devices:
-        if device.provisioned:
+        try:
             twin = provider.get_device_twin(
                 device.id, central_dns_suffix=central_dns_suffix
             )
@@ -371,6 +336,8 @@ def list_children(
                 and device.id != device_id  # skip current device
             ):
                 children.append(device)
+        except Exception:
+            pass
 
     return children
 
@@ -382,42 +349,19 @@ def add_children(
     children_ids: List[str],
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
+    api_version=API_VERSION,
 ):
     from uuid import uuid4
-
-    if api_version != ApiVersion.v1_1_preview.value:
-        raise InvalidArgumentValueError(
-            (
-                "Adding children devices to IoT Edge is still in preview "
-                "and only available for Api version >= 1.1-preview. "
-                'Please pass the right "api_version" to the command.'
-            )
-        )
 
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
-    rel_name = get_downstream_rel_name(
-        cmd,
-        app_id=app_id,
-        device_id=device_id,
-        token=token,
-        central_dns_suffix=central_dns_suffix,
-        api_version=api_version,
-    )
-
-    if not rel_name:
-        raise ResourceNotFoundError(
-            f'Relationship name cannot be found in the template for device with id "{device_id}"'
-        )
 
     return [
         provider.add_relationship(
             device_id=device_id,
             target_id=child_id,
             rel_id=str(uuid4()),
-            rel_name=rel_name,
             central_dns_suffix=central_dns_suffix,
         )
         for child_id in children_ids
@@ -431,28 +375,15 @@ def remove_children(
     children_ids: List[str],
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
+    api_version=API_VERSION,
 ):
 
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
-    rel_name = get_downstream_rel_name(
-        cmd,
-        app_id=app_id,
-        device_id=device_id,
-        token=token,
-        central_dns_suffix=central_dns_suffix,
-        api_version=api_version,
-    )
-
-    if not rel_name:
-        raise ResourceNotFoundError(
-            f'Relationship name cannot be found in the template for device with id "{device_id}"'
-        )
 
     rels = provider.list_relationships(
-        device_id=device_id, rel_name=rel_name, central_dns_suffix=central_dns_suffix
+        device_id=device_id, central_dns_suffix=central_dns_suffix
     )
     deleted = []
     for rel in rels:
@@ -477,7 +408,7 @@ def get_edge_device(
     device_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
+    api_version=API_VERSION,
 ) -> Any:
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -517,7 +448,7 @@ def list_device_modules(
 ) -> List[EdgeModule]:
 
     provider = CentralDeviceProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.ga_2022_05_31.value
+        cmd=cmd, app_id=app_id, token=token, api_version=API_VERSION
     )
 
     return provider.list_device_modules(
@@ -535,7 +466,7 @@ def get_device_module(
 ) -> EdgeModule:
 
     provider = CentralDeviceProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.ga_2022_05_31.value
+        cmd=cmd, app_id=app_id, token=token, api_version=API_VERSION
     )
 
     modules = provider.list_device_modules(
@@ -554,9 +485,8 @@ def get_device_module(
 def get_edge_manifest(
     cmd, app_id: str, device_id: str, token=None, central_dns_suffix=CENTRAL_ENDPOINT
 ):
-    # force API v1.1 for this to work
     template_provider = CentralDeviceTemplateProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.v1_1_preview.value
+        cmd=cmd, app_id=app_id, token=token, api_version=API_VERSION
     )
 
     device = get_edge_device(
@@ -582,7 +512,7 @@ def restart_device_module(
 ) -> List[EdgeModule]:
 
     provider = CentralDeviceProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.v1.value
+        cmd=cmd, app_id=app_id, token=token, api_version=API_VERSION
     )
 
     return provider.restart_device_module(
@@ -594,7 +524,7 @@ def registration_summary(
     cmd,
     app_id: str,
     token=None,
-    api_version=ApiVersion.v1.value,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     provider = CentralDeviceProvider(
@@ -610,7 +540,7 @@ def get_credentials(
     app_id: str,
     device_id,
     token=None,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     provider = CentralDeviceProvider(
@@ -628,62 +558,8 @@ def compute_device_key(cmd, primary_key, device_id):
     )
 
 
-def get_template_id(device: DeviceType, api_version=ApiVersion.v1.value):
-    return getattr(
-        device,
-        "instanceOf" if api_version == ApiVersion.preview.value else "template",
-    )
-
-
-def get_downstream_rel_name(
-    cmd,
-    app_id: str,
-    device_id: str,
-    token=None,
-    central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1.value,
-):
-    # force API v1.1 for this to work
-    template_provider = CentralDeviceTemplateProvider(
-        cmd=cmd, app_id=app_id, token=token, api_version=ApiVersion.v1_1_preview.value
-    )
-    device = get_device(
-        cmd,
-        app_id=app_id,
-        device_id=device_id,
-        token=token,
-        central_dns_suffix=central_dns_suffix,
-        api_version=api_version,
-    )
-
-    if not device:
-        raise ResourceNotFoundError(f'Device with id "{device_id}" cannot be found.')
-
-    template = template_provider.get_device_template(
-        get_template_id(device, api_version=api_version),
-        central_dns_suffix=central_dns_suffix,
-    )
-
-    if not template:
-        raise ResourceNotFoundError(
-            f'Template for device with id "{device_id}" cannot be found.'
-        )
-
-    # Get Gateway relationship name
-    for _, interface in template.interfaces.items():
-        for _, content in interface.items():
-            if all(
-                (
-                    cond is True
-                    for cond in [
-                        a in content[template.get_type_key()]
-                        for a in ["Relationship", "GatewayDevice"]
-                    ]
-                )
-            ):
-                rel_name = content.get("name")
-
-    return rel_name
+def get_template_id(device: DeviceGa):
+    return getattr(device, "template")
 
 
 def get_attestation(
@@ -692,7 +568,7 @@ def get_attestation(
     device_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
 ) -> dict:
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -709,7 +585,7 @@ def delete_attestation(
     device_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
 ) -> dict:
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -725,7 +601,7 @@ def update_attestation(
     content: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
 ) -> dict:
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -743,7 +619,7 @@ def create_attestation(
     content: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
 ) -> dict:
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -760,7 +636,7 @@ def list_modules(
     device_id,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
 ) -> dict:
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -779,7 +655,7 @@ def list_components(
     module_name=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
 ) -> dict:
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -800,7 +676,7 @@ def get_properties(
     module_name: Optional[str] = None,
     token: Optional[str] = None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
 ) -> dict:
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -823,7 +699,7 @@ def update_properties(
     module_name: Optional[str] = None,
     token: Optional[str] = None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
 ) -> dict:
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -849,7 +725,7 @@ def replace_properties(
     module_name: Optional[str] = None,
     token: Optional[str] = None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
 ) -> dict:
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -875,7 +751,7 @@ def get_telemetry_value(
     module_name=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
 ) -> dict:
     provider = CentralDeviceProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version

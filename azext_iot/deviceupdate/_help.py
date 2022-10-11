@@ -822,3 +822,73 @@ def load_deviceupdate_help():
           text: >
             az iot device-update device show -n {account_name} -i {instance_name} -d {device_id}
     """
+
+    helps["iot device-update update init"] = """
+        type: group
+        short-summary: Utilities for update import manifest creation.
+    """
+
+    helps["iot device-update update init v5"] = """
+        type: command
+        short-summary: Initialize a v5 import manifest with the desired state.
+        long-summary: This command supports all attributes of the v5 import manifest. Review examples
+          and parameter descriptions for details on how to fully utilize the operation. Note that
+          there is positional sensitivity between --step and --file, as well as --file and --related-file.
+          Review parameter help for more details.
+
+        examples:
+        - name: Initialize a minimum content import manifest.
+          text: >
+            az iot device-update update init v5 --update-provider Microsoft --update-name AptUpdate --update-version 1.0.0
+            --description "My minimum update"
+            --compat manufacturer=Contoso model=Vacuum
+            --step handler=microsoft/apt:1 --file path=/my/apt/manifest/file
+
+        - name: Initialize a non-deployable leaf update to be referenced in a bundled update.
+          text: >
+            az iot device-update update init v5 --update-provider Microsoft --update-name SwUpdate --update-version 1.1
+            --compat manufacturer=Contoso model=Microphone --step handler=microsoft/swupdate:1 description="Deploy Update"
+            --file path=/my/update/image/file1 --file path=/my/update/image/file2
+            --is-deployable false
+
+        - name: Initialize a bundled update referencing a leaf update as well as defining independent steps. Inline json examples
+            compatible with bash-like shells.
+          text: >
+            az iot device-update update init v5 --update-provider Microsoft --update-name Bundled --update-version 2.0
+            --compat manufacturer=Contoso model=SpaceStation
+            --step handler=microsoft/script:1 properties='{"arguments": "--pre"}' description="Pre-install script"
+            --file path=/my/update/scripts/preinstall.sh downloadHandler=microsoft/delta:1
+            --related-file path=/my/update/scripts/related_preinstall.json properties='{"microsoft.sourceFileHashAlgorithm": "sha256"}'
+            --step updateId.provider=Microsoft updateId.name=SwUpdate updateId.version=1.1
+            --step handler=microsoft/script:1 properties='{"arguments": "--post"}' description="Post-install script"
+            --file path=/my/update/scripts/postinstall.sh
+
+        - name: Initialize a bundled update referencing a leaf update as well as defining independent steps. Inline json examples
+            compatible with powershell.
+          text: >
+            az iot device-update update init v5 --update-provider Microsoft --update-name Bundled --update-version 2.0
+            --compat manufacturer=Contoso model=SpaceStation
+            --step handler=microsoft/script:1 properties='{\\"arguments\\": \\"--pre\\"}' description="Pre-install script"
+            --file path=/my/update/scripts/preinstall.sh downloadHandler=microsoft/delta:1
+            --related-file path=/my/update/scripts/related_preinstall.json properties='{\\"microsoft.sourceFileHashAlgorithm\\": \\"sha256\\"}'
+            --step updateId.provider=Microsoft updateId.name=SwUpdate updateId.version=1.1
+            --step handler=microsoft/script:1 properties='{\\"arguments": \\"--post\\"}' description="Post-install script"
+            --file path=/my/update/scripts/postinstall.sh
+    """
+
+    helps["iot device-update update init calculate-hash"] = """
+        type: command
+        short-summary: Calculate the base64 hashed representation of a file.
+
+        examples:
+        - name: Calculate the base64 representation of a sha256 digest for a target file.
+          text: >
+            az iot device-update update init calculate-hash --file-path /path/to/file
+
+        - name: Calculate the base64 representation of a sha256 digest for multiple target files.
+          text: >
+            az iot device-update update init calculate-hash
+            --file-path /path/to/file1
+            --file-path /path/to/file2
+            --file-path /path/to/file3
+    """

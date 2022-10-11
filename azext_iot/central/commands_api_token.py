@@ -8,7 +8,8 @@
 from typing import List
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers import CentralApiTokenProvider
-from azext_iot.central.models.enum import Role, ApiVersion
+from azext_iot.central.models.enum import Role
+from azext_iot.central.common import API_VERSION
 
 
 def add_api_token(
@@ -19,7 +20,7 @@ def add_api_token(
     org_id=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
 ) -> dict:
     provider = CentralApiTokenProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
@@ -43,7 +44,7 @@ def list_api_tokens(
     app_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
 ) -> List[dict]:
 
     provider = CentralApiTokenProvider(
@@ -59,7 +60,7 @@ def get_api_token(
     token_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
 ):
 
     provider = CentralApiTokenProvider(
@@ -78,7 +79,7 @@ def delete_api_token(
     token_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.ga_2022_05_31.value,
+    api_version=API_VERSION,
 ) -> dict:
     provider = CentralApiTokenProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version

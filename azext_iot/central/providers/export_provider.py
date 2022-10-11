@@ -11,7 +11,7 @@ from azure.cli.core.azclierror import AzureResponseError, ClientRequestError, Re
 from azext_iot.central.providers.central_provider import CentralProvider
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
-from azext_iot.central.models.v1_1_preview import ExportV1_1_preview
+from azext_iot.central.models.v2022_06_30_preview import ExportPreview
 
 logger = get_logger(__name__)
 
@@ -23,7 +23,7 @@ class CentralExportProvider(CentralProvider):
 
     def list_exports(
         self, central_dns_suffix=CENTRAL_ENDPOINT
-    ) -> List[Union[dict, ExportV1_1_preview]]:
+    ) -> List[Union[dict, ExportPreview]]:
         exports = central_services.export.list_exports(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -40,7 +40,7 @@ class CentralExportProvider(CentralProvider):
 
     def add_export(
         self, export_id, payload, central_dnx_suffix=CENTRAL_ENDPOINT
-    ) -> Union[dict, ExportV1_1_preview]:
+    ) -> Union[dict, ExportPreview]:
         if export_id in self._exports:
             raise ClientRequestError("Destination already exists")
 
@@ -64,7 +64,7 @@ class CentralExportProvider(CentralProvider):
 
     def update_export(
         self, export_id, payload, central_dnx_suffix=CENTRAL_ENDPOINT
-    ) -> Union[dict, ExportV1_1_preview]:
+    ) -> Union[dict, ExportPreview]:
         export = central_services.export.update_export(
             self._cmd,
             self._app_id,
@@ -85,7 +85,7 @@ class CentralExportProvider(CentralProvider):
 
     def get_export(
         self, export_id, central_dnx_suffix=CENTRAL_ENDPOINT
-    ) -> Union[dict, ExportV1_1_preview]:
+    ) -> Union[dict, ExportPreview]:
         # get or add to cache
         export = self._exports.get(export_id)
         if not export:

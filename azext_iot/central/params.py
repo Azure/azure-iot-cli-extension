@@ -9,7 +9,14 @@ CLI parameter definitions.
 """
 
 from knack.arguments import CLIArgumentType, CaseInsensitiveList
-from azext_iot.central.common import DestinationType, ExportSource
+from azext_iot.central.common import (
+    DestinationType,
+    ExportSource,
+    JobBatchType,
+    X509CertificateEntry,
+    EnrollmentGroupProvisionStatus,
+    EnrollmentGroupAttestationType,
+)
 from azure.cli.core.commands.parameters import get_three_state_flag, get_enum_type
 from azext_iot.monitor.models.enum import Severity
 from azext_iot.central.models.enum import ApiVersion
@@ -38,7 +45,7 @@ style_type = CLIArgumentType(
 api_version = CLIArgumentType(
     options_list=["--api-version", "--av"],
     choices=CaseInsensitiveList([version.value for version in ApiVersion]),
-    default=ApiVersion.ga_2022_05_31.value,
+    default=ApiVersion.ga.value,
     help="The API version for the requested operation.",
 )
 
@@ -54,7 +61,13 @@ def load_central_arguments(self, _):
             help="The App ID of the IoT Central app you want to manage."
             ' You can find the App ID in the "About" page for your application under the help menu.',
         )
-        context.argument("api_version", arg_type=api_version)
+        context.argument(
+            "api_version",
+            arg_type=api_version,
+            help="This command parameter has been deprecated and will be ignored."
+            "In the future release, we will only support IoT Central APIs from latest GA version."
+            "If any API is not GA yet, we will call latest preview version.",
+            deprecate_info=context.deprecate())
         context.argument(
             "token",
             options_list=["--token"],
@@ -339,8 +352,8 @@ def load_central_arguments(self, _):
         context.argument(
             "api_version",
             options_list=["--api-version", "--av"],
-            choices=CaseInsensitiveList([ApiVersion.v1_1_preview.value]),
-            default=ApiVersion.v1_1_preview.value,
+            choices=CaseInsensitiveList([ApiVersion.ga.value]),
+            default=ApiVersion.ga.value,
             help="The API version for the requested operation.",
         )
 
@@ -399,8 +412,8 @@ def load_central_arguments(self, _):
         context.argument(
             "api_version",
             options_list=["--api-version", "--av"],
-            choices=CaseInsensitiveList([ApiVersion.v1_1_preview.value]),
-            default=ApiVersion.v1_1_preview.value,
+            choices=CaseInsensitiveList([ApiVersion.ga.value]),
+            default=ApiVersion.ga.value,
             help="The API version for the requested operation.",
         )
 
@@ -438,9 +451,9 @@ def load_central_arguments(self, _):
             "api_version",
             options_list=["--api-version", "--av"],
             choices=CaseInsensitiveList(
-                [ApiVersion.v1_1_preview.value, ApiVersion.preview.value]
+                [ApiVersion.ga.value]
             ),
-            default=ApiVersion.v1_1_preview.value,
+            default=ApiVersion.ga.value,
             help="The API version for the requested operation.",
         )
 
@@ -472,7 +485,8 @@ def load_central_arguments(self, _):
         context.argument(
             "batch_type",
             options_list=["--batch-type", "--bt"],
-            default=False,
+            arg_type=get_enum_type(JobBatchType),
+            default="number",
             help="Specify if batching is done on a number of devices or a percentage of the total.",
         )
         context.argument(
@@ -490,7 +504,7 @@ def load_central_arguments(self, _):
         context.argument(
             "threshold_type",
             options_list=["--cancellation-threshold-type", "--ctt"],
-            choices=CaseInsensitiveList(["number", "percentage"]),
+            arg_type=get_enum_type(JobBatchType),
             default="number",
             help="Specify if cancellation threshold applies for a number of devices or a percentage of the total.",
         )
@@ -516,8 +530,8 @@ def load_central_arguments(self, _):
         context.argument(
             "api_version",
             options_list=["--api-version", "--av"],
-            choices=CaseInsensitiveList([ApiVersion.v1_1_preview.value]),
-            default=ApiVersion.v1_1_preview.value,
+            choices=CaseInsensitiveList([ApiVersion.preview.value]),
+            default=ApiVersion.preview.value,
             help="The API version for the requested operation.",
         )
 
@@ -530,8 +544,8 @@ def load_central_arguments(self, _):
         context.argument(
             "api_version",
             options_list=["--api-version", "--av"],
-            choices=CaseInsensitiveList([ApiVersion.v1_1_preview.value]),
-            default=ApiVersion.v1_1_preview.value,
+            choices=CaseInsensitiveList([ApiVersion.preview.value]),
+            default=ApiVersion.preview.value,
             help="The API version for the requested operation.",
         )
 
@@ -653,4 +667,225 @@ def load_central_arguments(self, _):
             nargs="+",
             options_list=["--children-ids"],
             help="Space-separated list of children device ids.",
+        )
+
+    with self.argument_context("iot central enrollment-group") as context:
+        context.argument(
+            "group_id",
+            options_list=["--group-id", "--id"],
+            help="Unique identifier for the enrollment group.",
+        )
+        context.argument(
+            "certificate_entry",
+            options_list=["--certificate-entry", "--entry"],
+            arg_type=get_enum_type(X509CertificateEntry),
+            help="Entry type of the x509 certificate which only allows 'primary' and 'secondary'",
+        )
+        context.argument(
+            "primary_cert_path",
+            options_list=["--certificate-path", "--cp"],
+            help="The path to the file containing the primary certificate.",
+        )
+        context.argument(
+            "secondary_cert_path",
+            options_list=["--secondary-certificate-path", "--scp"],
+            help="The path to the file containing the secondary certificate.",
+        )
+        context.argument(
+            "primary_key",
+            options_list=["--primary-key", "--pk"],
+            help="The primary symmetric shared access key stored in base64 format.",
+        )
+        context.argument(
+            "secondary_key",
+            options_list=["--secondary-key", "--sk"],
+            help="The secondary symmetric shared access key stored in base64 format.",
+        )
+        context.argument(
+            "attestation",
+            options_list=["--attestation-type", "--at"],
+            arg_type=get_enum_type(EnrollmentGroupAttestationType),
+            default="symmetricKey",
+            help="The attestation mechanism for the enrollment group. Only 'x509' or 'symmetricKey' are allowed."
+            "By default 'symmetricKey' will be used for attestation."
+        )
+        context.argument(
+            "display_name",
+            options_list=["--display-name"],
+            help="Display name of the enrollment group."
+        )
+        context.argument(
+            "type",
+            options_list=["--type"],
+            help="Type of devices that connect through the group."
+        )
+        context.argument(
+            "enabled",
+            options_list=["--provisioning-status", "--ps"],
+            arg_type=get_enum_type(EnrollmentGroupProvisionStatus),
+            default="enabled",
+            help="Whether the devices using the group are allowed to connect to IoT Central. True or False."
+        )
+
+    with self.argument_context("iot central enrollment-group update") as context:
+        context.argument(
+            "remove_x509",
+            options_list=["--remove-x509"],
+            arg_type=get_three_state_flag(),
+            help="Whether the x509 certificate should be removed from the group. True or False."
+        )
+        context.argument(
+            "etag",
+            options_list=["--etag"],
+            help="ETag used to prevent conflict in enrollment group updates."
+        )
+
+    with self.argument_context("iot central scheduled-job") as context:
+        context.argument(
+            "job_id",
+            options_list=["--job-id", "--id"],
+            help="Unique identifier for the scheduled job.",
+        )
+
+    with self.argument_context("iot central scheduled-job create") as context:
+        context.argument(
+            "job_name",
+            options_list=["--job-name"],
+            help="Display name of the job.",
+        )
+        context.argument(
+            "group_id",
+            options_list=["--group-id", "-g"],
+            help="The ID of the device group on which to execute the job",
+        )
+        context.argument(
+            "schedule",
+            options_list=["--schedule"],
+            help="The schedule at which to execute the job. Provide path to JSON file or raw stringified JSON."
+        )
+        context.argument(
+            "content",
+            options_list=["--content", "-k"],
+            help="The job data definition. Provide path to JSON file or raw stringified JSON."
+            " The request body must contain array of JobData.",
+        )
+        context.argument(
+            "batch_type",
+            options_list=["--batch-type", "--bt"],
+            arg_type=get_enum_type(JobBatchType),
+            default="number",
+            help="Specify if batching is done on a number of devices or a percentage of the total.",
+        )
+        context.argument(
+            "batch",
+            type=int,
+            options_list=["--batch", "-b"],
+            help="The number or percentage of devices on which batching is done.",
+        )
+        context.argument(
+            "threshold",
+            type=int,
+            options_list=["--cancellation-threshold", "--cth"],
+            help="The number or percentage of devices on which the cancellation threshold is applied.",
+        )
+        context.argument(
+            "threshold_type",
+            options_list=["--cancellation-threshold-type", "--ctt"],
+            arg_type=get_enum_type(JobBatchType),
+            default="number",
+            help="Specify if cancellation threshold applies for a number of devices or a percentage of the total.",
+        )
+        context.argument(
+            "threshold_batch",
+            options_list=["--cancellation-threshold-batch", "--ctb"],
+            default="number",
+            help="Whether the cancellation threshold applies per-batch or to the overall job.",
+        )
+        context.argument(
+            "description",
+            type=str,
+            options_list=["--description", "--desc"],
+            help="Detailed description of the job.",
+        )
+        context.argument(
+            "enabled",
+            options_list=["--enabled"],
+            arg_type=get_three_state_flag(),
+            help="Whether the scheduled job is enabled. True or False."
+        )
+        context.argument(
+            "organizations",
+            options_list=["--organizations", "--orgs"],
+            help="List of organizations of the job, only one organization is supported today.",
+        )
+
+    with self.argument_context("iot central scheduled-job update") as context:
+        context.argument(
+            "job_name",
+            options_list=["--job-name"],
+            help="Display name of the job.",
+        )
+        context.argument(
+            "group_id",
+            options_list=["--group-id", "-g"],
+            help="The ID of the device group on which to execute the job",
+        )
+        context.argument(
+            "schedule",
+            options_list=["--schedule"],
+            help="The schedule at which to execute the job. Provide path to JSON file or raw stringified JSON."
+        )
+        context.argument(
+            "content",
+            options_list=["--content", "-k"],
+            help="The job data definition. Provide path to JSON file or raw stringified JSON."
+            " The request body must contain array of JobData.",
+        )
+        context.argument(
+            "batch_type",
+            options_list=["--batch-type", "--bt"],
+            arg_type=get_enum_type(JobBatchType),
+            default="number",
+            help="Specify if batching is done on a number of devices or a percentage of the total.",
+        )
+        context.argument(
+            "batch",
+            type=int,
+            options_list=["--batch", "-b"],
+            help="The number or percentage of devices on which batching is done.",
+        )
+        context.argument(
+            "threshold",
+            type=int,
+            options_list=["--cancellation-threshold", "--cth"],
+            help="The number or percentage of devices on which the cancellation threshold is applied.",
+        )
+        context.argument(
+            "threshold_type",
+            options_list=["--cancellation-threshold-type", "--ctt"],
+            arg_type=get_enum_type(JobBatchType),
+            default="number",
+            help="Specify if cancellation threshold applies for a number of devices or a percentage of the total.",
+        )
+        context.argument(
+            "threshold_batch",
+            options_list=["--cancellation-threshold-batch", "--ctb"],
+            help="Whether the cancellation threshold applies per-batch or to the overall job.",
+        )
+        context.argument(
+            "description",
+            type=str,
+            options_list=["--description", "--desc"],
+            help="Detailed description of the job.",
+        )
+        context.argument(
+            "enabled",
+            options_list=["--enabled"],
+            arg_type=get_three_state_flag(),
+            help="Whether the scheduled job is enabled. True or False."
+        )
+        context.argument(
+            "organizations",
+            options_list=["--organizations", "--orgs"],
+            help="List of organizations of the job, only one organization is supported today.",
         )

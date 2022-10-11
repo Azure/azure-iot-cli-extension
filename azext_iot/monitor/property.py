@@ -45,13 +45,13 @@ class PropertyMonitor:
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
-            api_version=ApiVersion.v1.value,
+            api_version=ApiVersion.ga.value,
         )
         self._central_template_provider = CentralDeviceTemplateProvider(
             cmd=self._cmd,
             app_id=self._app_id,
             token=self._token,
-            api_version=ApiVersion.v1.value,
+            api_version=ApiVersion.ga.value,
         )
         self._template = self._get_device_template()
 
