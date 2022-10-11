@@ -76,7 +76,7 @@ def _setup_hub_state(cstring):
             cstring, edge_content2, labels, random.randint(1, 10), metrics, target_condition
         )
     )
-    edge_content_v1_path = os.path.join(Path(CWD), "..", "configurations","test_edge_deployment_v1.json")
+    edge_content_v1_path = os.path.join(Path(CWD), "..", "configurations", "test_edge_deployment_v1.json")
 
     # populate hub with devices
     for device_type in DEVICE_TYPES:
@@ -267,7 +267,7 @@ def test_export_import_controlplane(setup_hub_states_controlplane):
     hub_location = setup_hub_states_controlplane[0]["hub"]["location"]
 
     cli.invoke(
-            f"iot hub state export -n {hub_name} -f {filename} -g {hub_rg} --of --aspects {CONTROLPLANE}"
+        f"iot hub state export -n {hub_name} -f {filename} -g {hub_rg} --of --aspects {CONTROLPLANE}"
     )
     compare_hub_controlplane_to_file(filename, hub_name, hub_rg)
     clean_up_hub_controlplane(hub_name, hub_rg, hub_location)
@@ -341,6 +341,7 @@ def test_export_import_dataplane(setup_hub_states):
         )
         time.sleep(10)  # gives the hub time to update before the checks
         compare_hub_dataplane_to_file(filename, hub_cstring)
+
 
 # Dataplane main compare commands
 def compare_hubs_dataplane(origin_cstring: str, dest_cstring: str):
@@ -507,14 +508,6 @@ def compare_hub_dataplane_to_file(filename: str, cstring: str):
 
     assert len(file_devices) == len(hub_devices)
 
-    # file_modules_list = hub_info["modules"]
-    # file_modules_dict = {}
-    # for module in file_modules_list:
-    #     if module[0]["device_id"] in file_modules_dict:
-    #         file_modules_dict[module[0]["device_id"]].append(module)
-    #     else:
-    #         file_modules_dict[module[0]["device_id"]] = [module]
-
     for device in hub_devices:
         id = cli.invoke(
             f"iot hub device-identity show -l {cstring} -d {device['deviceId']}"
@@ -533,10 +526,9 @@ def compare_hub_dataplane_to_file(filename: str, cstring: str):
         assert file_device_identity
 
         for key in ["$metadata", "$version"]:
-                device["properties"]["desired"].pop(key)
+            device["properties"]["desired"].pop(key)
 
         compare_devices(device, file_device_identity)
-
 
         file_modules = file_device.get("modules", {})
         hub_modules = cli.invoke(
@@ -750,12 +742,16 @@ def compare_module_identities(module1, module2):
     assert module1["authentication"]["type"] == module2["authentication"]["type"]
 
     if module1["authentication"]["type"] == DeviceAuthApiType.sas.value:
-        assert module1["authentication"]["symmetricKey"]["primaryKey"] == module2["authentication"]["symmetricKey"]["primaryKey"]
-        assert module1["authentication"]["symmetricKey"]["secondaryKey"] == module2["authentication"]["symmetricKey"]["secondaryKey"]
+        symkeys1 = module1["authentication"]["symmetricKey"]
+        symkeys2 = module2["authentication"]["symmetricKey"]
+        assert symkeys1["primaryKey"] == symkeys2["primaryKey"]
+        assert symkeys1["secondaryKey"] == symkeys2["secondaryKey"]
 
     if module1["authentication"]["type"] == DeviceAuthApiType.selfSigned.value:
-        assert module1["authentication"]["x509Thumbprint"]["primaryThumbprint"] == module2["authentication"]["x509Thumbprint"]["primaryThumbprint"]
-        assert module1["authentication"]["x509Thumbprint"]["secondaryThumbprint"] == module2["authentication"]["x509Thumbprint"]["secondaryThumbprint"]
+        certs1 = module1["authentication"]["x509Thumbprint"]
+        certs2 = module2["authentication"]["x509Thumbprint"]
+        assert certs1["primaryThumbprint"] == certs2["primaryThumbprint"]
+        assert certs1["secondaryThumbprint"] == certs2["secondaryThumbprint"]
 
 
 def compare_module_twins(twin1, twin2):

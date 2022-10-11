@@ -8,11 +8,11 @@ import os
 from time import sleep
 import pytest
 from azext_iot.common.embedded_cli import EmbeddedCLI
-from azext_iot.iothub.providers.state import EndpointType
+from azext_iot.iothub.common import EndpointType
 from azext_iot.tests.settings import DynamoSettings
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.certops import create_self_signed_certificate
-from typing import  Optional, TypeVar
+from typing import Optional, TypeVar
 from knack.log import get_logger
 
 logger = get_logger(__name__)
@@ -125,13 +125,14 @@ def setup_hub_controlplane_states(
     )
 
     cli.invoke(
-        f"iot hub routing-endpoint create -n topic-userid -r {hub_rg} -g {hub_rg} -t {EndpointType.ServiceBusTopic.value} --hub-name {hub_name} -s {sub_id} --endpoint-uri "
-        f"{servicebus_endpoint_uri} --entity-path {servicebus_topic} --auth-type identityBased --identity "
-        f"{user_id}"
+        f"iot hub routing-endpoint create -n topic-userid -r {hub_rg} -g {hub_rg} -t {EndpointType.ServiceBusTopic.value} "
+        f"--hub-name {hub_name} -s {sub_id} --endpoint-uri {servicebus_endpoint_uri} --entity-path {servicebus_topic} "
+        f"--auth-type identityBased --identity {user_id}"
     )
 
     cli.invoke(
-        f"iot hub routing-endpoint create -n storagecontainer-key -r {hub_rg} -g {hub_rg} -t {EndpointType.AzureStorageContainer.value} --hub-name {hub_name} -c {storage_cstring} -s {sub_id} "
+        f"iot hub routing-endpoint create -n storagecontainer-key -r {hub_rg} -g {hub_rg} -t "
+        f"{EndpointType.AzureStorageContainer.value} --hub-name {hub_name} -c {storage_cstring} -s {sub_id} "
         f"--container {storage_container}  -b 350 -w 250 --encoding json")
 
     # add routes - prob change one to be custom endpoint
@@ -158,6 +159,15 @@ def setup_hub_controlplane_states(
     if os.path.isfile(cert_file):
         os.remove(cert_file)
 
+    # add ip filter rule
+    cli.invoke(
+        f"resource update --name {hub_name} --g {hub_rg} --resource-type "
+        "\"Microsoft.Devices/IotHubs\" --set properties.networkRuleSets='{}'"
+    )
+    cli.invoke(
+        f"resource update -n  {hub_name} -g {hub_rg} --resource-type Microsoft.Devices/IotHubs "
+        "--add properties.networkRuleSets.ipRules '{\"action\":\"Allow\",\"filterName\":\"Trusted\",\"ipMask\":\"192.168.0.1\"}'"
+    )
     yield provisioned_iothubs
 
 

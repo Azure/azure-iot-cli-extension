@@ -4,16 +4,19 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from enum import Enum
-from time import sleep
 from knack.log import get_logger
 
 from azext_iot.common.shared import DeviceAuthApiType, DeviceAuthType, ConfigType
+from azext_iot.iothub.common import (
+    IMMUTABLE_AND_DUPLICATE_MODULE_TWIN_FIELDS,
+    IMMUTABLE_DEVICE_IDENTITY_FIELDS,
+    IMMUTABLE_MODULE_IDENTITY_FIELDS,
+    HubAspects
+)
 from azext_iot.iothub.providers.base import IoTHubProvider
 from azext_iot.common._azure import parse_iot_hub_message_endpoint_connection_string, parse_storage_container_connection_string
 from azure.cli.core.azclierror import FileOperationError, ResourceNotFoundError, BadRequestError, AzCLIError
 from azext_iot.common.embedded_cli import EmbeddedCLI
-from azext_iot.common.utility import capture_stderr
 from azext_iot.operations.hub import (
     _iot_device_set_parent,
     _iot_device_show,
@@ -34,106 +37,12 @@ from azext_iot.operations.hub import (
 from azext_iot._factory import iot_hub_full_service_factory
 import json
 from tqdm import tqdm
-from typing import Optional
+from typing import List, Optional
 import os
-import sys
-import random
-import base64
 
 logger = get_logger(__name__)
 cli = EmbeddedCLI()
 
-
-IMMUTABLE_DEVICE_IDENTITY_FIELDS = [
-    "cloudToDeviceMessageCount",
-    "configurations",
-    "deviceEtag",
-    "deviceScope",
-    "lastActivityTime",
-    # "modelId",
-    "parentScopes",
-    "statusUpdateTime",
-    "etag",
-    "version",
-    "deviceId"
-]
-IMMUTABLE_MODULE_IDENTITY_FIELDS = [
-    "generationId",
-    "connectionStateUpdatedTime",
-    "lastActivityTime",
-    "cloudToDeviceMessageCount",
-    "etag",
-    "deviceId",
-    "moduleId",
-]
-IMMUTABLE_AND_DUPLICATE_MODULE_TWIN_FIELDS = [
-    "deviceEtag",
-    "lastActivityTime",
-    "etag",
-    "version",
-    "cloudToDeviceMessageCount",
-    "statusUpdateTime",
-    "authenticationType",
-    "connectionState",
-    "deviceId",
-    "moduleId",
-    "x509Thumbprint"
-]
-
-class EndpointType(Enum):
-    """
-    Type of the routing endpoint.
-    """
-    EventHub = 'eventhub'
-    ServiceBusQueue = 'servicebusqueue'
-    ServiceBusTopic = 'servicebustopic'
-    AzureStorageContainer = 'azurestoragecontainer'
-
-
-class HubAspects(Enum):
-    """
-    Hub aspects to import or export.
-    """
-    Configurations = "configurations"
-    # EdgeDeployments = "edgedeployments"
-    Devices = "devices"
-    Arm = "arm"
-    # Routes = "routes"
-    # Certificates = "certificates"
-    # Endpoints = "endpoints"
-    # Identities = "identities"
-    # Network = "network"
-    # BuiltIn = "builtin"
-    # Policy = "policy"
-
-    @classmethod
-    def list(cls):
-        return list(map(lambda c: c.value, cls))
-
-
-class AuthenticationType(Enum):
-    """
-    Type of the Authentication for the routing endpoint.
-    """
-    KeyBased = 'keyBased'
-    IdentityBased = 'identityBased'
-
-
-# pylint: disable=too-few-public-methods
-class IdentityType(Enum):
-    """
-    Type of managed identity for the IoT Hub.
-    """
-    SystemAssigned = "SystemAssigned"
-    UserAssigned = "UserAssigned"
-    SystemAndUserAssigned = "SystemAssigned, UserAssigned"
-    NoneAssigned = "None"
-
-
-ALL_HUB_ASPECTS = HubAspects.list()
-
-
-# TODO: is file storage needed? built in endpoint? -> group under endpoints
 
 class StateProvider(IoTHubProvider):
     def __init__(
@@ -161,7 +70,7 @@ class StateProvider(IoTHubProvider):
     def get_client(self):
         return iot_hub_full_service_factory(self.cmd.cli_ctx)
 
-    def save_state(self, filename: str, overwrite_file=False, hub_aspects = None):
+    def save_state(self, filename: str, overwrite_file: bool = False, hub_aspects: List[str] = None):
         '''
         Writes hub state to file
         '''
@@ -169,7 +78,7 @@ class StateProvider(IoTHubProvider):
             raise FileOperationError(f'File {filename} is not empty. Include the --overwrite-file flag to overwrite file.')
 
         if not hub_aspects:
-            hub_aspects = ALL_HUB_ASPECTS
+            hub_aspects = HubAspects.list()
 
         hub_state = self.process_hub_to_dict(self.target, hub_aspects)
 
@@ -182,10 +91,10 @@ class StateProvider(IoTHubProvider):
         except FileNotFoundError:
             raise FileOperationError(f'File {filename} does not exist.')
 
-    def upload_state(self, filename: str, replace: Optional[bool] = None, hub_aspects = None):
+    def upload_state(self, filename: str, replace: Optional[bool] = None, hub_aspects: List[str] = None):
         '''Uses device info from file to recreate the hub state'''
         if not hub_aspects:
-            hub_aspects = ALL_HUB_ASPECTS
+            hub_aspects = HubAspects.list()
 
         self.delete_aspects(replace, hub_aspects)
 
@@ -205,7 +114,7 @@ class StateProvider(IoTHubProvider):
         orig_rg: Optional[str] = None,
         orig_hub_login: Optional[str] = None,
         replace: Optional[bool] = False,
-        hub_aspects = None
+        hub_aspects: List[str] = None
     ):
         '''Migrates state from original hub to destination hub.'''
         orig_hub_target = self.discovery.get_target(
@@ -216,7 +125,7 @@ class StateProvider(IoTHubProvider):
         )
 
         if not hub_aspects:
-            hub_aspects = ALL_HUB_ASPECTS
+            hub_aspects = HubAspects.list()
 
         # Command modifies hub_aspect - make copy so we can reuse for upload
         hub_state = self.process_hub_to_dict(orig_hub_target, hub_aspects[:])
@@ -301,7 +210,7 @@ class StateProvider(IoTHubProvider):
                 }
                 if authentication["type"] == DeviceAuthApiType.sas.value:
                     id2 = _iot_device_show(target=target, device_id=device_id)
-                    authentication ["symmetricKey"] = id2["authentication"]["symmetricKey"]
+                    authentication["symmetricKey"] = id2["authentication"]["symmetricKey"]
                 device_twin["authentication"] = authentication
 
                 for key in IMMUTABLE_DEVICE_IDENTITY_FIELDS:
@@ -359,7 +268,7 @@ class StateProvider(IoTHubProvider):
             for ep in endpoints["eventHubs"]:
                 if ep.get("connectionString"):
                     endpoint_props = parse_iot_hub_message_endpoint_connection_string(ep["connectionString"])
-                    namespace = endpoint_props ["Endpoint"].strip("sb://").split(".")[0]
+                    namespace = endpoint_props["Endpoint"].strip("sb://").split(".")[0]
                     ep["connectionString"] = cli.invoke(
                         "eventhubs eventhub authorization-rule keys list --namespace-name {} --resource-group {} "
                         "--eventhub-name {} --name {}".format(
@@ -372,7 +281,7 @@ class StateProvider(IoTHubProvider):
             for ep in endpoints["serviceBusQueues"]:
                 if ep.get("connectionString"):
                     endpoint_props = parse_iot_hub_message_endpoint_connection_string(ep["connectionString"])
-                    namespace = endpoint_props ["Endpoint"].strip("sb://").split(".")[0]
+                    namespace = endpoint_props["Endpoint"].strip("sb://").split(".")[0]
                     ep["connectionString"] = cli.invoke(
                         "servicebus queue authorization-rule keys list --namespace-name {} --resource-group {} "
                         "--queue-name {} --name {}".format(
@@ -385,7 +294,7 @@ class StateProvider(IoTHubProvider):
             for ep in endpoints["serviceBusTopics"]:
                 if ep.get("connectionString"):
                     endpoint_props = parse_iot_hub_message_endpoint_connection_string(ep["connectionString"])
-                    namespace = endpoint_props ["Endpoint"].strip("sb://").split(".")[0]
+                    namespace = endpoint_props["Endpoint"].strip("sb://").split(".")[0]
                     ep["connectionString"] = cli.invoke(
                         "servicebus topic authorization-rule keys list --namespace-name {} --resource-group {} "
                         "--topic-name {} --name {}".format(
@@ -428,11 +337,18 @@ class StateProvider(IoTHubProvider):
                 current_hub_resource = self.discovery.find_resource(self.hub_name, self.rg)
                 if not self.rg:
                     self.rg = current_hub_resource.additional_properties["resourcegroup"]
-                #location
+                # location
                 hub_resource["location"] = current_hub_resource.location
                 # sku
                 hub_resource["sku"] = current_hub_resource.sku.serialize()
-                # other props
+                # event hub partitions
+                partition_count = current_hub_resource.properties.event_hub_endpoints["events"].partition_count
+                hub_resource["properties"]["eventHubEndpoints"]["events"]["partitionCount"] = partition_count
+                # enable data residency
+                hub_resource["properties"]["enableDataResidency"] = current_hub_resource.properties.enable_data_residency
+                # features - hub takes care of this
+                hub_resource["properties"]["features"] = current_hub_resource.properties.features
+                # other props TODO!
 
             hub_resources.append(hub_resource)
 
@@ -442,9 +358,6 @@ class StateProvider(IoTHubProvider):
 
             for res in hub_certs:
                 res["name"] = self.hub_name + "/" + res["name"].split("/")[1]
-                # elif res["type"].endswith("PrivateEndpointConnections"):
-                #     res["name"] = self.hub_name + "/" + self.hub_name + "." + res["name"].split("/")[1]
-
                 depends_on = res["dependsOn"][0].split("'")
                 depends_on[3] = self.hub_name
                 res["dependsOn"][0] = "'".join(depends_on)
@@ -514,14 +427,15 @@ class StateProvider(IoTHubProvider):
 
         if HubAspects.Devices.value in hub_aspects and hub_state.get("devices"):
             hub_aspects.remove(HubAspects.Devices.value)
-            # for identity in tqdm(hub_state["devices"]["identities"], desc="Uploading devices", file=sys.stdout):
             child_to_parent = {}
             for device_id, device_obj in tqdm(hub_state["devices"].items(), desc="Uploading devices and modules"):
                 # upload device identity and twin
                 try:
                     self.upload_device_identity(device_id, device_obj["identity"])
                 except AzCLIError as e:
-                    logger.error(f" Failed to upload device identity for {device_id}. Proceeding to next device. Error Message: {e}")
+                    logger.error(
+                        f" Failed to upload device identity for {device_id}. Proceeding to next device. Error Message: {e}"
+                    )
                     continue
 
                 try:
@@ -529,7 +443,9 @@ class StateProvider(IoTHubProvider):
                         target=self.target, device_id=device_id, parameters=device_obj["twin"]
                     )
                 except AzCLIError as e:
-                    logger.error(f" Failed to upload device twin for {device_id}. Proceeding to next device. Error Message: {e}")
+                    logger.error(
+                        f" Failed to upload device twin for {device_id}. Proceeding to next device. Error Message: {e}"
+                    )
                     continue
 
                 edge_modules = {}
@@ -547,7 +463,10 @@ class StateProvider(IoTHubProvider):
                         try:
                             self.upload_module_identity(device_id, module_id, module_identity)
                         except AzCLIError as e:
-                            logger.error(f" Failed to upload module identity for {module_id} for the device {device_id}. Proceeding to next module. Error Message: {e}")
+                            logger.error(
+                                f" Failed to upload module identity for {module_id} for the device {device_id}. "
+                                f"Proceeding to next module. Error Message: {e}"
+                            )
                             continue
                         try:
                             _iot_device_module_twin_update(
@@ -557,7 +476,10 @@ class StateProvider(IoTHubProvider):
                                 parameters=module_twin
                             )
                         except AzCLIError as e:
-                            logger.error(f" Failed to upload module identity for {module_id} for the device {device_id}. Proceeding to next module. Error Message: {e}")
+                            logger.error(
+                                f" Failed to upload module identity for {module_id} for the device {device_id}. "
+                                f"Proceeding to next module. Error Message: {e}"
+                            )
                             continue
 
                 if edge_modules:
@@ -566,7 +488,10 @@ class StateProvider(IoTHubProvider):
                             target=self.target, device_id=device_id, content=json.dumps({"modulesContent": edge_modules})
                         )
                     except AzCLIError as e:
-                        logger.error(f" Failed to upload edge modules for the device {device_id}. Proceeding to next device. Error Message: {e}")
+                        logger.error(
+                            f" Failed to upload edge modules for the device {device_id}. Proceeding to next device. "
+                            f"Error Message: {e}"
+                        )
                         continue
 
                 if device_obj.get("parent"):
@@ -577,13 +502,20 @@ class StateProvider(IoTHubProvider):
                 try:
                     _iot_device_set_parent(target=self.target, parent_id=child_to_parent[device_id], device_id=device_id)
                 except AzCLIError as e:
-                    logger.error(f" Failed to set parent-child relationship for the parent device {child_to_parent[device_id]} to the child device {device_id}. Error Message: {e}")
+                    logger.error(
+                        f" Failed to set parent-child relationship for the parent device {child_to_parent[device_id]} to "
+                        f"the child device {device_id}. Error Message: {e}"
+                    )
                     continue
 
         # Leftover aspects
         if hub_aspects:
-            logger.warning(f"Some hub aspects ({', '.join(hub_aspects)}) were not uploaded because the necessary aspects were not found in the file.")
+            logger.warning(
+                f"Some hub aspects ({', '.join(hub_aspects)}) were not uploaded because the necessary aspects were "
+                "not found in the file."
+            )
 
+    # Upload commands
     def upload_device_identity(self, device_id: str, identity: dict):
         auth_type = identity["authentication"]["type"]
         edge = identity["capabilities"]["iotEdge"]
@@ -666,7 +598,14 @@ class StateProvider(IoTHubProvider):
 
     # Delete Commands
     def delete_all_configs(self):
-        all_configs = _iot_hub_configuration_list(target=self.target)
+        """Delete all configs if possible."""
+        # Basic tier does not support list config
+        try:
+            all_configs = _iot_hub_configuration_list(target=self.target)
+        except AzCLIError:
+            logger.warning("Failed to retrieve configurations. Skipping configuration deletion.")
+            return
+
         for config in tqdm(all_configs, desc="Deleting configurations from destination hub"):
             try:
                 _iot_hub_configuration_delete(target=self.target, config_id=config["id"])
@@ -674,6 +613,7 @@ class StateProvider(IoTHubProvider):
                 logger.warning("Configuration '{0}' not found during hub clean-up.".format(config["id"]))
 
     def delete_all_devices(self):
+        """Delete all devices if possible."""
         identities = _iot_device_list(target=self.target, top=-1)
         for d in tqdm(identities, desc="Deleting device identities from destination hub"):
             try:
