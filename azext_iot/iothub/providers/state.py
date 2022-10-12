@@ -264,6 +264,7 @@ class StateProvider(IoTHubProvider):
             # get connection strings if needed
             endpoints = hub_resource["properties"]["routing"]["endpoints"]
             for ep in endpoints["cosmosDBSqlCollections"]:
+                # TODO
                 pass
             for ep in endpoints["eventHubs"]:
                 if ep.get("connectionString"):
