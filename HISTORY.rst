@@ -14,6 +14,14 @@ unreleased
 * Device identity export/import operations now automatically derive storage auth type - hence the parameter `storage_authentication_type` has been deprecated.
 * Add `az iot hub device-twin list` as a highly recommended alternative to `az iot hub device-identity list`. Functionality remains the same as both return a list of device twins and `az iot hub device-identity list` may be altered or deprecated in the future.
 
+**Device Update**
+
+* The in-preview Azure Device Update CLI root namespace changed from `az iot device-update` to `az iot du`.
+
+**General Updates**
+
+* The Azure IoT CLI extension min core CLI version incremented to `2.32.0`.
+
 
 0.17.3
 +++++++++++++++

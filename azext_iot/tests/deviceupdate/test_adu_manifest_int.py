@@ -214,7 +214,7 @@ sample_properties = {"property1": "value1", "property2": 2, "property3": {"a": "
     ],
 )
 def test_adu_manifest_init_v5(options, expected):
-    result = cli.invoke(f"iot device-update update init v5 {options}").as_json()
+    result = cli.invoke(f"iot du update init v5 {options}").as_json()
     del result["createdDateTime"]
     assert result == expected
 
@@ -248,7 +248,7 @@ def test_adu_manifest_init_v5(options, expected):
     ],
 )
 def test_adu_manifest_init_v5_invalid_path_required(options):
-    assert not cli.invoke(f"iot device-update update init v5 {options}").success()
+    assert not cli.invoke(f"iot du update init v5 {options}").success()
 
 
 @pytest.mark.parametrize(
@@ -305,9 +305,9 @@ def test_adu_manifest_init_v5_invalid_path_required(options):
 )
 def test_adu_manifest_init_v5_validate_errors(options, no_validation):
     if no_validation:
-        assert cli.invoke(f"iot device-update update init v5 {options} --no-validation").success()
+        assert cli.invoke(f"iot du update init v5 {options} --no-validation").success()
     else:
-        assert not cli.invoke(f"iot device-update update init v5 {options}").success()
+        assert not cli.invoke(f"iot du update init v5 {options}").success()
 
 
 @pytest.mark.parametrize(
@@ -335,7 +335,7 @@ def test_adu_manifest_init_calculate_hash(files_count, expected_bytes):
     for p in normalized_paths:
         cli_path_input = cli_path_input + f" --file-path '{str(p)}'"
 
-    result = cli.invoke(f"iot device-update update init calculate-hash {cli_path_input}").as_json()
+    result = cli.invoke(f"iot du update init calculate-hash {cli_path_input}").as_json()
 
     for i in range(files_count):
         assert result[i]["hashAlgorithm"] == "sha256"

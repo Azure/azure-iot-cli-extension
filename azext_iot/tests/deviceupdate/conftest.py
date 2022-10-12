@@ -97,7 +97,7 @@ def _account_provisioner(request, provisioned_storage: dict) -> Tuple[dict, List
         desired_role = acct_marker.kwargs.get("role")
         desired_sku = acct_marker.kwargs.get("sku")
 
-    base_create_command = f"iot device-update account create -g {ACCOUNT_RG}"
+    base_create_command = f"iot du account create -g {ACCOUNT_RG}"
 
     if desired_location:
         base_create_command = base_create_command + f" -l {desired_location}"
@@ -182,7 +182,7 @@ def _account_removal(request, accounts: dict, user_identities: Optional[List[dic
 
     account_delete_failures = []
     for account_name in accounts["accounts"]:
-        delete_command = f"iot device-update account delete -g {ACCOUNT_RG} -n {account_name} --no-wait -y"
+        delete_command = f"iot du account delete -g {ACCOUNT_RG} -n {account_name} --no-wait -y"
         acct_delete_result = cli.invoke(delete_command)
         if not acct_delete_result.success():
             account_delete_failures.append(accounts["accounts"][account_name]["id"])
@@ -248,7 +248,7 @@ def _instance_provisioner(request, provisioned_accounts: dict, provisioned_iothu
     desired_instance_diagnostics_user_storage = None
     result_map = {}
 
-    base_create_command = "iot device-update instance create "
+    base_create_command = "iot du instance create "
 
     if acct_marker:
         desired_instance_diagnostics = acct_marker.kwargs.get("instance_diagnostics", False)
