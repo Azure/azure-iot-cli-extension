@@ -34,7 +34,7 @@ def load_command_table(self, _):
         cmd_group.command(
             "list",
             "iot_device_twin_list",
-            deprecate_info=self.deprecate(redirect='new-test', hide=True)
+            deprecate_info=self.deprecate(redirect='iot device-twin list')
         )
         cmd_group.command("delete", "iot_device_delete")
         cmd_group.generic_update_command(
