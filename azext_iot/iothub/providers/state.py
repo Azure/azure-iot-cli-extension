@@ -14,7 +14,11 @@ from azext_iot.iothub.common import (
     HubAspects
 )
 from azext_iot.iothub.providers.base import IoTHubProvider
-from azext_iot.common._azure import parse_iot_hub_message_endpoint_connection_string, parse_storage_container_connection_string
+from azext_iot.common._azure import (
+    parse_iot_hub_message_endpoint_connection_string,
+    parse_storage_container_connection_string,
+    parse_cosmos_db_connection_string
+)
 from azure.cli.core.azclierror import FileOperationError, ResourceNotFoundError, BadRequestError, AzCLIError
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.operations.hub import (
@@ -28,7 +32,7 @@ from azext_iot.operations.hub import (
     _iot_edge_set_modules,
     _iot_hub_configuration_delete,
     _iot_device_module_list,
-    _iot_device_list,
+    _iot_device_twin_list,
     _iot_hub_configuration_list,
     _iot_hub_configuration_create,
     _iot_device_twin_update,
@@ -179,7 +183,7 @@ class StateProvider(IoTHubProvider):
         if HubAspects.Devices.value in hub_aspects:
             hub_aspects.remove(HubAspects.Devices.value)
             hub_state["devices"] = {}
-            twins = _iot_device_list(target=target, top=-1)
+            twins = _iot_device_twin_list(target=target, top=-1)
 
             for i in tqdm(range(len(twins)), desc="Saving devices and modules"):
                 device_twin = twins[i]
@@ -264,8 +268,21 @@ class StateProvider(IoTHubProvider):
             # get connection strings if needed
             endpoints = hub_resource["properties"]["routing"]["endpoints"]
             for ep in endpoints["cosmosDBSqlCollections"]:
-                # TODO
                 pass
+                # TODO: test when cosmos db endpoint feature is out
+                # if ep.get("primaryKey") or ep.get("secondaryKey"):
+                #     account_name = ep["endpointUri"].strip("https://").split(".")[0]
+                #     cosmos_keys = cli.invoke(
+                #         'cosmosdb keys list --resource-group {} --name {} --type connection-strings'.format(
+                #             account_name,
+                #             ep["resourceGroup"]
+                #         )
+                #     ).as_json()
+                #     for cs_object in cosmos_keys["connectionStrings"]:
+                #         if cs_object["description"] == "Primary SQL Connection String" and ep.get("primaryKey"):
+                #             ep["primaryKey"] = parse_cosmos_db_connection_string(cs_object["connectionString"])["AccountKey"]
+                #         if cs_object["description"] == "Secondary SQL Connection String" and ep.get("secondaryKey"):
+                #             ep["secondaryKey"] = parse_cosmos_db_connection_string(cs_object["connectionString"])["AccountKey"]
             for ep in endpoints["eventHubs"]:
                 if ep.get("connectionString"):
                     endpoint_props = parse_iot_hub_message_endpoint_connection_string(ep["connectionString"])
@@ -615,7 +632,7 @@ class StateProvider(IoTHubProvider):
 
     def delete_all_devices(self):
         """Delete all devices if possible."""
-        identities = _iot_device_list(target=self.target, top=-1)
+        identities = _iot_device_twin_list(target=self.target, top=-1)
         for d in tqdm(identities, desc="Deleting device identities from destination hub"):
             try:
                 _iot_device_delete(target=self.target, device_id=d["deviceId"])

@@ -124,21 +124,6 @@ def _iot_device_show(target, device_id):
         handle_service_exception(e)
 
 
-def _iot_device_list(target, edge_enabled=False, top=1000):
-    top = _process_top(top)
-    query = (
-        "select * from devices where capabilities.iotEdge = true"
-        if edge_enabled
-        else "select * from devices"
-    )
-    result = _iot_query(target=target, query_command=query, top=top)
-
-    if not result:
-        hub_name = target["entity"].split('.')[0]
-        logger.info('No registered devices found on hub "%s".', hub_name)
-    return result
-
-
 def iot_device_create(
     cmd,
     device_id,
@@ -1770,22 +1755,27 @@ def iot_device_twin_list(
     login=None,
     auth_type_dataplane=None,
 ):
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        resource_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
+    return _iot_device_twin_list(target, edge_enabled, top)
+
+
+def _iot_device_twin_list(target, edge_enabled=False, top=1000):
+    top = _process_top(top)
     query = (
         "select * from devices where capabilities.iotEdge = true"
         if edge_enabled
         else "select * from devices"
     )
-    result = iot_query(
-        cmd=cmd,
-        query_command=query,
-        hub_name=hub_name,
-        top=top,
-        resource_group_name=resource_group_name,
-        login=login,
-        auth_type_dataplane=auth_type_dataplane,
-    )
+    result = _iot_query(target=target, query_command=query, top=top)
 
     if not result:
+        hub_name = target["entity"].split('.')[0]
         logger.info('No registered devices found on hub "%s".', hub_name)
     return result
 
