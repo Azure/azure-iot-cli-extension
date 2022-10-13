@@ -189,9 +189,9 @@ helps[
     type: command
     short-summary: List devices in an IoT Hub.
     long-summary: |
-                   This command is an alias for `az iot hub device-twin list`, which is recommended over
+                   This command is an alias for `az iot hub device-twin list`, which is highly recommended over
                    this command. In the future, this `az iot hub device-identity list` command may be
-                   deprecated.
+                   altered or deprecated.
 
 """
 

@@ -8,7 +8,8 @@ unreleased
 
 **IoT Hub**
 
-* Deprecate `az iot hub device-identity list` in favor of `az iot hub device-twin list`. Functionality remains the same.
+* Add `az iot hub device-twin list` as a highly recommended alternative to `az iot hub device-identity list`. Functionality remains the same as both return a list of device twins and `az iot hub device-identity list` may be altered or deprecated in the future.
+
 
 0.17.3
 +++++++++++++++
