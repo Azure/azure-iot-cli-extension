@@ -6,6 +6,9 @@ Release History
 unreleased
 +++++++++++++++
 
+**IoT Hub**
+
+* Deprecate `az iot hub device-identity list` in favor of `az iot hub device-twin list`. Functionality remains the same.
 
 0.17.3
 +++++++++++++++
@@ -23,7 +26,7 @@ unreleased
 * Add support for enrollment groups CRUD.
 
   - az iot central enrollment-group
- 
+
     - az iot central enrollment-group list
     - az iot central enrollment-group show
     - az iot central enrollment-group create
@@ -35,7 +38,7 @@ unreleased
 * Add support for scheduled jobs CRUD.
 
   - az iot central scheduled-job
- 
+
     - az iot central scheduled-job list
     - az iot central scheduled-job show
     - az iot central scheduled-job create

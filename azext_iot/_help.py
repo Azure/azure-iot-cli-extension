@@ -404,6 +404,16 @@ helps[
 """
 
 helps[
+    "iot hub device-twin list"
+] = """
+    type: command
+    short-summary: List device twins in an IoT Hub.
+    long-summary: |
+                   This command is the same as iot hub query with the query "select * from devices" for
+                   all devices and "select * from devices where capabilities.iotEdge = true" for edge devices.
+"""
+
+helps[
     "iot hub device-twin update"
 ] = """
     type: command
