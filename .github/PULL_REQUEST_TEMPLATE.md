@@ -18,6 +18,7 @@ Basic expectations
 - [ ] Have **all** the relevant unit **and** integration tests pass? i.e. `pytest <project root> -vv`. Please provide evidence in the form of a screenshot showing a succesful run of tests locally OR a link to a test pipeline that has been run against the change-set.
 - [ ] Have linter checks passed using the `.pylintrc` and `.flake8` rules? Look at the CI scripts for example usage.
 - [ ] Have extraneous print or debug statements, commented out code-blocks or code-statements (if any) been removed from the surface area of changes?
+- [ ] Have you checked all relavent command help messages with -h? Include screenshots of relevant help for easier verification.
 - [ ] Have you made an entry in HISTORY.rst which concisely explains your user-facing feature or change?
 
 Azure IoT CLI maintainers reserve the right to enforce any of the outlined expectations.
