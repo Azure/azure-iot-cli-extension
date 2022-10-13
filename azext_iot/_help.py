@@ -188,6 +188,7 @@ helps[
 ] = """
     type: command
     short-summary: List devices in an IoT Hub.
+    long-summary: This command is an alias for `az iot hub device-twin list`.
 """
 
 helps[
