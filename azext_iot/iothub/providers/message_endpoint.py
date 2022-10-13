@@ -150,7 +150,7 @@ class MessageEndpoint(IoTHubResourceProvider):
         elif EndpointType.CosmosDBCollection.value == endpoint_type.lower():
             if authentication_type != AuthenticationType.IdentityBased.value and not connection_string:
                 # try to get connection string
-                get_cosmos_db_cstring(
+                connection_string = get_cosmos_db_cstring(
                     cmd=self.cmd,
                     account_name=endpoint_account_name,
                     rg=endpoint_resource_group,
@@ -197,7 +197,7 @@ class MessageEndpoint(IoTHubResourceProvider):
         elif EndpointType.AzureStorageContainer.value == endpoint_type.lower():
             if authentication_type != AuthenticationType.IdentityBased.value and not connection_string:
                 # try to get connection string
-                get_storage_cstring(
+                connection_string = get_storage_cstring(
                     cmd=self.cmd,
                     account_name=endpoint_account_name,
                     rg=endpoint_resource_group,
