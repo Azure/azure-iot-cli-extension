@@ -124,25 +124,6 @@ def _iot_device_show(target, device_id):
         handle_service_exception(e)
 
 
-def iot_device_list(
-    cmd,
-    hub_name=None,
-    top=1000,
-    edge_enabled=False,
-    resource_group_name=None,
-    login=None,
-    auth_type_dataplane=None,
-):
-    discovery = IotHubDiscovery(cmd)
-    target = discovery.get_target(
-        resource_name=hub_name,
-        resource_group_name=resource_group_name,
-        login=login,
-        auth_type=auth_type_dataplane,
-    )
-    return _iot_device_list(target, edge_enabled, top)
-
-
 def _iot_device_list(target, edge_enabled=False, top=1000):
     top = _process_top(top)
     query = (
@@ -1778,6 +1759,35 @@ def _iot_device_twin_show(target, device_id):
         return service_sdk.devices.get_twin(id=device_id, raw=True).response.json()
     except CloudError as e:
         handle_service_exception(e)
+
+
+def iot_device_twin_list(
+    cmd,
+    hub_name=None,
+    top=1000,
+    edge_enabled=False,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
+):
+    query = (
+        "select * from devices where capabilities.iotEdge = true"
+        if edge_enabled
+        else "select * from devices"
+    )
+    result = iot_query(
+        cmd=cmd,
+        query_command=query,
+        hub_name=hub_name,
+        top=top,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type_dataplane=auth_type_dataplane,
+    )
+
+    if not result:
+        logger.info('No registered devices found on hub "%s".', hub_name)
+    return result
 
 
 def iot_twin_update_custom(instance, desired=None, tags=None):
