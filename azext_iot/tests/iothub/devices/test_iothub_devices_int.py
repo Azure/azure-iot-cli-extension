@@ -270,7 +270,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
                 # List devices
                 self.cmd(
                     self.set_cmd_auth_type(
-                        f"iot hub device-identity twin -n {self.entity_name} -g {self.entity_rg}",
+                        f"iot hub device-twin list -n {self.entity_name} -g {self.entity_rg}",
                         auth_type=auth_phase,
                     ),
                     checks=query_checks,
@@ -279,7 +279,7 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
                 # List devices filtering for edge devices
                 edge_filtered_list = self.cmd(
                     self.set_cmd_auth_type(
-                        f"iot hub device-identity twin -n {self.entity_name} -g {self.entity_rg} --ee",
+                        f"iot hub device-twin list -n {self.entity_name} -g {self.entity_rg} --ee",
                         auth_type=auth_phase,
                     )
                 ).get_output_in_json()
