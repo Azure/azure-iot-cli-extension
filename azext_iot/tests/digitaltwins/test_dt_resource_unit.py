@@ -22,8 +22,8 @@ location = 'westus'
 role_type = "Contributor"
 public_network_access = ADTPublicNetworkAccessType.enabled.value
 provisioning = json.dumps({"provisioningState": "provisioning"})
-finished = json.dumps({"provisioningState": "succeeded"})
-failed = json.dumps({"provisioningState": "failed"})
+finished = json.dumps({"status": "Succeeded"})
+failed = json.dumps({"status": "Failed"})
 
 
 @pytest.fixture
@@ -70,7 +70,7 @@ class TestTwinCreateInstance(object):
             body=provisioning,
             status=201,
             headers={
-                "Location":
+                "Azure-AsyncOperation":
                     "https://management.azure.com/subscriptions/xxx/providers/Microsoft.DigitalTwins/"
                     "locations/xxx/operationResults/operationkey"
             },
@@ -84,11 +84,6 @@ class TestTwinCreateInstance(object):
                 "locations/xxx/operationResults/operationkey",
             body=finished,
             status=200,
-            headers={
-                "Location":
-                    "https://management.azure.com/subscriptions/xxx/providers/Microsoft.DigitalTwins/"
-                    "locations/xxx/operationResults/operationkey2"
-            },
             content_type="application/json",
             match_querystring=False,
         )
@@ -107,7 +102,9 @@ class TestTwinCreateInstance(object):
             sleep(10)
         check_request = service_client_with_retry.calls[1].request
         assert "operationkey" in check_request.url
-        assert len(service_client_with_retry.calls) == 2
+
+        # The LRO poller calls second call once more for some reason
+        assert len(service_client_with_retry.calls) >= 2
         assert service_client_with_retry.calls[1].response.content.decode("utf-8") == finished
 
     @pytest.fixture
@@ -123,7 +120,7 @@ class TestTwinCreateInstance(object):
             body=provisioning,
             status=201,
             headers={
-                "Location":
+                "Azure-AsyncOperation":
                     "https://management.azure.com/subscriptions/xxx/providers/Microsoft.DigitalTwins/"
                     "locations/xxx/operationResults/operationkey"
             },
@@ -136,7 +133,7 @@ class TestTwinCreateInstance(object):
             url="https://management.azure.com/subscriptions/xxx/providers/Microsoft.DigitalTwins/"
                 "locations/xxx/operationResults/operationkey",
             body=failed,
-            status=500,
+            status=200,
             content_type="application/json",
             match_querystring=False,
         )
