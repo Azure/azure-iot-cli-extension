@@ -149,14 +149,15 @@ class TestTwinCreateInstance(object):
             location=location
         )
         while len(service_client_with_failed_retry.calls) == 1:
-            sleep(15)
+            sleep(10)
         check_request = service_client_with_failed_retry.calls[1].request
         assert "operationkey" in check_request.url
 
         # The LRO poller calls once more for some reason
-        print(len(service_client_with_failed_retry.calls))
         assert len(service_client_with_failed_retry.calls) >= 2
         assert service_client_with_failed_retry.calls[1].response.content.decode("utf-8") == failed
+        # Sleep to give time for the poller
+        sleep(1)
 
         # The poller.result will have the error
         assert result.status() == "Failed"
