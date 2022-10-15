@@ -318,7 +318,7 @@ def test_adu_manifest_init_v5_validate_errors(options, no_validation):
         (3, 256),
     ],
 )
-def test_adu_manifest_init_calculate_hash(files_count, expected_bytes):
+def test_adu_manifest_calculate_hash(files_count, expected_bytes):
     from azext_iot.deviceupdate.providers.base import DeviceUpdateDataManager, FileMetadata
 
     normalized_paths: List[PurePath] = []
@@ -335,7 +335,7 @@ def test_adu_manifest_init_calculate_hash(files_count, expected_bytes):
     for p in normalized_paths:
         cli_path_input = cli_path_input + f" --file-path '{str(p)}'"
 
-    result = cli.invoke(f"iot du update init calculate-hash {cli_path_input}").as_json()
+    result = cli.invoke(f"iot du update calculate-hash {cli_path_input}").as_json()
 
     for i in range(files_count):
         assert result[i]["hashAlgorithm"] == "sha256"

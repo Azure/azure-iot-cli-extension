@@ -97,6 +97,8 @@ def load_deviceupdate_commands(self, _):
             ),
         )
         cmd_group.show_command("show", "show_update")
+        cmd_group.show_command("calculate-hash", "calculate_hash")
+        cmd_group.show_command("stage", "stage_update", is_preview=True)  # Is preview independent of command group.
 
     with self.command_group(
         "iot du update file",
@@ -110,7 +112,6 @@ def load_deviceupdate_commands(self, _):
         command_type=deviceupdate_update_ops,
     ) as cmd_group:
         cmd_group.command("v5", "manifest_init_v5")
-        cmd_group.show_command("calculate-hash", "calculate_hash")
 
     with self.command_group(
         "iot du device",

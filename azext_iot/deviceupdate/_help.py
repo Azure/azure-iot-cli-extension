@@ -825,7 +825,7 @@ def load_deviceupdate_help():
 
     helps["iot du update init"] = """
         type: group
-        short-summary: Utilities for update import manifest creation.
+        short-summary: Utility for update manifest initialization.
     """
 
     helps["iot du update init v5"] = """
@@ -876,7 +876,7 @@ def load_deviceupdate_help():
             --file path=/my/update/scripts/postinstall.sh
     """
 
-    helps["iot du update init calculate-hash"] = """
+    helps["iot du update calculate-hash"] = """
         type: command
         short-summary: Calculate the base64 hashed representation of a file.
 
@@ -891,4 +891,23 @@ def load_deviceupdate_help():
             --file-path /path/to/file1
             --file-path /path/to/file2
             --file-path /path/to/file3
+    """
+
+    helps["iot du update stage"] = """
+        type: command
+        short-summary: Stage an update for import to a target instance.
+        long-summary: >
+          Staging an update refers to accelerating the pre-requisite steps
+          of importing an update to a target instance. For a given update manifest, the process
+          will determine relevant files, push them to a desired storage container,
+          generate SAS URIs and cover other preparation steps for a succesful import.
+
+          The command depends on a convention based organization of update files. All update files for a
+          target manifest are expected to be in the same directory the update manifest resides in.
+
+          Key based access is used to upload blob artifacts and to generate 3 hour duration SAS URIs with read access.
+
+          If `--then-import` flag is provided, the command will import the staged update. Otherwise
+          the result of this operation is a collection of import commands to run in-order to achieve
+          the same result at a later time.
     """

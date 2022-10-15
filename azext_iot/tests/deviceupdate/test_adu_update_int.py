@@ -441,6 +441,14 @@ def test_instance_update_lifecycle(provisioned_instances_module: Dict[str, dict]
         assert len(list_device_groups) == 1
         assert list_device_groups[0]["groupId"] == "$default"
 
+    assert cli.invoke(
+        f"iot du update delete -n {account_name} -i {instance_name} --update-name {simple_manifest_id['name']} "
+        f"--update-provider {simple_manifest_id['provider']} --update-version {simple_manifest_id['version']} -y"
+    ).success()
+    list_updates = cli.invoke(f"iot du update list -n {account_name} -i {instance_name} -g {ACCOUNT_RG}").as_json()
+    friendly_name_map = [r["friendlyName"] for r in list_updates]
+    assert simple_manifest_friendly_name not in friendly_name_map
+
 
 def test_instance_update_nested(provisioned_instances_module: Dict[str, dict]):
     account_name = list(provisioned_instances_module.keys())[0]
@@ -497,6 +505,49 @@ def test_instance_update_nested(provisioned_instances_module: Dict[str, dict]):
         assert friendly_name not in friendly_name_map
 
 
+def test_instance_update_stage(provisioned_instances_module: Dict[str, dict]):
+    from msrestazure.tools import parse_resource_id
+    account_name = list(provisioned_instances_module.keys())[0]
+    instance_name = list(provisioned_instances_module[account_name].keys())[0]
+    storage_account_id = provisioned_instances_module[
+        account_name][instance_name]["diagnosticStorageProperties"]["resourceId"]
+    _assign_rbac_if_needed(account_name)
+    parsed_storage_id = parse_resource_id(storage_account_id)
+
+    # Upload simple manifest to storage blob
+    simple_manifest_file = "simple_apt_manifest_v5.json"
+    simple_update_path = get_context_path(__file__, "manifests", simple_manifest_file)
+    simple_update_id = process_json_arg(simple_update_path)["updateId"]
+    simple_friendly_name = f"simple_{generate_generic_id()}"
+    assert cli.invoke(
+        f"iot du update stage -n {account_name} -i {instance_name} --friendly-name {simple_friendly_name} "
+        f"--manifest-path '{simple_update_path}' --storage-account {parsed_storage_id['name']} --storage-container staged"
+    ).success()
+    list_updates = cli.invoke(f"iot du update list -n {account_name} -i {instance_name}").as_json()
+
+    import pdb; pdb.set_trace()
+    # Upload multi-reference update to storage blob
+    surface15_root = "parent.importmanifest.json"
+    surface15_leaf1 = "leaf1.importmanifest.json"
+    surface15_leaf2 = "leaf2.importmanifest.json"
+    complex_friendly_name = f"complex_{generate_generic_id()}"
+
+    file_paths = []
+    for name in [surface15_root, surface15_leaf1, surface15_leaf2]:
+        file_paths.append(get_context_path(__file__, "manifests", "surface15", name))
+    complex_update_parent_id = process_json_arg(file_paths[0])["updateId"]
+    complex_update_leaf1_id = process_json_arg(file_paths[1])["updateId"]
+    complex_update_leaf2_id = process_json_arg(file_paths[2])["updateId"]
+
+    assert cli.invoke(
+        f"iot du update stage -n {account_name} -i {instance_name} --friendly-name {complex_friendly_name} "
+        f"--storage-account {parsed_storage_id['name']} --storage-container staged "
+        f"--manifest-path '{file_paths[0]}' --manifest-path '{file_paths[1]}' --manifest-path '{file_paths[2]}'"
+    ).success()
+    list_updates = cli.invoke(f"iot du update list -n {account_name} -i {instance_name}").as_json()
+    import pdb; pdb.set_trace()
+
+
 def _stage_update_assets(file_paths: List[str], storage_account_id: str, storage_container: str = "updates") -> List[str]:
     from os import sep
     storage_account_cstring = cli.invoke(
@@ -514,7 +565,7 @@ def _stage_update_assets(file_paths: List[str], storage_account_id: str, storage
             f"--connection-string '{storage_account_cstring}' -n {file_name}"
         ).success()
 
-        target_datetime_expiry = (datetime.utcnow() + timedelta(hours=4.0)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        target_datetime_expiry = (datetime.utcnow() + timedelta(hours=3.0)).strftime("%Y-%m-%dT%H:%M:%SZ")
         file_sas_uri = cli.invoke(
             f"storage blob generate-sas --connection-string '{storage_account_cstring}' --container {storage_container} "
             f"--name {file_name} --permissions r --expiry {target_datetime_expiry} "

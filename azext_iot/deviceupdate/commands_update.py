@@ -425,3 +425,137 @@ def calculate_hash(
             }
         )
     return result
+
+
+def stage_update(
+    cmd,
+    name: str,
+    instance_name: str,
+    update_manifest_paths: List[str],
+    storage_account_name: str,
+    storage_container_name: str,
+    friendly_name: str = None,
+    then_import: Optional[bool] = None,
+    resource_group_name: Optional[str] = None,
+    overwrite: bool = False,
+):
+    from azext_iot.common.embedded_cli import EmbeddedCLI
+    from datetime import datetime, timedelta
+    from azext_iot.common.utility import process_json_arg
+    from pathlib import PurePath
+    from azure.identity import AzureCliCredential
+    from azure.mgmt.storage import StorageManagementClient
+    from azure.storage.blob import ResourceTypes, AccountSasPermissions, generate_account_sas, BlobServiceClient
+    from azure.cli.core.azclierror import ResourceNotFoundError
+    from azure.core.exceptions import ResourceExistsError
+    from msrestazure.tools import parse_resource_id
+
+    cli = EmbeddedCLI()
+    az_account_info = cli.invoke("account show").as_json()
+    azcli_credential = AzureCliCredential()
+
+    target_subscription = cmd.cli_ctx.data.get("subscription_id") or az_account_info.get("id")
+    storage_mgmt_client = StorageManagementClient(credential=azcli_credential, subscription_id=target_subscription)
+    list_iterator = storage_mgmt_client.storage_accounts.list()
+    target_account = None
+    for acc in list_iterator:
+        if acc.name == storage_account_name:
+            target_account = acc
+    if not target_account:
+        raise ResourceNotFoundError(
+            f"Unable to find storage account: {storage_account_name} in subscription: {target_subscription}.")
+
+    storage_rg = parse_resource_id(target_account.id)["resource_group"]
+    storage_keys = storage_mgmt_client.storage_accounts.list_keys(
+        resource_group_name=storage_rg, account_name=target_account.name)
+    blob_service_client = BlobServiceClient(
+        account_url=target_account.primary_endpoints.blob, credential=storage_keys.keys[0].value)
+    try:
+        blob_service_client.create_container(name=storage_container_name)
+    except ResourceExistsError:
+        pass
+    container_client = blob_service_client.get_container_client(container=storage_container_name)
+
+    def _stage_update_assets(
+        file_paths: List[str],
+        container_directory: str = "",
+    ) -> List[str]:
+
+        file_sas_result = []
+        for file_path in file_paths:
+            file_name = PurePath(file_path).name
+            blob_client = None
+            with open(file_path, "rb") as data:
+                blob_client = container_client.upload_blob(
+                    name=f"{container_directory}{file_name}", data=data, overwrite=overwrite)
+
+            target_datetime_expiry = (datetime.utcnow() + timedelta(hours=3.0))
+            sas_token = generate_account_sas(
+                account_name=target_account.name,
+                account_key=storage_keys.keys[0].value,
+                resource_types=ResourceTypes(object=True),
+                permission=AccountSasPermissions(read=True),
+                expiry=target_datetime_expiry
+            )
+            file_sas_result.append(f"{blob_client.url}?{sas_token}")
+
+        return file_sas_result
+
+    manifest_sas_uris_map = {}
+    for manifest_path in update_manifest_paths:
+        manifest: dict = process_json_arg(manifest_path, argument_name="--manifest-path")
+        manifest_files = manifest.get("files")
+        uploaded_files_map = {}
+
+        manifest_purepath = PurePath(manifest_path)
+        manifest_directory_path = manifest_purepath.parent.as_posix()
+        manifest_directory_name = manifest_purepath.parent.name
+
+        file_paths = [manifest_path]
+        file_names = []
+        if manifest_files:
+            for file in manifest_files:
+                filename = file["filename"]
+                if filename in uploaded_files_map:
+                    continue
+                file_names.append(filename)
+                file_paths.append(PurePath(manifest_directory_path, filename).as_posix())
+                uploaded_files_map[filename] = 1
+
+        updateId = manifest['updateId']
+        qualifier = f"{updateId['provider']}_{updateId['name']}_{updateId['version']}"
+        manifest_sas_uris_map[manifest_path] = (
+            _stage_update_assets(file_paths, f"{manifest_directory_name}/{qualifier}/"),
+            file_names
+        )
+
+    user_commands = []
+    manifest_count = len(manifest_sas_uris_map)
+    for manifest_sas_uris in manifest_sas_uris_map:
+        sas_uris, file_names = manifest_sas_uris_map[manifest_sas_uris]
+        root_uri = sas_uris.pop(0)
+        friendly_name_cmd_seg = ""
+        if friendly_name:
+            friendly_name_cmd_seg = f" --friendly-name {friendly_name}"
+        file_cmd_segs = ""
+        for file_uri_index in range(len(sas_uris)):
+            file_cmd_segs = file_cmd_segs + f" --file filename={file_names[file_uri_index]} url={sas_uris[file_uri_index]}"
+        defer_cmd_seg = ""
+        if manifest_count > 1:
+            defer_cmd_seg = " --defer"
+        user_commands.append(
+            f"az iot du update import -n {name} -i {instance_name} -g {resource_group_name} "
+            f"--url {root_uri}{friendly_name_cmd_seg}{file_cmd_segs}{defer_cmd_seg}"
+        )
+        manifest_count = manifest_count - 1
+
+    total_commands = {"commands": user_commands}
+
+    if then_import:
+        for command in total_commands["commands"]:
+            # New EmbeddedCLI instance created per command due to persisted cache setting.
+            import_cli = EmbeddedCLI(cli_ctx=cmd.cli_ctx)
+            import_cli.invoke(command.split("az")[1])
+        return
+
+    return total_commands

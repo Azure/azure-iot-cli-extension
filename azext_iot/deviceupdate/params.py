@@ -166,6 +166,20 @@ def load_deviceupdate_arguments(self, _):
             options_list=["--friendly-name"],
             help="Friendly name associated with the update definition.",
         )
+        context.argument(
+            "file_paths",
+            options_list=["--file-path"],
+            nargs="+",
+            action="append",
+            help="Local path to target file for hash calculation. --file-path can be used 1 or more times.",
+        )
+        context.argument(
+            "hash_algo",
+            options_list=["--hash-algo"],
+            help="Cryptographic algorithm to use for hashing.",
+            arg_type=get_enum_type(ADUValidHashAlgorithmType),
+            type=str,
+        )
 
     with self.argument_context("iot du update list") as context:
         context.argument(
@@ -487,7 +501,7 @@ def load_deviceupdate_arguments(self, _):
             "key value pairs. If either inline or reference step can be satisfied, the reference step will be prioritized. "
             "Usage of --file will be associated with the nearest inline --step entry, deriving the value for 'files'. "
             "The following reference step keys are supported: "
-            "`updateId.provider`, `updateId.name` `updateId.version` and `description`."
+            "`updateId.provider`, `updateId.name`, `updateId.version` and `description`. "
             "The following inline step keys are supported: "
             "`handler` (ex: 'microsoft/script:1' or 'microsoft/swupdate:1' or 'microsoft/apt:1'), "
             "`properties` (in-line json object the agent will pass to the handler), and `description`. "
@@ -519,22 +533,41 @@ def load_deviceupdate_arguments(self, _):
             "--related-file can be used 1 or more times.",
         )
         context.argument(
-            "file_paths",
-            options_list=["--file-path"],
-            nargs="+",
-            action="append",
-            help="Local path to target file for hash calculation. --file-path can be used 1 or more times.",
-        )
-        context.argument(
-            "hash_algo",
-            options_list=["--hash-algo"],
-            help="Cryptographic algorithm to use for hashing.",
-            arg_type=get_enum_type(ADUValidHashAlgorithmType),
-            type=str,
-        )
-        context.argument(
             "no_validation",
             options_list=["--no-validation"],
             arg_type=get_three_state_flag(),
             help="Disables client-side json schema validation of the import manifest content.",
+        )
+
+    with self.argument_context("iot du update stage") as context:
+        context.argument(
+            "storage_account_name",
+            options_list=["--storage-account"],
+            help="Desired storage account name to stage update manifest artifacts.",
+            arg_group="Storage"
+        )
+        context.argument(
+            "storage_container_name",
+            options_list=["--storage-container"],
+            help="Desired storage container name to stage update manifest artifacts.",
+            arg_group="Storage"
+        )
+        context.argument(
+            "update_manifest_paths",
+            nargs="?",
+            action="append",
+            options_list=["--manifest-path"],
+            help="Local file path to the update manifest that should be staged. Can be used 1 or more times.",
+        )
+        context.argument(
+            "then_import",
+            options_list=["--then-import"],
+            arg_type=get_three_state_flag(),
+            help="Flag indicating whether the update should be imported after staging.",
+        )
+        context.argument(
+            "overwrite",
+            options_list=["--overwrite"],
+            arg_type=get_three_state_flag(),
+            help="Flag indicating whether existing blobs should be overwritten if a conflict exists.",
         )
