@@ -2330,7 +2330,7 @@ def iot_device_export(
         )
     if storage_authentication_type is not None:
         logger.warning(
-            "The parameter --storage-authentication-type has been deprecated and should not be provided"
+            "The parameter --sat/--storage-authentication-type has been deprecated and should not be provided"
         )
     if auth_type_dataplane is not None:
         logger.warning(
@@ -2375,7 +2375,7 @@ def iot_device_import(
         )
     if storage_authentication_type is not None:
         logger.warning(
-            "The parameter --storage-authentication-type has been deprecated and should not be provided"
+            "The parameter --sat/--storage-authentication-type has been deprecated and should not be provided"
         )
     if auth_type_dataplane is not None:
         logger.warning(

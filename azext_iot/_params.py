@@ -477,7 +477,7 @@ def load_arguments(self, _):
         )
         context.argument(
             "storage_authentication_type",
-            options_list=["--storage-authentication-type"],
+            options_list=["--sat", "--storage-authentication-type"],
             arg_type=get_enum_type(AuthenticationType),
             deprecate_info=context.deprecate(hide=True),
             help="Authentication type for communicating with the storage container.",
@@ -538,7 +538,7 @@ def load_arguments(self, _):
         )
         context.argument(
             "storage_authentication_type",
-            options_list=["--storage-authentication-type"],
+            options_list=["--sat", "--storage-authentication-type"],
             arg_type=get_enum_type(AuthenticationType),
             deprecate_info=context.deprecate(hide=True),
             help="Authentication type for communicating with the storage container.",
