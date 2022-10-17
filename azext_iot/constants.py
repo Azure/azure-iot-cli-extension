@@ -57,41 +57,28 @@ IOTDPS_TRACK_2_SDK_MIN_VERSION = "1.0.0"
 
 # Edge device TOML default values
 DEVICE_CONFIG_TOML = {
-  "hostname": "",
-  "parent_hostname": "",
-  "provisioning": {
-    "device_id": "",
-    "iothub_hostname": "",
-    "source": "manual",
-    "authentication": {
-      "device_id_pk": "",
-      "method": "sas",
-      "trust_bundle_cert": ""
-    }
-  },
-  "edge_ca": {
-    "cert": "file:///",
-    "pk": "file:///"
-  },
-  "agent": {
-    "config": {
-      "image": ""
+    "hostname": "",
+    "provisioning": {
+        "device_id": "",
+        "iothub_hostname": "",
+        "source": "manual",
+        "authentication": {
+            "device_id_pk": "",
+            "method": "sas",
+            "trust_bundle_cert": "",
+        },
     },
-    "name": "edgeAgent",
-    "type": "docker"
-  },
-  "connect": {
-    "management_uri": "unix:///var/run/iotedge/mgmt.sock",
-    "workload_uri": "unix:///var/run/iotedge/workload.sock"
-  },
-  "listen": {
-    "management_uri": "fd://aziot-edged.mgmt.socket",
-    "workload_uri": "fd://aziot-edged.workload.socket"
-  },
-  "moby_runtime": {
-    "network": "azure-iot-edge",
-    "uri": "unix:///var/run/docker.sock"
-  }
+    "edge_ca": {"cert": "file:///", "pk": "file:///"},
+    "agent": {"config": {"image": ""}, "name": "edgeAgent", "type": "docker"},
+    "connect": {
+        "management_uri": "unix:///var/run/iotedge/mgmt.sock",
+        "workload_uri": "unix:///var/run/iotedge/workload.sock",
+    },
+    "listen": {
+        "management_uri": "fd://aziot-edged.mgmt.socket",
+        "workload_uri": "fd://aziot-edged.workload.socket",
+    },
+    "moby_runtime": {"network": "azure-iot-edge", "uri": "unix:///var/run/docker.sock"},
 }
 
 EDGE_CONFIG_SCRIPT_HEADERS = """
@@ -125,7 +112,7 @@ fi
 
 sed -i "s/{{PARENT_HOSTNAME}}/$parent_hostname/" /etc/aziot/config.toml
 """
-EDGE_CONFIG_SCRIPT_CA_CERTS= """
+EDGE_CONFIG_SCRIPT_CA_CERTS = """
 # ======================= Install nested root CA =======================================
 if [ -f /etc/os-release ]
 then
@@ -152,21 +139,21 @@ cp "iotedge_config_cli_root.pem" "$cert_dir/iotedge_config_cli_root.pem"
 cp "$device_id.full-chain.cert.pem" "$cert_dir/$device_id.full-chain.cert.pem"
 cp "$device_id.key.pem" "$cert_dir/$device_id.key.pem"
 """
-EDGE_CONFIG_SCRIPT_HUB_AUTH_CERTS= """
+EDGE_CONFIG_SCRIPT_HUB_AUTH_CERTS = """
 # ======================= Copy hub auth certs  =======================================
 cert_dir="/etc/aziot/certificates"
 mkdir -p $cert_dir
-cp "$device_id.hub-auth.cert.pem" "$cert_dir/$device_id.hub-auth.cert.pem"
-cp "$device_id.hub-auth.key.pem" "$cert_dir/$device_id.hub-auth.key.pem"
+cp "$device_id.hub-auth-cert.pem" "$cert_dir/$device_id.hub-auth-cert.pem"
+cp "$device_id.hub-auth-key.pem" "$cert_dir/$device_id.hub-auth-key.pem"
 """
-EDGE_CONFIG_SCRIPT_APPLY= """
+EDGE_CONFIG_SCRIPT_APPLY = """
 # ======================= Read User Input =======================================
 iotedge config apply -c /etc/aziot/config.toml
 
 echo "To check the edge runtime status, run 'iotedge system status'. To validate the configuration, run 'sudo iotedge check'"
 """
 
-DEVICE_README="""
+DEVICE_README = """
 # Prerequisites
 Each device must have IoT Edge (must be v1.2 or later) installed. Pick the [supported OS](https://docs.microsoft.com/en-us/azure/iot-edge/support?view=iotedge-2020-11) and follow the [tutorial](https://docs.microsoft.com/en-us/azure/iot-edge/support?view=iotedge-2020-11) to install Azure IoT Edge.
 

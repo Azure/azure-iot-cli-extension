@@ -67,7 +67,13 @@ class TestEdgeHierarchyCreateArgs:
         mocked_response.add(
             method=responses.PUT,
             url=re.compile(r"{}/dev\d+".format(devices_url)),
-            body="{}",
+            body=json.dumps({
+                'authentication': {
+                    'symmetricKey': {
+                        'primaryKey': 'devicePrimaryKey'
+                    }
+                }
+            }),
             status=200,
             content_type="application/json",
             match_querystring=False,
@@ -260,7 +266,13 @@ class TestHierarchyCreateConfig:
         mocked_response.add(
             method=responses.PUT,
             url=re.compile(r"{}/device_\d+".format(devices_url)),
-            body="{}",
+            body=json.dumps({
+                'authentication': {
+                    'symmetricKey': {
+                        'primaryKey': 'devicePrimaryKey'
+                    }
+                }
+            }),
             status=200,
             content_type="application/json",
             match_querystring=False,

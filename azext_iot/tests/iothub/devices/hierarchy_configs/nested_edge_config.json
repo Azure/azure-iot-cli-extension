@@ -4,7 +4,7 @@
         "authentication_method": "symmetric_key"
     },
     "configuration": {
-        "template_config_path": "./templates/purdue/device_config.toml"
+        "template_config_path": "./hierarchy_configs/device_config.toml"
     },
     "edgedevices": [
         {

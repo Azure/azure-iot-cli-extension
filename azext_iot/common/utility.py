@@ -711,12 +711,13 @@ def create_edge_configuration_script(
     device_id: str,
     hub_auth: Optional[bool] = False,
     hostname: Optional[str] = None,
+    has_parent: Optional[bool] = False,
     parent_hostname: Optional[str] = None,
 ):
     return "\n".join(
         [EDGE_CONFIG_SCRIPT_HEADERS.format(device_id)]
         + ([EDGE_CONFIG_SCRIPT_HOSTNAME] if not hostname else [])
-        + ([EDGE_CONFIG_SCRIPT_PARENT_HOSTNAME] if not parent_hostname else [])
+        + ([EDGE_CONFIG_SCRIPT_PARENT_HOSTNAME] if (has_parent and not parent_hostname) else [])
         + [EDGE_CONFIG_SCRIPT_CA_CERTS]
         + ([EDGE_CONFIG_SCRIPT_HUB_AUTH_CERTS] if hub_auth else [])
         + [EDGE_CONFIG_SCRIPT_APPLY]

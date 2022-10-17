@@ -9,15 +9,14 @@ certops: Functions for working with certificates.
 """
 
 import datetime
-from os import makedirs
 from os.path import exists, join
 import base64
-from pathlib import PurePath
-from typing import List, Optional, TypedDict, Union
+from typing import List, Optional, TypedDict
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
+from azext_iot.common.fileops import write_content_to_file
 from azext_iot.common.shared import SHAHashVersions
 from azure.cli.core.azclierror import FileOperationError
 
@@ -257,13 +256,16 @@ def create_signed_device_cert(
     ).decode("utf-8")
 
     if cert_output_dir and exists(cert_output_dir):
-        cert_file = device_id + ".cert.pem"
-        key_file = device_id + ".key.pem"
-        with open(join(cert_output_dir, cert_file), "wt", encoding="utf-8") as f:
-            f.write(certificate)
-
-        with open(join(cert_output_dir, key_file), "wt", encoding="utf-8") as f:
-            f.write(privateKey)
+        write_content_to_file(
+            content=certificate,
+            destination=cert_output_dir,
+            file_name=f"{device_id}.cert.pem",
+        )
+        write_content_to_file(
+            content=privateKey,
+            destination=cert_output_dir,
+            file_name=f"{device_id}.key.pem",
+        )
     return CertInfo(
         certificate=certificate, thumbprint=thumbprint, privateKey=privateKey
     )
@@ -300,22 +302,3 @@ def make_cert_chain(
             overwrite=True,
         )
     return cert_content
-
-
-def write_content_to_file(
-    content: Union[str, bytes],
-    destination: str,
-    file_name: str,
-    overwrite: Optional[bool] = False,
-):
-    dest_path = PurePath(destination)
-    file_path = dest_path.joinpath(file_name)
-
-    if exists(file_path) and not overwrite:
-        raise FileOperationError(f"File already exists at path: {file_path}")
-    if overwrite:
-        makedirs(destination, exist_ok=True)
-    with open(
-        file_path, "wt" if isinstance(content, str) else "wb", encoding="utf-8"
-    ) as f:
-        f.write(content)

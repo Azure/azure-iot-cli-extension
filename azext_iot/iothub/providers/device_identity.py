@@ -14,12 +14,10 @@ from azext_iot.common.certops import (
     create_signed_device_cert,
     load_ca_cert_info,
     make_cert_chain,
-    write_content_to_file,
 )
+
+from azext_iot.common.fileops import create_directory_tar_archive, write_content_to_file
 from azext_iot.constants import DEVICE_CONFIG_TOML, DEVICE_README
-from azext_iot.sdk.iothub.service.models.authentication_mechanism_py3 import (
-    AuthenticationMechanism,
-)
 from tqdm import tqdm
 from time import sleep
 from typing import Any, Dict, List, NamedTuple
@@ -115,7 +113,7 @@ class DeviceIdentityProvider(IoTHubProvider):
         config_file: Optional[str] = None,
         visualize: Optional[bool] = False,
         clean: Optional[bool] = False,
-        auth_type: Optional[DeviceAuthType] = None,
+        auth_type: Optional[DeviceAuthType] = DeviceAuthType.shared_private_key.value,
         root_cert_path: Optional[str] = None,
         root_key_path: Optional[str] = None,
         output_path: Optional[str] = None,
@@ -157,7 +155,7 @@ class DeviceIdentityProvider(IoTHubProvider):
             config = self._process_nested_edge_config_file_content(config_content)
         elif devices:
             # raise error if only key or cert provided
-            if root_cert_path ^ root_key_path:
+            if (root_cert_path is not None) ^ (root_key_path is not None):
                 raise RequiredArgumentMissingError(
                     "You must provide a path to both the root cert public and private keys."
                 )
@@ -204,11 +202,16 @@ class DeviceIdentityProvider(IoTHubProvider):
         tree = Tree()
         tree_root_node_id = "|root|"
         tree.create_node("Devices", tree_root_node_id)
+        hub_cert_auth = config.auth_method == DeviceAuthType.x509_ca.value
 
         # dict of assembled Device objects by ID
         assembled_device_dict: Dict[str, Device] = {}
         # dict of device parents by ID
         device_to_parent_dict: Dict[str, str] = {}
+        # device configs by id
+        device_config_dict: Dict[str, NestedEdgeConfig] = {}
+        for device_config in config.devices:
+            device_config_dict[device_config.device_id] = device_config
 
         # first pass to create devices and certs in flat tree
         config_devices_iterator = (
@@ -251,8 +254,7 @@ class DeviceIdentityProvider(IoTHubProvider):
                 output_dir=device_cert_output_directory,
                 output_file=f"{device_id}.full-chain.cert.pem",
             )
-            hub_auth = (config.auth_method == DeviceAuthType.x509_ca.value)
-            if hub_auth:
+            if hub_cert_auth:
                 device_hub_cert = create_self_signed_certificate(
                     subject=device_id,
                     valid_days=365,
@@ -264,20 +266,21 @@ class DeviceIdentityProvider(IoTHubProvider):
             write_content_to_file(
                 content=create_edge_configuration_script(
                     device_id=device_id,
-                    hub_auth=hub_auth,
+                    hub_auth=hub_cert_auth,
                     hostname=device_config.hostname,
-                    parent_hostname=device_config.parent_hostname
+                    has_parent=(device_config.parent_id is not None),
+                    parent_hostname=device_config.parent_hostname,
                 ),
                 destination=device_cert_output_directory,
-                file_name='install.sh',
-                overwrite=True
+                file_name="install.sh",
+                overwrite=True,
             )
 
             write_content_to_file(
                 content=DEVICE_README,
                 destination=device_cert_output_directory,
-                file_name='README.md',
-                overwrite=True
+                file_name="README.md",
+                overwrite=True,
             )
             # create device object
             assembled_device = _assemble_device(
@@ -362,19 +365,28 @@ class DeviceIdentityProvider(IoTHubProvider):
             device_result: Device = self.service_sdk.devices.create_or_update_identity(
                 id=device_id, device=device
             )
-            device_keys = device_result.authentication.symmetric_key
-            device_pk = device_keys.primary_key if device_keys else None
+            device_pk = None
+            if not hub_cert_auth:
+                device_keys = device_result.authentication.symmetric_key
+                device_pk = device_keys.primary_key if device_keys else None
             device_cert_output_directory = cert_output_directory.joinpath(device_id)
             self.create_edge_device_config(
                 device_id=device_id,
                 auth_method=config.auth_method,
                 default_edge_agent=config.default_edge_agent,
-                deviceConfig=device_config,
+                device_config=device_config_dict[device_id],
                 device_config_path=config.template_config_path,
                 device_pk=device_pk,
                 output_path=device_cert_output_directory,
             )
-            hub_auth = (config.auth_method==DeviceAuthType.x509_ca.value)
+
+            # zip up
+            create_directory_tar_archive(
+                target_directory=device_cert_output_directory,
+                tarfile_path=cert_output_directory,
+                tarfile_name=device_id,
+                overwrite=True,
+            )
 
         # Give device registry a chance to catch up
         sleep(1)
@@ -485,7 +497,7 @@ class DeviceIdentityProvider(IoTHubProvider):
             child_devices = device.get("child", [])
             container_auth = device.get("container_auth", {})
             hostname = device.get("hostname", None)
-            device_obj = NestedEdgeDeviceConfig(
+            device_config = NestedEdgeDeviceConfig(
                 device_id=device_id,
                 deployment=deployment,
                 parent_id=parent_id,
@@ -498,7 +510,7 @@ class DeviceIdentityProvider(IoTHubProvider):
                 hostname=hostname,
                 edge_agent=device.get("edge_agent", None),
             )
-            all_devices.append(device_obj)
+            all_devices.append(device_config)
             for child_device in child_devices:
                 _process_edge_config_device(
                     child_device, parent_id=device_id, parent_hostname=hostname
@@ -566,7 +578,7 @@ class DeviceIdentityProvider(IoTHubProvider):
         self,
         device_id: str,
         auth_method: DeviceAuthType,
-        deviceConfig: NestedEdgeDeviceConfig,
+        device_config: NestedEdgeDeviceConfig,
         default_edge_agent: str,
         device_config_path: Optional[str] = None,
         device_pk: Optional[str] = None,
@@ -581,17 +593,18 @@ class DeviceIdentityProvider(IoTHubProvider):
 
         device_toml[
             "trust_bundle_cert"
-        ] = "file://etc/aziot/certificates/iotedge_config_cli_root.pem"
+        ] = "file:///etc/aziot/certificates/iotedge_config_cli_root.pem"
         # Dynamic, AlwaysOnStartup, OnErrorOnly
         device_toml["auto_reprovisioning_mode"] = "Dynamic"
         device_toml["hostname"] = (
-            deviceConfig.hostname if deviceConfig.hostname else "{{HOSTNAME}}"
+            device_config.hostname if device_config.hostname else "{{HOSTNAME}}"
         )
-        device_toml["parent_hostname"] = (
-            deviceConfig.parent_hostname
-            if deviceConfig.parent_hostname
-            else "{{PARENT_HOSTNAME}}"
-        )
+        if device_config.parent_id:
+            device_toml["parent_hostname"] = (
+                device_config.parent_hostname
+                if device_config.parent_hostname
+                else "{{PARENT_HOSTNAME}}"
+            )
         device_toml["provisioning"] = {
             "device_id": device_id,
             "iothub_hostname": self.target["entity"],
@@ -600,25 +613,23 @@ class DeviceIdentityProvider(IoTHubProvider):
             if auth_method == DeviceAuthType.shared_private_key.value
             else {
                 "method": "x509",
-                "identity_cert": f"file:///etc/aziot/certificates/{device_id}.hub-auth.cert.pem",
-                "identity_pk": f"file:///etc/aziot/certificates/{device_id}.hub-auth.key.pem",
+                "identity_cert": f"file:///etc/aziot/certificates/{device_id}.hub-auth-cert.pem",
+                "identity_pk": f"file:///etc/aziot/certificates/{device_id}.hub-auth-key.pem",
             },
         }
         device_toml["edge_ca"] = {
             "cert": f"file:///etc/aziot/certificates/{device_id}.full-chain.cert.pem",
-            "pk": f"file:///etc/aziot/certificates/{device_id}.full-chain.key.pem",
+            "pk": f"file:///etc/aziot/certificates/{device_id}.key.pem",
         }
-        device_toml["agent"] = {
-            "config": {
-                "image": deviceConfig.edge_agent or default_edge_agent,
-                "auth": {
-                    "serveraddress": deviceConfig.container_auth.serveraddress,
-                    "username": deviceConfig.container_auth.username,
-                    "password": deviceConfig.container_auth.password,
-                }
-                if deviceConfig.container_auth
-                else {},
+        device_toml["agent"]["config"] = {
+            "image": device_config.edge_agent or default_edge_agent,
+            "auth": {
+                "serveraddress": device_config.container_auth.serveraddress,
+                "username": device_config.container_auth.username,
+                "password": device_config.container_auth.password,
             }
+            if device_config.container_auth
+            else {},
         }
         if output_path:
             write_content_to_file(
