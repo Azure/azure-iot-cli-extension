@@ -108,30 +108,15 @@ jobs:
 
 - job: 'testHub_job_2'
   condition: and(succeeded(), eq('${{ parameters.testHub }}', true))
-  displayName: 'Test IoT Hub - devices, messaging and modules'
+  displayName: 'Test IoT Hub - devices, messaging, modules and state'
   strategy:
     matrix: $[ variables['pythonVersions'] ]
     maxParallel: ${{ parameters.maxParallelHub }}
   steps:
   - template: run-tests-parallel.yml
     parameters:
-      path: 'azext_iot/tests/iothub/devices azext_iot/tests/iothub/messaging azext_iot/tests/iothub/modules'
+      path: 'azext_iot/tests/iothub/devices azext_iot/tests/iothub/messaging azext_iot/tests/iothub/modules azext_iot/tests/iothub/state'
       name: 'iot-hub-2'
-      azureCLIVersion: ${{ parameters.azureCLIVersion }}
-      pythonVersion: $(python)
-      serviceConnection: $(AzureServiceConnection)
-
-- job: 'testHub_job_3'
-  condition: and(succeeded(), eq('${{ parameters.testHub }}', true))
-  displayName: 'Test IoT Hub - state'
-  strategy:
-    matrix: $[ variables['pythonVersions'] ]
-    maxParallel: ${{ parameters.maxParallelHub }}
-  steps:
-  - template: run-tests-parallel.yml
-    parameters:
-      path: 'azext_iot/tests/iothub/state'
-      name: 'iot-hub-3'
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
       pythonVersion: $(python)
       serviceConnection: $(AzureServiceConnection)

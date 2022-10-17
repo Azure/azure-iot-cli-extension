@@ -19,17 +19,13 @@ class IoTHubProvider(object):
         self.hub_name = hub_name
         self.rg = rg
         self.discovery = IotHubDiscovery(cmd)
-        try:
-            self.target = self.discovery.get_target(
-                resource_name=self.hub_name,
-                resource_group_name=self.rg,
-                login=login,
-                auth_type=auth_type_dataplane,
-            )
-            self.resolver = SdkResolver(self.target)
-        except Exception:
-            self.target = None
-            self.resolver = None
+        self.target = self.discovery.get_target(
+            resource_name=self.hub_name,
+            resource_group_name=self.rg,
+            login=login,
+            auth_type=auth_type_dataplane,
+        )
+        self.resolver = SdkResolver(self.target)
 
     def get_sdk(self, sdk_type):
         return self.resolver.get_sdk(sdk_type)

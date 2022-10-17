@@ -37,7 +37,7 @@ class IotHubDiscovery(BaseDiscovery):
             self.track2 = ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION)
 
             if getattr(self.cmd, "cli_ctx", None):
-                self.client = iot_hub_service_factory(self.cmd.cli_ctx)
+                self.client = iot_hub_service_factory(self.cmd.cli_ctx).iot_hub_resource
                 self.sub_id = get_subscription_id(self.cmd.cli_ctx)
             else:
                 self.client = self.cmd

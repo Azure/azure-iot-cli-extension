@@ -251,19 +251,15 @@ def load_iothub_arguments(self, _):
 
     with self.argument_context("iot hub state") as context:
         context.argument(
-            "filename",
-            options_list=["--filename", "-f"],
+            "state_file",
+            options_list=["--state-file", "--sf"],
             help="The path to the file where the state information will be stored."
         )
         context.argument(
             "replace",
             options_list=["--replace", "-r"],
-            help="If this flag is set, then the command will overwrite the state of the destination hub."
-        )
-        context.argument(
-            "overwrite_file",
-            options_list=["--overwrite-file", "--of"],
-            help="If this flag is set, then the command will overwrite the contents of the output file."
+            help="If this flag is set, then the command will delete the current devices, configurations, and certificates "
+                 "of the destination hub."
         )
         context.argument(
             "hub_aspects",
@@ -271,6 +267,13 @@ def load_iothub_arguments(self, _):
             nargs="*",
             arg_type=get_enum_type(HubAspects),
             help="Hub Aspects (space seperated)."
+        )
+
+    with self.argument_context("iot hub state import") as context:
+        context.argument(
+            "replace",
+            options_list=["--replace", "-r"],
+            help="If this flag is set, then the command will overwrite the contents of the output file."
         )
 
     with self.argument_context("iot hub state migrate") as context:

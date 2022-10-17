@@ -37,24 +37,6 @@ def iot_hub_service_factory(cli_ctx, *_):
         *_ : all other args ignored.
 
     Returns:
-        iot_hub_resource (IotHubClient.iot_hub_resource): operational resource for
-            working with IoT Hub.
-    """
-    from azure.cli.core.commands.client_factory import get_mgmt_service_client
-    from azure.cli.core.profiles import ResourceType
-
-    return get_mgmt_service_client(cli_ctx, ResourceType.MGMT_IOTHUB).iot_hub_resource
-
-
-def iot_hub_full_service_factory(cli_ctx, *_):
-    """
-    Factory for importing deps and getting service client resources.
-
-    Args:
-        cli_ctx (knack.cli.CLI): CLI context.
-        *_ : all other args ignored.
-
-    Returns:
         service_client (IotHubClient): operational resource for
             working with IoT Hub.
     """

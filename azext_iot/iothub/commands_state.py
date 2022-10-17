@@ -10,21 +10,7 @@ from typing import Optional
 
 def state_export(
     cmd,
-    filename: str,
-    hub_name: Optional[str] = None,
-    resource_group_name: Optional[str] = None,
-    hub_aspects=None,
-    login: Optional[str] = None,
-    auth_type_dataplane: Optional[str] = None,
-    overwrite_file: Optional[bool] = False
-):
-    sp = StateProvider(cmd=cmd, hub=hub_name, rg=resource_group_name, login=login, auth_type_dataplane=auth_type_dataplane)
-    sp.save_state(filename, overwrite_file, hub_aspects)
-
-
-def state_import(
-    cmd,
-    filename: str,
+    state_file: str,
     hub_name: Optional[str] = None,
     resource_group_name: Optional[str] = None,
     hub_aspects=None,
@@ -33,7 +19,21 @@ def state_import(
     replace: Optional[bool] = False
 ):
     sp = StateProvider(cmd=cmd, hub=hub_name, rg=resource_group_name, login=login, auth_type_dataplane=auth_type_dataplane)
-    sp.upload_state(filename, replace, hub_aspects)
+    sp.save_state(state_file, replace, hub_aspects)
+
+
+def state_import(
+    cmd,
+    state_file: str,
+    hub_name: Optional[str] = None,
+    resource_group_name: Optional[str] = None,
+    hub_aspects=None,
+    login: Optional[str] = None,
+    auth_type_dataplane: Optional[str] = None,
+    replace: Optional[bool] = False
+):
+    sp = StateProvider(cmd=cmd, hub=hub_name, rg=resource_group_name, login=login, auth_type_dataplane=auth_type_dataplane)
+    sp.upload_state(state_file, replace, hub_aspects)
 
 
 def state_migrate(
