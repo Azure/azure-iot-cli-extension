@@ -254,8 +254,9 @@ helps[
     "iot hub device-identity export"
 ] = """
     type: command
-    short-summary: Export all device identities from an IoT Hub to an Azure Storage blob container. For inline
-                   blob container SAS uri input, please review the input rules of your environment.
+    short-summary: Export all device identities from an IoT Hub to an Azure Storage blob container.
+                   For inline blob container SAS uri input, please review the input rules of your environment.
+                   The output blob containing device identities is a text file named 'devices.txt'.
     long-summary: For more information, see
                   https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
     examples:
@@ -297,8 +298,10 @@ helps[
     "iot hub device-identity import"
 ] = """
     type: command
-    short-summary: Import device identities to an IoT Hub from a blob. For inline
-                   blob container SAS uri input, please review the input rules of your environment.
+    short-summary: Import device identities to an IoT Hub from a blob.
+                   For inline blob container SAS uri input, please review the input rules of your environment.
+                   The expected input file containing device identities should be named 'devices.txt'.
+                   The output log file 'importErrors.log' is empty when import is successful and contains error logs in case of import failure.
     long-summary: For more information, see
                   https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
     examples:

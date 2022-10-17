@@ -2225,10 +2225,15 @@ def _get_service_sdk(
     cmd,
     hub_name: str,
     resource_group_name: str = None,
+    login=None,
+    auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name, resource_group_name=resource_group_name
+        resource_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
     resolver = SdkResolver(target=target)
     return resolver.get_sdk(SdkType.service_sdk)
@@ -2316,6 +2321,8 @@ def iot_device_export(
     storage_authentication_type: str = None,
     identity: str = None,
     resource_group_name: str = None,
+    login=None,
+    auth_type_dataplane=None,
 ):
     if blob_container_uri is None:
         blob_container_uri = _generate_blob_container_uri(
@@ -2323,11 +2330,16 @@ def iot_device_export(
         )
     if storage_authentication_type is not None:
         logger.warning(
-            "The parameter --auth-type/--storage-authentication-type has been deprecated and should not be provided"
+            "The parameter --storage-authentication-type has been deprecated and should not be provided"
+        )
+    if auth_type_dataplane is not None:
+        logger.warning(
+            "The parameter --auth-type is now used to specify dataplane auth-type instead of storage auth-type. "
+            + "The storage auth-type is automatically derived and should no longer be provided as input."
         )
 
     service_sdk = _get_service_sdk(
-        cmd, hub_name, resource_group_name
+        cmd, hub_name, resource_group_name, login, auth_type_dataplane
     )
     export_job_properties = _create_export_import_job_properties(
         job_type=JobType.exportDevices.value,
@@ -2350,6 +2362,8 @@ def iot_device_import(
     storage_authentication_type: str = None,
     resource_group_name: str = None,
     identity: str = None,
+    login=None,
+    auth_type_dataplane=None,
 ):
     if input_blob_container_uri is None:
         input_blob_container_uri = _generate_blob_container_uri(
@@ -2361,11 +2375,16 @@ def iot_device_import(
         )
     if storage_authentication_type is not None:
         logger.warning(
-            "The parameter --auth-type/--storage-authentication-type has been deprecated and should not be provided"
+            "The parameter --storage-authentication-type has been deprecated and should not be provided"
+        )
+    if auth_type_dataplane is not None:
+        logger.warning(
+            "The parameter --auth-type is now used to specify dataplane auth-type instead of storage auth-type. "
+            + "The storage auth-type is automatically derived and should no longer be provided as input."
         )
 
     service_sdk = _get_service_sdk(
-        cmd, hub_name, resource_group_name
+        cmd, hub_name, resource_group_name, login, auth_type_dataplane
     )
     import_job_properties = _create_export_import_job_properties(
         job_type=JobType.importDevices.value,
