@@ -326,10 +326,10 @@ def load_iothub_help():
                        configurations and edge deployments), device information (including device identites,
                        device twins, module identities and module twins).
         examples:
-        - name: Export the full state of the specified hub to the specified file.
+        - name: Export the supported state of the specified hub to the specified file.
           text: >
             az iot hub state export -n {iothub_name} --sf {state_filename}
-        - name: Export the full state of the specified hub to the specified file, overwriting the file contents.
+        - name: Export the supported state of the specified hub to the specified file, overwriting the file contents.
           text: >
             az iot hub state export -n {iothub_name} --sf {state_filename} -r
         - name: Export only the devices and configurations of the specified hub to the specified file.
@@ -354,10 +354,10 @@ def load_iothub_help():
 
                        Private endpoints will be ignored in the import process.
         examples:
-        - name: Import the state from the specified file to the specified hub.
+        - name: Import the supported state from the specified file to the specified hub.
           text: >
             az iot hub state import -n {iothub_name} --sf {state_filename}
-        - name: Import the state from the default file to the specified hub, overwriting the previous state of the hub. All
+        - name: Import the supported state from the default file to the specified hub, overwriting the previous state of the hub. All
                 certificates, configurations, and devices will be deleted before the new state is uploaded.
           text: >
             az iot hub state import -n {iothub_name} --sf {state_filename} -r
@@ -391,10 +391,10 @@ def load_iothub_help():
 
                        If you have trouble migrating, please use the export and import commands to have a file as a backup.
         examples:
-        - name: Migrate the state of the original hub to the destination hub.
+        - name: Migrate the supported state of the original hub to the destination hub.
           text: >
             az iot hub state migrate --destination-hub {dest_hub_name} --origin-hub {orig_hub_name}
-        - name: Migrate the state of the original hub to the destination hub, overwriting the previous state of the hub. All
+        - name: Migrate the supported state of the original hub to the destination hub, overwriting the previous state of the hub. All
                 certificates, configurations, and devices in the destination hub will be deleted before the new state is uploaded.
           text: >
             az iot hub state migrate --destination-hub {dest_hub_name} --origin-hub {orig_hub_name} -r
