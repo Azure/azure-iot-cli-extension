@@ -665,7 +665,7 @@ class TestDeviceShow:
             )
 
 
-class TestDeviceList:
+class TestDeviceTwinList:
     @pytest.fixture(params=[10, 0])
     def service_client(self, mocked_response, fixture_ghcs, request):
         result = []
@@ -688,7 +688,7 @@ class TestDeviceList:
 
     @pytest.mark.parametrize("top, edge", [(10, True), (1000, False)])
     def test_device_list(self, fixture_cmd, service_client, top, edge):
-        result = subject.iot_device_list(
+        result = subject.iot_device_twin_list(
             cmd=fixture_cmd, hub_name=mock_target["entity"], top=top, edge_enabled=edge
         )
         list_request = service_client.calls[0].request
@@ -711,14 +711,14 @@ class TestDeviceList:
     @pytest.mark.parametrize("top", [-2, 0])
     def test_device_list_invalid_args(self, fixture_cmd, top):
         with pytest.raises(CLIError):
-            subject.iot_device_list(
+            subject.iot_device_twin_list(
                 cmd=fixture_cmd, hub_name=mock_target["entity"], top=top
             )
 
     def test_device_list_error(self, fixture_cmd, service_client_generic_errors):
         service_client_generic_errors.assert_all_requests_are_fired = False
         with pytest.raises(CLIError):
-            subject.iot_device_list(
+            subject.iot_device_twin_list(
                 cmd=fixture_cmd, hub_name=mock_target["entity"],
             )
 
