@@ -188,6 +188,11 @@ helps[
 ] = """
     type: command
     short-summary: List devices in an IoT Hub.
+    long-summary: |
+                   This command is an alias for `az iot hub device-twin list`, which is highly recommended over
+                   this command. In the future, this `az iot hub device-identity list` command may be
+                   altered or deprecated.
+
 """
 
 helps[
@@ -431,6 +436,16 @@ helps[
 ] = """
     type: command
     short-summary: Get a device twin definition.
+"""
+
+helps[
+    "iot hub device-twin list"
+] = """
+    type: command
+    short-summary: List device twins in an IoT Hub.
+    long-summary: |
+                   This command is the same as iot hub query with the query "select * from devices" for
+                   all devices and "select * from devices where capabilities.iotEdge = true" for edge devices.
 """
 
 helps[
