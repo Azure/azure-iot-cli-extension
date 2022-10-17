@@ -322,18 +322,19 @@ def load_iothub_help():
     ] = """
         type: command
         short-summary: Export the state of an IoT Hub to a file.
-        long-summary: The exported state will include hub configurations, edge deployments, device identities and twins, and module
-                      identities and twins.
+        long-summary: The exported state will include: arm template for hub, hub configurations (including ADM
+                       configurations and edge deployments), device information (including device identites,
+                       device twins, module identities and module twins).
         examples:
         - name: Export the full state of the specified hub to the specified file.
           text: >
-            az iot hub state export -n {iothub_name} -f {filename}
+            az iot hub state export -n {iothub_name} --sf {state_filename}
         - name: Export the full state of the specified hub to the specified file, overwriting the file contents.
           text: >
-            az iot hub state export -n {iothub_name} -f {filename} --of
+            az iot hub state export -n {iothub_name} --sf {state_filename} -r
         - name: Export only the devices and configurations of the specified hub to the specified file.
           text: >
-            az iot hub state export -n {iothub_name} -f {filename} --aspects devices configurations
+            az iot hub state export -n {iothub_name} --sf {state_filename} --aspects devices configurations
     """
 
     helps[
@@ -344,8 +345,9 @@ def load_iothub_help():
         long-summary: |
                        If the arm aspect is specified, the hub will be created if it does not exist.
 
-                       The imported state will include: arm template for hub, certificates, hub configurations, edge deployments,
-                       device identities and twins, and module identities and twins.
+                       The imported state will include: arm template for hub, hub configurations (including ADM
+                       configurations and edge deployments), device information (including device identites,
+                       device twins, module identities and module twins).
 
                        For imported endpoints with system assigned identity authentication, the specified hub must have
                        the correct permissions. Otherwise the command will fail.
@@ -354,19 +356,20 @@ def load_iothub_help():
         examples:
         - name: Import the state from the specified file to the specified hub.
           text: >
-            az iot hub state import -n {iothub_name} -f {filename}
-        - name: Import the state from the default file to the specified hub, overwriting the previous state of the hub.
+            az iot hub state import -n {iothub_name} --sf {state_filename}
+        - name: Import the state from the default file to the specified hub, overwriting the previous state of the hub. All
+                certificates, configurations, and devices will be deleted before the new state is uploaded.
           text: >
-            az iot hub state import -n {iothub_name} -f {filename} -r
+            az iot hub state import -n {iothub_name} --sf {state_filename} -r
         - name: Import only the arm template from the specified file to the specified hub. Note that this will create a new hub if
                 it does not exist. The file may contain the devices and configurations but those will be ignored.
           text: >
-            az iot hub state import -n {iothub_name} -f {filename} --aspects arm
+            az iot hub state import -n {iothub_name} --sf {state_filename} --aspects arm
         - name: Import only the devices and configurations from the specified file to the specified hub. Note that this will NOT
                 create a new hub if it does not exist and the command will fail. The file may contain the arm template but that
                 will be ignored.
           text: >
-            az iot hub state import -n {iothub_name} -f {filename} --aspects devices configurations
+            az iot hub state import -n {iothub_name} --sf {state_filename} --aspects devices configurations
     """
 
     helps[
@@ -377,8 +380,9 @@ def load_iothub_help():
         long-summary: |
                        If the arm aspect is specified, the hub will be created if it does not exist.
 
-                       The migrated state will include: arm template for hub, certificates, hub configurations, edge deployments,
-                       device identities and twins, and module identities and twins.
+                       The migrated state will include: arm template for hub, hub configurations (including ADM
+                       configurations and edge deployments), device information (including device identites,
+                       device twins, module identities and module twins).
 
                        For migrated endpoints with system assigned identity authentication, the specified hub must have
                        the correct permissions. Otherwise the command will fail.
@@ -390,7 +394,17 @@ def load_iothub_help():
         - name: Migrate the state of the original hub to the destination hub.
           text: >
             az iot hub state migrate --destination-hub {dest_hub_name} --origin-hub {orig_hub_name}
-        - name: Migrate the state of the original hub to the destination hub, overwriting the previous state of the hub.
+        - name: Migrate the state of the original hub to the destination hub, overwriting the previous state of the hub. All
+                certificates, configurations, and devices in the destination hub will be deleted before the new state is uploaded.
           text: >
             az iot hub state migrate --destination-hub {dest_hub_name} --origin-hub {orig_hub_name} -r
+        - name: Migrate only the arm template from the origin hub to the destination hub. Note that this will create a new hub if
+                the destination hub does not exist. The origin hub may contain the devices and configurations but those will be ignored.
+          text: >
+            az iot hub state migrate --destination-hub {dest_hub_name} --origin-hub {orig_hub_name} --aspects arm
+        - name: Migrate only the devices and configurations from the origin hub to the destination hub. Note that this will NOT
+                create a new hub if the destination hub does not exist and the command will fail. The arm template for the origin hub
+                will be ignored.
+          text: >
+            az iot hub state migrate --destination-hub {dest_hub_name} --origin-hub {orig_hub_name} --aspects devices configurations
     """
