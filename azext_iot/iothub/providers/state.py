@@ -95,7 +95,7 @@ class StateProvider(IoTHubProvider):
             os.path.exists(state_file)
             and os.stat(state_file).st_size
             and not replace
-            and not prompt_y_n(msg=OVERWRITE_FILE_MSG.format(state_file), default="yn")
+            and not prompt_y_n(msg=OVERWRITE_FILE_MSG.format(state_file), default="n")
         ):
             raise FileOperationError(FILE_NOT_EMPTY_MSG)
 
@@ -185,9 +185,8 @@ class StateProvider(IoTHubProvider):
             try:
                 all_configs = _iot_hub_configuration_list(target=self.target)
                 hub_state["configurations"] = {}
-                # if HubAspects.Configurations.value in hub_aspects:
                 adm_configs = {}
-                for c in all_configs:
+                for c in tqdm(all_configs, desc="Saving ADM configurations and Edge Deployments"):
                     if c["content"].get("deviceContent") or c["content"].get("moduleContent"):
                         for key in ["createdTimeUtc", "etag", "lastUpdatedTimeUtc", "schemaVersion"]:
                             c.pop(key, None)
@@ -195,7 +194,6 @@ class StateProvider(IoTHubProvider):
 
                 hub_state["configurations"]["admConfigurations"] = adm_configs
 
-                # if HubAspects.EdgeDeployments.value in hub_aspects:
                 hub_state["configurations"]["edgeDeployments"] = {
                     c["id"]: c for c in all_configs if c["content"].get("modulesContent")
                 }
@@ -365,6 +363,7 @@ class StateProvider(IoTHubProvider):
                         endpoint_props["AccountName"]
                     )
                 ).as_json()["connectionString"]
+            print("Saved ARM template.")
 
         return hub_state
 
@@ -434,7 +433,10 @@ class StateProvider(IoTHubProvider):
             hub_aspects.remove(HubAspects.Configurations.value)
             configs = hub_state["configurations"]["admConfigurations"]
             edge_deployments = hub_state["configurations"]["edgeDeployments"]
-            config_progress = tqdm(total=len(configs) + len(edge_deployments))
+            config_progress = tqdm(
+                total=len(configs) + len(edge_deployments),
+                desc="Uploading ADM configurations and Edge Deployments."
+            )
             for config_id, config_obj in configs.items():
                 try:
                     _iot_hub_configuration_create(
@@ -472,8 +474,9 @@ class StateProvider(IoTHubProvider):
                         logger.error(f" Failed to upload Edge Deployment {config_id}. Error Message: {e}")
                     config_progress.update(1)
 
-            # Do layered configs after edge configs. TODO: create an algo to figure out order
-            for config_id, config_obj in layered_configs:
+            # Do layered configs after edge configs.
+            # TODO: create an algo to figure out order
+            for config_id, config_obj in layered_configs.items():
                 try:
                     _iot_hub_configuration_create(
                         target=self.target,
@@ -576,7 +579,7 @@ class StateProvider(IoTHubProvider):
         # Leftover aspects
         if hub_aspects:
             logger.warning(
-                f"Some hub aspects ({', '.join(hub_aspects)}) were not uploaded because the necessary aspects were "
+                f" Some hub aspects ({', '.join(hub_aspects)}) were not uploaded because the necessary aspects were "
                 "not found in the file."
             )
 

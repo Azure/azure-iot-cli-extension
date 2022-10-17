@@ -322,7 +322,8 @@ def load_iothub_help():
     ] = """
         type: command
         short-summary: Export the state of an IoT Hub to a file.
-        long-summary: The exported state will include: arm template for hub, hub configurations (including ADM
+        long-summary: |
+                       The exported state will include: arm template for hub, hub configurations (including ADM
                        configurations and edge deployments), device information (including device identites,
                        device twins, module identities and module twins).
         examples:
