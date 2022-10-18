@@ -2263,7 +2263,7 @@ def iot_device_export(
 ):
     from azext_iot._factory import iot_hub_service_factory
 
-    client = iot_hub_service_factory(cmd.cli_ctx)
+    client = iot_hub_service_factory(cmd.cli_ctx).iot_hub_resource
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         resource_name=hub_name, resource_group_name=resource_group_name
@@ -2343,7 +2343,7 @@ def iot_device_import(
 ):
     from azext_iot._factory import iot_hub_service_factory
 
-    client = iot_hub_service_factory(cmd.cli_ctx)
+    client = iot_hub_service_factory(cmd.cli_ctx).iot_hub_resource
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         resource_name=hub_name, resource_group_name=resource_group_name
