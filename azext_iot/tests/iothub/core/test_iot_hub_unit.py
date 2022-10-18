@@ -60,12 +60,12 @@ def get_mgmt_client(mocker, fixture_cmd):
         patch.return_value = IotHubClient(
             credential='',
             subscription_id="00000000-0000-0000-0000-000000000000",
-        ).iot_hub_resource
+        )
     else:
         patch.return_value = IotHubClient(
             credentials='',
             subscription_id="00000000-0000-0000-0000-000000000000",
-        ).iot_hub_resource
+        )
 
     return patch
 
