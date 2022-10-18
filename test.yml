@@ -1,0 +1,31 @@
+config_version: "1.0"
+
+iothub:
+  authentication_method: symmetric_key
+
+## Root certificate used to generate device CA certificates. Optional. If not provided a self-signed CA will be generated
+# certificates:
+#   root_ca_cert_path: ""
+#   root_ca_cert_key_path: ""
+
+## IoT Edge configuration template to use
+configuration:
+  # Will use default device_config
+  # template_config_path: "./templates/purdue/device_config.toml"
+  default_edge_agent: "$upstream:443/azureiotedge-agent:1.2"
+
+## Hierarchy of IoT Edge devices to create
+edgedevices:
+  - device_id: pi_1
+    hostname: "10.120.60.53"
+    edge_agent: "mcr.microsoft.com/azureiotedge-agent:1.2"
+    deployment: deployment-top.json
+    child:
+      - device_id: pi_2
+        hostname: "10.120.60.51"
+        deployment: deployment-mid.json
+        child:
+          - device_id: pi_3
+            hostname: "10.120.60.61"
+            deployment: deployment-low.json
+    
