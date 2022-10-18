@@ -2313,7 +2313,7 @@ def _create_export_import_job_properties(
 
 def iot_device_export(
     cmd,
-    hub_name: str,
+    hub_name: str = None,
     blob_container_uri: str = None,
     blob_container_name: str = None,
     storage_account_name: str = None,
@@ -2352,7 +2352,7 @@ def iot_device_export(
 
 def iot_device_import(
     cmd,
-    hub_name: str,
+    hub_name: str = None,
     input_blob_container_uri: str = None,
     input_blob_container_name: str = None,
     input_storage_account_name: str = None,

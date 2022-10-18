@@ -262,6 +262,8 @@ helps[
     short-summary: Export all device identities from an IoT Hub to an Azure Storage blob container.
                    For inline blob container SAS uri input, please review the input rules of your environment.
                    The output blob containing device identities is a text file named 'devices.txt'.
+                   Permissions required - Either IoT Hub shared access policy supporting 'Registry Read & Registry Write' OR
+                   an entity with 'IoT Hub Data Contributor' role on the IoT Hub
     long-summary: For more information, see
                   https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
     examples:
@@ -307,6 +309,8 @@ helps[
                    For inline blob container SAS uri input, please review the input rules of your environment.
                    The expected input file containing device identities should be named 'devices.txt'.
                    The output log file 'importErrors.log' is empty when import is successful and contains error logs in case of import failure.
+                   Permissions required - Either IoT Hub shared access policy supporting 'Registry Read & Registry Write' OR
+                   an entity with 'IoT Hub Data Contributor' role on the IoT Hub
     long-summary: For more information, see
                   https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
     examples:

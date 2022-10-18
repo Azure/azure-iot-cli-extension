@@ -12,9 +12,6 @@ unreleased
 * Device identity export/import commands now support optional parameters for storage account and blob container names - users no longer need to supply input/output Blob container SAS URIs.
 * Device identity export/import operations now automatically derive storage auth type - hence the parameter `storage_authentication_type` has been deprecated.
 * Device identity export/import operations now expect the parameter `auth-type` to specify dataplane auth type (instead of storage auth type).
-
-**IoT Hub**
-
 * Add `az iot hub device-twin list` as a highly recommended alternative to `az iot hub device-identity list`. Functionality remains the same as both return a list of device twins and `az iot hub device-identity list` may be altered or deprecated in the future.
 
 
