@@ -498,7 +498,7 @@ class StateProvider(IoTHubProvider):
         if HubAspects.Devices.value in hub_aspects and hub_state.get("devices"):
             hub_aspects.remove(HubAspects.Devices.value)
             child_to_parent = {}
-            for device_id, device_obj in tqdm(hub_state["devices"].items(), desc="Uploading devices and modules", ascii= " #"):
+            for device_id, device_obj in tqdm(hub_state["devices"].items(), desc="Uploading devices and modules", ascii=" #"):
                 # upload device identity and twin
                 try:
                     self.upload_device_identity(device_id, device_obj["identity"])
