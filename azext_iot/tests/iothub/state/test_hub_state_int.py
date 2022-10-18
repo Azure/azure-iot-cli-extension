@@ -168,7 +168,7 @@ def _setup_hub_state(cstring):
 
 
 # Test with an empty hub to save all, upload all, migrate all - will need to have seperate hubs created
-@pytest.fixture()
+@pytest.fixture(scope="module")
 def setup_hub_states(provisioned_iothubs):
     filename = generate_generic_id() + ".json"
     provisioned_iothubs[0]["filename"] = filename
@@ -179,7 +179,7 @@ def setup_hub_states(provisioned_iothubs):
         os.remove(filename)
 
 
-@pytest.fixture()
+@pytest.fixture(scope="module")
 def setup_hub_states_controlplane(setup_hub_controlplane_states):
     filename = generate_generic_id() + ".json"
     setup_hub_controlplane_states[0]["filename"] = filename

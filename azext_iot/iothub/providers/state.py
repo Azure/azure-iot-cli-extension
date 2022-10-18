@@ -172,7 +172,7 @@ class StateProvider(IoTHubProvider):
                 # serialize strips name and etag - use as_dict instead
                 certificates = cert_client.list_by_iot_hub(self.rg, self.hub_name).as_dict()
 
-                for cert in tqdm(certificates["value"], desc="Deleting certificates from destination hub"):
+                for cert in tqdm(certificates["value"], desc="Deleting certificates from destination hub", ascii=" #"):
                     cert_client.delete(self.rg, self.hub_name, cert["name"], cert["etag"])
 
     def process_hub_to_dict(self, target: dict, hub_aspects: list = []) -> dict:
@@ -205,7 +205,7 @@ class StateProvider(IoTHubProvider):
             hub_state["devices"] = {}
             twins = _iot_device_twin_list(target=target, top=-1)
 
-            for i in tqdm(range(len(twins)), desc="Saving devices and modules"):
+            for i in tqdm(range(len(twins)), desc="Saving devices and modules", ascii=" #"):
                 device_twin = twins[i]
                 device_id = device_twin["deviceId"]
                 device_obj = {}
@@ -410,6 +410,7 @@ class StateProvider(IoTHubProvider):
             with open(state_file, "w", encoding='utf-8') as f:
                 json.dump(hub_state["arm"], f)
 
+            print(f"Starting Arm Deployment for IoT Hub {self.hub_name}.")
             arm_result = cli.invoke(
                 f"deployment group create --template-file {state_file} -g {self.rg}"
             )
@@ -435,7 +436,8 @@ class StateProvider(IoTHubProvider):
             edge_deployments = hub_state["configurations"]["edgeDeployments"]
             config_progress = tqdm(
                 total=len(configs) + len(edge_deployments),
-                desc="Uploading ADM configurations and Edge Deployments."
+                desc="Uploading ADM configurations and Edge Deployments.",
+                ascii=" #"
             )
             for config_id, config_obj in configs.items():
                 try:
@@ -496,7 +498,7 @@ class StateProvider(IoTHubProvider):
         if HubAspects.Devices.value in hub_aspects and hub_state.get("devices"):
             hub_aspects.remove(HubAspects.Devices.value)
             child_to_parent = {}
-            for device_id, device_obj in tqdm(hub_state["devices"].items(), desc="Uploading devices and modules"):
+            for device_id, device_obj in tqdm(hub_state["devices"].items(), desc="Uploading devices and modules", ascii= " #"):
                 # upload device identity and twin
                 try:
                     self.upload_device_identity(device_id, device_obj["identity"])
@@ -674,7 +676,7 @@ class StateProvider(IoTHubProvider):
             logger.warning("Failed to retrieve configurations. Skipping configuration deletion.")
             return
 
-        for config in tqdm(all_configs, desc="Deleting configurations from destination hub"):
+        for config in tqdm(all_configs, desc="Deleting configurations from destination hub", ascii=" #"):
             try:
                 _iot_hub_configuration_delete(target=self.target, config_id=config["id"])
             except ResourceNotFoundError:
@@ -683,7 +685,7 @@ class StateProvider(IoTHubProvider):
     def delete_all_devices(self):
         """Delete all devices if possible."""
         identities = _iot_device_twin_list(target=self.target, top=-1)
-        for d in tqdm(identities, desc="Deleting device identities from destination hub"):
+        for d in tqdm(identities, desc="Deleting device identities from destination hub", ascii=" #"):
             try:
                 _iot_device_delete(target=self.target, device_id=d["deviceId"])
             except ResourceNotFoundError:

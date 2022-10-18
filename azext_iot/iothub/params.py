@@ -252,7 +252,7 @@ def load_iothub_arguments(self, _):
     with self.argument_context("iot hub state") as context:
         context.argument(
             "state_file",
-            options_list=["--state-file", "--sf"],
+            options_list=["--state-file", "-f"],
             help="The path to the file where the state information will be stored."
         )
         context.argument(

@@ -329,13 +329,13 @@ def load_iothub_help():
         examples:
         - name: Export the supported state of the specified hub to the specified file.
           text: >
-            az iot hub state export -n {iothub_name} --sf {state_filename}
+            az iot hub state export -n {iothub_name} -f {state_filename}
         - name: Export the supported state of the specified hub to the specified file, overwriting the file contents.
           text: >
-            az iot hub state export -n {iothub_name} --sf {state_filename} -r
+            az iot hub state export -n {iothub_name} -f {state_filename} -r
         - name: Export only the devices and configurations of the specified hub to the specified file.
           text: >
-            az iot hub state export -n {iothub_name} --sf {state_filename} --aspects devices configurations
+            az iot hub state export -n {iothub_name} -f {state_filename} --aspects devices configurations
     """
 
     helps[
@@ -357,20 +357,20 @@ def load_iothub_help():
         examples:
         - name: Import the supported state from the specified file to the specified hub.
           text: >
-            az iot hub state import -n {iothub_name} --sf {state_filename}
+            az iot hub state import -n {iothub_name} -f {state_filename}
         - name: Import the supported state from the default file to the specified hub, overwriting the previous state of the hub. All
                 certificates, configurations, and devices will be deleted before the new state is uploaded.
           text: >
-            az iot hub state import -n {iothub_name} --sf {state_filename} -r
+            az iot hub state import -n {iothub_name} -f {state_filename} -r
         - name: Import only the arm template from the specified file to the specified hub. Note that this will create a new hub if
                 it does not exist. The file may contain the devices and configurations but those will be ignored.
           text: >
-            az iot hub state import -n {iothub_name} --sf {state_filename} --aspects arm
+            az iot hub state import -n {iothub_name} -f {state_filename} --aspects arm
         - name: Import only the devices and configurations from the specified file to the specified hub. Note that this will NOT
                 create a new hub if it does not exist and the command will fail. The file may contain the arm template but that
                 will be ignored.
           text: >
-            az iot hub state import -n {iothub_name} --sf {state_filename} --aspects devices configurations
+            az iot hub state import -n {iothub_name} -f {state_filename} --aspects devices configurations
     """
 
     helps[
