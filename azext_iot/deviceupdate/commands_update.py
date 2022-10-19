@@ -521,6 +521,15 @@ def stage_update(
                 file_names.append(filename)
                 file_paths.append(PurePath(manifest_directory_path, filename).as_posix())
                 uploaded_files_map[filename] = 1
+                related_files = file.get("relatedFiles")
+                if related_files:
+                    for related_file in related_files:
+                        related_filename = related_file["filename"]
+                        if related_filename in uploaded_files_map:
+                            continue
+                        file_names.append(related_filename)
+                        file_paths.append(PurePath(manifest_directory_path, related_filename).as_posix())
+                        uploaded_files_map[related_filename] = 1
 
         updateId = manifest['updateId']
         qualifier = f"{updateId['provider']}_{updateId['name']}_{updateId['version']}"

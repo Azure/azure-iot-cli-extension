@@ -514,19 +514,21 @@ def test_instance_update_stage(provisioned_instances_module: Dict[str, dict]):
     _assign_rbac_if_needed(account_name)
     parsed_storage_id = parse_resource_id(storage_account_id)
 
-    # Upload simple manifest to storage blob
+    # Stage & import simple update
     simple_manifest_file = "simple_apt_manifest_v5.json"
     simple_update_path = get_context_path(__file__, "manifests", simple_manifest_file)
     simple_update_id = process_json_arg(simple_update_path)["updateId"]
     simple_friendly_name = f"simple_{generate_generic_id()}"
+
     assert cli.invoke(
         f"iot du update stage -n {account_name} -i {instance_name} --friendly-name {simple_friendly_name} "
-        f"--manifest-path '{simple_update_path}' --storage-account {parsed_storage_id['name']} --storage-container staged"
-    ).success()
-    list_updates = cli.invoke(f"iot du update list -n {account_name} -i {instance_name}").as_json()
+        f"--manifest-path '{simple_update_path}' --storage-account {parsed_storage_id['name']} --storage-container staged "
+        f"--then-import").success()
+    assert cli.invoke(
+        f"iot du update show -n {account_name} -i {instance_name} --up {simple_update_id['provider']} "
+        f"--un {simple_update_id['name']} --uv {simple_update_id['version']}").as_json()['friendlyName'] == simple_friendly_name
 
-    import pdb; pdb.set_trace()
-    # Upload multi-reference update to storage blob
+    # Stage & import multi-reference update
     surface15_root = "parent.importmanifest.json"
     surface15_leaf1 = "leaf1.importmanifest.json"
     surface15_leaf2 = "leaf2.importmanifest.json"
@@ -536,16 +538,37 @@ def test_instance_update_stage(provisioned_instances_module: Dict[str, dict]):
     for name in [surface15_root, surface15_leaf1, surface15_leaf2]:
         file_paths.append(get_context_path(__file__, "manifests", "surface15", name))
     complex_update_parent_id = process_json_arg(file_paths[0])["updateId"]
-    complex_update_leaf1_id = process_json_arg(file_paths[1])["updateId"]
-    complex_update_leaf2_id = process_json_arg(file_paths[2])["updateId"]
 
     assert cli.invoke(
         f"iot du update stage -n {account_name} -i {instance_name} --friendly-name {complex_friendly_name} "
         f"--storage-account {parsed_storage_id['name']} --storage-container staged "
-        f"--manifest-path '{file_paths[0]}' --manifest-path '{file_paths[1]}' --manifest-path '{file_paths[2]}'"
+        f"--manifest-path '{file_paths[0]}' --manifest-path '{file_paths[1]}' --manifest-path '{file_paths[2]}' "
+        f"--then-import"
     ).success()
-    list_updates = cli.invoke(f"iot du update list -n {account_name} -i {instance_name}").as_json()
+    assert cli.invoke(
+        f"iot du update show -n {account_name} -i {instance_name} --up {complex_update_parent_id['provider']} "
+        f"--un {complex_update_parent_id['name']} --uv {complex_update_parent_id['version']}"
+    ).as_json()['friendlyName'] == complex_friendly_name
+
+    # Stage & import related files update but popen commands
+    delta_manifest_file = "delta-related-files-manifest.json"
+    delta_update_path = get_context_path(__file__, "manifests", "delta", delta_manifest_file)
+    delta_update_id = process_json_arg(delta_update_path)["updateId"]
+    delta_friendly_name = f"delta_{generate_generic_id()}"
+
+    commands_payload = cli.invoke(
+        f"iot du update stage -n {account_name} -i {instance_name} --friendly-name {simple_friendly_name} "
+        f"--manifest-path '{delta_update_path}' --storage-account {parsed_storage_id['name']} --storage-container staged"
+    ).as_json()
+
+    from subprocess import run
+    from shlex import quote
+    for command in commands_payload["commands"]:
+        run([quote(command)], check=True, shell=True)
     import pdb; pdb.set_trace()
+    assert cli.invoke(
+        f"iot du update show -n {account_name} -i {instance_name} --up {delta_update_id['provider']} "
+        f"--un {delta_update_id['name']} --uv {delta_update_id['version']}").as_json()['friendlyName'] == delta_friendly_name
 
 
 def _stage_update_assets(file_paths: List[str], storage_account_id: str, storage_container: str = "updates") -> List[str]:
