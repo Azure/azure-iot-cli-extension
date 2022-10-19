@@ -241,10 +241,11 @@ class DeviceIdentityProvider(IoTHubProvider):
             )
             # signed device cert (device_id.cert.pem and device_id.key.pem)
             signed_device_cert = create_signed_device_cert(
-                device_id,
-                config.root_cert["certificate"],
-                config.root_cert["privateKey"],
-                device_cert_output_directory,
+                subject=f"{device_id}.deviceca",
+                ca_public=config.root_cert["certificate"],
+                ca_private=config.root_cert["privateKey"],
+                cert_output_dir=device_cert_output_directory,
+                cert_file=device_id
             )
             make_cert_chain(
                 certs=[
@@ -437,6 +438,8 @@ class DeviceIdentityProvider(IoTHubProvider):
                     id=device_id, content=deployment_content
                 )
 
+
+    # TODO - Unit test
     def _process_nested_edge_config_file_content(
         self, content: dict
     ) -> NestedEdgeConfig:
@@ -542,6 +545,7 @@ class DeviceIdentityProvider(IoTHubProvider):
                 logger.warning("No value assigned to key '%s', input format is key=value | key='value value'.", key)
         return result
 
+    # TODO - Unit test
     def delete_device_identities(
         self, device_ids: List[str], confirm: Optional[bool] = False
     ):
@@ -557,6 +561,7 @@ class DeviceIdentityProvider(IoTHubProvider):
                     "An error has occurred - Not all devices were deleted."
                 )
 
+    # TODO - Unit test
     def _try_parse_valid_deployment_config(self, deployment_path):
         try:
             deployment_content = process_json_arg(
@@ -574,6 +579,7 @@ class DeviceIdentityProvider(IoTHubProvider):
             logger.warning(f"Error processing config file at '{deployment_path}'")
             raise InvalidArgumentValueError(ex)
 
+    # TODO - Unit test
     def create_edge_device_config(
         self,
         device_id: str,

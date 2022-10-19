@@ -9,7 +9,7 @@ certops: Functions for working with certificates.
 """
 
 import datetime
-from os.path import exists, join
+from os.path import exists
 import base64
 from typing import List, Optional, TypedDict
 from cryptography import x509
@@ -142,10 +142,9 @@ def open_certificate(certificate_path: str) -> str:
     return certificate.rstrip()
 
 
+# TODO - Unit test, compare with test_utils::_generate_root_certificate
 def create_edge_root_ca_certificate(
-    subject: Optional[str] = "Azure_IoT_Config_Cli_Cert",
-    output_path: Optional[str] = None,
-    cert_name: Optional[str] = "iotedge_config_cli_root",
+    subject: Optional[str] = "Azure_IoT_Config_Cli_Cert"
 ) -> CertInfo:
     key = rsa.generate_private_key(public_exponent=65537, key_size=4096)
 
@@ -177,13 +176,13 @@ def create_edge_root_ca_certificate(
         .subject_name(subject_name)
         .issuer_name(subject_name)
         .public_key(key.public_key())
-        .add_extension(subject_key_id, False)
-        .add_extension(authority_key_id, False)
-        .add_extension(basic, True)
-        .add_extension(key_usage, True)
         .serial_number(x509.random_serial_number())
         .not_valid_before(datetime.datetime.utcnow())
         .not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=365))
+        .add_extension(subject_key_id, critical=False)
+        .add_extension(authority_key_id, critical=False)
+        .add_extension(basic, critical=True)
+        .add_extension(key_usage, critical=True)
         .sign(key, hashes.SHA256())
     )
     certificate = cert.public_bytes(serialization.Encoding.PEM).decode("utf-8")
@@ -194,22 +193,6 @@ def create_edge_root_ca_certificate(
         encryption_algorithm=serialization.NoEncryption(),
     ).decode("utf-8")
 
-    if output_path and exists(output_path):
-        cert_file = cert_name + ".cert.pem"
-        key_file = cert_name + ".key.pem"
-        write_content_to_file(
-            content=certificate,
-            destination=output_path,
-            file_name=cert_file,
-            overwrite=True,
-        )
-        write_content_to_file(
-            content=private_key,
-            destination=output_path,
-            file_name=key_file,
-            overwrite=True,
-        )
-
     return CertInfo(
         certificate=certificate,
         privateKey=private_key,
@@ -217,39 +200,62 @@ def create_edge_root_ca_certificate(
     )
 
 
+# TODO - Unit test, compare with test_utils::_generate_device_certificate
 def create_signed_device_cert(
-    device_id, ca_public, ca_private, cert_output_dir
+    subject, ca_public, ca_private, cert_output_dir, cert_file
 ) -> CertInfo:
+
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=4096)
     ca_public_key = bytes(ca_public, "utf-8")
-    ca_private_key = serialization.load_pem_private_key(
-        bytes(ca_private, "utf-8"), None
+    ca_private_key = bytes(ca_private, "utf-8")
+    ca_key = serialization.load_pem_private_key(ca_private_key, password=None)
+    ca_cert = x509.load_pem_x509_certificate(ca_public_key)
+
+    # v3 certificate extensions
+    subject_key_id = x509.SubjectKeyIdentifier.from_public_key(private_key.public_key())
+    authority_key_id = x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(
+        subject_key_id,
     )
-    key = rsa.generate_private_key(public_exponent=65537, key_size=4096)
-    subject_name = x509.Name(
-        [
-            x509.NameAttribute(NameOID.COMMON_NAME, f"{device_id}.deviceca"),
-        ]
+    basic_constraints = x509.BasicConstraints(ca=True, path_length=None)
+    key_usage = x509.KeyUsage(
+        digital_signature=True,
+        crl_sign=True,
+        key_cert_sign=True,
+        content_commitment=False,
+        data_encipherment=False,
+        decipher_only=False,
+        encipher_only=False,
+        key_agreement=False,
+        key_encipherment=False,
     )
     csr = (
         x509.CertificateSigningRequestBuilder()
-        .subject_name(subject_name)
-        .sign(key, hashes.SHA256())
+        .subject_name(
+            x509.Name(
+                [
+                    x509.NameAttribute(NameOID.COMMON_NAME, subject),
+                ]
+            )
+        )
+        .sign(private_key, hashes.SHA256())
     )
-    ca = x509.load_pem_x509_certificate(ca_public_key)
-
     cert = (
         x509.CertificateBuilder()
         .subject_name(csr.subject)
-        .issuer_name(ca.subject)
+        .issuer_name(ca_cert.subject)
         .public_key(csr.public_key())
         .serial_number(x509.random_serial_number())
         .not_valid_before(datetime.datetime.utcnow())
         .not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=365))
-        .sign(ca_private_key, hashes.SHA256())
+        .add_extension(subject_key_id, False)
+        .add_extension(authority_key_id, False)
+        .add_extension(basic_constraints, True)
+        .add_extension(key_usage, True)
+        .sign(ca_key, hashes.SHA256())
     )
     certificate = cert.public_bytes(serialization.Encoding.PEM).decode("utf-8")
     thumbprint = cert.fingerprint(hashes.SHA256()).hex().upper()
-    privateKey = key.private_bytes(
+    privateKey = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.TraditionalOpenSSL,
         encryption_algorithm=serialization.NoEncryption(),
@@ -259,18 +265,21 @@ def create_signed_device_cert(
         write_content_to_file(
             content=certificate,
             destination=cert_output_dir,
-            file_name=f"{device_id}.cert.pem",
+            file_name=f"{cert_file}.cert.pem",
         )
         write_content_to_file(
             content=privateKey,
             destination=cert_output_dir,
-            file_name=f"{device_id}.key.pem",
+            file_name=f"{cert_file}.key.pem",
         )
     return CertInfo(
-        certificate=certificate, thumbprint=thumbprint, privateKey=privateKey
+        certificate=certificate,
+        thumbprint=thumbprint,
+        privateKey=privateKey
     )
 
 
+# TODO - Unit test
 def load_ca_cert_info(cert_path: str, key_path: str) -> CertInfo:
     for path in [cert_path, key_path]:
         if not exists(path):
@@ -288,6 +297,7 @@ def load_ca_cert_info(cert_path: str, key_path: str) -> CertInfo:
     )
 
 
+# TODO - Unit test
 def make_cert_chain(
     certs: List[str],
     output_dir: Optional[str] = None,

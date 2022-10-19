@@ -1,12 +1,12 @@
-from genericpath import exists
+import tarfile
 from os import makedirs, remove, listdir
 from os.path import exists, join
-import tarfile
 from pathlib import PurePath
 from typing import Optional, Union
 from azure.cli.core.azclierror import FileOperationError
 
 
+# TODO - Unit test
 def write_content_to_file(
     content: Union[str, bytes],
     destination: str,
@@ -25,6 +25,7 @@ def write_content_to_file(
         f.write(write_content)
 
 
+# TODO - Unit test
 def create_directory_tar_archive(
     target_directory: str,
     tarfile_path: str,
