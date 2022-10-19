@@ -207,7 +207,7 @@ def load_deviceupdate_arguments(self, _):
             "url",
             options_list=["--url"],
             help="Routable location from which the import manifest can be downloaded by Device Update for IoT Hub. "
-            "This is typically a read-only SAS-protected blob URL with an expiration set to at least 4 hours.",
+            "This is typically a read-only SAS-protected blob URL with an expiration set to at least 3 hours.",
         )
         context.argument(
             "file",
@@ -550,6 +550,13 @@ def load_deviceupdate_arguments(self, _):
             "storage_container_name",
             options_list=["--storage-container"],
             help="Desired storage container name to stage update manifest artifacts.",
+            arg_group="Storage"
+        )
+        context.argument(
+            "storage_account_subscription",
+            options_list=["--storage-subscription"],
+            help="Desired storage account subscription to stage update manifest artifacts. "
+            "Applicable when the storage and device update accounts are in different subscriptions.",
             arg_group="Storage"
         )
         context.argument(

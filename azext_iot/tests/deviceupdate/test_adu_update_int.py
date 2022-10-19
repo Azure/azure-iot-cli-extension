@@ -555,17 +555,21 @@ def test_instance_update_stage(provisioned_instances_module: Dict[str, dict]):
     delta_update_path = get_context_path(__file__, "manifests", "delta", delta_manifest_file)
     delta_update_id = process_json_arg(delta_update_path)["updateId"]
     delta_friendly_name = f"delta_{generate_generic_id()}"
+    target_sub = cli.invoke("account show").as_json()["id"]
 
-    commands_payload = cli.invoke(
-        f"iot du update stage -n {account_name} -i {instance_name} --friendly-name {simple_friendly_name} "
-        f"--manifest-path '{delta_update_path}' --storage-account {parsed_storage_id['name']} --storage-container staged"
+    # Also set explicit subscription & overwrite.
+    command_payload = cli.invoke(
+        f"iot du update stage -n {account_name} -i {instance_name} --friendly-name {delta_friendly_name} "
+        f"--manifest-path '{delta_update_path}' --storage-account {parsed_storage_id['name']} --storage-container staged "
+        f"--storage-subscription {target_sub} --overwrite"
     ).as_json()
 
-    from subprocess import run
-    from shlex import quote
-    for command in commands_payload["commands"]:
-        run([quote(command)], check=True, shell=True)
-    import pdb; pdb.set_trace()
+    from subprocess import run, CalledProcessError
+    try:
+        run(command_payload["importCommand"], check=True, shell=True)
+    except CalledProcessError as e:
+        logger.error(e)
+
     assert cli.invoke(
         f"iot du update show -n {account_name} -i {instance_name} --up {delta_update_id['provider']} "
         f"--un {delta_update_id['name']} --uv {delta_update_id['version']}").as_json()['friendlyName'] == delta_friendly_name

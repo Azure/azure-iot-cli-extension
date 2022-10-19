@@ -130,42 +130,48 @@ def import_update(
     resource_group_name: Optional[str] = None,
 ):
     from azext_iot.deviceupdate.providers.base import MicroObjectCache
+    from azext_iot.deviceupdate.common import get_cache_entry_name, CACHE_RESOURCE_TYPE
 
     data_manager = DeviceUpdateDataManager(
         cmd=cmd, account_name=name, instance_name=instance_name, resource_group=resource_group_name
     )
-    client_calculated_meta = None
-    if not size or not hashes:
-        client_calculated_meta = data_manager.calculate_manifest_metadata(url)
 
-    hashes = data_manager.assemble_nargs_to_dict(hash_list=hashes) or {"sha256": client_calculated_meta.hash}
-    size = size or client_calculated_meta.bytes
+    if url != "cache://":
+        client_calculated_meta = None
+        if not size or not hashes:
+            client_calculated_meta = data_manager.calculate_manifest_metadata(url)
 
-    manifest_metadata = DeviceUpdateDataModels.ImportManifestMetadata(url=url, size_in_bytes=size, hashes=hashes)
-    import_update_item = DeviceUpdateDataModels.ImportUpdateInputItem(
-        import_manifest=manifest_metadata,
-        friendly_name=friendly_name,
-        files=data_manager.assemble_files(file_list_col=file),
-    )
+        hashes = data_manager.assemble_nargs_to_dict(hash_list=hashes) or {"sha256": client_calculated_meta.hash}
+        size = size or client_calculated_meta.bytes
+
+        manifest_metadata = DeviceUpdateDataModels.ImportManifestMetadata(url=url, size_in_bytes=size, hashes=hashes)
+        import_update_item = DeviceUpdateDataModels.ImportUpdateInputItem(
+            import_manifest=manifest_metadata,
+            friendly_name=friendly_name,
+            files=data_manager.assemble_files(file_list_col=file),
+        )
     cache = MicroObjectCache(cmd, DeviceUpdateDataModels)
-    cache_resource_name = f"{name}_{instance_name}_importUpdate"
-    cache_resource_type = "DeviceUpdate"
+    cache_resource_name = get_cache_entry_name(account_name=name, instance_name=instance_name)
     cache_serialization_model = "[ImportUpdateInputItem]"
     defer = cmd.cli_ctx.data.get("_cache", False)
     cached_imports: Union[List[DeviceUpdateDataModels.ImportUpdateInputItem], None] = cache.get(
         resource_name=cache_resource_name,
         resource_group=data_manager.container.resource_group,
-        resource_type=cache_resource_type,
+        resource_type=CACHE_RESOURCE_TYPE,
         serialization_model=cache_serialization_model,
     )
     update_to_import = cached_imports if cached_imports else []
-    update_to_import.append(import_update_item)
+
+    if url != "cache://":
+        update_to_import.append(import_update_item)
+    else:
+        defer = False
 
     if defer:
         cache.set(
             resource_name=cache_resource_name,
             resource_group=data_manager.container.resource_group,
-            resource_type=cache_resource_type,
+            resource_type=CACHE_RESOURCE_TYPE,
             payload=update_to_import,
             serialization_model=cache_serialization_model,
         )
@@ -178,7 +184,7 @@ def import_update(
                 cache.remove(
                     resource_name=cache_resource_name,
                     resource_group=data_manager.container.resource_group,
-                    resource_type=cache_resource_type,
+                    resource_type=CACHE_RESOURCE_TYPE,
                 )
             elif lro.status() == "Failed":
                 try:
@@ -434,12 +440,15 @@ def stage_update(
     update_manifest_paths: List[str],
     storage_account_name: str,
     storage_container_name: str,
+    storage_account_subscription: Optional[str] = None,
     friendly_name: str = None,
     then_import: Optional[bool] = None,
     resource_group_name: Optional[str] = None,
     overwrite: bool = False,
 ):
     from azext_iot.common.embedded_cli import EmbeddedCLI
+    from azext_iot.deviceupdate.common import get_cache_entry_name, CACHE_RESOURCE_TYPE
+    from azext_iot.deviceupdate.providers.base import MicroObjectCache
     from datetime import datetime, timedelta
     from azext_iot.common.utility import process_json_arg
     from pathlib import PurePath
@@ -453,8 +462,8 @@ def stage_update(
     cli = EmbeddedCLI()
     az_account_info = cli.invoke("account show").as_json()
     azcli_credential = AzureCliCredential()
-
-    target_subscription = cmd.cli_ctx.data.get("subscription_id") or az_account_info.get("id")
+    # If the user is not logged in, 'account show' will fail asking the user to login, ensuring we have a subscription.
+    target_subscription = storage_account_subscription or cmd.cli_ctx.data.get("subscription_id") or az_account_info.get("id")
     storage_mgmt_client = StorageManagementClient(credential=azcli_credential, subscription_id=target_subscription)
     list_iterator = storage_mgmt_client.storage_accounts.list()
     target_account = None
@@ -538,6 +547,11 @@ def stage_update(
             file_names
         )
 
+    data_manager = DeviceUpdateDataManager(
+        cmd=cmd, account_name=name, instance_name=instance_name, resource_group=resource_group_name
+    )
+    resource_group_name = data_manager.container.resource_group
+
     user_commands = []
     manifest_count = len(manifest_sas_uris_map)
     for manifest_sas_uris in manifest_sas_uris_map:
@@ -549,22 +563,23 @@ def stage_update(
         file_cmd_segs = ""
         for file_uri_index in range(len(sas_uris)):
             file_cmd_segs = file_cmd_segs + f" --file filename={file_names[file_uri_index]} url={sas_uris[file_uri_index]}"
-        defer_cmd_seg = ""
-        if manifest_count > 1:
-            defer_cmd_seg = " --defer"
         user_commands.append(
-            f"az iot du update import -n {name} -i {instance_name} -g {resource_group_name} "
-            f"--url {root_uri}{friendly_name_cmd_seg}{file_cmd_segs}{defer_cmd_seg}"
+            f"iot du update import -n {name} -i {instance_name} -g {resource_group_name} "
+            f"--url {root_uri}{friendly_name_cmd_seg}{file_cmd_segs} --defer"
         )
         manifest_count = manifest_count - 1
 
-    total_commands = {"commands": user_commands}
+    # Purge cache prior to execution.
+    cache = MicroObjectCache(cmd, DeviceUpdateDataModels)
+    cache.remove(get_cache_entry_name(name, instance_name), resource_group_name, CACHE_RESOURCE_TYPE)
 
+    build_import_commands = {"commands": user_commands}
+    for command in build_import_commands["commands"]:
+        cli.invoke(command)
+
+    invoke_command = f"iot du update import -n {name} -i {instance_name} -g {resource_group_name} --url cache://"
     if then_import:
-        for command in total_commands["commands"]:
-            # New EmbeddedCLI instance created per command due to persisted cache setting.
-            import_cli = EmbeddedCLI(cli_ctx=cmd.cli_ctx)
-            import_cli.invoke(command.split("az")[1])
+        cli.invoke(invoke_command)
         return
 
-    return total_commands
+    return {"importCommand": f"az {invoke_command}"}

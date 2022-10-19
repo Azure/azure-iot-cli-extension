@@ -17,8 +17,10 @@ unreleased
 **Device Update**
 
 * The in-preview Azure Device Update CLI root namespace changed from `az iot device-update` to `az iot du`.
+* Introducing the preview `az iot du update stage` command. The update stage command is designed to automate
+  the pre-requisite steps of importing an update. Read the command reference to learn more.
 
-**General Updates**
+**General updates**
 
 * The Azure IoT CLI extension min core CLI version incremented to `2.32.0`.
 

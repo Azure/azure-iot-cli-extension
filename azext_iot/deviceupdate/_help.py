@@ -364,11 +364,16 @@ def load_deviceupdate_help():
     helps["iot du update import"] = """
         type: command
         short-summary: Import a new update version into the Device Update instance.
-        long-summary: This command supports the `--defer` capability. When used the command will store the
-          object payload intended to be sent to Azure in a local cache. The next usage of this command without `--defer`
-          will combine the new request payload with the cached objects sending them together. Upon success the local
-          cache for this command will be purged. Defer support is intended primarily for updates with multiple reference steps,
-          such that parent and child updates can be submitted together.
+        long-summary: |
+          This command supports the `--defer` capability. When used the command will store the
+          object payload intended to be sent to Azure in a local cache. The next usage of this command
+          without `--defer` will combine the new request payload with the cached objects sending them together.
+
+          Upon success the corresponding local cache entry will be purged. If failure occurs cached
+          contents will not be removed. Use `az cache` commands to manage local cache entries independently.
+
+          Defer support is intended primarily for updates with multiple reference steps, such that
+          parent and child updates can be submitted together.
 
         examples:
         - name: Import an update with two related files and no reference steps, explicitly providing
@@ -896,18 +901,19 @@ def load_deviceupdate_help():
     helps["iot du update stage"] = """
         type: command
         short-summary: Stage an update for import to a target instance.
-        long-summary: >
+        long-summary: |
           Staging an update refers to accelerating the pre-requisite steps
           of importing an update to a target instance. For a given update manifest, the process
           will determine relevant files, push them to a desired storage container,
           generate SAS URIs and cover other preparation steps for a succesful import.
 
-          The command depends on a convention based organization of update files. All update files for a
-          target manifest are expected to be in the same directory the update manifest resides in.
+          This command depends on a convention based organization of update files. All update files
+          for a target manifest are expected to be in the same directory the update manifest resides in.
 
           Key based access is used to upload blob artifacts and to generate 3 hour duration SAS URIs with read access.
 
           If `--then-import` flag is provided, the command will import the staged update. Otherwise
-          the result of this operation is a collection of import commands to run in-order to achieve
-          the same result at a later time.
+          the result of this operation is an import command to run to achieve the same result at a later time.
+
+          This command will purge and refresh any local cache entry for the target resource.
     """
