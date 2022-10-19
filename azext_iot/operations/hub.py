@@ -43,7 +43,7 @@ from azext_iot.common.utility import (
     init_monitoring,
     process_json_arg,
     generate_key,
-    generate_container_sas_token,
+    generate_storage_account_sas_token,
 )
 from azext_iot._factory import SdkResolver, CloudError
 from azext_iot.operations.generic import _execute_query, _process_top
@@ -2266,7 +2266,7 @@ def _generate_blob_container_uri(
                 storage_account_name
             )
         ).as_json()["connectionString"]
-        sas_token = generate_container_sas_token(storage_cstring)
+        sas_token = generate_storage_account_sas_token(storage_cstring, read=True, write=True, create=True, add=True, delete=True)
         container_sas_url = container_sas_url + "?" + sas_token
 
     return container_sas_url

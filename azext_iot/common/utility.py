@@ -621,7 +621,17 @@ def is_valid_dtmi(dtmi):
     return True
 
 
-def generate_container_sas_token(storage_cstring):
+def generate_storage_account_sas_token(
+    storage_cstring: str,
+    expiry_in_hours: int = 1,
+    read: bool = False,
+    write: bool = False,
+    create: bool = False,
+    update: bool = False,
+    add: bool = False,
+    list: bool = False,
+    delete: bool = False,
+):
     from datetime import datetime, timedelta
     ensure_azure_namespace_path()
     from azure.storage.blob import ResourceTypes, AccountSasPermissions, generate_account_sas, BlobServiceClient
@@ -633,9 +643,9 @@ def generate_container_sas_token(storage_cstring):
         account_key=blob_service_client.credential.account_key,
         resource_types=ResourceTypes(object=True),
         permission=AccountSasPermissions(
-            read=True, add=True, create=True, delete=True, filter=True, list=True, update=True, write=True
+            read=read, write=write, create=create, update=update, add=add, list=list, delete=delete
         ),
-        expiry=datetime.utcnow() + timedelta(hours=1)
+        expiry=datetime.utcnow() + timedelta(hours=expiry_in_hours)
     )
 
     return sas_token

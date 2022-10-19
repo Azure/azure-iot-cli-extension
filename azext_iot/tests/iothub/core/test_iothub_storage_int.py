@@ -12,7 +12,7 @@ from knack.log import get_logger
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.settings import UserTypes
-from azext_iot.common.utility import generate_container_sas_token
+from azext_iot.common.utility import generate_storage_account_sas_token
 
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.shared import AuthenticationType
@@ -50,7 +50,9 @@ class TestIoTStorage(IoTLiveScenarioTest):
         self.live_storage_id = storage_account["id"]
 
     def get_container_sas_url(self):
-        sas_token = generate_container_sas_token(self.storage_cstring)
+        sas_token = generate_storage_account_sas_token(
+            self.storage_cstring, read=True, write=True, create=True, add=True, delete=True
+        )
         container_sas_url = (
             "https://" + self.storage_account_name + ".blob.core.windows.net" + "/" + self.storage_container + "?" + sas_token
         )
