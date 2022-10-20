@@ -168,7 +168,7 @@ def _setup_hub_state(cstring):
 
 
 # Test with an empty hub to save all, upload all, migrate all - will need to have seperate hubs created
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def setup_hub_states(provisioned_iothubs):
     filename = generate_generic_id() + ".json"
     provisioned_iothubs[0]["filename"] = filename
@@ -179,7 +179,7 @@ def setup_hub_states(provisioned_iothubs):
         os.remove(filename)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def setup_hub_states_controlplane(setup_hub_controlplane_states):
     filename = generate_generic_id() + ".json"
     setup_hub_controlplane_states[0]["filename"] = filename
@@ -257,8 +257,6 @@ def test_migrate_controlplane(setup_hub_states_controlplane):
     compare_hubs_controlplane(origin_name, dest_name, origin_rg)
 
 
-# TODO figure out better way to force two hubs to be made that wont make this test create
-# two hubs if ran by it
 @pytest.mark.hub_infrastructure(count=1, sys_identity=True, user_identity=True, storage=True, desired_tags="abc=def")
 def test_export_import_controlplane(setup_hub_states_controlplane):
     filename = setup_hub_states_controlplane[0]["filename"]
@@ -267,7 +265,7 @@ def test_export_import_controlplane(setup_hub_states_controlplane):
     hub_location = setup_hub_states_controlplane[0]["hub"]["location"]
 
     cli.invoke(
-        f"iot hub state export -n {hub_name} -f {filename} -g {hub_rg} --of --aspects {CONTROLPLANE}"
+        f"iot hub state export -n {hub_name} -f {filename} -g {hub_rg} -r --aspects {CONTROLPLANE}"
     )
     compare_hub_controlplane_to_file(filename, hub_name, hub_rg)
     clean_up_hub_controlplane(hub_name, hub_rg, hub_location)
@@ -321,7 +319,7 @@ def test_export_import_dataplane(setup_hub_states):
     for auth_phase in DATAPLANE_AUTH_TYPES:
         cli.invoke(
             set_cmd_auth_type(
-                f"iot hub state export -n {hub_name} -f {filename} -g {hub_rg} --of --aspects {DATAPLANE}",
+                f"iot hub state export -n {hub_name} -f {filename} -g {hub_rg} -r --aspects {DATAPLANE}",
                 auth_type=auth_phase,
                 cstring=hub_cstring
             )
