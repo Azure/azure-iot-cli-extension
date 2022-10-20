@@ -417,12 +417,12 @@ def manifest_init_v5(
 
 
 def calculate_hash(
-    file_paths: List[List[str]],
+    file_paths: List[str],
     hash_algo: str = ADUValidHashAlgorithmType.SHA256.value,
 ):
     result = []
     for path in file_paths:
-        file_metadata = DeviceUpdateDataManager.calculate_file_metadata(path[0])
+        file_metadata = DeviceUpdateDataManager.calculate_file_metadata(path)
         result.append(
             {
                 "bytes": file_metadata.bytes,
