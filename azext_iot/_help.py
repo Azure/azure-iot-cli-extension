@@ -261,10 +261,10 @@ helps[
     type: command
     short-summary: Export all device identities from an IoT Hub to an Azure Storage blob container.
                    For inline blob container SAS uri input, please review the input rules of your environment.
-                   Storage account name and blob container name parameters can only be used when the storage account is in the same subscription as the input IoTHub.
+                   Storage account name and blob container name parameters can only be used when the storage account is in the same subscription as the input IoT Hub.
                    The output blob containing device identities is a text file named 'devices.txt'.
                    Permissions required - Either IoT Hub shared access policy supporting 'Registry Read & Registry Write' OR
-                   an entity with 'IoT Hub Data Contributor' role on the IoT Hub
+                   an entity with 'IoT Hub Data Contributor' role on the IoT Hub.
     long-summary: For more information, see
                   https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
     examples:
@@ -289,14 +289,13 @@ helps[
       text: >
         az iot hub device-identity export -n {iothub_name} --ik --bcu
         'https://mystorageaccount.blob.core.windows.net/devices' --identity [system]
-    - name: Export all device identities to a configured blob container and include device keys. Uses user assigned managed identity
-            that has Storage Blob Data Contributor roles for the storage account and contributor for the IoT hub. The blob container
-            name and storage account name are provided as parameters to the command.
+    - name: Export all device identities to a configured blob container and include device keys. Uses user assigned managed identity that has
+            Storage Blob Data Contributor role for the storage account. The blob container name and storage account name
+            are provided as parameters to the command.
       text: >
         az iot hub device-identity export -n {iothub_name} --ik --bc {blob_container_name} --sa {storage_account_name} --identity {managed_identity_resource_id}
-    - name: Export all device identities to a configured blob container and include device keys. Uses user assigned managed identity
-            that has Storage Blob Data Contributor roles for the storage account and contributor for the IoT hub. The blob container
-            uri does not need the blob SAS token.
+    - name: Export all device identities to a configured blob container and include device keys. Uses user assigned managed identity that has
+            Storage Blob Data Contributor role for the storage account. The blob container uri does not need the blob SAS token.
       text: >
         az iot hub device-identity export -n {iothub_name} --ik --bcu
         'https://mystorageaccount.blob.core.windows.net/devices' --identity {managed_identity_resource_id}
@@ -308,11 +307,11 @@ helps[
     type: command
     short-summary: Import device identities to an IoT Hub from a blob.
                    For inline blob container SAS uri input, please review the input rules of your environment.
-                   Storage account name and blob container name parameters can only be used when the storage account is in the same subscription as the input IoTHub.
+                   Storage account name and blob container name parameters can only be used when the storage account is in the same subscription as the input IoT Hub.
                    The expected input file containing device identities should be named 'devices.txt'.
                    The output log file 'importErrors.log' is empty when import is successful and contains error logs in case of import failure.
                    Permissions required - Either IoT Hub shared access policy supporting 'Registry Read & Registry Write' OR
-                   an entity with 'IoT Hub Data Contributor' role on the IoT Hub
+                   an entity with 'IoT Hub Data Contributor' role on the IoT Hub.
     long-summary: For more information, see
                   https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
     examples:
@@ -338,13 +337,13 @@ helps[
       text: >
         az iot hub device-identity import -n {iothub_name} --ibcu {input_sas_uri} --obcu {output_sas_uri} --identity [system]
     - name: Import all device identities from a blob using user assigned managed identity that has Storage Blob Data Contributor
-            roles for both storage accounts and contributor for the IoT hub. The input blob container and storage account as well as
-            output blob container and storage account are provided as parameters to the command
+            roles for both storage accounts. The input blob container and storage account as well as output blob container
+            and storage account are provided as parameters to the command
       text: >
         az iot hub device-identity import -n {iothub_name} --ibc {input_blob_container_name} --isa {input_storage_account_name}
         --obc {output_blob_container_name} --osa {output_storage_account_name} --identity {managed_identity_resource_id}
     - name: Import all device identities from a blob using user assigned managed identity that has Storage Blob Data Contributor
-            roles for both storage accounts and contributor for the IoT hub. The blob container uri does not need the blob SAS token.
+            roles for both storage accounts. The blob container uri does not need the blob SAS token.
       text: >
         az iot hub device-identity import -n {iothub_name} --ibcu {input_sas_uri} --obcu {output_sas_uri} --identity {managed_identity_resource_id}
 """
