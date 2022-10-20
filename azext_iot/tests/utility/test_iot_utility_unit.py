@@ -13,6 +13,7 @@ from unittest import mock
 from knack.util import CLIError
 from azure.cli.core.extension import get_extension_path
 from azext_iot.common.utility import (
+    create_nested_edge_device_config_script,
     handle_service_exception,
     validate_min_python_version,
     process_json_arg,
@@ -338,12 +339,12 @@ class TestEmbeddedCli(object):
             (
                 "iot hub device-twin show -n 'abcd' -d 'dcba'",
                 "20a300e5-a444-4130-bb5a-1abd08ad930a",
-                None
+                None,
             ),
             (
                 "iot hub device-identity create -n abcd -d dcba",
                 None,
-                "20a300e5-a444-4130-bb5a-1abd08ad930a"
+                "20a300e5-a444-4130-bb5a-1abd08ad930a",
             ),
             (
                 "iot hub device-twin show -n 'abcd' -d 'dcba'",
@@ -352,7 +353,9 @@ class TestEmbeddedCli(object):
             ),
         ],
     )
-    def test_embedded_cli(self, mocker, mocked_azclient, command, user_subscription, subscription):
+    def test_embedded_cli(
+        self, mocker, mocked_azclient, command, user_subscription, subscription
+    ):
         import shlex
 
         cli_ctx = mocker.MagicMock()
@@ -465,7 +468,7 @@ class TestHandleServiceException(object):
             (502, AzureInternalError),
             (503, AzureInternalError),
             (504, AzureInternalError),
-            (None, AzureResponseError)
+            (None, AzureResponseError),
         ],
     )
     def test_handle_service_exception(self, mocker, status_code, expected_error):
@@ -475,3 +478,88 @@ class TestHandleServiceException(object):
 
         with pytest.raises(expected_error):
             handle_service_exception(error)
+
+
+class TestNestedEdgeDeviceConfiguration(object):
+    from azext_iot.constants import (
+        EDGE_CONFIG_SCRIPT_APPLY,
+        EDGE_CONFIG_SCRIPT_CA_CERTS,
+        EDGE_CONFIG_SCRIPT_HEADERS,
+        EDGE_CONFIG_SCRIPT_HOSTNAME,
+        EDGE_CONFIG_SCRIPT_HUB_AUTH_CERTS,
+        EDGE_CONFIG_SCRIPT_PARENT_HOSTNAME,
+    )
+
+    @pytest.mark.parametrize(
+        "device_id, hub_auth, hostname, has_parent, parent_hostname, segments",
+        [
+            # device, hub_auth, hostname, parent, parent_hostname
+            (
+                "test_device_id",
+                True,
+                "hostname",
+                True,
+                "parent_hostname",
+                [
+                    EDGE_CONFIG_SCRIPT_HEADERS.format("test_device_id"),
+                    EDGE_CONFIG_SCRIPT_CA_CERTS,
+                    EDGE_CONFIG_SCRIPT_HUB_AUTH_CERTS,
+                    EDGE_CONFIG_SCRIPT_APPLY,
+                ],
+            ),
+            # device, no hub auth, hostname, parent, parent_hostname
+            (
+                "test_device_id",
+                False,
+                "hostname",
+                True,
+                "parent_hostname",
+                [
+                    EDGE_CONFIG_SCRIPT_HEADERS.format("test_device_id"),
+                    EDGE_CONFIG_SCRIPT_CA_CERTS,
+                    EDGE_CONFIG_SCRIPT_APPLY,
+                ],
+            ),
+            # no optional parameters
+            (
+                "test_device_id",
+                None,
+                None,
+                None,
+                None,
+                [
+                    EDGE_CONFIG_SCRIPT_HEADERS.format("test_device_id"),
+                    EDGE_CONFIG_SCRIPT_HOSTNAME,
+                    EDGE_CONFIG_SCRIPT_CA_CERTS,
+                    EDGE_CONFIG_SCRIPT_APPLY,
+                ],
+            ),
+            # parent but no hostnames, no hub auth
+            (
+                "test_device_id",
+                False,
+                None,
+                True,
+                None,
+                [
+                    EDGE_CONFIG_SCRIPT_HEADERS.format("test_device_id"),
+                    EDGE_CONFIG_SCRIPT_HOSTNAME,
+                    EDGE_CONFIG_SCRIPT_PARENT_HOSTNAME,
+                    EDGE_CONFIG_SCRIPT_CA_CERTS,
+                    EDGE_CONFIG_SCRIPT_APPLY,
+                ],
+            ),
+        ],
+    )
+    def test_nested_edge_device_config_script(
+        self, device_id, hub_auth, hostname, has_parent, parent_hostname, segments
+    ):
+        script_content = create_nested_edge_device_config_script(
+            device_id=device_id,
+            hub_auth=hub_auth,
+            hostname=hostname,
+            has_parent=has_parent,
+            parent_hostname=parent_hostname,
+        )
+
+        assert script_content == "\n".join(segments)

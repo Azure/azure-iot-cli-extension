@@ -707,7 +707,7 @@ def generate_storage_account_sas_token(
     return sas_token
 
 
-def create_edge_configuration_script(
+def create_nested_edge_device_config_script(
     device_id: str,
     hub_auth: Optional[bool] = False,
     hostname: Optional[str] = None,

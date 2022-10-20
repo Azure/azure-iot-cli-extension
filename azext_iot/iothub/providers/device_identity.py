@@ -36,7 +36,7 @@ from azext_iot.common.shared import (
 )
 from azext_iot.iothub.providers.base import IoTHubProvider
 from azext_iot.common.utility import (
-    create_edge_configuration_script,
+    create_nested_edge_device_config_script,
     process_json_arg,
     process_toml_content,
     process_yaml_arg,
@@ -271,7 +271,7 @@ class DeviceIdentityProvider(IoTHubProvider):
                 pk = signed_device_cert["thumbprint"]
                 sk = device_hub_cert["thumbprint"]
             write_content_to_file(
-                content=create_edge_configuration_script(
+                content=create_nested_edge_device_config_script(
                     device_id=device_id,
                     hub_auth=hub_cert_auth,
                     hostname=device_config.hostname,
