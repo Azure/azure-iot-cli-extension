@@ -915,5 +915,36 @@ def load_deviceupdate_help():
           If `--then-import` flag is provided, the command will import the staged update. Otherwise
           the result of this operation is an import command to run to achieve the same result at a later time.
 
-          This command will purge and refresh any local cache entry for the target resource.
+          This command will purge and refresh any local cache entry for the target instance.
+
+        examples:
+        - name: Stage a stand-alone update. Update files are expected to reside in the same directory
+            as the manifest. The resultant import command can be executed at a later time to initiate the
+            import of the staged update prior to SAS token expiration.
+          text: >
+            az iot du update stage -n {account_name} -i {instance_name} --storage-account {storage_account_name}
+            --storage-container {storage_container_name} --manifest-path /path/to/manifest.json
+
+        - name: Stage a stand-alone update. After staging, import the update to the instance using a desired friendly
+            name.
+          text: >
+            az iot du update stage -n {account_name} -i {instance_name} --storage-account {storage_account_name}
+            --storage-container {storage_container_name} --manifest-path /path/to/manifest.json --then-import
+            --friendly-name myAptUpdate
+
+        - name: Stage a multi-reference update. Update files will be uploaded to a storage blob container
+            residing in a different subscription to the update account.
+          text: >
+            az iot du update stage -n {account_name} -i {instance_name} --storage-account {storage_account_name}
+            --storage-container {storage_container_name} --storage-subscription {storage_account_subscription}
+            --manifest-path /path/to/parent/parent.manifest.json --manifest-path /path/to/leaf1/leaf1.manifest.json
+            --manifest-path /path/to/leaf2/leaf2.manifest.json
+
+        - name: Stage a multi-reference update, overwriting existing blobs if they exist. After staging,
+            import the update to the instance.
+          text: >
+            az iot du update stage -n {account_name} -i {instance_name} --storage-account {storage_account_name}
+            --storage-container {storage_container_name} --manifest-path /path/to/parent/parent.manifest.json
+            --manifest-path /path/to/leaf1/leaf1.manifest.json --manifest-path /path/to/leaf2/leaf2.manifest.json
+            --then-import --overwrite
     """

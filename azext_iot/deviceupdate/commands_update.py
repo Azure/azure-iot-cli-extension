@@ -178,6 +178,7 @@ def import_update(
         return
     else:
         import_poller = data_manager.data_client.device_update.begin_import_update(update_to_import=update_to_import)
+        had_cache_entry = len(update_to_import) > 1
 
         def import_handler(lro: ARMPolling):
             if lro.status() == "Succeeded":
@@ -188,10 +189,10 @@ def import_update(
                 )
             elif lro.status() == "Failed":
                 try:
-                    logger.warning(
-                        "Cached contents (if any) from usage of --defer were not removed. "
-                        "Use 'az cache' command group to manage."
-                    )
+                    if had_cache_entry:
+                        logger.warning(
+                            "Cached contents from usage of --defer were not removed. Use 'az cache' command group to manage. "
+                        )
                     logger.error(lro._pipeline_response.http_response.text())
                 except Exception:
                     pass
