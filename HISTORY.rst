@@ -5,9 +5,13 @@ Release History
 
 unreleased
 +++++++++++++++
+**IoT Hub updates**
 
-**IoT Hub**
-
+* Updated the IoT Hub service SDK to now use the newer 2021-04-12 API version.
+* [Breaking Change] The `az iot hub device-identity export` and `az iot hub device-identity import` commands are migrated to use dataplane APIs instead of controlplane.
+* [Breaking Change] Device identity export/import operations now expect the parameter `auth-type` to specify dataplane auth type (instead of storage auth type).
+* Device identity export/import commands now support optional parameters for storage account and blob container names - users no longer need to supply input/output Blob container SAS URIs.
+* Device identity export/import operations now automatically derive storage auth type - hence the parameter `storage_authentication_type` has been deprecated.
 * Add `az iot hub device-twin list` as a highly recommended alternative to `az iot hub device-identity list`. Functionality remains the same as both return a list of device twins and `az iot hub device-identity list` may be altered or deprecated in the future.
 
 
