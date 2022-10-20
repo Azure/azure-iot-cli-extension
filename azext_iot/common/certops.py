@@ -143,10 +143,12 @@ def open_certificate(certificate_path: str) -> str:
 
 
 # TODO - Unit test, compare with test_utils::_generate_root_certificate
-def create_edge_root_ca_certificate(
-    subject: Optional[str] = "Azure_IoT_Config_Cli_Cert"
+def create_root_certificate(
+    subject: Optional[str] = "Azure_IoT_CLI_Extension_Cert",
+    valid_days: Optional[int] = 365,
+    key_size: Optional[int] = 4096
 ) -> CertInfo:
-    key = rsa.generate_private_key(public_exponent=65537, key_size=4096)
+    key = rsa.generate_private_key(public_exponent=65537, key_size=key_size)
 
     subject_name = x509.Name(
         [
@@ -178,7 +180,7 @@ def create_edge_root_ca_certificate(
         .public_key(key.public_key())
         .serial_number(x509.random_serial_number())
         .not_valid_before(datetime.datetime.utcnow())
-        .not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=365))
+        .not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=valid_days))
         .add_extension(subject_key_id, critical=False)
         .add_extension(authority_key_id, critical=False)
         .add_extension(basic, critical=True)
@@ -201,8 +203,13 @@ def create_edge_root_ca_certificate(
 
 
 # TODO - Unit test, compare with test_utils::_generate_device_certificate
-def create_signed_device_cert(
-    subject, ca_public, ca_private, cert_output_dir, cert_file
+def create_signed_cert(
+    subject: str,
+    ca_public: str,
+    ca_private: str,
+    cert_output_dir: Optional[str] = None,
+    cert_file: Optional[str] = None,
+    valid_days: Optional[int] = 365,
 ) -> CertInfo:
 
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=4096)
@@ -246,7 +253,7 @@ def create_signed_device_cert(
         .public_key(csr.public_key())
         .serial_number(x509.random_serial_number())
         .not_valid_before(datetime.datetime.utcnow())
-        .not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=365))
+        .not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=valid_days))
         .add_extension(subject_key_id, False)
         .add_extension(authority_key_id, False)
         .add_extension(basic_constraints, True)
@@ -265,17 +272,15 @@ def create_signed_device_cert(
         write_content_to_file(
             content=certificate,
             destination=cert_output_dir,
-            file_name=f"{cert_file}.cert.pem",
+            file_name=f"{cert_file or subject}.cert.pem",
         )
         write_content_to_file(
             content=privateKey,
             destination=cert_output_dir,
-            file_name=f"{cert_file}.key.pem",
+            file_name=f"{cert_file or subject}.key.pem",
         )
     return CertInfo(
-        certificate=certificate,
-        thumbprint=thumbprint,
-        privateKey=privateKey
+        certificate=certificate, thumbprint=thumbprint, privateKey=privateKey
     )
 
 

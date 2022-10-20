@@ -81,6 +81,10 @@ DEVICE_CONFIG_TOML = {
     "moby_runtime": {"network": "azure-iot-edge", "uri": "unix:///var/run/docker.sock"},
 }
 
+EDGE_ROOT_CERTIFICATE_FILENAME = "iotedge_config_cli_root.pem"
+
+EDGE_DEVICE_BUNDLE_DEFAULT_FOLDER_NAME = "device_bundles"
+
 EDGE_CONFIG_SCRIPT_HEADERS = """
 # This script will attempt to configure a pre-installed iotedge as a nested node.
 # It must be run as sudo, and will modify the ca
@@ -112,21 +116,21 @@ fi
 
 sed -i "s/{{PARENT_HOSTNAME}}/$parent_hostname/" /etc/aziot/config.toml
 """
-EDGE_CONFIG_SCRIPT_CA_CERTS = """
+EDGE_CONFIG_SCRIPT_CA_CERTS = f"""
 # ======================= Install nested root CA =======================================
 if [ -f /etc/os-release ]
 then
         . /etc/os-release
         if [[ "$NAME" == "Common Base Linux Mariner"* ]];
         then
-                cp iotedge_config_cli_root.pem /etc/pki/ca-trust/source/anchors/iotedge_config_cli_root.pem.crt
+                cp {EDGE_ROOT_CERTIFICATE_FILENAME} /etc/pki/ca-trust/source/anchors/{EDGE_ROOT_CERTIFICATE_FILENAME}.crt
                 update-ca-trust
         else
-                cp iotedge_config_cli_root.pem /usr/local/share/ca-certificates/iotedge_config_cli_root.pem.crt
+                cp {EDGE_ROOT_CERTIFICATE_FILENAME} /usr/local/share/ca-certificates/{EDGE_ROOT_CERTIFICATE_FILENAME}.crt
                 update-ca-certificates
         fi
 else
-        cp iotedge_config_cli_root.pem /usr/local/share/ca-certificates/iotedge_config_cli_root.pem.crt
+        cp {EDGE_ROOT_CERTIFICATE_FILENAME} /usr/local/share/ca-certificates/{EDGE_ROOT_CERTIFICATE_FILENAME}.crt
         update-ca-certificates
 fi
 
@@ -135,7 +139,7 @@ systemctl restart docker
 # ======================= Copy device certs  =======================================
 cert_dir="/etc/aziot/certificates"
 mkdir -p $cert_dir
-cp "iotedge_config_cli_root.pem" "$cert_dir/iotedge_config_cli_root.pem"
+cp "{EDGE_ROOT_CERTIFICATE_FILENAME}" "$cert_dir/{EDGE_ROOT_CERTIFICATE_FILENAME}"
 cp "$device_id.full-chain.cert.pem" "$cert_dir/$device_id.full-chain.cert.pem"
 cp "$device_id.key.pem" "$cert_dir/$device_id.key.pem"
 """

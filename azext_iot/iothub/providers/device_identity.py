@@ -9,19 +9,23 @@ from os.path import exists
 from shutil import rmtree
 from azext_iot.common.certops import (
     CertInfo,
-    create_edge_root_ca_certificate,
+    create_root_certificate,
     create_self_signed_certificate,
-    create_signed_device_cert,
+    create_signed_cert,
     load_ca_cert_info,
     make_cert_chain,
 )
 
-from azext_iot.common.fileops import create_directory_tar_archive, write_content_to_file
-from azext_iot.constants import DEVICE_CONFIG_TOML, DEVICE_README
+from azext_iot.common.fileops import tar_directory, write_content_to_file
+from azext_iot.constants import (
+    DEVICE_CONFIG_TOML,
+    DEVICE_README,
+    EDGE_DEVICE_BUNDLE_DEFAULT_FOLDER_NAME,
+    EDGE_ROOT_CERTIFICATE_FILENAME,
+)
 from tqdm import tqdm
 from time import sleep
 from typing import Any, Dict, List, NamedTuple
-import toml
 from knack.log import get_logger
 from typing import Optional
 from azext_iot._factory import SdkResolver
@@ -128,11 +132,13 @@ class DeviceIdentityProvider(IoTHubProvider):
         config: NestedEdgeConfig = None
 
         # configuration for root cert and output directories
-        root_cert_name = "iotedge_config_cli_root.pem"
+        root_cert_name = EDGE_ROOT_CERTIFICATE_FILENAME
         if output_path and exists(output_path):
             cert_output_directory = PurePath(output_path)
         else:
-            cert_output_directory = PurePath(getcwd()).joinpath("device_bundles")
+            cert_output_directory = PurePath(getcwd()).joinpath(
+                EDGE_DEVICE_BUNDLE_DEFAULT_FOLDER_NAME
+            )
             makedirs(cert_output_directory, exist_ok=True)
 
         # If user has provided a path to a configuration file
@@ -163,7 +169,7 @@ class DeviceIdentityProvider(IoTHubProvider):
             root_cert = (
                 load_ca_cert_info(root_cert_path, root_key_path)
                 if all([root_cert_path, root_key_path])
-                else create_edge_root_ca_certificate()
+                else create_root_certificate()
             )
 
             config = NestedEdgeConfig(
@@ -240,7 +246,7 @@ class DeviceIdentityProvider(IoTHubProvider):
                 file_name=root_cert_name,
             )
             # signed device cert (device_id.cert.pem and device_id.key.pem)
-            signed_device_cert = create_signed_device_cert(
+            signed_device_cert = create_signed_cert(
                 subject=f"{device_id}.deviceca",
                 ca_public=config.root_cert["certificate"],
                 ca_private=config.root_cert["privateKey"],
@@ -382,7 +388,7 @@ class DeviceIdentityProvider(IoTHubProvider):
             )
 
             # zip up
-            create_directory_tar_archive(
+            tar_directory(
                 target_directory=device_cert_output_directory,
                 tarfile_path=cert_output_directory,
                 tarfile_name=device_id,
@@ -438,7 +444,6 @@ class DeviceIdentityProvider(IoTHubProvider):
                     id=device_id, content=deployment_content
                 )
 
-
     # TODO - Unit test
     def _process_nested_edge_config_file_content(
         self, content: dict
@@ -464,7 +469,7 @@ class DeviceIdentityProvider(IoTHubProvider):
                 )
             root_cert = load_ca_cert_info(root_ca_cert, root_ca_key)
         else:
-            root_cert = create_edge_root_ca_certificate()
+            root_cert = create_root_certificate()
 
         # device auth
         auth_value = hub_config["authentication_method"]
@@ -638,6 +643,7 @@ class DeviceIdentityProvider(IoTHubProvider):
             else {},
         }
         if output_path:
+            import toml
             write_content_to_file(
                 toml.dumps(device_toml),
                 output_path,
