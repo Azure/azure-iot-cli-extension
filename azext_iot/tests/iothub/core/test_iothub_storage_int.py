@@ -230,15 +230,15 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 self.check_for_running_import_export()
 
                 job_id = self.cmd(
-                    'iot hub device-identity export -n {} --bcu "{}" --ik true'.format(
-                        self.entity_name, self.live_storage_uri
+                    'iot hub device-identity export -n {} --bcu "{}" --identity {} --ik true'.format(
+                        self.entity_name, self.live_storage_uri, "[system]"
                     ),
                     checks=[
                         self.check("outputBlobContainerUri", self.live_storage_uri),
                         self.check("failureReason", None),
                         self.check("type", "export"),
                         self.check("excludeKeysInExport", False),
-                        self.check("storageAuthenticationType", AuthenticationType.keyBased.name),
+                        self.check("storageAuthenticationType", AuthenticationType.identityBased.name),
                         self.exists("jobId"),
                     ],
                 ).get_output_in_json()["jobId"]
