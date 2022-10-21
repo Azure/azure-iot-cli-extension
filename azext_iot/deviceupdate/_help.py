@@ -20,7 +20,7 @@ def load_deviceupdate_help():
           of reliability and security and are easy to connect and manage at scale. Device Update for IoT Hub is an end-to-end platform that customers
           can use to publish, distribute, and manage over-the-air updates for everything from tiny sensors to gateway-level devices.
 
-          To learn more about the Device Update for IoT Hub service visit https://docs.microsoft.com/en-us/azure/iot-hub-du/
+          To learn more about the Device Update for IoT Hub service visit https://docs.microsoft.com/en-us/azure/iot-hub-device-update/
     """
 
     helps["iot du account"] = """
@@ -886,13 +886,13 @@ def load_deviceupdate_help():
         short-summary: Calculate the base64 hashed representation of a file.
 
         examples:
-        - name: Calculate the base64 representation of a sha256 digest for a target file.
+        - name: Calculate the base64 representation of a sha256 digest for a target update file.
           text: >
-            az iot du update init calculate-hash --file-path /path/to/file
+            az iot du update calculate-hash --file-path /path/to/file
 
-        - name: Calculate the base64 representation of a sha256 digest for multiple target files.
+        - name: Calculate the base64 representation of a sha256 digest for multiple target update files.
           text: >
-            az iot du update init calculate-hash
+            az iot du update calculate-hash
             --file-path /path/to/file1
             --file-path /path/to/file2
             --file-path /path/to/file3

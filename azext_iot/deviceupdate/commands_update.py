@@ -448,38 +448,23 @@ def stage_update(
     overwrite: bool = False,
 ):
     from azext_iot.common.embedded_cli import EmbeddedCLI
+    from azext_iot.common.utility import process_json_arg
     from azext_iot.deviceupdate.common import get_cache_entry_name, CACHE_RESOURCE_TYPE
     from azext_iot.deviceupdate.providers.base import MicroObjectCache
-    from datetime import datetime, timedelta
-    from azext_iot.common.utility import process_json_arg
-    from pathlib import PurePath
-    from azure.identity import AzureCliCredential
-    from azure.mgmt.storage import StorageManagementClient
-    from azure.storage.blob import ResourceTypes, AccountSasPermissions, generate_account_sas, BlobServiceClient
-    from azure.cli.core.azclierror import ResourceNotFoundError
+    from azext_iot.deviceupdate.providers.storage import StorageAccountManager
+    from azure.storage.blob import ResourceTypes, AccountSasPermissions, generate_account_sas
     from azure.core.exceptions import ResourceExistsError
-    from msrestazure.tools import parse_resource_id
+    from pathlib import PurePath
+    from datetime import datetime, timedelta
 
     cli = EmbeddedCLI()
+    # If the user is not logged in, 'account show' will fail asking the user to login
+    # ensuring we have credentials and a subscription.
     az_account_info = cli.invoke("account show").as_json()
-    azcli_credential = AzureCliCredential()
-    # If the user is not logged in, 'account show' will fail asking the user to login, ensuring we have a subscription.
-    target_subscription = storage_account_subscription or cmd.cli_ctx.data.get("subscription_id") or az_account_info.get("id")
-    storage_mgmt_client = StorageManagementClient(credential=azcli_credential, subscription_id=target_subscription)
-    list_iterator = storage_mgmt_client.storage_accounts.list()
-    target_account = None
-    for acc in list_iterator:
-        if acc.name == storage_account_name:
-            target_account = acc
-    if not target_account:
-        raise ResourceNotFoundError(
-            f"Unable to find storage account: {storage_account_name} in subscription: {target_subscription}.")
+    target_storage_sub = storage_account_subscription or cmd.cli_ctx.data.get("subscription_id") or az_account_info.get("id")
+    storage_manager = StorageAccountManager(subscription_id=target_storage_sub)
+    blob_service_client = storage_manager.get_sas_blob_service_client(account_name=storage_account_name)
 
-    storage_rg = parse_resource_id(target_account.id)["resource_group"]
-    storage_keys = storage_mgmt_client.storage_accounts.list_keys(
-        resource_group_name=storage_rg, account_name=target_account.name)
-    blob_service_client = BlobServiceClient(
-        account_url=target_account.primary_endpoints.blob, credential=storage_keys.keys[0].value)
     try:
         blob_service_client.create_container(name=storage_container_name)
     except ResourceExistsError:
@@ -501,8 +486,8 @@ def stage_update(
 
             target_datetime_expiry = (datetime.utcnow() + timedelta(hours=3.0))
             sas_token = generate_account_sas(
-                account_name=target_account.name,
-                account_key=storage_keys.keys[0].value,
+                account_name=blob_service_client.credential.account_name,
+                account_key=blob_service_client.credential.account_key,
                 resource_types=ResourceTypes(object=True),
                 permission=AccountSasPermissions(read=True),
                 expiry=target_datetime_expiry
@@ -523,6 +508,7 @@ def stage_update(
 
         file_paths = [manifest_path]
         file_names = []
+        # TODO: Refactor to reduce duplication
         if manifest_files:
             for file in manifest_files:
                 filename = file["filename"]

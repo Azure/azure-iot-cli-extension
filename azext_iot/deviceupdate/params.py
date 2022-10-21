@@ -168,7 +168,7 @@ def load_deviceupdate_arguments(self, _):
         )
         context.argument(
             "file_paths",
-            options_list=["--file-path"],
+            options_list=["--file-path", "-f"],
             nargs="?",
             action="append",
             help="Local path to target file for hash calculation. --file-path can be used 1 or more times.",
