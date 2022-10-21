@@ -22,7 +22,6 @@ from azext_iot.constants import (
     TRACING_PROPERTY,
     TRACING_ALLOWED_FOR_LOCATION,
     TRACING_ALLOWED_FOR_SKU,
-    IOTHUB_TRACK_2_SDK_MIN_VERSION,
 )
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import (
@@ -34,7 +33,8 @@ from azext_iot.common.shared import (
     IoTHubStateType,
     DeviceAuthApiType,
     ConnectionStringParser,
-    EntityStatusType
+    EntityStatusType,
+    JobType
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
@@ -42,8 +42,8 @@ from azext_iot.common.utility import (
     read_file_content,
     init_monitoring,
     process_json_arg,
-    ensure_iothub_sdk_min_version,
     generate_key,
+    generate_storage_account_sas_token,
 )
 from azext_iot._factory import SdkResolver, CloudError
 from azext_iot.operations.generic import _execute_query, _process_top
@@ -2252,169 +2252,178 @@ def iot_get_module_connection_string(
     return result
 
 
-def iot_device_export(
+def _get_service_sdk(
     cmd,
-    hub_name,
-    blob_container_uri,
-    include_keys=False,
-    storage_authentication_type=None,
-    identity=None,
-    resource_group_name=None,
+    hub_name: str,
+    resource_group_name: str = None,
+    login=None,
+    auth_type_dataplane=None,
 ):
-    from azext_iot._factory import iot_hub_service_factory
-
-    client = iot_hub_service_factory(cmd.cli_ctx).iot_hub_resource
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name, resource_group_name=resource_group_name
+        resource_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
     )
+    resolver = SdkResolver(target=target)
+    return resolver.get_sdk(SdkType.service_sdk)
 
-    if exists(blob_container_uri):
-        blob_container_uri = read_file_content(blob_container_uri)
 
-    if ensure_iothub_sdk_min_version("0.12.0"):
-        from azure.mgmt.iothub.models import ExportDevicesRequest
-        from azext_iot.common.shared import AuthenticationType
-
-        storage_authentication_type = (
-            AuthenticationType(storage_authentication_type).name
-            if storage_authentication_type
-            else None
+def _generate_blob_container_uri(
+    cmd,
+    storage_account_name: str,
+    blob_container_name: str,
+    identity: str = None,
+):
+    from azext_iot.common.embedded_cli import EmbeddedCLI
+    if blob_container_name is None or storage_account_name is None:
+        raise ClientRequestError(
+            "Storage account and Blob container names are required to generate blob container uri"
         )
 
-        export_request = ExportDevicesRequest(
-            export_blob_container_uri=blob_container_uri,
-            exclude_keys=not include_keys,
-            authentication_type=storage_authentication_type,
+    cli = EmbeddedCLI(cli_ctx=cmd.cli_ctx)
+    storage_endpoint = cli.invoke(
+        "storage account show -n '{}'".format(
+            storage_account_name
         )
+    ).as_json()["primaryEndpoints"]["blob"]
 
-        user_identity = identity not in [None, "[system]"]
-        if (
-            user_identity
-            and storage_authentication_type != AuthenticationType.identityBased.name
-        ):
-            raise ClientRequestError(
-                "Device export with user-assigned identities requires identity-based authentication [--storage-auth-type]"
+    container_sas_url = storage_endpoint + blob_container_name
+
+    if not identity:
+        storage_cstring = cli.invoke(
+            "storage account show-connection-string -n '{}'".format(
+                storage_account_name
             )
-        # Track 2 CLI SDKs provide support for user-assigned identity objects
-        if (
-            ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION)
-            and user_identity
-        ):
-            from azure.mgmt.iothub.models import (
-                ManagedIdentity,
-            )  # pylint: disable=no-name-in-module
+        ).as_json()["connectionString"]
+        sas_token = generate_storage_account_sas_token(storage_cstring, read=True, write=True, create=True, add=True, delete=True)
+        container_sas_url = container_sas_url + "?" + sas_token
 
-            export_request.identity = ManagedIdentity(user_assigned_identity=identity)
+    return container_sas_url
 
-        # if the user supplied a user-assigned identity, let them know they need a new CLI/SDK
-        elif user_identity:
-            raise CLIInternalError(
-                "Device export with user-assigned identities requires a dependency of azure-mgmt-iothub>={}".format(
-                    IOTHUB_TRACK_2_SDK_MIN_VERSION
-                )
-            )
 
-        return client.export_devices(
-            target["resourcegroup"],
-            hub_name,
-            export_devices_parameters=export_request,
-        )
-    if storage_authentication_type:
-        raise CLIInternalError(
-            "Device export authentication-type properties require a dependency of azure-mgmt-iothub>=0.12.0"
-        )
-    return client.export_devices(
-        target["resourcegroup"],
-        hub_name,
-        export_blob_container_uri=blob_container_uri,
-        exclude_keys=not include_keys,
+def _create_export_import_job_properties(
+    job_type: str,
+    input_blob_container_uri: str = None,
+    output_blob_container_uri: str = None,
+    include_keys: bool = False,
+    identity: str = None,
+):
+    from azext_iot.common.shared import AuthenticationType
+    from azext_iot.sdk.iothub.service.models import (
+        JobProperties,
+        ManagedIdentity
     )
+    job_properties = JobProperties()
+    if job_type == JobType.exportDevices.value:
+        job_properties.exclude_keys_in_export = not include_keys
+    elif job_type == JobType.importDevices.value:
+        if exists(input_blob_container_uri):
+            input_blob_container_uri = read_file_content(input_blob_container_uri)
+        job_properties.input_blob_container_uri = input_blob_container_uri
+    else:
+        raise ClientRequestError(
+            "Invalid job type: {}".format(job_type)
+        )
+    job_properties.type = job_type
+
+    if exists(output_blob_container_uri):
+        output_blob_container_uri = read_file_content(output_blob_container_uri)
+    job_properties.output_blob_container_uri = output_blob_container_uri
+
+    if identity is None:
+        job_properties.storage_authentication_type = AuthenticationType.keyBased.name
+    else:
+        job_properties.storage_authentication_type = AuthenticationType.identityBased.name
+        if identity != "[system]":
+            job_properties.identity = ManagedIdentity(user_assigned_identity=identity)
+
+    return job_properties
+
+
+def iot_device_export(
+    cmd,
+    hub_name: str = None,
+    blob_container_uri: str = None,
+    blob_container_name: str = None,
+    storage_account_name: str = None,
+    include_keys: bool = False,
+    storage_authentication_type: str = None,
+    identity: str = None,
+    resource_group_name: str = None,
+    login=None,
+    auth_type_dataplane=None,
+):
+    if blob_container_uri is None:
+        blob_container_uri = _generate_blob_container_uri(
+            cmd, storage_account_name, blob_container_name, identity
+        )
+    if storage_authentication_type is not None:
+        logger.warning(
+            "The parameter --sat/--storage-authentication-type has been deprecated and should not be provided"
+        )
+    if auth_type_dataplane is not None:
+        logger.warning(
+            "The parameter --auth-type is now used to specify dataplane auth-type instead of storage auth-type. "
+            + "The storage auth-type is automatically derived and should no longer be provided as input."
+        )
+
+    service_sdk = _get_service_sdk(
+        cmd, hub_name, resource_group_name, login, auth_type_dataplane
+    )
+    export_job_properties = _create_export_import_job_properties(
+        job_type=JobType.exportDevices.value,
+        output_blob_container_uri=blob_container_uri,
+        include_keys=include_keys,
+        identity=identity
+    )
+    return service_sdk.jobs.create_import_export_job(export_job_properties)
 
 
 def iot_device_import(
     cmd,
-    hub_name,
-    input_blob_container_uri,
-    output_blob_container_uri,
-    storage_authentication_type=None,
-    resource_group_name=None,
-    identity=None,
+    hub_name: str = None,
+    input_blob_container_uri: str = None,
+    input_blob_container_name: str = None,
+    input_storage_account_name: str = None,
+    output_blob_container_uri: str = None,
+    output_blob_container_name: str = None,
+    output_storage_account_name: str = None,
+    storage_authentication_type: str = None,
+    resource_group_name: str = None,
+    identity: str = None,
+    login=None,
+    auth_type_dataplane=None,
 ):
-    from azext_iot._factory import iot_hub_service_factory
+    if input_blob_container_uri is None:
+        input_blob_container_uri = _generate_blob_container_uri(
+            cmd, input_storage_account_name, input_blob_container_name, identity
+        )
+    if output_blob_container_uri is None:
+        output_blob_container_uri = _generate_blob_container_uri(
+            cmd, output_storage_account_name, output_blob_container_name, identity
+        )
+    if storage_authentication_type is not None:
+        logger.warning(
+            "The parameter --sat/--storage-authentication-type has been deprecated and should not be provided"
+        )
+    if auth_type_dataplane is not None:
+        logger.warning(
+            "The parameter --auth-type is now used to specify dataplane auth-type instead of storage auth-type. "
+            + "The storage auth-type is automatically derived and should no longer be provided as input."
+        )
 
-    client = iot_hub_service_factory(cmd.cli_ctx).iot_hub_resource
-    discovery = IotHubDiscovery(cmd)
-    target = discovery.get_target(
-        resource_name=hub_name, resource_group_name=resource_group_name
+    service_sdk = _get_service_sdk(
+        cmd, hub_name, resource_group_name, login, auth_type_dataplane
     )
-
-    if exists(input_blob_container_uri):
-        input_blob_container_uri = read_file_content(input_blob_container_uri)
-
-    if exists(output_blob_container_uri):
-        output_blob_container_uri = read_file_content(output_blob_container_uri)
-
-    if ensure_iothub_sdk_min_version("0.12.0"):
-        from azure.mgmt.iothub.models import ImportDevicesRequest
-
-        from azext_iot.common.shared import AuthenticationType
-
-        storage_authentication_type = (
-            AuthenticationType(storage_authentication_type).name
-            if storage_authentication_type
-            else None
-        )
-
-        import_request = ImportDevicesRequest(
-            input_blob_container_uri=input_blob_container_uri,
-            output_blob_container_uri=output_blob_container_uri,
-            input_blob_name=None,
-            output_blob_name=None,
-            authentication_type=storage_authentication_type,
-        )
-
-        user_identity = identity not in [None, "[system]"]
-        if (
-            user_identity
-            and storage_authentication_type != AuthenticationType.identityBased.name
-        ):
-            raise ClientRequestError(
-                "Device import with user-assigned identities requires identity-based authentication [--storage-auth-type]"
-            )
-        # Track 2 CLI SDKs provide support for user-assigned identity objects
-        if (
-            ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION)
-            and user_identity
-        ):
-            from azure.mgmt.iothub.models import (
-                ManagedIdentity,
-            )  # pylint: disable=no-name-in-module
-
-            import_request.identity = ManagedIdentity(user_assigned_identity=identity)
-        # if the user supplied a user-assigned identity, let them know they need a new CLI/SDK
-        elif user_identity:
-            raise CLIInternalError(
-                "Device import with user-assigned identities requires a dependency of azure-mgmt-iothub>={}".format(
-                    IOTHUB_TRACK_2_SDK_MIN_VERSION
-                )
-            )
-
-        return client.import_devices(
-            target["resourcegroup"],
-            hub_name,
-            import_devices_parameters=import_request,
-        )
-    if storage_authentication_type:
-        raise CLIInternalError(
-            "Device import authentication-type properties require a dependency of azure-mgmt-iothub>=0.12.0"
-        )
-    return client.import_devices(
-        target["resourcegroup"],
-        hub_name,
+    import_job_properties = _create_export_import_job_properties(
+        job_type=JobType.importDevices.value,
         input_blob_container_uri=input_blob_container_uri,
         output_blob_container_uri=output_blob_container_uri,
+        identity=identity
     )
+    return service_sdk.jobs.create_import_export_job(import_job_properties)
 
 
 def iot_hub_monitor_events(
