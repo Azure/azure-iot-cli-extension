@@ -269,7 +269,6 @@ def test_export_import_controlplane(setup_hub_states_controlplane):
     )
     compare_hub_controlplane_to_file(filename, hub_name, hub_rg)
     clean_up_hub_controlplane(hub_name, hub_rg, hub_location)
-    # TODO: change this to import empty file
     time.sleep(5)
     cli.invoke(
         f"iot hub state import -n {hub_name} -f {filename} -g {hub_rg} -r --aspects {CONTROLPLANE}"
@@ -328,7 +327,6 @@ def test_export_import_dataplane(setup_hub_states):
 
     for auth_phase in DATAPLANE_AUTH_TYPES:
         clean_up_hub_dataplane(hub_cstring)
-        # TODO: change this to import empty file
         time.sleep(5)
         cli.invoke(
             set_cmd_auth_type(

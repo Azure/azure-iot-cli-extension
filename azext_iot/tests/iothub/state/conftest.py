@@ -161,11 +161,11 @@ def setup_hub_controlplane_states(
 
     # add ip filter rule
     cli.invoke(
-        f"resource update --name {hub_name} --g {hub_rg} --resource-type "
+        f"resource update --name {hub_name} -g {hub_rg} --resource-type "
         "\"Microsoft.Devices/IotHubs\" --set properties.networkRuleSets='{}'"
     )
     cli.invoke(
-        f"resource update -n  {hub_name} -g {hub_rg} --resource-type Microsoft.Devices/IotHubs "
+        f"resource update --name {hub_name} -g {hub_rg} --resource-type Microsoft.Devices/IotHubs "
         "--add properties.networkRuleSets.ipRules '{\"action\":\"Allow\",\"filterName\":\"Trusted\",\"ipMask\":\"192.168.0.1\"}'"
     )
     yield provisioned_iothubs

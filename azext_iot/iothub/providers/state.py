@@ -186,7 +186,7 @@ class StateProvider(IoTHubProvider):
                 all_configs = _iot_hub_configuration_list(target=self.target)
                 hub_state["configurations"] = {}
                 adm_configs = {}
-                for c in tqdm(all_configs, desc="Saving ADM configurations and Edge Deployments"):
+                for c in tqdm(all_configs, desc="Saving ADM configurations and Edge Deployments", ascii=" #"):
                     if c["content"].get("deviceContent") or c["content"].get("moduleContent"):
                         for key in ["createdTimeUtc", "etag", "lastUpdatedTimeUtc", "schemaVersion"]:
                             c.pop(key, None)
