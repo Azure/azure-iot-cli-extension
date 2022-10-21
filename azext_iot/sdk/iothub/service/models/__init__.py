@@ -30,6 +30,7 @@ try:
     from .query_specification_py3 import QuerySpecification
     from .twin_properties_py3 import TwinProperties
     from .twin_py3 import Twin
+    from .managed_identity_py3 import ManagedIdentity
     from .job_properties_py3 import JobProperties
     from .purge_message_queue_result_py3 import PurgeMessageQueueResult
     from .cloud_to_device_method_py3 import CloudToDeviceMethod
@@ -60,7 +61,6 @@ except (SyntaxError, ImportError):
     from .query_specification import QuerySpecification
     from .twin_properties import TwinProperties
     from .twin import Twin
-    from .job_properties import JobProperties
     from .purge_message_queue_result import PurgeMessageQueueResult
     from .cloud_to_device_method import CloudToDeviceMethod
     from .job_request import JobRequest
@@ -91,6 +91,7 @@ __all__ = [
     'QuerySpecification',
     'TwinProperties',
     'Twin',
+    'ManagedIdentity',
     'JobProperties',
     'PurgeMessageQueueResult',
     'CloudToDeviceMethod',
