@@ -11,6 +11,8 @@ from abc import ABC, abstractmethod
 from knack.log import get_logger
 
 from azext_iot.sdk.digitaltwins.controlplane.models import (
+    ManagedIdentityReference,
+    DigitalTwinsIdentityType,
     EventGrid as EventGridEndpointProperties,
     EventHub as EventHubEndpointProperties,
     ServiceBus as ServiceBusEndpointProperties,
@@ -28,6 +30,7 @@ class BaseEndpointBuilder(ABC):
         dead_letter_secret: str = None,
         dead_letter_uri: str = None,
         endpoint_subscription: str = None,
+        identity: str = None,
     ):
         self.cli = EmbeddedCLI()
         self.error_prefix = "Could not create ADT instance endpoint. Unable to retrieve"
@@ -37,6 +40,7 @@ class BaseEndpointBuilder(ABC):
         self.auth_type = auth_type
         self.dead_letter_secret = dead_letter_secret
         self.dead_letter_uri = dead_letter_uri
+        self.identity = identity
 
     def build_endpoint(self):
         endpoint_properties = (
@@ -45,6 +49,16 @@ class BaseEndpointBuilder(ABC):
             else self.build_identity_based()
         )
         endpoint_properties.authentication_type = self.auth_type
+        if self.identity == "[system]":
+            endpoint_properties.identity = ManagedIdentityReference(
+                type=DigitalTwinsIdentityType.system_assigned.value
+            )
+        elif self.identity:
+            endpoint_properties.identity = ManagedIdentityReference(
+                type=DigitalTwinsIdentityType.user_assigned.value, 
+                user_assigned_identity= self.identity
+            )
+
         return endpoint_properties
 
     @abstractmethod
@@ -65,6 +79,7 @@ class EventGridEndpointBuilder(BaseEndpointBuilder):
         dead_letter_secret=None,
         dead_letter_uri=None,
         endpoint_subscription=None,
+        identity = None,
     ):
         super().__init__(
             endpoint_resource_name=endpoint_resource_name,
@@ -73,6 +88,7 @@ class EventGridEndpointBuilder(BaseEndpointBuilder):
             dead_letter_secret=dead_letter_secret,
             dead_letter_uri=dead_letter_uri,
             endpoint_subscription=endpoint_subscription,
+            identity=identity,
         )
 
     def build_key_based(self):
@@ -122,6 +138,7 @@ class ServiceBusEndpointBuilder(BaseEndpointBuilder):
         dead_letter_secret=None,
         dead_letter_uri=None,
         endpoint_subscription=None,
+        identity = None,
     ):
         super().__init__(
             endpoint_resource_name=endpoint_resource_name,
@@ -130,6 +147,7 @@ class ServiceBusEndpointBuilder(BaseEndpointBuilder):
             dead_letter_secret=dead_letter_secret,
             dead_letter_uri=dead_letter_uri,
             endpoint_subscription=endpoint_subscription,
+            identity=identity,
         )
         self.endpoint_resource_namespace = endpoint_resource_namespace
         self.endpoint_resource_policy = endpoint_resource_policy
@@ -200,6 +218,7 @@ class EventHubEndpointBuilder(BaseEndpointBuilder):
         dead_letter_secret=None,
         dead_letter_uri=None,
         endpoint_subscription=None,
+        identity = None,
     ):
         super().__init__(
             endpoint_resource_name=endpoint_resource_name,
@@ -208,6 +227,7 @@ class EventHubEndpointBuilder(BaseEndpointBuilder):
             dead_letter_secret=dead_letter_secret,
             dead_letter_uri=dead_letter_uri,
             endpoint_subscription=endpoint_subscription,
+            identity=identity,
         )
         self.endpoint_resource_namespace = endpoint_resource_namespace
         self.endpoint_resource_policy = endpoint_resource_policy
@@ -290,6 +310,7 @@ def build_endpoint(
     dead_letter_secret: str = None,
     dead_letter_uri: str = None,
     endpoint_subscription: str = None,
+    identity: str = None,
 ):
     from azext_iot.digitaltwins.common import ADTEndpointType
 
@@ -301,6 +322,7 @@ def build_endpoint(
             dead_letter_secret=dead_letter_secret,
             dead_letter_uri=dead_letter_uri,
             endpoint_subscription=endpoint_subscription,
+            identity = identity,
         ).build_endpoint()
 
     if endpoint_resource_type == ADTEndpointType.servicebus.value:
@@ -313,6 +335,7 @@ def build_endpoint(
             endpoint_subscription=endpoint_subscription,
             endpoint_resource_namespace=endpoint_resource_namespace,
             endpoint_resource_policy=endpoint_resource_policy,
+            identity = identity,
         ).build_endpoint()
 
     if endpoint_resource_type == ADTEndpointType.eventhub.value:
@@ -325,6 +348,7 @@ def build_endpoint(
             endpoint_subscription=endpoint_subscription,
             endpoint_resource_namespace=endpoint_resource_namespace,
             endpoint_resource_policy=endpoint_resource_policy,
+            identity = identity,
         ).build_endpoint()
 
     raise ValueError("{} not supported.".format(endpoint_resource_type))

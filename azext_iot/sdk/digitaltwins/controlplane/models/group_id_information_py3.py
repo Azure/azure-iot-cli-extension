@@ -21,8 +21,7 @@ class GroupIdInformation(Model):
     All required parameters must be populated in order to send to Azure.
 
     :param properties: Required. The group information properties.
-    :type properties:
-     ~controlplane.models.GroupIdInformationProperties
+    :type properties: ~controlplane.models.GroupIdInformationProperties
     :param id: The resource identifier.
     :type id: str
     :ivar name: The resource name.

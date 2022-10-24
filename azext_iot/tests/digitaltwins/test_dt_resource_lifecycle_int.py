@@ -342,7 +342,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 EP_RG,
             )
         ).as_json()["id"]
-
+        self.region = "westcentralus"
         endpoint_instance = self.cmd(
             "dt create -n {} -g {} -l {} --assign-identity --scopes {} {} --role {}".format(
                 endpoints_instance_name,

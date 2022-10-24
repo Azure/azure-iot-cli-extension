@@ -12,24 +12,29 @@
 from msrest.serialization import Model
 
 
-class PrivateEndpoint(Model):
-    """The private endpoint property of a private endpoint connection.
+class UserAssignedIdentity(Model):
+    """The information about the user assigned identity.
 
     Variables are only populated by the server, and will be ignored when
     sending a request.
 
-    :ivar id: The resource identifier.
-    :vartype id: str
+    :ivar client_id: The client id of the User Assigned Identity Resource.
+    :vartype client_id: str
+    :ivar principal_id: The object id of the User Assigned Identity Resource.
+    :vartype principal_id: str
     """
 
     _validation = {
-        'id': {'readonly': True},
+        'client_id': {'readonly': True},
+        'principal_id': {'readonly': True},
     }
 
     _attribute_map = {
-        'id': {'key': 'id', 'type': 'str'},
+        'client_id': {'key': 'clientId', 'type': 'str'},
+        'principal_id': {'key': 'principalId', 'type': 'str'},
     }
 
-    def __init__(self, **kwargs):
-        super(PrivateEndpoint, self).__init__(**kwargs)
-        self.id = None
+    def __init__(self, **kwargs) -> None:
+        super(UserAssignedIdentity, self).__init__(**kwargs)
+        self.client_id = None
+        self.principal_id = None
