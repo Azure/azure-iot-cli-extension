@@ -43,7 +43,7 @@ def get_mgmt_client(mocker, fixture_cmd):
         "policy": hub_policy,
         "primarykey": shared_access_key
     }
-    
+
     return patch_discovery
 
 
