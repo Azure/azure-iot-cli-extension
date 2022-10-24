@@ -73,7 +73,7 @@ class EdgeContainerAuth(NamedTuple):
 
 class NestedEdgeDeviceConfig(NamedTuple):
     device_id: str
-    deployment: ConfigurationContent
+    deployment: Optional[ConfigurationContent] = None
     config: Optional[Any] = None
     parent_id: Optional[str] = None
     hostname: Optional[str] = None
@@ -604,7 +604,7 @@ class DeviceIdentityProvider(IoTHubProvider):
 
         device_toml[
             "trust_bundle_cert"
-        ] = "file:///etc/aziot/certificates/iotedge_config_cli_root.pem"
+        ] = f"file:///etc/aziot/certificates/{EDGE_ROOT_CERTIFICATE_FILENAME}"
         # Dynamic, AlwaysOnStartup, OnErrorOnly
         device_toml["auto_reprovisioning_mode"] = "Dynamic"
         device_toml["hostname"] = (

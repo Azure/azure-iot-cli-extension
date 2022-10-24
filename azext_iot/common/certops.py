@@ -213,15 +213,15 @@ def create_signed_cert(
 ) -> CertInfo:
 
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=4096)
-    ca_public_key = bytes(ca_public, "utf-8")
-    ca_private_key = bytes(ca_private, "utf-8")
+    ca_public_key = ca_public.encode("utf-8")
+    ca_private_key = ca_private.encode("utf-8")
     ca_key = serialization.load_pem_private_key(ca_private_key, password=None)
     ca_cert = x509.load_pem_x509_certificate(ca_public_key)
 
     # v3 certificate extensions
     subject_key_id = x509.SubjectKeyIdentifier.from_public_key(private_key.public_key())
-    authority_key_id = x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(
-        subject_key_id,
+    authority_key_id = x509.AuthorityKeyIdentifier.from_issuer_public_key(
+        ca_cert.public_key()
     )
     basic_constraints = x509.BasicConstraints(ca=True, path_length=None)
     key_usage = x509.KeyUsage(
