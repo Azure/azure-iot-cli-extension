@@ -259,7 +259,7 @@ def test_adu_manifest_init_v5_invalid_path_required(options):
             "--update-provider digimaun --update-name invalid --update-version 1.0 "
             "--compat deviceManufacturer=Contoso deviceModel=Vacuum "
             "--step handler=microsoft/apt:1 ",
-            False
+            False,
         ),
         (
             # Too long of a provider value.
@@ -267,7 +267,7 @@ def test_adu_manifest_init_v5_invalid_path_required(options):
             "--update-name invalid --update-version 1.0 "
             "--compat deviceManufacturer=Contoso deviceModel=Vacuum "
             "--step handler=microsoft/apt:1 files=hello.json",
-            False
+            False,
         ),
         (
             # Too long of a compat property value.
@@ -281,7 +281,7 @@ def test_adu_manifest_init_v5_invalid_path_required(options):
             "--update-provider digimaun --update-name invalid --update-version 1 "
             "--compat deviceManufacturer=Contoso deviceModel=Vacuum "
             "--step handler=microsoft/apt:1 ",
-            False
+            False,
         ),
         (
             # Too short file downloadHandler value.
@@ -290,7 +290,7 @@ def test_adu_manifest_init_v5_invalid_path_required(options):
             "--step handler=microsoft/apt:1 "
             f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\" "
             "downloadHandler=abc",
-            False
+            False,
         ),
         (
             # Same as prior test case but disable client-side validation.
@@ -299,8 +299,8 @@ def test_adu_manifest_init_v5_invalid_path_required(options):
             "--step handler=microsoft/apt:1 "
             f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\" "
             "downloadHandler=abc",
-            True
-        )
+            True,
+        ),
     ],
 )
 def test_adu_manifest_init_v5_validate_errors(options, no_validation):

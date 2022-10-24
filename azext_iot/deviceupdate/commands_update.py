@@ -333,7 +333,7 @@ def manifest_init_v5(
                         derived_step_files.append(PurePath(assembled_step_file["path"]).name)
                 step["files"] = derived_step_files
 
-            if "properties" in assembled_step:
+            if "properties" in assembled_step and assembled_step["properties"]:
                 step["handlerProperties"] = json.loads(assembled_step["properties"])
 
         if not step:
@@ -367,10 +367,10 @@ def manifest_init_v5(
             processed_file["filename"] = assembled_file_metadata.name
             processed_file["sizeInBytes"] = assembled_file_metadata.bytes
 
-            if "properties" in assembled_file:
+            if "properties" in assembled_file and assembled_file["properties"]:
                 processed_file["properties"] = json.loads(assembled_file["properties"])
 
-            if "downloadHandler" in assembled_file:
+            if "downloadHandler" in assembled_file and assembled_file["downloadHandler"]:
                 processed_file["downloadHandler"] = {"id": assembled_file["downloadHandler"]}
 
             processed_related_files = []
@@ -387,7 +387,7 @@ def manifest_init_v5(
                 processed_related_file["filename"] = related_file_metadata.name
                 processed_related_file["sizeInBytes"] = related_file_metadata.bytes
 
-                if "properties" in assembled_related_file:
+                if "properties" in assembled_related_file and assembled_related_file["properties"]:
                     processed_related_file["properties"] = json.loads(assembled_related_file["properties"])
 
                 if processed_related_file:
