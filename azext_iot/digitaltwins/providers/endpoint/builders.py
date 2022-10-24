@@ -55,8 +55,8 @@ class BaseEndpointBuilder(ABC):
             )
         elif self.identity:
             endpoint_properties.identity = ManagedIdentityReference(
-                type=DigitalTwinsIdentityType.user_assigned.value, 
-                user_assigned_identity= self.identity
+                type=DigitalTwinsIdentityType.user_assigned.value,
+                user_assigned_identity=self.identity
             )
 
         return endpoint_properties
@@ -79,7 +79,7 @@ class EventGridEndpointBuilder(BaseEndpointBuilder):
         dead_letter_secret=None,
         dead_letter_uri=None,
         endpoint_subscription=None,
-        identity = None,
+        identity=None,
     ):
         super().__init__(
             endpoint_resource_name=endpoint_resource_name,
@@ -138,7 +138,7 @@ class ServiceBusEndpointBuilder(BaseEndpointBuilder):
         dead_letter_secret=None,
         dead_letter_uri=None,
         endpoint_subscription=None,
-        identity = None,
+        identity=None,
     ):
         super().__init__(
             endpoint_resource_name=endpoint_resource_name,
@@ -218,7 +218,7 @@ class EventHubEndpointBuilder(BaseEndpointBuilder):
         dead_letter_secret=None,
         dead_letter_uri=None,
         endpoint_subscription=None,
-        identity = None,
+        identity=None,
     ):
         super().__init__(
             endpoint_resource_name=endpoint_resource_name,
@@ -322,7 +322,7 @@ def build_endpoint(
             dead_letter_secret=dead_letter_secret,
             dead_letter_uri=dead_letter_uri,
             endpoint_subscription=endpoint_subscription,
-            identity = identity,
+            identity=identity,
         ).build_endpoint()
 
     if endpoint_resource_type == ADTEndpointType.servicebus.value:
@@ -335,7 +335,7 @@ def build_endpoint(
             endpoint_subscription=endpoint_subscription,
             endpoint_resource_namespace=endpoint_resource_namespace,
             endpoint_resource_policy=endpoint_resource_policy,
-            identity = identity,
+            identity=identity,
         ).build_endpoint()
 
     if endpoint_resource_type == ADTEndpointType.eventhub.value:
@@ -348,7 +348,7 @@ def build_endpoint(
             endpoint_subscription=endpoint_subscription,
             endpoint_resource_namespace=endpoint_resource_namespace,
             endpoint_resource_policy=endpoint_resource_policy,
-            identity = identity,
+            identity=identity,
         ).build_endpoint()
 
     raise ValueError("{} not supported.".format(endpoint_resource_type))
