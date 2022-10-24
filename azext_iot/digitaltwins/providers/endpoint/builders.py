@@ -53,7 +53,7 @@ class BaseEndpointBuilder(ABC):
             endpoint_properties.identity = ManagedIdentityReference(
                 type=DigitalTwinsIdentityType.system_assigned.value
             )
-        elif self.identity:
+        elif self.identity is not None:
             endpoint_properties.identity = ManagedIdentityReference(
                 type=DigitalTwinsIdentityType.user_assigned.value,
                 user_assigned_identity=self.identity
