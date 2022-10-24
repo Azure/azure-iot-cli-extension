@@ -165,6 +165,13 @@ def load_digitaltwins_arguments(self, _):
             help="Endpoint authentication type.",
             arg_type=get_enum_type(ADTEndpointAuthType),
         )
+        context.argument(
+            "identity",
+            options_list=["--identity"],
+            help="Managed identity type to determine if system assigned managed identity or "
+            "user assigned managed identity is used. For system assigned managed identity, use [system]. "
+            "For user assigned managed identity, provide the user assigned managed identity resource id."
+        )
 
     with self.argument_context("dt endpoint create eventgrid") as context:
         context.argument(

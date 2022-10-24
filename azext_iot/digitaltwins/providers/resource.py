@@ -298,6 +298,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
         resource_group_name=None,
         timeout=20,
         auth_type=None,
+        identity=None,
     ):
         from azext_iot.digitaltwins.common import ADTEndpointType
 
@@ -351,6 +352,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
             auth_type=auth_type,
             dead_letter_secret=dead_letter_secret,
             dead_letter_uri=dead_letter_uri,
+            identity=identity,
         )
 
         try:

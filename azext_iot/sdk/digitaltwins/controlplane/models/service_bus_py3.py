@@ -21,8 +21,8 @@ class ServiceBus(DigitalTwinsEndpointResourceProperties):
     All required parameters must be populated in order to send to Azure.
 
     :ivar provisioning_state: The provisioning state. Possible values include:
-     'Provisioning', 'Deleting', 'Succeeded', 'Failed', 'Canceled', 'Deleted',
-     'Warning', 'Suspending', 'Restoring', 'Moving', 'Disabled'
+     'Provisioning', 'Deleting', 'Updating', 'Succeeded', 'Failed', 'Canceled',
+     'Deleted', 'Warning', 'Suspending', 'Restoring', 'Moving', 'Disabled'
     :vartype provisioning_state: str or
      ~controlplane.models.EndpointProvisioningState
     :ivar created_time: Time when the Endpoint was added to
@@ -34,14 +34,15 @@ class ServiceBus(DigitalTwinsEndpointResourceProperties):
      connection string). If 'IdentityBased' is select, the endpointUri and
      entityPath properties must be specified. Possible values include:
      'KeyBased', 'IdentityBased'
-    :type authentication_type: str or
-     ~controlplane.models.AuthenticationType
+    :type authentication_type: str or ~controlplane.models.AuthenticationType
     :param dead_letter_secret: Dead letter storage secret for key-based
      authentication. Will be obfuscated during read.
     :type dead_letter_secret: str
     :param dead_letter_uri: Dead letter storage URL for identity-based
      authentication.
     :type dead_letter_uri: str
+    :param identity: Managed identity properties for the endpoint.
+    :type identity: ~controlplane.models.ManagedIdentityReference
     :param endpoint_type: Required. Constant filled by server.
     :type endpoint_type: str
     :param primary_connection_string: PrimaryConnectionString of the endpoint
@@ -70,6 +71,7 @@ class ServiceBus(DigitalTwinsEndpointResourceProperties):
         'authentication_type': {'key': 'authenticationType', 'type': 'str'},
         'dead_letter_secret': {'key': 'deadLetterSecret', 'type': 'str'},
         'dead_letter_uri': {'key': 'deadLetterUri', 'type': 'str'},
+        'identity': {'key': 'identity', 'type': 'ManagedIdentityReference'},
         'endpoint_type': {'key': 'endpointType', 'type': 'str'},
         'primary_connection_string': {'key': 'primaryConnectionString', 'type': 'str'},
         'secondary_connection_string': {'key': 'secondaryConnectionString', 'type': 'str'},
@@ -77,8 +79,8 @@ class ServiceBus(DigitalTwinsEndpointResourceProperties):
         'entity_path': {'key': 'entityPath', 'type': 'str'},
     }
 
-    def __init__(self, *, authentication_type=None, dead_letter_secret: str=None, dead_letter_uri: str=None, primary_connection_string: str=None, secondary_connection_string: str=None, endpoint_uri: str=None, entity_path: str=None, **kwargs) -> None:
-        super(ServiceBus, self).__init__(authentication_type=authentication_type, dead_letter_secret=dead_letter_secret, dead_letter_uri=dead_letter_uri, **kwargs)
+    def __init__(self, *, authentication_type=None, dead_letter_secret: str=None, dead_letter_uri: str=None, identity=None, primary_connection_string: str=None, secondary_connection_string: str=None, endpoint_uri: str=None, entity_path: str=None, **kwargs) -> None:
+        super(ServiceBus, self).__init__(authentication_type=authentication_type, dead_letter_secret=dead_letter_secret, dead_letter_uri=dead_letter_uri, identity=identity, **kwargs)
         self.primary_connection_string = primary_connection_string
         self.secondary_connection_string = secondary_connection_string
         self.endpoint_uri = endpoint_uri

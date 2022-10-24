@@ -20,8 +20,7 @@ class DigitalTwinsPatchDescription(Model):
     :param identity: The managed identity for the DigitalTwinsInstance.
     :type identity: ~controlplane.models.DigitalTwinsIdentity
     :param properties: Properties for the DigitalTwinsInstance.
-    :type properties:
-     ~controlplane.models.DigitalTwinsPatchProperties
+    :type properties: ~controlplane.models.DigitalTwinsPatchProperties
     """
 
     _attribute_map = {

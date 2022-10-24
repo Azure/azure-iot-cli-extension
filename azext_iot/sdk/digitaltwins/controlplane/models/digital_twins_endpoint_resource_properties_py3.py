@@ -24,8 +24,8 @@ class DigitalTwinsEndpointResourceProperties(Model):
     All required parameters must be populated in order to send to Azure.
 
     :ivar provisioning_state: The provisioning state. Possible values include:
-     'Provisioning', 'Deleting', 'Succeeded', 'Failed', 'Canceled', 'Deleted',
-     'Warning', 'Suspending', 'Restoring', 'Moving', 'Disabled'
+     'Provisioning', 'Deleting', 'Updating', 'Succeeded', 'Failed', 'Canceled',
+     'Deleted', 'Warning', 'Suspending', 'Restoring', 'Moving', 'Disabled'
     :vartype provisioning_state: str or
      ~controlplane.models.EndpointProvisioningState
     :ivar created_time: Time when the Endpoint was added to
@@ -37,14 +37,15 @@ class DigitalTwinsEndpointResourceProperties(Model):
      connection string). If 'IdentityBased' is select, the endpointUri and
      entityPath properties must be specified. Possible values include:
      'KeyBased', 'IdentityBased'
-    :type authentication_type: str or
-     ~controlplane.models.AuthenticationType
+    :type authentication_type: str or ~controlplane.models.AuthenticationType
     :param dead_letter_secret: Dead letter storage secret for key-based
      authentication. Will be obfuscated during read.
     :type dead_letter_secret: str
     :param dead_letter_uri: Dead letter storage URL for identity-based
      authentication.
     :type dead_letter_uri: str
+    :param identity: Managed identity properties for the endpoint.
+    :type identity: ~controlplane.models.ManagedIdentityReference
     :param endpoint_type: Required. Constant filled by server.
     :type endpoint_type: str
     """
@@ -61,6 +62,7 @@ class DigitalTwinsEndpointResourceProperties(Model):
         'authentication_type': {'key': 'authenticationType', 'type': 'str'},
         'dead_letter_secret': {'key': 'deadLetterSecret', 'type': 'str'},
         'dead_letter_uri': {'key': 'deadLetterUri', 'type': 'str'},
+        'identity': {'key': 'identity', 'type': 'ManagedIdentityReference'},
         'endpoint_type': {'key': 'endpointType', 'type': 'str'},
     }
 
@@ -68,11 +70,12 @@ class DigitalTwinsEndpointResourceProperties(Model):
         'endpoint_type': {'ServiceBus': 'ServiceBus', 'EventHub': 'EventHub', 'EventGrid': 'EventGrid'}
     }
 
-    def __init__(self, *, authentication_type=None, dead_letter_secret: str=None, dead_letter_uri: str=None, **kwargs) -> None:
+    def __init__(self, *, authentication_type=None, dead_letter_secret: str=None, dead_letter_uri: str=None, identity=None, **kwargs) -> None:
         super(DigitalTwinsEndpointResourceProperties, self).__init__(**kwargs)
         self.provisioning_state = None
         self.created_time = None
         self.authentication_type = authentication_type
         self.dead_letter_secret = dead_letter_secret
         self.dead_letter_uri = dead_letter_uri
+        self.identity = identity
         self.endpoint_type = None
