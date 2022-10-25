@@ -69,6 +69,16 @@ class TestEdgeHierarchyCreateArgs:
             match_querystring=False,
         )
 
+        # GET specific devices
+        mocked_response.add(
+            method=responses.GET,
+            url=re.compile(r"{}/dev\d+".format(devices_url)),
+            body="{}",
+            status=200,
+            content_type="application/json",
+            match_querystring=False,
+        )
+
         # Create / Update device-identity
         mocked_response.add(
             method=responses.PUT,
@@ -308,6 +318,16 @@ class TestHierarchyCreateConfig:
             body=json.dumps(
                 {"authentication": {"symmetricKey": {"primaryKey": "devicePrimaryKey"}}}
             ),
+            status=200,
+            content_type="application/json",
+            match_querystring=False,
+        )
+
+        # GET specific device
+        mocked_response.add(
+            method=responses.GET,
+            url=re.compile(r"{}/device_\d+".format(devices_url)),
+            body="{}",
             status=200,
             content_type="application/json",
             match_querystring=False,

@@ -210,8 +210,6 @@ class DeviceIdentityProvider(IoTHubProvider):
         tree.create_node("Devices", tree_root_node_id)
         hub_cert_auth = config.auth_method == DeviceAuthType.x509_ca.value
 
-        # dict of assembled Device objects by ID
-        assembled_device_dict: Dict[str, Device] = {}
         # dict of device parents by ID
         device_to_parent_dict: Dict[str, str] = {}
         # device configs by id
@@ -219,7 +217,7 @@ class DeviceIdentityProvider(IoTHubProvider):
         for device_config in config.devices:
             device_config_dict[device_config.device_id] = device_config
 
-        # first pass to create devices and certs in flat tree
+        # first pass to create devices in flat tree
         config_devices_iterator = (
             tqdm(
                 config.devices,
@@ -230,78 +228,6 @@ class DeviceIdentityProvider(IoTHubProvider):
         )
         for device_config in config_devices_iterator:
             device_id = device_config.device_id
-            pk = None
-            sk = None
-            device_cert_output_directory = cert_output_directory.joinpath(device_id)
-            # if the device folder already exists, remove it
-            if exists(device_cert_output_directory):
-                rmtree(device_cert_output_directory)
-            # create fresh device folder
-            makedirs(device_cert_output_directory)
-
-            # write root cert to device directory
-            write_content_to_file(
-                content=config.root_cert["certificate"],
-                destination=device_cert_output_directory,
-                file_name=root_cert_name,
-            )
-            # signed device cert (device_id.cert.pem and device_id.key.pem)
-            signed_device_cert = create_signed_cert(
-                subject=f"{device_id}.deviceca",
-                ca_public=config.root_cert["certificate"],
-                ca_private=config.root_cert["privateKey"],
-                cert_output_dir=device_cert_output_directory,
-                cert_file=device_id
-            )
-            make_cert_chain(
-                certs=[
-                    signed_device_cert["certificate"],
-                    config.root_cert["certificate"],
-                ],
-                output_dir=device_cert_output_directory,
-                output_file=f"{device_id}.full-chain.cert.pem",
-            )
-            if hub_cert_auth:
-                device_hub_cert = create_self_signed_certificate(
-                    subject=device_id,
-                    valid_days=365,
-                    cert_output_dir=device_cert_output_directory,
-                    file_prefix=f"{device_id}.hub-auth",
-                )
-                pk = signed_device_cert["thumbprint"]
-                sk = device_hub_cert["thumbprint"]
-            write_content_to_file(
-                content=create_nested_edge_device_config_script(
-                    device_id=device_id,
-                    hub_auth=hub_cert_auth,
-                    hostname=device_config.hostname,
-                    has_parent=(device_config.parent_id is not None),
-                    parent_hostname=device_config.parent_hostname,
-                ),
-                destination=device_cert_output_directory,
-                file_name="install.sh",
-                overwrite=True,
-            )
-
-            write_content_to_file(
-                content=DEVICE_README,
-                destination=device_cert_output_directory,
-                file_name="README.md",
-                overwrite=True,
-            )
-            # create device object
-            assembled_device = _assemble_device(
-                is_update=False,
-                device_id=device_id,
-                auth_method=config.auth_method,
-                pk=pk,
-                sk=sk,
-                edge_enabled=True,
-            )
-
-            # store in assembled device lookup
-            assembled_device_dict[device_id] = assembled_device
-
             # add to flat tree
             try:
                 tree.create_node(device_id, device_id, parent=tree_root_node_id)
@@ -352,7 +278,7 @@ class DeviceIdentityProvider(IoTHubProvider):
         else:
             # If not cleaning the hub, ensure no duplicate device ids
             duplicates = list(
-                filter(lambda id: id in assembled_device_dict, existing_device_ids)
+                filter(lambda id: id in device_config_dict, existing_device_ids)
             )
             if any(duplicates):
                 raise InvalidArgumentValueError(
@@ -361,16 +287,90 @@ class DeviceIdentityProvider(IoTHubProvider):
                 )
 
         # Create all devices and configs
-        device_list = list(assembled_device_dict.values())
         device_iterator = (
-            tqdm(device_list, desc="Creating device identities and configs")
+            tqdm(config.devices, desc="Creating device identities and configs")
             if visualize
-            else device_list
+            else config.devices
         )
         for device in device_iterator:
             device_id = device.device_id
+
+            device_cert_output_directory = cert_output_directory.joinpath(device_id)
+            # if the device folder already exists, remove it
+            if exists(device_cert_output_directory):
+                rmtree(device_cert_output_directory)
+            # create fresh device folder
+            makedirs(device_cert_output_directory)
+
+            # write root cert to device directory
+            write_content_to_file(
+                content=config.root_cert["certificate"],
+                destination=device_cert_output_directory,
+                file_name=root_cert_name,
+            )
+            # signed device cert
+            signed_device_cert = create_signed_cert(
+                subject=f"{device_id}.deviceca",
+                ca_public=config.root_cert["certificate"],
+                ca_private=config.root_cert["privateKey"],
+                cert_output_dir=device_cert_output_directory,
+                cert_file=device_id,
+            )
+            # full-chain cert
+            make_cert_chain(
+                certs=[
+                    signed_device_cert["certificate"],
+                    config.root_cert["certificate"],
+                ],
+                output_dir=device_cert_output_directory,
+                output_file=f"{device_id}.full-chain.cert.pem",
+            )
+            pk = None
+            sk = None
+            # if using x509 device auth
+            if hub_cert_auth:
+                # hub auth cert for device
+                device_hub_cert = create_self_signed_certificate(
+                    subject=device_id,
+                    valid_days=365,
+                    cert_output_dir=device_cert_output_directory,
+                    file_prefix=f"{device_id}.hub-auth",
+                )
+                pk = signed_device_cert["thumbprint"]
+                sk = device_hub_cert["thumbprint"]
+
+            # create device object for service
+            assembled_device = _assemble_device(
+                is_update=False,
+                device_id=device_id,
+                auth_method=config.auth_method,
+                pk=pk,
+                sk=sk,
+                edge_enabled=True,
+            )
+            # create device identity
             device_result: Device = self.service_sdk.devices.create_or_update_identity(
-                id=device_id, device=device
+                id=device_id, device=assembled_device
+            )
+            # write install script
+            write_content_to_file(
+                content=create_nested_edge_device_config_script(
+                    device_id=device_id,
+                    hub_auth=hub_cert_auth,
+                    hostname=device_config.hostname,
+                    has_parent=(device_config.parent_id is not None),
+                    parent_hostname=device_config.parent_hostname,
+                ),
+                destination=device_cert_output_directory,
+                file_name="install.sh",
+                overwrite=True,
+            )
+            # write device readme
+            write_content_to_file(
+                content=DEVICE_README,
+                destination=device_cert_output_directory,
+                file_name="README.md",
+                overwrite=True,
             )
             device_pk = None
             if not hub_cert_auth:
@@ -401,19 +401,20 @@ class DeviceIdentityProvider(IoTHubProvider):
         # Get all device ids and scopes (inconsistent timing, hence sleep)
         query_args = ["SELECT deviceId, deviceScope FROM devices"]
         query_method = self.service_sdk.query.get_twins
-        all_devices = _execute_query(query_args, query_method)
+        all_hub_devices = _execute_query(query_args, query_method)
 
         # Throw an error if we don't get the same number of desired devices back
-        if len(all_devices) < len(config.devices):
+        if len(all_hub_devices) < len(config.devices):
             raise AzureResponseError(
                 "An error occurred - Failed to fetch device scopes for all devices"
             )
 
         # set all device scopes
-        for device in all_devices:
+        scope_dict: Dict[str, str] = {}
+        for device in all_hub_devices:
             id = device["deviceId"]
-            if assembled_device_dict.get(id, None):
-                assembled_device_dict[id].device_scope = device["deviceScope"]
+            if device_config_dict.get(id, None):
+                scope_dict[id] = device["deviceScope"]
 
         # Set parent / child relationships
         device_to_parent_iterator = (
@@ -422,10 +423,13 @@ class DeviceIdentityProvider(IoTHubProvider):
             else device_to_parent_dict
         )
         for device_id in device_to_parent_iterator:
-            device = assembled_device_dict[device_id]
+            # get device properties
+            device = self.service_sdk.devices.get_identity(id=device_id)
             parent_id = device_to_parent_dict[device_id]
-            parent_scope = assembled_device_dict[parent_id].device_scope
+            parent_scope = scope_dict[parent_id]
+            # set new parent scope
             device.parent_scopes = [parent_scope]
+            # update device
             self.service_sdk.devices.create_or_update_identity(
                 id=device_id, device=device, if_match="*"
             )
@@ -566,7 +570,6 @@ class DeviceIdentityProvider(IoTHubProvider):
                     "An error has occurred - Not all devices were deleted."
                 )
 
-    # TODO - Unit test
     def _try_parse_valid_deployment_config(self, deployment_path):
         try:
             deployment_content = process_json_arg(
@@ -584,7 +587,6 @@ class DeviceIdentityProvider(IoTHubProvider):
             logger.warning(f"Error processing config file at '{deployment_path}'")
             raise InvalidArgumentValueError(ex)
 
-    # TODO - Unit test
     def create_edge_device_config(
         self,
         device_id: str,
@@ -644,6 +646,7 @@ class DeviceIdentityProvider(IoTHubProvider):
         }
         if output_path:
             import toml
+
             write_content_to_file(
                 toml.dumps(device_toml),
                 output_path,
