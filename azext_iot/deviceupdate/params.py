@@ -474,7 +474,7 @@ def load_deviceupdate_arguments(self, _):
         context.argument(
             "description",
             options_list=["--description"],
-            help="Description for the import update manifest.",
+            help="Description for the import manifest.",
         )
         context.argument(
             "deployable",
@@ -543,19 +543,19 @@ def load_deviceupdate_arguments(self, _):
         context.argument(
             "storage_account_name",
             options_list=["--storage-account"],
-            help="Desired storage account name to stage update manifest artifacts.",
+            help="Desired storage account name to stage import manifest artifacts.",
             arg_group="Storage"
         )
         context.argument(
             "storage_container_name",
             options_list=["--storage-container"],
-            help="Desired storage container name to stage update manifest artifacts.",
+            help="Desired storage container name to stage import manifest artifacts.",
             arg_group="Storage"
         )
         context.argument(
             "storage_account_subscription",
             options_list=["--storage-subscription"],
-            help="Desired storage account subscription to stage update manifest artifacts. "
+            help="Desired storage account subscription to stage import manifest artifacts. "
             "Applicable when the storage and device update accounts are in different subscriptions.",
             arg_group="Storage"
         )
@@ -564,7 +564,7 @@ def load_deviceupdate_arguments(self, _):
             nargs="?",
             action="append",
             options_list=["--manifest-path"],
-            help="Local file path to the update manifest that should be staged. Can be used 1 or more times.",
+            help="Local file path to the import manifest that should be staged. Can be used 1 or more times.",
         )
         context.argument(
             "then_import",
