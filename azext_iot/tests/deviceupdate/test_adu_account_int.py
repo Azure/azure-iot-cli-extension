@@ -21,16 +21,16 @@ cli = EmbeddedCLI()
 def test_account_show_delete(provisioned_accounts: Dict[str, dict]):
     acct_names = list(provisioned_accounts["accounts"].keys())
     for acct_name in acct_names:
-        shown_account = cli.invoke(f"iot device-update account show -n {acct_name}").as_json()
+        shown_account = cli.invoke(f"iot du account show -n {acct_name}").as_json()
         assert shown_account["id"] == provisioned_accounts["accounts"][acct_name]["id"]
-        shown_account_rg = cli.invoke(f"iot device-update account show -n {acct_name} -g {ACCOUNT_RG}").as_json()
+        shown_account_rg = cli.invoke(f"iot du account show -n {acct_name} -g {ACCOUNT_RG}").as_json()
         assert shown_account_rg["id"] == provisioned_accounts["accounts"][acct_name]["id"]
 
-    cli.invoke(f"iot device-update account delete -n {acct_names[0]} -y --no-wait")
-    cli.invoke(f"iot device-update account delete -n {acct_names[1]} -g {ACCOUNT_RG} -y")
-    cli.invoke(f"iot device-update account wait -n {acct_names[0]} --deleted")
+    cli.invoke(f"iot du account delete -n {acct_names[0]} -y --no-wait")
+    cli.invoke(f"iot du account delete -n {acct_names[1]} -g {ACCOUNT_RG} -y")
+    cli.invoke(f"iot du account wait -n {acct_names[0]} --deleted")
     for acct_name in acct_names:
-        assert not cli.invoke(f"iot device-update account show -n {acct_name} -g {ACCOUNT_RG}").success()
+        assert not cli.invoke(f"iot du account show -n {acct_name} -g {ACCOUNT_RG}").success()
 
 
 @pytest.mark.adu_infrastructure(location="eastus2euap", public_network_access=False, sku="Free")
@@ -39,14 +39,14 @@ def test_account_update(provisioned_accounts: Dict[str, dict]):
     target_acct_name = acct_names[0]
 
     updated_account = cli.invoke(
-        f"iot device-update account update -n {target_acct_name} --set tags.env='test' publicNetworkAccess='Enabled'").as_json()
+        f"iot du account update -n {target_acct_name} --set tags.env='test' publicNetworkAccess='Enabled'").as_json()
     assert updated_account["provisioningState"] == "Succeeded"
     assert updated_account["publicNetworkAccess"] == "Enabled"
     assert updated_account["tags"]["env"] == "test"
 
-    cli.invoke(f"iot device-update account update -n {target_acct_name} --set tags.env2='staging' --no-wait")
-    cli.invoke(f"iot device-update account wait -n {target_acct_name} -g {ACCOUNT_RG} --updated")
-    updated_account = cli.invoke(f"iot device-update account show -n {target_acct_name}").as_json()
+    cli.invoke(f"iot du account update -n {target_acct_name} --set tags.env2='staging' --no-wait")
+    cli.invoke(f"iot du account wait -n {target_acct_name} -g {ACCOUNT_RG} --updated")
+    updated_account = cli.invoke(f"iot du account show -n {target_acct_name}").as_json()
     assert updated_account["provisioningState"] == "Succeeded"
     assert updated_account["tags"]["env2"] == 'staging'
 
@@ -70,20 +70,20 @@ def test_account_create_custom():
     target_account_name = generate_account_id()
     # @digimaun - We can uncomment once we have more capacity in non-eastus2euap locations.
     # group = cli.invoke(f"group show -n {ACCOUNT_RG}").as_json()
-    cli.invoke(f"iot device-update account create -n {target_account_name} -g {ACCOUNT_RG} -l eastus2euap --no-wait")
-    cli.invoke(f"iot device-update account wait -n {target_account_name} --created")
-    account = cli.invoke(f"iot device-update account show -n {target_account_name}").as_json()
+    cli.invoke(f"iot du account create -n {target_account_name} -g {ACCOUNT_RG} -l eastus2euap --no-wait")
+    cli.invoke(f"iot du account wait -n {target_account_name} --created")
+    account = cli.invoke(f"iot du account show -n {target_account_name}").as_json()
     assert account["provisioningState"] == "Succeeded"
     assert account["name"] == target_account_name
     # assert account["location"] == group["location"]
-    cli.invoke(f"iot device-update account delete -n {target_account_name} -y --no-wait")
+    cli.invoke(f"iot du account delete -n {target_account_name} -y --no-wait")
 
 
 @pytest.mark.adu_infrastructure(location="eastus2euap", count=2)
 def test_account_list(provisioned_accounts: Dict[str, dict]):
     provisioned_accounts_len = len(provisioned_accounts["accounts"])
 
-    sub_accounts: list = cli.invoke("iot device-update account list").as_json()
+    sub_accounts: list = cli.invoke("iot du account list").as_json()
     sub_accounts_len = len(sub_accounts)
     assert sub_accounts_len >= provisioned_accounts_len
     sub_acct_map = {}
@@ -92,7 +92,7 @@ def test_account_list(provisioned_accounts: Dict[str, dict]):
     for acct_name in provisioned_accounts["accounts"]:
         assert acct_name in sub_acct_map
 
-    group_accounts: list = cli.invoke(f"iot device-update account list -g {ACCOUNT_RG}").as_json()
+    group_accounts: list = cli.invoke(f"iot du account list -g {ACCOUNT_RG}").as_json()
     group_accounts_len = len(group_accounts)
     assert group_accounts_len >= provisioned_accounts_len
     group_acct_map = {}
@@ -108,7 +108,7 @@ def test_account_private_links_endpoint_connections(provisioned_accounts: Dict[s
     # There is a single command for private link resources
     expected_links = ["DeviceUpdate"]
     link_resources: list = cli.invoke(
-        f"iot device-update account private-link-resource list -n {target_account_name}").as_json()
+        f"iot du account private-link-resource list -n {target_account_name}").as_json()
     assert len(link_resources) > 0
     link_map = {}
     for link in link_resources:
@@ -133,7 +133,7 @@ def test_account_private_links_endpoint_connections(provisioned_accounts: Dict[s
         target_desc = generate_generic_id()
         target_status = "Approved"
         set_result = cli.invoke(
-            f"iot device-update account private-endpoint-connection set -n {target_account_name} --cn {endpoint_name} "
+            f"iot du account private-endpoint-connection set -n {target_account_name} --cn {endpoint_name} "
             f"--status {target_status} --desc '{target_desc}'").as_json()
         assert set_result["name"] == endpoint_name
         assert set_result["privateEndpoint"]
@@ -142,17 +142,17 @@ def test_account_private_links_endpoint_connections(provisioned_accounts: Dict[s
         assert set_result["privateLinkServiceConnectionState"]["status"] == target_status
 
         show_result = cli.invoke(
-            f"iot device-update account private-endpoint-connection show -n {target_account_name} --cn {endpoint_name}").as_json()
+            f"iot du account private-endpoint-connection show -n {target_account_name} --cn {endpoint_name}").as_json()
         assert show_result["name"] == endpoint_name
 
         list_result: list = cli.invoke(
-            f"iot device-update account private-endpoint-connection list -n {target_account_name}").as_json()
+            f"iot du account private-endpoint-connection list -n {target_account_name}").as_json()
         assert endpoint_name in [record["name"] for record in list_result]
         assert cli.invoke(
-            f"iot device-update account private-endpoint-connection delete -n {target_account_name} --cn {endpoint_name} -y"
+            f"iot du account private-endpoint-connection delete -n {target_account_name} --cn {endpoint_name} -y"
         ).success()
         list_result: list = cli.invoke(
-            f"iot device-update account private-endpoint-connection list -n {target_account_name}").as_json()
+            f"iot du account private-endpoint-connection list -n {target_account_name}").as_json()
         assert len(list_result) == 0
     finally:
         cli.invoke(f"network private-endpoint delete -n {endpoint_name} -g {ACCOUNT_RG}")

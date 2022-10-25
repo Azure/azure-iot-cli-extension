@@ -268,8 +268,14 @@ class DeviceUpdateDataManager(DeviceUpdateAccountManager):
         if not hash_list:
             return result
         for hash in hash_list:
+            if "=" not in hash:
+                logger.warning("Skipping processing of '%s', input format is key=value | key='value value'.", hash)
+                continue
             split_hash = hash.split("=", 1)
             result[split_hash[0]] = split_hash[1]
+        for key in result:
+            if not result.get(key):
+                logger.warning("No value assigned to key '%s', input format is key=value | key='value value'.", key)
         return result
 
     def assemble_files(self, file_list_col: List[List[str]]) -> Union[DeviceUpdateDataModels.FileImportMetadata, None]:

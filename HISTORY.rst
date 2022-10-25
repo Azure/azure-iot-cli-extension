@@ -5,14 +5,27 @@ Release History
 
 unreleased
 +++++++++++++++
+
 **IoT Hub updates**
 
-* Updated the IoT Hub service SDK to now use the newer 2021-04-12 API version.
-* [Breaking Change] The `az iot hub device-identity export` and `az iot hub device-identity import` commands are migrated to use dataplane APIs instead of controlplane.
-* [Breaking Change] Device identity export/import operations now expect the parameter `auth-type` to specify dataplane auth type (instead of storage auth type).
+* [Breaking Change] The `az iot hub device-identity export` and `az iot hub device-identity import` commands are migrated to use dataplane/IoT Hub APIs instead of controlplane/ARM.
+* [Breaking Change] Device identity export/import operations now expect the parameter `auth-type` to specify IoT Hub API auth type (instead of storage auth type).
+* Updated the IoT Hub service SDK to now use the newer `2021-04-12` API version.
 * Device identity export/import commands now support optional parameters for storage account and blob container names - users no longer need to supply input/output Blob container SAS URIs.
 * Device identity export/import operations now automatically derive storage auth type - hence the parameter `storage_authentication_type` has been deprecated.
-* Add `az iot hub device-twin list` as a highly recommended alternative to `az iot hub device-identity list`. Functionality remains the same as both return a list of device twins and `az iot hub device-identity list` may be altered or deprecated in the future.
+* Adds `az iot hub device-twin list` as a highly recommended alternative to `az iot hub device-identity list`.
+  Functionality remains the same as both return a list of device twins and `az iot hub device-identity list` may be altered or deprecated in the future.
+
+**Device Update**
+
+* The in-preview Azure Device Update CLI root namespace changed from `az iot device-update` to `az iot du`.
+* The in-preview `az iot device-update update init calculate-hash` command moved to `az iot du update calculate-hash`.
+* Introducing the preview `az iot du update stage` command. The update stage command is designed to automate
+  the pre-requisite steps of importing an update. Read the command reference to learn more.
+
+**General updates**
+
+* The Azure IoT CLI extension min core CLI version incremented to `2.32.0`.
 
 
 0.17.3
