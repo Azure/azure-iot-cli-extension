@@ -3,6 +3,71 @@
 Release History
 ===============
 
+unreleased
++++++++++++++++
+
+0.18.0
++++++++++++++++
+
+**IoT Hub updates**
+
+* **[Breaking Change]** The `az iot hub device-identity export` and `az iot hub device-identity import` commands have been migrated to use IoT Hub APIs instead of ARM.
+* **[Breaking Change]** Device identity export/import commands now expect the parameter `--auth-type` to specify the IoT Hub API data access auth type (instead of storage access auth type).
+* Updated the IoT Hub service SDK to now use the newer `2021-04-12` API version.
+* Device identity export/import commands now support optional parameters for storage account and blob container names - users no longer need to supply input/output Blob container SAS URIs.
+* Device identity export/import commands now automatically derive storage auth type - hence the parameter `storage_authentication_type` has been deprecated.
+* Adds `az iot hub device-twin list` as a highly recommended alternative to `az iot hub device-identity list`.
+  Functionality remains the same as both return a list of device twins and `az iot hub device-identity list` may be altered or deprecated in the future.
+
+**Device Update**
+
+* The in-preview Azure Device Update CLI root namespace changed from `az iot device-update` to `az iot du`.
+* The in-preview `az iot device-update update init calculate-hash` command moved to `az iot du update calculate-hash`.
+* Introducing the preview `az iot du update stage` command. The update stage command is designed to automate
+  the pre-requisite steps of importing an update. Read the command reference to learn more.
+
+**General updates**
+
+* The Azure IoT CLI extension min core CLI version incremented to `2.32.0`.
+
+
+0.17.3
++++++++++++++++
+
+**Device Update**
+
+* Adds `az iot device-update update init calculate-hash`, a utility command used to calculate the base64 hash representation of one or more files.
+* The `update init v5` command will by default validate the generated import manifest using the official json schema definition. Client-side validation can be skipped by using `--no-validation`.
+* The `update init v5` command support level has changed from `experimental` to `preview`.
+
+**IoT Central updates**
+
+* `--api-version` parameter will be deprecated and ignored. The IoT Central API will alway call latest GA version or latest preview version (if any API only exists in preview).
+
+* Add support for enrollment groups CRUD.
+
+  - az iot central enrollment-group
+
+    - az iot central enrollment-group list
+    - az iot central enrollment-group show
+    - az iot central enrollment-group create
+    - az iot central enrollment-group delete
+    - az iot central enrollment-group update
+    - az iot central enrollment-group verify-certificate
+    - az iot central enrollment-group generate-verification-code
+
+* Add support for scheduled jobs CRUD.
+
+  - az iot central scheduled-job
+
+    - az iot central scheduled-job list
+    - az iot central scheduled-job show
+    - az iot central scheduled-job create
+    - az iot central scheduled-job delete
+    - az iot central scheduled-job update
+    - az iot central scheduled-job list-runs
+
+
 0.17.2
 +++++++++++++++
 

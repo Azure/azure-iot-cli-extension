@@ -47,7 +47,17 @@ import isodate
 
 from typing import Dict, Any, cast, TYPE_CHECKING
 
-from azure.core.exceptions import DeserializationError, SerializationError, raise_with_traceback
+from azext_iot.constants import INTERNAL_AZURE_CORE_NAMESPACE
+
+try:
+    # @digimaun
+    from azure.core.exceptions import DeserializationError, SerializationError, raise_with_traceback
+except ImportError:
+    import importlib
+    internal_azure_core = importlib.import_module(INTERNAL_AZURE_CORE_NAMESPACE)
+    DeserializationError = internal_azure_core.exceptions.DeserializationError
+    SerializationError = internal_azure_core.exceptions.SerializationError
+    raise_with_traceback = internal_azure_core.exceptions.raise_with_traceback
 
 _BOM = codecs.BOM_UTF8.decode(encoding='utf-8')
 

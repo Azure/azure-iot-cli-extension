@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import List, Union
+from typing import List
 from azure.cli.core.azclierror import (
     AzureResponseError,
     ClientRequestError,
@@ -18,13 +18,7 @@ from azext_iot.central.models.edge import EdgeModule
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
 from azext_iot.central.models.enum import DeviceStatus, ApiVersion
-from azext_iot.central.models.v1 import DeviceV1
-from azext_iot.central.models.ga_2022_05_31 import DeviceGa20220531
-from azext_iot.central.models.v1_1_preview import (
-    DeviceV1_1_preview,
-    RelationshipV1_1_preview,
-)
-from azext_iot.central.models.preview import DevicePreview
+from azext_iot.central.models.ga_2022_07_31 import (DeviceGa, RelationshipGa)
 from azext_iot.dps.services import global_service as dps_global_service
 
 
@@ -59,7 +53,7 @@ class CentralDeviceProvider:
         self,
         device_id,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> Union[DeviceGa20220531, DeviceV1, DeviceV1_1_preview, DevicePreview]:
+    ) -> DeviceGa:
 
         # get or add to cache
         device = self._devices.get(device_id)
@@ -85,7 +79,7 @@ class CentralDeviceProvider:
         self,
         filter=None,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> List[Union[DeviceGa20220531, DeviceV1, DeviceV1_1_preview, DevicePreview]]:
+    ) -> List[DeviceGa]:
         devices = central_services.device.list_devices(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -108,7 +102,7 @@ class CentralDeviceProvider:
         simulated=False,
         organizations=None,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> Union[DeviceGa20220531, DeviceV1, DeviceV1_1_preview, DevicePreview]:
+    ) -> DeviceGa:
         if not device_id:
             raise RequiredArgumentMissingError("Device id must be specified.")
 
@@ -147,7 +141,7 @@ class CentralDeviceProvider:
         enabled=None,
         organizations=None,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> Union[DeviceGa20220531, DeviceV1, DeviceV1_1_preview, DevicePreview]:
+    ) -> DeviceGa:
         if not device_id:
             raise RequiredArgumentMissingError("Device id must be specified.")
 
@@ -206,9 +200,8 @@ class CentralDeviceProvider:
     def list_relationships(
         self,
         device_id,
-        rel_name=None,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> List[RelationshipV1_1_preview]:
+    ) -> List[RelationshipGa]:
         relationships = central_services.device.list_relationships(
             self._cmd,
             app_id=self._app_id,
@@ -221,9 +214,6 @@ class CentralDeviceProvider:
         if relationships is None:
             return []
 
-        if rel_name:
-            relationships = [rel for rel in relationships if rel.name == rel_name]
-
         return relationships
 
     def add_relationship(
@@ -231,7 +221,6 @@ class CentralDeviceProvider:
         device_id,
         target_id,
         rel_id,
-        rel_name,
         central_dns_suffix=CENTRAL_ENDPOINT,
     ) -> dict:
         relationship = central_services.device.create_relationship(
@@ -239,7 +228,6 @@ class CentralDeviceProvider:
             app_id=self._app_id,
             device_id=device_id,
             rel_id=rel_id,
-            rel_name=rel_name,
             target_id=target_id,
             token=self._token,
             api_version=self._api_version,

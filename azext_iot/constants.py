@@ -7,10 +7,11 @@
 
 import os
 
-VERSION = "0.17.2"
+VERSION = "0.18.0"
 EXTENSION_NAME = "azure-iot"
 EXTENSION_ROOT = os.path.dirname(os.path.abspath(__file__))
 EXTENSION_CONFIG_ROOT_KEY = "iotext"
+INTERNAL_AZURE_CORE_NAMESPACE: str = "azext_iot_internal.azure.core"
 EDGE_DEPLOYMENT_ROOT_SCHEMAS_PATH = os.path.join(EXTENSION_ROOT, "assets")
 MESSAGING_HTTP_C2D_SYSTEM_PROPERTIES = [
     "iothub-messageid",

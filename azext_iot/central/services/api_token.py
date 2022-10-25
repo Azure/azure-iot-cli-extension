@@ -7,7 +7,7 @@
 from knack.log import get_logger
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central.models.enum import ApiVersion
+from azext_iot.central.common import API_VERSION
 
 logger = get_logger(__name__)
 
@@ -39,12 +39,13 @@ def add_api_token(
     Returns:
     token: dict
     """
+    api_version = API_VERSION
+
     payload = {
         "roles": [{"role": role}],
     }
 
-    available_versions = [ApiVersion.v1_1_preview.value, ApiVersion.ga_2022_05_31.value]
-    if org_id and api_version in available_versions:
+    if org_id:
         payload["roles"][0]["organization"] = org_id
 
     return _utility.make_api_call(
@@ -63,7 +64,7 @@ def get_api_token_list(
     cmd,
     app_id: str,
     token: str,
-    api_version: ApiVersion.v1.value,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     """
@@ -79,6 +80,8 @@ def get_api_token_list(
     Returns:
         tokens: dict
     """
+    api_version = API_VERSION
+
     return _utility.make_api_call(
         cmd,
         app_id=app_id,
@@ -96,7 +99,7 @@ def get_api_token(
     app_id: str,
     token: str,
     token_id: str,
-    api_version=ApiVersion.v1.value,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     """
@@ -113,6 +116,8 @@ def get_api_token(
     Returns:
         token: dict
     """
+    api_version = API_VERSION
+
     return _utility.make_api_call(
         cmd,
         app_id=app_id,
@@ -130,7 +135,7 @@ def delete_api_token(
     app_id: str,
     token: str,
     token_id: str,
-    api_version=ApiVersion.v1.value,
+    api_version: str,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     """
@@ -147,6 +152,8 @@ def delete_api_token(
     Returns:
        result (currently a 201)
     """
+    api_version = API_VERSION
+
     return _utility.make_api_call(
         cmd,
         app_id=app_id,

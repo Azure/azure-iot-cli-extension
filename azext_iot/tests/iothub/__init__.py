@@ -568,7 +568,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def tearDown(self):
         device_list = []
         device_list.extend(d["deviceId"] for d in self.cmd(
-            f"iot hub device-identity list -n {self.entity_name} -g {self.entity_rg}"
+            f"iot hub device-twin list -n {self.entity_name} -g {self.entity_rg}"
         ).get_output_in_json())
 
         config_list = []

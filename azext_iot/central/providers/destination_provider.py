@@ -11,10 +11,10 @@ from knack.log import get_logger
 from azext_iot.central.providers.central_provider import CentralProvider
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
-from azext_iot.central.models.v1_1_preview import (
-    DestinationV1_1_preview,
-    WebhookDestinationV1_1_preview,
-    AdxDestinationV1_1_preview,
+from azext_iot.central.models.v2022_06_30_preview import (
+    DestinationPreview,
+    WebhookDestinationPreview,
+    AdxDestinationPreview,
 )
 
 logger = get_logger(__name__)
@@ -29,9 +29,9 @@ class CentralDestinationProvider(CentralProvider):
         self, central_dns_suffix=CENTRAL_ENDPOINT
     ) -> List[
         Union[
-            DestinationV1_1_preview,
-            WebhookDestinationV1_1_preview,
-            AdxDestinationV1_1_preview,
+            DestinationPreview,
+            WebhookDestinationPreview,
+            AdxDestinationPreview,
         ]
     ]:
         destinations = central_services.destination.list_destinations(
@@ -51,9 +51,9 @@ class CentralDestinationProvider(CentralProvider):
     def add_destination(
         self, destination_id, payload, central_dnx_suffix=CENTRAL_ENDPOINT
     ) -> Union[
-        DestinationV1_1_preview,
-        WebhookDestinationV1_1_preview,
-        AdxDestinationV1_1_preview,
+        DestinationPreview,
+        WebhookDestinationPreview,
+        AdxDestinationPreview,
     ]:
         if destination_id in self._destinations:
             raise ClientRequestError("Destination already exists")
@@ -81,9 +81,9 @@ class CentralDestinationProvider(CentralProvider):
     def update_destination(
         self, destination_id, payload, central_dnx_suffix=CENTRAL_ENDPOINT
     ) -> Union[
-        DestinationV1_1_preview,
-        WebhookDestinationV1_1_preview,
-        AdxDestinationV1_1_preview,
+        DestinationPreview,
+        WebhookDestinationPreview,
+        AdxDestinationPreview,
     ]:
         destination = central_services.destination.update_destination(
             self._cmd,
@@ -108,9 +108,9 @@ class CentralDestinationProvider(CentralProvider):
     def get_destination(
         self, destination_id, central_dnx_suffix=CENTRAL_ENDPOINT
     ) -> Union[
-        DestinationV1_1_preview,
-        WebhookDestinationV1_1_preview,
-        AdxDestinationV1_1_preview,
+        DestinationPreview,
+        WebhookDestinationPreview,
+        AdxDestinationPreview,
     ]:
         # get or add to cache
         destination = self._destinations.get(destination_id)

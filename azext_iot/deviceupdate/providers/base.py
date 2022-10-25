@@ -25,7 +25,7 @@ from azure.cli.core.azclierror import ResourceNotFoundError, CLIInternalError, I
 from azure.mgmt.core.polling.arm_polling import ARMPolling
 from azure.core.exceptions import AzureError, HttpResponseError
 from msrest.serialization import Model
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any, NamedTuple, Union, List, Dict, Tuple, Optional
 import json
 import os
@@ -48,7 +48,7 @@ class FileMetadata(NamedTuple):
     bytes: int
     hash: str
     name: str
-    path: str
+    path: PurePath
 
 
 __all__ = [
@@ -246,9 +246,7 @@ class DeviceUpdateDataManager(DeviceUpdateAccountManager):
             return UpdateManifestMeta(len(file_content), hash)
 
     @classmethod
-    def calculate_file_metadata(cls, file_path) -> FileMetadata:
-        from pathlib import PurePath
-
+    def calculate_file_metadata(cls, file_path: str) -> FileMetadata:
         file_pure_path = PurePath(file_path)
         with open(file_pure_path.as_posix(), "rb") as file_path:
             logger.debug("Attempting to read file %s as binary", file_path)
@@ -270,8 +268,14 @@ class DeviceUpdateDataManager(DeviceUpdateAccountManager):
         if not hash_list:
             return result
         for hash in hash_list:
+            if "=" not in hash:
+                logger.warning("Skipping processing of '%s', input format is key=value | key='value value'.", hash)
+                continue
             split_hash = hash.split("=", 1)
             result[split_hash[0]] = split_hash[1]
+        for key in result:
+            if not result.get(key):
+                logger.warning("No value assigned to key '%s', input format is key=value | key='value value'.", key)
         return result
 
     def assemble_files(self, file_list_col: List[List[str]]) -> Union[DeviceUpdateDataModels.FileImportMetadata, None]:

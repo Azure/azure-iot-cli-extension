@@ -7,7 +7,7 @@
 import pytest
 import collections
 
-from azext_iot.central.models.v1 import TemplateV1
+from azext_iot.central.models.v2022_06_30_preview import TemplatePreview
 from azext_iot.monitor.central_validator import validate, extract_schema_type
 
 from azext_iot.tests.helpers import load_json
@@ -22,7 +22,7 @@ class TestTemplateValidations:
             "urn:sampleApp:groupThree_bz:myxqftpsr:2",
             "urn:sampleApp:groupOne_bz:2",
         ]
-        template = TemplateV1(
+        template = TemplatePreview(
             load_json(FileNames.central_property_validation_template_file)
         )
 
@@ -35,7 +35,7 @@ class TestTemplateValidations:
             "_rpgcmdpo",
             "RS40OccupancySensorV36fy",
         ]
-        template = TemplateV1(
+        template = TemplatePreview(
             load_json(FileNames.central_property_validation_template_file)
         )
 
@@ -52,7 +52,7 @@ class TestExtractSchemaType:
             "component1PropReadonly": "boolean",
             "component1Prop2": "boolean",
         }
-        template = TemplateV1(
+        template = TemplatePreview(
             load_json(FileNames.central_property_validation_template_file)
         )
         for key, val in expected_mapping.items():
@@ -67,7 +67,7 @@ class TestExtractSchemaType:
             "testComponent": "boolean",
             "component2PropReadonly": "boolean",
         }
-        template = TemplateV1(
+        template = TemplatePreview(
             load_json(FileNames.central_property_validation_template_file)
         )
         for key, val in expected_mapping.items():
@@ -94,7 +94,7 @@ class TestExtractSchemaType:
             "Time": "time",
             "Vector": "vector",
         }
-        template = TemplateV1(load_json(FileNames.central_device_template_file))
+        template = TemplatePreview(load_json(FileNames.central_device_template_file))
         for key, val in expected_mapping.items():
             schema = template.get_schema(key)
             schema_type = extract_schema_type(schema)
@@ -244,7 +244,7 @@ class TestComplexType:
         [(1, True), (2, True), (3, False), ("1", False), ("2", False)],
     )
     def test_int_enum(self, value, expected_result):
-        template = TemplateV1(load_json(FileNames.central_device_template_file))
+        template = TemplatePreview(load_json(FileNames.central_device_template_file))
         schema = template.get_schema("IntEnum")
         assert validate(schema, value) == expected_result
 
@@ -253,7 +253,7 @@ class TestComplexType:
         [("A", True), ("B", True), ("C", False), (1, False), (2, False)],
     )
     def test_str_enum(self, value, expected_result):
-        template = TemplateV1(load_json(FileNames.central_device_template_file))
+        template = TemplatePreview(load_json(FileNames.central_device_template_file))
         schema = template.get_schema("StringEnum")
         assert validate(schema, value) == expected_result
 
@@ -267,7 +267,7 @@ class TestComplexType:
         ],
     )
     def test_object_simple(self, value, expected_result):
-        template = TemplateV1(load_json(FileNames.central_device_template_file))
+        template = TemplatePreview(load_json(FileNames.central_device_template_file))
         schema = template.get_schema("Object")
         assert validate(schema, value) == expected_result
 
@@ -301,7 +301,7 @@ class TestComplexType:
         ],
     )
     def test_object_medium(self, value, expected_result):
-        template = TemplateV1(
+        template = TemplatePreview(
             load_json(FileNames.central_deeply_nested_device_template_file)
         )
         schema = template.get_schema("RidiculousObject")
@@ -380,7 +380,7 @@ class TestComplexType:
         ],
     )
     def test_object_deep(self, value, expected_result):
-        template = TemplateV1(
+        template = TemplatePreview(
             load_json(FileNames.central_deeply_nested_device_template_file)
         )
         schema = template.get_schema("RidiculousObject")

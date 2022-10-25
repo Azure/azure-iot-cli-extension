@@ -105,7 +105,7 @@ def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
                 and p["deviceId"].lower() != device_id.lower()
             ):
                 return None
-            print(yaml.dump({"feedback": p}, default_flow_style=False), flush=True)
+            print(yaml.safe_dump({"feedback": p}, default_flow_style=False), flush=True)
             if wait_on_id:
                 msg_id = p["originalMessageId"]
                 if msg_id == wait_on_id:

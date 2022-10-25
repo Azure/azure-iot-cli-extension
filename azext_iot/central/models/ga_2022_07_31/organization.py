@@ -4,8 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-
-class Role:
-    def __init__(self, device: dict):
-        self.display_name = device.get("displayName")
-        self.id = device.get("id")
+class Organization:
+    def __init__(self, org: dict):
+        self.display_name = org.get("displayName")
+        self.id = org.get("id")
+        self.parent = org.get("parent")
