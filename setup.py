@@ -46,6 +46,7 @@ if not PACKAGE_NAME:
 DEPENDENCIES = [
     "azure-core>=1.24.0,<2.0.0",
     "azure-mgmt-core>=1.3.0,<2.0.0",
+    "azure-identity>=1.6.1,<2.0.0",
     "msrest>=0.6.21",
     "msrestazure>=0.6.3,<2.0.0",
     "jsonschema~=3.2.0",

@@ -307,7 +307,7 @@ class TestConfigCreate:
         args = serviceclient.call_args
         url = args[0][0].url
         method = args[0][0].method
-        body = json.loads(args[0][0].body)
+        body = args[0][2]
 
         assert "{}/configurations/{}?".format(hub_name, config_id.lower()) in url
         assert method == "PUT"
@@ -444,7 +444,7 @@ class TestConfigCreate:
         args = serviceclient.call_args
         url = args[0][0].url
         method = args[0][0].method
-        body = json.loads(args[0][0].body)
+        body = args[0][2]
 
         assert "{}/configurations/{}?".format(hub_name, config_id.lower()) in url
         assert method == "PUT"
@@ -612,7 +612,7 @@ class TestConfigDelete:
         args = serviceclient.call_args
         url = args[0][0].url
         method = args[0][0].method
-        headers = args[0][0].headers
+        headers = args[0][1]
 
         assert method == "DELETE"
         assert "{}/configurations/{}?".format(mock_target["entity"], config_id) in url
@@ -647,8 +647,8 @@ class TestConfigUpdate:
         args = serviceclient.call_args
         url = args[0][0].url
         method = args[0][0].method
-        body = json.loads(args[0][0].body)
-        headers = args[0][0].headers
+        body = args[0][2]
+        headers = args[0][1]
 
         assert "{}/configurations/{}?".format(mock_target["entity"], config_id) in url
         assert method == "PUT"
@@ -659,7 +659,7 @@ class TestConfigUpdate:
         assert body.get("priority") == sample_config_show.get("priority")
         assert body.get("labels") == sample_config_show.get("labels")
 
-        headers = args[0][0].headers
+        headers = args[0][1]
         assert headers["If-Match"] == '"{}"'.format(etag if etag else "*")
 
     def test_config_update_invalid_args(
@@ -808,7 +808,7 @@ class TestConfigApply:
         args = serviceclient.call_args_list[0]
         url = args[0][0].url
         method = args[0][0].method
-        body = json.loads(args[0][0].body)
+        body = args[0][2]
 
         assert method == "POST"
         assert (

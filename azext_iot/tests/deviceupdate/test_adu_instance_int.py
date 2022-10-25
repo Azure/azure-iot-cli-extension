@@ -23,27 +23,27 @@ cli = EmbeddedCLI()
 def test_instance_list_show_delete(provisioned_instances: Dict[str, dict]):
     for account_record in provisioned_instances.keys():
         instance_names = list(provisioned_instances[account_record].keys())
-        instance_list_result: list = cli.invoke(f"iot device-update instance list -n {account_record}").as_json()
+        instance_list_result: list = cli.invoke(f"iot du instance list -n {account_record}").as_json()
         assert len(instance_names) == len(instance_list_result)
         for instance in instance_list_result:
             assert instance["name"] in instance_names
-            assert cli.invoke(f"iot device-update instance show -n {account_record} -i {instance['name']}").success()
+            assert cli.invoke(f"iot du instance show -n {account_record} -i {instance['name']}").success()
         instance_list_by_group_result: list = cli.invoke(
-            f"iot device-update instance list -n {account_record} -g {ACCOUNT_RG}"
+            f"iot du instance list -n {account_record} -g {ACCOUNT_RG}"
         ).as_json()
         assert instance_list_result == instance_list_by_group_result
         for instance_name in instance_names:
             assert cli.invoke(
-                f"iot device-update instance delete -n {account_record} -i {instance_name} "
+                f"iot du instance delete -n {account_record} -i {instance_name} "
                 f" -g {ACCOUNT_RG} -y --no-wait"
             ).success()
         # @digimaun - Evaluate stability.
         # for instance_name in instance_names:
         #     cli.invoke(
-        #         f"iot device-update instance wait -n {account_record} -i {instance_name} --deleted --timeout 900"
+        #         f"iot du instance wait -n {account_record} -i {instance_name} --deleted --timeout 900"
         #     )
         #     assert not cli.invoke(
-        #         f"iot device-update instance show -n {account_record} -i {instance_name} -g {ACCOUNT_RG}"
+        #         f"iot du instance show -n {account_record} -i {instance_name} -g {ACCOUNT_RG}"
         #     ).success()
 
 
@@ -56,12 +56,12 @@ def test_instance_custom_storage_update_show_delete(provisioned_instances: Dict[
     random_tag1 = generate_generic_id()
     random_tag2 = generate_generic_id()
     # Fetch backing storage account
-    storage_resource_id = cli.invoke(f"iot device-update instance show -n {account_name} -i {instance_name}").as_json()[
+    storage_resource_id = cli.invoke(f"iot du instance show -n {account_name} -i {instance_name}").as_json()[
         "diagnosticStorageProperties"
     ]["resourceId"]
     # Set tag, disable diagnostics and remove existing diagnostic storage account.
     updated_instance: dict = cli.invoke(
-        f"iot device-update instance update -n {account_name} -i {instance_name} --set tags.env1={random_tag1} "
+        f"iot du instance update -n {account_name} -i {instance_name} --set tags.env1={random_tag1} "
         "diagnosticStorageProperties=null enableDiagnostics=false"
     ).as_json()
     assert updated_instance["provisioningState"] == "Succeeded"
@@ -70,12 +70,12 @@ def test_instance_custom_storage_update_show_delete(provisioned_instances: Dict[
     assert updated_instance["diagnosticStorageProperties"] is None
     # Set another tag, enable diagnostics and re-add existing storage account.
     cli.invoke(
-        f"iot device-update instance update -n {account_name} -i {instance_name} "
+        f"iot du instance update -n {account_name} -i {instance_name} "
         f"-g {ACCOUNT_RG} --set tags.env2={random_tag2} enableDiagnostics=true "
         f"diagnosticStorageProperties.resourceId={storage_resource_id} --no-wait"
     )
-    cli.invoke(f"iot device-update instance wait -n {account_name} -i {instance_name} --updated")
-    shown_instance: dict = cli.invoke(f"iot device-update instance show -n {account_name} -i {instance_name}").as_json()
+    cli.invoke(f"iot du instance wait -n {account_name} -i {instance_name} --updated")
+    shown_instance: dict = cli.invoke(f"iot du instance show -n {account_name} -i {instance_name}").as_json()
     assert shown_instance["provisioningState"] == "Succeeded"
     assert shown_instance["tags"]["env1"] == random_tag1
     assert shown_instance["tags"]["env2"] == random_tag2
@@ -84,7 +84,7 @@ def test_instance_custom_storage_update_show_delete(provisioned_instances: Dict[
     assert shown_instance["id"] == provisioned_instances[account_name][instance_name]["id"]
     assert shown_instance["accountName"] == account_name
     # Delete synchronously
-    assert cli.invoke(f"iot device-update instance delete -n {account_name} -i {instance_name} -y").success()
+    assert cli.invoke(f"iot du instance delete -n {account_name} -i {instance_name} -y").success()
     assert not cli.invoke(
-        f"iot device-update instance show -n {account_name} -i {instance_name} -g {ACCOUNT_RG}"
+        f"iot du instance show -n {account_name} -i {instance_name} -g {ACCOUNT_RG}"
     ).success()

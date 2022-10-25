@@ -251,7 +251,7 @@ class TestJobCreate:
         args = serviceclient.call_args
         url = args[0][0].url
         method = args[0][0].method
-        body = json.loads(args[0][0].body)
+        body = args[0][2]
 
         assert "{}/jobs/v2/{}?".format(hub_name, job_id) in url
         assert method == "PUT"

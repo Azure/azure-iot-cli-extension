@@ -10,8 +10,9 @@ from typing import Union
 from knack.log import get_logger
 
 from azext_iot.constants import CENTRAL_ENDPOINT
+from azext_iot.central.common import API_VERSION_PREVIEW
 from azext_iot.central.services import _utility
-from azext_iot.central.models.v1_1_preview import QueryReponseV1_1_preview
+from azext_iot.central.models.v2022_06_30_preview import QueryReponsePreview
 
 logger = get_logger(__name__)
 
@@ -23,9 +24,9 @@ def query_run(
     app_id: str,
     query: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION_PREVIEW,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[dict, QueryReponseV1_1_preview]:
+) -> Union[dict, QueryReponsePreview]:
     """
     Execute query to get the telemetry or property data
 
@@ -40,6 +41,7 @@ def query_run(
     returns:
         queryReponse: dict
     """
+    api_version = API_VERSION_PREVIEW
 
     url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
 

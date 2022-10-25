@@ -5,14 +5,12 @@
 # --------------------------------------------------------------------------------------------
 
 
-from typing import List, Union
+from typing import List
 from knack.log import get_logger
 from azure.cli.core.azclierror import ResourceNotFoundError
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central import services as central_services
-from azext_iot.central.models.v1 import RoleV1
-from azext_iot.central.models.v1_1_preview import RoleV1_1_preview
-from azext_iot.central.models.preview import RolePreview
+from azext_iot.central.models.ga_2022_07_31 import RoleGa
 
 logger = get_logger(__name__)
 
@@ -39,7 +37,7 @@ class CentralRoleProvider:
 
     def list_roles(
         self, central_dns_suffix=CENTRAL_ENDPOINT
-    ) -> List[Union[RoleV1, RoleV1_1_preview, RolePreview]]:
+    ) -> List[RoleGa]:
         roles = central_services.role.list_roles(
             cmd=self._cmd,
             app_id=self._app_id,
@@ -57,7 +55,7 @@ class CentralRoleProvider:
         self,
         role_id,
         central_dns_suffix=CENTRAL_ENDPOINT,
-    ) -> Union[RoleV1, RoleV1_1_preview, RolePreview]:
+    ) -> RoleGa:
         # get or add to cache
         role = self._roles.get(role_id)
         if not role:

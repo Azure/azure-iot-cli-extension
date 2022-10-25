@@ -231,22 +231,21 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             )
 
     def tearDown(self):
-        if self.added_data_contributor:
-            device_list = []
-            device_list.extend(d["deviceId"] for d in self.cmd(
-                f"iot hub device-identity list -n {self.entity_name} -g {self.entity_rg}"
-            ).get_output_in_json())
+        device_list = []
+        device_list.extend(d["deviceId"] for d in self.cmd(
+            f"iot hub device-twin list -n {self.entity_name} -g {self.entity_rg}"
+        ).get_output_in_json())
 
-            config_list = []
-            config_list.extend(c["id"] for c in self.cmd(
-                f"iot edge deployment list -n {self.entity_name} -g {self.entity_rg}"
-            ).get_output_in_json())
+        config_list = []
+        config_list.extend(c["id"] for c in self.cmd(
+            f"iot edge deployment list -n {self.entity_name} -g {self.entity_rg}"
+        ).get_output_in_json())
 
-            config_list.extend(c["id"] for c in self.cmd(
-                f"iot hub configuration list -n {self.entity_name} -g {self.entity_rg}"
-            ).get_output_in_json())
+        config_list.extend(c["id"] for c in self.cmd(
+            f"iot hub configuration list -n {self.entity_name} -g {self.entity_rg}"
+        ).get_output_in_json())
 
-            self.clean_up(device_ids=device_list, config_ids=config_list)
+        self.clean_up(device_ids=device_list, config_ids=config_list)
 
     def get_region(self):
         result = self.cmd(

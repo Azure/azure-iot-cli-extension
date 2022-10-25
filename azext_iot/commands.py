@@ -31,7 +31,11 @@ def load_command_table(self, _):
     ) as cmd_group:
         cmd_group.command("create", "iot_device_create")
         cmd_group.show_command("show", "iot_device_show")
-        cmd_group.command("list", "iot_device_list")
+        cmd_group.command(
+            "list",
+            "iot_device_twin_list",
+            # deprecate_info=self.deprecate(redirect='iot device-twin list')
+        )
         cmd_group.command("delete", "iot_device_delete")
         cmd_group.generic_update_command(
             "update",
@@ -98,6 +102,7 @@ def load_command_table(self, _):
         "iot hub device-twin", command_type=iothub_ops
     ) as cmd_group:
         cmd_group.show_command("show", "iot_device_twin_show")
+        cmd_group.command("list", "iot_device_twin_list")
         cmd_group.command("replace", "iot_device_twin_replace")
         cmd_group.generic_update_command(
             "update",

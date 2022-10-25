@@ -8,10 +8,10 @@ from typing import List, Union
 from knack.log import get_logger
 
 from azure.cli.core.azclierror import AzureResponseError
-from azext_iot.central.models.enum import ApiVersion
 from azext_iot.constants import CENTRAL_ENDPOINT
-from azext_iot.central.models.v1_1_preview import ExportV1_1_preview
+from azext_iot.central.models.v2022_06_30_preview import ExportPreview
 from azext_iot.central.services import _utility
+from azext_iot.central.common import API_VERSION_PREVIEW
 
 logger = get_logger(__name__)
 
@@ -24,9 +24,9 @@ def add_export(
     export_id: str,
     payload: str,
     token: str,
-    api_version=ApiVersion.v1_1_preview.value,
+    api_version=API_VERSION_PREVIEW,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[dict, ExportV1_1_preview]:
+) -> Union[dict, ExportPreview]:
     """
     Add and data export to IoT Central app
 
@@ -42,6 +42,7 @@ def add_export(
     Returns:
         Export
     """
+    api_version = API_VERSION_PREVIEW
 
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, export_id)
 
@@ -63,9 +64,9 @@ def update_export(
     export_id: str,
     payload: str,
     token: str,
-    api_version=ApiVersion.v1_1_preview.value,
+    api_version=API_VERSION_PREVIEW,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[dict, ExportV1_1_preview]:
+) -> Union[dict, ExportPreview]:
     """
     Update and data export in IoT Central app
 
@@ -81,6 +82,7 @@ def update_export(
     Returns:
         Export
     """
+    api_version = API_VERSION_PREVIEW
 
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, export_id)
 
@@ -101,9 +103,9 @@ def list_exports(
     app_id: str,
     token: str,
     max_pages=0,
-    api_version=ApiVersion.v1_1_preview.value,
+    api_version=API_VERSION_PREVIEW,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> List[Union[dict, ExportV1_1_preview]]:
+) -> List[Union[dict, ExportPreview]]:
     """
     Get the list of exports for a central app.
 
@@ -118,6 +120,8 @@ def list_exports(
     Returns:
         List of Export
     """
+    api_version = API_VERSION_PREVIEW
+
     exports = []
 
     url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
@@ -150,9 +154,9 @@ def get_export(
     app_id: str,
     export_id: str,
     token: str,
-    api_version=ApiVersion.v1_1_preview.value,
+    api_version=API_VERSION_PREVIEW,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[dict, ExportV1_1_preview]:
+) -> Union[dict, ExportPreview]:
     """
     Get information about a specified export.
 
@@ -167,6 +171,7 @@ def get_export(
     Returns:
         Export
     """
+    api_version = API_VERSION_PREVIEW
 
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, export_id)
 
@@ -187,7 +192,7 @@ def delete_export(
     app_id: str,
     export_id: str,
     token: str,
-    api_version=ApiVersion.v1.value,
+    api_version=API_VERSION_PREVIEW,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     """
@@ -204,6 +209,7 @@ def delete_export(
     Returns:
         Response dict
     """
+    api_version = API_VERSION_PREVIEW
 
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, export_id)
 

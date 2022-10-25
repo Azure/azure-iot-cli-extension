@@ -11,12 +11,12 @@ from azext_iot.central.common import DestinationType
 from azext_iot.common import utility
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers import CentralDestinationProvider
-from azext_iot.central.models.enum import ApiVersion
-from azext_iot.central.models.v1_1_preview import (
-    DestinationV1_1_preview,
-    WebhookDestinationV1_1_preview,
-    AdxDestinationV1_1_preview,
+from azext_iot.central.models.v2022_06_30_preview import (
+    DestinationPreview,
+    WebhookDestinationPreview,
+    AdxDestinationPreview,
 )
+from azext_iot.central.common import API_VERSION_PREVIEW
 
 
 def get_destination(
@@ -25,9 +25,9 @@ def get_destination(
     destination_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
+    api_version=API_VERSION_PREVIEW,
 ) -> Union[
-    DestinationV1_1_preview, WebhookDestinationV1_1_preview, AdxDestinationV1_1_preview
+    DestinationPreview, WebhookDestinationPreview, AdxDestinationPreview
 ]:
     provider = CentralDestinationProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
@@ -44,7 +44,7 @@ def delete_destination(
     destination_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
+    api_version=API_VERSION_PREVIEW,
 ):
     provider = CentralDestinationProvider(
         cmd=cmd, app_id=app_id, api_version=api_version, token=token
@@ -60,12 +60,12 @@ def list_destinations(
     app_id: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
+    api_version=API_VERSION_PREVIEW,
 ) -> List[
     Union[
-        DestinationV1_1_preview,
-        WebhookDestinationV1_1_preview,
-        AdxDestinationV1_1_preview,
+        DestinationPreview,
+        WebhookDestinationPreview,
+        AdxDestinationPreview,
     ]
 ]:
     provider = CentralDestinationProvider(
@@ -89,9 +89,9 @@ def add_destination(
     authorization=None,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
+    api_version=API_VERSION_PREVIEW,
 ) -> Union[
-    DestinationV1_1_preview, WebhookDestinationV1_1_preview, AdxDestinationV1_1_preview
+    DestinationPreview, WebhookDestinationPreview, AdxDestinationPreview
 ]:
     destination = {
         "id": destination_id,
@@ -163,9 +163,9 @@ def update_destination(
     content: str,
     token=None,
     central_dns_suffix=CENTRAL_ENDPOINT,
-    api_version=ApiVersion.v1_1_preview.value,
+    api_version=API_VERSION_PREVIEW,
 ) -> Union[
-    DestinationV1_1_preview, WebhookDestinationV1_1_preview, AdxDestinationV1_1_preview
+    DestinationPreview, WebhookDestinationPreview, AdxDestinationPreview
 ]:
     payload = utility.process_json_arg(content, argument_name="content")
 

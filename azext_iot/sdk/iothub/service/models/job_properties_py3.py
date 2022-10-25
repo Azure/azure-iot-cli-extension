@@ -58,6 +58,8 @@ class JobProperties(Model):
      connecting to the storage account. Possible values include: 'keyBased',
      'identityBased'
     :type storage_authentication_type: str or ~service.models.enum
+    :param identity:
+    :type identity: ~service.models.ManagedIdentity
     :param failure_reason: System genereated.  Ignored at creation. The reason
      for failure, if a failure occurred.
     :type failure_reason: str
@@ -82,12 +84,13 @@ class JobProperties(Model):
         'output_blob_name': {'key': 'outputBlobName', 'type': 'str'},
         'exclude_keys_in_export': {'key': 'excludeKeysInExport', 'type': 'bool'},
         'storage_authentication_type': {'key': 'storageAuthenticationType', 'type': 'str'},
+        'identity': {'key': 'identity', 'type': 'ManagedIdentity'},
         'failure_reason': {'key': 'failureReason', 'type': 'str'},
         'include_configurations': {'key': 'includeConfigurations', 'type': 'bool'},
         'configurations_blob_name': {'key': 'configurationsBlobName', 'type': 'str'},
     }
 
-    def __init__(self, *, job_id: str=None, start_time_utc=None, end_time_utc=None, type=None, status=None, progress: int=None, input_blob_container_uri: str=None, input_blob_name: str=None, output_blob_container_uri: str=None, output_blob_name: str=None, exclude_keys_in_export: bool=None, storage_authentication_type=None, failure_reason: str=None, include_configurations: bool=None, configurations_blob_name: str=None, **kwargs) -> None:
+    def __init__(self, *, job_id: str=None, start_time_utc=None, end_time_utc=None, type=None, status=None, progress: int=None, input_blob_container_uri: str=None, input_blob_name: str=None, output_blob_container_uri: str=None, output_blob_name: str=None, exclude_keys_in_export: bool=None, storage_authentication_type=None, identity=None, failure_reason: str=None, include_configurations: bool=None, configurations_blob_name: str=None, **kwargs) -> None:
         super(JobProperties, self).__init__(**kwargs)
         self.job_id = job_id
         self.start_time_utc = start_time_utc
@@ -101,6 +104,7 @@ class JobProperties(Model):
         self.output_blob_name = output_blob_name
         self.exclude_keys_in_export = exclude_keys_in_export
         self.storage_authentication_type = storage_authentication_type
+        self.identity = identity
         self.failure_reason = failure_reason
         self.include_configurations = include_configurations
         self.configurations_blob_name = configurations_blob_name

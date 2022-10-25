@@ -11,7 +11,8 @@ from knack.log import get_logger
 
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.services import _utility
-from azext_iot.central.models.v1_1_preview import FileUploadV1_1_preview
+from azext_iot.central.common import API_VERSION
+from azext_iot.central.models.ga_2022_07_31 import FileUploadGa
 from azure.cli.core.util import should_disable_connection_verify
 
 
@@ -26,9 +27,9 @@ def _make_call(
     app_id: str,
     method: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[dict, FileUploadV1_1_preview]:
+) -> Union[dict, FileUploadGa]:
     url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
     headers = _utility.get_headers(token, cmd)
 
@@ -50,9 +51,9 @@ def get_fileupload(
     cmd,
     app_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> FileUploadV1_1_preview:
+) -> FileUploadGa:
     """
     Get fileupload info
     Args:
@@ -65,6 +66,8 @@ def get_fileupload(
     Returns:
         fileupload: dict
     """
+    api_version = API_VERSION
+
     result = _make_call(
         cmd,
         app_id,
@@ -78,8 +81,8 @@ def get_fileupload(
 
 
 def delete_fileupload(
-    cmd, app_id: str, token: str, api_version: str, central_dns_suffix=CENTRAL_ENDPOINT
-) -> FileUploadV1_1_preview:
+    cmd, app_id: str, token: str, api_version=API_VERSION, central_dns_suffix=CENTRAL_ENDPOINT
+) -> FileUploadGa:
     """
     Delete file upload storage configuration
 
@@ -93,6 +96,7 @@ def delete_fileupload(
     Returns:
         fileupload: dict
     """
+    api_version = API_VERSION
 
     result = _make_call(
         cmd,
@@ -114,10 +118,10 @@ def createorupdate_fileupload(
     account: str,
     sasTtl: bool,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     update=False,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> FileUploadV1_1_preview:
+) -> FileUploadGa:
     """
     Create the file upload storage account configuration.
 
@@ -136,6 +140,7 @@ def createorupdate_fileupload(
     Returns:
         fileupload: dict
     """
+    api_version = API_VERSION
 
     url = "https://{}.{}/{}".format(app_id, central_dns_suffix, BASE_PATH)
     headers = _utility.get_headers(token, cmd, has_json_payload=True)

@@ -92,32 +92,13 @@ def log_response_debug(response: Response, logger: logging.Logger):
     logger.debug("Response headers: {}".format(response.headers))
 
 
+# Only latest GA and latest Preview version are supported
 def get_object(data: dict, model: str, api_version) -> object:
     try:
-        if api_version == ApiVersion.ga_2022_05_31.value:
+        if api_version == ApiVersion.ga.value:
             module = getattr(
                 import_module(
-                    "azext_iot.central.models.ga_2022_05_31.{}".format(to_snake_case(model))
-                ),
-                model,
-            )
-            return module(data)
-
-        elif api_version == ApiVersion.v1.value:
-            module = getattr(
-                import_module(
-                    "azext_iot.central.models.v1.{}".format(to_snake_case(model))
-                ),
-                model,
-            )
-            return module(data)
-
-        elif api_version == ApiVersion.v1_1_preview.value:
-            module = getattr(
-                import_module(
-                    "azext_iot.central.models.v1_1_preview.{}".format(
-                        to_snake_case(model)
-                    )
+                    "azext_iot.central.models.ga_2022_07_31.{}".format(to_snake_case(model))
                 ),
                 model,
             )
@@ -125,7 +106,7 @@ def get_object(data: dict, model: str, api_version) -> object:
         else:
             module = getattr(
                 import_module(
-                    "azext_iot.central.models.preview.{}".format(to_snake_case(model))
+                    "azext_iot.central.models.v2022_06_30_preview.{}".format(to_snake_case(model))
                 ),
                 model,
             )
