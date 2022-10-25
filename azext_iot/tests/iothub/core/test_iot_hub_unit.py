@@ -14,7 +14,7 @@ from azext_iot.common.shared import (
     JobType,
     AuthenticationType,
 )
-from azure.cli.core.azclierror import BadRequestError
+from azure.cli.core.azclierror import BadRequestError, ForbiddenError
 
 hub_name = "hubname"
 shared_access_key_name = "TEST_SAS_KEY_NAME"
@@ -67,6 +67,25 @@ def assert_device_identity_result(actual, expected):
     assert actual.additional_properties == expected
 
 
+@pytest.fixture(params=[(400, BadRequestError), (403, ForbiddenError)])
+def importexport_service_client_error(mocked_response, get_mgmt_client, request):
+    mocked_response.assert_all_requests_are_fired = True
+
+    mocked_response.add(
+        method=responses.POST,
+        url="https://{}/jobs/create?api-version=2021-04-12".format(hub_name),
+        body=json.dumps(
+            {"Message": "ErrorCode:BlobContainerValidationError;Failed to read devices blob from the input container."}
+        ),
+        status=request.param[0],
+        content_type="application/json",
+        match_querystring=False,
+    )
+    setattr(mocked_response, "expected_exception", request.param[1])
+
+    yield mocked_response
+
+
 class TestIoTHubDeviceIdentityExport(object):
     @pytest.fixture
     def service_client(self, mocked_response, get_mgmt_client):
@@ -80,24 +99,6 @@ class TestIoTHubDeviceIdentityExport(object):
             content_type="application/json",
             match_querystring=False,
         )
-
-        yield mocked_response
-
-    @pytest.fixture(params=[(400, BadRequestError)])
-    def service_client_error(self, mocked_response, get_mgmt_client, request):
-        mocked_response.assert_all_requests_are_fired = True
-
-        mocked_response.add(
-            method=responses.POST,
-            url="https://{}/jobs/create?api-version=2021-04-12".format(hub_name),
-            body=json.dumps(
-                {"Message": "ErrorCode:BlobContainerValidationError;Failed to read devices blob from the input container."}
-            ),
-            status=request.param[0],
-            content_type="application/json",
-            match_querystring=False,
-        )
-        setattr(mocked_response, "expected_exception", request.param[1])
 
         yield mocked_response
 
@@ -153,7 +154,7 @@ class TestIoTHubDeviceIdentityExport(object):
                 resource_group_name=req["resource_group_name"],
             )
 
-    def test_device_identity_export_error(self, fixture_cmd, service_client_error):
+    def test_device_identity_export_error(self, fixture_cmd, importexport_service_client_error):
         with pytest.raises(CLIError) as e:
             subject.iot_device_export(
                 cmd=fixture_cmd,
@@ -161,7 +162,9 @@ class TestIoTHubDeviceIdentityExport(object):
                 blob_container_uri=blob_container_uri,
                 resource_group_name="myresourcegroup",
             )
-        assert isinstance(e.value, service_client_error.expected_exception)
+        assert isinstance(e.value, importexport_service_client_error.expected_exception)
+        # Ensures error body serialization works
+        assert e.value.error_msg.get("Message")
 
 
 class TestIoTHubDeviceIdentityImport(object):
@@ -177,24 +180,6 @@ class TestIoTHubDeviceIdentityImport(object):
             content_type="application/json",
             match_querystring=False,
         )
-
-        yield mocked_response
-
-    @pytest.fixture(params=[(400, BadRequestError)])
-    def service_client_error(self, mocked_response, get_mgmt_client, request):
-        mocked_response.assert_all_requests_are_fired = True
-
-        mocked_response.add(
-            method=responses.POST,
-            url="https://{}/jobs/create?api-version=2021-04-12".format(hub_name),
-            body=json.dumps(
-                {"Message": "ErrorCode:BlobContainerValidationError;Failed to read devices blob from the input container."}
-            ),
-            status=request.param[0],
-            content_type="application/json",
-            match_querystring=False,
-        )
-        setattr(mocked_response, "expected_exception", request.param[1])
 
         yield mocked_response
 
@@ -249,7 +234,7 @@ class TestIoTHubDeviceIdentityImport(object):
                 resource_group_name=req["resource_group_name"],
             )
 
-    def test_device_identity_import_error(self, fixture_cmd, service_client_error):
+    def test_device_identity_import_error(self, fixture_cmd, importexport_service_client_error):
         with pytest.raises(CLIError) as e:
             subject.iot_device_import(
                 cmd=fixture_cmd,
@@ -258,4 +243,6 @@ class TestIoTHubDeviceIdentityImport(object):
                 output_blob_container_uri=blob_container_uri + "2",
                 resource_group_name="myresourcegroup",
             )
-        assert isinstance(e.value, service_client_error.expected_exception)
+        assert isinstance(e.value, importexport_service_client_error.expected_exception)
+        # Ensures error body serialization works
+        assert e.value.error_msg.get("Message")
