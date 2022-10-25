@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from azure.cli.core.commands.parameters import get_enum_type, get_three_state_flag
-from azext_iot.common.shared import SettleType, ProtocolType, AckType
+from azext_iot.common.shared import DeviceAuthApiType, DeviceAuthType, SettleType, ProtocolType, AckType
 from azext_iot.assets.user_messages import info_param_properties_device
 from azext_iot._params import hub_auth_type_dataplane_param_type
 from azext_iot.iothub._validators import validate_device_model_id
@@ -273,4 +273,30 @@ def load_iothub_arguments(self, _):
             "config_file",
             options_list=["--config-file", "--config", "--cfg"],
             help="Path to device hierarchy config file"
+        )
+        context.argument(
+            "device_auth_type",
+            arg_type=get_enum_type(
+                [
+                    DeviceAuthType.shared_private_key,
+                    DeviceAuthType.x509_ca
+                ]
+            ),
+            options_list=["--device-auth-type", "--device-auth",],
+            help="Device to hub authorization mechanism."
+        )
+        context.argument(
+            "bundle_output_path",
+            options_list=["--output-path", "--out",],
+            help="Path to output device bundle files."
+        )
+        context.argument(
+            "root_cert_path",
+            options_list=["--root-cert", "--rc",],
+            help="Path to root public key certificate to sign nested edge device certs."
+        )
+        context.argument(
+            "root_key_path",
+            options_list=["--root-key", "--rk",],
+            help="Path to root private key to sign nested edge device certs."
         )

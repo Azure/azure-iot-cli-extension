@@ -333,6 +333,12 @@ def load_iothub_help():
             --device id=parent2 deployment=/path/to/parentDeployment2.json
             --device id=child2 parent=parent2 deployment=/path/to/child_deployment2.json
 
+        - name: Create a simple nested edge device hierarchy (deleting existing devices)
+            with an existing root CA, using x509 auth, and specify a custom device bundle output path.
+          text: >
+            az iot edge hierarchy create -n {hub_name} --clean --root-cert "root_cert.pem" --root-key "root_key.pem" --device-auth x509_ca
+            --device id=parent1 --device id=child1 parent=parent1 --out "path/to/bundle_folder"
+
         - name: Create a new nested edge device hierarchy (without deleting existing devices)
             from a configuration file without any output / visualization.
           text: >
