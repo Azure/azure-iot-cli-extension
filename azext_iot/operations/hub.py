@@ -2330,12 +2330,10 @@ def iot_device_export(
         )
     if storage_authentication_type is not None:
         logger.warning(
-            "The parameter --sat/--storage-authentication-type has been deprecated and should not be provided"
+            "The parameter --sat/--storage-authentication-type has been deprecated and should not be provided. "
         )
-    if auth_type_dataplane is not None:
         logger.warning(
-            "The parameter --auth-type is now used to specify dataplane auth-type instead of storage auth-type. "
-            + "The storage auth-type is automatically derived and should no longer be provided as input."
+            "The parameter --auth-type is now used to specify IoT Hub data access auth type instead of storage access auth type. "
         )
 
     service_sdk = _get_service_sdk(
@@ -2379,12 +2377,10 @@ def iot_device_import(
         )
     if storage_authentication_type is not None:
         logger.warning(
-            "The parameter --sat/--storage-authentication-type has been deprecated and should not be provided"
+            "The parameter --sat/--storage-authentication-type has been deprecated and should not be provided. "
         )
-    if auth_type_dataplane is not None:
         logger.warning(
-            "The parameter --auth-type is now used to specify dataplane auth-type instead of storage auth-type. "
-            + "The storage auth-type is automatically derived and should no longer be provided as input."
+            "The parameter --auth-type is now used to specify IoT Hub data access auth type instead of storage access auth type. "
         )
 
     service_sdk = _get_service_sdk(
