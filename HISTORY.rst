@@ -5,6 +5,14 @@ Release History
 
 unreleased
 +++++++++++++++
+**IoT Hub updates**
+
+* Updated the IoT Hub service SDK to now use the newer 2021-04-12 API version.
+* [Breaking Change] The `az iot hub device-identity export` and `az iot hub device-identity import` commands are migrated to use dataplane APIs instead of controlplane.
+* [Breaking Change] Device identity export/import operations now expect the parameter `auth-type` to specify dataplane auth type (instead of storage auth type).
+* Device identity export/import commands now support optional parameters for storage account and blob container names - users no longer need to supply input/output Blob container SAS URIs.
+* Device identity export/import operations now automatically derive storage auth type - hence the parameter `storage_authentication_type` has been deprecated.
+* Add `az iot hub device-twin list` as a highly recommended alternative to `az iot hub device-identity list`. Functionality remains the same as both return a list of device twins and `az iot hub device-identity list` may be altered or deprecated in the future.
 
 
 0.17.3
@@ -14,6 +22,7 @@ unreleased
 
 * Adds `az iot device-update update init calculate-hash`, a utility command used to calculate the base64 hash representation of one or more files.
 * The `update init v5` command will by default validate the generated import manifest using the official json schema definition. Client-side validation can be skipped by using `--no-validation`.
+* The `update init v5` command support level has changed from `experimental` to `preview`.
 
 **IoT Central updates**
 
@@ -22,7 +31,7 @@ unreleased
 * Add support for enrollment groups CRUD.
 
   - az iot central enrollment-group
- 
+
     - az iot central enrollment-group list
     - az iot central enrollment-group show
     - az iot central enrollment-group create
@@ -34,7 +43,7 @@ unreleased
 * Add support for scheduled jobs CRUD.
 
   - az iot central scheduled-job
- 
+
     - az iot central scheduled-job list
     - az iot central scheduled-job show
     - az iot central scheduled-job create
