@@ -382,13 +382,13 @@ def load_deviceupdate_help():
             az iot du update import -n {account_name} -i {instance_name} --hashes sha256={hash_value} --size {size_in_bytes}
             --url {manifest_location} --file filename={file1_name} url={file1_url} --file filename={file2_name} url={file2_url}
 
-        - name: Import an update with two related files and no reference steps, letting the CLI calculate the update manifest
+        - name: Import an update with two related files and no reference steps, letting the CLI calculate the import manifest
             hash value and size in bytes.
           text: >
             az iot du update import -n {account_name} -i {instance_name} --url {manifest_location}
             --file filename={file1_name} url={file1_url} --file filename={file2_name} url={file2_url}
 
-        - name: Import a parent update with two child update reference steps, where all three update manifests have one related file.
+        - name: Import a parent update with two child update reference steps, where all three import manifests have one related file.
             Let the CLI calculate hash value and size in bytes for all. This operation will rely on the `--defer` capability.
           text: >
             az iot du update import -n {account_name} -i {instance_name} --url {parent_manifest_location}
@@ -830,7 +830,7 @@ def load_deviceupdate_help():
 
     helps["iot du update init"] = """
         type: group
-        short-summary: Utility for update manifest initialization.
+        short-summary: Utility for import manifest initialization.
     """
 
     helps["iot du update init v5"] = """
@@ -903,12 +903,12 @@ def load_deviceupdate_help():
         short-summary: Stage an update for import to a target instance.
         long-summary: |
           Staging an update refers to accelerating the pre-requisite steps
-          of importing an update to a target instance. For a given update manifest, the process
+          of importing an update to a target instance. For a given import manifest, the process
           will determine relevant files, push them to a desired storage container,
           generate SAS URIs and cover other preparation steps for a succesful import.
 
           This command depends on a convention based organization of update files. All update files
-          for a target manifest are expected to be in the same directory the update manifest resides in.
+          for a target manifest are expected to be in the same directory the import manifest resides in.
 
           Key based access is used to upload blob artifacts and to generate 3 hour duration SAS URIs with read access.
 
