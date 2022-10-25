@@ -214,7 +214,7 @@ sample_properties = {"property1": "value1", "property2": 2, "property3": {"a": "
     ],
 )
 def test_adu_manifest_init_v5(options, expected):
-    result = cli.invoke(f"iot device-update update init v5 {options}").as_json()
+    result = cli.invoke(f"iot du update init v5 {options}").as_json()
     del result["createdDateTime"]
     assert result == expected
 
@@ -248,7 +248,7 @@ def test_adu_manifest_init_v5(options, expected):
     ],
 )
 def test_adu_manifest_init_v5_invalid_path_required(options):
-    assert not cli.invoke(f"iot device-update update init v5 {options}").success()
+    assert not cli.invoke(f"iot du update init v5 {options}").success()
 
 
 @pytest.mark.parametrize(
@@ -259,7 +259,7 @@ def test_adu_manifest_init_v5_invalid_path_required(options):
             "--update-provider digimaun --update-name invalid --update-version 1.0 "
             "--compat deviceManufacturer=Contoso deviceModel=Vacuum "
             "--step handler=microsoft/apt:1 ",
-            False
+            False,
         ),
         (
             # Too long of a provider value.
@@ -267,7 +267,7 @@ def test_adu_manifest_init_v5_invalid_path_required(options):
             "--update-name invalid --update-version 1.0 "
             "--compat deviceManufacturer=Contoso deviceModel=Vacuum "
             "--step handler=microsoft/apt:1 files=hello.json",
-            False
+            False,
         ),
         (
             # Too long of a compat property value.
@@ -281,7 +281,7 @@ def test_adu_manifest_init_v5_invalid_path_required(options):
             "--update-provider digimaun --update-name invalid --update-version 1 "
             "--compat deviceManufacturer=Contoso deviceModel=Vacuum "
             "--step handler=microsoft/apt:1 ",
-            False
+            False,
         ),
         (
             # Too short file downloadHandler value.
@@ -290,7 +290,7 @@ def test_adu_manifest_init_v5_invalid_path_required(options):
             "--step handler=microsoft/apt:1 "
             f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\" "
             "downloadHandler=abc",
-            False
+            False,
         ),
         (
             # Same as prior test case but disable client-side validation.
@@ -299,15 +299,15 @@ def test_adu_manifest_init_v5_invalid_path_required(options):
             "--step handler=microsoft/apt:1 "
             f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\" "
             "downloadHandler=abc",
-            True
-        )
+            True,
+        ),
     ],
 )
 def test_adu_manifest_init_v5_validate_errors(options, no_validation):
     if no_validation:
-        assert cli.invoke(f"iot device-update update init v5 {options} --no-validation").success()
+        assert cli.invoke(f"iot du update init v5 {options} --no-validation").success()
     else:
-        assert not cli.invoke(f"iot device-update update init v5 {options}").success()
+        assert not cli.invoke(f"iot du update init v5 {options}").success()
 
 
 @pytest.mark.parametrize(
@@ -318,7 +318,7 @@ def test_adu_manifest_init_v5_validate_errors(options, no_validation):
         (3, 256),
     ],
 )
-def test_adu_manifest_init_calculate_hash(files_count, expected_bytes):
+def test_adu_manifest_calculate_hash(files_count, expected_bytes):
     from azext_iot.deviceupdate.providers.base import DeviceUpdateDataManager, FileMetadata
 
     normalized_paths: List[PurePath] = []
@@ -335,7 +335,7 @@ def test_adu_manifest_init_calculate_hash(files_count, expected_bytes):
     for p in normalized_paths:
         cli_path_input = cli_path_input + f" --file-path '{str(p)}'"
 
-    result = cli.invoke(f"iot device-update update init calculate-hash {cli_path_input}").as_json()
+    result = cli.invoke(f"iot du update calculate-hash {cli_path_input}").as_json()
 
     for i in range(files_count):
         assert result[i]["hashAlgorithm"] == "sha256"
