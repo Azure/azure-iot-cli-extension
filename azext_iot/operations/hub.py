@@ -2347,7 +2347,11 @@ def iot_device_export(
         include_keys=include_keys,
         identity=identity
     )
-    return service_sdk.jobs.create_import_export_job(export_job_properties)
+
+    try:
+        return service_sdk.jobs.create_import_export_job(export_job_properties)
+    except CloudError as e:
+        handle_service_exception(e)
 
 
 def iot_device_import(
@@ -2392,7 +2396,11 @@ def iot_device_import(
         output_blob_container_uri=output_blob_container_uri,
         identity=identity
     )
-    return service_sdk.jobs.create_import_export_job(import_job_properties)
+
+    try:
+        return service_sdk.jobs.create_import_export_job(import_job_properties)
+    except CloudError as e:
+        handle_service_exception(e)
 
 
 def iot_hub_monitor_events(
