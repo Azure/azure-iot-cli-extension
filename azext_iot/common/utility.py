@@ -155,7 +155,7 @@ def process_yaml_arg(path: str) -> dict:
     try:
         import yaml
         with open(path, "rb") as f:
-            return yaml.load(f, Loader=yaml.FullLoader)
+            return yaml.load(f, Loader=yaml.SafeLoader)
     except Exception as ex:
         raise InvalidArgumentValueError(
             "Failed to parse yaml for file '{}' with exception:\n{}".format(

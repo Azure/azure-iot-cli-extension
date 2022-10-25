@@ -339,14 +339,17 @@ class DeviceIdentityProvider(IoTHubProvider):
 
     def assemble_nargs_to_dict(self, hash_list: List[str]) -> Dict[str, str]:
         result = {}
-        if not hash_list or not hash_list[0]:
+        if not hash_list:
             return result
         for hash in hash_list:
-            # filter for malformed nArg input (no = value assigned)
             if "=" not in hash:
-                return result
+                logger.warning("Skipping processing of '%s', input format is key=value | key='value value'.", hash)
+                continue
             split_hash = hash.split("=", 1)
             result[split_hash[0]] = split_hash[1]
+        for key in result:
+            if not result.get(key):
+                logger.warning("No value assigned to key '%s', input format is key=value | key='value value'.", key)
         return result
 
     def delete_device_identities(
