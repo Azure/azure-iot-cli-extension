@@ -6,6 +6,9 @@ Release History
 unreleased
 +++++++++++++++
 
+0.18.0
++++++++++++++++
+
 **IoT Hub updates**
 
 * [Breaking Change] The `az iot hub device-identity export` and `az iot hub device-identity import` commands are migrated to use dataplane/IoT Hub APIs instead of controlplane/ARM.
