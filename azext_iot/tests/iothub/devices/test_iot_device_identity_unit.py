@@ -4,22 +4,31 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from os.path import exists, join
 from azext_iot.common.shared import DeviceAuthType
+from azext_iot.common.utility import process_json_arg, process_yaml_arg
 from azext_iot.constants import EDGE_ROOT_CERTIFICATE_FILENAME
-from azext_iot.sdk.iothub.service.models.configuration_content_py3 import ConfigurationContent
+from azext_iot.sdk.iothub.service.models.configuration_content_py3 import (
+    ConfigurationContent,
+)
 import pytest
 import json
 import responses
 import re
 from azext_iot.iothub import commands_device_identity as subject
-from azext_iot.iothub.providers.device_identity import DeviceIdentityProvider, EdgeContainerAuth, NestedEdgeDeviceConfig
+from azext_iot.iothub.providers.device_identity import (
+    DeviceIdentityProvider,
+    EdgeContainerAuth,
+    NestedEdgeConfig,
+    NestedEdgeDeviceConfig,
+)
 from azext_iot.tests.conftest import fixture_cmd, mock_target
 
 from azure.cli.core.azclierror import (
     FileOperationError,
     InvalidArgumentValueError,
     MutuallyExclusiveArgumentError,
-    RequiredArgumentMissingError
+    RequiredArgumentMissingError,
 )
 
 from shutil import rmtree
@@ -94,11 +103,16 @@ class TestEdgeHierarchyCreateArgs:
         yield mocked_response
 
     @pytest.mark.parametrize(
-        "devices, config, visualize, clean",
-        [([["id=dev1", "parent=dev2"], ["id=dev2"]], None, False, True)],
+        "devices, config, visualize, clean, auth, output",
+        [
+            # basic example, default auth and output directory
+            ([["id=dev1", "parent=dev2"], ["id=dev2"]], None, False, True, None, None),
+            # Visualize, no clean, certificate auth, different output folder
+            ([["id=dev3"]], None, True, False, 'x509_ca', 'new_device_bundle_folder'),
+        ],
     )
     def test_edge_hierarchy_create_args(
-        self, fixture_cmd, service_client, devices, config, visualize, clean
+        self, fixture_cmd, service_client, devices, config, visualize, clean, auth, output
     ):
         subject.iot_edge_hierarchy_create(
             cmd=fixture_cmd,
@@ -106,8 +120,16 @@ class TestEdgeHierarchyCreateArgs:
             config_file=config,
             visualize=visualize,
             clean=clean,
+            device_auth_type=auth,
+            bundle_output_path=output
         )
-        rmtree("device_bundles")
+        out_path = output or "device_bundles"
+        assert exists(out_path)
+        for device in devices:
+            device_id = device[0].split('=')[1]
+            assert exists(join(out_path, f'{device_id}.tgz'))
+
+        rmtree(out_path)
 
 
 class TestHierarchyCreateFailures:
@@ -117,7 +139,13 @@ class TestHierarchyCreateFailures:
             # No devices
             (None, None, None, None, InvalidArgumentValueError),
             # Missing Device Id
-            ([["parent=dev2"], ["id=dev2"]], None, None, None, InvalidArgumentValueError),
+            (
+                [["parent=dev2"], ["id=dev2"]],
+                None,
+                None,
+                None,
+                InvalidArgumentValueError,
+            ),
             # Loop
             (
                 [["id=dev1", "parent=dev2"], ["id=dev2", "parent=dev1"]],
@@ -195,7 +223,7 @@ class TestHierarchyCreateFailures:
                 None,
                 "root_cert.pem",
                 None,
-                RequiredArgumentMissingError
+                RequiredArgumentMissingError,
             ),
             # missing cert paths
             (
@@ -205,12 +233,28 @@ class TestHierarchyCreateFailures:
                 None,
                 "root_cert.pem",
                 "root_key.pem",
-                FileOperationError
+                FileOperationError,
+            ),
+            # cert path and config file
+            (
+                None,
+                "hierarchy_configs/nested_edge_config.yml",
+                "root_cert.pem",
+                "root_key.pem",
+                MutuallyExclusiveArgumentError,
             ),
         ],
     )
     def test_edge_hierarchy_create_arg_failures(
-        self, fixture_cmd, fixture_ghcs, set_cwd, devices, config, root_cert, root_key, exception
+        self,
+        fixture_cmd,
+        fixture_ghcs,
+        set_cwd,
+        devices,
+        config,
+        root_cert,
+        root_key,
+        exception,
     ):
         with pytest.raises(exception):
             subject.iot_edge_hierarchy_create(
@@ -218,7 +262,7 @@ class TestHierarchyCreateFailures:
                 devices=devices,
                 config_file=config,
                 root_cert_path=root_cert,
-                root_key_path=root_key
+                root_key_path=root_key,
             )
 
     @pytest.mark.parametrize(
@@ -364,7 +408,25 @@ class TestHierarchyCreateConfig:
             visualize=visualize,
             clean=clean,
         )
-        rmtree("device_bundles")
+        
+        cfg_obj = process_yaml_arg(config) if config.endswith('.yml') else process_json_arg(config)
+        
+        expected_devices = []
+        def add_nested_device(device):
+            expected_devices.append(device['device_id'])
+            for child in device.get("child", []):
+                add_nested_device(child)
+
+        for device in cfg_obj["edgedevices"]:
+            add_nested_device(device)
+
+        out_path = "device_bundles"
+
+        assert exists(out_path)
+        for device_id in expected_devices:
+            assert exists(join(out_path, f'{device_id}.tgz'))
+
+        rmtree(out_path)
 
 
 class TestEdgeHierarchyConfigFunctions:
@@ -374,25 +436,41 @@ class TestEdgeHierarchyConfigFunctions:
         device_id=test_device_id,
         parent_id="parent_device_id",
         parent_hostname="parentHostname",
-        hostname="hostname"
+        hostname="hostname",
     )
     device_config_container_auth_with_agent_no_parent = NestedEdgeDeviceConfig(
         device_id=test_device_id,
-        container_auth = EdgeContainerAuth(
+        container_auth=EdgeContainerAuth(
             serveraddress="test-container-registry-address",
             username="container registry username",
-            password="container registry password"
+            password="container registry password",
         ),
-        edge_agent="special-edge-agent"
+        edge_agent="special-edge-agent",
     )
 
     @pytest.mark.parametrize(
         "device_id, auth_method, device_config, default_edge_agent, device_config_path, device_pk, output_path",
         [
             # load external TOML, key auth
-            (test_device_id, DeviceAuthType.shared_private_key.value, device_config_with_parent_no_agent, "default-edge-agent", "./hierarchy_configs/device_config.toml", "test-device-pk", None),
+            (
+                test_device_id,
+                DeviceAuthType.shared_private_key.value,
+                device_config_with_parent_no_agent,
+                "default-edge-agent",
+                "./hierarchy_configs/device_config.toml",
+                "test-device-pk",
+                None,
+            ),
             # load default TOML, cert auth
-            (test_device_id, DeviceAuthType.x509_ca.value, device_config_container_auth_with_agent_no_parent, "default-edge-agent", None, None, "output_device_configs"),
+            (
+                test_device_id,
+                DeviceAuthType.x509_ca.value,
+                device_config_container_auth_with_agent_no_parent,
+                "default-edge-agent",
+                None,
+                None,
+                "output_device_configs",
+            ),
         ],
     )
     def test_create_edge_device_config(
@@ -463,26 +541,42 @@ class TestEdgeHierarchyConfigFunctions:
         if not device_config.container_auth:
             assert device_toml["agent"]["config"]["auth"] == {}
         else:
-            assert device_toml["agent"]["config"]["auth"]["serveraddress"] == device_config.container_auth.serveraddress
-            assert device_toml["agent"]["config"]["auth"]["username"] == device_config.container_auth.username
-            assert device_toml["agent"]["config"]["auth"]["password"] == device_config.container_auth.password
+            assert (
+                device_toml["agent"]["config"]["auth"]["serveraddress"]
+                == device_config.container_auth.serveraddress
+            )
+            assert (
+                device_toml["agent"]["config"]["auth"]["username"]
+                == device_config.container_auth.username
+            )
+            assert (
+                device_toml["agent"]["config"]["auth"]["password"]
+                == device_config.container_auth.password
+            )
 
         if output_path:
             import toml
             from os.path import join
-            path = join(output_path, 'config.toml')
-            with open(path, 'rt', encoding="utf-8") as f:
+
+            path = join(output_path, "config.toml")
+            with open(path, "rt", encoding="utf-8") as f:
                 assert toml.dumps(device_toml) == f.read()
             rmtree(output_path)
 
-
-    @pytest.mark.parametrize("deployment, error", 
-    [
-        ("hierarchy_configs/invalid/invalid_deployment.json", InvalidArgumentValueError),
-        ("path_does_not_exist.json", FileOperationError),
-        ("hierarchy_configs/deploymentLowerLayer.json", None)
-    ])
-    def test_process_edge_config_content(self, fixture_ghcs, set_cwd, deployment, error):
+    @pytest.mark.parametrize(
+        "deployment, error",
+        [
+            (
+                "hierarchy_configs/invalid/invalid_deployment.json",
+                InvalidArgumentValueError,
+            ),
+            ("path_does_not_exist.json", FileOperationError),
+            ("hierarchy_configs/deploymentLowerLayer.json", None),
+        ],
+    )
+    def test_process_edge_config_content(
+        self, fixture_ghcs, set_cwd, deployment, error
+    ):
         provider = DeviceIdentityProvider(fixture_cmd, hub_name, resource_group_name)
         try:
             config_content = provider._try_parse_valid_deployment_config(deployment)

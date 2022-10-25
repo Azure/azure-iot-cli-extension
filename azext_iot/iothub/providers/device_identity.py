@@ -117,7 +117,7 @@ class DeviceIdentityProvider(IoTHubProvider):
         config_file: Optional[str] = None,
         visualize: Optional[bool] = False,
         clean: Optional[bool] = False,
-        auth_type: Optional[DeviceAuthType] = DeviceAuthType.shared_private_key.value,
+        auth_type: Optional[DeviceAuthType] = None,
         root_cert_path: Optional[str] = None,
         root_key_path: Optional[str] = None,
         output_path: Optional[str] = None,
@@ -133,7 +133,9 @@ class DeviceIdentityProvider(IoTHubProvider):
 
         # configuration for root cert and output directories
         root_cert_name = EDGE_ROOT_CERTIFICATE_FILENAME
-        if output_path and exists(output_path):
+        if output_path:
+            if not exists(output_path):
+                makedirs(output_path)
             cert_output_directory = PurePath(output_path)
         else:
             cert_output_directory = PurePath(getcwd()).joinpath(
@@ -147,6 +149,11 @@ class DeviceIdentityProvider(IoTHubProvider):
             if devices:
                 raise MutuallyExclusiveArgumentError(
                     "Please either use a --config-file argument or inline --device arguments, both were provided."
+                )
+            # if config file is specified, warn user that auth_type and cert info should be set in the file
+            if any([auth_type, root_cert_path, root_key_path]):
+                raise MutuallyExclusiveArgumentError(
+                    "If using a --config-file argument, please set device auth and root certificate parameters in that file."
                 )
 
             config_content = None
@@ -174,7 +181,7 @@ class DeviceIdentityProvider(IoTHubProvider):
 
             config = NestedEdgeConfig(
                 version="1.0",
-                auth_method=auth_type,
+                auth_method=auth_type or DeviceAuthType.shared_private_key.value,
                 devices=[],
                 root_cert=root_cert,
             )
@@ -395,6 +402,9 @@ class DeviceIdentityProvider(IoTHubProvider):
                 overwrite=True,
             )
 
+            # delete non-tarred folder
+            rmtree(device_cert_output_directory)
+
         # Give device registry a chance to catch up
         sleep(1)
 
@@ -448,7 +458,7 @@ class DeviceIdentityProvider(IoTHubProvider):
                     id=device_id, content=deployment_content
                 )
 
-    # TODO - Unit test
+    # TODO - Unit test and error handling
     def _process_nested_edge_config_file_content(
         self, content: dict
     ) -> NestedEdgeConfig:

@@ -18,7 +18,7 @@ def iot_edge_hierarchy_create(
     config_file: Optional[str] = None,
     visualize: Optional[bool] = False,
     clean: Optional[bool] = False,
-    device_auth_type: Optional[DeviceAuthType] = DeviceAuthType.shared_private_key.value,
+    device_auth_type: Optional[DeviceAuthType] = None,
     root_cert_path: Optional[str] = None,
     root_key_path: Optional[str] = None,
     bundle_output_path: Optional[str] = None,
