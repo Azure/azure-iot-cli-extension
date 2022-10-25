@@ -16,7 +16,7 @@ def state_export(
     hub_aspects=None,
     login: Optional[str] = None,
     auth_type_dataplane: Optional[str] = None,
-    replace: Optional[bool] = False
+    replace: bool = False
 ):
     sp = StateProvider(cmd=cmd, hub=hub_name, rg=resource_group_name, login=login, auth_type_dataplane=auth_type_dataplane)
     sp.save_state(state_file, replace, hub_aspects)
@@ -30,7 +30,7 @@ def state_import(
     hub_aspects=None,
     login: Optional[str] = None,
     auth_type_dataplane: Optional[str] = None,
-    replace: Optional[bool] = False
+    replace: bool = False
 ):
     sp = StateProvider(cmd=cmd, hub=hub_name, rg=resource_group_name, login=login, auth_type_dataplane=auth_type_dataplane)
     sp.upload_state(state_file, replace, hub_aspects)
@@ -46,7 +46,7 @@ def state_migrate(
     orig_resource_group_name: Optional[str] = None,
     orig_hub_login: Optional[str] = None,
     auth_type_dataplane: Optional[str] = None,
-    replace: Optional[bool] = False
+    replace: bool = False
 ):
     sp = StateProvider(cmd=cmd, hub=hub_name, rg=resource_group_name, login=login, auth_type_dataplane=auth_type_dataplane)
     sp.migrate_state(orig_hub, orig_resource_group_name, orig_hub_login, replace, hub_aspects)

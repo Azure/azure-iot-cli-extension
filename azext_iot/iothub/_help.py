@@ -315,6 +315,7 @@ def load_iothub_help():
     ] = """
         type: group
         short-summary: Manage the state of an IoT Hub.
+        long-summary: For more information, see aka.ms/iothubstate
     """
 
     helps[
@@ -326,6 +327,8 @@ def load_iothub_help():
                        The exported state will include: arm template for hub, hub configurations (including ADM
                        configurations and edge deployments), device information (including device identites,
                        device twins, module identities and module twins).
+
+                       For more information, see aka.ms/iothubstate
         examples:
         - name: Export the supported state of the specified hub to the specified file.
           text: >
@@ -354,11 +357,13 @@ def load_iothub_help():
                        the correct permissions. Otherwise the command will fail.
 
                        Private endpoints will be ignored in the import process.
+
+                       For more information, see aka.ms/iothubstate
         examples:
         - name: Import the supported state from the specified file to the specified hub.
           text: >
             az iot hub state import -n {iothub_name} -f {state_filename}
-        - name: Import the supported state from the default file to the specified hub, overwriting the previous state of the hub. All
+        - name: Import the supported state from the specified file to the specified hub, overwriting the previous state of the hub. All
                 certificates, configurations, and devices will be deleted before the new state is uploaded.
           text: >
             az iot hub state import -n {iothub_name} -f {state_filename} -r
@@ -377,7 +382,7 @@ def load_iothub_help():
         "iot hub state migrate"
     ] = """
         type: command
-        short-summary: Copy the state of one hub to another hub without saving to a file.
+        short-summary: Migrate the state of one hub to another hub without saving to a file.
         long-summary: |
                        If the arm aspect is specified, the hub will be created if it does not exist.
 
@@ -391,6 +396,8 @@ def load_iothub_help():
                        Private endpoints will be ignored in the migration process.
 
                        If you have trouble migrating, please use the export and import commands to have a file as a backup.
+
+                       For more information, see aka.ms/iothubstate
         examples:
         - name: Migrate the supported state of the original hub to the destination hub.
           text: >

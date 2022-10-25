@@ -45,7 +45,7 @@ IMMUTABLE_AND_DUPLICATE_MODULE_TWIN_FIELDS = [
 # Enums
 class EndpointType(Enum):
     """
-    Type of the routing endpoint.
+    Type of the message endpoint.
     """
     EventHub = 'eventhub'
     ServiceBusQueue = 'servicebusqueue'

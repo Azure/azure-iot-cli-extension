@@ -1,5 +1,7 @@
 # IoT Hub State Trouble Shooting Guide
 
+This section aims to provide additional help for the command group `az iot hub state` and answers to common questions.
+
 ## Defintions and Expected Behavior
 
 Below is a table mapping aspects to hub properties. Anything that is not included in the list below may not be exported or imported correctly.
@@ -80,6 +82,10 @@ When the replace flag is given for import or migrate, certain hub aspects will b
 | devices        | (Edge and Non-edge) Device Identities, Device Twins, Module Identities, Module Twins | All devices will be deleted.                                     |
 | configurations | ADM configurations and Edge Deployments                                              | All configurations will be deleted.                              |
 
+## Example Export File
+
+For an example of an export file, see https://github.com/Azure/azure-iot-cli-extension/tree/dev/docs/samples/iot_hub_state_export.json. In this file, private and sensitive data has been wiped so this file will not work with `az iot hub state import` but the file should provide an example of the overall structure.
+
 ## Common Issues
 
 If `az iot hub state migrate` does not work, please use `az iot hub state export` with the origin hub followed by `az iot hub state import` with the destination hub. This will result in the same functionality but will also create a file. This will also help pinpoint issues - the information below will refer to export (which includes the export of hub aspects for the origin hub in migrate) and import (which includes the import of hub aspects for the destination hub in migrate).
@@ -106,6 +112,13 @@ If an endpoint has System Identity as the authentication method, the endpoint wi
 2. the service the endpoint is connected to has the correct permissions to the destination hub's system identity.
 
 If either of the above conditions are not met, the endpoint will not be copied over and the command will fail.
+
+To fix this, add the permissions needed for the system assigned identity and rerun the command. If this cannot be done because the hub does not exist yet (or system assigned permissions are not turned on):
+ 1. make a copy of the state you want to import and remove the offending endpoint(s) in your copy
+ 2. run `az iot hub state import` with the copied file
+ 3. check that the hub has been created and system assigned identity is turned on
+ 4. assign the correct permissions for the IoT Hub's system assigned identity to the correct endpoint scope(s)
+ 5. run `az iot hub state import` with the original file (with the endpoint(s)) or create the endpoint manually
 
 ### Private Endpoints
 

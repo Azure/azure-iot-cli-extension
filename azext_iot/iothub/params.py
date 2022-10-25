@@ -264,9 +264,9 @@ def load_iothub_arguments(self, _):
         context.argument(
             "hub_aspects",
             options_list=["--aspects"],
-            nargs="*",
+            nargs="+",
             arg_type=get_enum_type(HubAspects),
-            help="Hub Aspects (space seperated)."
+            help="Hub Aspects (space separated)."
         )
 
     with self.argument_context("iot hub state import") as context:
