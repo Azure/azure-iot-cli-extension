@@ -208,6 +208,11 @@ def load_deviceupdate_help():
           text: >
             az iot du instance create -n {account_name} -i {instance_name} --iothub-ids {iothub_resource_id}
 
+        - name: Create an instance first assigning the 'Azure Device Update' service principal the role of 'IoT Hub Data Contributor'
+            against the IoT Hub resource Id scope(s).
+          text: >
+            az iot du instance create -n {account_name} -i {instance_name} --iothub-ids {iothub_resource_id} --set-du-principal-role
+
         - name: Create an instance with diagnostics enabled, paired with a user provided storage account. Include tags.
           text: >
             az iot du instance create -n {account_name} -i {instance_name} --iothub-ids {iothub_resource_id} --enable-diagnostics

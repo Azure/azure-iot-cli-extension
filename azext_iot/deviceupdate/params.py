@@ -139,6 +139,13 @@ def load_deviceupdate_arguments(self, _):
             options_list=["--diagnostics-storage-id"],
             help="User provided storage account resource Id for use in diagnostic logs collection.",
         )
+        context.argument(
+            "set_du_principal",
+            options_list=["--set-du-principal-role"],
+            arg_type=get_three_state_flag(),
+            help="If enabled, the 'Azure Device Update' service principal will be "
+            "assigned the role of 'IoT Hub Data Contributor' against the on create IoT Hub scope(s).",
+        )
 
     with self.argument_context("iot du update") as context:
         context.argument(
