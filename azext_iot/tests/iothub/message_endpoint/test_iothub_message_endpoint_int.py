@@ -28,8 +28,8 @@ def generate_ep_names(count=1):
     return names
 
 
-def test_iot_eventhub_endpoint_lifecycle(provisioned_event_hub_with_identity_session):
-    iot_hub_obj, event_hub_obj = provisioned_event_hub_with_identity_session
+def test_iot_eventhub_endpoint_lifecycle(provisioned_event_hub_with_identity_module):
+    iot_hub_obj, event_hub_obj = provisioned_event_hub_with_identity_module
 
     iot_hub = iot_hub_obj["name"]
     iot_rg = iot_hub_obj["resourcegroup"]
@@ -165,9 +165,9 @@ def test_iot_eventhub_endpoint_lifecycle(provisioned_event_hub_with_identity_ses
     assert endpoint_list == []
 
 
-def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity_session):
+def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity_module):
     # this test covers two endpoint types
-    iot_hub_obj, servicebus_obj = provisioned_service_bus_with_identity_session
+    iot_hub_obj, servicebus_obj = provisioned_service_bus_with_identity_module
     iot_hub = iot_hub_obj["name"]
     iot_rg = iot_hub_obj["resourcegroup"]
     iot_sub = iot_hub_obj["subscriptionid"]
@@ -444,8 +444,8 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     assert endpoint_list == []
 
 
-def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_session):
-    iot_hub_obj, storage_obj = provisioned_storage_with_identity_session
+def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module):
+    iot_hub_obj, storage_obj = provisioned_storage_with_identity_module
 
     iot_hub = iot_hub_obj["name"]
     iot_rg = iot_hub_obj["resourcegroup"]
@@ -609,8 +609,8 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_sessio
     assert endpoint_list == []
 
 
-def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_session):
-    iot_hub_obj, cosmosdb_obj = provisioned_cosmosdb_with_identity_session
+def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module):
+    iot_hub_obj, cosmosdb_obj = provisioned_cosmosdb_with_identity_module
 
     iot_hub = iot_hub_obj["name"]
     iot_rg = iot_hub_obj["resourcegroup"]

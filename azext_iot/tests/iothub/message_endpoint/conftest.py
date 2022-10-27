@@ -45,25 +45,17 @@ def tags_to_dict(tags: str) -> dict:
     return result
 
 
-@pytest.fixture(scope="session")
-def provisioned_iot_hub_session(request, provisioned_user_identity_session) -> Optional[dict]:
-    result = _iot_hub_provisioner(request, provisioned_user_identity_session)
+@pytest.fixture(scope="module")
+def provisioned_iot_hub_module(request, provisioned_user_identity_module) -> Optional[dict]:
+    result = _iot_hub_provisioner(request, provisioned_user_identity_module)
     yield result
     if result:
         _iot_hub_removal(result["name"])
 
 
-@pytest.fixture(scope="session")
-def provisioned_only_iot_hub_session(request) -> Optional[dict]:
+@pytest.fixture(scope="module")
+def provisioned_only_iot_hub_module(request) -> Optional[dict]:
     result = _iot_hub_provisioner(request)
-    yield result
-    if result:
-        _iot_hub_removal(result["name"])
-
-
-@pytest.fixture
-def provisioned_iot_hub(request, provisioned_user_identity) -> Optional[dict]:
-    result = _iot_hub_provisioner(request, provisioned_user_identity)
     yield result
     if result:
         _iot_hub_removal(result["name"])
@@ -104,16 +96,8 @@ def _iot_hub_removal(name):
         logger.error(f"Failed to delete iot hub resource {name}.")
 
 
-@pytest.fixture(scope="session")
-def provisioned_user_identity_session() -> Optional[dict]:
-    result = _user_identity_provisioner()
-    yield result
-    if result:
-        _user_identity_removal(result["name"])
-
-
-@pytest.fixture
-def provisioned_user_identity() -> Optional[dict]:
+@pytest.fixture(scope="module")
+def provisioned_user_identity_module() -> Optional[dict]:
     result = _user_identity_provisioner()
     yield result
     if result:
@@ -156,40 +140,20 @@ def _assign_rbac_role(assignee: str, scope: str, role: str, max_tries: int = 10)
         tries += 1
 
 
-@pytest.fixture(scope="session")
-def provisioned_storage_with_identity_session(request, provisioned_iot_hub_session, provisioned_storage_session):
+@pytest.fixture(scope="module")
+def provisioned_storage_with_identity_module(request, provisioned_iot_hub_module, provisioned_storage_module):
     role = "Storage Blob Data Contributor"
-    scope = provisioned_storage_session["storage"]["id"]
-    hub_principal_id = provisioned_iot_hub_session["identity"]["principalId"]
-    user_identities = list(provisioned_iot_hub_session["identity"]["userAssignedIdentities"].values())
+    scope = provisioned_storage_module["storage"]["id"]
+    hub_principal_id = provisioned_iot_hub_module["identity"]["principalId"]
+    user_identities = list(provisioned_iot_hub_module["identity"]["userAssignedIdentities"].values())
     user_id = user_identities[0]["principalId"]
     _assign_rbac_role(assignee=hub_principal_id, scope=scope, role=role)
     _assign_rbac_role(assignee=user_id, scope=scope, role=role)
-    yield provisioned_iot_hub_session, provisioned_storage_session
+    yield provisioned_iot_hub_module, provisioned_storage_module
 
 
-@pytest.fixture()
-def provisioned_storage_with_identity(provisioned_iot_hub, provisioned_storage):
-    role = "Storage Blob Data Contributor"
-    scope = provisioned_storage["storage"]["id"]
-    hub_principal_id = provisioned_iot_hub["identity"]["principalId"]
-    user_identities = list(provisioned_iot_hub["identity"]["userAssignedIdentities"].values())
-    user_id = user_identities[0]["principalId"]
-    _assign_rbac_role(assignee=hub_principal_id, scope=scope, role=role)
-    _assign_rbac_role(assignee=user_id, scope=scope, role=role)
-    yield provisioned_iot_hub, provisioned_storage
-
-
-@pytest.fixture(scope="session")
-def provisioned_storage_session() -> Optional[dict]:
-    result = _storage_provisioner()
-    yield result
-    if result:
-        _storage_removal(result["storage"]["name"])
-
-
-@pytest.fixture
-def provisioned_storage() -> Optional[dict]:
+@pytest.fixture(scope="module")
+def provisioned_storage_module() -> Optional[dict]:
     result = _storage_provisioner()
     yield result
     if result:
@@ -255,40 +219,20 @@ def _storage_removal(account_name: str):
         logger.error(f"Failed to delete storage account resource {account_name}.")
 
 
-@pytest.fixture(scope="session")
-def provisioned_event_hub_with_identity_session(provisioned_iot_hub_session, provisioned_event_hub_session):
+@pytest.fixture(scope="module")
+def provisioned_event_hub_with_identity_module(provisioned_iot_hub_module, provisioned_event_hub_module):
     role = "Azure Event Hubs Data Sender"
-    scope = provisioned_event_hub_session["eventhub"]["id"]
-    hub_principal_id = provisioned_iot_hub_session["identity"]["principalId"]
-    user_identities = list(provisioned_iot_hub_session["identity"]["userAssignedIdentities"].values())
+    scope = provisioned_event_hub_module["eventhub"]["id"]
+    hub_principal_id = provisioned_iot_hub_module["identity"]["principalId"]
+    user_identities = list(provisioned_iot_hub_module["identity"]["userAssignedIdentities"].values())
     user_id = user_identities[0]["principalId"]
     _assign_rbac_role(assignee=hub_principal_id, scope=scope, role=role)
     _assign_rbac_role(assignee=user_id, scope=scope, role=role)
-    yield provisioned_iot_hub_session, provisioned_event_hub_session
+    yield provisioned_iot_hub_module, provisioned_event_hub_module
 
 
-@pytest.fixture()
-def provisioned_event_hub_with_identity(provisioned_iot_hub, provisioned_event_hub):
-    role = "Azure Event Hubs Data Sender"
-    scope = provisioned_event_hub["eventhub"]["id"]
-    hub_principal_id = provisioned_iot_hub["identity"]["principalId"]
-    user_identities = list(provisioned_iot_hub["identity"]["userAssignedIdentities"].values())
-    user_id = user_identities[0]["principalId"]
-    _assign_rbac_role(assignee=hub_principal_id, scope=scope, role=role)
-    _assign_rbac_role(assignee=user_id, scope=scope, role=role)
-    yield provisioned_iot_hub, provisioned_event_hub
-
-
-@pytest.fixture(scope="session")
-def provisioned_event_hub_session() -> Optional[list]:
-    result = _event_hub_provisioner()
-    yield result
-    if result:
-        _event_hub_removal(result["namespace"]["name"])
-
-
-@pytest.fixture
-def provisioned_event_hub() -> Optional[list]:
+@pytest.fixture(scope="module")
+def provisioned_event_hub_module() -> Optional[list]:
     result = _event_hub_provisioner()
     yield result
     if result:
@@ -343,31 +287,23 @@ def _event_hub_removal(account_name: str):
         logger.error(f"Failed to delete eventhubs namespace resource {account_name}.")
 
 
-@pytest.fixture(scope="session")
-def provisioned_service_bus_with_identity_session(provisioned_iot_hub_session, provisioned_service_bus_session):
+@pytest.fixture(scope="module")
+def provisioned_service_bus_with_identity_module(provisioned_iot_hub_module, provisioned_service_bus_module):
     role = "Azure Service Bus Data Sender"
-    queue_scope = provisioned_service_bus_session["queue"]["id"]
-    topic_scope = provisioned_service_bus_session["topic"]["id"]
-    hub_principal_id = provisioned_iot_hub_session["identity"]["principalId"]
-    user_identities = list(provisioned_iot_hub_session["identity"]["userAssignedIdentities"].values())
+    queue_scope = provisioned_service_bus_module["queue"]["id"]
+    topic_scope = provisioned_service_bus_module["topic"]["id"]
+    hub_principal_id = provisioned_iot_hub_module["identity"]["principalId"]
+    user_identities = list(provisioned_iot_hub_module["identity"]["userAssignedIdentities"].values())
     user_id = user_identities[0]["principalId"]
     _assign_rbac_role(assignee=hub_principal_id, scope=queue_scope, role=role)
     _assign_rbac_role(assignee=user_id, scope=queue_scope, role=role)
     _assign_rbac_role(assignee=hub_principal_id, scope=topic_scope, role=role)
     _assign_rbac_role(assignee=user_id, scope=topic_scope, role=role)
-    yield provisioned_iot_hub_session, provisioned_service_bus_session
+    yield provisioned_iot_hub_module, provisioned_service_bus_module
 
 
-@pytest.fixture(scope="session")
-def provisioned_service_bus_session() -> Optional[list]:
-    result = _service_bus_provisioner()
-    yield result
-    if result:
-        _service_bus_removal(result["namespace"]["name"])
-
-
-@pytest.fixture
-def provisioned_service_bus() -> Optional[list]:
+@pytest.fixture(scope="module")
+def provisioned_service_bus_module() -> Optional[list]:
     result = _service_bus_provisioner()
     yield result
     if result:
@@ -449,17 +385,17 @@ def _service_bus_removal(account_name: str):
         logger.error(f"Failed to delete servicebus namespace resource {account_name}.")
 
 
-@pytest.fixture(scope="session")
-def provisioned_cosmosdb_with_identity_session(provisioned_iot_hub_session, provisioned_cosmos_db_session):
+@pytest.fixture(scope="module")
+def provisioned_cosmosdb_with_identity_module(provisioned_iot_hub_module, provisioned_cosmos_db_module):
     role = "Cosmos DB Built-in Data Reader"
-    cosmosdb_rg = provisioned_cosmos_db_session["cosmosdb"]["resourceGroup"]
-    cosmosdb_account = provisioned_cosmos_db_session["cosmosdb"]["name"]
-    hub_principal_id = provisioned_iot_hub_session["identity"]["principalId"]
-    user_identities = list(provisioned_iot_hub_session["identity"]["userAssignedIdentities"].values())
+    cosmosdb_rg = provisioned_cosmos_db_module["cosmosdb"]["resourceGroup"]
+    cosmosdb_account = provisioned_cosmos_db_module["cosmosdb"]["name"]
+    hub_principal_id = provisioned_iot_hub_module["identity"]["principalId"]
+    user_identities = list(provisioned_iot_hub_module["identity"]["userAssignedIdentities"].values())
     user_id = user_identities[0]["principalId"]
     assign_cosmos_db_role(principal_id=hub_principal_id, cosmos_db_account=cosmosdb_account, role=role, rg=cosmosdb_rg)
     assign_cosmos_db_role(principal_id=user_id, cosmos_db_account=cosmosdb_account, role=role, rg=cosmosdb_rg)
-    yield provisioned_iot_hub_session, provisioned_cosmos_db_session
+    yield provisioned_iot_hub_module, provisioned_cosmos_db_module
 
 
 def assign_cosmos_db_role(principal_id: str, role: str, cosmos_db_account: str, rg: str):
@@ -470,16 +406,8 @@ def assign_cosmos_db_role(principal_id: str, role: str, cosmos_db_account: str, 
     )
 
 
-@pytest.fixture(scope="session")
-def provisioned_cosmos_db_session() -> Optional[list]:
-    result = _cosmos_db_provisioner()
-    yield result
-    if result:
-        _cosmos_db_removal(result["cosmosdb"]["name"])
-
-
-@pytest.fixture
-def provisioned_cosmos_db() -> Optional[list]:
+@pytest.fixture(scope="module")
+def provisioned_cosmos_db_module() -> Optional[list]:
     result = _cosmos_db_provisioner()
     yield result
     if result:
@@ -504,9 +432,10 @@ def _cosmos_db_provisioner():
     database_name = generate_hub_depenency_id()
     collection_name = generate_hub_depenency_id()
     partition_key_path = "/test"
+    location = "eastus"
     cosmos_obj = cli.invoke(
-        "cosmosdb create --name {} --resource-group {}".format(
-            account_name, RG
+        "cosmosdb create --name {} --resource-group {} --locations regionName={} failoverPriority=0".format(
+            account_name, RG, location
         )
     ).as_json()
 

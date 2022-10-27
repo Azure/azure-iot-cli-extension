@@ -24,17 +24,17 @@ def generate_names(prefix: str = "", count: int = 1):
 
 
 @pytest.mark.hub_infrastructure(desired_tags="test=message_route")
-def test_route_lifecycle(provisioned_only_iot_hub_session, provisioned_event_hub_session):
-    iot_hub = provisioned_only_iot_hub_session["name"]
-    iot_rg = provisioned_only_iot_hub_session["resourcegroup"]
+def test_route_lifecycle(provisioned_only_iot_hub_module, provisioned_event_hub_module):
+    iot_hub = provisioned_only_iot_hub_module["name"]
+    iot_rg = provisioned_only_iot_hub_module["resourcegroup"]
 
     # make a route of every kind
     route_names = generate_names(prefix="route", count=6)
     built_in_endpoint = "events"
     endpoint_name = generate_names(prefix="ep")[0]
-    eventhub_cs = provisioned_event_hub_session["connectionString"]
+    eventhub_cs = provisioned_event_hub_module["connectionString"]
 
-    # Custom endpoint must exist
+    # Custom endpoint must exist - TODO: hide the error message from the pytest logs
     result = cli.invoke(
         "iot hub message-route create -n {} -g {} --rn {} --en {} -t {}".format(
             iot_hub, iot_rg, route_names[0], endpoint_name, RouteSourceType.DeviceMessages.value
@@ -365,9 +365,9 @@ def test_route_lifecycle(provisioned_only_iot_hub_session, provisioned_event_hub
 
 
 @pytest.mark.hub_infrastructure(desired_tags="test=message_route")
-def test_route_fallback_lifecycle(provisioned_only_iot_hub_session):
-    iot_hub = provisioned_only_iot_hub_session["name"]
-    iot_rg = provisioned_only_iot_hub_session["resourcegroup"]
+def test_route_fallback_lifecycle(provisioned_only_iot_hub_module):
+    iot_hub = provisioned_only_iot_hub_module["name"]
+    iot_rg = provisioned_only_iot_hub_module["resourcegroup"]
     fallback_name = "$fallback"
 
     expected_fallback_route = build_expected_route(

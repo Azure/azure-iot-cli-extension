@@ -47,7 +47,9 @@ def load_iothub_commands(self, _):
         cmd_group.show_command("show", "get_digital_twin")
         cmd_group.command("update", "patch_digital_twin")
 
-    with self.command_group("iot hub message-endpoint", command_type=iothub_message_endpoint_ops) as cmd_group:
+    with self.command_group(
+        "iot hub message-endpoint", command_type=iothub_message_endpoint_ops, is_preview=True
+    ) as cmd_group:
         cmd_group.show_command("show", "message_endpoint_show")
         cmd_group.command("list", "message_endpoint_list")
         cmd_group.command(
@@ -87,7 +89,9 @@ def load_iothub_commands(self, _):
             transform=EndpointUpdateResultTransform(self.cli_ctx)
         )
 
-    with self.command_group('iot hub message-route', command_type=iothub_message_route_ops) as cmd_group:
+    with self.command_group(
+        'iot hub message-route', command_type=iothub_message_route_ops, is_preview=True
+    ) as cmd_group:
         cmd_group.command(
             'create', 'message_route_create', transform=RouteUpdateResultTransform(self.cli_ctx)
         )
