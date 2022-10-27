@@ -8,7 +8,6 @@ from os import getcwd, makedirs
 from os.path import exists
 from shutil import rmtree
 from azext_iot.common.certops import (
-    CertInfo,
     create_root_certificate,
     create_self_signed_certificate,
     create_signed_cert,
@@ -25,7 +24,7 @@ from azext_iot.constants import (
 )
 from tqdm import tqdm
 from time import sleep
-from typing import Any, Dict, List, NamedTuple
+from typing import Dict, List
 from knack.log import get_logger
 from typing import Optional
 from azext_iot._factory import SdkResolver
@@ -33,6 +32,9 @@ from azext_iot.common.shared import (
     ConfigType,
     DeviceAuthType,
     SdkType,
+    EdgeContainerAuth,
+    NestedEdgeDeviceConfig,
+    NestedEdgeConfig
 )
 from azext_iot.iothub.providers.base import IoTHubProvider
 from azext_iot.common.utility import (
@@ -54,41 +56,12 @@ from azext_iot.operations.hub import (
     _assemble_device,
     _process_config_content,
 )
-from azext_iot.sdk.iothub.service.models.configuration_content_py3 import (
+from azext_iot.sdk.iothub.service.models import (
     ConfigurationContent,
 )
 from azext_iot.sdk.iothub.service.models import Device
 
 logger = get_logger(__name__)
-
-
-# Utility classes for edge config file values and device arguments
-
-
-class EdgeContainerAuth(NamedTuple):
-    serveraddress: Optional[str] = None
-    username: Optional[str] = None
-    password: Optional[str] = None
-
-
-class NestedEdgeDeviceConfig(NamedTuple):
-    device_id: str
-    deployment: Optional[ConfigurationContent] = None
-    config: Optional[Any] = None
-    parent_id: Optional[str] = None
-    hostname: Optional[str] = None
-    parent_hostname: Optional[str] = None
-    edge_agent: Optional[str] = None
-    container_auth: Optional[EdgeContainerAuth] = None
-
-
-class NestedEdgeConfig(NamedTuple):
-    version: str
-    auth_method: DeviceAuthType
-    root_cert: CertInfo
-    devices: List[NestedEdgeDeviceConfig]
-    template_config_path: Optional[str] = None
-    default_edge_agent: Optional[str] = None
 
 
 class DeviceIdentityProvider(IoTHubProvider):

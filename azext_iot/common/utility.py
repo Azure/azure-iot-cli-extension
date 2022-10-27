@@ -188,7 +188,7 @@ def process_toml_content(path: str) -> Dict[str, Any]:
     try:
         import toml
 
-        with open(path, "rt") as f:
+        with open(path, "rt", encoding="utf-8") as f:
             return toml.load(f)
     except Exception as ex:
         raise InvalidArgumentValueError(

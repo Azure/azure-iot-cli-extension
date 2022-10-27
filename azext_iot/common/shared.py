@@ -10,6 +10,8 @@ shared: Define shared data types(enums); hub and dps connection string functions
 """
 
 from enum import Enum
+from typing import NamedTuple, Optional, Any, TypedDict, List
+from azext_iot.sdk.iothub.service.models import ConfigurationContent
 
 
 class SdkType(Enum):
@@ -263,6 +265,7 @@ class IoTDPSStateType(Enum):
     """
     IoT Hub Device Provisioning Service State Property
     """
+
     Activating = "Activating"
     ActivationFailed = "ActivationFailed"
     Active = "Active"
@@ -279,12 +282,13 @@ class IoTDPSStateType(Enum):
 
 class ConnectionStringParser(Enum):
     """
-        All connection string parser with respective functions
+    All connection string parser with respective functions
     """
+
     from azext_iot.common._azure import (
         parse_iot_device_connection_string,
         parse_iot_device_module_connection_string,
-        parse_iot_hub_connection_string
+        parse_iot_hub_connection_string,
     )
 
     Module = parse_iot_device_module_connection_string
@@ -296,6 +300,7 @@ class DiscoveryResourceType(Enum):
     """
     Resource types supported by discovery.
     """
+
     IoTHub = "IoT Hub"
     DPS = "IoT Hub Device Provisioning Service"
 
@@ -304,5 +309,43 @@ class SHAHashVersions(Enum):
     """
     Supported SHA types for generating the certificate thumbprint.
     """
+
     SHA1 = 1
     SHA256 = 256
+
+
+class CertInfo(TypedDict):
+    """
+    Typed Dict for certificate, thumbprint, and private key return type
+    """
+
+    certificate: str
+    privateKey: str
+    thumbprint: str
+
+
+# Utility classes for nested edge config file values and device arguments
+class EdgeContainerAuth(NamedTuple):
+    serveraddress: Optional[str] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+
+
+class NestedEdgeDeviceConfig(NamedTuple):
+    device_id: str
+    deployment: Optional[ConfigurationContent] = None
+    config: Optional[Any] = None
+    parent_id: Optional[str] = None
+    hostname: Optional[str] = None
+    parent_hostname: Optional[str] = None
+    edge_agent: Optional[str] = None
+    container_auth: Optional[EdgeContainerAuth] = None
+
+
+class NestedEdgeConfig(NamedTuple):
+    version: str
+    auth_method: DeviceAuthType
+    root_cert: CertInfo
+    devices: List[NestedEdgeDeviceConfig]
+    template_config_path: Optional[str] = None
+    default_edge_agent: Optional[str] = None

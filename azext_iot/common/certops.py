@@ -11,20 +11,14 @@ certops: Functions for working with certificates.
 import datetime
 from os.path import exists
 import base64
-from typing import List, Optional, TypedDict
+from typing import List, Optional
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
 from azext_iot.common.fileops import write_content_to_file
-from azext_iot.common.shared import SHAHashVersions
+from azext_iot.common.shared import SHAHashVersions, CertInfo
 from azure.cli.core.azclierror import FileOperationError
-
-
-class CertInfo(TypedDict):
-    certificate: str
-    privateKey: str
-    thumbprint: str
 
 
 def create_self_signed_certificate(

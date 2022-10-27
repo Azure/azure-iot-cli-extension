@@ -8,9 +8,10 @@ import pytest
 import tarfile
 from os.path import exists
 from azext_iot.tests.iothub import IoTLiveScenarioTest
-from azext_iot.iothub.providers.device_identity import (
+from azext_iot.common.shared import (
     EdgeContainerAuth,
 )
+
 
 @pytest.mark.usefixtures("set_cwd")
 class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
@@ -104,7 +105,7 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
             (
                 "device_7",
                 None,
-                None, 
+                None,
                 "device_7",
                 "mcr.microsoft.com/azureiotedge-agent:1.2",
                 EdgeContainerAuth(
@@ -228,10 +229,8 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
                         "config.toml",
                         "install.sh",
                         "README.md"
-                        
                     ]:
                         assert item in file_names
-                
                     # TODO - config checks
 
     def _generate_device_arg_string(self, devices):

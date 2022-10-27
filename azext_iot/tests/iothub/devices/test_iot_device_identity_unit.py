@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from os.path import exists, join
-from azext_iot.common.certops import CertInfo, create_root_certificate
+from azext_iot.common.certops import create_root_certificate
 from azext_iot.common.fileops import write_content_to_file
 from azext_iot.common.shared import DeviceAuthType
 from azext_iot.common.utility import process_json_arg, process_yaml_arg
@@ -18,8 +18,8 @@ import json
 import responses
 import re
 from azext_iot.iothub import commands_device_identity as subject
-from azext_iot.iothub.providers.device_identity import (
-    DeviceIdentityProvider,
+from azext_iot.iothub.providers.device_identity import DeviceIdentityProvider
+from azext_iot.common.shared import (
     EdgeContainerAuth,
     NestedEdgeConfig,
     NestedEdgeDeviceConfig,
@@ -39,9 +39,9 @@ hub_name = "myhub"
 hub_entity = mock_target["entity"]
 resource_group_name = "RESOURCEGROUP"
 mock_container_auth = {
-    'serveraddress':'serveraddress',
-    'username':'username',
-    'password':'password'
+    "serveraddress": "serveraddress",
+    "username": "username",
+    "password": "password",
 }
 
 
@@ -110,9 +110,7 @@ class TestEdgeHierarchyCreateArgs:
         # Update config content / set modules
         mocked_response.add(
             method=responses.POST,
-            url=re.compile(
-                r"{}/dev\d+/applyConfigurationContent".format(devices_url)
-            ),
+            url=re.compile(r"{}/dev\d+/applyConfigurationContent".format(devices_url)),
             body="{}",
             status=200,
             content_type="application/json",
@@ -136,14 +134,14 @@ class TestEdgeHierarchyCreateArgs:
                         "hostname=device-hostname",
                         "deployment=hierarchy_configs/deploymentTopLayer.json",
                         "edge_agent=my-edge-agent",
-                        f"container_auth={json.dumps(mock_container_auth)}"
+                        f"container_auth={json.dumps(mock_container_auth)}",
                     ],
                     [
                         "id=dev5",
                         "hostname=device-hostname",
                         "deployment=hierarchy_configs/deploymentTopLayer.json",
                         "edge_agent=my-edge-agent",
-                        f"container_auth=hierarchy_configs/fake_edge_container_auth.json"
+                        "container_auth=hierarchy_configs/fake_edge_container_auth.json",
                     ],
                 ],
                 None,
@@ -505,7 +503,6 @@ class TestEdgeHierarchyConfigFunctions:
             overwrite=True,
         )
         return root_cert
-       
 
     test_device_id = "test_device_id"
     device_config_with_parent_no_agent = NestedEdgeDeviceConfig(
@@ -826,4 +823,4 @@ class TestEdgeHierarchyConfigFunctions:
     def test_process_nested_edge_config_errors(self, fixture_ghcs, content, error):
         provider = DeviceIdentityProvider(fixture_cmd, hub_name, resource_group_name)
         with pytest.raises(error):
-            result = provider._process_nested_edge_config_file_content(content)
+            provider._process_nested_edge_config_file_content(content)

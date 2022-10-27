@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from azure.cli.core.commands.parameters import get_enum_type, get_three_state_flag
-from azext_iot.common.shared import DeviceAuthApiType, DeviceAuthType, SettleType, ProtocolType, AckType
+from azext_iot.common.shared import DeviceAuthType, SettleType, ProtocolType, AckType
 from azext_iot.assets.user_messages import info_param_properties_device
 from azext_iot._params import hub_auth_type_dataplane_param_type
 from azext_iot.iothub._validators import validate_device_model_id
@@ -42,14 +42,14 @@ def load_iothub_arguments(self, _):
             type=int,
             options_list=["--connect-timeout", "--cto"],
             help="Maximum interval of time, in seconds, that IoT Hub will attempt to connect to the device.",
-            arg_group="Timeout"
+            arg_group="Timeout",
         )
         context.argument(
             "response_timeout",
             type=int,
             options_list=["--response-timeout", "--rto"],
             help="Maximum interval of time, in seconds, that the digital twin command will wait for the result.",
-            arg_group="Timeout"
+            arg_group="Timeout",
         )
 
     with self.argument_context("iot device") as context:
@@ -254,49 +254,55 @@ def load_iothub_arguments(self, _):
             nargs="+",
             action="append",
             help="Space-separated key=value pairs corresponding to properties of the edge device to create. "
-            "--device can be used 1 or more times. "
+            "--device can be used 1 or more times. ",
         )
         context.argument(
             "clean",
             options_list=["--clean", "-c"],
             arg_type=get_three_state_flag(),
-            help="Deletes all devices in target hub before creating new hierarchy."
+            help="Deletes all devices in target hub before creating new hierarchy.",
         )
         context.argument(
             "visualize",
             options_list=["--visualize", "--vis", "-v"],
             arg_type=get_three_state_flag(),
             help="Shows visualizations of device hierarchy and progress of various tasks "
-            "(device creation, setting parents, updating configs, etc)."
+            "(device creation, setting parents, updating configs, etc).",
         )
         context.argument(
             "config_file",
             options_list=["--config-file", "--config", "--cfg"],
-            help="Path to device hierarchy config file"
+            help="Path to device hierarchy config file",
         )
         context.argument(
             "device_auth_type",
             arg_type=get_enum_type(
-                [
-                    DeviceAuthType.shared_private_key,
-                    DeviceAuthType.x509_ca
-                ]
+                [DeviceAuthType.shared_private_key, DeviceAuthType.x509_ca]
             ),
-            options_list=["--device-auth-type", "--device-auth",],
-            help="Device to hub authorization mechanism."
+            options_list=["--device-auth-type", "--device-auth"],
+            help="Device to hub authorization mechanism.",
         )
         context.argument(
             "bundle_output_path",
-            options_list=["--output-path", "--out",],
-            help="Path to output device bundle files."
+            options_list=[
+                "--output-path",
+                "--out",
+            ],
+            help="Path to output device bundle files.",
         )
         context.argument(
             "root_cert_path",
-            options_list=["--root-cert", "--rc",],
-            help="Path to root public key certificate to sign nested edge device certs."
+            options_list=[
+                "--root-cert",
+                "--rc",
+            ],
+            help="Path to root public key certificate to sign nested edge device certs.",
         )
         context.argument(
             "root_key_path",
-            options_list=["--root-key", "--rk",],
-            help="Path to root private key to sign nested edge device certs."
+            options_list=[
+                "--root-key",
+                "--rk",
+            ],
+            help="Path to root private key to sign nested edge device certs.",
         )

@@ -35,10 +35,14 @@ path_iot_hub_monitor_events_entrypoint = (
     "azext_iot.operations.hub._iot_hub_monitor_events"
 )
 path_iot_device_show = "azext_iot.operations.hub._iot_device_show"
-path_device_messaging_iot_device_show = "azext_iot.iothub.providers.device_messaging._iot_device_show"
+path_device_messaging_iot_device_show = (
+    "azext_iot.iothub.providers.device_messaging._iot_device_show"
+)
 path_update_device_twin = "azext_iot.operations.hub._iot_device_twin_update"
 hub_entity = "myhub.azure-devices.net"
-path_iot_service_provisioning_factory = "azext_iot._factory.iot_service_provisioning_factory"
+path_iot_service_provisioning_factory = (
+    "azext_iot._factory.iot_service_provisioning_factory"
+)
 path_gdcs = "azext_iot.dps.providers.discovery.DPSDiscovery.get_target"
 path_discovery_dps_init = (
     "azext_iot.dps.providers.discovery.DPSDiscovery._initialize_client"
@@ -60,19 +64,16 @@ mock_target["resourcegroup"] = "myresourcegroup"
 
 # Mock Iot DPS Target
 mock_dps_target = {}
-mock_dps_target['cs'] = 'HostName=mydps;SharedAccessKeyName=name;SharedAccessKey=value'
-mock_dps_target['entity'] = 'mydps'
-mock_dps_target['primarykey'] = 'rJx/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo='
-mock_dps_target['secondarykey'] = 'aCd/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo='
-mock_dps_target['policy'] = 'provisioningserviceowner'
-mock_dps_target['subscription'] = "5952cff8-bcd1-4235-9554-af2c0348bf23"
+mock_dps_target["cs"] = "HostName=mydps;SharedAccessKeyName=name;SharedAccessKey=value"
+mock_dps_target["entity"] = "mydps"
+mock_dps_target["primarykey"] = "rJx/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo="
+mock_dps_target["secondarykey"] = "aCd/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo="
+mock_dps_target["policy"] = "provisioningserviceowner"
+mock_dps_target["subscription"] = "5952cff8-bcd1-4235-9554-af2c0348bf23"
 
 mock_symmetric_key_attestation = {
     "type": "symmetricKey",
-    "symmetricKey": {
-        "primaryKey": "primary_key",
-        "secondaryKey": "secondary_key"
-    },
+    "symmetricKey": {"primaryKey": "primary_key", "secondaryKey": "secondary_key"},
 }
 
 generic_cs_template = "HostName={};SharedAccessKeyName={};SharedAccessKey={}"
@@ -428,18 +429,18 @@ def fixture_gdcs(mocker):
 
 @pytest.fixture()
 def fixture_dps_sas(mocker):
-    r = SasTokenAuthentication(mock_dps_target['entity'],
-                               mock_dps_target['policy'],
-                               mock_dps_target['primarykey'])
+    r = SasTokenAuthentication(
+        mock_dps_target["entity"],
+        mock_dps_target["policy"],
+        mock_dps_target["primarykey"],
+    )
     sas = mocker.patch(path_sas)
     sas.return_value = r
 
 
 @pytest.fixture
 def patch_certificate_open(mocker):
-    patch = mocker.patch(
-        "azext_iot.operations.dps.open_certificate"
-    )
+    patch = mocker.patch("azext_iot.operations.dps.open_certificate")
     patch.return_value = ""
     return patch
 
@@ -450,7 +451,7 @@ def patch_create_edge_root_cert(mocker):
         "azext_iot.iothub.providers.device_identity.create_root_certificate",
     )
     patch.return_value = {
-        "certificate":"root_certificate",
+        "certificate": "root_certificate",
         "privateKey": "root_private_key",
         "thumbprint": "root_thumbprint",
     }

@@ -163,7 +163,7 @@ Each device must have IoT Edge (must be v1.2 or later) installed. Pick the [supp
 
 # Steps
 
-1. After install and configure IoT Edge to Azure IoT Hub or Azure IoT Central, copy the zip file for each device created, named [[device-id]].zip. 
+1. After install and configure IoT Edge to Azure IoT Hub or Azure IoT Central, copy the zip file for each device created, named [[device-id]].zip.
 2. Transfer each zip to its respective device. A good option for this is to use [scp](https://man7.org/linux/man-pages/man1/scp.1.html).
 3. Unzip the zip file by running following commands
 

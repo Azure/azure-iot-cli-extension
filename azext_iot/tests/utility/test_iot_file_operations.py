@@ -57,4 +57,3 @@ class TestFileOperations(object):
                     os.rmdir(tarfile_path)
         except Exception as ex:
             assert (error and isinstance(ex, error))
-
