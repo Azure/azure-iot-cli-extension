@@ -1,5 +1,5 @@
 {
     "servername": "servername",
     "username": "username",
-    "password": "password"
+    "password": "$credential$"
 }

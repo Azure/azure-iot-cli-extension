@@ -41,7 +41,7 @@ resource_group_name = "RESOURCEGROUP"
 mock_container_auth = {
     "serveraddress": "serveraddress",
     "username": "username",
-    "password": "password",
+    "password": "$credential$",
 }
 
 

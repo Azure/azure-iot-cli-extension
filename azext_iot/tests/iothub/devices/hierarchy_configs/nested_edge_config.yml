@@ -38,4 +38,4 @@ edgedevices:
     container_auth:
       serverAddress: 'mcr.microsoft.com'
       username: 'test-user'
-      password: 'secretpassword'
+      password: '$credential$'

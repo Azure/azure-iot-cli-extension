@@ -109,7 +109,7 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
                 "device_7",
                 "mcr.microsoft.com/azureiotedge-agent:1.2",
                 EdgeContainerAuth(
-                    serveraddress='mcr.microsoft.com', username='test-user', password='secretpassword'
+                    serveraddress='mcr.microsoft.com', username='test-user', password='$credential$'
                 )
             ),
         ]
