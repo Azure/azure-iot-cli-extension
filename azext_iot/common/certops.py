@@ -11,13 +11,13 @@ certops: Functions for working with certificates.
 import datetime
 from os.path import exists
 import base64
-from typing import List, Optional
+from typing import Dict, List, Optional
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
 from azext_iot.common.fileops import write_content_to_file
-from azext_iot.common.shared import SHAHashVersions, CertInfo
+from azext_iot.common.shared import SHAHashVersions
 from azure.cli.core.azclierror import FileOperationError
 
 
@@ -28,7 +28,7 @@ def create_self_signed_certificate(
     cert_only: bool = False,
     file_prefix: str = None,
     sha_version: int = SHAHashVersions.SHA1.value,
-) -> CertInfo:
+) -> Dict[str, str]:
     """
     Function used to create a basic self-signed certificate with no extensions.
 
@@ -102,11 +102,11 @@ def create_self_signed_certificate(
                 overwrite=True,
             )
 
-    result = CertInfo(
-        certificate=cert_dump,
-        privateKey=key_dump,
-        thumbprint=thumbprint,
-    )
+    result = {
+        "certificate": cert_dump,
+        "privateKey": key_dump,
+        "thumbprint": thumbprint,
+    }
 
     return result
 
@@ -140,8 +140,8 @@ def open_certificate(certificate_path: str) -> str:
 def create_root_certificate(
     subject: Optional[str] = "Azure_IoT_CLI_Extension_Cert",
     valid_days: Optional[int] = 365,
-    key_size: Optional[int] = 4096
-) -> CertInfo:
+    key_size: Optional[int] = 4096,
+) -> Dict[str, str]:
     key = rsa.generate_private_key(public_exponent=65537, key_size=key_size)
 
     subject_name = x509.Name(
@@ -174,7 +174,9 @@ def create_root_certificate(
         .public_key(key.public_key())
         .serial_number(x509.random_serial_number())
         .not_valid_before(datetime.datetime.utcnow())
-        .not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=valid_days))
+        .not_valid_after(
+            datetime.datetime.utcnow() + datetime.timedelta(days=valid_days)
+        )
         .add_extension(subject_key_id, critical=False)
         .add_extension(authority_key_id, critical=False)
         .add_extension(basic, critical=True)
@@ -183,17 +185,21 @@ def create_root_certificate(
     )
     certificate = cert.public_bytes(serialization.Encoding.PEM).decode("utf-8").rstrip()
     thumbprint = cert.fingerprint(hashes.SHA256()).hex().upper()
-    private_key = key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.TraditionalOpenSSL,
-        encryption_algorithm=serialization.NoEncryption(),
-    ).decode("utf-8").rstrip()
-
-    return CertInfo(
-        certificate=certificate,
-        privateKey=private_key,
-        thumbprint=thumbprint,
+    private_key = (
+        key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+        .decode("utf-8")
+        .rstrip()
     )
+
+    return {
+        "certificate": certificate,
+        "privateKey": private_key,
+        "thumbprint": thumbprint,
+    }
 
 
 # TODO - Unit test, compare with test_utils::_generate_device_certificate
@@ -204,7 +210,7 @@ def create_signed_cert(
     cert_output_dir: Optional[str] = None,
     cert_file: Optional[str] = None,
     valid_days: Optional[int] = 365,
-) -> CertInfo:
+) -> Dict[str, str]:
 
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=4096)
     ca_public_key = ca_public.encode("utf-8")
@@ -247,7 +253,9 @@ def create_signed_cert(
         .public_key(csr.public_key())
         .serial_number(x509.random_serial_number())
         .not_valid_before(datetime.datetime.utcnow())
-        .not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=valid_days))
+        .not_valid_after(
+            datetime.datetime.utcnow() + datetime.timedelta(days=valid_days)
+        )
         .add_extension(subject_key_id, False)
         .add_extension(authority_key_id, False)
         .add_extension(basic_constraints, True)
@@ -273,12 +281,14 @@ def create_signed_cert(
             destination=cert_output_dir,
             file_name=f"{cert_file or subject}.key.pem",
         )
-    return CertInfo(
-        certificate=certificate, thumbprint=thumbprint, privateKey=privateKey
-    )
+    return {
+        "certificate": certificate,
+        "thumbprint": thumbprint,
+        "privateKey": privateKey,
+    }
 
 
-def load_ca_cert_info(cert_path: str, key_path: str) -> CertInfo:
+def load_ca_cert_info(cert_path: str, key_path: str) -> Dict[str, str]:
     for path in [cert_path, key_path]:
         if not exists(path):
             raise FileOperationError(
@@ -288,11 +298,12 @@ def load_ca_cert_info(cert_path: str, key_path: str) -> CertInfo:
     cert = open_certificate(cert_path).encode("utf-8")
     certificate = x509.load_pem_x509_certificate(cert)
     thumbprint = certificate.fingerprint(hashes.SHA256()).hex().upper()
-    return CertInfo(
-        certificate=certificate.public_bytes(serialization.Encoding.PEM).decode("utf-8").rstrip(),
-        thumbprint=thumbprint,
-        privateKey=key,
-    )
+    cert_dump = certificate.public_bytes(serialization.Encoding.PEM).decode("utf-8").rstrip()
+    return {
+        "certificate": cert_dump,
+        "thumbprint": thumbprint,
+        "privateKey": key,
+    }
 
 
 def make_cert_chain(

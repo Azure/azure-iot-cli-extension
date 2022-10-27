@@ -10,7 +10,7 @@ shared: Define shared data types(enums); hub and dps connection string functions
 """
 
 from enum import Enum
-from typing import NamedTuple, Optional, Any, TypedDict, List
+from typing import NamedTuple, Optional, Any, Dict, List
 from azext_iot.sdk.iothub.service.models import ConfigurationContent
 
 
@@ -314,16 +314,6 @@ class SHAHashVersions(Enum):
     SHA256 = 256
 
 
-class CertInfo(TypedDict):
-    """
-    Typed Dict for certificate, thumbprint, and private key return type
-    """
-
-    certificate: str
-    privateKey: str
-    thumbprint: str
-
-
 # Utility classes for nested edge config file values and device arguments
 class EdgeContainerAuth(NamedTuple):
     serveraddress: Optional[str] = None
@@ -345,7 +335,7 @@ class NestedEdgeDeviceConfig(NamedTuple):
 class NestedEdgeConfig(NamedTuple):
     version: str
     auth_method: DeviceAuthType
-    root_cert: CertInfo
+    root_cert: Dict[str, str]
     devices: List[NestedEdgeDeviceConfig]
     template_config_path: Optional[str] = None
     default_edge_agent: Optional[str] = None
