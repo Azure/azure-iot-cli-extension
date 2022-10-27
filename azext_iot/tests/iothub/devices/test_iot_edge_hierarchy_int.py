@@ -5,8 +5,12 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
+import tarfile
+from os.path import exists
 from azext_iot.tests.iothub import IoTLiveScenarioTest
-
+from azext_iot.iothub.providers.device_identity import (
+    EdgeContainerAuth,
+)
 
 @pytest.mark.usefixtures("set_cwd")
 class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
@@ -91,13 +95,22 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
         # └── device_7
         config_path = "./hierarchy_configs/nested_edge_config.yml"
         devices = [
-            ("device_1", None, self.deployment_top),
-            ("device_2", "device_1", self.deployment_lower),
-            ("device_3", "device_2", self.deployment_lower),
-            ("device_4", "device_1", self.deployment_top),
-            ("device_5", "device_4", self.deployment_lower),
-            ("device_6", "device_4", self.deployment_lower),
-            ("device_7", None, None),
+            ("device_1", None, self.deployment_top, "device_1", "mcr.microsoft.com/azureiotedge-agent:1.1", None),
+            ("device_2", "device_1", self.deployment_lower, "device_2", None, None),
+            ("device_3", "device_2", self.deployment_lower, "device_3", None, None),
+            ("device_4", "device_1", self.deployment_top, "device_4", None, None),
+            ("device_5", "device_4", self.deployment_lower, "device_5", None, None),
+            ("device_6", "device_4", self.deployment_lower, "device_6", None, None),
+            (
+                "device_7",
+                None,
+                None, 
+                "device_7",
+                "mcr.microsoft.com/azureiotedge-agent:1.2",
+                EdgeContainerAuth(
+                    serveraddress='mcr.microsoft.com', username='test-user', password='secretpassword'
+                )
+            ),
         ]
 
         self.cmd(
@@ -200,6 +213,26 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
                     f"iot hub module-twin show -d {device_id} -n {self.entity_name} -g {self.entity_rg} -m $edgeAgent",
                     checks=checks,
                 )
+                # untar target device bundle
+                bundle_file = f"device_bundles/{device_id}.tgz"
+                assert exists(bundle_file)
+                with tarfile.open(bundle_file, "r:gz") as device_tar:
+
+                    # check device bundle files
+                    file_names = device_tar.getnames()
+                    for item in [
+                        f"{device_id}.cert.pem",
+                        f"{device_id}.key.pem",
+                        f"{device_id}.full-chain.cert.pem",
+                        "iotedge_config_cli_root.pem",
+                        "config.toml",
+                        "install.sh",
+                        "README.md"
+                        
+                    ]:
+                        assert item in file_names
+                
+                    # TODO - config checks
 
     def _generate_device_arg_string(self, devices):
         device_arg_string = ""

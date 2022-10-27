@@ -199,11 +199,23 @@ class DeviceIdentityProvider(IoTHubProvider):
                 if deployment:
                     deployment = self._try_parse_valid_deployment_config(deployment)
                 parent_id = device_params.get("parent", None)
+                hostname = device_params.get("hostname", None)
+                edge_agent = device_params.get("edge_agent", None)
+                container_auth_arg = device_params.get("container_auth", '{}')
+                container_auth_obj = process_json_arg(container_auth_arg)
+                container_auth = EdgeContainerAuth(
+                    serveraddress=container_auth_obj.get("serveraddress", None),
+                    username=container_auth_obj.get("username", None),
+                    password=container_auth_obj.get("password", None),
+                ) if container_auth_obj else None
 
                 device_config = NestedEdgeDeviceConfig(
                     device_id=device_id,
                     deployment=deployment,
                     parent_id=parent_id,
+                    hostname=hostname,
+                    edge_agent=edge_agent,
+                    container_auth=container_auth
                 )
                 config.devices.append(device_config)
 
@@ -458,17 +470,23 @@ class DeviceIdentityProvider(IoTHubProvider):
                     id=device_id, content=deployment_content
                 )
 
-    # TODO - Unit test and error handling
     def _process_nested_edge_config_file_content(
         self, content: dict
     ) -> NestedEdgeConfig:
         """
         Process edge config file schema dictionary
         """
-        # TODO version / schema validation
-        version = content["config_version"]
-        hub_config = content["iothub"]
-        devices_config = content["edgedevices"]
+        # TODO - version / schema validation
+        version = content.get("config_version", None)
+        hub_config = content.get("iothub", None)
+        devices_config = content.get("edgedevices", [])
+        for check, err in [
+            (version, "No schema version specified in configuration file"),
+            (hub_config, "No `iothub` properties specified in configuration file")
+            # (len(devices_config), "No devices specified in configuration file")
+        ]:
+            if not check:
+                raise InvalidArgumentValueError(err)
 
         # edge root CA
         root_cert = None
@@ -519,6 +537,7 @@ class DeviceIdentityProvider(IoTHubProvider):
             child_devices = device.get("child", [])
             container_auth = device.get("container_auth", {})
             hostname = device.get("hostname", None)
+            edge_agent = device.get("edge_agent", None)
             device_config = NestedEdgeDeviceConfig(
                 device_id=device_id,
                 deployment=deployment,
@@ -528,9 +547,9 @@ class DeviceIdentityProvider(IoTHubProvider):
                     serveraddress=container_auth.get("serveraddress", None),
                     username=container_auth.get("username", None),
                     password=container_auth.get("password", None),
-                ),
+                ) if container_auth else None,
                 hostname=hostname,
-                edge_agent=device.get("edge_agent", None),
+                edge_agent=edge_agent,
             )
             all_devices.append(device_config)
             for child_device in child_devices:

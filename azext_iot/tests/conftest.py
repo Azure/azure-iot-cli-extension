@@ -442,3 +442,16 @@ def patch_certificate_open(mocker):
     )
     patch.return_value = ""
     return patch
+
+
+@pytest.fixture
+def patch_create_edge_root_cert(mocker):
+    patch = mocker.patch(
+        "azext_iot.iothub.providers.device_identity.create_root_certificate",
+    )
+    patch.return_value = {
+        "certificate":"root_certificate",
+        "privateKey": "root_private_key",
+        "thumbprint": "root_thumbprint",
+    }
+    return patch

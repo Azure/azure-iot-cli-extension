@@ -1,45 +1,58 @@
 {
     "config_version": "1.0",
     "iothub": {
-        "authentication_method": "symmetric_key"
+      "authentication_method": "symmetric_key"
     },
     "configuration": {
-        "template_config_path": "./hierarchy_configs/device_config.toml"
+      "template_config_path": "./hierarchy_configs/device_config.toml"
     },
     "edgedevices": [
-        {
-            "device_id": "device_1",
-            "edge_agent": "mcr.microsoft.com/azureiotedge-agent:1.2",
+      {
+        "device_id": "device_1",
+        "edge_agent": "mcr.microsoft.com/azureiotedge-agent:1.1",
+        "hostname": "device_1",
+        "deployment": "./hierarchy_configs/deploymentTopLayer.json",
+        "child": [
+          {
+            "device_id": "device_2",
+            "hostname": "device_2",
+            "deployment": "./hierarchy_configs/deploymentLowerLayer.json",
+            "child": [
+              {
+                "device_id": "device_3",
+                "hostname": "device_3",
+                "deployment": "./hierarchy_configs/deploymentLowerLayer.json"
+              }
+            ]
+          },
+          {
+            "device_id": "device_4",
+            "hostname": "device_4",
             "deployment": "./hierarchy_configs/deploymentTopLayer.json",
             "child": [
-                {
-                    "device_id": "device_2",
-                    "deployment": "./hierarchy_configs/deploymentLowerLayer.json",
-                    "child": [
-                        {
-                            "device_id": "device_3",
-                            "deployment": "./hierarchy_configs/deploymentLowerLayer.json"
-                        }
-                    ]
-                },
-                {
-                    "device_id": "device_4",
-                    "deployment": "./hierarchy_configs/deploymentTopLayer.json",
-                    "child": [
-                        {
-                            "device_id": "device_5",
-                            "deployment": "./hierarchy_configs/deploymentLowerLayer.json"
-                        },
-                        {
-                            "device_id": "device_6",
-                            "deployment": "./hierarchy_configs/deploymentLowerLayer.json"
-                        }
-                    ]
-                }
+              {
+                "device_id": "device_5",
+                "deployment": "./hierarchy_configs/deploymentLowerLayer.json",
+                "hostname": "device_5"
+              },
+              {
+                "device_id": "device_6",
+                "hostname": "device_6",
+                "deployment": "./hierarchy_configs/deploymentLowerLayer.json"
+              }
             ]
-        },
-        {
-            "device_id": "device_7"
+          }
+        ]
+      },
+      {
+        "device_id": "device_7",
+        "hostname": "device_7",
+        "edge_agent": "mcr.microsoft.com/azureiotedge-agent:1.2",
+        "container_auth": {
+          "serverAddress": "mcr.microsoft.com",
+          "username": "test-user",
+          "password": "secretpassword"
         }
+      }
     ]
-}
+  }

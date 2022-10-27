@@ -187,13 +187,13 @@ def create_root_certificate(
         .add_extension(key_usage, critical=True)
         .sign(key, hashes.SHA256())
     )
-    certificate = cert.public_bytes(serialization.Encoding.PEM).decode("utf-8")
+    certificate = cert.public_bytes(serialization.Encoding.PEM).decode("utf-8").rstrip()
     thumbprint = cert.fingerprint(hashes.SHA256()).hex().upper()
     private_key = key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.TraditionalOpenSSL,
         encryption_algorithm=serialization.NoEncryption(),
-    ).decode("utf-8")
+    ).decode("utf-8").rstrip()
 
     return CertInfo(
         certificate=certificate,
@@ -284,25 +284,23 @@ def create_signed_cert(
     )
 
 
-# TODO - Unit test
 def load_ca_cert_info(cert_path: str, key_path: str) -> CertInfo:
     for path in [cert_path, key_path]:
         if not exists(path):
             raise FileOperationError(
                 "Error loading certificates. " f"No file found at path '{path}'"
             )
-    cert = open_certificate(cert_path)
     key = open_certificate(key_path)
+    cert = open_certificate(cert_path).encode("utf-8")
     certificate = x509.load_pem_x509_certificate(cert)
     thumbprint = certificate.fingerprint(hashes.SHA256()).hex().upper()
     return CertInfo(
-        certificate=certificate.public_bytes(serialization.Encoding.PEM),
+        certificate=certificate.public_bytes(serialization.Encoding.PEM).decode("utf-8").rstrip(),
         thumbprint=thumbprint,
         privateKey=key,
     )
 
 
-# TODO - Unit test
 def make_cert_chain(
     certs: List[str],
     output_dir: Optional[str] = None,

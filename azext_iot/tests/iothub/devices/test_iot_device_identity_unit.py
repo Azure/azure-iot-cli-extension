@@ -5,6 +5,8 @@
 # --------------------------------------------------------------------------------------------
 
 from os.path import exists, join
+from azext_iot.common.certops import CertInfo, create_root_certificate
+from azext_iot.common.fileops import write_content_to_file
 from azext_iot.common.shared import DeviceAuthType
 from azext_iot.common.utility import process_json_arg, process_yaml_arg
 from azext_iot.constants import EDGE_ROOT_CERTIFICATE_FILENAME
@@ -36,6 +38,11 @@ from shutil import rmtree
 hub_name = "myhub"
 hub_entity = mock_target["entity"]
 resource_group_name = "RESOURCEGROUP"
+mock_container_auth = {
+    'serveraddress':'serveraddress',
+    'username':'username',
+    'password':'password'
+}
 
 
 class TestEdgeHierarchyCreateArgs:
@@ -100,6 +107,18 @@ class TestEdgeHierarchyCreateArgs:
             match_querystring=False,
         )
 
+        # Update config content / set modules
+        mocked_response.add(
+            method=responses.POST,
+            url=re.compile(
+                r"{}/dev\d+/applyConfigurationContent".format(devices_url)
+            ),
+            body="{}",
+            status=200,
+            content_type="application/json",
+            match_querystring=False,
+        )
+
         yield mocked_response
 
     @pytest.mark.parametrize(
@@ -108,11 +127,44 @@ class TestEdgeHierarchyCreateArgs:
             # basic example, default auth and output directory
             ([["id=dev1", "parent=dev2"], ["id=dev2"]], None, False, True, None, None),
             # Visualize, no clean, certificate auth, different output folder
-            ([["id=dev3"]], None, True, False, 'x509_ca', 'new_device_bundle_folder'),
+            ([["id=dev3"]], None, True, False, "x509_ca", "new_device_bundle_folder"),
+            # Flex argument processing
+            (
+                [
+                    [
+                        "id=dev4",
+                        "hostname=device-hostname",
+                        "deployment=hierarchy_configs/deploymentTopLayer.json",
+                        "edge_agent=my-edge-agent",
+                        f"container_auth={json.dumps(mock_container_auth)}"
+                    ],
+                    [
+                        "id=dev5",
+                        "hostname=device-hostname",
+                        "deployment=hierarchy_configs/deploymentTopLayer.json",
+                        "edge_agent=my-edge-agent",
+                        f"container_auth=hierarchy_configs/fake_edge_container_auth.json"
+                    ],
+                ],
+                None,
+                True,
+                False,
+                "x509_ca",
+                "new_device_bundle_folder",
+            ),
         ],
     )
     def test_edge_hierarchy_create_args(
-        self, fixture_cmd, service_client, devices, config, visualize, clean, auth, output
+        self,
+        fixture_cmd,
+        set_cwd,
+        service_client,
+        devices,
+        config,
+        visualize,
+        clean,
+        auth,
+        output,
     ):
         subject.iot_edge_hierarchy_create(
             cmd=fixture_cmd,
@@ -121,13 +173,16 @@ class TestEdgeHierarchyCreateArgs:
             visualize=visualize,
             clean=clean,
             device_auth_type=auth,
-            bundle_output_path=output
+            bundle_output_path=output,
         )
         out_path = output or "device_bundles"
+
+        # spy on config / certs to ensure correct file output
+
         assert exists(out_path)
         for device in devices:
-            device_id = device[0].split('=')[1]
-            assert exists(join(out_path, f'{device_id}.tgz'))
+            device_id = device[0].split("=")[1]
+            assert exists(join(out_path, f"{device_id}.tgz"))
 
         rmtree(out_path)
 
@@ -408,12 +463,17 @@ class TestHierarchyCreateConfig:
             visualize=visualize,
             clean=clean,
         )
-        
-        cfg_obj = process_yaml_arg(config) if config.endswith('.yml') else process_json_arg(config)
-        
+
+        cfg_obj = (
+            process_yaml_arg(config)
+            if config.endswith(".yml")
+            else process_json_arg(config)
+        )
+
         expected_devices = []
+
         def add_nested_device(device):
-            expected_devices.append(device['device_id'])
+            expected_devices.append(device["device_id"])
             for child in device.get("child", []):
                 add_nested_device(child)
 
@@ -424,12 +484,28 @@ class TestHierarchyCreateConfig:
 
         assert exists(out_path)
         for device_id in expected_devices:
-            assert exists(join(out_path, f'{device_id}.tgz'))
+            assert exists(join(out_path, f"{device_id}.tgz"))
 
         rmtree(out_path)
 
 
 class TestEdgeHierarchyConfigFunctions:
+    def create_test_root_cert(self, path):
+        root_cert = create_root_certificate()
+        write_content_to_file(
+            content=root_cert["certificate"],
+            destination=path,
+            file_name="root-cert.pem",
+            overwrite=True,
+        )
+        write_content_to_file(
+            content=root_cert["privateKey"],
+            destination=path,
+            file_name="root-key.pem",
+            overwrite=True,
+        )
+        return root_cert
+       
 
     test_device_id = "test_device_id"
     device_config_with_parent_no_agent = NestedEdgeDeviceConfig(
@@ -583,3 +659,171 @@ class TestEdgeHierarchyConfigFunctions:
             assert isinstance(config_content, ConfigurationContent)
         except error as ex:
             assert isinstance(ex, error)
+
+    @pytest.mark.parametrize(
+        "content, expected",
+        [
+            (
+                {
+                    "config_version": "1.0",
+                    "iothub": {"authentication_method": "symmetric_key"},
+                    "configuration": {
+                        "template_config_path": "template-config-path.toml",
+                        "default_edge_agent": "edge-agent-1",
+                    },
+                    "edgedevices": [],
+                },
+                NestedEdgeConfig(
+                    version="1.0",
+                    auth_method=DeviceAuthType.shared_private_key.value,
+                    root_cert={
+                        "certificate": "root_certificate",
+                        "thumbprint": "root_thumbprint",
+                        "privateKey": "root_private_key",
+                    },
+                    devices=[],
+                    template_config_path="template-config-path.toml",
+                    default_edge_agent="edge-agent-1",
+                ),
+            ),
+            (
+                {
+                    "config_version": "1.0",
+                    "iothub": {"authentication_method": "x509_certificate"},
+                    "configuration": {"default_edge_agent": "edge-agent-1"},
+                    "edgedevices": [
+                        {
+                            "device_id": "parent-device-id",
+                            "edge_agent": "test-agent",
+                            "hostname": "parent-hostname",
+                            "child": [
+                                {
+                                    "device_id": "child-device-id",
+                                    "edge_agent": "test-agent2",
+                                    "hostname": "child-hostname",
+                                }
+                            ],
+                        }
+                    ],
+                },
+                NestedEdgeConfig(
+                    version="1.0",
+                    auth_method=DeviceAuthType.x509_ca.value,
+                    root_cert={
+                        "certificate": "root_certificate",
+                        "thumbprint": "root_thumbprint",
+                        "privateKey": "root_private_key",
+                    },
+                    devices=[
+                        NestedEdgeDeviceConfig(
+                            device_id="parent-device-id",
+                            edge_agent="test-agent",
+                            hostname="parent-hostname",
+                        ),
+                        NestedEdgeDeviceConfig(
+                            device_id="child-device-id",
+                            edge_agent="test-agent2",
+                            hostname="child-hostname",
+                            parent_id="parent-device-id",
+                            parent_hostname="parent-hostname",
+                        ),
+                    ],
+                    default_edge_agent="edge-agent-1",
+                ),
+            ),
+        ],
+    )
+    def test_process_nested_edge_config_content(
+        self, fixture_ghcs, set_cwd, patch_create_edge_root_cert, content, expected
+    ):
+        provider = DeviceIdentityProvider(fixture_cmd, hub_name, resource_group_name)
+        result = provider._process_nested_edge_config_file_content(content)
+        assert result == expected
+
+    def test_process_nested_edge_config_load_cert(
+        self,
+        fixture_ghcs,
+        set_cwd,
+    ):
+        content = {
+            "config_version": "1.0",
+            "iothub": {"authentication_method": "x509_certificate"},
+            "configuration": {"default_edge_agent": "edge-agent-2"},
+            "certificates": {
+                "root_ca_cert_path": "test_certs/root-cert.pem",
+                "root_ca_cert_key_path": "test_certs/root-key.pem",
+            },
+            "edgedevices": [],
+        }
+        cert = self.create_test_root_cert("test_certs")
+        provider = DeviceIdentityProvider(fixture_cmd, hub_name, resource_group_name)
+        result = provider._process_nested_edge_config_file_content(content)
+        assert result == NestedEdgeConfig(
+            version="1.0",
+            auth_method=DeviceAuthType.x509_ca.value,
+            default_edge_agent="edge-agent-2",
+            root_cert=cert,
+            devices=[],
+        )
+        rmtree("test_certs")
+
+    @pytest.mark.parametrize(
+        "content, error",
+        [
+            # no version
+            (
+                {
+                    "iothub": {"authentication_method": "symmetric_key"},
+                    "configuration": {
+                        "template_config_path": "template-config-path.toml",
+                        "default_edge_agent": "edge-agent-1",
+                    },
+                },
+                InvalidArgumentValueError,
+            ),
+            # No iothub config
+            (
+                {
+                    "version": "1.0",
+                    "configuration": {
+                        "template_config_path": "template-config-path.toml",
+                        "default_edge_agent": "edge-agent-1",
+                    },
+                },
+                InvalidArgumentValueError,
+            ),
+            # missing root CA key
+            (
+                {
+                    "config_version": "1.0",
+                    "iothub": {"authentication_method": "symmetric_key"},
+                    "configuration": {
+                        "template_config_path": "template-config-path.toml",
+                        "default_edge_agent": "edge-agent-1",
+                    },
+                    "certificates": {
+                        "root_ca_cert_path": "certs/root-cert.pem",
+                    },
+                    "edgedevices": [],
+                },
+                InvalidArgumentValueError,
+            ),
+            # invalid auth value
+            (
+                {
+                    "config_version": "1.0",
+                    "iothub": {"authentication_method": "super-duper-auth"},
+                    "configuration": {
+                        "template_config_path": "template-config-path.toml",
+                        "default_edge_agent": "edge-agent-1",
+                    },
+                    "edgedevices": [],
+                },
+                InvalidArgumentValueError,
+            ),
+        ],
+    )
+    def test_process_nested_edge_config_errors(self, fixture_ghcs, content, error):
+        provider = DeviceIdentityProvider(fixture_cmd, hub_name, resource_group_name)
+        with pytest.raises(error):
+            result = provider._process_nested_edge_config_file_content(content)
