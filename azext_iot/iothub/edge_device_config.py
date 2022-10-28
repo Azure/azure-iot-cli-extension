@@ -3,7 +3,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-"""This module defines common values for IoT Hub modules"""
+"""This module defines common values and functions for processing edge device configurations"""
 
 from typing import Optional
 from azext_iot.common.fileops import write_content_to_file
@@ -252,8 +252,8 @@ def process_nested_edge_config_file_content(content: dict) -> NestedEdgeConfig:
     devices_config = content.get("edgedevices", [])
     for check, err in [
         (version, "No schema version specified in configuration file"),
-        (hub_config, "No `iothub` properties specified in configuration file")
-        # (len(devices_config), "No devices specified in configuration file")
+        (hub_config, "No `iothub` properties specified in configuration file"),
+        (len(devices_config), "No devices specified in configuration file")
     ]:
         if not check:
             raise InvalidArgumentValueError(err)

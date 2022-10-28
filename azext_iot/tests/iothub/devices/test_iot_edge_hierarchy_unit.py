@@ -667,7 +667,13 @@ class TestEdgeHierarchyConfigFunctions:
                         "template_config_path": "template-config-path.toml",
                         "default_edge_agent": "edge-agent-1",
                     },
-                    "edgedevices": [],
+                    "edgedevices": [
+                        {
+                            "device_id": "parent-device-id",
+                            "edge_agent": "test-agent",
+                            "hostname": "parent-hostname",
+                        },
+                    ],
                 },
                 NestedEdgeConfig(
                     version="1.0",
@@ -677,7 +683,13 @@ class TestEdgeHierarchyConfigFunctions:
                         "thumbprint": "root_thumbprint",
                         "privateKey": "root_private_key",
                     },
-                    devices=[],
+                    devices=[
+                        NestedEdgeDeviceConfig(
+                            device_id="parent-device-id",
+                            edge_agent="test-agent",
+                            hostname="parent-hostname",
+                        ),
+                    ],
                     template_config_path="template-config-path.toml",
                     default_edge_agent="edge-agent-1",
                 ),
@@ -747,7 +759,7 @@ class TestEdgeHierarchyConfigFunctions:
                 "root_ca_cert_path": "test_certs/root-cert.pem",
                 "root_ca_cert_key_path": "test_certs/root-key.pem",
             },
-            "edgedevices": [],
+            "edgedevices": [{"device_id": "test"}],
         }
         cert = self.create_test_root_cert("test_certs")
         result = process_nested_edge_config_file_content(content)
@@ -756,7 +768,7 @@ class TestEdgeHierarchyConfigFunctions:
             auth_method=DeviceAuthType.x509_ca.value,
             default_edge_agent="edge-agent-2",
             root_cert=cert,
-            devices=[],
+            devices=[NestedEdgeDeviceConfig(device_id="test")],
         )
         rmtree("test_certs")
 
