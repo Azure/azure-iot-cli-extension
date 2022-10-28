@@ -254,7 +254,7 @@ def load_iothub_arguments(self, _):
             nargs="+",
             action="append",
             help="Space-separated key=value pairs corresponding to properties of the edge device to create. "
-            "--device can be used 1 or more times. ",
+            "--device can be used 1 or more times. Review help examples for parameter usage."
         )
         context.argument(
             "clean",
@@ -288,7 +288,7 @@ def load_iothub_arguments(self, _):
                 "--output-path",
                 "--out",
             ],
-            help="Path to output device bundle files.",
+            help="Directory path to output device configuration bundles.",
         )
         context.argument(
             "root_cert_path",
