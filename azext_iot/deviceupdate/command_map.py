@@ -30,7 +30,6 @@ def load_deviceupdate_commands(self, _):
     with self.command_group(
         "iot du",
         command_type=deviceupdate_account_ops,
-        is_preview=True,
     ) as cmd_group:
         pass
 
