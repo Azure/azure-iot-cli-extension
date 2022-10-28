@@ -4,21 +4,23 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import pytest
+import json
+import responses
+import re
 from os.path import exists, join
 from azext_iot.common.certops import create_root_certificate
 from azext_iot.common.fileops import write_content_to_file
 from azext_iot.common.shared import DeviceAuthType
 from azext_iot.common.utility import process_json_arg, process_yaml_arg
-from azext_iot.constants import EDGE_ROOT_CERTIFICATE_FILENAME
-from azext_iot.sdk.iothub.service.models.configuration_content_py3 import (
-    ConfigurationContent,
-)
-import pytest
-import json
-import responses
-import re
+from azext_iot.sdk.iothub.service.models import ConfigurationContent
 from azext_iot.iothub import commands_device_identity as subject
-from azext_iot.iothub.providers.device_identity import DeviceIdentityProvider
+from azext_iot.iothub.edge_device_config import (
+    EDGE_ROOT_CERTIFICATE_FILENAME,
+    process_nested_edge_config_file_content,
+    create_edge_device_config,
+    try_parse_valid_deployment_config,
+)
 from azext_iot.common.shared import (
     EdgeContainerAuth,
     NestedEdgeConfig,
@@ -558,9 +560,9 @@ class TestEdgeHierarchyConfigFunctions:
         device_pk,
         output_path,
     ):
-        provider = DeviceIdentityProvider(fixture_cmd, hub_name, resource_group_name)
-        device_toml = provider.create_edge_device_config(
+        device_toml = create_edge_device_config(
             device_id=device_id,
+            hub_hostname=hub_entity,
             auth_method=auth_method,
             device_config=device_config,
             default_edge_agent=default_edge_agent,
@@ -647,12 +649,9 @@ class TestEdgeHierarchyConfigFunctions:
             ("hierarchy_configs/deploymentLowerLayer.json", None),
         ],
     )
-    def test_process_edge_config_content(
-        self, fixture_ghcs, set_cwd, deployment, error
-    ):
-        provider = DeviceIdentityProvider(fixture_cmd, hub_name, resource_group_name)
+    def test_process_edge_config_content(self, set_cwd, deployment, error):
         try:
-            config_content = provider._try_parse_valid_deployment_config(deployment)
+            config_content = try_parse_valid_deployment_config(deployment)
             assert isinstance(config_content, ConfigurationContent)
         except error as ex:
             assert isinstance(ex, error)
@@ -731,15 +730,13 @@ class TestEdgeHierarchyConfigFunctions:
         ],
     )
     def test_process_nested_edge_config_content(
-        self, fixture_ghcs, set_cwd, patch_create_edge_root_cert, content, expected
+        self, set_cwd, patch_create_edge_root_cert, content, expected
     ):
-        provider = DeviceIdentityProvider(fixture_cmd, hub_name, resource_group_name)
-        result = provider._process_nested_edge_config_file_content(content)
+        result = process_nested_edge_config_file_content(content)
         assert result == expected
 
     def test_process_nested_edge_config_load_cert(
         self,
-        fixture_ghcs,
         set_cwd,
     ):
         content = {
@@ -753,8 +750,7 @@ class TestEdgeHierarchyConfigFunctions:
             "edgedevices": [],
         }
         cert = self.create_test_root_cert("test_certs")
-        provider = DeviceIdentityProvider(fixture_cmd, hub_name, resource_group_name)
-        result = provider._process_nested_edge_config_file_content(content)
+        result = process_nested_edge_config_file_content(content)
         assert result == NestedEdgeConfig(
             version="1.0",
             auth_method=DeviceAuthType.x509_ca.value,
@@ -820,7 +816,6 @@ class TestEdgeHierarchyConfigFunctions:
             ),
         ],
     )
-    def test_process_nested_edge_config_errors(self, fixture_ghcs, content, error):
-        provider = DeviceIdentityProvider(fixture_cmd, hub_name, resource_group_name)
+    def test_process_nested_edge_config_errors(self, content, error):
         with pytest.raises(error):
-            provider._process_nested_edge_config_file_content(content)
+            process_nested_edge_config_file_content(content)

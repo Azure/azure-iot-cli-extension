@@ -13,7 +13,6 @@ from unittest import mock
 from knack.util import CLIError
 from azure.cli.core.extension import get_extension_path
 from azext_iot.common.utility import (
-    create_nested_edge_device_config_script,
     handle_service_exception,
     validate_min_python_version,
     process_json_arg,
@@ -26,6 +25,7 @@ from azext_iot.common.deps import ensure_uamqp
 from azext_iot.constants import EVENT_LIB, EXTENSION_NAME
 from azext_iot._validators import mode2_iot_login_handler
 from azext_iot.common.embedded_cli import EmbeddedCLI
+from azext_iot.iothub.edge_device_config import create_nested_edge_device_config_script
 
 
 class TestMinPython(object):
@@ -481,7 +481,7 @@ class TestHandleServiceException(object):
 
 
 class TestNestedEdgeDeviceConfiguration(object):
-    from azext_iot.constants import (
+    from azext_iot.iothub.edge_device_config import (
         EDGE_CONFIG_SCRIPT_APPLY,
         EDGE_CONFIG_SCRIPT_CA_CERTS,
         EDGE_CONFIG_SCRIPT_HEADERS,

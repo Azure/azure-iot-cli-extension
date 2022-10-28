@@ -448,7 +448,7 @@ def patch_certificate_open(mocker):
 @pytest.fixture
 def patch_create_edge_root_cert(mocker):
     patch = mocker.patch(
-        "azext_iot.iothub.providers.device_identity.create_root_certificate",
+        "azext_iot.iothub.edge_device_config.create_root_certificate",
     )
     patch.return_value = {
         "certificate": "root_certificate",
