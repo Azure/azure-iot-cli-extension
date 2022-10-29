@@ -8,6 +8,7 @@
 Load CLI commands
 """
 from azure.cli.core.commands import CliCommandType
+from azure.cli.core.commands import LongRunningOperation
 
 digitaltwins_resource_ops = CliCommandType(
     operations_tmpl="azext_iot.digitaltwins.commands_resource#{}"
@@ -32,6 +33,16 @@ digitaltwins_rbac_ops = CliCommandType(
 digitaltwins_job_ops = CliCommandType(
     operations_tmpl="azext_iot.digitaltwins.commands_jobs#{}"
 )
+
+digitaltwins_identity_ops = CliCommandType(
+    operations_tmpl="azext_iot.digitaltwins.commands_identity#{}"
+)
+
+
+class IdentityResultTransform(LongRunningOperation):
+    def __call__(self, poller):
+        result = super(IdentityResultTransform, self).__call__(poller)
+        return result.identity
 
 
 def load_digitaltwins_commands(self, _):
@@ -118,6 +129,13 @@ def load_digitaltwins_commands(self, _):
         )
         cmd_group.command("delete", "delete_route")
         cmd_group.command("create", "create_route")
+
+    with self.command_group(
+        "dt identity", command_type=digitaltwins_identity_ops
+    ) as cmd_group:
+        cmd_group.command("assign", "assign_identity", transform=IdentityResultTransform(self.cli_ctx))
+        cmd_group.command("remove", "remove_identity", transform=IdentityResultTransform(self.cli_ctx))
+        cmd_group.command("show", "show_identity")
 
     with self.command_group(
         "dt role-assignment", command_type=digitaltwins_rbac_ops

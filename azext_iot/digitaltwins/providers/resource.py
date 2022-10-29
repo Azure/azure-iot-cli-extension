@@ -15,6 +15,7 @@ from azext_iot.digitaltwins.common import (
     ADTEndpointAuthType,
     ADTPublicNetworkAccessType,
     MAX_ADT_CREATE_RETRIES,
+    IdentityType,
 )
 from azext_iot.digitaltwins.providers import (
     DigitalTwinsResourceManager,
@@ -30,6 +31,8 @@ from azext_iot.common.utility import (
     handle_service_exception
 )
 from knack.log import get_logger
+
+from azext_iot.sdk.digitaltwins.controlplane.models import DigitalTwinsIdentity
 
 logger = get_logger(__name__)
 
@@ -229,6 +232,143 @@ class ResourceProvider(DigitalTwinsResourceManager):
         return self.rbac.remove_role(
             dt_scope=target_instance.id, assignee=assignee, role_type=role_type
         )
+
+    # Identity
+
+    def assign_identity(
+        self,
+        name,
+        system_identity=None,
+        user_identities=None,
+        identity_role=None,
+        identity_scopes=None,
+        resource_group_name=None
+    ):
+        target_instance = self.find_instance(
+            name=name, resource_group_name=resource_group_name
+        )
+
+        if bool(identity_role) ^ bool(identity_scopes):
+            raise RequiredArgumentMissingError('At least one scope (--scopes) and one role (--role) required for system-managed identity role assignment.')
+        if not system_identity and not user_identities:
+            raise RequiredArgumentMissingError('No identities provided to assign. Please provide system (--system) or user-assigned identities (--user).')
+
+        if not target_instance.identity:
+            target_instance.identity = DigitalTwinsIdentity()
+
+        if user_identities:
+            if not target_instance.identity.user_assigned_identities:
+                target_instance.identity.user_assigned_identities = {}
+            for identity in user_identities:
+                target_instance.identity.user_assigned_identities[identity] = target_instance.identity.user_assigned_identities.get(identity, {})
+
+
+        has_system_identity = target_instance.identity.type in [IdentityType.system_assigned_user_assigned.value, IdentityType.system_assigned.value]
+
+        if system_identity or has_system_identity:
+            target_instance.identity.type = IdentityType.system_assigned_user_assigned.value if target_instance.identity.user_assigned_identities else IdentityType.system_assigned.value
+        else:
+            target_instance.identity.type = IdentityType.user_assigned.value if target_instance.identity.user_assigned_identities else IdentityType.none.value
+
+        try:
+            update_poller = self.mgmt_sdk.digital_twins.create_or_update(
+                resource_name=name,
+                resource_group_name=resource_group_name,
+                digital_twins_create=target_instance,
+                long_running_operation_timeout=60,
+            )
+
+            def rbac_handler(lro):
+                instance = lro.resource().as_dict()
+                identity = instance.get("identity")
+                if identity:
+                    identity_type = identity.get("type")
+                    principal_id = identity.get("principal_id")
+
+                    if (
+                        principal_id
+                        and identity_scopes
+                        and identity_type
+                        and identity_type.lower() == "systemassigned"
+                    ):
+                        for scope in identity_scopes:
+                            logger.info(
+                                "Applying rbac assignment: Principal Id: {}, Scope: {}, Role: {}".format(
+                                    principal_id, scope, identity_role
+                                )
+                            )
+                            self.rbac.assign_role_flex(
+                                principal_id=principal_id,
+                                scope=scope,
+                                role_type=identity_role,
+                            )
+
+            update_poller.add_done_callback(rbac_handler)
+            return update_poller
+        except CloudError as e:
+            raise e
+        except ErrorResponseException as err:
+            handle_service_exception(err)
+
+    def remove_identity(
+        self,
+        name,
+        system_identity=None,
+        user_identities=None,
+        resource_group_name=None
+    ):
+        target_instance = self.find_instance(
+            name=name, resource_group_name=resource_group_name
+        )
+
+        if not system_identity and user_identities is None:
+            raise RequiredArgumentMissingError('No identities provided to remove. Please provide system (--system) or user-assigned identities (--user).')
+
+        # Turn off system managed identity
+        if system_identity:
+            if target_instance.identity.type not in [
+                    IdentityType.system_assigned.value,
+                    IdentityType.system_assigned_user_assigned.value
+            ]:
+                raise ArgumentUsageError('Digital Twin {} is not currently using a system-assigned identity'.format(name))
+            target_instance.identity.type = IdentityType.user_assigned if target_instance.identity.type == IdentityType.system_assigned_user_assigned.value else IdentityType.none.value
+
+        if user_identities and target_instance.identity.user_assigned_identities:
+            # loop through user_identities to remove
+            for identity in user_identities:
+                if not target_instance.identity.user_assigned_identities.get(identity):
+                    raise ArgumentUsageError('Digital Twin {0} is not currently using a user-assigned identity with id: {1}'.format(name, identity))
+                del target_instance.identity.user_assigned_identities[identity]
+            if not target_instance.identity.user_assigned_identities:
+                target_instance.identity.user_assigned_identities = None
+        elif isinstance(user_identities, list):
+            target_instance.identity.user_assigned_identities = None
+
+        if target_instance.identity.type in [
+                IdentityType.system_assigned.value,
+                IdentityType.system_assigned_user_assigned.value
+        ]:
+            target_instance.identity.type = IdentityType.system_assigned_user_assigned.value if getattr(target_instance.identity, 'user_assigned_identities', None) else IdentityType.system_assigned.value
+        else:
+            target_instance.identity.type = IdentityType.user_assigned.value if getattr(target_instance.identity, 'user_assigned_identities', None) else IdentityType.none.value
+
+        try:
+            update_poller = self.mgmt_sdk.digital_twins.create_or_update(
+                resource_name=name,
+                resource_group_name=resource_group_name,
+                digital_twins_create=target_instance,
+                long_running_operation_timeout=60,
+            )
+            return update_poller
+        except ErrorResponseException as err:
+            handle_service_exception(err)
+
+    def show_identity(self, name, resource_group_name=None):
+        target_instance = self.find_instance(
+            name=name, resource_group_name=resource_group_name
+        )
+
+        return target_instance.identity
 
     # Endpoints
 

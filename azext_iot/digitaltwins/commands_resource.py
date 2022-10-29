@@ -115,7 +115,7 @@ def add_endpoint_eventgrid(
     dead_letter_uri=None,
     dead_letter_secret=None,
     auth_type=ADTEndpointAuthType.keybased.value,
-    identity=None,
+    # identity=None,
 ):
     rp = ResourceProvider(cmd)
     return rp.add_endpoint(
@@ -129,7 +129,7 @@ def add_endpoint_eventgrid(
         dead_letter_uri=dead_letter_uri,
         dead_letter_secret=dead_letter_secret,
         auth_type=auth_type,
-        identity=identity,
+        # identity=identity,
     )
 
 

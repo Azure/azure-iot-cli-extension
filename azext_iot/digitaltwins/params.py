@@ -263,6 +263,50 @@ def load_digitaltwins_arguments(self, _):
     with self.argument_context("dt endpoint wait") as context:
         context.ignore("updated")
 
+    with self.argument_context("dt identity assign") as context:
+        context.argument(
+            'system_identity',
+            options_list=['--system-assigned', '--system'],
+            arg_type=get_three_state_flag(),
+            nargs='*',
+            help="Assign a system-assigned managed identity to this Digital Twin."
+        )
+        context.argument(
+            'user_identities',
+            options_list=['--user-assigned', '--user'],
+            nargs='+',
+            help="Assign user-assigned managed identities to this Digital Twin. "
+            "Accepts space-separated list of identity resource IDs."
+        )
+        context.argument(
+            'identity_role',
+            options_list=['--role'],
+            help="Role to assign to the digital twin's system-assigned managed identity."
+        )
+        context.argument(
+            'identity_scopes',
+            options_list=['--scopes'],
+            nargs='*',
+            help="Space separated list of scopes to assign the role (--role) "
+                 "for the system-assigned managed identity."
+        )
+
+    with self.argument_context("dt identity remove") as context:
+        context.argument(
+            'system_identity',
+            options_list=['--system-assigned', '--system'],
+            arg_type=get_three_state_flag(),
+            nargs='*',
+            help="Remove a system-assigned managed identity to this Digital Twin."
+        )
+        context.argument(
+            'user_identities',
+            options_list=['--user-assigned', '--user'],
+            nargs='+',
+            help="Remove user-assigned managed identities to this Digital Twin. "
+            "Accepts space-separated list of identity resource IDs."
+        )
+
     with self.argument_context("dt twin") as context:
         context.argument(
             "query_command",

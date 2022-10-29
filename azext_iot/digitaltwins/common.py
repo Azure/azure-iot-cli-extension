@@ -95,3 +95,13 @@ class ADTModelCreateFailurePolicy(Enum):
     """
     ROLLBACK = "Rollback"
     NONE = "None"
+
+
+class IdentityType(Enum):
+    """
+    Type of managed identity for the IoT Hub.
+    """
+    system_assigned = "SystemAssigned"
+    user_assigned = "UserAssigned"
+    system_assigned_user_assigned = "SystemAssigned,UserAssigned"
+    none = "None"
