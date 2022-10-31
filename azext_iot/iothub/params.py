@@ -306,3 +306,11 @@ def load_iothub_arguments(self, _):
             ],
             help="Path to root private key to sign nested edge device certs.",
         )
+        context.argument(
+            "root_cert_password",
+            options_list=[
+                "--root-pass",
+                "--rp",
+            ],
+            help="Root key password",
+        )

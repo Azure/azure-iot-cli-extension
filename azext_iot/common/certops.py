@@ -183,17 +183,13 @@ def create_root_certificate(
         .add_extension(key_usage, critical=True)
         .sign(key, hashes.SHA256())
     )
-    certificate = cert.public_bytes(serialization.Encoding.PEM).decode("utf-8").rstrip()
+    certificate = cert.public_bytes(serialization.Encoding.PEM).decode("utf-8")
     thumbprint = cert.fingerprint(hashes.SHA256()).hex().upper()
-    private_key = (
-        key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.TraditionalOpenSSL,
-            encryption_algorithm=serialization.NoEncryption(),
-        )
-        .decode("utf-8")
-        .rstrip()
-    )
+    private_key = key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption(),
+    ).decode("utf-8")
 
     return {
         "certificate": certificate,
@@ -235,22 +231,16 @@ def create_signed_cert(
         key_agreement=False,
         key_encipherment=False,
     )
-    csr = (
-        x509.CertificateSigningRequestBuilder()
-        .subject_name(
-            x509.Name(
-                [
-                    x509.NameAttribute(NameOID.COMMON_NAME, subject),
-                ]
-            )
-        )
-        .sign(private_key, hashes.SHA256())
+    subject_name = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COMMON_NAME, subject),
+        ]
     )
     cert = (
         x509.CertificateBuilder()
-        .subject_name(csr.subject)
+        .subject_name(subject_name)
         .issuer_name(ca_cert.subject)
-        .public_key(csr.public_key())
+        .public_key(private_key.public_key())
         .serial_number(x509.random_serial_number())
         .not_valid_before(datetime.datetime.utcnow())
         .not_valid_after(
@@ -288,17 +278,36 @@ def create_signed_cert(
     }
 
 
-def load_ca_cert_info(cert_path: str, key_path: str) -> Dict[str, str]:
+def load_ca_cert_info(
+    cert_path: str, key_path: str, password: Optional[str] = None
+) -> Dict[str, str]:
     for path in [cert_path, key_path]:
         if not exists(path):
             raise FileOperationError(
                 "Error loading certificates. " f"No file found at path '{path}'"
             )
-    key = open_certificate(key_path)
-    cert = open_certificate(cert_path).encode("utf-8")
-    certificate = x509.load_pem_x509_certificate(cert)
-    thumbprint = certificate.fingerprint(hashes.SHA256()).hex().upper()
-    cert_dump = certificate.public_bytes(serialization.Encoding.PEM).decode("utf-8").rstrip()
+    # open cert files and get string contents
+    key_str = open_certificate(key_path).encode("utf-8")
+    cert_str = open_certificate(cert_path).encode("utf-8")
+
+    # load certificates
+    try:
+        cert_obj = x509.load_pem_x509_certificate(cert_str)
+        key_obj = serialization.load_pem_private_key(
+            key_str, password=(password.encode("utf-8") if password else None)
+        )
+    except Exception as ex:
+        raise FileOperationError(f"Error loading certificate info:\n{ex}")
+
+    # create correctly stringified versions
+    key = key_obj.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption(),
+    ).decode("utf-8")
+    thumbprint = cert_obj.fingerprint(hashes.SHA256()).hex().upper()
+    cert_dump = cert_obj.public_bytes(serialization.Encoding.PEM).decode("utf-8")
+
     return {
         "certificate": cert_dump,
         "thumbprint": thumbprint,

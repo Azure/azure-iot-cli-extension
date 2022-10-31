@@ -21,6 +21,7 @@ def iot_edge_hierarchy_create(
     device_auth_type: Optional[DeviceAuthType] = None,
     root_cert_path: Optional[str] = None,
     root_key_path: Optional[str] = None,
+    root_cert_password: Optional[str] = None,
     bundle_output_path: Optional[str] = None,
     hub_name: Optional[str] = None,
     resource_group_name: Optional[str] = None,
@@ -42,6 +43,7 @@ def iot_edge_hierarchy_create(
         auth_type=device_auth_type,
         root_cert_path=root_cert_path,
         root_key_path=root_key_path,
+        root_cert_password=root_cert_password,
         output_path=bundle_output_path,
     )
 

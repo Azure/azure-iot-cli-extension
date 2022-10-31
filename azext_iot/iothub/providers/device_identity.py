@@ -85,6 +85,7 @@ class DeviceIdentityProvider(IoTHubProvider):
         auth_type: Optional[DeviceAuthType] = None,
         root_cert_path: Optional[str] = None,
         root_key_path: Optional[str] = None,
+        root_cert_password: Optional[str] = None,
         output_path: Optional[str] = None,
     ):
         from treelib import Tree
@@ -139,7 +140,7 @@ class DeviceIdentityProvider(IoTHubProvider):
                 )
             # create cert if one isn't provided
             root_cert = (
-                load_ca_cert_info(root_cert_path, root_key_path)
+                load_ca_cert_info(root_cert_path, root_key_path, root_cert_password)
                 if all([root_cert_path, root_key_path])
                 else create_root_certificate()
             )
