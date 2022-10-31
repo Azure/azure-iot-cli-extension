@@ -302,7 +302,7 @@ def load_digitaltwins_arguments(self, _):
         context.argument(
             'user_identities',
             options_list=['--user-assigned', '--user'],
-            nargs='+',
+            nargs='*',
             help="Remove user-assigned managed identities to this Digital Twin. "
             "Accepts space-separated list of identity resource IDs."
         )

@@ -284,8 +284,11 @@ def load_digitaltwins_help():
     helps["dt endpoint create eventhub"] = """
         type: command
         short-summary: Adds an EventHub endpoint to a Digital Twins instance.
-            Requires pre-created resource. The instance must be created
-            with a managed identity to support identity based endpoint integration
+            Requires pre-created resource.
+        long-summary: |
+            The instance must have a system-assigned identity to support system-assigned identity based endpoint
+            integration. The instance must have the user-assigned identity associated to support user-assigned
+            identity based endpoint integration.
 
         examples:
         - name: Adds an EventHub endpoint to a target instance using Key based auth.
@@ -297,21 +300,35 @@ def load_digitaltwins_help():
             --eventhub-policy {eventhub_policy}
             -n {instance_name}
 
-        - name: Adds an EventHub endpoint to a target instance using Identity based auth.
+        - name: Adds an EventHub endpoint to a target instance using system-assigned identity authentication.
           text: >
             az dt endpoint create eventhub --endpoint-name {endpoint_name}
             --eventhub-resource-group {eventhub_resource_group}
             --eventhub-namespace {eventhub_namespace}
             --eventhub {eventhub_name}
             --auth-type IdentityBased
+            --identity [system]
+            -n {instance_name}
+
+        - name: Adds an EventHub endpoint to a target instance using a user-assigned identity authentication.
+          text: >
+            az dt endpoint create eventhub --endpoint-name {endpoint_name}
+            --eventhub-resource-group {eventhub_resource_group}
+            --eventhub-namespace {eventhub_namespace}
+            --eventhub {eventhub_name}
+            --auth-type IdentityBased
+            --identity {resource_id}
             -n {instance_name}
     """
 
     helps["dt endpoint create servicebus"] = """
         type: command
         short-summary: Adds a ServiceBus Topic endpoint to a Digital Twins instance.
-            Requires pre-created resource. The instance must be created
-            with a managed identity to support identity based endpoint integration
+            Requires pre-created resource.
+        long-summary: |
+            The instance must have a system-assigned identity to support system-assigned identity based endpoint
+            integration. The instance must have the user-assigned identity associated to support user-assigned
+            identity based endpoint integration.
 
         examples:
         - name: Adds a ServiceBus Topic endpoint to a target instance using Key based auth.
@@ -379,6 +396,50 @@ def load_digitaltwins_help():
         - name: Wait until an existing endpoint's primaryConnectionString is null.
           text: >
             az dt endpoint wait -n {instance_name} --endpoint-name {endpoint_name} --custom "properties.primaryConnectionString==null"
+    """
+
+    helps["dt identity"] = """
+        type: group
+        short-summary: Manage identites of a Digital Twins instance.
+    """
+
+    helps["dt identity assign"] = """
+        type: group
+        short-summary: Assign managed identities to a Digital Twins instance.
+
+        examples:
+        - name: Assign a system-assigned identity to a Digital Twins instance and assign a role to that identity.
+          text: >
+            az dt identity assign -n {instance_name} --system --role "Azure Event Hubs Data Sender" --scopes {resource_id}
+        - name: Assign two user-assigned identities to a Digital Twins instace.
+          text: >
+            az dt identity assign -n {instance_name} --user {resource_id} {resource_id}
+    """
+
+    helps["dt identity remove"] = """
+        type: group
+        short-summary: Remove managed identities from a Digital Twins instance.
+
+        examples:
+        - name: Remove a system-assigned identity from a Digital Twins instance.
+          text: >
+            az dt identity remove -n {instance_name} --system
+        - name: Remove two user-assigned identities from a Digital Twins instance.
+          text: >
+            az dt identity remove -n {instance_name} --user {resource_id} {resource_id}
+        - name: Remove all identities from a Digital Twins instance.
+          text: >
+            az dt identity remove -n {instance_name} --user --system
+    """
+
+    helps["dt identity show"] = """
+        type: group
+        short-summary: Show the identity properties of a Digital Twins instance.
+
+        examples:
+        - name: Show identity properties of a Digital Twins instance.
+          text: >
+            az dt identity assign -n {instance_name} -g {resource_group}
     """
 
     helps["dt network"] = """

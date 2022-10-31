@@ -526,7 +526,8 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         self.wait_for_capacity()
         endpoints_instance_name = generate_resource_id()
         user_identity = self.ensure_user_identity()
-        sleep(1)
+        # TODO: lower sleep time to necessary amount
+        sleep(60)
         user_identity_principal_id = user_identity["principalId"]
         user_identity_id = user_identity["id"]
         target_scope_role = "Contributor"
@@ -569,7 +570,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         self.track_instance(endpoint_instance)
 
         self.cmd(
-            "dt identity -n {} -g {} --user {}".format(
+            "dt identity assign -n {} -g {} --user {}".format(
                 endpoints_instance_name,
                 self.rg,
                 user_identity_id
@@ -794,7 +795,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 EP_SERVICEBUS_TOPIC,
                 servicebus_endpoint_uai,
                 MOCK_DEAD_LETTER_ENDPOINT,
-                user_identity_principal_id
+                user_identity_id
             )
         ).get_output_in_json()
 
@@ -813,11 +814,13 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             auth_type=ADTEndpointAuthType.identitybased,
             dead_letter_endpoint=MOCK_DEAD_LETTER_ENDPOINT,
         )
-        endpoint_tuple_collection.append(
-            EndpointTuple(
+
+        # Delete endpoint to avoid endpoint limits
+        self.cmd(
+            "dt endpoint delete -n {} -g {} --en {} -y".format(
+                endpoints_instance_name,
+                self.rg,
                 servicebus_endpoint_uai,
-                ADTEndpointType.servicebus,
-                ADTEndpointAuthType.identitybased,
             )
         )
 
@@ -956,7 +959,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 self.current_subscription,
                 eventhub_endpoint_uai,
                 MOCK_DEAD_LETTER_ENDPOINT,
-                user_identity_principal_id
+                user_identity_id
             )
         ).get_output_in_json()
 
@@ -1003,7 +1006,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         list_ep_output = self.cmd(
             "dt endpoint list -n {} -g {}".format(endpoints_instance_name, self.rg)
         ).get_output_in_json()
-        assert len(list_ep_output) == 5
+        assert len(list_ep_output) == 6
 
         for ep in endpoint_tuple_collection:
             logger.debug("Deleting endpoint {}...".format(ep.endpoint_name))
@@ -1150,12 +1153,12 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 dt_instance_name,
                 self.rg,
             )
-        )
-        assert assign_output["principalId"] is None
-        assert assign_output["tenantId"]
-        assert assign_output["type"] == IdentityType.user_assigned.value
-        assert len(assign_output["userAssignedIdentities"]) == 1
-        assert assign_output["userAssignedIdentities"].get(user_identity_id)
+        ).get_output_in_json()
+        assert remove_output["principalId"] is None
+        assert remove_output["tenantId"]
+        assert remove_output["type"] == IdentityType.user_assigned.value
+        assert len(remove_output["userAssignedIdentities"]) == 1
+        assert remove_output["userAssignedIdentities"].get(user_identity_id)
 
         # Remove user
         remove_output = self.cmd(
@@ -1164,8 +1167,8 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 self.rg,
                 user_identity_id
             )
-        ).get_output_in_json()
-        assert remove_output is None
+        )
+        assert remove_output.output == ''
 
         # Assign only user
         assign_output = self.cmd(
@@ -1181,14 +1184,14 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         assert len(assign_output["userAssignedIdentities"]) == 1
         assert assign_output["userAssignedIdentities"].get(user_identity_id)
 
-        # Assign system - user not removed
+        # Assign system - user not removed; principal id may be different from original
         assign_output = self.cmd(
             "dt identity assign -n {} -g {} --system".format(
                 dt_instance_name,
                 self.rg,
             )
         ).get_output_in_json()
-        assert assign_output["principalId"] is None
+        assert assign_output["principalId"]
         assert assign_output["tenantId"]
         assert assign_output["type"] == IdentityType.system_assigned_user_assigned.value
         assert len(assign_output["userAssignedIdentities"]) == 1
@@ -1196,12 +1199,12 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         # Remove all identities
         remove_output = self.cmd(
-            "dt identity remove -n {} -g {} --user [] --system".format(
+            "dt identity remove -n {} -g {} --user --system".format(
                 dt_instance_name,
                 self.rg,
             )
         )
-        assert remove_output is None
+        assert remove_output.output == ''
 
 
 def assert_common_resource_attributes(
