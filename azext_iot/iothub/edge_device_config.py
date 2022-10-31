@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 """This module defines common values and functions for processing edge device configurations"""
 
-from typing import Optional
+from typing import Optional, List, Dict
 from azext_iot.common.fileops import write_content_to_file
 from azext_iot.common.certops import create_root_certificate, load_ca_cert_info
 from azext_iot.common.shared import (
@@ -21,6 +21,7 @@ from azure.cli.core.azclierror import (
     CLIInternalError,
     FileOperationError,
     InvalidArgumentValueError,
+    RequiredArgumentMissingError,
 )
 
 from azext_iot.operations.hub import _process_config_content
@@ -360,7 +361,7 @@ def create_nested_edge_device_config_script(
     )
 
 
-def try_parse_valid_deployment_config(deployment_path):
+def try_parse_valid_deployment_config(deployment_path: str):
     try:
         deployment_content = process_json_arg(
             deployment_path, argument_name="deployment"
@@ -376,3 +377,93 @@ def try_parse_valid_deployment_config(deployment_path):
     except Exception as ex:
         logger.warning(f"Error processing config file at '{deployment_path}'")
         raise InvalidArgumentValueError(ex)
+
+
+def process_nested_edge_config_args(
+    device_args: List[List[str]],
+    auth_type: DeviceAuthType,
+    default_edge_agent: Optional[str] = None,
+    device_config_template: Optional[str] = None,
+    root_cert_path: Optional[str] = None,
+    root_key_path: Optional[str] = None,
+    root_cert_password: Optional[str] = None,
+) -> NestedEdgeConfig:
+    # raise error if only key or cert provided
+    if (root_cert_path is not None) ^ (root_key_path is not None):
+        raise RequiredArgumentMissingError(
+            "You must provide a path to both the root cert public and private keys."
+        )
+    # create cert if one isn't provided
+    root_cert = (
+        load_ca_cert_info(root_cert_path, root_key_path, root_cert_password)
+        if all([root_cert_path, root_key_path])
+        else create_root_certificate()
+    )
+
+    config = NestedEdgeConfig(
+        version="1.0",
+        auth_method=auth_type or DeviceAuthType.shared_private_key.value,
+        default_edge_agent=default_edge_agent,
+        template_config_path=device_config_template,
+        devices=[],
+        root_cert=root_cert,
+    )
+    # Process --device arguments
+    for device_input in device_args:
+        # assemble device params from nArgs strings
+        device_params = assemble_nargs_to_dict(device_input)
+        device_id = device_params.get("id", None)
+        if not device_id:
+            raise InvalidArgumentValueError(
+                "A device argument is missing required parameter 'id'"
+            )
+        deployment = device_params.get("deployment", None)
+        if deployment:
+            deployment = try_parse_valid_deployment_config(deployment)
+        parent_id = device_params.get("parent", None)
+        hostname = device_params.get("hostname", None)
+        edge_agent = device_params.get("edge_agent", None)
+        container_auth_arg = device_params.get("container_auth", "{}")
+        container_auth_obj = process_json_arg(container_auth_arg)
+        container_auth = (
+            EdgeContainerAuth(
+                serveraddress=container_auth_obj.get("serveraddress", None),
+                username=container_auth_obj.get("username", None),
+                password=container_auth_obj.get("password", None),
+            )
+            if container_auth_obj
+            else None
+        )
+
+        device_config = NestedEdgeDeviceConfig(
+            device_id=device_id,
+            deployment=deployment,
+            parent_id=parent_id,
+            hostname=hostname,
+            edge_agent=edge_agent,
+            container_auth=container_auth,
+        )
+        config.devices.append(device_config)
+    return config
+
+
+def assemble_nargs_to_dict(hash_list: List[str]) -> Dict[str, str]:
+    result = {}
+    if not hash_list:
+        return result
+    for hash in hash_list:
+        if "=" not in hash:
+            logger.warning(
+                "Skipping processing of '%s', input format is key=value | key='value value'.",
+                hash,
+            )
+            continue
+        split_hash = hash.split("=", 1)
+        result[split_hash[0]] = split_hash[1]
+    for key in result:
+        if not result.get(key):
+            logger.warning(
+                "No value assigned to key '%s', input format is key=value | key='value value'.",
+                key,
+            )
+    return result

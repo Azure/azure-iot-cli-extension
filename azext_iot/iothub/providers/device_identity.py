@@ -8,10 +8,8 @@ from os import getcwd, makedirs
 from os.path import exists
 from shutil import rmtree
 from azext_iot.common.certops import (
-    create_root_certificate,
     create_self_signed_certificate,
     create_signed_cert,
-    load_ca_cert_info,
     make_cert_chain,
 )
 
@@ -21,9 +19,9 @@ from azext_iot.iothub.edge_device_config import (
     EDGE_DEVICE_BUNDLE_DEFAULT_FOLDER_NAME,
     EDGE_ROOT_CERTIFICATE_FILENAME,
     create_edge_device_config,
+    process_nested_edge_config_args,
     process_nested_edge_config_file_content,
     create_nested_edge_device_config_script,
-    try_parse_valid_deployment_config,
 )
 from tqdm import tqdm
 from time import sleep
@@ -34,8 +32,6 @@ from azext_iot._factory import SdkResolver
 from azext_iot.common.shared import (
     DeviceAuthType,
     SdkType,
-    EdgeContainerAuth,
-    NestedEdgeDeviceConfig,
     NestedEdgeConfig,
 )
 from azext_iot.iothub.providers.base import IoTHubProvider
@@ -47,7 +43,6 @@ from azext_iot.operations.generic import _execute_query
 from azure.cli.core.azclierror import (
     AzureResponseError,
     InvalidArgumentValueError,
-    RequiredArgumentMissingError,
     MutuallyExclusiveArgumentError,
 )
 from azext_iot.operations.hub import _assemble_device
@@ -83,6 +78,8 @@ class DeviceIdentityProvider(IoTHubProvider):
         visualize: Optional[bool] = False,
         clean: Optional[bool] = False,
         auth_type: Optional[DeviceAuthType] = None,
+        default_edge_agent: Optional[str] = None,
+        device_config_template: Optional[str] = None,
         root_cert_path: Optional[str] = None,
         root_key_path: Optional[str] = None,
         root_cert_password: Optional[str] = None,
@@ -133,61 +130,15 @@ class DeviceIdentityProvider(IoTHubProvider):
 
             config = process_nested_edge_config_file_content(config_content)
         elif devices:
-            # raise error if only key or cert provided
-            if (root_cert_path is not None) ^ (root_key_path is not None):
-                raise RequiredArgumentMissingError(
-                    "You must provide a path to both the root cert public and private keys."
-                )
-            # create cert if one isn't provided
-            root_cert = (
-                load_ca_cert_info(root_cert_path, root_key_path, root_cert_password)
-                if all([root_cert_path, root_key_path])
-                else create_root_certificate()
+            config = process_nested_edge_config_args(
+                device_args=devices,
+                auth_type=auth_type,
+                default_edge_agent=default_edge_agent,
+                device_config_template=device_config_template,
+                root_cert_path=root_cert_path,
+                root_key_path=root_key_path,
+                root_cert_password=root_cert_password
             )
-
-            config = NestedEdgeConfig(
-                version="1.0",
-                auth_method=auth_type or DeviceAuthType.shared_private_key.value,
-                devices=[],
-                root_cert=root_cert,
-            )
-            # Process --device arguments
-            # Parse each device and add to the tree
-            for device_input in devices:
-                # assemble device params from nArgs strings
-                device_params = self.assemble_nargs_to_dict(device_input)
-                device_id = device_params.get("id", None)
-                if not device_id:
-                    raise InvalidArgumentValueError(
-                        "A device argument is missing required parameter 'id'"
-                    )
-                deployment = device_params.get("deployment", None)
-                if deployment:
-                    deployment = try_parse_valid_deployment_config(deployment)
-                parent_id = device_params.get("parent", None)
-                hostname = device_params.get("hostname", None)
-                edge_agent = device_params.get("edge_agent", None)
-                container_auth_arg = device_params.get("container_auth", "{}")
-                container_auth_obj = process_json_arg(container_auth_arg)
-                container_auth = (
-                    EdgeContainerAuth(
-                        serveraddress=container_auth_obj.get("serveraddress", None),
-                        username=container_auth_obj.get("username", None),
-                        password=container_auth_obj.get("password", None),
-                    )
-                    if container_auth_obj
-                    else None
-                )
-
-                device_config = NestedEdgeDeviceConfig(
-                    device_id=device_id,
-                    deployment=deployment,
-                    parent_id=parent_id,
-                    hostname=hostname,
-                    edge_agent=edge_agent,
-                    container_auth=container_auth,
-                )
-                config.devices.append(device_config)
 
         if not config or not len(config.devices):
             raise InvalidArgumentValueError(
@@ -440,27 +391,6 @@ class DeviceIdentityProvider(IoTHubProvider):
                 self.service_sdk.configuration.apply_on_edge_device(
                     id=device_id, content=deployment_content
                 )
-
-    def assemble_nargs_to_dict(self, hash_list: List[str]) -> Dict[str, str]:
-        result = {}
-        if not hash_list:
-            return result
-        for hash in hash_list:
-            if "=" not in hash:
-                logger.warning(
-                    "Skipping processing of '%s', input format is key=value | key='value value'.",
-                    hash,
-                )
-                continue
-            split_hash = hash.split("=", 1)
-            result[split_hash[0]] = split_hash[1]
-        for key in result:
-            if not result.get(key):
-                logger.warning(
-                    "No value assigned to key '%s', input format is key=value | key='value value'.",
-                    key,
-                )
-        return result
 
     # TODO - Unit test
     def delete_device_identities(

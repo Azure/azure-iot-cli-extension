@@ -17,6 +17,7 @@ from azext_iot.sdk.iothub.service.models import ConfigurationContent
 from azext_iot.iothub import commands_device_identity as subject
 from azext_iot.iothub.edge_device_config import (
     EDGE_ROOT_CERTIFICATE_FILENAME,
+    process_nested_edge_config_args,
     process_nested_edge_config_file_content,
     create_edge_device_config,
     try_parse_valid_deployment_config,
@@ -831,3 +832,103 @@ class TestEdgeHierarchyConfigFunctions:
     def test_process_nested_edge_config_errors(self, content, error):
         with pytest.raises(error):
             process_nested_edge_config_file_content(content)
+
+    @pytest.mark.parametrize(
+        "devices, auth, edge_agent, config_template, expected",
+        [
+            # No extra params
+            (
+                [["id=dev1", "parent=dev2"], ["id=dev2"]],
+                DeviceAuthType.x509_ca.value,
+                None,
+                None,
+                NestedEdgeConfig(
+                    version="1.0",
+                    auth_method=DeviceAuthType.x509_ca.value,
+                    root_cert={
+                        "certificate": "root_certificate",
+                        "thumbprint": "root_thumbprint",
+                        "privateKey": "root_private_key",
+                    },
+                    devices=[
+                        NestedEdgeDeviceConfig(device_id="dev1", parent_id="dev2"),
+                        NestedEdgeDeviceConfig(device_id="dev2"),
+                    ],
+                ),
+            ),
+            # various edge-agent configs
+            (
+                [
+                    ["id=dev1", "edge_agent=new-edge-agent"],
+                    ["id=dev2"],
+                ],
+                DeviceAuthType.x509_ca.value,
+                "default-edge-agent",
+                None,
+                NestedEdgeConfig(
+                    version="1.0",
+                    auth_method=DeviceAuthType.x509_ca.value,
+                    default_edge_agent="default-edge-agent",
+                    root_cert={
+                        "certificate": "root_certificate",
+                        "thumbprint": "root_thumbprint",
+                        "privateKey": "root_private_key",
+                    },
+                    devices=[
+                        NestedEdgeDeviceConfig(
+                            device_id="dev1", edge_agent="new-edge-agent"
+                        ),
+                        NestedEdgeDeviceConfig(
+                            device_id="dev2",
+                        ),
+                    ],
+                ),
+            ),
+            # load device config toml
+            (
+                [
+                    ["id=dev1", "edge_agent=new-edge-agent"],
+                    ["id=dev2"],
+                ],
+                DeviceAuthType.x509_ca.value,
+                None,
+                "hierarchy_configs/device_config.toml",
+                NestedEdgeConfig(
+                    version="1.0",
+                    auth_method=DeviceAuthType.x509_ca.value,
+                    root_cert={
+                        "certificate": "root_certificate",
+                        "thumbprint": "root_thumbprint",
+                        "privateKey": "root_private_key",
+                    },
+                    template_config_path="hierarchy_configs/device_config.toml",
+                    devices=[
+                        NestedEdgeDeviceConfig(
+                            device_id="dev1", edge_agent="new-edge-agent"
+                        ),
+                        NestedEdgeDeviceConfig(
+                            device_id="dev2",
+                        ),
+                    ],
+                ),
+            ),
+        ],
+    )
+    def test_process_nested_edge_config_args(
+        self,
+        set_cwd,
+        patch_create_edge_root_cert,
+        devices,
+        auth,
+        edge_agent,
+        config_template,
+        expected,
+    ):
+        # TODO - spy on toml load (path or object)
+        result = process_nested_edge_config_args(
+            device_args=devices,
+            auth_type=auth,
+            default_edge_agent=edge_agent,
+            device_config_template=config_template,
+        )
+        assert result == expected

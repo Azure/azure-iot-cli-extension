@@ -283,6 +283,16 @@ def load_iothub_arguments(self, _):
             help="Device to hub authorization mechanism.",
         )
         context.argument(
+            "default_edge_agent",
+            options_list=["--default-edge-agent", "--default-agent", "--dea"],
+            help="Default edge agent for created devices.",
+        )
+        context.argument(
+            "device_config_template",
+            options_list=["--device-template", "--dt"],
+            help="Path to config.toml file to use as a basis for edge device configs.",
+        )
+        context.argument(
             "bundle_output_path",
             options_list=[
                 "--output-path",
