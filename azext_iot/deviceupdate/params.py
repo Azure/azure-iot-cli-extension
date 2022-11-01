@@ -47,7 +47,7 @@ def load_deviceupdate_arguments(self, _):
         context.argument(
             "instance_name",
             options_list=["-i", "--instance"],
-            help="Device Update instance name."
+            help="Device Update instance name. "
             "You can configure the default instance name using `az config set defaults.adu_instance=<name>`.",
             arg_group="Account Identifier",
             configured_default="adu_instance",
