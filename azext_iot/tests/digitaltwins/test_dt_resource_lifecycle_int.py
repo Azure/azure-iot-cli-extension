@@ -532,7 +532,6 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         user_identity_id = user_identity["id"]
         target_scope_role = "Contributor"
 
-
         sb_topic_resource_id = self.embedded_cli.invoke(
             "servicebus topic show --namespace-name {} -n {} -g {}".format(
                 EP_SERVICEBUS_NAMESPACE,

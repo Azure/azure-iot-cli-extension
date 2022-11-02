@@ -268,9 +268,13 @@ class ResourceProvider(DigitalTwinsResourceManager):
         )
 
         if bool(identity_role) ^ bool(identity_scopes):
-            raise RequiredArgumentMissingError('At least one scope (--scopes) and one role (--role) required for system-managed identity role assignment.')
+            raise RequiredArgumentMissingError(
+                'At least one scope (--scopes) and one role (--role) required for system-managed identity role assignment.'
+            )
         if not system_identity and not user_identities:
-            raise RequiredArgumentMissingError('No identities provided to assign. Please provide system (--system) or user-assigned identities (--user).')
+            raise RequiredArgumentMissingError(
+                'No identities provided to assign. Please provide system (--system) or user-assigned identities (--user).'
+            )
 
         if not target_instance.identity:
             target_instance.identity = DigitalTwinsIdentity()
@@ -278,16 +282,24 @@ class ResourceProvider(DigitalTwinsResourceManager):
         if user_identities:
             if not target_instance.identity.user_assigned_identities:
                 target_instance.identity.user_assigned_identities = {}
-            for identity in user_identities:
-                target_instance.identity.user_assigned_identities[identity] = target_instance.identity.user_assigned_identities.get(identity, {})
+            for user_identity in user_identities:
+                identity = target_instance.identity.user_assigned_identities.get(user_identity, {})
+                target_instance.identity.user_assigned_identities[user_identity] = identity
 
-
-        has_system_identity = target_instance.identity.type in [IdentityType.system_assigned_user_assigned.value, IdentityType.system_assigned.value]
+        has_system_identity = target_instance.identity.type in [
+            IdentityType.system_assigned_user_assigned.value, IdentityType.system_assigned.value
+        ]
 
         if system_identity or has_system_identity:
-            target_instance.identity.type = IdentityType.system_assigned_user_assigned.value if target_instance.identity.user_assigned_identities else IdentityType.system_assigned.value
+            if target_instance.identity.user_assigned_identities:
+                target_instance.identity.type = IdentityType.system_assigned_user_assigned.value
+            else:
+                target_instance.identity.type = IdentityType.system_assigned.value
         else:
-            target_instance.identity.type = IdentityType.user_assigned.value if target_instance.identity.user_assigned_identities else IdentityType.none.value
+            if target_instance.identity.user_assigned_identities:
+                target_instance.identity.type = IdentityType.user_assigned.value
+            else:
+                target_instance.identity.type = IdentityType.none.value
 
         try:
             update_poller = self.mgmt_sdk.digital_twins.create_or_update(
@@ -341,7 +353,9 @@ class ResourceProvider(DigitalTwinsResourceManager):
         )
 
         if not system_identity and user_identities is None:
-            raise RequiredArgumentMissingError('No identities provided to remove. Please provide system (--system) or user-assigned identities (--user).')
+            raise RequiredArgumentMissingError(
+                'No identities provided to remove. Please provide system (--system) or user-assigned identities (--user).'
+            )
 
         # Turn off system managed identity
         if system_identity:
@@ -350,13 +364,18 @@ class ResourceProvider(DigitalTwinsResourceManager):
                     IdentityType.system_assigned_user_assigned.value
             ]:
                 raise ArgumentUsageError('Digital Twin {} is not currently using a system-assigned identity'.format(name))
-            target_instance.identity.type = IdentityType.user_assigned if target_instance.identity.type == IdentityType.system_assigned_user_assigned.value else IdentityType.none.value
+            elif target_instance.identity.type == IdentityType.system_assigned_user_assigned.value:
+                target_instance.identity.type = IdentityType.user_assigned
+            else:
+                target_instance.identity.type = IdentityType.none.value
 
         if user_identities and target_instance.identity.user_assigned_identities:
             # loop through user_identities to remove
             for identity in user_identities:
                 if not target_instance.identity.user_assigned_identities.get(identity):
-                    raise ArgumentUsageError('Digital Twin {0} is not currently using a user-assigned identity with id: {1}'.format(name, identity))
+                    raise ArgumentUsageError(
+                        'Digital Twin {0} is not currently using a user-assigned identity with id: {1}'.format(name, identity)
+                    )
                 del target_instance.identity.user_assigned_identities[identity]
             if not target_instance.identity.user_assigned_identities:
                 target_instance.identity.user_assigned_identities = None
@@ -367,9 +386,15 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 IdentityType.system_assigned.value,
                 IdentityType.system_assigned_user_assigned.value
         ]:
-            target_instance.identity.type = IdentityType.system_assigned_user_assigned.value if getattr(target_instance.identity, 'user_assigned_identities', None) else IdentityType.system_assigned.value
+            if getattr(target_instance.identity, 'user_assigned_identities', None):
+                target_instance.identity.type = IdentityType.system_assigned_user_assigned.value
+            else:
+                target_instance.identity.type = IdentityType.system_assigned.value
         else:
-            target_instance.identity.type = IdentityType.user_assigned.value if getattr(target_instance.identity, 'user_assigned_identities', None) else IdentityType.none.value
+            if getattr(target_instance.identity, 'user_assigned_identities', None):
+                target_instance.identity.type = IdentityType.user_assigned.value
+            else:
+                target_instance.identity.type = IdentityType.none.value
 
         try:
             update_poller = self.mgmt_sdk.digital_twins.create_or_update(
@@ -448,7 +473,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
         endpoint_name,
         endpoint_resource_type,
         endpoint_resource_name,
-        endpoint_resource_group,
+        endpoint_resource_group=None,
         endpoint_resource_policy=None,
         endpoint_resource_namespace=None,
         endpoint_subscription=None,
@@ -505,6 +530,8 @@ class ResourceProvider(DigitalTwinsResourceManager):
         )
         if not resource_group_name:
             resource_group_name = self.get_rg(target_instance)
+
+        endpoint_resource_group = endpoint_resource_group or resource_group_name
 
         from azext_iot.digitaltwins.providers.endpoint.builders import build_endpoint
 

@@ -202,7 +202,7 @@ def load_digitaltwins_arguments(self, _):
         context.argument(
             "eventgrid_resource_group",
             options_list=["--eventgrid-resource-group", "--egg"],
-            help="Name of EventGrid Topic resource group.",
+            help="Name of EventGrid Topic resource group. If not provided, the Digital Twin's resource group will be used.",
             arg_group="Event Grid Topic",
         )
         context.argument(
@@ -211,6 +211,13 @@ def load_digitaltwins_arguments(self, _):
             help="Name or ID of subscription where the endpoint resource exists. "
             "If no subscription is provided the default subscription is used.",
             arg_group="Event Grid Topic",
+        )
+        context.argument(
+            "auth_type",
+            options_list=["--auth-type"],
+            help="Endpoint authentication type.",
+            arg_type=get_enum_type(ADTEndpointAuthType),
+            deprecate_info=context.deprecate(redirect="identity", hide=True)
         )
 
     with self.argument_context("dt endpoint create eventhub") as context:
@@ -235,7 +242,7 @@ def load_digitaltwins_arguments(self, _):
         context.argument(
             "eventhub_resource_group",
             options_list=["--eventhub-resource-group", "--ehg"],
-            help="Name of EventHub resource group.",
+            help="Name of EventHub resource group. If not provided, the Digital Twin's resource group will be used.",
             arg_group="Event Hub",
         )
         context.argument(
@@ -268,7 +275,7 @@ def load_digitaltwins_arguments(self, _):
         context.argument(
             "servicebus_resource_group",
             options_list=["--servicebus-resource-group", "--sbg"],
-            help="Name of ServiceBus resource group.",
+            help="Name of ServiceBus resource group. If not provided, the Digital Twin's resource group will be used.",
             arg_group="Service Bus Topic",
         )
         context.argument(
