@@ -413,7 +413,7 @@ def load_digitaltwins_help():
     """
 
     helps["dt identity assign"] = """
-        type: group
+        type: command
         short-summary: Assign managed identities to a Digital Twins instance.
 
         examples:
@@ -426,11 +426,11 @@ def load_digitaltwins_help():
     """
 
     helps["dt identity remove"] = """
-        type: group
+        type: command
         short-summary: Remove managed identities from a Digital Twins instance.
 
         examples:
-        - name: Remove a system-assigned identity from a Digital Twins instance.
+        - name: Remove the system-assigned identity from a Digital Twins instance.
           text: >
             az dt identity remove -n {instance_name} --system
         - name: Remove two user-assigned identities from a Digital Twins instance.
@@ -442,13 +442,13 @@ def load_digitaltwins_help():
     """
 
     helps["dt identity show"] = """
-        type: group
+        type: command
         short-summary: Show the identity properties of a Digital Twins instance.
 
         examples:
         - name: Show identity properties of a Digital Twins instance.
           text: >
-            az dt identity assign -n {instance_name} -g {resource_group}
+            az dt identity show -n {instance_name} -g {resource_group}
     """
 
     helps["dt network"] = """

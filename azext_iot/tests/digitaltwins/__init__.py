@@ -537,7 +537,7 @@ class DTLiveScenarioTest(LiveScenarioTest):
             )
         ).get_output_in_json()
 
-    def assign_role_assignment(self, scope, role, assignee, max_tries = 10):
+    def assign_role_assignment(self, scope, role, assignee, max_tries=10):
         tries = 0
         while tries < max_tries:
             role_assignments = self.get_role_assignment(scope, role, assignee)
