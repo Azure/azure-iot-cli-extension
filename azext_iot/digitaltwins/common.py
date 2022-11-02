@@ -99,7 +99,7 @@ class ADTModelCreateFailurePolicy(Enum):
 
 class IdentityType(Enum):
     """
-    Type of managed identity for the IoT Hub.
+    Type of managed identity for the Digital Twin.
     """
     system_assigned = "SystemAssigned"
     user_assigned = "UserAssigned"

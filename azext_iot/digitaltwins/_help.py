@@ -32,12 +32,20 @@ def load_digitaltwins_help():
 
         - name: Create instance in the target resource group with a system managed identity.
           text: >
-            az dt create -n {instance_name} -g {resouce_group} --assign-identity
+            az dt create -n {instance_name} -g {resouce_group} --mi-system-assigned
+
+        - name: Create instance in the target resource group with a user managed identity.
+          text: >
+            az dt create -n {instance_name} -g {resouce_group} --mi-user-assigned {resource_id}
+
+        - name: Create instance in the target resource group with a system managed identity and multiple user managed identities.
+          text: >
+            az dt create -n {instance_name} -g {resouce_group} --mi-system-assigned --mi-user-assigned {resource_id} {resource_id}
 
         - name: Create instance in the target resource group with a system managed identity then
                 assign the identity to one or more scopes (space-separated) with the role of Contributor.
           text: >
-            az dt create -n {instance_name} -g {resouce_group} --assign-identity
+            az dt create -n {instance_name} -g {resouce_group} --mi-system-assigned
             --scopes
             "/subscriptions/a12345ea-bb21-994d-2263-c716348e32a1/resourceGroups/ProResourceGroup/providers/Microsoft.EventHub/namespaces/myEventHubNamespace/eventhubs/myEventHub"
             "/subscriptions/a12345ea-bb21-994d-2263-c716348e32a1/resourceGroups/ProResourceGroup/providers/Microsoft.ServiceBus/namespaces/myServiceBusNamespace/topics/myTopic"
@@ -45,19 +53,11 @@ def load_digitaltwins_help():
         - name: Create instance in the target resource group with a system managed identity then
                 assign the identity to one or more scopes with a custom specified role.
           text: >
-            az dt create -n {instance_name} -g {resouce_group} --assign-identity
+            az dt create -n {instance_name} -g {resouce_group} --mi-system-assigned
             --scopes
             "/subscriptions/a12345ea-bb21-994d-2263-c716348e32a1/resourceGroups/ProResourceGroup/providers/Microsoft.EventHub/namespaces/myEventHubNamespace/eventhubs/myEventHub"
             "/subscriptions/a12345ea-bb21-994d-2263-c716348e32a1/resourceGroups/ProResourceGroup/providers/Microsoft.ServiceBus/namespaces/myServiceBusNamespace/topics/myTopic"
             --role MyCustomRole
-
-        - name: Update an instance in the target resource group to enable system managed identity.
-          text: >
-            az dt create -n {instance_name} -g {resouce_group} --assign-identity
-
-        - name: Update an instance in the target resource group to disable system managed identity.
-          text: >
-            az dt create -n {instance_name} -g {resouce_group} --assign-identity false
 
         - name: Update an instance in the target resource group with new tag values and disable public network access.
           text: >
@@ -271,6 +271,7 @@ def load_digitaltwins_help():
         type: command
         short-summary: Adds an EventGrid Topic endpoint to a Digital Twins instance.
             Requires pre-created resource.
+        long-summary: EventGrid topic endpoints do not support identity based endpoint integration.
 
         examples:
         - name: Adds an EventGrid Topic endpoint to a target instance.
@@ -306,7 +307,6 @@ def load_digitaltwins_help():
             --eventhub-resource-group {eventhub_resource_group}
             --eventhub-namespace {eventhub_namespace}
             --eventhub {eventhub_name}
-            --auth-type IdentityBased
             --identity [system]
             -n {instance_name}
 
@@ -316,7 +316,6 @@ def load_digitaltwins_help():
             --eventhub-resource-group {eventhub_resource_group}
             --eventhub-namespace {eventhub_namespace}
             --eventhub {eventhub_name}
-            --auth-type IdentityBased
             --identity {resource_id}
             -n {instance_name}
     """
@@ -340,12 +339,22 @@ def load_digitaltwins_help():
             --servicebus-policy {servicebus_policy}
             -n {instance_name}
 
-        - name: Adds a ServiceBus Topic endpoint to a target instance using Identity based auth.
+        - name: Adds a ServiceBus Topic endpoint to a target instance using system-assigned identity authentication.
           text: >
             az dt endpoint create servicebus --endpoint-name {endpoint_name}
             --servicebus-resource-group {servicebus_resource_group}
             --servicebus-namespace {servicebus_namespace}
             --servicebus-topic {servicebus_topic_name}
+            --identity [system]
+            -n {instance_name}
+
+        - name: Adds a ServiceBus Topic endpoint to a target instance using user-assigned identity authentication.
+          text: >
+            az dt endpoint create servicebus --endpoint-name {endpoint_name}
+            --servicebus-resource-group {servicebus_resource_group}
+            --servicebus-namespace {servicebus_namespace}
+            --servicebus-topic {servicebus_topic_name}
+            --identity {resource_id}
             -n {instance_name}
     """
 

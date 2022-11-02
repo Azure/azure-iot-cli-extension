@@ -128,6 +128,7 @@ def load_digitaltwins_arguments(self, _):
             arg_group="Managed Service Identity",
             help="Assign a system generated identity to the Digital Twins instance.",
             arg_type=get_three_state_flag(),
+            deprecate_info=context.deprecate(redirect="--mi-system-assigned")
         )
         context.argument(
             "scopes",
@@ -141,6 +142,19 @@ def load_digitaltwins_arguments(self, _):
             arg_group="Managed Service Identity",
             options_list=["--role"],
             help="Role name or Id the system assigned identity will have.",
+        )
+        context.argument(
+            "system_identity",
+            arg_group="Managed Service Identity",
+            options_list=["--mi-system-assigned"],
+            help="Assign a system generated identity to the Digital Twins instance.",
+        )
+        context.argument(
+            "user_identities",
+            arg_group="Managed Service Identity",
+            nargs="+",
+            options_list=["--mi-user-assigned"],
+            help="Space-separated user identities resource ids to add to the Digital Twins instance.",
         )
 
     with self.argument_context("dt wait") as context:
@@ -164,13 +178,17 @@ def load_digitaltwins_arguments(self, _):
             options_list=["--auth-type"],
             help="Endpoint authentication type.",
             arg_type=get_enum_type(ADTEndpointAuthType),
+            deprecate_info=context.deprecate(redirect="identity")
         )
         context.argument(
             "identity",
             options_list=["--identity"],
+            nargs="?",
+            const="[system]",
             help="Managed identity type to determine if system assigned managed identity or "
             "user assigned managed identity is used. For system assigned managed identity, use [system]. "
-            "For user assigned managed identity, provide the user assigned managed identity resource id."
+            "For user assigned managed identity, provide the user assigned managed identity resource id. "
+            "For key-based authentication methods, do not provide this parameter."
         )
 
     with self.argument_context("dt endpoint create eventgrid") as context:

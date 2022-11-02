@@ -28,6 +28,8 @@ def create_instance(
     scopes=None,
     role_type="Contributor",
     public_network_access=ADTPublicNetworkAccessType.enabled.value,
+    system_identity=None,
+    user_identities=None,
     no_wait=False,
 ):
     if no_wait and scopes:
@@ -44,6 +46,8 @@ def create_instance(
         scopes=scopes,
         role_type=role_type,
         public_network_access=public_network_access,
+        system_identity=system_identity,
+        user_identities=user_identities
     )
 
 

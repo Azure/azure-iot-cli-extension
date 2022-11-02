@@ -54,6 +54,8 @@ class ResourceProvider(DigitalTwinsResourceManager):
         scopes=None,
         role_type="Contributor",
         public_network_access=ADTPublicNetworkAccessType.enabled.value,
+        system_identity=None,
+        user_identities=None
     ):
         if not location:
             from azext_iot.common.embedded_cli import EmbeddedCLI
@@ -65,16 +67,33 @@ class ResourceProvider(DigitalTwinsResourceManager):
             location = resource_group_meta["location"]
 
         try:
-            if assign_identity:
+            # Temporary make the deprecated assign_identity param work for now
+            if assign_identity and not system_identity:
+                system_identity = assign_identity
+
+            if system_identity:
                 if scopes and not role_type:
                     raise RequiredArgumentMissingError(
                         "Both --scopes and --role values are required when assigning the instance identity."
                     )
 
+            identity = {"type": IdentityType.none.value}
+            if system_identity and user_identities:
+                identity["type"] = IdentityType.system_assigned_user_assigned.value
+            elif user_identities:
+                identity["type"] = IdentityType.user_assigned.value
+            elif system_identity:
+                identity["type"] = IdentityType.system_assigned.value
+
+            if user_identities:
+                identity["userAssignedIdentities"] = {}
+                for user_identity in user_identities:
+                    identity["userAssignedIdentities"][user_identity] = {}
+
             digital_twins_create = DigitalTwinsDescription(
                 location=location,
                 tags=tags,
-                identity={"type": "SystemAssigned" if assign_identity else "None"},
+                identity=identity,
                 public_network_access=public_network_access,
             )
             create_or_update = self.mgmt_sdk.digital_twins.create_or_update(
@@ -441,6 +460,13 @@ class ResourceProvider(DigitalTwinsResourceManager):
         identity=None,
     ):
         from azext_iot.digitaltwins.common import ADTEndpointType
+
+        # do not break users who are still using auth_type to make identity based endpoints
+        if not identity and auth_type == ADTEndpointAuthType.identitybased.value:
+            identity = "[system]"
+
+        # Determine auth type from identity
+        auth_type = ADTEndpointAuthType.identitybased.value if identity else ADTEndpointAuthType.keybased.value
 
         requires_namespace = [
             ADTEndpointType.eventhub.value,

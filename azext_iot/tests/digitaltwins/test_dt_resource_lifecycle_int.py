@@ -132,7 +132,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         # Assert that --no-wait and --scopes will not work
         self.cmd(
-            "dt create -n {} -g {} --assign-identity --scopes {} --no-wait".format(
+            "dt create -n {} -g {} --mi-system-assigned --scopes {} --no-wait".format(
                 instance_names[1], self.rg, " ".join(scope_ids)
             ),
             expect_failure=True,
@@ -140,7 +140,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         # No location specified. Use the resource group location.
         create_msi_output = self.cmd(
-            "dt create -n {} -g {} --assign-identity --scopes {}".format(
+            "dt create -n {} -g {} --mi-system-assigned --scopes {}".format(
                 instance_names[1], self.rg, " ".join(scope_ids)
             )
         ).get_output_in_json()
@@ -190,7 +190,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         updated_tags = "env=test tier=premium"
         updated_tags_dict = {"env": "test", "tier": "premium"}
         self.cmd(
-            "dt create -n {} -g {} --assign-identity false --tags {} --no-wait".format(
+            "dt create -n {} -g {} --mi-system-assigned false --tags {} --no-wait".format(
                 instance_names[1], self.rg, updated_tags
             )
         )
@@ -350,7 +350,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         ).as_json()["id"]
         self.region = "westcentralus"
         endpoint_instance = self.cmd(
-            "dt create -n {} -g {} -l {} --assign-identity --scopes {} {} --role {}".format(
+            "dt create -n {} -g {} -l {} --mi-system-assigned --scopes {} {} --role {}".format(
                 endpoints_instance_name,
                 self.rg,
                 self.region,
@@ -430,7 +430,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         logger.debug("Adding identity based eventhub endpoint...")
         self.cmd(
             "dt endpoint create eventhub -n {} --ehg {} --ehn {} --eh {} --ehs {} --en {} --du {} "
-            "--auth-type IdentityBased --no-wait".format(
+            "--identity [system] --no-wait".format(
                 endpoints_instance_name,
                 EP_RG,
                 EP_EVENTHUB_NAMESPACE,
@@ -527,7 +527,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         endpoints_instance_name = generate_resource_id()
         user_identity = self.ensure_user_identity()
         # TODO: lower sleep time to necessary amount
-        sleep(60)
+        sleep(45)
         user_identity_principal_id = user_identity["principalId"]
         user_identity_id = user_identity["id"]
         target_scope_role = "Contributor"
@@ -558,24 +558,17 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         )
 
         endpoint_instance = self.cmd(
-            "dt create -n {} -g {} -l {} --assign-identity --scopes {} {} --role {}".format(
+            "dt create -n {} -g {} -l {} --mi-system-assigned --scopes {} {} --role {} --mi-user-assigned {}".format(
                 endpoints_instance_name,
                 self.rg,
                 self.region,
                 sb_topic_resource_id,
                 eh_resource_id,
                 target_scope_role,
+                user_identity_id
             )
         ).get_output_in_json()
         self.track_instance(endpoint_instance)
-
-        self.cmd(
-            "dt identity assign -n {} -g {} --user {}".format(
-                endpoints_instance_name,
-                self.rg,
-                user_identity_id
-            )
-        )
 
         EndpointTuple = namedtuple(
             "endpoint_tuple", ["endpoint_name", "endpoint_type", "auth_type"]
@@ -753,7 +746,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         logger.debug("Adding identity based servicebus topic endpoint...")
         add_ep_sb_identity_output = self.cmd(
-            "dt endpoint create servicebus -n {} --sbg {} --sbn {} --sbt {} --en {} --du {} --auth-type IdentityBased --identity [system]".format(
+            "dt endpoint create servicebus -n {} --sbg {} --sbn {} --sbt {} --en {} --du {} --identity [system]".format(
                 endpoints_instance_name,
                 EP_RG,
                 EP_SERVICEBUS_NAMESPACE,
@@ -788,7 +781,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         logger.debug("Adding User identity based servicebus topic endpoint...")
         add_ep_sb_identity_output = self.cmd(
-            "dt endpoint create servicebus -n {} --sbg {} --sbn {} --sbt {} --en {} --du {} --auth-type IdentityBased --identity {}".format(
+            "dt endpoint create servicebus -n {} --sbg {} --sbn {} --sbt {} --en {} --du {} --identity {}".format(
                 endpoints_instance_name,
                 EP_RG,
                 EP_SERVICEBUS_NAMESPACE,
@@ -865,10 +858,11 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             )
         )
 
+        # Identity present without any input is system assigned identity
         logger.debug("Adding identity based eventhub endpoint...")
         add_ep_output = self.cmd(
             "dt endpoint create eventhub -n {} --ehg {} --ehn {} --eh {} --ehs {} --en {} --du {} "
-            "--auth-type IdentityBased".format(
+            "--identity".format(
                 endpoints_instance_name,
                 EP_RG,
                 EP_EVENTHUB_NAMESPACE,
@@ -906,7 +900,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         self.cmd(
             "dt endpoint create eventhub -n {} --ehg {} --ehn {} --eh {} --ehs {} --en {} --du {} "
-            "--auth-type IdentityBased --no-wait".format(
+            "--identity --no-wait".format(
                 endpoints_instance_name,
                 EP_RG,
                 EP_EVENTHUB_NAMESPACE,
@@ -951,7 +945,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         logger.debug("Adding user identity based eventhub endpoint...")
         add_ep_output = self.cmd(
             "dt endpoint create eventhub -n {} --ehg {} --ehn {} --eh {} --ehs {} --en {} --du {} "
-            "--auth-type IdentityBased --identity {}".format(
+            "--identity {}".format(
                 endpoints_instance_name,
                 EP_RG,
                 EP_EVENTHUB_NAMESPACE,
@@ -1208,7 +1202,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
 
 def assert_common_resource_attributes(
-    instance_output, resource_id, group_id, location, tags=None, assign_identity=False
+    instance_output, resource_id, group_id, location, tags=None, assign_identity=None
 ):
     assert instance_output["createdTime"]
     assert_system_data_attributes(instance_output.get("systemData"))
