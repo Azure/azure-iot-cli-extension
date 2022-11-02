@@ -119,7 +119,6 @@ def add_endpoint_eventgrid(
     dead_letter_uri=None,
     dead_letter_secret=None,
     auth_type=ADTEndpointAuthType.keybased.value,
-    # identity=None,
 ):
     rp = ResourceProvider(cmd)
     return rp.add_endpoint(
@@ -133,7 +132,6 @@ def add_endpoint_eventgrid(
         dead_letter_uri=dead_letter_uri,
         dead_letter_secret=dead_letter_secret,
         auth_type=auth_type,
-        # identity=identity,
     )
 
 
@@ -150,7 +148,8 @@ def add_endpoint_servicebus(
     dead_letter_uri=None,
     dead_letter_secret=None,
     auth_type=ADTEndpointAuthType.keybased.value,
-    identity=None,
+    system_identity=None,
+    user_identity=None,
 ):
     rp = ResourceProvider(cmd)
     return rp.add_endpoint(
@@ -166,7 +165,8 @@ def add_endpoint_servicebus(
         dead_letter_uri=dead_letter_uri,
         dead_letter_secret=dead_letter_secret,
         auth_type=auth_type,
-        identity=identity,
+        system_identity=system_identity,
+        user_identity=user_identity
     )
 
 
@@ -183,7 +183,8 @@ def add_endpoint_eventhub(
     dead_letter_uri=None,
     dead_letter_secret=None,
     auth_type=ADTEndpointAuthType.keybased.value,
-    identity=None,
+    system_identity=None,
+    user_identity=None,
 ):
     rp = ResourceProvider(cmd)
     return rp.add_endpoint(
@@ -199,7 +200,8 @@ def add_endpoint_eventhub(
         dead_letter_uri=dead_letter_uri,
         dead_letter_secret=dead_letter_secret,
         auth_type=auth_type,
-        identity=identity,
+        system_identity=system_identity,
+        user_identity=user_identity
     )
 
 

@@ -182,14 +182,16 @@ def load_digitaltwins_arguments(self, _):
             deprecate_info=context.deprecate(redirect="identity")
         )
         context.argument(
-            "identity",
-            options_list=["--identity"],
-            nargs="?",
-            const="[system]",
-            help="Managed identity type to determine if system assigned managed identity or "
-            "user assigned managed identity is used. For system assigned managed identity, use [system]. "
-            "For user assigned managed identity, provide the user assigned managed identity resource id. "
-            "For key-based authentication methods, do not provide this parameter."
+            'system_identity',
+            options_list=['--mi-system-assigned', '--system'],
+            arg_type=get_three_state_flag(),
+            help="Use a system-assigned managed identity for endpoint authentication."
+        )
+        context.argument(
+            'user_identity',
+            options_list=['--mi-user-assigned', '--user'],
+            help="Use an user-assigned managed identities for endpoint authentication. "
+            "Accepts the identity resource ID."
         )
 
     with self.argument_context("dt endpoint create eventgrid") as context:
@@ -292,14 +294,13 @@ def load_digitaltwins_arguments(self, _):
     with self.argument_context("dt identity assign") as context:
         context.argument(
             'system_identity',
-            options_list=['--system-assigned', '--system'],
+            options_list=['--mi-system-assigned', '--system'],
             arg_type=get_three_state_flag(),
-            nargs='*',
             help="Assign a system-assigned managed identity to this Digital Twin."
         )
         context.argument(
             'user_identities',
-            options_list=['--user-assigned', '--user'],
+            options_list=['--mi-user-assigned', '--user'],
             nargs='+',
             help="Assign user-assigned managed identities to this Digital Twin. "
             "Accepts space-separated list of identity resource IDs."

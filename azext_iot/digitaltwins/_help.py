@@ -307,7 +307,7 @@ def load_digitaltwins_help():
             --eventhub-resource-group {eventhub_resource_group}
             --eventhub-namespace {eventhub_namespace}
             --eventhub {eventhub_name}
-            --identity [system]
+            --system
             -n {instance_name}
 
         - name: Adds an EventHub endpoint to a target instance using a user-assigned identity authentication.
@@ -316,7 +316,7 @@ def load_digitaltwins_help():
             --eventhub-resource-group {eventhub_resource_group}
             --eventhub-namespace {eventhub_namespace}
             --eventhub {eventhub_name}
-            --identity {resource_id}
+            --user {resource_id}
             -n {instance_name}
     """
 
@@ -345,7 +345,7 @@ def load_digitaltwins_help():
             --servicebus-resource-group {servicebus_resource_group}
             --servicebus-namespace {servicebus_namespace}
             --servicebus-topic {servicebus_topic_name}
-            --identity [system]
+            --system
             -n {instance_name}
 
         - name: Adds a ServiceBus Topic endpoint to a target instance using user-assigned identity authentication.
@@ -354,7 +354,7 @@ def load_digitaltwins_help():
             --servicebus-resource-group {servicebus_resource_group}
             --servicebus-namespace {servicebus_namespace}
             --servicebus-topic {servicebus_topic_name}
-            --identity {resource_id}
+            --user {resource_id}
             -n {instance_name}
     """
 

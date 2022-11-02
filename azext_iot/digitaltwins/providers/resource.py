@@ -8,6 +8,7 @@ from azure.cli.core.azclierror import (
     InvalidArgumentValueError,
     RequiredArgumentMissingError,
     ResourceNotFoundError,
+    MutuallyExclusiveArgumentError
 )
 from azext_iot.digitaltwins.common import (
     DEFAULT_CONSUMER_GROUP,
@@ -482,9 +483,17 @@ class ResourceProvider(DigitalTwinsResourceManager):
         resource_group_name=None,
         timeout=20,
         auth_type=None,
-        identity=None,
+        system_identity=None,
+        user_identity=None,
     ):
         from azext_iot.digitaltwins.common import ADTEndpointType
+
+        if system_identity and user_identity:
+            raise MutuallyExclusiveArgumentError(
+                "Only one type of identity is permitted for endpoint creation."
+            )
+
+        identity = "[system]" if system_identity else user_identity
 
         # do not break users who are still using auth_type to make identity based endpoints
         if not identity and auth_type == ADTEndpointAuthType.identitybased.value:

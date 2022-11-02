@@ -430,7 +430,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         logger.debug("Adding identity based eventhub endpoint...")
         self.cmd(
             "dt endpoint create eventhub -n {} --ehg {} --ehn {} --eh {} --ehs {} --en {} --du {} "
-            "--identity [system] --no-wait".format(
+            "--system --no-wait".format(
                 endpoints_instance_name,
                 EP_RG,
                 EP_EVENTHUB_NAMESPACE,
@@ -745,7 +745,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         logger.debug("Adding identity based servicebus topic endpoint...")
         add_ep_sb_identity_output = self.cmd(
-            "dt endpoint create servicebus -n {} --sbg {} --sbn {} --sbt {} --en {} --du {} --identity [system]".format(
+            "dt endpoint create servicebus -n {} --sbg {} --sbn {} --sbt {} --en {} --du {} --system".format(
                 endpoints_instance_name,
                 EP_RG,
                 EP_SERVICEBUS_NAMESPACE,
@@ -780,7 +780,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         logger.debug("Adding User identity based servicebus topic endpoint...")
         add_ep_sb_identity_output = self.cmd(
-            "dt endpoint create servicebus -n {} --sbg {} --sbn {} --sbt {} --en {} --du {} --identity {}".format(
+            "dt endpoint create servicebus -n {} --sbg {} --sbn {} --sbt {} --en {} --du {} --user {}".format(
                 endpoints_instance_name,
                 EP_RG,
                 EP_SERVICEBUS_NAMESPACE,
@@ -820,6 +820,23 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         eventhub_endpoint_msi = "{}identity".format(eventhub_endpoint)
         eventhub_endpoint_uai = "{}user".format(eventhub_endpoint)
 
+        # Cannot use both system and user identities
+        add_ep_output = self.cmd(
+            "dt endpoint create eventhub -n {} --ehg {} --ehn {} --ehp {} --eh {} --ehs {} --en {}"
+            " --dsu '{}' --system --user {}".format(
+                endpoints_instance_name,
+                EP_RG,
+                EP_EVENTHUB_NAMESPACE,
+                EP_EVENTHUB_POLICY,
+                EP_EVENTHUB_TOPIC,
+                self.current_subscription,
+                eventhub_endpoint,
+                MOCK_DEAD_LETTER_SECRET,
+                user_identity_id
+            ),
+            expect_failure=True
+        )
+
         logger.debug("Adding key based eventhub endpoint...")
         add_ep_output = self.cmd(
             "dt endpoint create eventhub -n {} --ehg {} --ehn {} --ehp {} --eh {} --ehs {} --en {} --dsu '{}'".format(
@@ -857,11 +874,10 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             )
         )
 
-        # Identity present without any input is system assigned identity
         logger.debug("Adding identity based eventhub endpoint...")
         add_ep_output = self.cmd(
             "dt endpoint create eventhub -n {} --ehg {} --ehn {} --eh {} --ehs {} --en {} --du {} "
-            "--identity".format(
+            "--system".format(
                 endpoints_instance_name,
                 EP_RG,
                 EP_EVENTHUB_NAMESPACE,
@@ -899,7 +915,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         self.cmd(
             "dt endpoint create eventhub -n {} --ehg {} --ehn {} --eh {} --ehs {} --en {} --du {} "
-            "--identity --no-wait".format(
+            "--system --no-wait".format(
                 endpoints_instance_name,
                 EP_RG,
                 EP_EVENTHUB_NAMESPACE,
@@ -944,7 +960,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         logger.debug("Adding user identity based eventhub endpoint...")
         add_ep_output = self.cmd(
             "dt endpoint create eventhub -n {} --ehg {} --ehn {} --eh {} --ehs {} --en {} --du {} "
-            "--identity {}".format(
+            "--user {}".format(
                 endpoints_instance_name,
                 EP_RG,
                 EP_EVENTHUB_NAMESPACE,
