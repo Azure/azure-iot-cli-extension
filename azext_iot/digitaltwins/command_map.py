@@ -135,7 +135,7 @@ def load_digitaltwins_commands(self, _):
     ) as cmd_group:
         cmd_group.command("assign", "assign_identity", transform=IdentityResultTransform(self.cli_ctx))
         cmd_group.command("remove", "remove_identity", transform=IdentityResultTransform(self.cli_ctx))
-        cmd_group.command("show", "show_identity")
+        cmd_group.show_command("show", "show_identity")
 
     with self.command_group(
         "dt role-assignment", command_type=digitaltwins_rbac_ops
