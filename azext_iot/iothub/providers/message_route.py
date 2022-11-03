@@ -145,16 +145,8 @@ class MessageRoute(IoTHubResourceProvider):
 
         # for all types, need to test all types one by one
         routes = []
-        all_route_types = [
-            RouteSourceType.DeviceConnectionStateEvents.value,
-            RouteSourceType.DeviceJobLifecycleEvents.value,
-            RouteSourceType.DeviceLifecycleEvents.value,
-            RouteSourceType.DeviceMessages.value,
-            RouteSourceType.DigitalTwinChangeEvents.value,
-            RouteSourceType.TwinChangeEvents.value
-        ]
         fallback = None
-        for type in all_route_types:
+        for type in RouteSourceType.list():
             test_all_routes_input = {
                 "routingSource": type,
                 "message": route_message,

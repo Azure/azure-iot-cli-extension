@@ -62,3 +62,7 @@ class RouteSourceType(Enum):
     DeviceJobLifecycleEvents = 'devicejoblifecycleevents'
     DigitalTwinChangeEvents = 'digitaltwinchangeevents'
     DeviceConnectionStateEvents = 'deviceconnectionstateevents'
+
+    @classmethod
+    def list(cls):
+        return list(map(lambda c: c.value, cls))
