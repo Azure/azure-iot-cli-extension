@@ -348,7 +348,6 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 EP_RG,
             )
         ).as_json()["id"]
-        self.region = "westcentralus"
         endpoint_instance = self.cmd(
             "dt create -n {} -g {} -l {} --mi-system-assigned --scopes {} {} --role {}".format(
                 endpoints_instance_name,
@@ -386,10 +385,10 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         logger.debug("Adding key based eventgrid endpoint...")
         self.cmd(
-            "dt endpoint create eventgrid -n {} -g {} --egg {} --egt {} --en {} --dsu {} --no-wait".format(
+            "dt endpoint create eventgrid -n {} -g {} {} --egt {} --en {} --dsu {} --no-wait".format(
                 endpoints_instance_name,
                 self.rg,
-                EP_RG,
+                "" if EP_RG == self.rg else f"--egg {EP_RG}",
                 EP_EVENTGRID_TOPIC,
                 eventgrid_endpoint,
                 MOCK_DEAD_LETTER_SECRET,
@@ -407,9 +406,9 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         logger.debug("Adding key based servicebus topic endpoint...")
         self.cmd(
-            "dt endpoint create servicebus -n {} --sbg {} --sbn {} --sbp {} --sbt {} --en {} --dsu {} --no-wait".format(
+            "dt endpoint create servicebus -n {} {} --sbn {} --sbp {} --sbt {} --en {} --dsu {} --no-wait".format(
                 endpoints_instance_name,
-                EP_RG,
+                "" if EP_RG == self.rg else f"--sbg {EP_RG}",
                 EP_SERVICEBUS_NAMESPACE,
                 EP_SERVICEBUS_POLICY,
                 EP_SERVICEBUS_TOPIC,
@@ -429,10 +428,10 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         logger.debug("Adding identity based eventhub endpoint...")
         self.cmd(
-            "dt endpoint create eventhub -n {} --ehg {} --ehn {} --eh {} --ehs {} --en {} --du {} "
+            "dt endpoint create eventhub -n {} {} --ehn {} --eh {} --ehs {} --en {} --du {} "
             "--system --no-wait".format(
                 endpoints_instance_name,
-                EP_RG,
+                "" if EP_RG == self.rg else f"--ehg {EP_RG}",
                 EP_EVENTHUB_NAMESPACE,
                 EP_EVENTHUB_TOPIC,
                 self.current_subscription,
