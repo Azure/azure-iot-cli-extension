@@ -409,21 +409,34 @@ def process_nested_edge_config_args(
         root_cert=root_cert,
     )
     # Process --device arguments
+    all_devices: Dict[str, Dict[str, str]] = {}
     for device_input in device_args:
         # assemble device params from nArgs strings
-        device_params = assemble_nargs_to_dict(device_input)
-        device_id = device_params.get("id", None)
+        device_dict = assemble_nargs_to_dict(device_input)
+        device_id = device_dict.get("id", None)
         if not device_id:
             raise InvalidArgumentValueError(
                 "A device argument is missing required parameter 'id'"
             )
-        deployment = device_params.get("deployment", None)
+        if all_devices.get(device_id, None):
+            raise InvalidArgumentValueError(
+                f"Duplicate deviceId '{device_id}' detected"
+            )
+        all_devices[device_id] = device_dict
+
+    for device_id in all_devices:
+        device_dict = all_devices[device_id]
+        deployment = device_dict.get("deployment", None)
         if deployment:
             deployment = try_parse_valid_deployment_config(deployment)
-        parent_id = device_params.get("parent", None)
-        hostname = device_params.get("hostname", None)
-        edge_agent = device_params.get("edge_agent", None)
-        container_auth_arg = device_params.get("container_auth", "{}")
+        parent_id = device_dict.get("parent", None)
+        parent_hostname = None
+        if parent_id:
+            parent = all_devices.get(parent_id, {})
+            parent_hostname = parent.get("hostname", None)
+        hostname = device_dict.get("hostname", None)
+        edge_agent = device_dict.get("edge_agent", None)
+        container_auth_arg = device_dict.get("container_auth", "{}")
         container_auth_obj = process_json_arg(container_auth_arg)
         container_auth = (
             EdgeContainerAuth(
@@ -434,12 +447,12 @@ def process_nested_edge_config_args(
             if container_auth_obj
             else None
         )
-
         device_config = NestedEdgeDeviceConfig(
             device_id=device_id,
             deployment=deployment,
             parent_id=parent_id,
             hostname=hostname,
+            parent_hostname=parent_hostname,
             edge_agent=edge_agent,
             container_auth=container_auth,
         )

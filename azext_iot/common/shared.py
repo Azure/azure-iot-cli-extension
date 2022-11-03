@@ -10,7 +10,7 @@ shared: Define shared data types(enums); hub and dps connection string functions
 """
 
 from enum import Enum
-from typing import NamedTuple, Optional, Any, Dict, List
+from typing import NamedTuple, Optional, Dict, List
 from azext_iot.sdk.iothub.service.models import ConfigurationContent
 
 
@@ -324,7 +324,6 @@ class EdgeContainerAuth(NamedTuple):
 class NestedEdgeDeviceConfig(NamedTuple):
     device_id: str
     deployment: Optional[ConfigurationContent] = None
-    config: Optional[Any] = None
     parent_id: Optional[str] = None
     hostname: Optional[str] = None
     parent_hostname: Optional[str] = None

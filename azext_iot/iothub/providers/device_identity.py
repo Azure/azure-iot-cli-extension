@@ -297,9 +297,9 @@ class DeviceIdentityProvider(IoTHubProvider):
                 content=create_nested_edge_device_config_script(
                     device_id=device_id,
                     hub_auth=hub_cert_auth,
-                    hostname=device_config.hostname,
-                    has_parent=(device_config.parent_id is not None),
-                    parent_hostname=device_config.parent_hostname,
+                    hostname=device.hostname,
+                    has_parent=(device.parent_id is not None),
+                    parent_hostname=device.parent_hostname,
                 ),
                 destination=device_cert_output_directory,
                 file_name="install.sh",

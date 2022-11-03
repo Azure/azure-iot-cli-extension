@@ -887,8 +887,8 @@ class TestEdgeHierarchyConfigFunctions:
             # load device config toml
             (
                 [
-                    ["id=dev1", "edge_agent=new-edge-agent"],
-                    ["id=dev2"],
+                    ["id=dev1", "edge_agent=new-edge-agent", "hostname=dev1"],
+                    ["id=dev2", "hostname=dev2"],
                 ],
                 DeviceAuthType.x509_ca.value,
                 None,
@@ -904,10 +904,10 @@ class TestEdgeHierarchyConfigFunctions:
                     template_config_path="hierarchy_configs/device_config.toml",
                     devices=[
                         NestedEdgeDeviceConfig(
-                            device_id="dev1", edge_agent="new-edge-agent"
+                            device_id="dev1", edge_agent="new-edge-agent", hostname="dev1"
                         ),
                         NestedEdgeDeviceConfig(
-                            device_id="dev2",
+                            device_id="dev2", hostname="dev2"
                         ),
                     ],
                 ),
