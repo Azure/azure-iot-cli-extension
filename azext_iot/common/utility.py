@@ -150,7 +150,7 @@ def process_json_arg(
         )
 
 
-def process_yaml_arg(path: str) -> dict:
+def process_yaml_arg(path: str) -> Dict[str, Any]:
     """Primary processor of yaml file input"""
 
     if not os.path.exists(path):
@@ -169,7 +169,7 @@ def process_yaml_arg(path: str) -> dict:
         )
 
 
-def process_toml_content(path: str) -> Dict[str, Any]:
+def process_toml_arg(path: str) -> Dict[str, Any]:
     """Primary processor of TOML file input"""
 
     if not os.path.exists(path):

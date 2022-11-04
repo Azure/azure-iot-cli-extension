@@ -1,7 +1,7 @@
 from os import makedirs, remove, listdir
 from os.path import exists, join
 from pathlib import PurePath
-from typing import Optional, Union
+from typing import Union
 from azure.cli.core.azclierror import FileOperationError
 
 
@@ -14,7 +14,7 @@ def write_content_to_file(
     content: Union[str, bytes],
     destination: str,
     file_name: str,
-    overwrite: Optional[bool] = False,
+    overwrite: bool = False,
 ):
     dest_path = PurePath(destination)
     file_path = dest_path.joinpath(file_name)
@@ -32,7 +32,7 @@ def tar_directory(
     target_directory: str,
     tarfile_path: str,
     tarfile_name: str,
-    overwrite: Optional[bool] = False,
+    overwrite: bool = False,
 ):
     full_path = join(tarfile_path, f"{tarfile_name}.tgz")
     if exists(full_path):

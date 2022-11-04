@@ -12,12 +12,12 @@ from knack.log import get_logger
 logger = get_logger(__name__)
 
 
-def iot_edge_hierarchy_create(
+def iot_edge_devices_create(
     cmd,
     devices: Optional[List[List[str]]] = None,
     config_file: Optional[str] = None,
-    visualize: Optional[bool] = False,
-    clean: Optional[bool] = False,
+    visualize: bool = False,
+    clean: bool = False,
     device_auth_type: Optional[DeviceAuthType] = None,
     default_edge_agent: Optional[str] = None,
     device_config_template: Optional[str] = None,
@@ -37,7 +37,7 @@ def iot_edge_hierarchy_create(
         login=login,
         auth_type_dataplane=auth_type_dataplane,
     )
-    return device_identity_provider.create_edge_hierarchy(
+    return device_identity_provider.create_edge_devices(
         devices=devices,
         config_file=config_file,
         clean=clean,
@@ -55,7 +55,7 @@ def iot_edge_hierarchy_create(
 def iot_delete_devices(
     cmd,
     device_ids: List[str],
-    confirm: Optional[bool] = True,
+    confirm: bool = True,
     hub_name: Optional[str] = None,
     resource_group_name: Optional[str] = None,
     login: Optional[str] = None,

@@ -324,4 +324,3 @@ src/build
 *.sh
 
 /extensions
-device_bundles

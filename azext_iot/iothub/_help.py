@@ -310,42 +310,46 @@ def load_iothub_help():
         short-summary: Upload a local file as a device to a pre-configured blob storage container.
     """
 
-    helps["iot edge hierarchy"] = """
+    helps["iot edge devices"] = """
         type: group
-        short-summary: Commands to deploy and manage nested IoT Edge device hierarchies.
+        short-summary: Commands to create and manage IoT Edge devices.
     """
 
-    helps["iot edge hierarchy create"] = """
+    helps["iot edge devices create"] = """
         type: command
-        short-summary: |
-          Deploy nested edge hierarchies to an IoT Hub.
-          This can be done with inline device arguments or by supplying a nested edge configuration file in YAML or JSON format.
+        short-summary: Create configuratations of edge devices in an IoT Hub.
+        long-summary: |
+          This operation accepts inline device arguments or an edge devices configuration file in YAML or JSON format.
           Review examples and parameter descriptions for details on how to fully utilize this operation.
 
         examples:
-        - name: Delete all existing devices in the Hub, and create a simple nested edge device hierarchy
+        - name: Delete all existing devices in the Hub, and create a group of edge devices
             containing 2 parent devices with 1 child device each. Also specifies module deployments
             to configure the devices and visualizes the operations as they progress.
           text: |
-            az iot edge hierarchy create -n {hub_name} --clean --visualize
+            az iot edge devices create -n {hub_name} --clean --visualize
             --device id=parent_1 deployment=/path/to/parentDeployment_1.json
             --device id=child_1 parent=parent_1 deployment=/path/to/child_deployment_1.json
             --device id=parent_2 deployment=/path/to/parentDeployment_2.json
             --device id=child_2 parent=parent_2 deployment=/path/to/child_deployment_2.json
 
-        - name: Create a simple nested edge device hierarchy (deleting existing devices)
+        - name: Create a simple nested edge device configuration (deleting existing devices)
             with an existing root CA, using x509 auth, and specify a custom device bundle output path.
-          text: >
-            az iot edge hierarchy create -n {hub_name} --clean --root-cert "root_cert.pem" --root-key "root_key.pem" --device-auth x509_ca
-            --device id=parent1 --device id=child1 parent=parent1 --out "path/to/bundle_folder"
+          text: |
+            az iot edge devices create -n {hub_name} --clean --out "path/to/bundle_folder"
+            --root-cert "root_cert.pem" --root-key "root_key.pem" --device-auth x509_ca
+            --device id=parent1
+            --device id=child1 parent=parent1
 
-        - name: Create a new nested edge device hierarchy (without deleting existing devices)
+        - name: Create a new nested edge device group (without deleting existing devices)
             from a configuration file without any output / visualization.
           text: >
-            az iot edge hierarchy create -n {hub_name} --cfg path/to/config_yml_or_json
+            az iot edge devices create -n {hub_name} --cfg path/to/config_yml_or_json
 
-        - name: Customize device hostname and edge agent configuration.
-          text: >
-            az iot edge hierarchy create -n {hub_name} --clean
-            --device id=parent hostname={parent_FQDN} edge_agent={custom_image} container_auth=/path/to/auth.json
+        - name: Create a flat list of edge devices with hostname, deployment, and edge agent configuration.
+          text: |
+            az iot edge devices create -n {hub_name} --clean
+            --device id=device_1 hostname={FQDN}
+            --device id=device_2 edge_agent={custom_agent}
+            --device id=parent hostname={FQDN} edge_agent={custom_agent} container_auth=/path/to/auth.json
     """

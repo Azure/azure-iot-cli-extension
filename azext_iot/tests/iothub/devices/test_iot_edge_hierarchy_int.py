@@ -6,9 +6,10 @@
 
 import pytest
 import tarfile
+from shutil import rmtree
 from os.path import exists
 from azext_iot.tests.iothub import IoTLiveScenarioTest
-from azext_iot.common.shared import (
+from azext_iot.iothub.common import (
     EdgeContainerAuth,
 )
 
@@ -41,10 +42,10 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
 
         device_arg_string = self._generate_device_arg_string(devices)
         self.cmd(
-            f"iot edge hierarchy create -n {self.entity_name} -g {self.entity_rg} -c {device_arg_string}"
+            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c {device_arg_string} --out bundles"
         )
 
-        self._validate_results(devices)
+        self._validate_results(devices, "bundles")
 
     def test_nested_edge_hierarchy_nArgs_partial(self):
         # Partial 1
@@ -72,19 +73,19 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
         # Clean on first run
         device_arg_string = self._generate_device_arg_string(partial_devices_primary)
         self.cmd(
-            f"iot edge hierarchy create -n {self.entity_name} -g {self.entity_rg} -c {device_arg_string}"
+            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c {device_arg_string} --out primary"
         )
 
-        self._validate_results(partial_devices_primary)
+        self._validate_results(partial_devices_primary, "primary")
 
         # Second run, no clean
         device_arg_string = self._generate_device_arg_string(partial_devices_secondary)
         self.cmd(
-            f"iot edge hierarchy create -n {self.entity_name} -g {self.entity_rg} {device_arg_string}"
+            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} {device_arg_string}"
         )
         # validate results on entire run
         full_device_list = partial_devices_primary + partial_devices_secondary
-        self._validate_results(full_device_list)
+        self._validate_results(full_device_list, None)
 
     def test_nested_edge_hierarchy_config_full(self):
         # ├── device_1 (toplayer)
@@ -115,10 +116,10 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
         ]
 
         self.cmd(
-            f"iot edge hierarchy create -n {self.entity_name} -g {self.entity_rg} -c --cfg {config_path}"
+            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c --cfg {config_path} --out device_bundles"
         )
 
-        self._validate_results(devices)
+        self._validate_results(devices, "device_bundles")
 
     def test_nested_edge_hierarchy_config_partial(self):
         # Partial 1
@@ -154,18 +155,36 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
             ("device_400", "device_300", self.deployment_lower),
         ]
         self.cmd(
-            f"iot edge hierarchy create -n {self.entity_name} -g {self.entity_rg} -c --cfg {primary_config_path}"
+            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c --cfg {primary_config_path} --out output"
         )
 
-        self._validate_results(devices_primary)
+        self._validate_results(devices_primary, "output")
 
         self.cmd(
-            f"iot edge hierarchy create -n {self.entity_name} -g {self.entity_rg} --cfg {secondary_config_path}"
+            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} --cfg {secondary_config_path}"
         )
 
-        self._validate_results(devices_primary + devices_secondary)
+        self._validate_results(devices_primary + devices_secondary, None)
 
-    def _validate_results(self, devices):
+    def test_edge_devices_nArgs_flat_no_output(self):
+        devices = [
+            ("device1", None, self.deployment_top),
+            ("device2", None, None),
+            ("device3", None, self.deployment_lower),
+            ("device4", None, None),
+            ("device5", None, self.deployment_lower),
+            ("device6", None, self.deployment_lower),
+            ("device7", None, self.deployment_top),
+        ]
+
+        device_arg_string = self._generate_device_arg_string(devices)
+        self.cmd(
+            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c {device_arg_string}"
+        )
+
+        self._validate_results(devices, None)
+
+    def _validate_results(self, devices, output_path):
         # get all devices in hub
         device_list = self.cmd(
             f"iot hub device-identity list -n {self.entity_name} -g {self.entity_rg}"
@@ -214,8 +233,10 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
                     f"iot hub module-twin show -d {device_id} -n {self.entity_name} -g {self.entity_rg} -m $edgeAgent",
                     checks=checks,
                 )
+            # check output if specified
+            if output_path:
                 # untar target device bundle
-                bundle_file = f"device_bundles/{device_id}.tgz"
+                bundle_file = f"{output_path}/{device_id}.tgz"
                 assert exists(bundle_file)
                 with tarfile.open(bundle_file, "r:gz") as device_tar:
 
@@ -231,7 +252,9 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
                         "README.md"
                     ]:
                         assert item in file_names
-                    # TODO - config checks
+
+        if output_path:
+            rmtree(output_path)
 
     def _generate_device_arg_string(self, devices):
         device_arg_string = ""

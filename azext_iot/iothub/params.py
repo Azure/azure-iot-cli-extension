@@ -247,32 +247,34 @@ def load_iothub_arguments(self, _):
             help="MIME Type of file.",
         )
 
-    with self.argument_context("iot edge hierarchy") as context:
+    with self.argument_context("iot edge devices") as context:
         context.argument(
             "devices",
             options_list=["--device", "-d"],
             nargs="+",
             action="append",
             help="Space-separated key=value pairs corresponding to properties of the edge device to create. "
+            "The following key values are supported: `id`, `deployment` (inline json or path to file), `hostname`, "
+            "`parent`, `edge_agent`, and `container_auth` (inline json or path to file). "
             "--device can be used 1 or more times. Review help examples for parameter usage."
         )
         context.argument(
             "clean",
             options_list=["--clean", "-c"],
             arg_type=get_three_state_flag(),
-            help="Deletes all devices in target hub before creating new hierarchy.",
+            help="Deletes all devices in target hub before creating new devices.",
         )
         context.argument(
             "visualize",
             options_list=["--visualize", "--vis", "-v"],
             arg_type=get_three_state_flag(),
-            help="Shows visualizations of device hierarchy and progress of various tasks "
+            help="Shows visualizations of devices and progress of various tasks "
             "(device creation, setting parents, updating configs, etc).",
         )
         context.argument(
             "config_file",
             options_list=["--config-file", "--config", "--cfg"],
-            help="Path to device hierarchy config file",
+            help="Path to devices configuration file",
         )
         context.argument(
             "device_auth_type",
@@ -298,7 +300,8 @@ def load_iothub_arguments(self, _):
                 "--output-path",
                 "--out",
             ],
-            help="Directory path to output device configuration bundles.",
+            help="Directory path to output device configuration bundles. "
+            "If this value is not specified, no file output will be created.",
         )
         context.argument(
             "root_cert_path",
@@ -307,6 +310,7 @@ def load_iothub_arguments(self, _):
                 "--rc",
             ],
             help="Path to root public key certificate to sign nested edge device certs.",
+            arg_group="Root Certificate"
         )
         context.argument(
             "root_key_path",
@@ -315,6 +319,7 @@ def load_iothub_arguments(self, _):
                 "--rk",
             ],
             help="Path to root private key to sign nested edge device certs.",
+            arg_group="Root Certificate"
         )
         context.argument(
             "root_cert_password",
@@ -323,4 +328,5 @@ def load_iothub_arguments(self, _):
                 "--rp",
             ],
             help="Root key password",
+            arg_group="Root Certificate"
         )

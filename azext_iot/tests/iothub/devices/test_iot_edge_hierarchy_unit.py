@@ -17,15 +17,15 @@ from azext_iot.sdk.iothub.service.models import ConfigurationContent
 from azext_iot.iothub import commands_device_identity as subject
 from azext_iot.iothub.edge_device_config import (
     EDGE_ROOT_CERTIFICATE_FILENAME,
-    process_nested_edge_config_args,
-    process_nested_edge_config_file_content,
+    process_edge_devices_config_args,
+    process_edge_devices_config_file_content,
     create_edge_device_config,
     try_parse_valid_deployment_config,
 )
-from azext_iot.common.shared import (
+from azext_iot.iothub.common import (
     EdgeContainerAuth,
-    NestedEdgeConfig,
-    NestedEdgeDeviceConfig,
+    EdgeDevicesConfig,
+    EdgeDeviceConfig,
 )
 from azext_iot.tests.conftest import fixture_cmd, mock_target
 
@@ -125,10 +125,10 @@ class TestEdgeHierarchyCreateArgs:
     @pytest.mark.parametrize(
         "devices, config, visualize, clean, auth, output",
         [
-            # basic example, default auth and output directory
+            # basic example, default auth, should output no files
             ([["id=dev1", "parent=dev2"], ["id=dev2"]], None, False, True, None, None),
-            # Visualize, no clean, certificate auth, different output folder
-            ([["id=dev3"]], None, True, False, "x509_ca", "new_device_bundle_folder"),
+            # Visualize, no clean, certificate auth, specified output
+            ([["id=dev3"]], None, True, False, "x509_ca", "device_bundles"),
             # Flex argument processing
             (
                 [
@@ -155,7 +155,7 @@ class TestEdgeHierarchyCreateArgs:
             ),
         ],
     )
-    def test_edge_hierarchy_create_args(
+    def test_edge_devices_create_args(
         self,
         fixture_cmd,
         set_cwd,
@@ -167,7 +167,7 @@ class TestEdgeHierarchyCreateArgs:
         auth,
         output,
     ):
-        subject.iot_edge_hierarchy_create(
+        subject.iot_edge_devices_create(
             cmd=fixture_cmd,
             devices=devices,
             config_file=config,
@@ -176,16 +176,16 @@ class TestEdgeHierarchyCreateArgs:
             device_auth_type=auth,
             bundle_output_path=output,
         )
-        out_path = output or "device_bundles"
 
         # spy on config / certs to ensure correct file output
+        if output:
+            assert exists(output)
+            for device in devices:
+                device_id = device[0].split("=")[1]
+                assert exists(join(output, f"{device_id}.tgz"))
 
-        assert exists(out_path)
-        for device in devices:
-            device_id = device[0].split("=")[1]
-            assert exists(join(out_path, f"{device_id}.tgz"))
-
-        rmtree(out_path)
+            rmtree(output)
+        pass
 
 
 class TestHierarchyCreateFailures:
@@ -301,7 +301,7 @@ class TestHierarchyCreateFailures:
             ),
         ],
     )
-    def test_edge_hierarchy_create_arg_failures(
+    def test_edge_devices_create_arg_failures(
         self,
         fixture_cmd,
         fixture_ghcs,
@@ -313,7 +313,7 @@ class TestHierarchyCreateFailures:
         exception,
     ):
         with pytest.raises(exception):
-            subject.iot_edge_hierarchy_create(
+            subject.iot_edge_devices_create(
                 cmd=fixture_cmd,
                 devices=devices,
                 config_file=config,
@@ -355,11 +355,11 @@ class TestHierarchyCreateFailures:
             ),
         ],
     )
-    def test_edge_hierarchy_create_config_failures(
+    def test_edge_devices_create_config_failures(
         self, fixture_ghcs, set_cwd, devices, config, exception
     ):
         with pytest.raises(exception):
-            subject.iot_edge_hierarchy_create(
+            subject.iot_edge_devices_create(
                 cmd=fixture_cmd,
                 devices=devices,
                 config_file=config,
@@ -448,21 +448,24 @@ class TestHierarchyCreateConfig:
         yield mocked_response
 
     @pytest.mark.parametrize(
-        "devices, config, visualize, clean",
+        "devices, config, visualize, clean, out",
         [
-            (None, "hierarchy_configs/nested_edge_config.yml", False, True),
-            (None, "hierarchy_configs/nested_edge_config.json", True, True),
+            (None, "hierarchy_configs/nested_edge_config.yml", False, True, "device_bundles"),
+            (None, "hierarchy_configs/nested_edge_config.json", True, True, "device_bundles_2"),
+            # no output
+            (None, "hierarchy_configs/nested_edge_config.json", True, True, None),
         ],
     )
-    def test_edge_hierarchy_create_config(
-        self, fixture_cmd, service_client, set_cwd, devices, config, visualize, clean
+    def test_edge_devices_create_config(
+        self, fixture_cmd, service_client, set_cwd, devices, config, visualize, clean, out
     ):
-        subject.iot_edge_hierarchy_create(
+        subject.iot_edge_devices_create(
             cmd=fixture_cmd,
             devices=devices,
             config_file=config,
             visualize=visualize,
             clean=clean,
+            bundle_output_path=out
         )
 
         cfg_obj = (
@@ -473,21 +476,19 @@ class TestHierarchyCreateConfig:
 
         expected_devices = []
 
-        def add_nested_device(device):
+        def add_device(device):
             expected_devices.append(device["device_id"])
             for child in device.get("child", []):
-                add_nested_device(child)
+                add_device(child)
 
         for device in cfg_obj["edgedevices"]:
-            add_nested_device(device)
+            add_device(device)
+        if out:
+            assert exists(out)
+            for device_id in expected_devices:
+                assert exists(join(out, f"{device_id}.tgz"))
 
-        out_path = "device_bundles"
-
-        assert exists(out_path)
-        for device_id in expected_devices:
-            assert exists(join(out_path, f"{device_id}.tgz"))
-
-        rmtree(out_path)
+            rmtree(out)
 
 
 class TestEdgeHierarchyConfigFunctions:
@@ -508,13 +509,13 @@ class TestEdgeHierarchyConfigFunctions:
         return root_cert
 
     test_device_id = "test_device_id"
-    device_config_with_parent_no_agent = NestedEdgeDeviceConfig(
+    device_config_with_parent_no_agent = EdgeDeviceConfig(
         device_id=test_device_id,
         parent_id="parent_device_id",
         parent_hostname="parentHostname",
         hostname="hostname",
     )
-    device_config_container_auth_with_agent_no_parent = NestedEdgeDeviceConfig(
+    device_config_container_auth_with_agent_no_parent = EdgeDeviceConfig(
         device_id=test_device_id,
         container_auth=EdgeContainerAuth(
             serveraddress="test-container-registry-address",
@@ -676,7 +677,7 @@ class TestEdgeHierarchyConfigFunctions:
                         },
                     ],
                 },
-                NestedEdgeConfig(
+                EdgeDevicesConfig(
                     version="1.0",
                     auth_method=DeviceAuthType.shared_private_key.value,
                     root_cert={
@@ -685,7 +686,7 @@ class TestEdgeHierarchyConfigFunctions:
                         "privateKey": "root_private_key",
                     },
                     devices=[
-                        NestedEdgeDeviceConfig(
+                        EdgeDeviceConfig(
                             device_id="parent-device-id",
                             edge_agent="test-agent",
                             hostname="parent-hostname",
@@ -715,7 +716,7 @@ class TestEdgeHierarchyConfigFunctions:
                         }
                     ],
                 },
-                NestedEdgeConfig(
+                EdgeDevicesConfig(
                     version="1.0",
                     auth_method=DeviceAuthType.x509_ca.value,
                     root_cert={
@@ -724,12 +725,12 @@ class TestEdgeHierarchyConfigFunctions:
                         "privateKey": "root_private_key",
                     },
                     devices=[
-                        NestedEdgeDeviceConfig(
+                        EdgeDeviceConfig(
                             device_id="parent-device-id",
                             edge_agent="test-agent",
                             hostname="parent-hostname",
                         ),
-                        NestedEdgeDeviceConfig(
+                        EdgeDeviceConfig(
                             device_id="child-device-id",
                             edge_agent="test-agent2",
                             hostname="child-hostname",
@@ -742,13 +743,13 @@ class TestEdgeHierarchyConfigFunctions:
             ),
         ],
     )
-    def test_process_nested_edge_config_content(
+    def test_process_edge_devices_config_content(
         self, set_cwd, patch_create_edge_root_cert, content, expected
     ):
-        result = process_nested_edge_config_file_content(content)
+        result = process_edge_devices_config_file_content(content)
         assert result == expected
 
-    def test_process_nested_edge_config_load_cert(
+    def test_process_edge_devices_config_load_cert(
         self,
         set_cwd,
     ):
@@ -763,13 +764,13 @@ class TestEdgeHierarchyConfigFunctions:
             "edgedevices": [{"device_id": "test"}],
         }
         cert = self.create_test_root_cert("test_certs")
-        result = process_nested_edge_config_file_content(content)
-        assert result == NestedEdgeConfig(
+        result = process_edge_devices_config_file_content(content)
+        assert result == EdgeDevicesConfig(
             version="1.0",
             auth_method=DeviceAuthType.x509_ca.value,
             default_edge_agent="edge-agent-2",
             root_cert=cert,
-            devices=[NestedEdgeDeviceConfig(device_id="test")],
+            devices=[EdgeDeviceConfig(device_id="test")],
         )
         rmtree("test_certs")
 
@@ -829,9 +830,9 @@ class TestEdgeHierarchyConfigFunctions:
             ),
         ],
     )
-    def test_process_nested_edge_config_errors(self, content, error):
+    def test_process_edge_devices_config_errors(self, content, error):
         with pytest.raises(error):
-            process_nested_edge_config_file_content(content)
+            process_edge_devices_config_file_content(content)
 
     @pytest.mark.parametrize(
         "devices, auth, edge_agent, config_template, expected",
@@ -842,7 +843,7 @@ class TestEdgeHierarchyConfigFunctions:
                 DeviceAuthType.x509_ca.value,
                 None,
                 None,
-                NestedEdgeConfig(
+                EdgeDevicesConfig(
                     version="1.0",
                     auth_method=DeviceAuthType.x509_ca.value,
                     root_cert={
@@ -851,8 +852,8 @@ class TestEdgeHierarchyConfigFunctions:
                         "privateKey": "root_private_key",
                     },
                     devices=[
-                        NestedEdgeDeviceConfig(device_id="dev1", parent_id="dev2"),
-                        NestedEdgeDeviceConfig(device_id="dev2"),
+                        EdgeDeviceConfig(device_id="dev1", parent_id="dev2"),
+                        EdgeDeviceConfig(device_id="dev2"),
                     ],
                 ),
             ),
@@ -865,7 +866,7 @@ class TestEdgeHierarchyConfigFunctions:
                 DeviceAuthType.x509_ca.value,
                 "default-edge-agent",
                 None,
-                NestedEdgeConfig(
+                EdgeDevicesConfig(
                     version="1.0",
                     auth_method=DeviceAuthType.x509_ca.value,
                     default_edge_agent="default-edge-agent",
@@ -875,10 +876,10 @@ class TestEdgeHierarchyConfigFunctions:
                         "privateKey": "root_private_key",
                     },
                     devices=[
-                        NestedEdgeDeviceConfig(
+                        EdgeDeviceConfig(
                             device_id="dev1", edge_agent="new-edge-agent"
                         ),
-                        NestedEdgeDeviceConfig(
+                        EdgeDeviceConfig(
                             device_id="dev2",
                         ),
                     ],
@@ -893,7 +894,7 @@ class TestEdgeHierarchyConfigFunctions:
                 DeviceAuthType.x509_ca.value,
                 None,
                 "hierarchy_configs/device_config.toml",
-                NestedEdgeConfig(
+                EdgeDevicesConfig(
                     version="1.0",
                     auth_method=DeviceAuthType.x509_ca.value,
                     root_cert={
@@ -903,10 +904,10 @@ class TestEdgeHierarchyConfigFunctions:
                     },
                     template_config_path="hierarchy_configs/device_config.toml",
                     devices=[
-                        NestedEdgeDeviceConfig(
+                        EdgeDeviceConfig(
                             device_id="dev1", edge_agent="new-edge-agent", hostname="dev1"
                         ),
-                        NestedEdgeDeviceConfig(
+                        EdgeDeviceConfig(
                             device_id="dev2", hostname="dev2"
                         ),
                     ],
@@ -914,7 +915,7 @@ class TestEdgeHierarchyConfigFunctions:
             ),
         ],
     )
-    def test_process_nested_edge_config_args(
+    def test_process_edge_devices_config_args(
         self,
         set_cwd,
         patch_create_edge_root_cert,
@@ -924,8 +925,7 @@ class TestEdgeHierarchyConfigFunctions:
         config_template,
         expected,
     ):
-        # TODO - spy on toml load (path or object)
-        result = process_nested_edge_config_args(
+        result = process_edge_devices_config_args(
             device_args=devices,
             auth_type=auth,
             default_edge_agent=edge_agent,

@@ -25,7 +25,7 @@ from azext_iot.common.deps import ensure_uamqp
 from azext_iot.constants import EVENT_LIB, EXTENSION_NAME
 from azext_iot._validators import mode2_iot_login_handler
 from azext_iot.common.embedded_cli import EmbeddedCLI
-from azext_iot.iothub.edge_device_config import create_nested_edge_device_config_script
+from azext_iot.iothub.edge_device_config import create_edge_device_config_script
 
 
 class TestMinPython(object):
@@ -480,7 +480,7 @@ class TestHandleServiceException(object):
             handle_service_exception(error)
 
 
-class TestNestedEdgeDeviceConfiguration(object):
+class TestEdgeDevicesConfiguration(object):
     from azext_iot.iothub.edge_device_config import (
         EDGE_CONFIG_SCRIPT_APPLY,
         EDGE_CONFIG_SCRIPT_CA_CERTS,
@@ -551,10 +551,10 @@ class TestNestedEdgeDeviceConfiguration(object):
             ),
         ],
     )
-    def test_nested_edge_device_config_script(
+    def test_create_edge_device_config_script(
         self, device_id, hub_auth, hostname, has_parent, parent_hostname, segments
     ):
-        script_content = create_nested_edge_device_config_script(
+        script_content = create_edge_device_config_script(
             device_id=device_id,
             hub_auth=hub_auth,
             hostname=hostname,

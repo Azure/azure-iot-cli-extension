@@ -56,6 +56,6 @@ def load_iothub_commands(self, _):
         cmd_group.command("purge", "iot_c2d_message_purge")
 
     with self.command_group(
-        "iot edge hierarchy", command_type=device_identity_ops
+        "iot edge devices", command_type=device_identity_ops
     ) as cmd_group:
-        cmd_group.command("create", "iot_edge_hierarchy_create", is_experimental=True)
+        cmd_group.command("create", "iot_edge_devices_create", is_experimental=True)

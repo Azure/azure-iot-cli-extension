@@ -11,11 +11,13 @@ from azext_iot.common.certops import create_root_certificate, load_ca_cert_info
 from azext_iot.common.shared import (
     ConfigType,
     DeviceAuthType,
-    NestedEdgeConfig,
-    NestedEdgeDeviceConfig,
+)
+from azext_iot.iothub.common import (
+    EdgeDevicesConfig,
+    EdgeDeviceConfig,
     EdgeContainerAuth,
 )
-from azext_iot.common.utility import process_json_arg, process_toml_content
+from azext_iot.common.utility import process_json_arg, process_toml_arg
 
 from azure.cli.core.azclierror import (
     CLIInternalError,
@@ -57,8 +59,6 @@ DEVICE_CONFIG_TOML = {
 }
 
 EDGE_ROOT_CERTIFICATE_FILENAME = "iotedge_config_cli_root.pem"
-
-EDGE_DEVICE_BUNDLE_DEFAULT_FOLDER_NAME = "device_bundles"
 
 EDGE_CONFIG_SCRIPT_HEADERS = """
 # This script will attempt to configure a pre-installed iotedge as a nested node.
@@ -132,17 +132,9 @@ iotedge config apply -c /etc/aziot/config.toml
 echo "To check the edge runtime status, run 'iotedge system status'. To validate the configuration, run 'sudo iotedge check'"
 """
 
-EDGE_SUPPORTED_OS_LINK = (
-    "https://docs.microsoft.com/en-us/azure/iot-edge/support?view=iotedge-2020-11"
-)
-
-EDGE_LINUX_TUTORIAL_LINK = (
-    "https://learn.microsoft.com/en-us/azure/iot-edge/how-to-provision-single-device-linux-symmetric"
-)
-
-EDGE_WINDOWS_TUTORIAL_LINK = (
-    "https://learn.microsoft.com/en-us/azure/iot-edge/how-to-provision-single-device-linux-on-windows-symmetric"
-)
+EDGE_SUPPORTED_OS_LINK = "https://aka.ms/iotedge-supported-systems"
+EDGE_LINUX_TUTORIAL_LINK = "https://aka.ms/iotedge-provision-linux-device"
+EDGE_WINDOWS_TUTORIAL_LINK = "https://aka.ms/iotedge-provision-windows"
 
 DEVICE_README = f"""
 # Prerequisites
@@ -178,7 +170,7 @@ def create_edge_device_config(
     hub_hostname: str,
     device_id: str,
     auth_method: DeviceAuthType,
-    device_config: NestedEdgeDeviceConfig,
+    device_config: EdgeDeviceConfig,
     default_edge_agent: str,
     device_config_path: Optional[str] = None,
     device_pk: Optional[str] = None,
@@ -186,7 +178,7 @@ def create_edge_device_config(
 ):
     # load default device TOML object or custom path
     device_toml = (
-        process_toml_content(device_config_path)
+        process_toml_arg(device_config_path)
         if device_config_path
         else DEVICE_CONFIG_TOML
     )
@@ -243,7 +235,7 @@ def create_edge_device_config(
     return device_toml
 
 
-def process_nested_edge_config_file_content(content: dict) -> NestedEdgeConfig:
+def process_edge_devices_config_file_content(content: dict) -> EdgeDevicesConfig:
     """
     Process edge config file schema dictionary
     """
@@ -307,7 +299,7 @@ def process_nested_edge_config_file_content(content: dict) -> NestedEdgeConfig:
         container_auth = device.get("container_auth", {})
         hostname = device.get("hostname", None)
         edge_agent = device.get("edge_agent", None)
-        device_config = NestedEdgeDeviceConfig(
+        device_config = EdgeDeviceConfig(
             device_id=device_id,
             deployment=deployment,
             parent_id=parent_id,
@@ -330,7 +322,7 @@ def process_nested_edge_config_file_content(content: dict) -> NestedEdgeConfig:
 
     for device in devices_config:
         _process_edge_config_device(device)
-    return NestedEdgeConfig(
+    return EdgeDevicesConfig(
         version=version,
         auth_method=device_authentication_method,
         root_cert=root_cert,
@@ -340,11 +332,11 @@ def process_nested_edge_config_file_content(content: dict) -> NestedEdgeConfig:
     )
 
 
-def create_nested_edge_device_config_script(
+def create_edge_device_config_script(
     device_id: str,
-    hub_auth: Optional[bool] = False,
+    hub_auth: bool = False,
     hostname: Optional[str] = None,
-    has_parent: Optional[bool] = False,
+    has_parent: bool = False,
     parent_hostname: Optional[str] = None,
 ):
     return "\n".join(
@@ -379,7 +371,7 @@ def try_parse_valid_deployment_config(deployment_path: str):
         raise InvalidArgumentValueError(ex)
 
 
-def process_nested_edge_config_args(
+def process_edge_devices_config_args(
     device_args: List[List[str]],
     auth_type: DeviceAuthType,
     default_edge_agent: Optional[str] = None,
@@ -387,7 +379,7 @@ def process_nested_edge_config_args(
     root_cert_path: Optional[str] = None,
     root_key_path: Optional[str] = None,
     root_cert_password: Optional[str] = None,
-) -> NestedEdgeConfig:
+) -> EdgeDevicesConfig:
     # raise error if only key or cert provided
     if (root_cert_path is not None) ^ (root_key_path is not None):
         raise RequiredArgumentMissingError(
@@ -400,7 +392,7 @@ def process_nested_edge_config_args(
         else create_root_certificate()
     )
 
-    config = NestedEdgeConfig(
+    config = EdgeDevicesConfig(
         version="1.0",
         auth_method=auth_type or DeviceAuthType.shared_private_key.value,
         default_edge_agent=default_edge_agent,
@@ -447,7 +439,7 @@ def process_nested_edge_config_args(
             if container_auth_obj
             else None
         )
-        device_config = NestedEdgeDeviceConfig(
+        device_config = EdgeDeviceConfig(
             device_id=device_id,
             deployment=deployment,
             parent_id=parent_id,

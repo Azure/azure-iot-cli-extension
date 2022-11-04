@@ -136,11 +136,10 @@ def open_certificate(certificate_path: str) -> str:
     return certificate.rstrip()
 
 
-# TODO - Unit test, compare with test_utils::_generate_root_certificate
 def create_root_certificate(
-    subject: Optional[str] = "Azure_IoT_CLI_Extension_Cert",
-    valid_days: Optional[int] = 365,
-    key_size: Optional[int] = 4096,
+    subject: str = "Azure_IoT_CLI_Extension_Cert",
+    valid_days: int = 365,
+    key_size: int = 4096,
 ) -> Dict[str, str]:
     key = rsa.generate_private_key(public_exponent=65537, key_size=key_size)
 
@@ -198,7 +197,6 @@ def create_root_certificate(
     }
 
 
-# TODO - Unit test, compare with test_utils::_generate_device_certificate
 def create_signed_cert(
     subject: str,
     ca_public: str,
@@ -318,14 +316,14 @@ def load_ca_cert_info(
 def make_cert_chain(
     certs: List[str],
     output_dir: Optional[str] = None,
-    output_file: Optional[str] = "cert-chain.pem",
-):
+    output_file: Optional[str] = None,
+) -> str:
     cert_content = "".join(certs)
     if output_dir and exists(output_dir) and len(certs):
         write_content_to_file(
             content=cert_content,
             destination=output_dir,
-            file_name=output_file,
+            file_name=output_file or "cert-chain.pem",
             overwrite=True,
         )
     return cert_content
