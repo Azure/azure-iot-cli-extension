@@ -4,9 +4,10 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from typing import Optional
 from azure.cli.core.azclierror import CLIInternalError
 from azext_iot.common.embedded_cli import EmbeddedCLI
-from azext_iot.digitaltwins.common import ADTEndpointAuthType
+from azext_iot.digitaltwins.common import SYSTEM_IDENTITY, ADTEndpointAuthType
 from abc import ABC, abstractmethod
 from knack.log import get_logger
 
@@ -27,10 +28,10 @@ class BaseEndpointBuilder(ABC):
         endpoint_resource_name: str,
         endpoint_resource_group: str,
         auth_type: str = ADTEndpointAuthType.keybased.value,
-        dead_letter_secret: str = None,
-        dead_letter_uri: str = None,
-        endpoint_subscription: str = None,
-        identity: str = None,
+        dead_letter_secret: Optional[str] = None,
+        dead_letter_uri: Optional[str] = None,
+        endpoint_subscription: Optional[str] = None,
+        identity: Optional[str] = None,
     ):
         self.cli = EmbeddedCLI()
         self.error_prefix = "Could not create ADT instance endpoint. Unable to retrieve"
@@ -49,7 +50,7 @@ class BaseEndpointBuilder(ABC):
             else self.build_identity_based()
         )
         endpoint_properties.authentication_type = self.auth_type
-        if self.identity == "[system]":
+        if self.identity == SYSTEM_IDENTITY:
             endpoint_properties.identity = ManagedIdentityReference(
                 type=DigitalTwinsIdentityType.system_assigned.value
             )
@@ -73,13 +74,13 @@ class BaseEndpointBuilder(ABC):
 class EventGridEndpointBuilder(BaseEndpointBuilder):
     def __init__(
         self,
-        endpoint_resource_name,
-        endpoint_resource_group,
-        auth_type=ADTEndpointAuthType.keybased.value,
-        dead_letter_secret=None,
-        dead_letter_uri=None,
-        endpoint_subscription=None,
-        identity=None,
+        endpoint_resource_name: str,
+        endpoint_resource_group: str,
+        auth_type: str = ADTEndpointAuthType.keybased.value,
+        dead_letter_secret: Optional[str] = None,
+        dead_letter_uri: Optional[str] = None,
+        endpoint_subscription: Optional[str] = None,
+        identity: Optional[str] = None,
     ):
         super().__init__(
             endpoint_resource_name=endpoint_resource_name,
@@ -130,15 +131,15 @@ class EventGridEndpointBuilder(BaseEndpointBuilder):
 class ServiceBusEndpointBuilder(BaseEndpointBuilder):
     def __init__(
         self,
-        endpoint_resource_name,
-        endpoint_resource_group,
-        endpoint_resource_namespace,
-        endpoint_resource_policy,
-        auth_type=ADTEndpointAuthType.keybased.value,
-        dead_letter_secret=None,
-        dead_letter_uri=None,
-        endpoint_subscription=None,
-        identity=None,
+        endpoint_resource_name: str,
+        endpoint_resource_group: str,
+        endpoint_resource_namespace: str,
+        endpoint_resource_policy: str,
+        auth_type: str = ADTEndpointAuthType.keybased.value,
+        dead_letter_secret: Optional[str] = None,
+        dead_letter_uri: Optional[str] = None,
+        endpoint_subscription: Optional[str] = None,
+        identity: Optional[str] = None,
     ):
         super().__init__(
             endpoint_resource_name=endpoint_resource_name,
@@ -210,15 +211,15 @@ class ServiceBusEndpointBuilder(BaseEndpointBuilder):
 class EventHubEndpointBuilder(BaseEndpointBuilder):
     def __init__(
         self,
-        endpoint_resource_name,
-        endpoint_resource_group,
-        endpoint_resource_namespace,
-        endpoint_resource_policy,
-        auth_type=ADTEndpointAuthType.keybased.value,
-        dead_letter_secret=None,
-        dead_letter_uri=None,
-        endpoint_subscription=None,
-        identity=None,
+        endpoint_resource_name: str,
+        endpoint_resource_group: str,
+        endpoint_resource_namespace: str,
+        endpoint_resource_policy: str,
+        auth_type: str = ADTEndpointAuthType.keybased.value,
+        dead_letter_secret: Optional[str] = None,
+        dead_letter_uri: Optional[str] = None,
+        endpoint_subscription: Optional[str] = None,
+        identity: Optional[str] = None,
     ):
         super().__init__(
             endpoint_resource_name=endpoint_resource_name,
@@ -305,12 +306,12 @@ def build_endpoint(
     endpoint_resource_name: str,
     endpoint_resource_group: str,
     auth_type: str = ADTEndpointAuthType.keybased.value,
-    endpoint_resource_namespace: str = None,
-    endpoint_resource_policy: str = None,
-    dead_letter_secret: str = None,
-    dead_letter_uri: str = None,
-    endpoint_subscription: str = None,
-    identity: str = None,
+    endpoint_resource_namespace: Optional[str] = None,
+    endpoint_resource_policy: Optional[str] = None,
+    dead_letter_secret: Optional[str] = None,
+    dead_letter_uri: Optional[str] = None,
+    endpoint_subscription: Optional[str] = None,
+    identity: Optional[str] = None,
 ):
     from azext_iot.digitaltwins.common import ADTEndpointType
 

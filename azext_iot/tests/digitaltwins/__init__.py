@@ -423,7 +423,7 @@ class DTLiveScenarioTest(LiveScenarioTest):
             )
 
     def ensure_user_identity(self):
-        """Create a user identity to use with the test. Will populate self.user_identity
+        """Create a user identity to use with the test. Will populate self.user_identity_name
 
         Returns the user identity object."""
         if not hasattr(self, "user_identity_name"):
@@ -434,7 +434,7 @@ class DTLiveScenarioTest(LiveScenarioTest):
         else:
             return self.embedded_cli.invoke(
                 f"identity show -n {self.user_identity_name} -g {self.rg}"
-            )
+            ).as_json()
 
     def delete_adx_resources(self):
         """Delete all created ADX resources."""
@@ -527,8 +527,8 @@ class DTLiveScenarioTest(LiveScenarioTest):
 
     def delete_user_identity(self):
         """Delete user identity if created"""
-        if hasattr(self, "user_identity"):
-            self.embedded_cli.invoke(f"identity delete -n {self.user_identity} -g {self.rg}")
+        if hasattr(self, "user_identity_name"):
+            self.embedded_cli.invoke(f"identity delete -n {self.user_identity_name} -g {self.rg}")
 
     def get_role_assignment(self, scope, role, assignee):
         return self.cmd(
