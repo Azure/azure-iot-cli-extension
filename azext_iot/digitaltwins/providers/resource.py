@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 from functools import partial
-from typing import List, Optional, Union
+from typing import List, Optional
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
     InvalidArgumentValueError,
@@ -333,7 +333,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
         self,
         name: str,
         system_identity: Optional[bool] = None,
-        user_identities: Optional[Union[List[str], bool]] = None,
+        user_identities: Optional[List[str]] = None,
         resource_group_name: Optional[str] = None
     ):
         target_instance = self.find_instance(

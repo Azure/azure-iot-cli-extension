@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from typing import List, Optional
 from azext_iot.digitaltwins.providers.resource import ResourceProvider
 from knack.log import get_logger
 
@@ -12,12 +13,12 @@ logger = get_logger(__name__)
 
 def assign_identity(
     cmd,
-    name,
-    system_identity=None,
-    user_identities=None,
-    identity_role=None,
-    identity_scopes=None,
-    resource_group_name=None
+    name: str,
+    system_identity: Optional[bool] = None,
+    user_identities: Optional[List[str]] = None,
+    identity_role: Optional[str] = None,
+    identity_scopes: Optional[List[str]] = None,
+    resource_group_name: Optional[str] = None
 ):
     rp = ResourceProvider(cmd)
     return rp.assign_identity(
@@ -32,10 +33,10 @@ def assign_identity(
 
 def remove_identity(
     cmd,
-    name,
-    system_identity=None,
-    user_identities=None,
-    resource_group_name=None
+    name: str,
+    system_identity: Optional[bool] = None,
+    user_identities: Optional[List[str]] = None,
+    resource_group_name: Optional[str] = None
 ):
     rp = ResourceProvider(cmd)
     return rp.remove_identity(
@@ -46,7 +47,7 @@ def remove_identity(
     )
 
 
-def show_identity(cmd, name, resource_group_name=None):
+def show_identity(cmd, name: str, resource_group_name: Optional[str] = None):
     rp = ResourceProvider(cmd)
     return rp.show_identity(
         name=name,

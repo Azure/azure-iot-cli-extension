@@ -24,14 +24,14 @@ def create_instance(
     name: str,
     resource_group_name: str,
     location: Optional[str] = None,
-    tags=None,
-    assign_identity=None,
-    scopes=None,
+    tags: Optional[List[str]] = None,
+    assign_identity: Optional[bool] = None,
+    scopes: Optional[List[str]] = None,
     role_type: str = "Contributor",
     public_network_access: str = ADTPublicNetworkAccessType.enabled.value,
-    system_identity=None,
+    system_identity: Optional[bool] = None,
     user_identities: Optional[List[str]] = None,
-    no_wait=False,
+    no_wait: bool = False,
 ):
     if no_wait and scopes:
         raise MutuallyExclusiveArgumentError(
@@ -149,8 +149,8 @@ def add_endpoint_servicebus(
     dead_letter_uri: Optional[str] = None,
     dead_letter_secret: Optional[str] = None,
     auth_type: str = ADTEndpointAuthType.keybased.value,
-    system_identity=None,
-    user_identity=None,
+    system_identity: Optional[bool] = None,
+    user_identity: Optional[List[str]] = None,
 ):
     rp = ResourceProvider(cmd)
     return rp.add_endpoint(
@@ -184,8 +184,8 @@ def add_endpoint_eventhub(
     dead_letter_uri: Optional[str] = None,
     dead_letter_secret: Optional[str] = None,
     auth_type: str = ADTEndpointAuthType.keybased.value,
-    system_identity=None,
-    user_identity=None,
+    system_identity: Optional[bool] = None,
+    user_identity: Optional[List[str]] = None,
 ):
     rp = ResourceProvider(cmd)
     return rp.add_endpoint(
