@@ -324,14 +324,14 @@ def load_digitaltwins_arguments(self, _):
     with self.argument_context("dt identity remove") as context:
         context.argument(
             'system_identity',
-            options_list=['--system-assigned', '--system'],
+            options_list=['--mi-system-assigned', '--system'],
             arg_type=get_three_state_flag(),
             nargs='*',
-            help="Remove a system-assigned managed identity to this Digital Twin instance."
+            help="Remove the system-assigned managed identity to this Digital Twin instance."
         )
         context.argument(
             'user_identities',
-            options_list=['--user-assigned', '--user'],
+            options_list=['--mi-user-assigned', '--user'],
             nargs='*',
             help="Remove user-assigned managed identities to this Digital Twin instance. "
             "Accepts space-separated list of identity resource ids."
