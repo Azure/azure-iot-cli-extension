@@ -6,7 +6,6 @@
 
 # Utility classes for edge device configs
 from typing import NamedTuple, Optional, List, Dict
-from azext_iot.common.shared import DeviceAuthType
 from azext_iot.sdk.iothub.service.models import ConfigurationContent
 
 

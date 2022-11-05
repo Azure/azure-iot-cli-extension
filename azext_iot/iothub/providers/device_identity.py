@@ -125,7 +125,7 @@ class DeviceIdentityProvider(IoTHubProvider):
                 override_root_key_path=root_key_path,
                 override_default_edge_agent=default_edge_agent,
                 override_device_config_template=device_config_template,
-                )
+            )
         elif devices:
             config = process_edge_devices_config_args(
                 device_args=devices,

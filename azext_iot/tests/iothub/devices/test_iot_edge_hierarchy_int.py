@@ -40,7 +40,8 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
 
         device_arg_string = self._generate_device_arg_string(devices)
         self.cmd(
-            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c {device_arg_string} --out bundles --device-auth x509_thumbprint"
+            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c {device_arg_string} "
+            "--out bundles --device-auth x509_thumbprint"
         )
 
         self._validate_results(devices, "bundles", True)
@@ -114,7 +115,8 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
         ]
 
         self.cmd(
-            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c --cfg {config_path} --out device_bundles --device-auth x509_thumbprint"
+            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c --cfg {config_path} "
+            "--out device_bundles --device-auth x509_thumbprint"
         )
 
         self._validate_results(devices, "device_bundles", True)
@@ -182,7 +184,7 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
 
         self._validate_results(devices, None)
 
-    def _validate_results(self, devices, output_path, cert_auth = False):
+    def _validate_results(self, devices, output_path, cert_auth=False):
         # get all devices in hub
         device_list = self.cmd(
             f"iot hub device-identity list -n {self.entity_name} -g {self.entity_rg}"

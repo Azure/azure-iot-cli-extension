@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 
 from typing import List, Optional
-from azext_iot.common.shared import DeviceAuthType
 from azext_iot.iothub.providers.device_identity import DeviceIdentityProvider
 from knack.log import get_logger
 
