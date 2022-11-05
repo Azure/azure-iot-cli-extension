@@ -52,7 +52,7 @@ DEPENDENCIES = [
     "importlib_metadata;python_version<'3.8'",
     "azure-iot-device~=2.11",
     "tomli",
-    "tomli-w"
+    "tomli-w",
     "tqdm~=4.62",
     "treelib",
     "packaging"
