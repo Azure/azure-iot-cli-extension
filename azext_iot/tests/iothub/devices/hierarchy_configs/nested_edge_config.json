@@ -4,7 +4,8 @@
       "authentication_method": "symmetric_key"
     },
     "configuration": {
-      "template_config_path": "./hierarchy_configs/device_config.toml"
+      "template_config_path": "./hierarchy_configs/device_config.toml",
+      "default_edge_agent": "$upstream:443/azureiotedge-agent:1.2"
     },
     "edgedevices": [
       {
@@ -49,7 +50,7 @@
         "hostname": "device_7",
         "edge_agent": "mcr.microsoft.com/azureiotedge-agent:1.2",
         "container_auth": {
-          "serverAddress": "mcr.microsoft.com",
+          "serveraddress": "mcr.microsoft.com",
           "username": "test-user",
           "password": "$credential$"
         }

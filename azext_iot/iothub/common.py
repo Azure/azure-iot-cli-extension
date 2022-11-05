@@ -28,7 +28,7 @@ class EdgeDeviceConfig(NamedTuple):
 
 class EdgeDevicesConfig(NamedTuple):
     version: str
-    auth_method: DeviceAuthType
+    auth_method: str
     root_cert: Dict[str, str]
     devices: List[EdgeDeviceConfig]
     template_config_path: Optional[str] = None

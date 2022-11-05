@@ -18,7 +18,7 @@ def iot_edge_devices_create(
     config_file: Optional[str] = None,
     visualize: bool = False,
     clean: bool = False,
-    device_auth_type: Optional[DeviceAuthType] = None,
+    device_auth_type: Optional[str] = None,
     default_edge_agent: Optional[str] = None,
     device_config_template: Optional[str] = None,
     root_cert_path: Optional[str] = None,

@@ -128,7 +128,7 @@ class TestEdgeHierarchyCreateArgs:
             # basic example, default auth, should output no files
             ([["id=dev1", "parent=dev2"], ["id=dev2"]], None, False, True, None, None),
             # Visualize, no clean, certificate auth, specified output
-            ([["id=dev3"]], None, True, False, "x509_ca", "device_bundles"),
+            ([["id=dev3"]], None, True, False, DeviceAuthType.x509_thumbprint.value, "device_bundles"),
             # Flex argument processing
             (
                 [
@@ -150,7 +150,7 @@ class TestEdgeHierarchyCreateArgs:
                 None,
                 True,
                 False,
-                "x509_ca",
+                DeviceAuthType.x509_thumbprint.value,
                 "new_device_bundle_folder",
             ),
         ],
@@ -290,14 +290,6 @@ class TestHierarchyCreateFailures:
                 "root_cert.pem",
                 "root_key.pem",
                 FileOperationError,
-            ),
-            # cert path and config file
-            (
-                None,
-                "hierarchy_configs/nested_edge_config.yml",
-                "root_cert.pem",
-                "root_key.pem",
-                MutuallyExclusiveArgumentError,
             ),
         ],
     )
@@ -531,7 +523,7 @@ class TestEdgeHierarchyConfigFunctions:
             # load external TOML, key auth
             (
                 test_device_id,
-                DeviceAuthType.shared_private_key.value,
+                DeviceAuthType.shared_private_key,
                 device_config_with_parent_no_agent,
                 "default-edge-agent",
                 "./hierarchy_configs/device_config.toml",
@@ -541,7 +533,7 @@ class TestEdgeHierarchyConfigFunctions:
             # load default TOML, cert auth
             (
                 test_device_id,
-                DeviceAuthType.x509_ca.value,
+                DeviceAuthType.x509_thumbprint.value,
                 device_config_container_auth_with_agent_no_parent,
                 "default-edge-agent",
                 None,
@@ -602,14 +594,14 @@ class TestEdgeHierarchyConfigFunctions:
         assert device_toml["provisioning"]["source"] == "manual"
 
         auth = device_toml["provisioning"]["authentication"]
-        if auth_method == DeviceAuthType.shared_private_key.value:
-            assert auth == {"device_id_pk": {"value": device_pk}, "method": "sas"}
-        else:
+        if auth_method == DeviceAuthType.x509_thumbprint.value:
             assert auth == {
                 "method": "x509",
                 "identity_cert": f"file:///etc/aziot/certificates/{device_id}.hub-auth-cert.pem",
                 "identity_pk": f"file:///etc/aziot/certificates/{device_id}.hub-auth-key.pem",
             }
+        else:
+            assert auth == {"device_id_pk": {"value": device_pk}, "method": "sas"}
 
         assert device_toml["agent"]["config"]["image"] == (
             device_config.edge_agent if device_config.edge_agent else default_edge_agent
@@ -632,12 +624,12 @@ class TestEdgeHierarchyConfigFunctions:
             )
 
         if output_path:
-            import toml
+            import tomli_w
             from os.path import join
 
             path = join(output_path, "config.toml")
             with open(path, "rt", encoding="utf-8") as f:
-                assert toml.dumps(device_toml) == f.read()
+                assert tomli_w.dumps(device_toml) == f.read()
             rmtree(output_path)
 
     @pytest.mark.parametrize(
@@ -718,7 +710,7 @@ class TestEdgeHierarchyConfigFunctions:
                 },
                 EdgeDevicesConfig(
                     version="1.0",
-                    auth_method=DeviceAuthType.x509_ca.value,
+                    auth_method=DeviceAuthType.x509_thumbprint.value,
                     root_cert={
                         "certificate": "root_certificate",
                         "thumbprint": "root_thumbprint",
@@ -767,7 +759,7 @@ class TestEdgeHierarchyConfigFunctions:
         result = process_edge_devices_config_file_content(content)
         assert result == EdgeDevicesConfig(
             version="1.0",
-            auth_method=DeviceAuthType.x509_ca.value,
+            auth_method=DeviceAuthType.x509_thumbprint.value,
             default_edge_agent="edge-agent-2",
             root_cert=cert,
             devices=[EdgeDeviceConfig(device_id="test")],
@@ -840,12 +832,12 @@ class TestEdgeHierarchyConfigFunctions:
             # No extra params
             (
                 [["id=dev1", "parent=dev2"], ["id=dev2"]],
-                DeviceAuthType.x509_ca.value,
+                DeviceAuthType.x509_thumbprint.value,
                 None,
                 None,
                 EdgeDevicesConfig(
                     version="1.0",
-                    auth_method=DeviceAuthType.x509_ca.value,
+                    auth_method=DeviceAuthType.x509_thumbprint.value,
                     root_cert={
                         "certificate": "root_certificate",
                         "thumbprint": "root_thumbprint",
@@ -863,12 +855,12 @@ class TestEdgeHierarchyConfigFunctions:
                     ["id=dev1", "edge_agent=new-edge-agent"],
                     ["id=dev2"],
                 ],
-                DeviceAuthType.x509_ca.value,
+                DeviceAuthType.x509_thumbprint.value,
                 "default-edge-agent",
                 None,
                 EdgeDevicesConfig(
                     version="1.0",
-                    auth_method=DeviceAuthType.x509_ca.value,
+                    auth_method=DeviceAuthType.x509_thumbprint.value,
                     default_edge_agent="default-edge-agent",
                     root_cert={
                         "certificate": "root_certificate",
@@ -891,12 +883,12 @@ class TestEdgeHierarchyConfigFunctions:
                     ["id=dev1", "edge_agent=new-edge-agent", "hostname=dev1"],
                     ["id=dev2", "hostname=dev2"],
                 ],
-                DeviceAuthType.x509_ca.value,
+                DeviceAuthType.x509_thumbprint.value,
                 None,
                 "hierarchy_configs/device_config.toml",
                 EdgeDevicesConfig(
                     version="1.0",
-                    auth_method=DeviceAuthType.x509_ca.value,
+                    auth_method=DeviceAuthType.x509_thumbprint.value,
                     root_cert={
                         "certificate": "root_certificate",
                         "thumbprint": "root_thumbprint",

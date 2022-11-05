@@ -9,9 +9,7 @@ import tarfile
 from shutil import rmtree
 from os.path import exists
 from azext_iot.tests.iothub import IoTLiveScenarioTest
-from azext_iot.iothub.common import (
-    EdgeContainerAuth,
-)
+from azext_iot.iothub.common import EdgeContainerAuth
 
 
 @pytest.mark.usefixtures("set_cwd")
@@ -42,10 +40,10 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
 
         device_arg_string = self._generate_device_arg_string(devices)
         self.cmd(
-            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c {device_arg_string} --out bundles"
+            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c {device_arg_string} --out bundles --device-auth x509_thumbprint"
         )
 
-        self._validate_results(devices, "bundles")
+        self._validate_results(devices, "bundles", True)
 
     def test_nested_edge_hierarchy_nArgs_partial(self):
         # Partial 1
@@ -116,10 +114,10 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
         ]
 
         self.cmd(
-            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c --cfg {config_path} --out device_bundles"
+            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c --cfg {config_path} --out device_bundles --device-auth x509_thumbprint"
         )
 
-        self._validate_results(devices, "device_bundles")
+        self._validate_results(devices, "device_bundles", True)
 
     def test_nested_edge_hierarchy_config_partial(self):
         # Partial 1
@@ -184,7 +182,7 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
 
         self._validate_results(devices, None)
 
-    def _validate_results(self, devices, output_path):
+    def _validate_results(self, devices, output_path, cert_auth = False):
         # get all devices in hub
         device_list = self.cmd(
             f"iot hub device-identity list -n {self.entity_name} -g {self.entity_rg}"
@@ -252,6 +250,9 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
                         "README.md"
                     ]:
                         assert item in file_names
+                    if cert_auth:
+                        assert f"{device_id}.hub-auth-cert.pem" in file_names
+                        assert f"{device_id}.hub-auth-key.pem" in file_names
 
         if output_path:
             rmtree(output_path)

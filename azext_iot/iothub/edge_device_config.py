@@ -202,7 +202,7 @@ def create_edge_device_config(
         "iothub_hostname": hub_hostname,
         "source": "manual",
         "authentication": {"device_id_pk": {"value": device_pk}, "method": "sas"}
-        if auth_method == DeviceAuthType.shared_private_key.value
+        if auth_method == DeviceAuthType.shared_private_key
         else {
             "method": "x509",
             "identity_cert": f"file:///etc/aziot/certificates/{device_id}.hub-auth-cert.pem",
@@ -214,7 +214,7 @@ def create_edge_device_config(
         "pk": f"file:///etc/aziot/certificates/{device_id}.key.pem",
     }
     device_toml["agent"]["config"] = {
-        "image": device_config.edge_agent or default_edge_agent,
+        "image": device_config.edge_agent or default_edge_agent or '',
         "auth": {
             "serveraddress": device_config.container_auth.serveraddress,
             "username": device_config.container_auth.username,
@@ -224,10 +224,9 @@ def create_edge_device_config(
         else {},
     }
     if output_path:
-        import toml
-
+        import tomli_w
         write_content_to_file(
-            toml.dumps(device_toml),
+            tomli_w.dumps(device_toml),
             output_path,
             "config.toml",
             overwrite=True,
@@ -235,10 +234,33 @@ def create_edge_device_config(
     return device_toml
 
 
-def process_edge_devices_config_file_content(content: dict) -> EdgeDevicesConfig:
+def process_edge_devices_config_file_content(
+    content: dict,
+    override_auth_type: Optional[str] = None,
+    override_root_cert_path: Optional[str] = None,
+    override_root_key_path: Optional[str] = None,
+    override_root_password: Optional[str] = None,
+    override_default_edge_agent: Optional[str] = None,
+    override_device_config_template: Optional[str] = None,
+) -> EdgeDevicesConfig:
     """
     Process edge config file schema dictionary
     """
+
+    # Warn about override values
+    for value, name in [
+        (override_auth_type, "Authentication Type"),
+        (override_root_cert_path, "Root certificate"),
+        (override_root_key_path, "Root certificate key"),
+        (override_default_edge_agent, "Default edge agent"),
+        (override_device_config_template, "Device config template"),
+    ]:
+        if value:
+            logger.info(
+                f"Overriding configuration file property `{name}` "
+                f"with command argument value: `{value}`"
+            )
+
     # TODO - version / schema validation
     version = content.get("config_version", None)
     hub_config = content.get("iothub", None)
@@ -246,7 +268,7 @@ def process_edge_devices_config_file_content(content: dict) -> EdgeDevicesConfig
     for check, err in [
         (version, "No schema version specified in configuration file"),
         (hub_config, "No `iothub` properties specified in configuration file"),
-        (len(devices_config), "No devices specified in configuration file")
+        (len(devices_config), "No devices specified in configuration file"),
     ]:
         if not check:
             raise InvalidArgumentValueError(err)
@@ -254,35 +276,54 @@ def process_edge_devices_config_file_content(content: dict) -> EdgeDevicesConfig
     # edge root CA
     root_cert = None
     certificates = content.get("certificates", None)
-    if certificates:
-        root_ca_cert = certificates.get("root_ca_cert_path", None)
-        root_ca_key = certificates.get("root_ca_cert_key_path", None)
+    if certificates or any(
+        [override_root_cert_path, override_root_key_path, override_root_password]
+    ):
+        root_ca_cert = override_root_cert_path or certificates.get(
+            "root_ca_cert_path", None
+        )
+        root_ca_key = override_root_key_path or certificates.get(
+            "root_ca_cert_key_path", None
+        )
         if not all([root_ca_cert, root_ca_key]):
             raise InvalidArgumentValueError(
                 "Please check your config file to ensure values are provided "
                 "for both `root_ca_cert_path` and `root_ca_cert_key_path`."
             )
-        root_cert = load_ca_cert_info(root_ca_cert, root_ca_key)
+        root_cert = load_ca_cert_info(
+            root_ca_cert, root_ca_key, password=override_root_password
+        )
     else:
         root_cert = create_root_certificate()
 
     # device auth
-    auth_value = hub_config["authentication_method"]
-    if auth_value not in ["symmetric_key", "x509_certificate"]:
-        raise InvalidArgumentValueError(
-            "Invalid authentication_method in edge config file, must be either symmetric_key or x509_certificate"
+    # default to symmetric key
+    device_authentication_method = DeviceAuthType.shared_private_key.value
+    auth_value = hub_config.get("authentication_method", None)
+    if override_auth_type:
+        device_authentication_method = override_auth_type
+    else:
+        if auth_value not in ["symmetric_key", "x509_certificate"]:
+            raise InvalidArgumentValueError(
+                "Invalid authentication_method in edge config file, must be either symmetric_key or x509_certificate"
+            )
+        device_authentication_method = (
+            DeviceAuthType.x509_thumbprint.value
+            if auth_value == "x509_certificate"
+            else DeviceAuthType.shared_private_key.value
         )
-    device_authentication_method = (
-        DeviceAuthType.shared_private_key.value
-        if auth_value == "symmetric_key"
-        else DeviceAuthType.x509_ca.value
-    )
 
     # edge config
     edge_config = content.get("configuration", None)
-    if edge_config:
-        template_config_path = edge_config.get("template_config_path", None)
-        default_edge_agent = edge_config.get("default_edge_agent", None)
+    if edge_config or any(
+        [override_default_edge_agent, override_device_config_template]
+    ):
+        template_config_path = override_device_config_template or edge_config.get(
+            "template_config_path", None
+        )
+        default_edge_agent = override_default_edge_agent or edge_config.get(
+            "default_edge_agent", None
+        )
     all_devices = []
 
     def _process_edge_config_device(device: dict, parent_id=None, parent_hostname=None):
@@ -373,7 +414,7 @@ def try_parse_valid_deployment_config(deployment_path: str):
 
 def process_edge_devices_config_args(
     device_args: List[List[str]],
-    auth_type: DeviceAuthType,
+    auth_type: str,
     default_edge_agent: Optional[str] = None,
     device_config_template: Optional[str] = None,
     root_cert_path: Optional[str] = None,
@@ -394,7 +435,7 @@ def process_edge_devices_config_args(
 
     config = EdgeDevicesConfig(
         version="1.0",
-        auth_method=auth_type or DeviceAuthType.shared_private_key.value,
+        auth_method=(auth_type or DeviceAuthType.shared_private_key.value),
         default_edge_agent=default_edge_agent,
         template_config_path=device_config_template,
         devices=[],

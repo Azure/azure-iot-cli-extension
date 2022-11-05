@@ -29,6 +29,7 @@ from knack.log import get_logger
 from typing import Optional
 from azext_iot.common.shared import (
     DeviceAuthType,
+    SHAHashVersions,
     SdkType,
 )
 from azext_iot.iothub.common import (
@@ -75,7 +76,7 @@ class DeviceIdentityProvider(IoTHubProvider):
         config_file: Optional[str] = None,
         visualize: bool = False,
         clean: bool = False,
-        auth_type: Optional[DeviceAuthType] = None,
+        auth_type: Optional[str] = None,
         default_edge_agent: Optional[str] = None,
         device_config_template: Optional[str] = None,
         root_cert_path: Optional[str] = None,
@@ -107,11 +108,6 @@ class DeviceIdentityProvider(IoTHubProvider):
                 raise MutuallyExclusiveArgumentError(
                     "Please either use a --config-file argument or inline --device arguments, both were provided."
                 )
-            # if config file is specified, warn user that auth_type and cert info should be set in the file
-            if any([auth_type, root_cert_path, root_key_path]):
-                raise MutuallyExclusiveArgumentError(
-                    "If using a --config-file argument, please set device auth and root certificate parameters in that file."
-                )
 
             config_content = None
             # Process Edge Config file into object dictionary
@@ -122,7 +118,14 @@ class DeviceIdentityProvider(IoTHubProvider):
             else:
                 raise InvalidArgumentValueError("Config file must be JSON or YAML")
 
-            config = process_edge_devices_config_file_content(config_content)
+            config = process_edge_devices_config_file_content(
+                content=config_content,
+                override_auth_type=auth_type,
+                override_root_cert_path=root_cert_path,
+                override_root_key_path=root_key_path,
+                override_default_edge_agent=default_edge_agent,
+                override_device_config_template=device_config_template,
+                )
         elif devices:
             config = process_edge_devices_config_args(
                 device_args=devices,
@@ -131,7 +134,7 @@ class DeviceIdentityProvider(IoTHubProvider):
                 device_config_template=device_config_template,
                 root_cert_path=root_cert_path,
                 root_key_path=root_key_path,
-                root_cert_password=root_cert_password
+                root_cert_password=root_cert_password,
             )
 
         if not config or not len(config.devices):
@@ -142,7 +145,7 @@ class DeviceIdentityProvider(IoTHubProvider):
         tree = Tree()
         tree_root_node_id = "|root|"
         tree.create_node("Devices", tree_root_node_id)
-        hub_cert_auth = config.auth_method == DeviceAuthType.x509_ca.value
+        hub_cert_auth = config.auth_method == DeviceAuthType.x509_thumbprint.value
 
         # dict of device parents by ID
         device_to_parent_dict: Dict[str, str] = {}
@@ -293,6 +296,7 @@ class DeviceIdentityProvider(IoTHubProvider):
                     valid_days=365,
                     cert_output_dir=device_cert_output_directory,
                     file_prefix=f"{device_id}.hub-auth",
+                    sha_version=SHAHashVersions.SHA256.value,
                 )
                 pk = signed_device_cert["thumbprint"]
                 sk = device_hub_cert["thumbprint"]
@@ -392,9 +396,7 @@ class DeviceIdentityProvider(IoTHubProvider):
                 )
 
     # TODO - Unit test
-    def delete_device_identities(
-        self, device_ids: List[str], confirm: bool = False
-    ):
+    def delete_device_identities(self, device_ids: List[str], confirm: bool = False):
         for id in device_ids:
             try:
                 self.service_sdk.devices.delete_identity(id=id, if_match="*")

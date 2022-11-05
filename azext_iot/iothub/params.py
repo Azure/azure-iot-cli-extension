@@ -279,7 +279,8 @@ def load_iothub_arguments(self, _):
         context.argument(
             "device_auth_type",
             arg_type=get_enum_type(
-                [DeviceAuthType.shared_private_key, DeviceAuthType.x509_ca]
+                [DeviceAuthType.shared_private_key.value, DeviceAuthType.x509_thumbprint.value],
+                DeviceAuthType.shared_private_key.value
             ),
             options_list=["--device-auth-type", "--device-auth"],
             help="Device to hub authorization mechanism.",

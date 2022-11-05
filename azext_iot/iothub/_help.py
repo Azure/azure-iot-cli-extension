@@ -337,7 +337,7 @@ def load_iothub_help():
             with an existing root CA, using x509 auth, and specify a custom device bundle output path.
           text: |
             az iot edge devices create -n {hub_name} --clean --out "path/to/bundle_folder"
-            --root-cert "root_cert.pem" --root-key "root_key.pem" --device-auth x509_ca
+            --root-cert "root_cert.pem" --root-key "root_key.pem" --device-auth x509_thumbprint
             --device id=parent1
             --device id=child1 parent=parent1
 
