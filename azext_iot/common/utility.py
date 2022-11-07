@@ -178,10 +178,10 @@ def process_toml_arg(path: str) -> Dict[str, Any]:
         )
 
     try:
-        import toml
+        import tomli
 
-        with open(path, "rt", encoding="utf-8") as f:
-            return toml.load(f)
+        with open(path, "rb") as f:
+            return tomli.load(f)
     except Exception as ex:
         raise InvalidArgumentValueError(
             "Failed to parse TOML for file '{}' with exception:\n{}".format(path, ex)
