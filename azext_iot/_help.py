@@ -260,13 +260,16 @@ helps[
 ] = """
     type: command
     short-summary: Export all device identities from an IoT Hub to an Azure Storage blob container.
-                   For inline blob container SAS uri input, please review the input rules of your environment.
-                   Storage account name and blob container name parameters can only be used when the storage account is in the same subscription as the input IoT Hub.
-                   The output blob containing device identities is a text file named 'devices.txt'.
-                   Permissions required - Either IoT Hub shared access policy supporting 'Registry Read & Registry Write' OR
-                   an entity with 'IoT Hub Data Contributor' role on the IoT Hub.
-    long-summary: For more information, see
-                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
+    long-summary: |
+                  The output blob containing device identities is a text file named 'devices.txt'.
+
+                  Permissions required - Either IoT Hub shared access policy supporting 'Registry Read & Registry Write' OR a principal
+                  with 'IoT Hub Data Contributor' role on the IoT Hub.
+
+                  Storage account name and blob container name parameters can only be used when the storage account is in the same subscription as the input IoT Hub.
+                  For inline blob container SAS uri input, please review the input rules of your environment.
+
+                  For more information, see https://aka.ms/iothub-device-exportimport
     examples:
     - name: Export all device identities to a configured blob container and include device keys.
             The blob container name and storage account name are provided as parameters to the command.
@@ -305,15 +308,18 @@ helps[
     "iot hub device-identity import"
 ] = """
     type: command
-    short-summary: Import device identities to an IoT Hub from a blob.
-                   For inline blob container SAS uri input, please review the input rules of your environment.
-                   Storage account name and blob container name parameters can only be used when the storage account is in the same subscription as the input IoT Hub.
-                   The expected input file containing device identities should be named 'devices.txt'.
-                   The output log file 'importErrors.log' is empty when import is successful and contains error logs in case of import failure.
-                   Permissions required - Either IoT Hub shared access policy supporting 'Registry Read & Registry Write' OR
-                   an entity with 'IoT Hub Data Contributor' role on the IoT Hub.
-    long-summary: For more information, see
-                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
+    short-summary: Import device identities to an IoT Hub from a storage container blob.
+    long-summary: |
+                  The expected input file containing device identities should be named 'devices.txt'.
+                  The output log file 'importErrors.log' is empty when import is successful and contains error logs in case of import failure.
+
+                  Permissions required - Either IoT Hub shared access policy supporting 'Registry Read & Registry Write' OR a principal
+                  with 'IoT Hub Data Contributor' role on the IoT Hub.
+
+                  Storage account name and blob container name parameters can only be used when the storage account is in the same subscription as the input IoT Hub.
+                  For inline blob container SAS uri input, please review the input rules of your environment.
+
+                  For more information, see https://aka.ms/iothub-device-exportimport
     examples:
     - name: Import all device identities from a blob by providing command parameters for
             input blob container and storage account as well as output blob container and storage account.
@@ -672,9 +678,11 @@ helps[
     "iot hub invoke-module-method"
 ] = """
     type: command
-    short-summary: Invoke an Edge module method.
+    short-summary: Invoke a module method.
+    long-summary: This command supports both edge and non-edge device modules.
+
     examples:
-    - name: Invoke a direct method on edge device using a module from the cloud.
+    - name: Invoke a direct method on an edge device module.
       text: >
         az iot hub invoke-module-method -n {iothub_name} -d {device_id}
         -m '$edgeAgent' --method-name 'RestartModule' --method-payload '{"schemaVersion": "1.0"}'
@@ -685,8 +693,9 @@ helps[
 ] = """
     type: command
     short-summary: Invoke a device method.
+
     examples:
-    - name: Invoke a direct method on device from the cloud.
+    - name: Invoke a direct method on a device.
       text: >
         az iot hub invoke-device-method --hub-name {iothub_name} --device-id {device_id}
         --method-name Reboot --method-payload '{"version":"1.0"}'
