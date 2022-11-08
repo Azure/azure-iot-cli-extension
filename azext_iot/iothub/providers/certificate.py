@@ -54,15 +54,15 @@ class CertificateProvider(IoTHubProvider):
 
         # Check if changes are needed
         if ca_version == CertificateAuthorityVersions.v1.value and root_ca:
-            print(CA_REVERT_WARNING)
+            logger.warning(CA_REVERT_WARNING)
             if not yes and not prompt_y_n(msg=CONT_INPUT_MSG, default="n"):
                 raise ManualInterrupt(ABORT_MSG)
         elif ca_version == CertificateAuthorityVersions.v2.value and not root_ca:
-            print(CA_TRANSITION_WARNING)
+            logger.warning(CA_TRANSITION_WARNING)
             if not yes and not prompt_y_n(msg=CONT_INPUT_MSG, default="n"):
                 raise ManualInterrupt(ABORT_MSG)
         else:
-            print(NO_CHANGE_MSG.format(ca_version))
+            logger.warning(NO_CHANGE_MSG.format(ca_version))
             return
 
         command = "resource update -n {} -g {} --api-version {} --resource-type {}".format(
