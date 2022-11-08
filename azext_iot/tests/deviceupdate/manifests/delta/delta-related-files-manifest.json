@@ -1,0 +1,55 @@
+{
+    "updateId": {
+        "provider": "Microsoft",
+        "name": "Toaster",
+        "version": "1.0"
+    },
+    "description": "Example update",
+    "compatibility": [
+        {
+            "deviceManufacturer": "Microsoft",
+            "deviceModel": "Toaster"
+        }
+    ],
+    "instructions": {
+        "steps": [
+            {
+                "description": "pre-install script",
+                "handler": "microsoft/script:1",
+                "handlerProperties": {
+                    "arguments": "--pre-install"
+                },
+                "files": [
+                    "configure.sh"
+                ]
+            }
+        ]
+    },
+    "files": [
+        {
+            "filename": "configure.sh",
+            "sizeInBytes": 103,
+            "hashes": {
+                "sha256": "vN/bX+eYD32Vh1/8nAZmqdrUBik27DZFSQ/ukQoFZvI="
+            },
+            "relatedFiles": [
+                {
+                    "filename": "in1_in2_deltaupdate.dat",
+                    "sizeInBytes": 2000000,
+                    "hashes": {
+                        "sha256": "bM6xSDPUrQAuhvrEs3UX4SqYKn5/EsvGFGKtKrZWSrY="
+                    },
+                    "properties": {
+                        "microsoft.sourceFileHashAlgorithm": "sha256",
+                        "microsoft.sourceFileHash": "YmFYwnEUddq2nZsBAn5v7gCRKdHx+TUntMz5tLwU+24="
+                    }
+                }
+            ],
+            "downloadHandler": {
+                "id": "microsoft/delta:1"
+            }
+        }
+    ],
+    "manifestVersion": "5.0",
+    "createdDateTime": "2020-10-02T22:18:04.9446744Z"
+}

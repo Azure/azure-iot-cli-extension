@@ -27,7 +27,7 @@ def load_deviceupdate_arguments(self, _):
     """
     Load CLI Args for Knack parser
     """
-    with self.argument_context("iot device-update") as context:
+    with self.argument_context("iot du") as context:
         context.argument(
             "resource_group_name",
             arg_type=resource_group_name_type,
@@ -47,7 +47,7 @@ def load_deviceupdate_arguments(self, _):
         context.argument(
             "instance_name",
             options_list=["-i", "--instance"],
-            help="Device Update instance name."
+            help="Device Update instance name. "
             "You can configure the default instance name using `az config set defaults.adu_instance=<name>`.",
             arg_group="Account Identifier",
             configured_default="adu_instance",
@@ -66,7 +66,7 @@ def load_deviceupdate_arguments(self, _):
             help="Resource tags. Property bag in key-value pairs with the following format: a=b c=d",
         )
 
-    with self.argument_context("iot device-update account") as context:
+    with self.argument_context("iot du account") as context:
         context.argument(
             "location",
             options_list=["-l", "--location"],
@@ -101,7 +101,7 @@ def load_deviceupdate_arguments(self, _):
             arg_type=get_enum_type(ADUAccountSKUType),
         )
 
-    with self.argument_context("iot device-update account private-endpoint-connection") as context:
+    with self.argument_context("iot du account private-endpoint-connection") as context:
         context.argument(
             "conn_name",
             options_list=["--cn", "--conn-name"],
@@ -119,7 +119,7 @@ def load_deviceupdate_arguments(self, _):
             help="The reason for approval/rejection of the connection.",
         )
 
-    with self.argument_context("iot device-update instance") as context:
+    with self.argument_context("iot du instance") as context:
         context.argument(
             "iothub_resource_ids",
             arg_group="IoT Hub",
@@ -140,7 +140,7 @@ def load_deviceupdate_arguments(self, _):
             help="User provided storage account resource Id for use in diagnostic logs collection.",
         )
 
-    with self.argument_context("iot device-update update") as context:
+    with self.argument_context("iot du update") as context:
         context.argument(
             "update_name",
             options_list=["--update-name", "--un"],
@@ -166,8 +166,22 @@ def load_deviceupdate_arguments(self, _):
             options_list=["--friendly-name"],
             help="Friendly name associated with the update definition.",
         )
+        context.argument(
+            "file_paths",
+            options_list=["--file-path", "-f"],
+            nargs="?",
+            action="append",
+            help="Local path to target file for hash calculation. --file-path can be used 1 or more times.",
+        )
+        context.argument(
+            "hash_algo",
+            options_list=["--hash-algo"],
+            help="Cryptographic algorithm to use for hashing.",
+            arg_type=get_enum_type(ADUValidHashAlgorithmType),
+            type=str,
+        )
 
-    with self.argument_context("iot device-update update list") as context:
+    with self.argument_context("iot du update list") as context:
         context.argument(
             "by_provider",
             options_list=["--by-provider"],
@@ -188,12 +202,12 @@ def load_deviceupdate_arguments(self, _):
             arg_group="Filter",
         )
 
-    with self.argument_context("iot device-update update import") as context:
+    with self.argument_context("iot du update import") as context:
         context.argument(
             "url",
             options_list=["--url"],
             help="Routable location from which the import manifest can be downloaded by Device Update for IoT Hub. "
-            "This is typically a read-only SAS-protected blob URL with an expiration set to at least 4 hours.",
+            "This is typically a read-only SAS-protected blob URL with an expiration set to at least 3 hours.",
         )
         context.argument(
             "file",
@@ -218,7 +232,7 @@ def load_deviceupdate_arguments(self, _):
             help="File size in number of bytes. " "If not provided it will by calculated from the provided url.",
         )
 
-    with self.argument_context("iot device-update device") as context:
+    with self.argument_context("iot du device") as context:
         context.argument(
             "device_group_id",
             options_list=["--group-id", "--gid"],
@@ -232,7 +246,7 @@ def load_deviceupdate_arguments(self, _):
             "device update agent in the Device Update PnP interface in IoT Hub. It is a hex-encoded SHA1 hash.",
         )
 
-    with self.argument_context("iot device-update device list") as context:
+    with self.argument_context("iot du device list") as context:
         context.argument(
             "filter",
             options_list=["--filter"],
@@ -240,7 +254,7 @@ def load_deviceupdate_arguments(self, _):
             "or groupId and deploymentStatus.",
         )
 
-    with self.argument_context("iot device-update device health") as context:
+    with self.argument_context("iot du device health") as context:
         context.argument(
             "filter",
             options_list=["--filter"],
@@ -248,7 +262,7 @@ def load_deviceupdate_arguments(self, _):
             "If deviceId is provided moduleId can be optionally specified.",
         )
 
-    with self.argument_context("iot device-update device class") as context:
+    with self.argument_context("iot du device class") as context:
         context.argument(
             "installable_updates",
             options_list=["--installable-updates"],
@@ -281,7 +295,7 @@ def load_deviceupdate_arguments(self, _):
             "alphanumeric, dot and dash values.",
         )
 
-    with self.argument_context("iot device-update device class list") as context:
+    with self.argument_context("iot du device class list") as context:
         context.argument(
             "filter",
             options_list=["--filter"],
@@ -290,7 +304,7 @@ def load_deviceupdate_arguments(self, _):
             "Otherwise supports filtering by class friendly name.",
         )
 
-    with self.argument_context("iot device-update device group") as context:
+    with self.argument_context("iot du device group") as context:
         context.argument(
             "best_updates",
             options_list=["--best-updates"],
@@ -316,7 +330,7 @@ def load_deviceupdate_arguments(self, _):
             "or subgroupsWithOnLatestUpdateCount.",
         )
 
-    with self.argument_context("iot device-update device import") as context:
+    with self.argument_context("iot du device import") as context:
         context.argument(
             "import_type",
             options_list=["--import-type", "--it"],
@@ -324,7 +338,7 @@ def load_deviceupdate_arguments(self, _):
             arg_type=get_enum_type(ADUManageDeviceImportType),
         )
 
-    with self.argument_context("iot device-update device deployment") as context:
+    with self.argument_context("iot du device deployment") as context:
         context.argument(
             "deployment_id",
             options_list=["--deployment-id", "--did"],
@@ -363,7 +377,7 @@ def load_deviceupdate_arguments(self, _):
             help="Orders the set of deployments returned. You can order by startDateTime [desc/asc].",
         )
 
-    with self.argument_context("iot device-update device deployment list-devices") as context:
+    with self.argument_context("iot du device deployment list-devices") as context:
         context.argument(
             "filter",
             options_list=["--filter"],
@@ -371,7 +385,7 @@ def load_deviceupdate_arguments(self, _):
             "deviceId and moduleId and/or deviceState.",
         )
 
-    with self.argument_context("iot device-update device deployment create") as context:
+    with self.argument_context("iot du device deployment create") as context:
         context.argument(
             "start_date_time",
             options_list=["--start-time"],
@@ -413,7 +427,7 @@ def load_deviceupdate_arguments(self, _):
             arg_group="Update Rollback Policy",
         )
 
-    with self.argument_context("iot device-update device log") as context:
+    with self.argument_context("iot du device log") as context:
         context.argument(
             "log_collection_id",
             options_list=["--log-collection-id", "--lcid"],
@@ -426,7 +440,7 @@ def load_deviceupdate_arguments(self, _):
             arg_type=get_three_state_flag(),
         )
 
-    with self.argument_context("iot device-update device log collect") as context:
+    with self.argument_context("iot du device log collect") as context:
         context.argument(
             "agent_id",
             options_list=["--agent-id"],
@@ -441,7 +455,7 @@ def load_deviceupdate_arguments(self, _):
             help="Description for the log collection operation.",
         )
 
-    with self.argument_context("iot device-update update init") as context:
+    with self.argument_context("iot du update init") as context:
         context.argument(
             "update_provider",
             options_list=["--update-provider"],
@@ -460,7 +474,7 @@ def load_deviceupdate_arguments(self, _):
         context.argument(
             "description",
             options_list=["--description"],
-            help="Description for the import update manifest.",
+            help="Description for the import manifest.",
         )
         context.argument(
             "deployable",
@@ -487,7 +501,7 @@ def load_deviceupdate_arguments(self, _):
             "key value pairs. If either inline or reference step can be satisfied, the reference step will be prioritized. "
             "Usage of --file will be associated with the nearest inline --step entry, deriving the value for 'files'. "
             "The following reference step keys are supported: "
-            "`updateId.provider`, `updateId.name` `updateId.version` and `description`."
+            "`updateId.provider`, `updateId.name`, `updateId.version` and `description`. "
             "The following inline step keys are supported: "
             "`handler` (ex: 'microsoft/script:1' or 'microsoft/swupdate:1' or 'microsoft/apt:1'), "
             "`properties` (in-line json object the agent will pass to the handler), and `description`. "
@@ -519,22 +533,48 @@ def load_deviceupdate_arguments(self, _):
             "--related-file can be used 1 or more times.",
         )
         context.argument(
-            "file_paths",
-            options_list=["--file-path"],
-            nargs="+",
-            action="append",
-            help="Local path to target file for hash calculation. --file-path can be used 1 or more times.",
-        )
-        context.argument(
-            "hash_algo",
-            options_list=["--hash-algo"],
-            help="Cryptographic algorithm to use for hashing.",
-            arg_type=get_enum_type(ADUValidHashAlgorithmType),
-            type=str,
-        )
-        context.argument(
             "no_validation",
             options_list=["--no-validation"],
             arg_type=get_three_state_flag(),
             help="Disables client-side json schema validation of the import manifest content.",
+        )
+
+    with self.argument_context("iot du update stage") as context:
+        context.argument(
+            "storage_account_name",
+            options_list=["--storage-account"],
+            help="Desired storage account name to stage import manifest artifacts.",
+            arg_group="Storage"
+        )
+        context.argument(
+            "storage_container_name",
+            options_list=["--storage-container"],
+            help="Desired storage container name to stage import manifest artifacts.",
+            arg_group="Storage"
+        )
+        context.argument(
+            "storage_account_subscription",
+            options_list=["--storage-subscription"],
+            help="Desired storage account subscription to stage import manifest artifacts. "
+            "Applicable when the storage and device update accounts are in different subscriptions.",
+            arg_group="Storage"
+        )
+        context.argument(
+            "update_manifest_paths",
+            nargs="?",
+            action="append",
+            options_list=["--manifest-path"],
+            help="Local file path to the import manifest that should be staged. Can be used 1 or more times.",
+        )
+        context.argument(
+            "then_import",
+            options_list=["--then-import"],
+            arg_type=get_three_state_flag(),
+            help="Flag indicating whether the update should be imported after staging.",
+        )
+        context.argument(
+            "overwrite",
+            options_list=["--overwrite"],
+            arg_type=get_three_state_flag(),
+            help="Flag indicating whether existing blobs should be overwritten if a conflict exists.",
         )

@@ -28,14 +28,13 @@ def load_deviceupdate_commands(self, _):
     """
 
     with self.command_group(
-        "iot device-update",
+        "iot du",
         command_type=deviceupdate_account_ops,
-        is_preview=True,
     ) as cmd_group:
         pass
 
     with self.command_group(
-        "iot device-update account",
+        "iot du account",
         command_type=deviceupdate_account_ops,
     ) as cmd_group:
         cmd_group.command("create", "create_account", supports_no_wait=True)
@@ -51,7 +50,7 @@ def load_deviceupdate_commands(self, _):
         cmd_group.wait_command("wait", getter_name="wait_on_account")
 
     with self.command_group(
-        "iot device-update account private-endpoint-connection",
+        "iot du account private-endpoint-connection",
         command_type=deviceupdate_account_ops,
     ) as cmd_group:
         cmd_group.command("list", "list_account_private_connections")
@@ -60,13 +59,13 @@ def load_deviceupdate_commands(self, _):
         cmd_group.command("delete", "delete_account_private_connection", confirmation=True)
 
     with self.command_group(
-        "iot device-update account private-link-resource",
+        "iot du account private-link-resource",
         command_type=deviceupdate_account_ops,
     ) as cmd_group:
         cmd_group.command("list", "list_account_private_links")
 
     with self.command_group(
-        "iot device-update instance",
+        "iot du instance",
         command_type=deviceupdate_instance_ops,
     ) as cmd_group:
         cmd_group.command("create", "create_instance", supports_no_wait=True)
@@ -82,7 +81,7 @@ def load_deviceupdate_commands(self, _):
         cmd_group.wait_command("wait", getter_name="wait_on_instance")
 
     with self.command_group(
-        "iot device-update update",
+        "iot du update",
         command_type=deviceupdate_update_ops,
     ) as cmd_group:
         cmd_group.command("import", "import_update", supports_no_wait=True, supports_local_cache=True)
@@ -97,23 +96,25 @@ def load_deviceupdate_commands(self, _):
             ),
         )
         cmd_group.show_command("show", "show_update")
+        cmd_group.show_command("calculate-hash", "calculate_hash")
+        cmd_group.show_command("stage", "stage_update", is_preview=True)  # Is preview independent of root command group.
 
     with self.command_group(
-        "iot device-update update file",
+        "iot du update file",
         command_type=deviceupdate_update_ops,
     ) as cmd_group:
         cmd_group.command("list", "list_update_files")
         cmd_group.show_command("show", "show_update_file")
 
     with self.command_group(
-        "iot device-update update init",
+        "iot du update init",
         command_type=deviceupdate_update_ops,
+        is_preview=True,  # Is preview independent of root command group.
     ) as cmd_group:
         cmd_group.command("v5", "manifest_init_v5")
-        cmd_group.show_command("calculate-hash", "calculate_hash")
 
     with self.command_group(
-        "iot device-update device",
+        "iot du device",
         command_type=deviceupdate_device_ops,
     ) as cmd_group:
         cmd_group.command("import", "import_devices")
@@ -121,19 +122,19 @@ def load_deviceupdate_commands(self, _):
         cmd_group.show_command("show", "show_device")
 
     with self.command_group(
-        "iot device-update device module",
+        "iot du device module",
         command_type=deviceupdate_device_ops,
     ) as cmd_group:
         cmd_group.show_command("show", "show_device_module")
 
     with self.command_group(
-        "iot device-update device compliance",
+        "iot du device compliance",
         command_type=deviceupdate_device_ops,
     ) as cmd_group:
         cmd_group.show_command("show", "show_update_compliance")
 
     with self.command_group(
-        "iot device-update device group",
+        "iot du device group",
         command_type=deviceupdate_device_ops,
     ) as cmd_group:
         cmd_group.command("list", "list_device_groups")
@@ -141,7 +142,7 @@ def load_deviceupdate_commands(self, _):
         cmd_group.command("delete", "delete_device_group", confirmation=True)
 
     with self.command_group(
-        "iot device-update device class",
+        "iot du device class",
         command_type=deviceupdate_device_class_ops,
     ) as cmd_group:
         cmd_group.command("list", "list_device_classes")
@@ -150,13 +151,13 @@ def load_deviceupdate_commands(self, _):
         cmd_group.command("delete", "delete_device_class", confirmation=True)
 
     with self.command_group(
-        "iot device-update device health",
+        "iot du device health",
         command_type=deviceupdate_device_ops,
     ) as cmd_group:
         cmd_group.command("list", "list_device_health")
 
     with self.command_group(
-        "iot device-update device deployment",
+        "iot du device deployment",
         command_type=deviceupdate_deployment_ops,
     ) as cmd_group:
         cmd_group.command("create", "create_deployment")
@@ -168,7 +169,7 @@ def load_deviceupdate_commands(self, _):
         cmd_group.command("list-devices", "list_devices_for_deployment")
 
     with self.command_group(
-        "iot device-update device log",
+        "iot du device log",
         command_type=deviceupdate_log_ops,
     ) as cmd_group:
         cmd_group.command("collect", "collect_logs")
