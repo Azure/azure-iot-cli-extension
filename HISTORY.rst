@@ -3,8 +3,15 @@
 Release History
 ===============
 
-unreleased
+
+0.18.1
 +++++++++++++++
+
+**Device Update**
+
+* Removed preview classification from the root Azure Device Update command group.
+  Commands are GA with the exception of `az iot du update stage` and `az iot du update init` which are still preview.
+
 
 **IoT Hub Update**
 
@@ -15,15 +22,6 @@ unreleased
 
   - az iot hub certificate root-authority show
   - az iot hub certificate root-authority set
-
-
-0.18.1
-+++++++++++++++
-
-**Device Update**
-
-* Removed preview classification from the root Azure Device Update command group.
-  Commands are GA with the exception of `az iot du update stage` and `az iot du update init` which are still preview.
 
 
 0.18.0

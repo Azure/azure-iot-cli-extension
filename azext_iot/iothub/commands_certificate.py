@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 
 def certificate_root_authority_show(
     cmd,
-    hub_name: Optional[str] = None,
+    hub_name: str,
     resource_group_name: Optional[str] = None,
 ):
     resource = CertificateProvider(
@@ -27,7 +27,7 @@ def certificate_root_authority_show(
 def certificate_root_authority_set(
     cmd,
     ca_version: str,
-    hub_name: Optional[str] = None,
+    hub_name: str,
     resource_group_name: Optional[str] = None,
     yes: bool = False
 ):

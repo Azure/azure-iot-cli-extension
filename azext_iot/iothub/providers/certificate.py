@@ -31,7 +31,7 @@ class CertificateProvider(IoTHubProvider):
     def __init__(
         self,
         cmd,
-        hub_name: Optional[str] = None,
+        hub_name: str,
         rg: Optional[str] = None,
     ):
         super(CertificateProvider, self).__init__(
