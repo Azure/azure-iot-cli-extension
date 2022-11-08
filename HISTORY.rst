@@ -13,7 +13,7 @@ Release History
   Commands are GA with the exception of `az iot du update stage` and `az iot du update init` which are still preview.
 
 
-**IoT Hub Update**
+**IoT Hub Updates**
 
 * The root-authority migration feature is now available. Since the Baltimore root will soon expire, IoT Hub will
  transition to the DigiCert Global G2 root starting February 15, 2023. You will need to update all device certificates
