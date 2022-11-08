@@ -1,0 +1,26 @@
+configVersion: "1.0"
+
+iotHub:
+  authenticationMethod: symmetricKey # Options: [symmetricKey, x509Certificate]
+
+certificates: # Optional, a self-signed CA will be generated if not provided here or in command arguments
+  rootCACertPath: "rootCA.cert.pem"
+  rootCACertKeyPath: "rootCA.key.pem"
+
+edgeConfiguration:
+  templateConfigPath: "./hierarchy_configs/device_config.toml" # Optional, an empty device configuration is created if not provided here or in command arguments
+  defaultEdgeAgent: "$upstream:443/azureiotedge-agent:1.2"
+
+edgeDevices:
+  - deviceId: "parentDevice" # Hub Device Identity
+    edgeAgent: "mcr.microsoft.com/azureiotedge-agent:1.2" # Edge agent image URI
+    hostname: "parentDeviceHostname.local" # FQDN or IP address
+    deployment: "parentDeviceDeployment.json" # Path to deployment JSON
+    children:
+      - deviceId: "childDevice"
+        hostname: "childDeviceHostname.local"
+        edgeAgent: "$upstream:443/azureiotedge-agent:1.2" # Optional, will use `defaultEdgeAgent` if not provided
+        deployment: "childDeviceDeployment.json"
+      - deviceId: "secondChildDevice"
+        hostname: "secondChildDeviceHostname.local"
+        deployment: "childDeviceDeployment.json"

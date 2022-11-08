@@ -1,16 +1,8 @@
-config_version: "1.0"
-# We don't need iothub info from the config schema
-iothub:
-  # This should probably be moved into configuration section
-  authentication_method: symmetric_key
+configVersion: "1.0"
+iotHub:
+  authenticationMethod: symmetricKey
+edgeConfiguration:
+  templateConfigPath: "./hierarchy_configs/device_config.toml"
 
-## IoT Edge configuration template to use
-configuration:
-  template_config_path: "./hierarchy_configs/device_config.toml"
-
-## Hierarchy of IoT Edge devices to create
-edgedevices:
-  - device_id: device_1
-  # duplicate deviceID
-  - device_id: device_1
+edgeDevices:
   - deployment: './fake_deployment.json'

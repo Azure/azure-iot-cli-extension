@@ -42,7 +42,7 @@ hub_name = "myhub"
 hub_entity = mock_target["entity"]
 resource_group_name = "RESOURCEGROUP"
 mock_container_auth = {
-    "serveraddress": "serveraddress",
+    "serverAddress": "serverAddress",
     "username": "username",
     "password": "$credential$",
 }
@@ -469,11 +469,11 @@ class TestHierarchyCreateConfig:
         expected_devices = []
 
         def add_device(device):
-            expected_devices.append(device["device_id"])
-            for child in device.get("child", []):
+            expected_devices.append(device["deviceId"])
+            for child in device.get("children", []):
                 add_device(child)
 
-        for device in cfg_obj["edgedevices"]:
+        for device in cfg_obj["edgeDevices"]:
             add_device(device)
         if out:
             assert exists(out)
@@ -655,16 +655,16 @@ class TestEdgeHierarchyConfigFunctions:
         [
             (
                 {
-                    "config_version": "1.0",
-                    "iothub": {"authentication_method": "symmetric_key"},
-                    "configuration": {
-                        "template_config_path": "template-config-path.toml",
-                        "default_edge_agent": "edge-agent-1",
+                    "configVersion": "1.0",
+                    "iotHub": {"authenticationMethod": "symmetricKey"},
+                    "edgeConfiguration": {
+                        "templateConfigPath": "template-config-path.toml",
+                        "defaultEdgeAgent": "edge-agent-1",
                     },
-                    "edgedevices": [
+                    "edgeDevices": [
                         {
-                            "device_id": "parent-device-id",
-                            "edge_agent": "test-agent",
+                            "deviceId": "parent-device-id",
+                            "edgeAgent": "test-agent",
                             "hostname": "parent-hostname",
                         },
                     ],
@@ -690,18 +690,18 @@ class TestEdgeHierarchyConfigFunctions:
             ),
             (
                 {
-                    "config_version": "1.0",
-                    "iothub": {"authentication_method": "x509_certificate"},
-                    "configuration": {"default_edge_agent": "edge-agent-1"},
-                    "edgedevices": [
+                    "configVersion": "1.0",
+                    "iotHub": {"authenticationMethod": "x509Certificate"},
+                    "edgeConfiguration": {"defaultEdgeAgent": "edge-agent-1"},
+                    "edgeDevices": [
                         {
-                            "device_id": "parent-device-id",
-                            "edge_agent": "test-agent",
+                            "deviceId": "parent-device-id",
+                            "edgeAgent": "test-agent",
                             "hostname": "parent-hostname",
-                            "child": [
+                            "children": [
                                 {
-                                    "device_id": "child-device-id",
-                                    "edge_agent": "test-agent2",
+                                    "deviceId": "child-device-id",
+                                    "edgeAgent": "test-agent2",
                                     "hostname": "child-hostname",
                                 }
                             ],
@@ -746,14 +746,14 @@ class TestEdgeHierarchyConfigFunctions:
         set_cwd,
     ):
         content = {
-            "config_version": "1.0",
-            "iothub": {"authentication_method": "x509_certificate"},
-            "configuration": {"default_edge_agent": "edge-agent-2"},
+            "configVersion": "1.0",
+            "iotHub": {"authenticationMethod": "x509Certificate"},
+            "edgeConfiguration": {"defaultEdgeAgent": "edge-agent-2"},
             "certificates": {
-                "root_ca_cert_path": "test_certs/root-cert.pem",
-                "root_ca_cert_key_path": "test_certs/root-key.pem",
+                "rootCACertPath": "test_certs/root-cert.pem",
+                "rootCACertKeyPath": "test_certs/root-key.pem",
             },
-            "edgedevices": [{"device_id": "test"}],
+            "edgeDevices": [{"deviceId": "test"}],
         }
         cert = self.create_test_root_cert("test_certs")
         result = process_edge_devices_config_file_content(content)
@@ -772,10 +772,10 @@ class TestEdgeHierarchyConfigFunctions:
             # no version
             (
                 {
-                    "iothub": {"authentication_method": "symmetric_key"},
-                    "configuration": {
-                        "template_config_path": "template-config-path.toml",
-                        "default_edge_agent": "edge-agent-1",
+                    "iotHub": {"authentication_method": "symmetricKey"},
+                    "edgeConfiguration": {
+                        "templateConfigPath": "template-config-path.toml",
+                        "defaultEdgeAgent": "edge-agent-1",
                     },
                 },
                 InvalidArgumentValueError,
@@ -783,10 +783,10 @@ class TestEdgeHierarchyConfigFunctions:
             # No iothub config
             (
                 {
-                    "version": "1.0",
-                    "configuration": {
-                        "template_config_path": "template-config-path.toml",
-                        "default_edge_agent": "edge-agent-1",
+                    "configVersion": "1.0",
+                    "edgeConfiguration": {
+                        "templateConfigPath": "template-config-path.toml",
+                        "defaultEdgeAgent": "edge-agent-1",
                     },
                 },
                 InvalidArgumentValueError,
@@ -794,29 +794,29 @@ class TestEdgeHierarchyConfigFunctions:
             # missing root CA key
             (
                 {
-                    "config_version": "1.0",
-                    "iothub": {"authentication_method": "symmetric_key"},
-                    "configuration": {
-                        "template_config_path": "template-config-path.toml",
-                        "default_edge_agent": "edge-agent-1",
+                    "configVersion": "1.0",
+                    "iotHub": {"authentication_method": "symmetricKey"},
+                    "edgeConfiguration": {
+                        "templateConfigPath": "template-config-path.toml",
+                        "defaultEdgeAgent": "edge-agent-1",
                     },
                     "certificates": {
-                        "root_ca_cert_path": "certs/root-cert.pem",
+                        "rootCACertPath": "certs/root-cert.pem",
                     },
-                    "edgedevices": [],
+                    "edgeDevices": [],
                 },
                 InvalidArgumentValueError,
             ),
             # invalid auth value
             (
                 {
-                    "config_version": "1.0",
-                    "iothub": {"authentication_method": "super-duper-auth"},
-                    "configuration": {
-                        "template_config_path": "template-config-path.toml",
-                        "default_edge_agent": "edge-agent-1",
+                    "configVersion": "1.0",
+                    "iotHub": {"authenticationMethod": "super-duper-auth"},
+                    "edgeConfiguration": {
+                        "templateConfigPath": "template-config-path.toml",
+                        "defaultEdgeAgent": "edge-agent-1",
                     },
-                    "edgedevices": [],
+                    "edgeDevices": [],
                 },
                 InvalidArgumentValueError,
             ),

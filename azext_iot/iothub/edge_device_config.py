@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 """This module defines common values and functions for processing edge device configurations"""
 
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from azext_iot.common.fileops import write_content_to_file
 from azext_iot.common.certops import create_root_certificate, load_ca_cert_info
 from azext_iot.common.shared import (
@@ -31,6 +31,71 @@ from azext_iot.sdk.iothub.service.models import ConfigurationContent
 from knack.log import get_logger
 
 logger = get_logger(__name__)
+
+DEVICE_CONFIG_SCHEMA_VALID_VERSIONS: Dict[str, Any] = {}
+
+DEVICE_CONFIG_SCHEMA_VALID_VERSIONS["1.0"] = {
+    "type": "object",
+    "required": ["configVersion", "iotHub", "edgeConfiguration", "edgeDevices"],
+    "properties": {
+        "configVersion": {"type": "string"},
+        "iotHub": {
+            "type": "object",
+            "required": ["authenticationMethod"],
+            "properties": {
+                "authenticationMethod": {
+                    "type": "string",
+                    "enum": ["symmetricKey", "x509Certificate"]
+                },
+            }
+        },
+        "certificates": {
+            "type": "object",
+            "required": ["rootCACertPath", "rootCACertKeyPath"],
+            "properties": {
+                "rootCACertPath": {"type": "string"},
+                "rootCACertKeyPath": {"type": "string"}
+            }
+        },
+        "edgeConfiguration": {
+            "type": "object",
+            "properties": {
+                "templateConfigPath": {"type": "string"},
+                "defaultEdgeAgent": {"type": "string"}
+            },
+            "required": ["defaultEdgeAgent"]
+        },
+        "edgeDevices": {
+            "type": "array",
+            "items": {"$ref": "#/$defs/edgeDevice"}
+        },
+    },
+    "$defs": {
+        "edgeDevice": {
+            "type": "object",
+            "properties": {
+                "deviceId": {"type": "string"},
+                "hostname": {"type": "string"},
+                "edgeAgent": {"type": "string"},
+                "deployment": {"type": "string"},
+                "containerAuth": {
+                    "type": "object",
+                    "properties": {
+                        "serverAddress": {"type": "string"},
+                        "username": {"type": "string"},
+                        "password": {"type": "string"}
+                    }
+                },
+                "children": {
+                    "type": "array",
+                    "items": {"$ref": "#/$defs/edgeDevice"},
+                    "minItems": 1,
+                }
+            },
+            "required": ["deviceId"]
+        }
+    }
+}
 
 # Edge device TOML default values
 DEVICE_CONFIG_TOML = {
@@ -261,17 +326,18 @@ def process_edge_devices_config_file_content(
                 f"with command argument value: `{value}`"
             )
 
-    # TODO - version / schema validation
-    version = content.get("config_version", None)
-    hub_config = content.get("iothub", None)
-    devices_config = content.get("edgedevices", [])
-    for check, err in [
-        (version, "No schema version specified in configuration file"),
-        (hub_config, "No `iothub` properties specified in configuration file"),
-        (len(devices_config), "No devices specified in configuration file"),
-    ]:
-        if not check:
-            raise InvalidArgumentValueError(err)
+    version = content.get("configVersion", None)
+    if not version:
+        raise InvalidArgumentValueError("'configVersion' property missing from device configuration file.")
+    from jsonschema import validate
+    from jsonschema.exceptions import ValidationError
+    try:
+        validate(content, DEVICE_CONFIG_SCHEMA_VALID_VERSIONS[version])
+    except ValidationError as err:
+        raise InvalidArgumentValueError(f"Invalid devices config file schema:\n{err.message}")
+
+    hub_config = content.get("iotHub", {})
+    devices_config = content.get("edgeDevices", [])
 
     # edge root CA
     root_cert = None
@@ -280,15 +346,15 @@ def process_edge_devices_config_file_content(
         [override_root_cert_path, override_root_key_path, override_root_password]
     ):
         root_ca_cert = override_root_cert_path or certificates.get(
-            "root_ca_cert_path", None
+            "rootCACertPath", None
         )
         root_ca_key = override_root_key_path or certificates.get(
-            "root_ca_cert_key_path", None
+            "rootCACertKeyPath", None
         )
         if not all([root_ca_cert, root_ca_key]):
             raise InvalidArgumentValueError(
                 "Please check your config file to ensure values are provided "
-                "for both `root_ca_cert_path` and `root_ca_cert_key_path`."
+                "for both `rootCACertPath` and `rootCACertKeyPath`."
             )
         root_cert = load_ca_cert_info(
             root_ca_cert, root_ca_key, password=override_root_password
@@ -299,35 +365,31 @@ def process_edge_devices_config_file_content(
     # device auth
     # default to symmetric key
     device_authentication_method = DeviceAuthType.shared_private_key.value
-    auth_value = hub_config.get("authentication_method", None)
+    auth_value = hub_config.get("authenticationMethod", None)
     if override_auth_type:
         device_authentication_method = override_auth_type
     else:
-        if auth_value not in ["symmetric_key", "x509_certificate"]:
-            raise InvalidArgumentValueError(
-                "Invalid authentication_method in edge config file, must be either symmetric_key or x509_certificate"
-            )
         device_authentication_method = (
             DeviceAuthType.x509_thumbprint.value
-            if auth_value == "x509_certificate"
+            if auth_value == "x509Certificate"
             else DeviceAuthType.shared_private_key.value
         )
 
     # edge config
-    edge_config = content.get("configuration", None)
+    edge_config = content.get("edgeConfiguration", None)
     if edge_config or any(
         [override_default_edge_agent, override_device_config_template]
     ):
         template_config_path = override_device_config_template or edge_config.get(
-            "template_config_path", None
+            "templateConfigPath", None
         )
         default_edge_agent = override_default_edge_agent or edge_config.get(
-            "default_edge_agent", None
+            "defaultEdgeAgent", None
         )
     all_devices = []
 
     def _process_edge_config_device(device: dict, parent_id=None, parent_hostname=None):
-        device_id = device.get("device_id", None)
+        device_id = device.get("deviceId", None)
         if not device_id:
             raise InvalidArgumentValueError(
                 "A device parameter is missing required attribute 'device_id'"
@@ -336,17 +398,17 @@ def process_edge_devices_config_file_content(
         if deployment:
             deployment = try_parse_valid_deployment_config(deployment)
 
-        child_devices = device.get("child", [])
-        container_auth = device.get("container_auth", {})
+        child_devices = device.get("children", [])
+        container_auth = device.get("containerAuth", {})
         hostname = device.get("hostname", None)
-        edge_agent = device.get("edge_agent", None)
+        edge_agent = device.get("edgeAgent", None)
         device_config = EdgeDeviceConfig(
             device_id=device_id,
             deployment=deployment,
             parent_id=parent_id,
             parent_hostname=parent_hostname,
             container_auth=EdgeContainerAuth(
-                serveraddress=container_auth.get("serveraddress", None),
+                serveraddress=container_auth.get("serverAddress", None),
                 username=container_auth.get("username", None),
                 password=container_auth.get("password", None),
             )
@@ -473,7 +535,7 @@ def process_edge_devices_config_args(
         container_auth_obj = process_json_arg(container_auth_arg)
         container_auth = (
             EdgeContainerAuth(
-                serveraddress=container_auth_obj.get("serveraddress", None),
+                serveraddress=container_auth_obj.get("serverAddress", None),
                 username=container_auth_obj.get("username", None),
                 password=container_auth_obj.get("password", None),
             )

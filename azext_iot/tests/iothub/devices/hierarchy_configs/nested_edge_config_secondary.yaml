@@ -1,22 +1,18 @@
-config_version: "1.0"
-# We don't need iothub info from the config schema
-iothub:
-  # This should probably be moved into configuration section
-  authentication_method: symmetric_key
+configVersion: "1.0"
+iotHub:
+  authenticationMethod: symmetricKey
+edgeConfiguration:
+  defaultEdgeAgent: "mcr.microsoft.com/azureiotedge-agent:1.2"
+  templateConfigPath: "./hierarchy_configs/device_config.toml"
 
-## IoT Edge configuration template to use
-configuration:
-  template_config_path: "./hierarchy_configs/device_config.toml"
-
-## Hierarchy of IoT Edge devices to create
-edgedevices:
-  - device_id: device_100
-    edge_agent: "mcr.microsoft.com/azureiotedge-agent:1.2"
+edgeDevices:
+  - deviceId: device_100
+    edgeAgent: "mcr.microsoft.com/azureiotedge-agent:1.2"
     deployment: "./hierarchy_configs/deploymentTopLayer.json"
-    child:
-    - device_id: device_200
-      child:
-        - device_id: device_300
-          child:
-          - device_id: device_400
+    children:
+    - deviceId: device_200
+      children:
+        - deviceId: device_300
+          children:
+          - deviceId: device_400
             deployment: "./hierarchy_configs/deploymentLowerLayer.json"
