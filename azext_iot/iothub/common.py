@@ -20,12 +20,12 @@ CA_TRANSITION_WARNING = "Please ensure the following: \n\
     You must update all devices to trust the DigiCert Global G2 root. \n\
     Any devices not updated will not be able to connect. \n\
     The IP address for this IoT Hub resource may change as part of this migration, \
-and that it can take up to an hour for DNS servers to refresh. \n\
+and that it can take up to an hour for devices to reconnect. \n\
     The devices will be disconnected and reconnect with the DigiCert Global G2 root."
 CA_REVERT_WARNING = "This will revert the resource Root Certificate to Baltimore. \n\
     Any devices without the Baltimore root will not be able to connect. \n\
     The IP address for this IoT Hub resource may change as part of this migration, \
-and that it can take up to an hour for DNS servers to refresh. \n\
+and that it can take up to an hour for devices to reconnect. \n\
     The devices will be disconnected and reconnect with the Baltimore root."
 CONT_INPUT_MSG = "Continue?"
 ABORT_MSG = "Command was aborted."
