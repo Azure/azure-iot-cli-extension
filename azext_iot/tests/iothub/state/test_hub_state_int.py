@@ -7,6 +7,7 @@ from pathlib import Path
 from azext_iot.common.shared import DeviceAuthApiType
 
 from azext_iot.common.embedded_cli import EmbeddedCLI
+from azext_iot.tests.iothub.state.conftest import generate_hub_id
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.utility import generate_key, read_file_content
@@ -242,6 +243,16 @@ def clean_up_hub_dataplane(cstring):
     time.sleep(1)
 
 
+def delete_system_endpoints(hub_name, rg):
+    # delete is a no-op
+    cli.invoke(
+        f"iot hub routing-endpoint delete --hub-name {hub_name} -g {rg} -n eventhub-systemid"
+    )
+    cli.invoke(
+        f"iot hub routing-endpoint delete --hub-name {hub_name} -g {rg} -n queue-systemid"
+    )
+
+
 @pytest.mark.hub_infrastructure(count=2, sys_identity=True, user_identity=True, storage=True, desired_tags="abc=def")
 def test_migrate_controlplane(setup_hub_states_controlplane):
     origin_name = setup_hub_states_controlplane[0]["name"]
@@ -276,6 +287,49 @@ def test_export_import_controlplane(setup_hub_states_controlplane):
     time.sleep(10)  # gives the hub time to update before the checks
     compare_hub_controlplane_to_file(filename, hub_name, hub_rg)
 
+
+@pytest.mark.hub_infrastructure(
+    count=1, sys_identity=True, user_identity=True, storage=True, desired_tags="abc=def", system_endpoints=False
+)
+def test_migrate_controlplane_with_create(setup_hub_states_controlplane):
+    origin_name = setup_hub_states_controlplane[0]["name"]
+    origin_rg = setup_hub_states_controlplane[0]["rg"]
+    dest_name = generate_hub_id()
+    setup_hub_states_controlplane.append({"name": dest_name})
+    # ensure that there are no system endpoints
+    delete_system_endpoints(origin_name, origin_rg)
+
+    cli.invoke(
+        f"iot hub state migrate --origin-hub {origin_name} --origin-resource-group {origin_rg} "
+        f"--destination-hub {dest_name} --destination-resource-group {origin_rg} -r --aspects {CONTROLPLANE}"
+    )
+
+    time.sleep(1)  # gives the hub time to update before the checks
+    compare_hubs_controlplane(origin_name, dest_name, origin_rg)
+
+
+@pytest.mark.hub_infrastructure(
+    count=1, sys_identity=True, user_identity=True, storage=True, desired_tags="abc=def", system_endpoints=False
+)
+def test_export_import_controlplane_with_create(setup_hub_states_controlplane):
+    filename = setup_hub_states_controlplane[0]["filename"]
+    hub_name = setup_hub_states_controlplane[0]["name"]
+    hub_rg = setup_hub_states_controlplane[0]["rg"]
+    dest_name = generate_hub_id()
+    setup_hub_states_controlplane.append({"name": dest_name})
+    # ensure that there are no system endpoints
+    delete_system_endpoints(hub_name, hub_rg)
+
+    cli.invoke(
+        f"iot hub state export -n {hub_name} -f {filename} -g {hub_rg} -r --aspects {CONTROLPLANE}"
+    )
+    compare_hub_controlplane_to_file(filename, hub_name, hub_rg)
+    time.sleep(5)
+    cli.invoke(
+        f"iot hub state import -n {dest_name} -f {filename} -g {hub_rg} -r --aspects {CONTROLPLANE}"
+    )
+    time.sleep(10)  # gives the hub time to update before the checks
+    compare_hub_controlplane_to_file(filename, dest_name, hub_rg)
 
 @pytest.mark.hub_infrastructure(count=2)
 def test_migrate_dataplane(setup_hub_states):

@@ -74,7 +74,7 @@ def _assign_rbac_role(assignee: str, scope: str, role: str, max_tries: int = 10)
 # IoT Hub with control plane
 @pytest.fixture(scope="module")
 def setup_hub_controlplane_states(
-    provisioned_iothubs, provisioned_event_hub, provisioned_service_bus
+    request, provisioned_iothubs, provisioned_event_hub, provisioned_service_bus
 ) -> Optional[dict]:
     """
     Set up so that first hub will have all permissions, endpoints, etc and the other one(s) have correct
@@ -92,6 +92,8 @@ def setup_hub_controlplane_states(
     storage_cstring = provisioned_storage["connectionString"]
     storage_container = provisioned_storage["container"]["name"]
 
+    use_system_endpoints = get_closest_marker(request).kwargs.get("system_endpoints", True)
+
     # add endpoints - prob use dict of scope to role + for loop
     hub_principal_ids = [hub_obj["hub"]["identity"]["principalId"] for hub_obj in provisioned_iothubs]
     user_identities = list(provisioned_iothubs[0]["hub"]["identity"]["userAssignedIdentities"].values())
@@ -108,20 +110,24 @@ def setup_hub_controlplane_states(
     }
     for scope, role in scope_dict.items():
         _assign_rbac_role(assignee=user_principal_id, scope=scope, role=role)
-        for hub_principal_id in hub_principal_ids:
-            _assign_rbac_role(assignee=hub_principal_id, scope=scope, role=role)
+        if use_system_endpoints:
+            for hub_principal_id in hub_principal_ids:
+                _assign_rbac_role(assignee=hub_principal_id, scope=scope, role=role)
     sleep(30)
 
+    suffix = "systemid" if use_system_endpoints else "userid"
+    user_identity_parameter = "" if use_system_endpoints else f"--identity {user_id}"
     cli.invoke(
-        f"iot hub routing-endpoint create -n eventhub-systemid -r {hub_rg} -g {hub_rg} -s {sub_id}"
+        f"iot hub routing-endpoint create -n eventhub-{suffix} -r {hub_rg} -g {hub_rg} -s {sub_id}"
         f" -t {EndpointType.EventHub.value} --hub-name {hub_name} --endpoint-uri {eventhub_endpoint_uri}"
-        f" --entity-path {eventhub_name} --auth-type identityBased"
+        f" --entity-path {eventhub_name} --auth-type identityBased {user_identity_parameter}"
     )
 
     cli.invoke(
-        f"iot hub routing-endpoint create -n queue-systemid -r {hub_rg} -g {hub_rg} -s {sub_id}"
+        f"iot hub routing-endpoint create -n queue-{suffix} -r {hub_rg} -g {hub_rg} -s {sub_id}"
         f" -t {EndpointType.ServiceBusQueue.value} --hub-name {hub_name} --endpoint-uri "
-        f"{servicebus_endpoint_uri} --entity-path {servicebus_queue} --auth-type identityBased"
+        f"{servicebus_endpoint_uri} --entity-path {servicebus_queue} --auth-type identityBased "
+        f"{user_identity_parameter}"
     )
 
     cli.invoke(
