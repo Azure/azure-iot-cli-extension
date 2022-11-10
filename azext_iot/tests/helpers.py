@@ -8,10 +8,13 @@ import json
 import os
 
 from inspect import getsourcefile
-from azure.iot.device import ProvisioningDeviceClient, IoTHubDeviceClient
-
+from azext_iot.common.utility import ensure_azure_namespace_path
 from azext_iot.common.utility import read_file_content
 from azext_iot.tests.settings import DynamoSettings
+
+ensure_azure_namespace_path()
+
+from azure.iot.device import ProvisioningDeviceClient, IoTHubDeviceClient
 
 GLOBAL_PROVISIONING_HOST = "global.azure-devices-provisioning.net"
 TAG_ENV_VAR = [

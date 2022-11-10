@@ -65,3 +65,8 @@ class ADUValidHashAlgorithmType(Enum):
 
 SYSTEM_IDENTITY_ARG = "[system]"
 AUTH_RESOURCE_ID = "https://api.adu.microsoft.com/"
+CACHE_RESOURCE_TYPE = "DeviceUpdate"
+
+
+def get_cache_entry_name(account_name: str, instance_name: str):
+    return f"{account_name}_{instance_name}_importUpdate"
