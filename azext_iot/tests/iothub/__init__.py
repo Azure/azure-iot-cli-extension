@@ -54,7 +54,6 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         assert test_scenario
         self.entity_rg = ENTITY_RG
         self.entity_name = ENTITY_NAME
-        self.added_data_contributor = add_data_contributor
         super(IoTLiveScenarioTest, self).__init__(test_scenario)
 
         if hasattr(self, 'storage_cstring'):

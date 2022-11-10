@@ -67,7 +67,7 @@ class CertificateProvider(IoTHubProvider):
 
         command = "resource update -n {} -g {} --api-version {} --resource-type {}".format(
             self.target["entity"].split(".")[0],
-            self.target['resourcegroup'],
+            self.target["resourcegroup"],
             CA_TRANSITION_API_VERSION,
             HUB_PROVIDER
         )
