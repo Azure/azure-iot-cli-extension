@@ -252,9 +252,8 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
                         "README.md"
                     ]:
                         assert item in file_names
-                    if cert_auth:
-                        assert f"{device_id}.hub-auth-cert.pem" in file_names
-                        assert f"{device_id}.hub-auth-key.pem" in file_names
+                    assert cert_auth == (f"{device_id}.hub-auth-cert.pem" in file_names)
+                    assert cert_auth == (f"{device_id}.hub-auth-key.pem" in file_names)
 
         if output_path:
             rmtree(output_path)

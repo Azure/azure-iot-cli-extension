@@ -320,36 +320,39 @@ def load_iothub_help():
         short-summary: Create configuratations of edge devices in an IoT Hub.
         long-summary: |
           This operation accepts inline device arguments or an edge devices configuration file in YAML or JSON format.
+          Inline command args (like '--device-auth') will take precedence and override configuration file properties if they are provided.
+          A sample configuration file can be found here: https://github.com/Azure/azure-iot-cli-extension/tree/dev/docs/samples/sample_devices_config.yaml
           Review examples and parameter descriptions for details on how to fully utilize this operation.
 
         examples:
-        - name: Delete all existing devices in the Hub, and create a group of edge devices
-            containing 2 parent devices with 1 child device each. Also specifies module deployments
-            to configure the devices and visualizes the operations as they progress.
+        - name: Create a couple of edge devices using symmetric key auth (default)
           text: |
-            az iot edge devices create -n {hub_name} --clean --visualize
+            az iot edge devices create -n {hub_name} --device id=device_1 --device id=device_2
+
+        - name: Create a flat list of edge devices using self-signed certificate authentication with various edge property configurations, using inline arguments.
+          text: |
+            az iot edge devices create -n {hub_name} --device-auth x509_thumbprint --default-edge-agent {default_edge_agent}
+            --device id=device_1 hostname={FQDN}
+            --device id=device_2 edge_agent={custom_agent}
+            --device id=parent hostname={FQDN} edge_agent={custom_agent} container_auth={path_or_json_string}
+
+        - name: Delete all existing devices on a hub and create new devices based on a configuration file (with progress bars and visualization).
+          text: >
+            az iot edge devices create -n {hub_name} --cfg path/to/config_yml_or_json -c -v
+
+        - name: Create a group of nested edge devices with custom module deployments - containing 2 parent devices with 1 child device each, using inline arguments.
+            Also specifies output path for device certificate bundles.
+          text: |
+            az iot edge devices create -n {hub_name} --out {device_bundle_path}
             --device id=parent_1 deployment=/path/to/parentDeployment_1.json
             --device id=child_1 parent=parent_1 deployment=/path/to/child_deployment_1.json
             --device id=parent_2 deployment=/path/to/parentDeployment_2.json
             --device id=child_2 parent=parent_2 deployment=/path/to/child_deployment_2.json
 
-        - name: Create a simple nested edge device configuration (deleting existing devices)
-            with an existing root CA, using x509 auth, and specify a custom device bundle output path.
+        - name: Create a simple nested edge device configuration with an existing root CA, using x509 auth, and specify a custom device bundle output path.
           text: |
-            az iot edge devices create -n {hub_name} --clean --out "path/to/bundle_folder"
+            az iot edge devices create -n {hub_name} --out {device_bundle_path}
             --root-cert "root_cert.pem" --root-key "root_key.pem" --device-auth x509_thumbprint
             --device id=parent1
             --device id=child1 parent=parent1
-
-        - name: Create a new nested edge device group (without deleting existing devices)
-            from a configuration file without any output / visualization.
-          text: >
-            az iot edge devices create -n {hub_name} --cfg path/to/config_yml_or_json
-
-        - name: Create a flat list of edge devices with hostname, deployment, and edge agent configuration.
-          text: |
-            az iot edge devices create -n {hub_name} --clean
-            --device id=device_1 hostname={FQDN}
-            --device id=device_2 edge_agent={custom_agent}
-            --device id=parent hostname={FQDN} edge_agent={custom_agent} container_auth=/path/to/auth.json
     """

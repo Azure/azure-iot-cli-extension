@@ -267,7 +267,7 @@ def create_edge_device_config(
         "iothub_hostname": hub_hostname,
         "source": "manual",
         "authentication": {"device_id_pk": {"value": device_pk}, "method": "sas"}
-        if auth_method == DeviceAuthType.shared_private_key
+        if auth_method == DeviceAuthType.shared_private_key.value
         else {
             "method": "x509",
             "identity_cert": f"file:///etc/aziot/certificates/{device_id}.hub-auth-cert.pem",

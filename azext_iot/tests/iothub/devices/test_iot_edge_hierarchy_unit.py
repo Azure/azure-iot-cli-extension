@@ -523,7 +523,7 @@ class TestEdgeHierarchyConfigFunctions:
             # load external TOML, key auth
             (
                 test_device_id,
-                DeviceAuthType.shared_private_key,
+                DeviceAuthType.shared_private_key.value,
                 device_config_with_parent_no_agent,
                 "default-edge-agent",
                 "./hierarchy_configs/device_config.toml",

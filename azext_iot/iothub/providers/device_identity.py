@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 from pathlib import PurePath
 from os import makedirs
-from os.path import exists
+from os.path import exists, abspath
 from shutil import rmtree
 from azext_iot.common.certops import (
     create_self_signed_certificate,
@@ -95,11 +95,11 @@ class DeviceIdentityProvider(IoTHubProvider):
 
         # configuration for root cert and output directories
         root_cert_name = EDGE_ROOT_CERTIFICATE_FILENAME
-        cert_output_directory = None
+        bundle_output_directory = None
         if output_path:
             if not exists(output_path):
                 makedirs(output_path, exist_ok=True)
-            cert_output_directory = PurePath(output_path)
+            bundle_output_directory = PurePath(output_path)
 
         # If user has provided a path to a configuration file
         if config_file:
@@ -232,9 +232,9 @@ class DeviceIdentityProvider(IoTHubProvider):
         for device in device_iterator:
             device_id = device.device_id
             device_cert_output_directory = None
-            if cert_output_directory:
-                device_cert_output_directory = cert_output_directory.joinpath(device_id)
-                # if the device folder already exists, remove it
+            if bundle_output_directory:
+                device_cert_output_directory = bundle_output_directory.joinpath(device_id)
+                # if the device's folder already exists, remove it
                 if exists(device_cert_output_directory):
                     rmtree(device_cert_output_directory)
                 # create fresh device folder
@@ -334,7 +334,7 @@ class DeviceIdentityProvider(IoTHubProvider):
                 # zip up
                 tar_directory(
                     target_directory=device_cert_output_directory,
-                    tarfile_path=cert_output_directory,
+                    tarfile_path=bundle_output_directory,
                     tarfile_name=device_id,
                     overwrite=True,
                 )
@@ -394,6 +394,12 @@ class DeviceIdentityProvider(IoTHubProvider):
                 self.service_sdk.configuration.apply_on_edge_device(
                     id=device_id, content=deployment_content
                 )
+
+        # Print device bundle details
+        if bundle_output_directory:
+            num_bundles = len(config.devices)
+            bundle_plural = '' if num_bundles == 1 else 's'
+            print(f"{num_bundles} device bundle{bundle_plural} created in folder: {abspath(bundle_output_directory)}")
 
     # TODO - Unit test
     def delete_device_identities(self, device_ids: List[str], confirm: bool = False):

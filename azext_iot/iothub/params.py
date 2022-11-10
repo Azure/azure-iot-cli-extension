@@ -274,13 +274,13 @@ def load_iothub_arguments(self, _):
         context.argument(
             "config_file",
             options_list=["--config-file", "--config", "--cfg"],
-            help="Path to devices configuration file",
+            help="Path to devices configuration file. Sample configuration file: "
+            "https://github.com/Azure/azure-iot-cli-extension/tree/dev/docs/samples/sample_devices_config.yaml",
         )
         context.argument(
             "device_auth_type",
             arg_type=get_enum_type(
-                [DeviceAuthType.shared_private_key.value, DeviceAuthType.x509_thumbprint.value],
-                DeviceAuthType.shared_private_key.value
+                [DeviceAuthType.shared_private_key.value, DeviceAuthType.x509_thumbprint.value]
             ),
             options_list=["--device-auth-type", "--device-auth"],
             help="Device to hub authorization mechanism.",
@@ -288,12 +288,12 @@ def load_iothub_arguments(self, _):
         context.argument(
             "default_edge_agent",
             options_list=["--default-edge-agent", "--default-agent", "--dea"],
-            help="Default edge agent for created devices.",
+            help="Default edge agent for created Edge devices if not specified individually.",
         )
         context.argument(
             "device_config_template",
             options_list=["--device-template", "--dt"],
-            help="Path to config.toml file to use as a basis for edge device configs.",
+            help="Path to IoT Edge config.toml file to use as a basis for edge device configs.",
         )
         context.argument(
             "bundle_output_path",
