@@ -278,6 +278,8 @@ class ResourceProvider(DigitalTwinsResourceManager):
         target_instance = self.find_instance(
             name=name, resource_group_name=resource_group_name
         )
+        if not resource_group_name:
+            resource_group_name = self.get_rg(target_instance)
 
         if bool(identity_role) ^ bool(identity_scopes):
             raise RequiredArgumentMissingError(
@@ -339,6 +341,8 @@ class ResourceProvider(DigitalTwinsResourceManager):
         target_instance = self.find_instance(
             name=name, resource_group_name=resource_group_name
         )
+        if not resource_group_name:
+            resource_group_name = self.get_rg(target_instance)
 
         if not system_identity and user_identities is None:
             raise RequiredArgumentMissingError(
