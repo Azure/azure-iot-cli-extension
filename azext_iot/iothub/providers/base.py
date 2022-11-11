@@ -9,7 +9,6 @@ from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot._factory import SdkResolver
 from msrest.exceptions import SerializationError
 from msrestazure.azure_exceptions import CloudError
-from azext_iot.constants import USER_AGENT
 
 
 __all__ = ["IoTHubProvider", "CloudError", "SerializationError"]
