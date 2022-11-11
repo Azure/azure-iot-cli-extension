@@ -30,19 +30,19 @@ class MessageRoute(IoTHubResourceProvider):
         source_type: str,
         endpoint_name: str,
         enabled: bool = True,
-        condition: Optional[str] = None,
+        condition: str = "true",
     ):
         self.hub_resource.properties.routing.routes.append(
             {
                 "source": source_type,
                 "name": route_name,
                 "endpointNames": endpoint_name.split(),
-                "condition": ('true' if condition is None else condition),
+                "condition": condition,
                 "isEnabled": enabled
             }
         )
 
-        return self.client.iot_hub_resource.begin_create_or_update(
+        return self.discovery.client.begin_create_or_update(
             resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
             resource_name=self.hub_resource.name,
             iot_hub_description=self.hub_resource,
@@ -63,7 +63,7 @@ class MessageRoute(IoTHubResourceProvider):
         route.condition = route.condition if condition is None else condition
         route.is_enabled = route.is_enabled if enabled is None else enabled
 
-        return self.client.iot_hub_resource.begin_create_or_update(
+        return self.discovery.client.begin_create_or_update(
             resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
             resource_name=self.hub_resource.name,
             iot_hub_description=self.hub_resource,
@@ -92,7 +92,7 @@ class MessageRoute(IoTHubResourceProvider):
         else:
             routing.routes = [route for route in routing.routes if route.source.lower() != source_type.lower()]
 
-        return self.client.iot_hub_resource.begin_create_or_update(
+        return self.discovery.client.begin_create_or_update(
             resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
             resource_name=self.hub_resource.name,
             iot_hub_description=self.hub_resource,
@@ -125,7 +125,7 @@ class MessageRoute(IoTHubResourceProvider):
                 "twin": None,
                 "route": route
             }
-            return self.client.iot_hub_resource.test_route(
+            return self.discovery.client.test_route(
                 iot_hub_name=self.hub_resource.name,
                 resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
                 input=test_route_input
@@ -137,7 +137,7 @@ class MessageRoute(IoTHubResourceProvider):
                 "message": route_message,
                 "twin": None
             }
-            return self.client.iot_hub_resource.test_all_routes(
+            return self.discovery.client.test_all_routes(
                 iot_hub_name=self.hub_resource.name,
                 resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
                 input=test_all_routes_input
@@ -146,13 +146,13 @@ class MessageRoute(IoTHubResourceProvider):
         # for all types, need to test all types one by one
         routes = []
         fallback = None
-        for type in RouteSourceType.list():
+        for type in RouteSourceType.list_valid_types():
             test_all_routes_input = {
                 "routingSource": type,
                 "message": route_message,
                 "twin": None
             }
-            result = self.client.iot_hub_resource.test_all_routes(
+            result = self.discovery.client.test_all_routes(
                 iot_hub_name=self.hub_resource.name,
                 resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
                 input=test_all_routes_input
@@ -175,7 +175,7 @@ class MessageRoute(IoTHubResourceProvider):
         fallback_route = self.hub_resource.properties.routing.fallback_route
         fallback_route.is_enabled = enabled
 
-        self.client.iot_hub_resource.begin_create_or_update(
+        self.discovery.client.begin_create_or_update(
             resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
             resource_name=self.hub_resource.name,
             iot_hub_description=self.hub_resource,

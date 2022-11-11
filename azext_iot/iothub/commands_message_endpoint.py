@@ -26,10 +26,10 @@ def message_endpoint_create_event_hub(
     identity: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
-    messaging_provider = MessageEndpoint(
+    message_endpoint_provider = MessageEndpoint(
         cmd=cmd, hub_name=hub_name, rg=resource_group_name
     )
-    return messaging_provider.create(
+    return message_endpoint_provider.create(
         endpoint_name=endpoint_name,
         endpoint_type=EndpointType.EventHub.value,
         endpoint_account_name=endpoint_account_name,
@@ -59,10 +59,10 @@ def message_endpoint_create_service_bus_queue(
     identity: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
-    messaging_provider = MessageEndpoint(
+    message_endpoint_provider = MessageEndpoint(
         cmd=cmd, hub_name=hub_name, rg=resource_group_name
     )
-    return messaging_provider.create(
+    return message_endpoint_provider.create(
         endpoint_name=endpoint_name,
         endpoint_type=EndpointType.ServiceBusQueue.value,
         endpoint_account_name=endpoint_account_name,
@@ -92,10 +92,10 @@ def message_endpoint_create_service_bus_topic(
     identity: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
-    messaging_provider = MessageEndpoint(
+    message_endpoint_provider = MessageEndpoint(
         cmd=cmd, hub_name=hub_name, rg=resource_group_name
     )
-    return messaging_provider.create(
+    return message_endpoint_provider.create(
         endpoint_name=endpoint_name,
         endpoint_type=EndpointType.ServiceBusTopic.value,
         endpoint_account_name=endpoint_account_name,
@@ -129,10 +129,10 @@ def message_endpoint_create_cosmos_db_collection(
     identity: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
-    messaging_provider = MessageEndpoint(
+    message_endpoint_provider = MessageEndpoint(
         cmd=cmd, hub_name=hub_name, rg=resource_group_name
     )
-    return messaging_provider.create(
+    return message_endpoint_provider.create(
         endpoint_name=endpoint_name,
         endpoint_type=EndpointType.CosmosDBCollection.value,
         endpoint_account_name=endpoint_account_name,
@@ -169,10 +169,10 @@ def message_endpoint_create_storage_container(
     identity: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
-    messaging_provider = MessageEndpoint(
+    message_endpoint_provider = MessageEndpoint(
         cmd=cmd, hub_name=hub_name, rg=resource_group_name
     )
-    return messaging_provider.create(
+    return message_endpoint_provider.create(
         endpoint_name=endpoint_name,
         endpoint_type=EndpointType.AzureStorageContainer.value,
         endpoint_account_name=endpoint_account_name,
@@ -196,10 +196,10 @@ def message_endpoint_show(
     endpoint_name: str,
     resource_group_name: Optional[str] = None,
 ):
-    messaging_provider = MessageEndpoint(
+    message_endpoint_provider = MessageEndpoint(
         cmd=cmd, hub_name=hub_name, rg=resource_group_name
     )
-    return messaging_provider.show(endpoint_name=endpoint_name)
+    return message_endpoint_provider.show(endpoint_name=endpoint_name)
 
 
 def message_endpoint_list(
@@ -208,10 +208,10 @@ def message_endpoint_list(
     endpoint_type: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
-    messaging_provider = MessageEndpoint(
+    message_endpoint_provider = MessageEndpoint(
         cmd=cmd, hub_name=hub_name, rg=resource_group_name
     )
-    return messaging_provider.list(endpoint_type=endpoint_type)
+    return message_endpoint_provider.list(endpoint_type=endpoint_type)
 
 
 def message_endpoint_delete(
@@ -221,7 +221,7 @@ def message_endpoint_delete(
     endpoint_type: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
-    messaging_provider = MessageEndpoint(
+    message_endpoint_provider = MessageEndpoint(
         cmd=cmd, hub_name=hub_name, rg=resource_group_name
     )
-    return messaging_provider.delete(endpoint_name=endpoint_name, endpoint_type=endpoint_type)
+    return message_endpoint_provider.delete(endpoint_name=endpoint_name, endpoint_type=endpoint_type)

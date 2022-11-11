@@ -55,7 +55,7 @@ class RouteSourceType(Enum):
     """
     Type of the route source.
     """
-    # Invalid = 'invalid'
+    Invalid = 'invalid'
     DeviceMessages = 'devicemessages'
     TwinChangeEvents = 'twinchangeevents'
     DeviceLifecycleEvents = 'devicelifecycleevents'
@@ -66,3 +66,7 @@ class RouteSourceType(Enum):
     @classmethod
     def list(cls):
         return list(map(lambda c: c.value, cls))
+
+    @classmethod
+    def list_valid_types(cls):
+        return list(filter(lambda d: d != RouteSourceType.Invalid.value, map(lambda c: c.value, cls)))

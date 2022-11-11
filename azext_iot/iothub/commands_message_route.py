@@ -18,13 +18,13 @@ def message_route_create(
     source_type: str,
     endpoint_name: str,
     enabled: bool = True,
-    condition: Optional[str] = None,
+    condition: str = "true",
     resource_group_name: Optional[str] = None,
 ):
-    messaging_provider = MessageRoute(
+    message_route_provider = MessageRoute(
         cmd=cmd, hub_name=hub_name, rg=resource_group_name
     )
-    return messaging_provider.create(
+    return message_route_provider.create(
         route_name=route_name,
         source_type=source_type,
         endpoint_name=endpoint_name,
@@ -43,10 +43,10 @@ def message_route_update(
     condition: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
-    messaging_provider = MessageRoute(
+    message_route_provider = MessageRoute(
         cmd=cmd, hub_name=hub_name, rg=resource_group_name
     )
-    return messaging_provider.update(
+    return message_route_provider.update(
         route_name=route_name,
         source_type=source_type,
         endpoint_name=endpoint_name,
@@ -61,10 +61,10 @@ def message_route_show(
     route_name: str,
     resource_group_name: Optional[str] = None,
 ):
-    messaging_provider = MessageRoute(
+    message_route_provider = MessageRoute(
         cmd=cmd, hub_name=hub_name, rg=resource_group_name
     )
-    return messaging_provider.show(route_name=route_name)
+    return message_route_provider.show(route_name=route_name)
 
 
 def message_route_list(
@@ -73,10 +73,10 @@ def message_route_list(
     source_type: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
-    messaging_provider = MessageRoute(
+    message_route_provider = MessageRoute(
         cmd=cmd, hub_name=hub_name, rg=resource_group_name
     )
-    return messaging_provider.list(source_type=source_type)
+    return message_route_provider.list(source_type=source_type)
 
 
 def message_route_delete(
@@ -86,10 +86,10 @@ def message_route_delete(
     source_type: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
-    messaging_provider = MessageRoute(
+    message_route_provider = MessageRoute(
         cmd=cmd, hub_name=hub_name, rg=resource_group_name
     )
-    return messaging_provider.delete(route_name=route_name, source_type=source_type)
+    return message_route_provider.delete(route_name=route_name, source_type=source_type)
 
 
 def message_route_test(
@@ -102,10 +102,10 @@ def message_route_test(
     system_properties: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
-    messaging_provider = MessageRoute(
+    message_route_provider = MessageRoute(
         cmd=cmd, hub_name=hub_name, rg=resource_group_name
     )
-    return messaging_provider.test(
+    return message_route_provider.test(
         route_name=route_name,
         source_type=source_type,
         body=body,
@@ -119,10 +119,10 @@ def message_fallback_route_show(
     hub_name: str,
     resource_group_name: Optional[str] = None,
 ):
-    messaging_provider = MessageRoute(
+    message_route_provider = MessageRoute(
         cmd=cmd, hub_name=hub_name, rg=resource_group_name
     )
-    return messaging_provider.show_fallback()
+    return message_route_provider.show_fallback()
 
 
 def message_fallback_route_set(
@@ -131,7 +131,7 @@ def message_fallback_route_set(
     enabled: bool,
     resource_group_name: Optional[str] = None,
 ):
-    messaging_provider = MessageRoute(
+    message_route_provider = MessageRoute(
         cmd=cmd, hub_name=hub_name, rg=resource_group_name
     )
-    return messaging_provider.set_fallback(enabled=enabled)
+    return message_route_provider.set_fallback(enabled=enabled)

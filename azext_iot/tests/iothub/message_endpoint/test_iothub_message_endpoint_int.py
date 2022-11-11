@@ -7,6 +7,7 @@
 
 from typing import Optional
 import pytest
+from azext_iot.common.utility import ensure_iothub_sdk_min_version
 from azext_iot.iothub.common import AuthenticationType
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
@@ -609,6 +610,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     assert endpoint_list == []
 
 
+@pytest.mark.skipif(not ensure_iothub_sdk_min_version("2.3.0"), reason="Cosmos Db Endpoints requires azure-mgmt-iothub>=2.3.0.")
 def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module):
     iot_hub_obj, cosmosdb_obj = provisioned_cosmosdb_with_identity_module
 

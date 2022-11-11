@@ -204,7 +204,7 @@ def test_route_lifecycle(provisioned_only_iot_hub_module, provisioned_event_hub_
     ).as_json()
     assert len(routes) == 6
 
-    for source_type in RouteSourceType.list():
+    for source_type in RouteSourceType.list_valid_types():
         routes = cli.invoke(
             "iot hub message-route list -n {} -g {} -t {}".format(
                 iot_hub, iot_rg, source_type
