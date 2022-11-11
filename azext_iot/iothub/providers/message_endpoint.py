@@ -15,7 +15,7 @@ from azure.cli.core.azclierror import (
 from azext_iot.iothub.common import (
     SYSTEM_ASSIGNED_IDENTITY, AuthenticationType, EncodingFormat, EndpointType, IdentityType
 )
-from azext_iot.iothub.providers.base import IoTHubResourceProvider
+from azext_iot.iothub.providers.base import IoTHubProvider
 from azext_iot.common._azure import parse_cosmos_db_connection_string
 from azure.mgmt.iothub.models import ManagedIdentity
 
@@ -23,14 +23,14 @@ from azure.mgmt.iothub.models import ManagedIdentity
 logger = get_logger(__name__)
 
 
-class MessageEndpoint(IoTHubResourceProvider):
+class MessageEndpoint(IoTHubProvider):
     def __init__(
         self,
         cmd,
         hub_name: str,
         rg: Optional[str] = None,
     ):
-        super(MessageEndpoint, self).__init__(cmd, hub_name, rg)
+        super(MessageEndpoint, self).__init__(cmd, hub_name, rg, dataplane=False)
         self.support_cosmos = hasattr(self.hub_resource.properties.routing.endpoints, "cosmos_db_sql_collections")
 
     def create(

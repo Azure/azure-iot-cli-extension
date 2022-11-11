@@ -15,33 +15,29 @@ __all__ = ["IoTHubProvider", "CloudError", "SerializationError"]
 
 
 class IoTHubProvider(object):
-    """Class to use for data plane operations."""
-    def __init__(self, cmd, hub_name, rg, login=None, auth_type_dataplane=None):
-        self.cmd = cmd
-        self.hub_name = hub_name
-        self.rg = rg
-        self.discovery = IotHubDiscovery(cmd)
-        self.target = self.discovery.get_target(
-            resource_name=self.hub_name,
-            resource_group_name=self.rg,
-            login=login,
-            auth_type=auth_type_dataplane,
-        )
-        self.resolver = SdkResolver(self.target)
-
-    def get_sdk(self, sdk_type):
-        return self.resolver.get_sdk(sdk_type)
-
-
-class IoTHubResourceProvider(object):
-    """Class to use for control plane operations."""
     def __init__(
         self,
         cmd,
         hub_name: str,
-        rg: Optional[str] = None,
+        rg: str,
+        login: Optional[str] = None,
+        auth_type_dataplane: Optional[str] = None,
+        dataplane: bool = True
     ):
         self.cmd = cmd
+        self.hub_name = hub_name
+        self.rg = rg
         self.discovery = IotHubDiscovery(cmd)
-        # Need to get the direct resource
-        self.hub_resource = self.discovery.find_resource(hub_name, rg)
+        if dataplane:
+            self.target = self.discovery.get_target(
+                resource_name=self.hub_name,
+                resource_group_name=self.rg,
+                login=login,
+                auth_type=auth_type_dataplane,
+            )
+        else:
+            self.hub_resource = self.discovery.find_resource(hub_name, rg)
+        self.resolver = SdkResolver(self.target)
+
+    def get_sdk(self, sdk_type):
+        return self.resolver.get_sdk(sdk_type)

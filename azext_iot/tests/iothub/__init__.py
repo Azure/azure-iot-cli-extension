@@ -10,13 +10,6 @@ from time import sleep
 from typing import List
 from azext_iot.tests.helpers import (
     add_test_tag,
-    assign_cosmos_db_role,
-    assign_rbac_role,
-    create_cosmos_db,
-    create_event_hub,
-    create_managed_identity,
-    create_service_bus_queue,
-    create_service_bus_topic,
     create_storage_account
 )
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
@@ -57,21 +50,6 @@ STORAGE_ACCOUNT = settings.env.azext_iot_teststorageaccount or "hubstore" + gene
 STORAGE_CONTAINER = settings.env.azext_iot_teststoragecontainer or DEFAULT_CONTAINER
 MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries or 10
 ROLE_ASSIGNMENT_REFRESH_TIME = 120
-
-# Endpoints
-EP_RG = settings.env.azext_iot_ep_rg or ENTITY_RG
-EP_EVENTHUB_NAMESPACE = settings.env.azext_iot_eventhub_namespace or ("testeh" + generate_generic_id())
-EP_EVENTHUB_INSTANCE = settings.env.azext_iot_eventhub_instance or ("testevent" + generate_generic_id())
-EP_EVENTHUB_POLICY = settings.env.azext_iot_eventhub_policy or ("testpolicy" + generate_generic_id())
-EP_SERVICEBUS_NAMESPACE = settings.env.azext_iot_servicebus_namespace or ("testsb" + generate_generic_id())
-EP_SERVICEBUS_QUEUE = settings.env.azext_iot_servicebus_queue or ("testqueue" + generate_generic_id())
-EP_SERVICEBUS_TOPIC = settings.env.azext_iot_servicebus_topic or ("testtopic" + generate_generic_id())
-EP_SERVICEBUS_POLICY = settings.env.azext_iot_servicebus_policy or ("testpolicy" + generate_generic_id())
-EP_COSMOS_NAMESPACE = settings.env.azext_iot_cosmos_namespace or ("testcos" + generate_generic_id())
-EP_COSMOS_DATABASE = settings.env.azext_iot_cosmos_database or ("testdb" + generate_generic_id())
-EP_COSMOS_COLLECTION = settings.env.azext_iot_cosmos_collection or ("testcol" + generate_generic_id())
-EP_COSMOS_PARTITION_PATH = "test"
-USER_IDENTITY = settings.env.azext_iot_user_identity or ("testuser" + generate_generic_id())
 
 
 class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
@@ -143,7 +121,6 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         self.region = self.get_region()
         self.connection_string = self.get_hub_cstring()
-        self.entity_sub = self.get_hub_sub()
         add_test_tag(
             cmd=self.cmd,
             name=self.entity_name,
@@ -236,29 +213,6 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             create_account=(not settings.env.azext_iot_teststorageaccount)
         )
 
-    def _assign_storage_account_roles(self):
-        scope = "/subscriptions/{}/resourceGroups/{}/providers/Microsoft.Storage/storageAccounts/{}".format(
-            self.entity_sub,
-            EP_RG,
-            STORAGE_ACCOUNT
-        )
-        assign_rbac_role(
-            cmd=self.cmd,
-            assignee=self.entity_identity,
-            scope=scope,
-            role="Storage Blob Data Contributor",
-            max_tries=MAX_RBAC_ASSIGNMENT_TRIES
-        )
-
-        if hasattr(self, "user_identity_principal_id"):
-            assign_rbac_role(
-                cmd=self.cmd,
-                assignee=self.user_identity_principal_id,
-                scope=scope,
-                role="Storage Blob Data Contributor",
-                max_tries=MAX_RBAC_ASSIGNMENT_TRIES
-            )
-
     def _delete_storage_account(self):
         """
         Delete the storage account if it was created.
@@ -266,304 +220,16 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         if not settings.env.azext_iot_teststorageaccount:
             self.cmd(
                 "storage account delete -n {} -g {} -y".format(
-                    STORAGE_ACCOUNT, self.entity_rg
+                    self.storage_account_name, self.entity_rg
                 ),
             )
 
         elif not settings.env.azext_iot_teststoragecontainer:
             self.cmd(
                 "storage container delete -n {} --connection-string '{}'".format(
-                    STORAGE_ACCOUNT, self.storage_cstring
+                    self.storage_account_name, self.storage_cstring
                 ),
             )
-
-    def _create_cosmos_db(self):
-        cosmos_cs = create_cosmos_db(
-            cmd=self.cmd,
-            account_name=EP_COSMOS_NAMESPACE,
-            database_name=EP_COSMOS_DATABASE,
-            collection_name=EP_COSMOS_COLLECTION,
-            partition_key_path="/" + EP_COSMOS_PARTITION_PATH,
-            rg=EP_RG,
-            resource_name=ENTITY_NAME,
-            create_account=(not settings.env.azext_iot_cosmos_namespace),
-            create_database=(not settings.env.azext_iot_cosmos_database),
-            create_collection=(not settings.env.azext_iot_cosmos_collection)
-        )
-
-        # Cosmos DB uses some internal RBAC - can take a bit to sync with AAD
-        sleep(30)
-        role = "Cosmos DB Built-in Data Reader"
-        assign_cosmos_db_role(
-            cmd=self.cmd,
-            principal_id=self.entity_identity,
-            role=role,
-            cosmos_db_account=EP_COSMOS_NAMESPACE,
-            rg=EP_RG
-        )
-
-        if hasattr(self, "user_identity_principal_id"):
-            assign_cosmos_db_role(
-                cmd=self.cmd,
-                principal_id=self.user_identity_principal_id,
-                role=role,
-                cosmos_db_account=EP_COSMOS_NAMESPACE,
-                rg=EP_RG
-            )
-
-        return cosmos_cs
-
-    def _delete_cosmos_db(self):
-        """
-        Delete the cosmos db account if it was created.
-        """
-        if not settings.env.azext_iot_cosmos_namespace:
-            self.cmd(
-                'cosmosdb delete --resource-group {} --name {} -y'.format(
-                    EP_RG, EP_COSMOS_NAMESPACE
-                )
-            )
-        elif not settings.env.azext_iot_cosmos_database:
-            self.cmd(
-                'cosmosdb sql database delete --resource-group {} --account-name {} --name {} -y'.format(
-                    EP_RG, EP_COSMOS_NAMESPACE, EP_COSMOS_DATABASE
-                )
-            )
-        elif not settings.env.azext_iot_cosmos_collection:
-            self.cmd(
-                'cosmosdb sql collection delete --resource-group {} --account-name {} --database-name {} --name {} -y'.format(
-                    EP_RG, EP_COSMOS_NAMESPACE, EP_COSMOS_DATABASE, EP_COSMOS_COLLECTION
-                )
-            )
-
-    def _create_eventhub(self):
-        eventhub_cs = create_event_hub(
-            cmd=self.cmd,
-            namespace_name=EP_EVENTHUB_NAMESPACE,
-            eventhub_name=EP_EVENTHUB_INSTANCE,
-            policy_name=EP_EVENTHUB_POLICY,
-            rg=EP_RG,
-            resource_name=ENTITY_NAME,
-            create_namespace=(not settings.env.azext_iot_eventhub_namespace),
-            create_eventhub=(not settings.env.azext_iot_eventhub_instance),
-            create_policy=(not settings.env.azext_iot_eventhub_policy)
-        )
-
-        role = "Azure Event Hubs Data Sender"
-        scope = "/subscriptions/{}/resourceGroups/{}/providers/Microsoft.EventHub/namespaces/{}/eventhubs/{}".format(
-            self.entity_sub,
-            EP_RG,
-            EP_EVENTHUB_NAMESPACE,
-            EP_EVENTHUB_INSTANCE
-        )
-
-        assign_rbac_role(
-            cmd=self.cmd,
-            assignee=self.entity_identity,
-            scope=scope,
-            role=role,
-            max_tries=MAX_RBAC_ASSIGNMENT_TRIES
-        )
-
-        if hasattr(self, "user_identity_principal_id"):
-            assign_rbac_role(
-                cmd=self.cmd,
-                assignee=self.user_identity_principal_id,
-                scope=scope,
-                role=role,
-                max_tries=MAX_RBAC_ASSIGNMENT_TRIES
-            )
-
-        return eventhub_cs
-
-    def _delete_eventhub(self):
-        """
-        Delete the eventhub if it was created.
-        """
-        if not settings.env.azext_iot_cosmos_namespace:
-            self.cmd(
-                'eventhubs namespace delete --resource-group {} --name {}'.format(
-                    EP_RG, EP_EVENTHUB_NAMESPACE
-                )
-            )
-        elif not settings.env.azext_iot_eventhub_instance:
-            self.cmd(
-                'eventhubs eventhub delete --resource-group {} --namespace-name {} --name {}'.format(
-                    EP_RG, EP_EVENTHUB_NAMESPACE, EP_EVENTHUB_INSTANCE
-                )
-            )
-        elif not settings.env.azext_iot_eventhub_policy:
-            self.cmd(
-                'eventhubs eventhub authorization-rule delete --resource-group {} --namespace-name {} --eventhub-name {} '
-                '--name {}'.format(
-                    EP_RG, EP_EVENTHUB_NAMESPACE, EP_EVENTHUB_INSTANCE, EP_EVENTHUB_POLICY
-                )
-            )
-
-    def _create_service_bus_topic_queue(self):
-        topic_cs = create_service_bus_topic(
-            cmd=self.cmd,
-            namespace_name=EP_SERVICEBUS_NAMESPACE,
-            topic_name=EP_SERVICEBUS_TOPIC,
-            policy_name=EP_SERVICEBUS_POLICY,
-            rg=EP_RG,
-            resource_name=ENTITY_NAME,
-            create_namespace=(not settings.env.azext_iot_servicebus_namespace),
-            create_topic=(not settings.env.azext_iot_servicebus_topic),
-            create_policy=(not settings.env.azext_iot_servicebus_policy)
-        )
-
-        role = "Azure Service Bus Data Sender"
-        scope = "/subscriptions/{}/resourceGroups/{}/providers/Microsoft.ServiceBus/namespaces/{}/topics/{}".format(
-            self.entity_sub,
-            EP_RG,
-            EP_SERVICEBUS_NAMESPACE,
-            EP_SERVICEBUS_TOPIC
-        )
-
-        assign_rbac_role(
-            cmd=self.cmd,
-            assignee=self.entity_identity,
-            scope=scope,
-            role=role,
-            max_tries=MAX_RBAC_ASSIGNMENT_TRIES
-        )
-
-        if hasattr(self, "user_identity_principal_id"):
-            assign_rbac_role(
-                cmd=self.cmd,
-                assignee=self.user_identity_principal_id,
-                scope=scope,
-                role=role,
-                max_tries=MAX_RBAC_ASSIGNMENT_TRIES
-            )
-
-        queue_cs = create_service_bus_queue(
-            cmd=self.cmd,
-            namespace_name=EP_SERVICEBUS_NAMESPACE,
-            queue_name=EP_SERVICEBUS_QUEUE,
-            policy_name=EP_SERVICEBUS_POLICY,
-            rg=EP_RG,
-            resource_name=ENTITY_NAME,
-            create_namespace=False,
-            create_queue=(not settings.env.azext_iot_servicebus_queue),
-            create_policy=(not settings.env.azext_iot_servicebus_policy)
-        )
-
-        scope = "/subscriptions/{}/resourceGroups/{}/providers/Microsoft.ServiceBus/namespaces/{}/queues/{}".format(
-            self.entity_sub,
-            EP_RG,
-            EP_SERVICEBUS_NAMESPACE,
-            EP_SERVICEBUS_QUEUE
-        )
-
-        assign_rbac_role(
-            cmd=self.cmd,
-            assignee=self.entity_identity,
-            scope=scope,
-            role=role,
-            max_tries=MAX_RBAC_ASSIGNMENT_TRIES
-        )
-
-        if hasattr(self, "user_identity_principal_id"):
-            assign_rbac_role(
-                cmd=self.cmd,
-                assignee=self.user_identity_principal_id,
-                scope=scope,
-                role=role,
-                max_tries=MAX_RBAC_ASSIGNMENT_TRIES
-            )
-
-        return topic_cs, queue_cs
-
-    def _delete_service_bus_topic_queue(self):
-        """
-        Delete the service bus topic and queue if it was created.
-        """
-        if not settings.env.azext_iot_servicebus_namespace:
-            self.cmd(
-                'servicebus namespace delete --resource-group {} --name {}'.format(
-                    EP_RG, EP_SERVICEBUS_NAMESPACE
-                )
-            )
-        else:
-            if not settings.env.azext_iot_servicebus_topic:
-                self.cmd(
-                    'servicebus topic delete --resource-group {} --namespace-name {} --name {}'.format(
-                        EP_RG, EP_SERVICEBUS_NAMESPACE, EP_SERVICEBUS_TOPIC
-                    )
-                )
-            elif not settings.env.azext_iot_servicebus_policy:
-                self.cmd(
-                    'servicebus topic authorization-rule delete --resource-group {} --namespace-name {} --topic-name {} '
-                    '--name {}'.format(
-                        EP_RG, EP_SERVICEBUS_NAMESPACE, EP_SERVICEBUS_TOPIC, EP_SERVICEBUS_POLICY
-                    )
-                )
-
-            if not settings.env.azext_iot_servicebus_queue:
-                self.cmd(
-                    'servicebus queue delete --resource-group {} --namespace-name {} --name {}'.format(
-                        EP_RG, EP_SERVICEBUS_NAMESPACE, EP_SERVICEBUS_QUEUE
-                    )
-                )
-            elif not settings.env.azext_iot_servicebus_policy:
-                self.cmd(
-                    'servicebus queue authorization-rule delete --resource-group {} --namespace-name {} --queue-name {} '
-                    '--name {}'.format(
-                        EP_RG, EP_SERVICEBUS_NAMESPACE, EP_SERVICEBUS_QUEUE, EP_SERVICEBUS_POLICY
-                    )
-                )
-
-    def _create_user_identity(self):
-        """Set self.user_identity_id and assign user identity to iot hub."""
-        if hasattr(self, "user_identity_id"):
-            return
-
-        identities = self.cmd(f"identity list -g {EP_RG}").get_output_in_json()
-
-        target_identity = None
-        for identity in identities:
-            if identity["name"].lower() == USER_IDENTITY.lower():
-                target_identity = identity
-
-        if not target_identity:
-            target_identity = create_managed_identity(cmd=self.cmd, name=USER_IDENTITY, rg=EP_RG)
-
-        self.user_identity_id = target_identity["id"]
-        self.user_identity_principal_id = target_identity["principalId"]
-        self.cmd(
-            "iot hub identity assign -n {} -g {} --user {}".format(
-                self.entity_name, self.entity_rg, self.user_identity_id
-            )
-        )
-
-    def _delete_user_identity(self):
-        if not settings.env.azext_iot_user_identity:
-            self.cmd(
-                f"identity delete -n {USER_IDENTITY} -g {EP_RG}"
-            )
-
-    def enable_hub_system_identity(self):
-        """Set self.entity_identity and turn on system assigned identity if needed."""
-        if hasattr(self, "entity_identity"):
-            return
-
-        identity = self.cmd(
-            "iot hub show -n {} -g {}".format(
-                self.entity_name, self.entity_rg
-            )
-        ).get_output_in_json()["identity"]
-
-        if identity.get("principalId"):
-            self.entity_identity = identity.get("principalId")
-
-        # Need to enable
-        self.entity_identity = self.cmd(
-            "iot hub identity assign -n {} -g {} --system".format(
-                self.entity_name, self.entity_rg
-            )
-        ).get_output_in_json()["principalId"]
 
     def tearDown(self):
         device_list = []
@@ -590,11 +256,6 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         for loc in locations_set:
             if loc["role"] == "primary":
                 return loc["location"]
-
-    def get_hub_sub(self):
-        return self.cmd(
-            "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg)
-        ).get_output_in_json()["subscriptionid"]
 
     def get_hub_cstring(self, policy="iothubowner"):
         return self.cmd(
