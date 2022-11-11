@@ -35,9 +35,9 @@ class IoTHubProvider(object):
                 login=login,
                 auth_type=auth_type_dataplane,
             )
+            self.resolver = SdkResolver(self.target)
         else:
             self.hub_resource = self.discovery.find_resource(hub_name, rg)
-        self.resolver = SdkResolver(self.target)
 
     def get_sdk(self, sdk_type):
         return self.resolver.get_sdk(sdk_type)
