@@ -8,6 +8,7 @@
 Load CLI commands
 """
 from azure.cli.core.commands import CliCommandType, LongRunningOperation
+from azure.cli.core.profiles import ResourceType
 
 pnp_runtime_ops = CliCommandType(
     operations_tmpl="azext_iot.iothub.commands_pnp_runtime#{}"
@@ -61,7 +62,7 @@ def load_iothub_commands(self, _):
 
     with self.command_group(
         "iot hub message-endpoint create",
-        command_type=iothub_message_endpoint_ops
+        command_type=iothub_message_endpoint_ops,
     ) as cmd_group:
         cmd_group.command(
             "eventhub",
@@ -81,7 +82,9 @@ def load_iothub_commands(self, _):
         cmd_group.command(
             "cosmosdb-collection",
             "message_endpoint_create_cosmos_db_collection",
-            transform=EndpointUpdateResultTransform(self.cli_ctx)
+            transform=EndpointUpdateResultTransform(self.cli_ctx),
+            resource_type=ResourceType.MGMT_IOTHUB,
+            min_api="2022-04-30-preview"
         )
         cmd_group.command(
             "storage-container",
