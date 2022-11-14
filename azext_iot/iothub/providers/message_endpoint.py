@@ -76,7 +76,7 @@ class MessageEndpoint(IoTHubProvider):
         elif authentication_type != AuthenticationType.IdentityBased.value and not connection_string:
             # check for connection string args
             error_msg = "Please provide a connection string '--connection-string/-c'"
-            if not(
+            if not (
                 endpoint_account_name and entity_path and endpoint_policy_name
             ) and endpoint_type.lower() in [
                 EndpointType.EventHub.value, EndpointType.ServiceBusQueue.value, EndpointType.ServiceBusTopic.value

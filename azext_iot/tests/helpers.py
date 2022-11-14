@@ -8,7 +8,6 @@ import json
 import os
 
 from inspect import getsourcefile
-from time import sleep
 from azext_iot.common.utility import ensure_azure_namespace_path
 from azext_iot.common.utility import read_file_content
 from azext_iot.tests.settings import DynamoSettings
