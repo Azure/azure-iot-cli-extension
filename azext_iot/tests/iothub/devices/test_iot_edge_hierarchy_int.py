@@ -96,12 +96,12 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
         # └── device_7
         config_path = "./hierarchy_configs/nested_edge_config.yml"
         devices = [
-            ("device_1", None, self.deployment_top, "device_1", "mcr.microsoft.com/azureiotedge-agent:1.1", None),
-            ("device_2", "device_1", self.deployment_lower, "device_2", None, None),
-            ("device_3", "device_2", self.deployment_lower, "device_3", None, None),
-            ("device_4", "device_1", self.deployment_top, "device_4", None, None),
-            ("device_5", "device_4", self.deployment_lower, "device_5", None, None),
-            ("device_6", "device_4", self.deployment_lower, "device_6", None, None),
+            ("device_1", None, self.deployment_top, "device_1", "mcr.microsoft.com/azureiotedge-agent:1.1"),
+            ("device_2", "device_1", self.deployment_lower, "device_2", None),
+            ("device_3", "device_2", self.deployment_lower, "device_3", None),
+            ("device_4", "device_1", self.deployment_top, "device_4", None),
+            ("device_5", "device_4", self.deployment_lower, "device_5", None),
+            ("device_6", "device_4", self.deployment_lower, "device_6", None),
             (
                 "device_7",
                 None,
@@ -184,7 +184,33 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
 
         self._validate_results(devices, None)
 
-    def _validate_results(self, devices, output_path, cert_auth=False):
+    def test_edge_devices_create_config_overrides(self):
+        config_path = "./hierarchy_configs/edge_devices_min_config.yml"
+        override_auth_type = "shared_private_key"
+        default_edge_agent = "mcr.microsoft.com/azureiotedge-agent:1.3"
+        config_template = "./hierarchy_configs/device_config.toml"
+        devices = [
+            ("device_1", None, None, None, "mcr.microsoft.com/azureiotedge-agent:1.2", None),
+            ("device_2", "device_1", None, None, default_edge_agent, None),
+            ("device_3", "device_1", None, None, "mcr.microsoft.com/azureiotedge-agent:1.4", None),
+            ("device_4", None, None, None, default_edge_agent, None),
+        ]
+
+        # file has cert auth, call with overrides: keyAuth, custom config path, default edge agent
+        self.cmd(
+            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c --cfg {config_path} --dt {config_template} "
+            f"--out device_bundles --device-auth {override_auth_type} --default-edge-agent {default_edge_agent}"
+        )
+
+        self._validate_results(devices, "device_bundles", cert_auth=False, custom_device_template=True)
+
+    def _validate_results(self, devices, output_path, cert_auth=False, custom_device_template=False):
+        # device_tuple[0] == device_id
+        # device_tuple[1] == parent
+        # device_tuple[2] == deployment
+        # device_tuple[3] == hostname
+        # device_tuple[4] == edgeAgent
+
         # get all devices in hub
         device_list = self.cmd(
             f"iot hub device-identity list -n {self.entity_name} -g {self.entity_rg}"
@@ -254,6 +280,28 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
                         assert item in file_names
                     assert cert_auth == (f"{device_id}.hub-auth-cert.pem" in file_names)
                     assert cert_auth == (f"{device_id}.hub-auth-key.pem" in file_names)
+                    # check config values
+                    config_toml = device_tar.extractfile('config.toml')
+                    import tomli
+                    config = tomli.load(config_toml)
+
+                    # auth type
+                    assert config['provisioning']['authentication']['method'] == (
+                        'x509' if cert_auth else 'sas'
+                    )
+                    # hub hostname
+                    assert config['provisioning']['iothub_hostname'] == f"{self.entity_name}.azure-devices.net"
+                    # device_id
+                    assert config['provisioning']['device_id'] == device_tuple[0]
+                    # device hostname
+                    if len(device_tuple) > 3 and device_tuple[3]:
+                        assert config['hostname'] == device_tuple[3]
+                    # edge agent
+                    if len(device_tuple) > 4 and device_tuple[4]:
+                        assert config['agent']['config']['image'] == device_tuple[4]
+                    # hacky way to ensure we're loading config from file
+                    if custom_device_template:
+                        assert config['test']['foo'] == 'bar'
 
         if output_path:
             rmtree(output_path)
@@ -264,10 +312,16 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
             device_id = device_tuple[0]
             parent_id = device_tuple[1]
             deployment = device_tuple[2]
+            hostname = device_tuple[3] if len(device_tuple) > 3 else None
+            edgeAgent = device_tuple[4] if len(device_tuple) > 4 else None
             args = [f"id={device_id}"]
             if parent_id:
                 args.append(f"parent={parent_id}")
             if deployment:
                 args.append(f"deployment={deployment}")
+            if hostname:
+                args.append(f"hostname={hostname}")
+            if edgeAgent:
+                args.append(f"edgeAgent={edgeAgent}")
             device_arg_string = f"{device_arg_string} --device {' '.join(args)}"
         return device_arg_string

@@ -40,3 +40,6 @@ workload_uri = "fd://aziot-edged.workload.socket"
 [moby_runtime]
 network = "azure-iot-edge"
 uri = "unix:///var/run/docker.sock"
+
+[test]
+foo = "bar"

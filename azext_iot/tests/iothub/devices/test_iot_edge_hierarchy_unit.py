@@ -48,6 +48,11 @@ mock_container_auth = {
 }
 
 
+test_certs_folder = "./test_certs"
+test_root_cert = "root-cert.pem"
+test_root_key = "root-key.pem"
+
+
 class TestEdgeHierarchyCreateArgs:
     @pytest.fixture()
     def service_client(self, mocked_response, fixture_ghcs, fixture_sas):
@@ -128,7 +133,14 @@ class TestEdgeHierarchyCreateArgs:
             # basic example, default auth, should output no files
             ([["id=dev1", "parent=dev2"], ["id=dev2"]], None, False, True, None, None),
             # Visualize, no clean, certificate auth, specified output
-            ([["id=dev3"]], None, True, False, DeviceAuthType.x509_thumbprint.value, "device_bundles"),
+            (
+                [["id=dev3"]],
+                None,
+                True,
+                False,
+                DeviceAuthType.x509_thumbprint.value,
+                "device_bundles",
+            ),
             # Flex argument processing
             (
                 [
@@ -177,7 +189,6 @@ class TestEdgeHierarchyCreateArgs:
             bundle_output_path=output,
         )
 
-        # spy on config / certs to ensure correct file output
         if output:
             assert exists(output)
             for device in devices:
@@ -439,31 +450,162 @@ class TestHierarchyCreateConfig:
 
         yield mocked_response
 
+    @pytest.fixture()
+    def mock_config_parse(self, mocker):
+        from azext_iot.iothub.providers import device_identity
+
+        return mocker.spy(device_identity, "process_edge_devices_config_file_content")
+
     @pytest.mark.parametrize(
-        "devices, config, visualize, clean, out",
-        [
-            (None, "hierarchy_configs/nested_edge_config.yml", False, True, "device_bundles"),
-            (None, "hierarchy_configs/nested_edge_config.json", True, True, "device_bundles_2"),
+        "devices, config, visualize, clean, out, auth_override, agent_override, "
+        "template_override, ca_cert_override, ca_key_override",
+        [  # yaml config
+            (
+                None,
+                "hierarchy_configs/nested_edge_config.yml",
+                False,
+                True,
+                "device_bundles",
+                None,
+                None,
+                None,
+                None,
+                None,
+            ),
+            # yaml with auth type, device_config, and agent override
+            (
+                None,
+                "hierarchy_configs/nested_edge_config.yml",
+                False,
+                True,
+                "device_bundles",
+                DeviceAuthType.x509_thumbprint.value,
+                "custom_edge_agent",
+                "./hierarchy_configs/device_config.toml",
+                None,
+                None
+            ),
+            # json config
+            (
+                None,
+                "hierarchy_configs/nested_edge_config.json",
+                True,
+                True,
+                "device_bundles_2",
+                None,
+                None,
+                None,
+                None,
+                None,
+            ),
+            # json config with cert overrides
+            (
+                None,
+                "hierarchy_configs/nested_edge_config.json",
+                True,
+                True,
+                "device_bundles_2",
+                None,
+                None,
+                None,
+                f"{test_certs_folder}/{test_root_cert}",
+                f"{test_certs_folder}/{test_root_key}"
+            ),
             # no output
-            (None, "hierarchy_configs/nested_edge_config.json", True, True, None),
+            (
+                None,
+                "hierarchy_configs/nested_edge_config.json",
+                True,
+                True,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None
+            ),
         ],
     )
     def test_edge_devices_create_config(
-        self, fixture_cmd, service_client, set_cwd, devices, config, visualize, clean, out
+        self,
+        fixture_cmd,
+        mock_config_parse,
+        service_client,
+        set_cwd,
+        devices,
+        config,
+        visualize,
+        clean,
+        out,
+        auth_override,
+        agent_override,
+        template_override,
+        ca_cert_override,
+        ca_key_override
     ):
+
+        # create cert if we need
+        if ca_cert_override and ca_key_override:
+            # create_root_certificate()
+            root_cert = create_root_certificate()
+            write_content_to_file(
+                content=root_cert["certificate"],
+                destination=test_certs_folder,
+                file_name=test_root_cert,
+                overwrite=True,
+            )
+            write_content_to_file(
+                content=root_cert["privateKey"],
+                destination=test_certs_folder,
+                file_name=test_root_key,
+                overwrite=True,
+            )
+
         subject.iot_edge_devices_create(
             cmd=fixture_cmd,
             devices=devices,
             config_file=config,
             visualize=visualize,
             clean=clean,
-            bundle_output_path=out
+            bundle_output_path=out,
+            device_auth_type=auth_override,
+            device_config_template=template_override,
+            default_edge_agent=agent_override,
+            root_cert_path=ca_cert_override,
+            root_key_path=ca_key_override
         )
+
+        # remove test cert'
+        if ca_cert_override and ca_key_override:
+            rmtree(test_certs_folder)
 
         cfg_obj = (
             process_yaml_arg(config)
             if config.endswith(".yml")
             else process_json_arg(config)
+        )
+
+        # parse called with correct config
+        assert mock_config_parse.call_args[1]["content"] == cfg_obj
+
+        # assert inline overrides
+        assert mock_config_parse.call_args[1]["content"] == cfg_obj
+        assert mock_config_parse.call_args[1]["override_auth_type"] == auth_override
+        assert (
+            mock_config_parse.call_args[1]["override_default_edge_agent"]
+            == agent_override
+        )
+        assert (
+            mock_config_parse.call_args[1]["override_device_config_template"]
+            == template_override
+        )
+        assert (
+            mock_config_parse.call_args[1]["override_root_cert_path"]
+            == ca_cert_override
+        )
+        assert (
+            mock_config_parse.call_args[1]["override_root_key_path"]
+            == ca_key_override
         )
 
         expected_devices = []
@@ -489,13 +631,13 @@ class TestEdgeHierarchyConfigFunctions:
         write_content_to_file(
             content=root_cert["certificate"],
             destination=path,
-            file_name="root-cert.pem",
+            file_name=test_root_cert,
             overwrite=True,
         )
         write_content_to_file(
             content=root_cert["privateKey"],
             destination=path,
-            file_name="root-key.pem",
+            file_name=test_root_key,
             overwrite=True,
         )
         return root_cert
@@ -750,13 +892,14 @@ class TestEdgeHierarchyConfigFunctions:
             "iotHub": {"authenticationMethod": "x509Certificate"},
             "edgeConfiguration": {"defaultEdgeAgent": "edge-agent-2"},
             "certificates": {
-                "rootCACertPath": "test_certs/root-cert.pem",
-                "rootCACertKeyPath": "test_certs/root-key.pem",
+                "rootCACertPath": f"{test_certs_folder}/{test_root_cert}",
+                "rootCACertKeyPath": f"{test_certs_folder}/{test_root_key}",
             },
             "edgeDevices": [{"deviceId": "test"}],
         }
-        cert = self.create_test_root_cert("test_certs")
+        cert = self.create_test_root_cert(test_certs_folder)
         result = process_edge_devices_config_file_content(content)
+        rmtree(test_certs_folder)
         assert result == EdgeDevicesConfig(
             version="1.0",
             auth_method=DeviceAuthType.x509_thumbprint.value,
@@ -764,7 +907,6 @@ class TestEdgeHierarchyConfigFunctions:
             root_cert=cert,
             devices=[EdgeDeviceConfig(device_id="test")],
         )
-        rmtree("test_certs")
 
     @pytest.mark.parametrize(
         "content, error",
@@ -868,9 +1010,7 @@ class TestEdgeHierarchyConfigFunctions:
                         "privateKey": "root_private_key",
                     },
                     devices=[
-                        EdgeDeviceConfig(
-                            device_id="dev1", edge_agent="new-edge-agent"
-                        ),
+                        EdgeDeviceConfig(device_id="dev1", edge_agent="new-edge-agent"),
                         EdgeDeviceConfig(
                             device_id="dev2",
                         ),
@@ -897,11 +1037,11 @@ class TestEdgeHierarchyConfigFunctions:
                     template_config_path="hierarchy_configs/device_config.toml",
                     devices=[
                         EdgeDeviceConfig(
-                            device_id="dev1", edge_agent="new-edge-agent", hostname="dev1"
+                            device_id="dev1",
+                            edge_agent="new-edge-agent",
+                            hostname="dev1",
                         ),
-                        EdgeDeviceConfig(
-                            device_id="dev2", hostname="dev2"
-                        ),
+                        EdgeDeviceConfig(device_id="dev2", hostname="dev2"),
                     ],
                 ),
             ),
