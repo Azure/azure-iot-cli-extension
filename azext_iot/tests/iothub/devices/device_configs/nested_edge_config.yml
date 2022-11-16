@@ -4,32 +4,32 @@ iotHub:
   authenticationMethod: symmetricKey
 
 edgeConfiguration:
-  templateConfigPath: "./hierarchy_configs/device_config.toml"
+  templateConfigPath: "./device_configs/device_config.toml"
   defaultEdgeAgent: "$upstream:443/azureiotedge-agent:1.2"
 
 edgeDevices:
   - deviceId: device_1
     edgeAgent: "mcr.microsoft.com/azureiotedge-agent:1.1"
     hostname: device_1
-    deployment: "./hierarchy_configs/deploymentTopLayer.json"
+    deployment: "./device_configs/deploymentTopLayer.json"
     children:
     - deviceId: device_2
       hostname: device_2
-      deployment: "./hierarchy_configs/deploymentLowerLayer.json"
+      deployment: "./device_configs/deploymentLowerLayer.json"
       children:
         - deviceId: device_3
           hostname: device_3
-          deployment: "./hierarchy_configs/deploymentLowerLayer.json"
+          deployment: "./device_configs/deploymentLowerLayer.json"
     - deviceId: device_4
       hostname: device_4
-      deployment: "./hierarchy_configs/deploymentTopLayer.json"
+      deployment: "./device_configs/deploymentTopLayer.json"
       children:
         - deviceId: device_5
-          deployment: "./hierarchy_configs/deploymentLowerLayer.json"
+          deployment: "./device_configs/deploymentLowerLayer.json"
           hostname: device_5
         - deviceId: device_6
           hostname: device_6
-          deployment: "./hierarchy_configs/deploymentLowerLayer.json"
+          deployment: "./device_configs/deploymentLowerLayer.json"
   - deviceId: device_7
     hostname: device_7
     edgeAgent: "mcr.microsoft.com/azureiotedge-agent:1.2"

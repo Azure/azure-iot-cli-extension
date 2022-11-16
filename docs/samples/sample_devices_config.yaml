@@ -8,7 +8,7 @@ certificates: # Optional, a self-signed CA will be generated if not provided her
   rootCACertKeyPath: "rootCA.key.pem"
 
 edgeConfiguration:
-  templateConfigPath: "./hierarchy_configs/device_config.toml" # Optional, an empty device configuration is created if not provided here or in command arguments
+  templateConfigPath: "./device_configs/config_template.toml" # Optional, an empty device configuration is created if not provided here or in command arguments
   defaultEdgeAgent: "$upstream:443/azureiotedge-agent:1.2"
 
 edgeDevices:

@@ -16,10 +16,10 @@ from azext_iot.iothub.common import EdgeContainerAuth
 class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestNestedEdgeHierarchy, self).__init__(test_case)
-        self.deployment_top = "./hierarchy_configs/deploymentTopLayer.json"
-        self.deployment_lower = "./hierarchy_configs/deploymentLowerLayer.json"
+        self.deployment_top = "./device_configs/deploymentTopLayer.json"
+        self.deployment_lower = "./device_configs/deploymentLowerLayer.json"
 
-    def test_nested_edge_hierarchy_nArgs_full(self):
+    def test_nested_edge_devices_create_nArgs_full(self):
         # ├── device_1 (toplayer)
         # │   ├── device_2
         # │   │   └── device_3 (lowerLayer)
@@ -46,7 +46,7 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
 
         self._validate_results(devices, "bundles", True)
 
-    def test_nested_edge_hierarchy_nArgs_partial(self):
+    def test_nested_edge_devices_create_nArgs_partial(self):
         # Partial 1
         # ├── device1 (toplayer)
         # │   ├── device2
@@ -86,7 +86,7 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
         full_device_list = partial_devices_primary + partial_devices_secondary
         self._validate_results(full_device_list, None)
 
-    def test_nested_edge_hierarchy_config_full(self):
+    def test_nested_edge_devices_create_config_full(self):
         # ├── device_1 (toplayer)
         # │   ├── device_2 (lowerLayer)
         # │   │   └── device_3 (lowerLayer)
@@ -94,7 +94,7 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
         # │       ├── device_5 (lowerLayer)
         # │       └── device_6 (lowerLayer)
         # └── device_7
-        config_path = "./hierarchy_configs/nested_edge_config.yml"
+        config_path = "./device_configs/nested_edge_config.yml"
         devices = [
             ("device_1", None, self.deployment_top, "device_1", "mcr.microsoft.com/azureiotedge-agent:1.1"),
             ("device_2", "device_1", self.deployment_lower, "device_2", None),
@@ -121,7 +121,7 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
 
         self._validate_results(devices, "device_bundles", True)
 
-    def test_nested_edge_hierarchy_config_partial(self):
+    def test_nested_edge_devices_create_config_partial(self):
         # Partial 1
         # ├── device_1 (toplayer)
         # │   ├── device_2 (lowerLayer)
@@ -137,8 +137,8 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
         #         └── device_300
         #             └── device_400 (lowerLayer)
 
-        primary_config_path = "./hierarchy_configs/nested_edge_config.json"
-        secondary_config_path = "./hierarchy_configs/nested_edge_config_secondary.yaml"
+        primary_config_path = "./device_configs/nested_edge_config.json"
+        secondary_config_path = "./device_configs/nested_edge_config_secondary.yaml"
         devices_primary = [
             ("device_1", None, self.deployment_top),
             ("device_2", "device_1", self.deployment_lower),
@@ -185,10 +185,10 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
         self._validate_results(devices, None)
 
     def test_edge_devices_create_config_overrides(self):
-        config_path = "./hierarchy_configs/edge_devices_min_config.yml"
+        config_path = "./device_configs/edge_devices_min_config.yml"
         override_auth_type = "shared_private_key"
         default_edge_agent = "mcr.microsoft.com/azureiotedge-agent:1.3"
-        config_template = "./hierarchy_configs/device_config.toml"
+        config_template = "./device_configs/device_config.toml"
         devices = [
             ("device_1", None, None, None, "mcr.microsoft.com/azureiotedge-agent:1.2", None),
             ("device_2", "device_1", None, None, default_edge_agent, None),

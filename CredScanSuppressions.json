@@ -68,17 +68,17 @@
             "_justification": "Completely made up x509 certificate for IoT central integration tests."
         },
         {
-            "file": "azext_iot\\tests\\iothub\\devices\\hierarchy_configs\\nested_edge_config.json",
+            "file": "azext_iot\\tests\\iothub\\devices\\device_configs\\nested_edge_config.json",
             "placeholder": "$credential$",
             "_justification": "Nested Edge configuration file with fake credentials"
         },
         {
-            "file": "azext_iot\\tests\\iothub\\devices\\hierarchy_configs\\fake_edge_container_auth.json",
+            "file": "azext_iot\\tests\\iothub\\devices\\device_configs\\fake_edge_container_auth.json",
             "placeholder": "$credential$",
             "_justification": "Container auth test file with fake credentials"
         },
         {
-            "file": "azext_iot\\tests\\iothub\\devices\\test_iot_edge_hierarchy_int.py",
+            "file": "azext_iot\\tests\\iothub\\devices\\test_iot_edge_devices_create_int.py",
             "placeholder": "$credential$",
             "_justification": "Fake credentials for container auth"
         }

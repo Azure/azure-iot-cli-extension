@@ -15,8 +15,15 @@ from azext_iot.common.shared import DeviceAuthType
 from azext_iot.common.utility import process_json_arg, process_yaml_arg
 from azext_iot.sdk.iothub.service.models import ConfigurationContent
 from azext_iot.iothub import commands_device_identity as subject
-from azext_iot.iothub.edge_device_config import (
+from azext_iot.iothub.providers.helpers.edge_device_config import (
+    EDGE_CONFIG_SCRIPT_APPLY,
+    EDGE_CONFIG_SCRIPT_CA_CERTS,
+    EDGE_CONFIG_SCRIPT_HEADERS,
+    EDGE_CONFIG_SCRIPT_HOSTNAME,
+    EDGE_CONFIG_SCRIPT_HUB_AUTH_CERTS,
+    EDGE_CONFIG_SCRIPT_PARENT_HOSTNAME,
     EDGE_ROOT_CERTIFICATE_FILENAME,
+    create_edge_device_config_script,
     process_edge_devices_config_args,
     process_edge_devices_config_file_content,
     create_edge_device_config,
@@ -147,16 +154,16 @@ class TestEdgeHierarchyCreateArgs:
                     [
                         "id=dev4",
                         "hostname=device-hostname",
-                        "deployment=hierarchy_configs/deploymentTopLayer.json",
+                        "deployment=device_configs/deploymentTopLayer.json",
                         "edge_agent=my-edge-agent",
                         f"container_auth={json.dumps(mock_container_auth)}",
                     ],
                     [
                         "id=dev5",
                         "hostname=device-hostname",
-                        "deployment=hierarchy_configs/deploymentTopLayer.json",
+                        "deployment=device_configs/deploymentTopLayer.json",
                         "edge_agent=my-edge-agent",
-                        "container_auth=hierarchy_configs/fake_edge_container_auth.json",
+                        "container_auth=device_configs/fake_edge_container_auth.json",
                     ],
                 ],
                 None,
@@ -273,7 +280,7 @@ class TestHierarchyCreateFailures:
                     [
                         "id=dev1",
                         "parent=dev2",
-                        "deployment=./hierarchy_configs/invalid/invalid_deployment.json",
+                        "deployment=./device_configs/invalid/invalid_deployment.json",
                     ],
                     ["id=dev2"],
                 ],
@@ -332,13 +339,13 @@ class TestHierarchyCreateFailures:
             # duplicate device
             (
                 None,
-                "hierarchy_configs/invalid/duplicate_device_config.yml",
+                "device_configs/invalid/duplicate_device_config.yml",
                 InvalidArgumentValueError,
             ),
             # missing device ID
             (
                 None,
-                "hierarchy_configs/invalid/missing_device_id.yml",
+                "device_configs/invalid/missing_device_id.yml",
                 InvalidArgumentValueError,
             ),
             # devices AND config
@@ -347,13 +354,13 @@ class TestHierarchyCreateFailures:
                     ["id=dev1", "parent=dev2"],
                     ["id=dev2"],
                 ],
-                "hierarchy_configs/nested_edge_config.yml",
+                "device_configs/nested_edge_config.yml",
                 MutuallyExclusiveArgumentError,
             ),
             # invalid file format
             (
                 None,
-                "hierarchy_configs/nested_edge_config.txt",
+                "device_configs/nested_edge_config.txt",
                 InvalidArgumentValueError,
             ),
         ],
@@ -462,7 +469,7 @@ class TestHierarchyCreateConfig:
         [  # yaml config
             (
                 None,
-                "hierarchy_configs/nested_edge_config.yml",
+                "device_configs/nested_edge_config.yml",
                 False,
                 True,
                 "device_bundles",
@@ -475,20 +482,20 @@ class TestHierarchyCreateConfig:
             # yaml with auth type, device_config, and agent override
             (
                 None,
-                "hierarchy_configs/nested_edge_config.yml",
+                "device_configs/nested_edge_config.yml",
                 False,
                 True,
                 "device_bundles",
                 DeviceAuthType.x509_thumbprint.value,
                 "custom_edge_agent",
-                "./hierarchy_configs/device_config.toml",
+                "./device_configs/device_config.toml",
                 None,
                 None
             ),
             # json config
             (
                 None,
-                "hierarchy_configs/nested_edge_config.json",
+                "device_configs/nested_edge_config.json",
                 True,
                 True,
                 "device_bundles_2",
@@ -501,7 +508,7 @@ class TestHierarchyCreateConfig:
             # json config with cert overrides
             (
                 None,
-                "hierarchy_configs/nested_edge_config.json",
+                "device_configs/nested_edge_config.json",
                 True,
                 True,
                 "device_bundles_2",
@@ -514,7 +521,7 @@ class TestHierarchyCreateConfig:
             # no output
             (
                 None,
-                "hierarchy_configs/nested_edge_config.json",
+                "device_configs/nested_edge_config.json",
                 True,
                 True,
                 None,
@@ -668,7 +675,7 @@ class TestEdgeHierarchyConfigFunctions:
                 DeviceAuthType.shared_private_key.value,
                 device_config_with_parent_no_agent,
                 "default-edge-agent",
-                "./hierarchy_configs/device_config.toml",
+                "./device_configs/device_config.toml",
                 "test-device-pk",
                 None,
             ),
@@ -778,11 +785,11 @@ class TestEdgeHierarchyConfigFunctions:
         "deployment, error",
         [
             (
-                "hierarchy_configs/invalid/invalid_deployment.json",
+                "device_configs/invalid/invalid_deployment.json",
                 InvalidArgumentValueError,
             ),
             ("path_does_not_exist.json", FileOperationError),
-            ("hierarchy_configs/deploymentLowerLayer.json", None),
+            ("device_configs/deploymentLowerLayer.json", None),
         ],
     )
     def test_process_edge_config_content(self, set_cwd, deployment, error):
@@ -1025,7 +1032,7 @@ class TestEdgeHierarchyConfigFunctions:
                 ],
                 DeviceAuthType.x509_thumbprint.value,
                 None,
-                "hierarchy_configs/device_config.toml",
+                "device_configs/device_config.toml",
                 EdgeDevicesConfig(
                     version="1.0",
                     auth_method=DeviceAuthType.x509_thumbprint.value,
@@ -1034,7 +1041,7 @@ class TestEdgeHierarchyConfigFunctions:
                         "thumbprint": "root_thumbprint",
                         "privateKey": "root_private_key",
                     },
-                    template_config_path="hierarchy_configs/device_config.toml",
+                    template_config_path="device_configs/device_config.toml",
                     devices=[
                         EdgeDeviceConfig(
                             device_id="dev1",
@@ -1064,3 +1071,77 @@ class TestEdgeHierarchyConfigFunctions:
             device_config_template=config_template,
         )
         assert result == expected
+
+    @pytest.mark.parametrize(
+        "device_id, hub_auth, hostname, has_parent, parent_hostname, segments",
+        [
+            # device, hub_auth, hostname, parent, parent_hostname
+            (
+                "test_device_id",
+                True,
+                "hostname",
+                True,
+                "parent_hostname",
+                [
+                    EDGE_CONFIG_SCRIPT_HEADERS.format("test_device_id"),
+                    EDGE_CONFIG_SCRIPT_CA_CERTS,
+                    EDGE_CONFIG_SCRIPT_HUB_AUTH_CERTS,
+                    EDGE_CONFIG_SCRIPT_APPLY,
+                ],
+            ),
+            # device, no hub auth, hostname, parent, parent_hostname
+            (
+                "test_device_id",
+                False,
+                "hostname",
+                True,
+                "parent_hostname",
+                [
+                    EDGE_CONFIG_SCRIPT_HEADERS.format("test_device_id"),
+                    EDGE_CONFIG_SCRIPT_CA_CERTS,
+                    EDGE_CONFIG_SCRIPT_APPLY,
+                ],
+            ),
+            # no optional parameters
+            (
+                "test_device_id",
+                None,
+                None,
+                None,
+                None,
+                [
+                    EDGE_CONFIG_SCRIPT_HEADERS.format("test_device_id"),
+                    EDGE_CONFIG_SCRIPT_HOSTNAME,
+                    EDGE_CONFIG_SCRIPT_CA_CERTS,
+                    EDGE_CONFIG_SCRIPT_APPLY,
+                ],
+            ),
+            # parent but no hostnames, no hub auth
+            (
+                "test_device_id",
+                False,
+                None,
+                True,
+                None,
+                [
+                    EDGE_CONFIG_SCRIPT_HEADERS.format("test_device_id"),
+                    EDGE_CONFIG_SCRIPT_HOSTNAME,
+                    EDGE_CONFIG_SCRIPT_PARENT_HOSTNAME,
+                    EDGE_CONFIG_SCRIPT_CA_CERTS,
+                    EDGE_CONFIG_SCRIPT_APPLY,
+                ],
+            ),
+        ],
+    )
+    def test_create_edge_device_config_script(
+        self, device_id, hub_auth, hostname, has_parent, parent_hostname, segments
+    ):
+        script_content = create_edge_device_config_script(
+            device_id=device_id,
+            hub_auth=hub_auth,
+            hostname=hostname,
+            has_parent=has_parent,
+            parent_hostname=parent_hostname,
+        )
+
+        assert script_content == "\n".join(segments)

@@ -25,7 +25,6 @@ from azext_iot.common.deps import ensure_uamqp
 from azext_iot.constants import EVENT_LIB, EXTENSION_NAME
 from azext_iot._validators import mode2_iot_login_handler
 from azext_iot.common.embedded_cli import EmbeddedCLI
-from azext_iot.iothub.edge_device_config import create_edge_device_config_script
 
 
 class TestMinPython(object):
@@ -478,88 +477,3 @@ class TestHandleServiceException(object):
 
         with pytest.raises(expected_error):
             handle_service_exception(error)
-
-
-class TestEdgeDevicesConfiguration(object):
-    from azext_iot.iothub.edge_device_config import (
-        EDGE_CONFIG_SCRIPT_APPLY,
-        EDGE_CONFIG_SCRIPT_CA_CERTS,
-        EDGE_CONFIG_SCRIPT_HEADERS,
-        EDGE_CONFIG_SCRIPT_HOSTNAME,
-        EDGE_CONFIG_SCRIPT_HUB_AUTH_CERTS,
-        EDGE_CONFIG_SCRIPT_PARENT_HOSTNAME,
-    )
-
-    @pytest.mark.parametrize(
-        "device_id, hub_auth, hostname, has_parent, parent_hostname, segments",
-        [
-            # device, hub_auth, hostname, parent, parent_hostname
-            (
-                "test_device_id",
-                True,
-                "hostname",
-                True,
-                "parent_hostname",
-                [
-                    EDGE_CONFIG_SCRIPT_HEADERS.format("test_device_id"),
-                    EDGE_CONFIG_SCRIPT_CA_CERTS,
-                    EDGE_CONFIG_SCRIPT_HUB_AUTH_CERTS,
-                    EDGE_CONFIG_SCRIPT_APPLY,
-                ],
-            ),
-            # device, no hub auth, hostname, parent, parent_hostname
-            (
-                "test_device_id",
-                False,
-                "hostname",
-                True,
-                "parent_hostname",
-                [
-                    EDGE_CONFIG_SCRIPT_HEADERS.format("test_device_id"),
-                    EDGE_CONFIG_SCRIPT_CA_CERTS,
-                    EDGE_CONFIG_SCRIPT_APPLY,
-                ],
-            ),
-            # no optional parameters
-            (
-                "test_device_id",
-                None,
-                None,
-                None,
-                None,
-                [
-                    EDGE_CONFIG_SCRIPT_HEADERS.format("test_device_id"),
-                    EDGE_CONFIG_SCRIPT_HOSTNAME,
-                    EDGE_CONFIG_SCRIPT_CA_CERTS,
-                    EDGE_CONFIG_SCRIPT_APPLY,
-                ],
-            ),
-            # parent but no hostnames, no hub auth
-            (
-                "test_device_id",
-                False,
-                None,
-                True,
-                None,
-                [
-                    EDGE_CONFIG_SCRIPT_HEADERS.format("test_device_id"),
-                    EDGE_CONFIG_SCRIPT_HOSTNAME,
-                    EDGE_CONFIG_SCRIPT_PARENT_HOSTNAME,
-                    EDGE_CONFIG_SCRIPT_CA_CERTS,
-                    EDGE_CONFIG_SCRIPT_APPLY,
-                ],
-            ),
-        ],
-    )
-    def test_create_edge_device_config_script(
-        self, device_id, hub_auth, hostname, has_parent, parent_hostname, segments
-    ):
-        script_content = create_edge_device_config_script(
-            device_id=device_id,
-            hub_auth=hub_auth,
-            hostname=hostname,
-            has_parent=has_parent,
-            parent_hostname=parent_hostname,
-        )
-
-        assert script_content == "\n".join(segments)

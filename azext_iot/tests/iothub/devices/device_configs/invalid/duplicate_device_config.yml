@@ -2,7 +2,7 @@ configVersion: "1.0"
 iotHub:
   authenticationMethod: symmetricKey
 edgeConfiguration:
-  templateConfigPath: "./hierarchy_configs/device_config.toml"
+  templateConfigPath: "./device_configs/device_config.toml"
 
 edgeDevices:
   - deviceId: device_1

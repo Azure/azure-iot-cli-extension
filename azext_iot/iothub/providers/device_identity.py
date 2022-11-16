@@ -14,7 +14,7 @@ from azext_iot.common.certops import (
 )
 
 from azext_iot.common.fileops import tar_directory, write_content_to_file
-from azext_iot.iothub.edge_device_config import (
+from azext_iot.iothub.providers.helpers.edge_device_config import (
     DEVICE_README,
     EDGE_ROOT_CERTIFICATE_FILENAME,
     create_edge_device_config,
