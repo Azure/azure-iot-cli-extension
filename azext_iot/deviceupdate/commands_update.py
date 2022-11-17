@@ -237,7 +237,8 @@ def manifest_init_v5(
     import json
     from datetime import datetime
     from pathlib import PurePath
-    from azure.cli.core.azclierror import ArgumentUsageError
+    from azure.cli.core.azclierror import ArgumentUsageError, InvalidArgumentValueError
+    from azext_iot.deviceupdate.common import FP_HANDLERS, FP_HANDLERS_REQUIRE_CRITERIA
 
     def _sanitize_safe_params(safe_params: list, keep: list) -> list:
         """
@@ -321,6 +322,11 @@ def manifest_init_v5(
                 "type": "inline",
                 "handler": assembled_step["handler"],
             }
+
+            if step["handler"].lower().startswith("microsoft") and step["handler"] not in FP_HANDLERS:
+                if not no_validation:
+                    raise InvalidArgumentValueError(f"Valid Microsoft handlers: {', '.join(FP_HANDLERS)}")
+
             step["files"] = [f.strip() for f in assembled_step["files"].split(",")] if "files" in assembled_step else []
             if not step["files"]:
                 derived_step_files = []
@@ -335,6 +341,19 @@ def manifest_init_v5(
 
             if "properties" in assembled_step and assembled_step["properties"]:
                 step["handlerProperties"] = json.loads(assembled_step["properties"])
+                if not isinstance(step["handlerProperties"], dict):
+                    raise InvalidArgumentValueError(
+                        f"handlerProperties must be an object, parsed type: {type(step['handlerProperties'])}")
+
+            if step["handler"] in FP_HANDLERS_REQUIRE_CRITERIA:
+                if not no_validation:
+                    input_handler_properties = step.get("handlerProperties", {})
+                    if "installedCriteria" not in input_handler_properties:
+                        input_handler_properties["installedCriteria"] = "1.0"
+                        step["handlerProperties"] = input_handler_properties
+                        logger.warning(
+                            "The handler '%s' requires handlerProperties.installedCriteria. "
+                            "A default value has been added.", step["handler"])
 
         if not step:
             raise ArgumentUsageError(
