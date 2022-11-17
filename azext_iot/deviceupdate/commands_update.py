@@ -327,7 +327,7 @@ def manifest_init_v5(
                 if not no_validation:
                     raise InvalidArgumentValueError(f"Valid Microsoft handlers: {', '.join(FP_HANDLERS)}")
 
-            step["files"] = [f.strip() for f in assembled_step["files"].split(",")] if "files" in assembled_step else []
+            step["files"] = list(set([f.strip() for f in assembled_step["files"].split(",")])) if "files" in assembled_step else []
             if not step["files"]:
                 derived_step_files = []
                 for f in related_step_file_map[s]:
@@ -336,7 +336,9 @@ def manifest_init_v5(
                         continue
                     assembled_step_file = DeviceUpdateDataManager.assemble_nargs_to_dict(step_file)
                     if "path" in assembled_step_file:
-                        derived_step_files.append(PurePath(assembled_step_file["path"]).name)
+                        step_filename = PurePath(assembled_step_file["path"]).name
+                        if step_filename not in derived_step_files:
+                            derived_step_files.append(step_filename)
                 step["files"] = derived_step_files
 
             if "properties" in assembled_step and assembled_step["properties"]:
@@ -374,6 +376,7 @@ def manifest_init_v5(
         related_file_map = _associate_related(file_params, "--file")
 
         processed_files = []
+        processed_files_map = {}
         for f in range(len(files)):
             if not files[f] or not files[f][0]:
                 continue
@@ -416,7 +419,11 @@ def manifest_init_v5(
                 processed_file["relatedFiles"] = processed_related_files
 
             if processed_file:
-                processed_files.append(processed_file)
+                processed_files_map[processed_file["filename"]] = processed_file
+
+        if processed_files_map:
+            for f in processed_files_map:
+                processed_files.append(processed_files_map[f])
 
         payload["files"] = processed_files
 
