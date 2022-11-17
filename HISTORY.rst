@@ -3,6 +3,22 @@
 Release History
 ===============
 
+unreleased
++++++++++++++++
+
+**IoT Hub updates**
+
+* The root-authority migration feature is now available. Since the Baltimore root will soon expire, IoT Hub will
+  transition to the DigiCert Global G2 root starting February 15, 2023. You will need to update all device certificates
+  to use the new G2 root.
+  
+  **These commands are temporary** and will be removed once all IoT Hubs have been transitioned:
+    
+  - az iot hub certificate root-authority show
+  - az iot hub certificate root-authority set
+  
+  To learn more about this transition, visit http://aka.ms/iot-ca-updates/.
+
 
 0.18.1
 +++++++++++++++
@@ -11,17 +27,6 @@ Release History
 
 * Removed preview classification from the root Azure Device Update command group.
   Commands are GA with the exception of `az iot du update stage` and `az iot du update init` which are still preview.
-
-
-**IoT Hub updates**
-
-* The root-authority migration feature is now available. Since the Baltimore root will soon expire, IoT Hub will
- transition to the DigiCert Global G2 root starting February 15, 2023. You will need to update all device certificates
- to use the new G2 root. *This command is temporary* and will be removed once all IoT Hubs have been transitioned. To
- learn more about this transition, visit http://aka.ms/iot-ca-updates/.
-
-  - az iot hub certificate root-authority show
-  - az iot hub certificate root-authority set
 
 
 0.18.0
