@@ -327,7 +327,9 @@ def manifest_init_v5(
                 if not no_validation:
                     raise InvalidArgumentValueError(f"Valid Microsoft handlers: {', '.join(FP_HANDLERS)}")
 
-            step["files"] = list(set([f.strip() for f in assembled_step["files"].split(",")])) if "files" in assembled_step else []
+            step["files"] = (
+                list(set([f.strip() for f in assembled_step["files"].split(",")])) if "files" in assembled_step else []
+            )
             if not step["files"]:
                 derived_step_files = []
                 for f in related_step_file_map[s]:
@@ -345,7 +347,8 @@ def manifest_init_v5(
                 step["handlerProperties"] = json.loads(assembled_step["properties"])
                 if not isinstance(step["handlerProperties"], dict):
                     raise InvalidArgumentValueError(
-                        f"handlerProperties must be an object, parsed type: {type(step['handlerProperties'])}")
+                        f"handlerProperties must be an object, parsed type: {type(step['handlerProperties'])}"
+                    )
 
             if step["handler"] in FP_HANDLERS_REQUIRE_CRITERIA:
                 if not no_validation:
@@ -354,8 +357,9 @@ def manifest_init_v5(
                         input_handler_properties["installedCriteria"] = "1.0"
                         step["handlerProperties"] = input_handler_properties
                         logger.warning(
-                            "The handler '%s' requires handlerProperties.installedCriteria. "
-                            "A default value has been added.", step["handler"])
+                            "The handler '%s' requires handlerProperties.installedCriteria. A default value has been added.",
+                            step["handler"],
+                        )
 
         if not step:
             raise ArgumentUsageError(
@@ -431,6 +435,7 @@ def manifest_init_v5(
         import jsonschema
         from azure.cli.core.azclierror import ValidationError
         from azext_iot.deviceupdate.schemas import DEVICE_UPDATE_MANIFEST_V5, DEVICE_UPDATE_MANIFEST_V5_DEFS
+
         validator = jsonschema.Draft7Validator(DEVICE_UPDATE_MANIFEST_V5)
         validator.resolver.store[DEVICE_UPDATE_MANIFEST_V5_DEFS["$id"]] = DEVICE_UPDATE_MANIFEST_V5_DEFS
 
@@ -508,15 +513,16 @@ def stage_update(
             blob_client = None
             with open(file_path, "rb") as data:
                 blob_client = container_client.upload_blob(
-                    name=f"{container_directory}{file_name}", data=data, overwrite=overwrite)
+                    name=f"{container_directory}{file_name}", data=data, overwrite=overwrite
+                )
 
-            target_datetime_expiry = (datetime.utcnow() + timedelta(hours=3.0))
+            target_datetime_expiry = datetime.utcnow() + timedelta(hours=3.0)
             sas_token = generate_account_sas(
                 account_name=blob_service_client.credential.account_name,
                 account_key=blob_service_client.credential.account_key,
                 resource_types=ResourceTypes(object=True),
                 permission=AccountSasPermissions(read=True),
-                expiry=target_datetime_expiry
+                expiry=target_datetime_expiry,
             )
             file_sas_result.append(f"{blob_client.url}?{sas_token}")
 
@@ -553,11 +559,11 @@ def stage_update(
                         file_paths.append(PurePath(manifest_directory_path, related_filename).as_posix())
                         uploaded_files_map[related_filename] = 1
 
-        updateId = manifest['updateId']
+        updateId = manifest["updateId"]
         qualifier = f"{updateId['provider']}_{updateId['name']}_{updateId['version']}"
         manifest_sas_uris_map[manifest_path] = (
             _stage_update_assets(file_paths, f"{manifest_directory_name}/{qualifier}/"),
-            file_names
+            file_names,
         )
 
     data_manager = DeviceUpdateDataManager(
