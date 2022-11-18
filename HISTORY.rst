@@ -6,6 +6,21 @@ Release History
 unreleased
 +++++++++++++++
 
+0.18.2
++++++++++++++++
+
+**Device Update**
+
+`az iot du update init v5` improvements:
+
+* Fixed an issue where duplicate `files[]`/`relatedFiles[]`` entries were created via multiple usage of --file or 
+  --related-file against the same update file asset.
+* If the inline step content handler requires `handlerProperties.installedCriteria` and a value was not provided,
+  a default value will be automatically added with a warning.
+* If the inline step content handler starts with 'microsoft' (case-insensitive), valid first-party handler values
+  will be enforced.
+
+
 0.18.1
 +++++++++++++++
 
