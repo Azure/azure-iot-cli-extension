@@ -400,6 +400,7 @@ def manifest_init_v5(
                 processed_file["downloadHandler"] = {"id": assembled_file["downloadHandler"]}
 
             processed_related_files = []
+            processed_related_files_map = {}
             for r in related_file_map[f]:
                 related_file = related_files[r]
                 if not related_file or not related_file[0]:
@@ -417,7 +418,11 @@ def manifest_init_v5(
                     processed_related_file["properties"] = json.loads(assembled_related_file["properties"])
 
                 if processed_related_file:
-                    processed_related_files.append(processed_related_file)
+                    processed_related_files_map[processed_related_file["filename"]] = processed_related_file
+
+            if processed_related_files_map:
+                for _rf in processed_related_files_map:
+                    processed_related_files.append(processed_related_files_map[_rf])
 
             if processed_related_files:
                 processed_file["relatedFiles"] = processed_related_files
@@ -426,8 +431,8 @@ def manifest_init_v5(
                 processed_files_map[processed_file["filename"]] = processed_file
 
         if processed_files_map:
-            for f in processed_files_map:
-                processed_files.append(processed_files_map[f])
+            for _f in processed_files_map:
+                processed_files.append(processed_files_map[_f])
 
         payload["files"] = processed_files
 

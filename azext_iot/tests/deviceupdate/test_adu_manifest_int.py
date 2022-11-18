@@ -264,7 +264,9 @@ sample_properties = {"property1": "value1", "property2": 2, "property3": {"a": "
             "--compat manufacturer=Contoso model=Vacuum "
             "--step handler=microsoft/swupdate:2 "
             f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\" "
-            f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\" ",
+            f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\" "
+            f"--related-file path=\"{get_context_path(__file__, 'manifests', 'surface15', 'action.sh')}\" "
+            f"--related-file path=\"{get_context_path(__file__, 'manifests', 'surface15', 'action.sh')}\" ",
             {
                 "updateId": {"provider": "digimaun0", "name": "swupdatev2", "version": "0.1"},
                 "compatibility": [
@@ -288,6 +290,14 @@ sample_properties = {"property1": "value1", "property2": 2, "property3": {"a": "
                         "filename": "libcurl4-doc-apt-manifest.json",
                         "sizeInBytes": 163,
                         "hashes": {"sha256": "iFWTIaxp33tf5BR1w0fMmnnHpjsUjLRQ9eZFjw74LbU="},
+                        "relatedFiles": [
+                            # Duplicated related file names should not exist in relatedFiles[]
+                            {
+                                "filename": "action.sh",
+                                "sizeInBytes": 33,
+                                "hashes": {"sha256": "n+KGjLjSGr7LVKsgWiExUDeU6Z2ZTJu0tpAWxkmYKxA="},
+                            },
+                        ],
                     }
                 ],
                 "manifestVersion": "5.0",
