@@ -833,6 +833,9 @@ def load_deviceupdate_help():
         short-summary: Utility for import manifest initialization.
     """
 
+    # @digimaun - The extra newlines in powershell and cmd examples are to ensure
+    # consistent format with Az CLI help yaml parsing.
+
     helps["iot du update init v5"] = """
         type: command
         short-summary: Initialize a v5 import manifest with the desired state.
@@ -872,27 +875,43 @@ def load_deviceupdate_help():
         - name: Initialize a bundled update referencing a leaf update as well as defining independent steps. Example
             optimized for `powershell`.
           text: |
-            az iot du update init v5 `
-            --update-provider Microsoft --update-name Bundled --update-version 2.0 `
-            --compat manufacturer=Contoso model=SpaceStation `
-            --step handler=microsoft/script:1 properties='{\\"arguments\\": \\"--pre\\"}' description="Pre-install script" `
-            --file path=/my/update/scripts/preinstall.sh downloadHandler=microsoft/delta:1
-            --related-file path=/my/update/scripts/related_preinstall.json properties='{\\"microsoft.sourceFileHashAlgorithm\\": \\"sha256\\"}' `
-            --step updateId.provider=Microsoft updateId.name=SwUpdate updateId.version=1.1 `
-            --step handler=microsoft/script:1 properties='{\\"arguments\\": \\"--post\\"}' description="Post-install script" `
+            az iot du update init v5 `\
+
+            --update-provider Microsoft --update-name Bundled --update-version 2.0 `\
+
+            --compat manufacturer=Contoso model=SpaceStation `\
+
+            --step handler=microsoft/script:1 properties='{\\"arguments\\": \\"--pre\\"}' description="Pre-install script" `\
+
+            --file path=/my/update/scripts/preinstall.sh downloadHandler=microsoft/delta:1 `\
+
+            --related-file path=/my/update/scripts/related_preinstall.json properties='{\\"microsoft.sourceFileHashAlgorithm\\": \\"sha256\\"}' `\
+
+            --step updateId.provider=Microsoft updateId.name=SwUpdate updateId.version=1.1 `\
+
+            --step handler=microsoft/script:1 properties='{\\"arguments\\": \\"--post\\"}' description="Post-install script" `\
+
             --file path=/my/update/scripts/postinstall.sh
 
         - name: Initialize a bundled update referencing a leaf update as well as defining independent steps. Example
             optimized for `cmd`.
           text: |
-            az iot du update init v5 ^
-            --update-provider Microsoft --update-name Bundled --update-version 2.0 ^
-            --compat manufacturer=Contoso model=SpaceStation ^
-            --step handler=microsoft/script:1 properties=\"{\\"arguments\\": \\"--pre\\"}\" description="Pre-install script" ^
-            --file path=/my/update/scripts/preinstall.sh downloadHandler=microsoft/delta:1 ^
-            --related-file path=/my/update/scripts/related_preinstall.json properties=\"{\\"microsoft.sourceFileHashAlgorithm\\": \\"sha256\\"}\" ^
-            --step updateId.provider=Microsoft updateId.name=SwUpdate updateId.version=1.1 ^
-            --step handler=microsoft/script:1 properties=\"{\\"arguments\\": \\"--post\\"}\" description="Post-install script" ^
+            az iot du update init v5 ^\
+
+            --update-provider Microsoft --update-name Bundled --update-version 2.0 ^\
+
+            --compat manufacturer=Contoso model=SpaceStation ^\
+
+            --step handler=microsoft/script:1 properties=\"{\\"arguments\\": \\"--pre\\"}\" description="Pre-install script" ^\
+
+            --file path=/my/update/scripts/preinstall.sh downloadHandler=microsoft/delta:1 ^\
+
+            --related-file path=/my/update/scripts/related_preinstall.json properties=\"{\\"microsoft.sourceFileHashAlgorithm\\": \\"sha256\\"}\" ^\
+
+            --step updateId.provider=Microsoft updateId.name=SwUpdate updateId.version=1.1 ^\
+
+            --step handler=microsoft/script:1 properties=\"{\\"arguments\\": \\"--post\\"}\" description="Post-install script" ^\
+
             --file path=/my/update/scripts/postinstall.sh
     """
 
