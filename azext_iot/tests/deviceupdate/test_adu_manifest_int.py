@@ -29,6 +29,37 @@ sample_properties = {"property1": "value1", "property2": 2, "property3": {"a": "
         (
             "--update-provider digimaun0 --update-name simpleaptupdate --update-version 1.0.0 "
             "--compat deviceManufacturer=Contoso deviceModel=Vacuum "
+            '--step handler=custom/handler:1 properties=\'{"installedCriteria":"2.0"}\' '
+            f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\"",
+            {
+                "updateId": {"provider": "digimaun0", "name": "simpleaptupdate", "version": "1.0.0"},
+                "compatibility": [
+                    {"deviceManufacturer": "Contoso", "deviceModel": "Vacuum"},
+                ],
+                "instructions": {
+                    "steps": [
+                        {
+                            # Ensures custom handler can be used.
+                            "handler": "custom/handler:1",
+                            "files": ["libcurl4-doc-apt-manifest.json"],
+                            "handlerProperties": {"installedCriteria": "2.0"},
+                            "type": "inline",
+                        }
+                    ]
+                },
+                "files": [
+                    {
+                        "filename": "libcurl4-doc-apt-manifest.json",
+                        "sizeInBytes": 163,
+                        "hashes": {"sha256": "iFWTIaxp33tf5BR1w0fMmnnHpjsUjLRQ9eZFjw74LbU="},
+                    }
+                ],
+                "manifestVersion": "5.0",
+            },
+        ),
+        (
+            "--update-provider digimaun0 --update-name simpleaptupdate --update-version 1.0.0 "
+            "--compat deviceManufacturer=Contoso deviceModel=Vacuum "
             '--step handler=microsoft/apt:1 properties=\'{"installedCriteria":"2.0"}\' '
             f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\"",
             {
