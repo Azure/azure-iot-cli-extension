@@ -856,40 +856,43 @@ def load_deviceupdate_help():
             --file path=/my/update/image/file1 --file path=/my/update/image/file2
             --is-deployable false
 
-        - name: Initialize a bundled update referencing a leaf update as well as defining independent steps. Inline json examples
-            compatible with `bash`-like shells.
-          text: >
-            az iot du update init v5 --update-provider Microsoft --update-name Bundled --update-version 2.0
-            --compat manufacturer=Contoso model=SpaceStation
-            --step handler=microsoft/script:1 properties='{"arguments": "--pre"}' description="Pre-install script"
-            --file path=/my/update/scripts/preinstall.sh downloadHandler=microsoft/delta:1
-            --related-file path=/my/update/scripts/related_preinstall.json properties='{"microsoft.sourceFileHashAlgorithm": "sha256"}'
-            --step updateId.provider=Microsoft updateId.name=SwUpdate updateId.version=1.1
-            --step handler=microsoft/script:1 properties='{"arguments": "--post"}' description="Post-install script"
+        - name: Initialize a bundled update referencing a leaf update as well as defining independent steps. Example
+            optimized for `bash`-like shells.
+          text: |
+            az iot du update init v5 \\
+            --update-provider Microsoft --update-name Bundled --update-version 2.0 \\
+            --compat manufacturer=Contoso model=SpaceStation \\
+            --step handler=microsoft/script:1 properties='{"arguments": "--pre"}' description="Pre-install script" \\
+            --file path=/my/update/scripts/preinstall.sh downloadHandler=microsoft/delta:1 \\
+            --related-file path=/my/update/scripts/related_preinstall.json properties='{"microsoft.sourceFileHashAlgorithm": "sha256"}' \\
+            --step updateId.provider=Microsoft updateId.name=SwUpdate updateId.version=1.1 \\
+            --step handler=microsoft/script:1 properties='{"arguments": "--post"}' description="Post-install script" \\
             --file path=/my/update/scripts/postinstall.sh
 
-        - name: Initialize a bundled update referencing a leaf update as well as defining independent steps. Inline json examples
-            compatible with `powershell`.
-          text: >
-            az iot du update init v5 --update-provider Microsoft --update-name Bundled --update-version 2.0
-            --compat manufacturer=Contoso model=SpaceStation
-            --step handler=microsoft/script:1 properties='{\\"arguments\\": \\"--pre\\"}' description="Pre-install script"
+        - name: Initialize a bundled update referencing a leaf update as well as defining independent steps. Example
+            optimized for `powershell`.
+          text: |
+            az iot du update init v5 `
+            --update-provider Microsoft --update-name Bundled --update-version 2.0 `
+            --compat manufacturer=Contoso model=SpaceStation `
+            --step handler=microsoft/script:1 properties='{\\"arguments\\": \\"--pre\\"}' description="Pre-install script" `
             --file path=/my/update/scripts/preinstall.sh downloadHandler=microsoft/delta:1
-            --related-file path=/my/update/scripts/related_preinstall.json properties='{\\"microsoft.sourceFileHashAlgorithm\\": \\"sha256\\"}'
-            --step updateId.provider=Microsoft updateId.name=SwUpdate updateId.version=1.1
-            --step handler=microsoft/script:1 properties='{\\"arguments": \\"--post\\"}' description="Post-install script"
+            --related-file path=/my/update/scripts/related_preinstall.json properties='{\\"microsoft.sourceFileHashAlgorithm\\": \\"sha256\\"}' `
+            --step updateId.provider=Microsoft updateId.name=SwUpdate updateId.version=1.1 `
+            --step handler=microsoft/script:1 properties='{\\"arguments\\": \\"--post\\"}' description="Post-install script" `
             --file path=/my/update/scripts/postinstall.sh
 
-        - name: Initialize a bundled update referencing a leaf update as well as defining independent steps. Inline json examples
-            compatible with `cmd`.
-          text: >
-            az iot du update init v5 --update-provider Microsoft --update-name Bundled --update-version 2.0
-            --compat manufacturer=Contoso model=SpaceStation
-            --step handler=microsoft/script:1 properties={\\"arguments\\": \\"--pre\\"} description="Pre-install script"
-            --file path=/my/update/scripts/preinstall.sh downloadHandler=microsoft/delta:1
-            --related-file path=/my/update/scripts/related_preinstall.json properties={\\"microsoft.sourceFileHashAlgorithm\\": \\"sha256\\"}
-            --step updateId.provider=Microsoft updateId.name=SwUpdate updateId.version=1.1
-            --step handler=microsoft/script:1 properties={\\"arguments": \\"--post\\"} description="Post-install script"
+        - name: Initialize a bundled update referencing a leaf update as well as defining independent steps. Example
+            optimized for `cmd`.
+          text: |
+            az iot du update init v5 ^
+            --update-provider Microsoft --update-name Bundled --update-version 2.0 ^
+            --compat manufacturer=Contoso model=SpaceStation ^
+            --step handler=microsoft/script:1 properties=\"{\\"arguments\\": \\"--pre\\"}\" description="Pre-install script" ^
+            --file path=/my/update/scripts/preinstall.sh downloadHandler=microsoft/delta:1 ^
+            --related-file path=/my/update/scripts/related_preinstall.json properties=\"{\\"microsoft.sourceFileHashAlgorithm\\": \\"sha256\\"}\" ^
+            --step updateId.provider=Microsoft updateId.name=SwUpdate updateId.version=1.1 ^
+            --step handler=microsoft/script:1 properties=\"{\\"arguments\\": \\"--post\\"}\" description="Post-install script" ^
             --file path=/my/update/scripts/postinstall.sh
     """
 
