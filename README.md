@@ -55,41 +55,45 @@ For usage and help content of any command or command group, pass in the `-h` par
 
 > **Click** a section to expand or collapse
 
-<details>
+<details open>
   <summary>Digital Twins</summary>
 
-```
+```text
 $ az dt -h
+
 Group
     az dt : Manage Azure Digital Twins solutions & infrastructure.
 
 Subgroups:
-    data-history [Preview] : Manage and configure data history.
-    endpoint               : Manage and configure Digital Twins instance endpoints.
-    model                  : Manage DTDL models and definitions on a Digital Twins instance.
-    network                : Manage Digital Twins network configuration including private links and
-                             endpoint connections.
-    role-assignment        : Manage RBAC role assignments for a Digital Twins instance.
-    route                  : Manage and configure event routes.
-    twin                   : Manage and configure the digital twins of a Digital Twins instance.
+    data-history    : Manage and configure data history.
+    endpoint        : Manage and configure Digital Twins instance endpoints.
+    job             : Manage and configure jobs for a digital twin instance.
+    model           : Manage DTDL models and definitions on a Digital Twins instance.
+    network         : Manage Digital Twins network configuration including private links and
+                      endpoint connections.
+    role-assignment : Manage RBAC role assignments for a Digital Twins instance.
+    route           : Manage and configure event routes.
+    twin            : Manage and configure the digital twins of a Digital Twins instance.
 
 Commands:
-    create                 : Create or update a Digital Twins instance.
-    delete                 : Delete an existing Digital Twins instance.
-    list                   : List the collection of Digital Twins instances by subscription or
-                             resource group.
-    reset        [Preview] : Reset an existing Digital Twins instance by deleting
-                             associated assets. Currently only supports deleting models and twins.
-    show                   : Show an existing Digital Twins instance.
-    wait                   : Wait until an operation on an Digital Twins instance is complete.
+    create          : Create or update a Digital Twins instance.
+    delete          : Delete an existing Digital Twins instance.
+    list            : List the collection of Digital Twins instances by subscription or resource
+                      group.
+    reset [Preview] : Reset an existing Digital Twins instance by deleting associated
+                      assets. Currently only supports deleting models and twins.
+    show            : Show an existing Digital Twins instance.
+    wait            : Wait until an operation on an Digital Twins instance is complete.
 ```
+
 </details>
 
-<details open>
+<details>
   <summary>IoT Central</summary>
 
-```
+```text
 $ az iot central -h
+
 Group
     az iot central : Manage IoT Central resources.
         IoT Central is an IoT application platform that reduces the burden and cost of developing,
@@ -99,36 +103,37 @@ Group
         IoT infrastructure.
 
         IoT Central documentation is available at https://aka.ms/iotcentral-documentation
-        Additional information on CLI commands is available at https://aka.ms/azure-cli-iot-ext.
+        Additional information on CLI commands is available at https://aka.ms/azure-cli-iot-ext.    
 
 Subgroups:
-    api-token                    : Manage API tokens for your IoT Central application.
-    app                          : Manage IoT Central applications.
-    device                       : Manage and configure IoT Central devices.
-    device-group       [Preview] : Manage and configure IoT Central device groups.
-    device-template              : Manage and configure IoT Central device templates.
-    diagnostics        [Preview] : Perform application and device level diagnostics.
-    export             [Preview] : Manage and configure IoT Central data exports.
-    file-upload-config [Preview] : Manage and configure IoT Central file upload.
-    job                [Preview] : Manage and configure jobs for an IoT Central
-                                   application.
-    organization       [Preview] : Manage and configure organizations for an IoT Central
-                                   application.
-    role               [Preview] : Manage and configure roles for an IoT Central
-                                   application.
-    user                         : Manage and configure IoT Central users.
+    api-token             : Manage API tokens for your IoT Central application.
+    app                   : Manage IoT Central applications.
+    device                : Manage and configure IoT Central devices.
+    device-group          : Manage and configure IoT Central device groups.
+    device-template       : Manage and configure IoT Central device templates.
+    diagnostics [Preview] : Perform application and device level diagnostics.
+    enrollment-group      : Manage and configure IoT Central enrollment group.
+    export      [Preview] : Manage and configure IoT Central data exports.
+    file-upload-config    : Manage and configure IoT Central file upload.
+    job                   : Manage and configure jobs for an IoT Central application.
+    organization          : Manage and configure organizations for an IoT Central application.      
+    role                  : Manage and configure roles for an IoT Central application.
+    scheduled-job         : Manage and configure IoT Central schedule job.
+    user                  : Manage and configure IoT Central users.
 
 Commands:
-    query              [Preview] : Query device telemetry or property data with IoT Central
-                                   Query Language.
+    query       [Preview] : Query device telemetry or property data with IoT Central Query
+                            Language.
 ```
+
 </details>
 
 <details>
   <summary>IoT Device Provisioning</summary>
 
-```
+```text
 $ az iot dps -h
+
 Group
     az iot dps : Manage entities in an Azure IoT Hub Device Provisioning Service (DPS). Augmented
     with the IoT extension.
@@ -150,13 +155,15 @@ Commands:
     show              : Get the details of an Azure IoT Hub device provisioning service.
     update            : Update an Azure IoT Hub device provisioning service.
 ```
+
 </details>
 
 <details>
   <summary>IoT Edge</summary>
 
-```
+```text
 $ az iot edge -h
+
 Group
     az iot edge : Manage IoT solutions on the Edge.
 
@@ -166,13 +173,15 @@ Subgroups:
 Commands:
     set-modules : Set edge modules on a single device.
 ```
+
 </details>
 
 <details open>
   <summary>IoT Hub</summary>
 
-```
+```text
 $ az iot hub -h
+
 Group
     az iot hub : Manage entities in an Azure IoT Hub.
 
@@ -203,7 +212,7 @@ Commands:
     generate-sas-token                  : Generate a SAS token for a target IoT Hub, device or
                                           module.
     invoke-device-method                : Invoke a device method.
-    invoke-module-method                : Invoke an Edge module method.
+    invoke-module-method                : Invoke a module method.
     list                                : List IoT hubs.
     list-skus                           : List available pricing tiers.
     manual-failover                     : Initiate a manual failover for the IoT Hub to the geo-
@@ -218,6 +227,34 @@ Commands:
     show-stats                          : Get the statistics for an IoT hub.
     update                              : Update metadata for an IoT hub.
 ```
+
+</details>
+
+<details open>
+  <summary>Device Update for IoT Hub</summary>
+
+```text
+$ az iot du -h
+
+Group
+    az iot du : Device Update for IoT Hub is a service that enables you to deploy over-the-air
+    updates (OTA) for your IoT devices.
+        As organizations look to further enable productivity and operational efficiency, Internet of
+        Things (IoT) solutions continue to be adopted at increasing rates. This makes it essential
+        that the devices forming these solutions are built on a foundation of reliability and
+        security and are easy to connect and manage at scale. Device Update for IoT Hub is an end-
+        to-end platform that customers can use to publish, distribute, and manage over-the-air
+        updates for everything from tiny sensors to gateway-level devices.
+        To learn more about the Device Update for IoT Hub service visit
+        https://docs.microsoft.com/en-us/azure/iot-hub-device-update/.
+
+Subgroups:
+    account  : Device Update account management.
+    device   : Device Update device management.
+    instance : Device Update instance management.
+    update   : Device Update update management.
+```
+
 </details>
 
 ## Scenario Automation
