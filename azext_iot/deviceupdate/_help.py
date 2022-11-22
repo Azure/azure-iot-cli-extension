@@ -847,7 +847,7 @@ def load_deviceupdate_help():
           - For cmd inline json format use \"{\\"key\\":\\"value\\"}\" and ^ (caret) for command continuation.
 
         examples:
-        - name: Initialize a minimum content import manifest.
+        - name: Initialize a minimum content import manifest. Inline json optimized for `bash`.
           text: >
             az iot du update init v5
             --update-provider Microsoft --update-name myAptUpdate --update-version 1.0.0
@@ -856,7 +856,26 @@ def load_deviceupdate_help():
             --step handler=microsoft/apt:1 properties='{"installedCriteria": "1.0"}'
             --file path=/my/apt/manifest/file
 
+        - name: Initialize a minimum content import manifest. Inline json optimized for `powershell`.
+          text: >
+            az iot du update init v5
+            --update-provider Microsoft --update-name myAptUpdate --update-version 1.0.0
+            --description "My minimum update"
+            --compat manufacturer=Contoso model=Vacuum
+            --step handler=microsoft/apt:1 properties='{\\"installedCriteria\\": \\"1.0\\"}'
+            --file path=/my/apt/manifest/file
+
+        - name: Initialize a minimum content import manifest. Inline json optimized for `cmd`.
+          text: >
+            az iot du update init v5
+            --update-provider Microsoft --update-name myAptUpdate --update-version 1.0.0
+            --description "My minimum update"
+            --compat manufacturer=Contoso model=Vacuum
+            --step handler=microsoft/apt:1 properties=\"{\\"installedCriteria\\": \\"1.0\\"}\"
+            --file path=/my/apt/manifest/file
+
         - name: Initialize a non-deployable leaf update to be referenced in a bundled update.
+            Inline json optimized for `bash`.
           text: >
             az iot du update init v5
             --update-provider Microsoft --update-name mySwUpdate --update-version 1.1.0
@@ -867,7 +886,7 @@ def load_deviceupdate_help():
             --is-deployable false
 
         - name: Initialize a bundled update referencing a leaf update as well as defining independent steps. Example
-            optimized for `bash`-like shells.
+            optimized for `bash` using command continuation to delineate import manifest segments.
           text: |
             az iot du update init v5 \\
             --update-provider Microsoft --update-name myBundled --update-version 2.0 \\
