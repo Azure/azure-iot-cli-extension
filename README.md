@@ -103,7 +103,7 @@ Group
         IoT infrastructure.
 
         IoT Central documentation is available at https://aka.ms/iotcentral-documentation
-        Additional information on CLI commands is available at https://aka.ms/azure-cli-iot-ext.    
+        Additional information on CLI commands is available at https://aka.ms/azure-cli-iot-ext.
 
 Subgroups:
     api-token             : Manage API tokens for your IoT Central application.
