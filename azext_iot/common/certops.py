@@ -142,7 +142,7 @@ def create_root_certificate(
     key_size: int = 4096,
 ) -> Dict[str, str]:
     key = rsa.generate_private_key(public_exponent=65537, key_size=key_size)
-
+    serial = x509.random_serial_number()
     subject_name = x509.Name(
         [
             x509.NameAttribute(NameOID.COMMON_NAME, subject),
@@ -151,8 +151,10 @@ def create_root_certificate(
 
     # v3_ca extensions
     subject_key_id = x509.SubjectKeyIdentifier.from_public_key(key.public_key())
-    authority_key_id = x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(
-        subject_key_id
+    authority_key_id = x509.AuthorityKeyIdentifier(
+        authority_cert_issuer=[x509.DirectoryName(subject_name)],
+        authority_cert_serial_number=serial,
+        key_identifier=subject_key_id.digest
     )
     basic = x509.BasicConstraints(ca=True, path_length=None)
     key_usage = x509.KeyUsage(
@@ -171,7 +173,7 @@ def create_root_certificate(
         .subject_name(subject_name)
         .issuer_name(subject_name)
         .public_key(key.public_key())
-        .serial_number(x509.random_serial_number())
+        .serial_number(serial)
         .not_valid_before(datetime.datetime.utcnow())
         .not_valid_after(
             datetime.datetime.utcnow() + datetime.timedelta(days=valid_days)
@@ -213,9 +215,12 @@ def create_signed_cert(
     ca_cert = x509.load_pem_x509_certificate(ca_public_key)
 
     # v3 certificate extensions
-    subject_key_id = x509.SubjectKeyIdentifier.from_public_key(private_key.public_key())
-    authority_key_id = x509.AuthorityKeyIdentifier.from_issuer_public_key(
-        ca_cert.public_key()
+    subject_key_id = x509.SubjectKeyIdentifier.from_public_key(ca_key.public_key())
+    auth_subject_key = ca_cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier) or subject_key_id
+    authority_key_id = x509.AuthorityKeyIdentifier(
+        authority_cert_issuer=[x509.DirectoryName(ca_cert.subject)],
+        authority_cert_serial_number=ca_cert.serial_number,
+        key_identifier=auth_subject_key.value.digest
     )
     basic_constraints = x509.BasicConstraints(ca=True, path_length=None)
     key_usage = x509.KeyUsage(

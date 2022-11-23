@@ -8,7 +8,7 @@ from os import makedirs
 from os.path import exists, abspath
 from shutil import rmtree
 from azext_iot.common.certops import (
-    create_self_signed_certificate,
+    create_root_certificate,
     create_signed_cert,
     make_cert_chain,
 )
@@ -29,7 +29,6 @@ from knack.log import get_logger
 from typing import Optional
 from azext_iot.common.shared import (
     DeviceAuthType,
-    SHAHashVersions,
     SdkType,
 )
 from azext_iot.iothub.common import (
@@ -194,11 +193,11 @@ class DeviceIdentityProvider(IoTHubProvider):
                     f"devices '{device_id}' and '{device_parent}'."
                 )
 
-        # Show the tree
+        # Show the device tree
         if visualize:
             tree.show()
 
-        # Delete or verify existing device IDs
+        # Query existing devices
         query_args = ["SELECT deviceId FROM devices"]
         query_method = self.service_sdk.query.get_twins
         existing_devices = _execute_query(query_args, query_method)
@@ -229,6 +228,7 @@ class DeviceIdentityProvider(IoTHubProvider):
             if visualize
             else config.devices
         )
+
         for device in device_iterator:
             device_id = device.device_id
             device_cert_output_directory = None
@@ -249,8 +249,65 @@ class DeviceIdentityProvider(IoTHubProvider):
                 cert_file=device_id,
             )
 
+            device_pk = None
+            device_sk = None
+            # if using x509 device auth
+            if hub_cert_auth:
+                # hub auth cert for device
+                device_hub_cert = create_root_certificate(
+                    subject=device_id,
+                    valid_days=365,
+                )
+                device_pk = signed_device_cert["thumbprint"]
+                device_sk = device_hub_cert["thumbprint"]
+
+            # create device object for service
+            assembled_device = _assemble_device(
+                is_update=False,
+                device_id=device_id,
+                auth_method=config.auth_method,
+                pk=device_pk,
+                sk=device_sk,
+                edge_enabled=True,
+            )
+            # create device identity
+            device_result: Device = self.service_sdk.devices.create_or_update_identity(
+                id=device_id, device=assembled_device
+            )
+
+            # write all device bundle content
             if device_cert_output_directory:
-                # write root cert to device directory
+                if hub_cert_auth:
+                    # hub auth cert
+                    write_content_to_file(
+                        content=device_hub_cert["certificate"],
+                        destination=device_cert_output_directory,
+                        file_name=f"{device_id}.hub-auth-cert.pem",
+                        overwrite=True
+                    )
+                    # hub auth key
+                    write_content_to_file(
+                        content=device_hub_cert["privateKey"],
+                        destination=device_cert_output_directory,
+                        file_name=f"{device_id}.hub-auth-key.pem",
+                        overwrite=True
+                    )
+                else:
+                    device_keys = device_result.authentication.symmetric_key
+                    device_pk = device_keys.primary_key if device_keys else None
+
+                # edge device config
+                create_edge_device_config(
+                    device_id=device_id,
+                    hub_hostname=self.target["entity"],
+                    auth_method=config.auth_method,
+                    default_edge_agent=config.default_edge_agent,
+                    device_config=device_config_dict[device_id],
+                    device_config_path=config.template_config_path,
+                    device_pk=device_pk,
+                    output_path=device_cert_output_directory,
+                )
+                # root cert
                 write_content_to_file(
                     content=config.root_cert["certificate"],
                     destination=device_cert_output_directory,
@@ -285,61 +342,14 @@ class DeviceIdentityProvider(IoTHubProvider):
                     file_name="README.md",
                     overwrite=True,
                 )
-
-            pk = None
-            sk = None
-            # if using x509 device auth
-            if hub_cert_auth:
-                # hub auth cert for device
-                device_hub_cert = create_self_signed_certificate(
-                    subject=device_id,
-                    valid_days=365,
-                    cert_output_dir=device_cert_output_directory,
-                    file_prefix=f"{device_id}.hub-auth",
-                    sha_version=SHAHashVersions.SHA256.value,
-                )
-                pk = signed_device_cert["thumbprint"]
-                sk = device_hub_cert["thumbprint"]
-
-            # create device object for service
-            assembled_device = _assemble_device(
-                is_update=False,
-                device_id=device_id,
-                auth_method=config.auth_method,
-                pk=pk,
-                sk=sk,
-                edge_enabled=True,
-            )
-            # create device identity
-            device_result: Device = self.service_sdk.devices.create_or_update_identity(
-                id=device_id, device=assembled_device
-            )
-
-            device_pk = None
-            if not hub_cert_auth:
-                device_keys = device_result.authentication.symmetric_key
-                device_pk = device_keys.primary_key if device_keys else None
-            if device_cert_output_directory:
-                create_edge_device_config(
-                    device_id=device_id,
-                    hub_hostname=self.target["entity"],
-                    auth_method=config.auth_method,
-                    default_edge_agent=config.default_edge_agent,
-                    device_config=device_config_dict[device_id],
-                    device_config_path=config.template_config_path,
-                    device_pk=device_pk,
-                    output_path=device_cert_output_directory,
-                )
-
-                # zip up
+                # create archive
                 tar_directory(
                     target_directory=device_cert_output_directory,
                     tarfile_path=bundle_output_directory,
                     tarfile_name=device_id,
                     overwrite=True,
                 )
-
-                # delete non-tarred folder
+                # delete uncompressed files
                 rmtree(device_cert_output_directory)
 
         # Give device registry a chance to catch up
@@ -350,7 +360,7 @@ class DeviceIdentityProvider(IoTHubProvider):
         query_method = self.service_sdk.query.get_twins
         all_hub_devices = _execute_query(query_args, query_method)
 
-        # Throw an error if we don't get the same number of desired devices back
+        # Sanity check we got all device scopes
         if len(all_hub_devices) < len(config.devices):
             raise AzureResponseError(
                 "An error occurred - Failed to fetch device scopes for all devices"
@@ -395,7 +405,7 @@ class DeviceIdentityProvider(IoTHubProvider):
                     id=device_id, content=deployment_content
                 )
 
-        # Print device bundle details
+        # Print device bundle details after other visuals
         if bundle_output_directory:
             num_bundles = len(config.devices)
             bundle_plural = '' if num_bundles == 1 else 's'
