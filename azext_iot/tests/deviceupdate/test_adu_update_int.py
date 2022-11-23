@@ -25,7 +25,7 @@ logger = get_logger(__name__)
 
 
 pytestmark = pytest.mark.adu_infrastructure(
-    location="eastus2euap",
+    location="westus2",
     instance_count=1,
     instance_diagnostics=True,
     instance_diagnostics_user_storage=True)
