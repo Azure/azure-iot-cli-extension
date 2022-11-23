@@ -29,6 +29,68 @@ sample_properties = {"property1": "value1", "property2": 2, "property3": {"a": "
         (
             "--update-provider digimaun0 --update-name simpleaptupdate --update-version 1.0.0 "
             "--compat deviceManufacturer=Contoso deviceModel=Vacuum "
+            '--step handler=custom/handler:1 properties=\'{"installedCriteria":"2.0"}\' '
+            f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\"",
+            {
+                "updateId": {"provider": "digimaun0", "name": "simpleaptupdate", "version": "1.0.0"},
+                "compatibility": [
+                    {"deviceManufacturer": "Contoso", "deviceModel": "Vacuum"},
+                ],
+                "instructions": {
+                    "steps": [
+                        {
+                            # Ensures custom handler can be used.
+                            "handler": "custom/handler:1",
+                            "files": ["libcurl4-doc-apt-manifest.json"],
+                            "handlerProperties": {"installedCriteria": "2.0"},
+                            "type": "inline",
+                        }
+                    ]
+                },
+                "files": [
+                    {
+                        "filename": "libcurl4-doc-apt-manifest.json",
+                        "sizeInBytes": 163,
+                        "hashes": {"sha256": "iFWTIaxp33tf5BR1w0fMmnnHpjsUjLRQ9eZFjw74LbU="},
+                    }
+                ],
+                "manifestVersion": "5.0",
+            },
+        ),
+        (
+            "--update-provider digimaun0 --update-name simpleaptupdate --update-version 1.0.0 "
+            "--compat deviceManufacturer=Contoso deviceModel=Vacuum "
+            '--step handler=microsoft/apt:1 properties=\'{"installedCriteria":"2.0"}\' '
+            f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\"",
+            {
+                "updateId": {"provider": "digimaun0", "name": "simpleaptupdate", "version": "1.0.0"},
+                "compatibility": [
+                    {"deviceManufacturer": "Contoso", "deviceModel": "Vacuum"},
+                ],
+                "instructions": {
+                    "steps": [
+                        {
+                            # Tests that user input installedCriteria does not get clobbered.
+                            "handler": "microsoft/apt:1",
+                            "files": ["libcurl4-doc-apt-manifest.json"],
+                            "handlerProperties": {"installedCriteria": "2.0"},
+                            "type": "inline",
+                        }
+                    ]
+                },
+                "files": [
+                    {
+                        "filename": "libcurl4-doc-apt-manifest.json",
+                        "sizeInBytes": 163,
+                        "hashes": {"sha256": "iFWTIaxp33tf5BR1w0fMmnnHpjsUjLRQ9eZFjw74LbU="},
+                    }
+                ],
+                "manifestVersion": "5.0",
+            },
+        ),
+        (
+            "--update-provider digimaun0 --update-name simpleaptupdate --update-version 1.0.0 "
+            "--compat deviceManufacturer=Contoso deviceModel=Vacuum "
             "--compat deviceManufacturer=Contoso deviceModel=Radio "
             "--step handler=microsoft/apt:1 "
             f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\"",
@@ -39,7 +101,15 @@ sample_properties = {"property1": "value1", "property2": 2, "property3": {"a": "
                     {"deviceManufacturer": "Contoso", "deviceModel": "Radio"},
                 ],
                 "instructions": {
-                    "steps": [{"handler": "microsoft/apt:1", "files": ["libcurl4-doc-apt-manifest.json"], "type": "inline"}]
+                    # handlerProperties.installedCriteria has been added automatically for specific content handlers.
+                    "steps": [
+                        {
+                            "handler": "microsoft/apt:1",
+                            "files": ["libcurl4-doc-apt-manifest.json"],
+                            "handlerProperties": {"installedCriteria": "1.0"},
+                            "type": "inline",
+                        }
+                    ]
                 },
                 "files": [
                     {
@@ -71,6 +141,7 @@ sample_properties = {"property1": "value1", "property2": 2, "property3": {"a": "
                 "instructions": {
                     "steps": [
                         {
+                            # handlerProperties.installedCriteria not required/auto-added for microsoft/script:1
                             "handler": "microsoft/script:1",
                             "files": ["libcurl4-doc-apt-manifest.json", "action.sh"],
                             "type": "inline",
@@ -110,7 +181,7 @@ sample_properties = {"property1": "value1", "property2": 2, "property3": {"a": "
         (
             "--update-provider digimaun1 --update-name Microphone --update-version 2.0.0 "
             "--compat deviceManufacturer=Contoso deviceModel=Microphone "
-            "--step handler=microsoft/swupdate:1 "
+            '--step handler=microsoft/swupdate:1 properties=\'{"arguments": "--pre"}\' '
             f"--file path=\"{get_context_path(__file__, 'manifests', 'surface15', 'action.sh')}\" "
             f"--file path=\"{get_context_path(__file__, 'manifests', 'surface15', 'install.sh')}\" "
             "--is-deployable false",
@@ -120,7 +191,15 @@ sample_properties = {"property1": "value1", "property2": 2, "property3": {"a": "
                     {"deviceManufacturer": "Contoso", "deviceModel": "Microphone"},
                 ],
                 "instructions": {
-                    "steps": [{"handler": "microsoft/swupdate:1", "files": ["action.sh", "install.sh"], "type": "inline"}]
+                    "steps": [
+                        {
+                            # Ensures handlerProperties addition is merged with existing input.
+                            "handler": "microsoft/swupdate:1",
+                            "handlerProperties": {"installedCriteria": "1.0", "arguments": "--pre"},
+                            "files": ["action.sh", "install.sh"],
+                            "type": "inline",
+                        }
+                    ]
                 },
                 "files": [
                     {
@@ -207,6 +286,140 @@ sample_properties = {"property1": "value1", "property2": 2, "property3": {"a": "
                         "sizeInBytes": 33,
                         "hashes": {"sha256": "n+KGjLjSGr7LVKsgWiExUDeU6Z2ZTJu0tpAWxkmYKxA="},
                     },
+                ],
+                "manifestVersion": "5.0",
+            },
+        ),
+        (
+            "--update-provider digimaun0 --update-name swupdatev2 --update-version 0.1 "
+            "--compat manufacturer=Contoso model=Vacuum "
+            "--step handler=microsoft/swupdate:2 "
+            f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\" "
+            f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\" "
+            f"--related-file path=\"{get_context_path(__file__, 'manifests', 'surface15', 'action.sh')}\" "
+            f"--related-file path=\"{get_context_path(__file__, 'manifests', 'surface15', 'action.sh')}\" ",
+            {
+                "updateId": {"provider": "digimaun0", "name": "swupdatev2", "version": "0.1"},
+                "compatibility": [
+                    {"manufacturer": "Contoso", "model": "Vacuum"},
+                ],
+                "instructions": {
+                    # handlerProperties.installedCriteria has been added automatically for specific content handlers.
+                    "steps": [
+                        {
+                            "handler": "microsoft/swupdate:2",
+                            # Duplicate file names should not exist in same step{}.
+                            "files": ["libcurl4-doc-apt-manifest.json"],
+                            "handlerProperties": {"installedCriteria": "1.0"},
+                            "type": "inline",
+                        }
+                    ]
+                },
+                "files": [
+                    # Duplicate file names should not exist in files[].
+                    {
+                        "filename": "libcurl4-doc-apt-manifest.json",
+                        "sizeInBytes": 163,
+                        "hashes": {"sha256": "iFWTIaxp33tf5BR1w0fMmnnHpjsUjLRQ9eZFjw74LbU="},
+                        "relatedFiles": [
+                            # Duplicated related file names should not exist in relatedFiles[]
+                            {
+                                "filename": "action.sh",
+                                "sizeInBytes": 33,
+                                "hashes": {"sha256": "n+KGjLjSGr7LVKsgWiExUDeU6Z2ZTJu0tpAWxkmYKxA="},
+                            },
+                        ],
+                    }
+                ],
+                "manifestVersion": "5.0",
+            },
+        ),
+        (
+            "--update-provider digimaun0 --update-name swupdatev2 --update-version 0.1 "
+            "--compat manufacturer=Contoso model=Vacuum "
+            "--step handler=microsoft/swupdate:2 "
+            f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\" "
+            "--step handler=microsoft/swupdate:2 "
+            f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\" ",
+            {
+                "updateId": {"provider": "digimaun0", "name": "swupdatev2", "version": "0.1"},
+                "compatibility": [
+                    {"manufacturer": "Contoso", "model": "Vacuum"},
+                ],
+                "instructions": {
+                    # handlerProperties.installedCriteria has been added automatically for specific content handlers.
+                    "steps": [
+                        {
+                            "handler": "microsoft/swupdate:2",
+                            "files": ["libcurl4-doc-apt-manifest.json"],
+                            "handlerProperties": {"installedCriteria": "1.0"},
+                            "type": "inline",
+                        },
+                        {
+                            "handler": "microsoft/swupdate:2",
+                            "files": ["libcurl4-doc-apt-manifest.json"],
+                            "handlerProperties": {"installedCriteria": "1.0"},
+                            "type": "inline",
+                        },
+                    ]
+                },
+                "files": [
+                    # Duplicate file names should not exist in files[].
+                    {
+                        "filename": "libcurl4-doc-apt-manifest.json",
+                        "sizeInBytes": 163,
+                        "hashes": {"sha256": "iFWTIaxp33tf5BR1w0fMmnnHpjsUjLRQ9eZFjw74LbU="},
+                    }
+                ],
+                "manifestVersion": "5.0",
+            },
+        ),
+        (
+            "--update-provider digimaun0 --update-name swupdatev2 --update-version 0.1 "
+            "--compat manufacturer=Contoso model=Vacuum "
+            "--compat ring=0 tier=test "
+            "--step handler=microsoft/swupdate:2 "
+            f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\" "
+            "--step handler=microsoft/swupdate:2 "
+            f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\" "
+            f"--related-file path=\"{get_context_path(__file__, 'manifests', 'surface15', 'parent.importmanifest.json')}\" ",
+            {
+                "updateId": {"provider": "digimaun0", "name": "swupdatev2", "version": "0.1"},
+                "compatibility": [
+                    {"manufacturer": "Contoso", "model": "Vacuum"},
+                    {"ring": "0", "tier": "test"},
+                ],
+                "instructions": {
+                    # handlerProperties.installedCriteria has been added automatically for specific content handlers.
+                    "steps": [
+                        {
+                            "handler": "microsoft/swupdate:2",
+                            "files": ["libcurl4-doc-apt-manifest.json"],
+                            "handlerProperties": {"installedCriteria": "1.0"},
+                            "type": "inline",
+                        },
+                        {
+                            "handler": "microsoft/swupdate:2",
+                            "files": ["libcurl4-doc-apt-manifest.json"],
+                            "handlerProperties": {"installedCriteria": "1.0"},
+                            "type": "inline",
+                        },
+                    ]
+                },
+                "files": [
+                    # Duplicate file names should not exist in files[], but last --file with same name wins.
+                    {
+                        "filename": "libcurl4-doc-apt-manifest.json",
+                        "sizeInBytes": 163,
+                        "hashes": {"sha256": "iFWTIaxp33tf5BR1w0fMmnnHpjsUjLRQ9eZFjw74LbU="},
+                        "relatedFiles": [
+                            {
+                                "filename": "parent.importmanifest.json",
+                                "sizeInBytes": 1390,
+                                "hashes": {"sha256": "hos1UvCk66WmtL/SPNUmub+k302BM4gtWYtAF7tOCb4="},
+                            }
+                        ],
+                    }
                 ],
                 "manifestVersion": "5.0",
             },
@@ -300,6 +513,22 @@ def test_adu_manifest_init_v5_invalid_path_required(options):
             f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\" "
             "downloadHandler=abc",
             True,
+        ),
+        (
+            # If content handler starts with microsoft (case-insensitive) enforce valid value.
+            "--update-provider digimaun --update-name invalid --update-version 1.0 "
+            "--compat deviceManufacturer=Contoso deviceModel=Vacuum "
+            "--step handler=microsoft/fake:1 "
+            f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\" ",
+            False,
+        ),
+        (
+            # Same as prior test case but ensure escape hatch with --no-validation
+            "--update-provider digimaun --update-name invalid --update-version 1.0 "
+            "--compat deviceManufacturer=Contoso deviceModel=Vacuum "
+            "--step handler=microsoft/fake:1 "
+            f"--file path=\"{get_context_path(__file__, 'manifests', 'libcurl4-doc-apt-manifest.json')}\" ",
+            False,
         ),
     ],
 )
