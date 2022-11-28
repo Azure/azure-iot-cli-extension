@@ -49,6 +49,9 @@ unreleased
 * The in-preview `az iot device-update update init calculate-hash` command moved to `az iot du update calculate-hash`.
 * Introducing the preview `az iot du update stage` command. The update stage command is designed to automate
   the pre-requisite steps of importing an update. Read the command reference to learn more.
+* Adds the `--set-du-principal-role` flag for the `az iot du instance create` command. When enabled the client
+  will automatically assign the "Azure Device Update" service principal the role of "IoT Hub Data Contributor" against the
+  on create IoT Hub scope(s).
 
 **General updates**
 

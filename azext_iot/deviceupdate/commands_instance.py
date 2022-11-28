@@ -26,11 +26,21 @@ def create_instance(
     storage_resource_id: Optional[str] = None,
     tags: Optional[dict] = None,
     resource_group_name: Optional[str] = None,
+    set_du_principal: Optional[bool] = None,
 ):
     instance_manager = DeviceUpdateInstanceManager(cmd=cmd)
     target_container = instance_manager.find_account(target_name=name, target_rg=resource_group_name)
     # @digimaun - the location of an instance must be the same as the account container.
     location = target_container.account.location
+
+    if set_du_principal:
+        from azext_iot.deviceupdate.common import AUTH_RESOURCE_ID
+        for scope in iothub_resource_ids:
+            instance_manager.assign_msi_scope(
+                principal_id=AUTH_RESOURCE_ID,
+                scope=scope,
+                role="IoT Hub Data Contributor",
+                use_basic_assignee=True)
 
     instance = DeviceUpdateMgmtModels.Instance(
         location=location,

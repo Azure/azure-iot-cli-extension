@@ -176,10 +176,14 @@ class DeviceUpdateAccountManager(DeviceUpdateClientHandler):
         scope: str,
         principal_type: str = "ServicePrincipal",
         role: str = "Contributor",
+        use_basic_assignee: bool = False,
     ) -> dict:
+        assignee_arguments = f"--assignee-object-id '{principal_id}' --assignee-principal-type '{principal_type}'"
+        if use_basic_assignee:
+            assignee_arguments = f"--assignee '{principal_id}'"
+
         assign_op = self.cli.invoke(
-            f"role assignment create --scope '{scope}' --role '{role}' --assignee-object-id '{principal_id}' "
-            f"--assignee-principal-type '{principal_type}'"
+            f"role assignment create --scope '{scope}' --role '{role}' {assignee_arguments}"
         )
         if not assign_op.success():
             raise CLIInternalError(f"Failed to assign '{principal_id}' the role of '{role}' against scope '{scope}'.")

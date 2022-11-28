@@ -8,6 +8,7 @@ import pytest
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.settings import DynamoSettings
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.deviceupdate.common import AUTH_RESOURCE_ID
 from typing import List, Tuple, Optional, Dict, Any
 from knack.log import get_logger
 
@@ -23,6 +24,7 @@ settings = DynamoSettings(req_env_set=REQUIRED_TEST_ENV_VARS)
 ACCOUNT_RG = settings.env.azext_iot_testrg
 VALID_IDENTITY_MAP = {"system": 1, "user": 1}
 DEFAULT_ADU_RBAC_SLEEP_SEC = 105
+EXPECTED_DU_SP_ROLE = "IoT Hub Data Contributor"
 
 # Manifest v4 will work with deviceUpdateModel;[1|2] but v5 only with deviceUpdateModel;2
 ADU_CLIENT_DTMI = "dtmi:azure:iot:deviceUpdateModel;2"
@@ -246,6 +248,8 @@ def _instance_provisioner(request, provisioned_accounts: dict, provisioned_iothu
     acct_marker = request.node.get_closest_marker("adu_infrastructure")
     desired_instance_diagnostics = None
     desired_instance_diagnostics_user_storage = None
+    desired_set_du_principal_role = None
+
     result_map = {}
 
     base_create_command = "iot du instance create "
@@ -253,6 +257,7 @@ def _instance_provisioner(request, provisioned_accounts: dict, provisioned_iothu
     if acct_marker:
         desired_instance_diagnostics = acct_marker.kwargs.get("instance_diagnostics", False)
         desired_instance_diagnostics_user_storage = acct_marker.kwargs.get("instance_diagnostics_user_storage")
+        desired_set_du_principal_role = acct_marker.kwargs.get("set_du_principal_role")
 
     if desired_instance_diagnostics:
         base_create_command = base_create_command + " --enable-diagnostics"
@@ -260,6 +265,9 @@ def _instance_provisioner(request, provisioned_accounts: dict, provisioned_iothu
             target_storage = provisioned_accounts.get("storage")
             if target_storage:
                 base_create_command = base_create_command + f" --diagnostics-storage-id {target_storage['id']}"
+
+    if desired_set_du_principal_role:
+        base_create_command = base_create_command + " --set-du-principal-role"
 
     for acct_name in provisioned_accounts["accounts"]:
         for hub_id in provisioned_iothubs:
@@ -282,6 +290,9 @@ def _instance_provisioner(request, provisioned_accounts: dict, provisioned_iothu
                 assert target_instance["diagnosticStorageProperties"]["resourceId"] == target_storage["id"]
             else:
                 assert target_instance["diagnosticStorageProperties"] is None
+            if desired_set_du_principal_role:
+                _validate_du_role(scope=hub_id, role=EXPECTED_DU_SP_ROLE)
+
             if acct_name in result_map:
                 result_map[acct_name][target_instance_name] = target_instance
             else:
@@ -364,3 +375,8 @@ def _storage_removal(storage_account: dict):
     delete_result = cli.invoke(f"storage account delete -g {ACCOUNT_RG} -n {storage_account['name']} -y")
     if not delete_result.success():
         logger.error(f"Failed to delete storage account resource {storage_account['name']}.")
+
+
+def _validate_du_role(scope: str, role: str):
+    role_assignments = cli.invoke(f"role assignment list --scope '{scope}' --role '{role}'").as_json()
+    assert AUTH_RESOURCE_ID in [r['principalName'] for r in role_assignments]

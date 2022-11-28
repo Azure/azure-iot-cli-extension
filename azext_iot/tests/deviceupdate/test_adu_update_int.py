@@ -28,7 +28,9 @@ pytestmark = pytest.mark.adu_infrastructure(
     location="westus2",
     instance_count=1,
     instance_diagnostics=True,
-    instance_diagnostics_user_storage=True)
+    instance_diagnostics_user_storage=True,
+    set_du_principal_role=True,
+)
 
 
 def test_instance_update_lifecycle(provisioned_instances_module: Dict[str, dict]):
