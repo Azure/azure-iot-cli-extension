@@ -1197,7 +1197,8 @@ helps[
             IoT Device Provisioning Service '{dps_name}' in the resource group
             '{resource_group_name}' with provisioning status 'disabled',
             device id '{device_id}', initial twin properties '{"location":{"region":"US"}}',
-            initial twin tags '{"version":"1"}', and device information '{"color":"red"}'.
+            initial twin tags '{"version":"1"}', and device information '{"color":"red"}'
+            Please provide certificate format using Base64 ASCII encoding and the certificate should start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----''.
       text: >
         az iot dps enrollment create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --attestation-type x509
@@ -1249,6 +1250,7 @@ helps[
     examples:
     - name: Update enrollment '{enrollment_id}' with a new x509 certificate in the Azure IoT
             Device Provisioning Service '{dps_name}' in the resource group '{resource_group_name}'.
+            Please provide certificate format using Base64 ASCII encoding and the certificate should start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----''
       text: >
         az iot dps enrollment update -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --certificate-path /certificates/NewCertificate.pem
@@ -1354,7 +1356,8 @@ helps[
     short-summary: Create an enrollment group in an Azure IoT Hub Device Provisioning Service.
     examples:
     - name: Create an enrollment group '{enrollment_id}' in the Azure IoT provisioning service
-            '{dps_name}' in the resource group '{resource_group_name} using an intermediate certificate as primary certificate'.
+            '{dps_name}' in the resource group '{resource_group_name} using an intermediate certificate as primary certificate.
+            Please provide certificate format using Base64 ASCII encoding and the certificate should start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----''.
       text: >
         az iot dps enrollment-group create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --certificate-path /certificates/Certificate.pem
@@ -1368,7 +1371,8 @@ helps[
             'MyDps' in the resource group '{resource_group_name}' with provisioning status
             'enabled', initial twin properties
             '{"location":{"region":"US"}}' and initial twin tags '{"version_dps":"1"}'
-            using an intermediate certificate as primary certificate'.
+            using an intermediate certificate as primary certificate'
+            Please provide certificate format using Base64 ASCII encoding and the certificate should start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----''.
       text: >
         az iot dps enrollment-group create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --certificate-path /certificates/Certificate.pem
@@ -1401,7 +1405,8 @@ helps[
         --initial-twin-tags "{'version_dps':'2'}" --etag AAAAAAAAAAA=
     - name: Update enrollment group '{enrollment_id}' in the Azure IoT provisioning service '{dps_name}'
             in the resource group '{resource_group_name}' with new primary intermediate certificate
-            and remove existing secondary intermediate certificate.
+            and remove existing secondary intermediate certificate
+            Please provide certificate format using Base64 ASCII encoding and the certificate should start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----''.
       text: >
         az iot dps enrollment-group update -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --certificate-path /certificates/NewCertificate.pem

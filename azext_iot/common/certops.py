@@ -102,6 +102,51 @@ def create_self_signed_certificate(
     return result
 
 
+def isBase64(content: str) -> bool:
+    """
+    Checks if certificant content should be valid base64 string without prefix and suffix
+
+    Args:
+        content (str): certificant content without prefix and suffix.
+
+    Returns:
+        isBase64 (bool): returns where the certificant content is valid base64 value.
+    """
+    try:
+        sb_bytes = bytes(content, "ascii")
+        base64.b64decode(sb_bytes)
+        return True
+    except Exception:
+        return False
+
+
+def getCertificateFormatValidation(certificate: str) -> str:
+    """
+    Checks if the certificate format is valid
+    1. start with -----BEGIN CERTIFICATE----- (prefix)
+    2. end with -----END CERTIFICATE----- (suffix)
+    3. content should be valid base64 string without prefix and suffix
+
+    Args:
+        certificate (str): certificate string.
+
+    Returns:
+        validation string (str): returns validation string when content format is incorrect.
+    """
+    if (
+        certificate.find("-----BEGIN CERTIFICATE-----") != -1
+        and certificate.find("-----END CERTIFICATE-----") != -1
+    ):
+        certificate = certificate.replace("-----BEGIN CERTIFICATE-----", "")
+        certificate = certificate.replace("-----END CERTIFICATE-----", "")
+        if isBase64(certificate):
+            return ""
+        else:
+            return "The certificate content is not a valid base64 string value"
+    else:
+        return "The certificate should start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----'"
+
+
 def open_certificate(certificate_path: str) -> str:
     """
     Opens certificate file (as read binary) from the file system and
@@ -114,14 +159,14 @@ def open_certificate(certificate_path: str) -> str:
         certificate (str): returns utf-8 encoded value from certificate file.
     """
     certificate = ""
-    if certificate_path.endswith(".pem") or certificate_path.endswith(".cer"):
-        with open(certificate_path, "rb") as cert_file:
-            certificate = cert_file.read()
-            try:
-                certificate = certificate.decode("utf-8")
-            except UnicodeError:
-                certificate = base64.b64encode(certificate).decode("utf-8")
-    else:
-        raise ValueError("Certificate file type must be either '.pem' or '.cer'.")
+    with open(certificate_path, "rb") as cert_file:
+        certificate = cert_file.read()
+        try:
+            certificate = certificate.decode("utf-8")
+        except UnicodeError:
+            certificate = base64.b64encode(certificate).decode("utf-8")
+        validationString = getCertificateFormatValidation(certificate)
+        if validationString != "":
+            raise ValueError(validationString)
     # Remove trailing white space from the certificate content
     return certificate.rstrip()
