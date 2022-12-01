@@ -115,9 +115,9 @@ def isBase64(content: str) -> bool:
     try:
         sb_bytes = bytes(content, "ascii")
         base64.b64decode(sb_bytes)
-        return True
     except Exception:
         return False
+    return True
 
 
 def getCertificateFormatValidation(certificate: str) -> str:
