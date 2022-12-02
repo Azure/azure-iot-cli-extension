@@ -239,6 +239,7 @@ def manifest_init_v5(
     from pathlib import PurePath
     from azure.cli.core.azclierror import ArgumentUsageError, InvalidArgumentValueError
     from azext_iot.deviceupdate.common import FP_HANDLERS, FP_HANDLERS_REQUIRE_CRITERIA
+    from azext_iot.deviceupdate.providers.utility import parse_manifest_json
 
     def _sanitize_safe_params(safe_params: list, keep: list) -> list:
         """
@@ -344,11 +345,7 @@ def manifest_init_v5(
                 step["files"] = derived_step_files
 
             if "properties" in assembled_step and assembled_step["properties"]:
-                step["handlerProperties"] = json.loads(assembled_step["properties"])
-                if not isinstance(step["handlerProperties"], dict):
-                    raise InvalidArgumentValueError(
-                        f"handlerProperties must be an object, parsed type: {type(step['handlerProperties'])}"
-                    )
+                step["handlerProperties"] = parse_manifest_json(assembled_step["properties"], "handlerProperties")
 
             if step["handler"] in FP_HANDLERS_REQUIRE_CRITERIA:
                 if not no_validation:
@@ -394,7 +391,7 @@ def manifest_init_v5(
             processed_file["sizeInBytes"] = assembled_file_metadata.bytes
 
             if "properties" in assembled_file and assembled_file["properties"]:
-                processed_file["properties"] = json.loads(assembled_file["properties"])
+                processed_file["properties"] = parse_manifest_json(assembled_file["properties"], "properties")
 
             if "downloadHandler" in assembled_file and assembled_file["downloadHandler"]:
                 processed_file["downloadHandler"] = {"id": assembled_file["downloadHandler"]}
@@ -415,7 +412,7 @@ def manifest_init_v5(
                 processed_related_file["sizeInBytes"] = related_file_metadata.bytes
 
                 if "properties" in assembled_related_file and assembled_related_file["properties"]:
-                    processed_related_file["properties"] = json.loads(assembled_related_file["properties"])
+                    processed_related_file["properties"] = parse_manifest_json(assembled_related_file["properties"], "properties")
 
                 if processed_related_file:
                     processed_related_files_map[processed_related_file["filename"]] = processed_related_file
