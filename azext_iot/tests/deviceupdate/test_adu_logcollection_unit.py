@@ -7,14 +7,16 @@
 import json
 import re
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
 
 import pytest
 import responses
 from requests import PreparedRequest
 
 from azext_iot.deviceupdate import commands_log as subject
-from azext_iot.tests.deviceupdate.conftest import mock_account_id, mock_instance_id
+from azext_iot.sdk.deviceupdate.dataplane._serialization import Model
+from azext_iot.tests.deviceupdate.conftest import (mock_account_id,
+                                                   mock_instance_id)
 from azext_iot.tests.generators import generate_generic_id
 
 existing_mock_collection_id = generate_generic_id()
@@ -56,7 +58,6 @@ class TestAduLogCollection(object):
         return (200, headers, json.dumps({"value": response_payload}))
 
     def log_show_callback(self, request: PreparedRequest):
-        import pdb; pdb.set_trace()
         headers = {"Content-Type": "application/json; charset=utf-8"}
         if "/detailedStatus?" in request.path_url:
             detailed_log = self.gen_arbitrary_log(operation_id=existing_mock_collection_id)
@@ -155,12 +156,7 @@ class TestAduLogCollection(object):
         )
         assert result
         for r in result:
-            assert r.log_collection_id
-            assert r.device_list
-            assert r.description
-            assert r.created_date_time
-            assert r.last_action_date_time
-            assert r.status
+            assert_common_log_model_attributes(r)
 
     def test_adu_show_device_log_collection(
         self,
@@ -175,8 +171,15 @@ class TestAduLogCollection(object):
             instance_name=mock_instance_id,
             log_collection_id=existing_mock_collection_id
         )
-        #assert_common_log_attributes(show_result.serialize())
-        #import pdb; pdb.set_trace()
+        assert_common_log_model_attributes(show_result)
+
+    def test_adu_show_detailed_device_log_collection(
+        self,
+        fixture_cmd,
+        discovery_client,
+        profile_mock,
+        service_client,
+    ):
         show_detailed_result = subject.show_log_collection(
             cmd=fixture_cmd,
             name=mock_account_id,
@@ -184,11 +187,10 @@ class TestAduLogCollection(object):
             log_collection_id=existing_mock_collection_id,
             detailed_status=True,
         )
-        #import pdb; pdb.set_trace()
-        #assert_common_log_attributes(show_detailed_result.serialize(), True)
+        assert_common_log_object_attributes(show_detailed_result.serialize(), True)
 
 
-def assert_common_log_attributes(serialized_log_object: dict, detailed: bool = False):
+def assert_common_log_object_attributes(serialized_log_object: dict, detailed: bool = False):
     assert serialized_log_object["operationId"]
     assert serialized_log_object["createdDateTime"]
     assert serialized_log_object["lastActionDateTime"]
@@ -202,3 +204,12 @@ def assert_common_log_attributes(serialized_log_object: dict, detailed: bool = F
         assert serialized_log_object["deviceStatus"][0]["logLocation"]
     else:
         assert serialized_log_object["deviceList"]
+
+
+def assert_common_log_model_attributes(serialized_log_model: Model):
+    assert serialized_log_model.log_collection_id
+    assert serialized_log_model.device_list
+    assert serialized_log_model.description
+    assert serialized_log_model.created_date_time
+    assert serialized_log_model.last_action_date_time
+    assert serialized_log_model.status
