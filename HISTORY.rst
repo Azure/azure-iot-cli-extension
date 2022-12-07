@@ -19,7 +19,10 @@ unreleased
   a default value will be automatically added with a warning.
 * If the inline step content handler starts with 'microsoft' (case-insensitive), valid first-party handler values
   will be enforced.
+  
+**IoT Central updates**
 
+* Fixed an issue with enrollement group certificate encoding 
 
 0.18.1
 +++++++++++++++
