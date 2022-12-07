@@ -845,6 +845,10 @@ def load_deviceupdate_help():
           - For bash inline json format use '{"key":"value"}' and \\ (backslash) for command continuation.
           - For powershell inline json format use '{\\"key\\":\\"value\\"}' and ` (tilde) for command continuation.
           - For cmd inline json format use \"{\\"key\\":\\"value\\"}\" and ^ (caret) for command continuation.
+          - For file based json input use "@/path/to/file". File based input avoids shell quotation issues.
+
+          For a detailed explanation of shell quoting rules please goto
+            https://learn.microsoft.com/en-us/cli/azure/use-cli-effectively
 
         examples:
         - name: Initialize a minimum content import manifest. Inline json optimized for `bash`.
@@ -872,6 +876,15 @@ def load_deviceupdate_help():
             --description "My minimum update"
             --compat manufacturer=Contoso model=Vacuum
             --step handler=microsoft/apt:1 properties=\"{\\"installedCriteria\\": \\"1.0\\"}\"
+            --file path=/my/apt/manifest/file
+
+        - name: Initialize a minimum content import manifest. Use file input for json.
+          text: >
+            az iot du update init v5
+            --update-provider Microsoft --update-name myAptUpdate --update-version 1.0.0
+            --description "My minimum update"
+            --compat manufacturer=Contoso model=Vacuum
+            --step handler=microsoft/apt:1 properties="@/path/to/file"
             --file path=/my/apt/manifest/file
 
         - name: Initialize a non-deployable leaf update to be referenced in a bundled update.

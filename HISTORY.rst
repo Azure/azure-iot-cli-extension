@@ -13,13 +13,25 @@ unreleased
 
 `az iot du update init v5` improvements:
 
-* Fixed an issue where duplicate `files[]`/`relatedFiles[]`` entries were created via multiple usage of --file or 
+* Fixed an issue where duplicate `files[]` / `relatedFiles[]` entries were created via multiple usage of --file or 
   --related-file against the same update file asset.
 * If the inline step content handler requires `handlerProperties.installedCriteria` and a value was not provided,
   a default value will be automatically added with a warning.
 * If the inline step content handler starts with 'microsoft' (case-insensitive), valid first-party handler values
   will be enforced.
-  
+* Inline json rules and examples provided for every shell.
+* Improves error handling for free-form json properties.
+
+**Digital Twins**
+
+* New command group `az dt identity` to easily manage instance identities.
+* `az dt create` supports adding user-managed identities on create.
+* `az dt endpoint create <type>` commands support identity parameters - you are able to leverage managed identities
+  to integrate with the target endpoint.
+  * The `eventgrid` endpoint does not support managed identities.
+* Resource group for endpoint resources are no longer required - if not present, the resource group of the
+  digital twins instance is used.
+
 **IoT Central updates**
 
 * Fixed an issue with enrollement group certificate encoding 

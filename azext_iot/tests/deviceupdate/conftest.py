@@ -4,12 +4,18 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
+import re
+import sys
+from typing import Any, Dict, List, Optional, Tuple
+
 import pytest
-from azext_iot.common.embedded_cli import EmbeddedCLI
-from azext_iot.tests.settings import DynamoSettings
-from azext_iot.tests.generators import generate_generic_id
-from typing import List, Tuple, Optional, Dict, Any
+import responses
 from knack.log import get_logger
+
+from azext_iot.common.embedded_cli import EmbeddedCLI
+from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests.settings import DynamoSettings
 
 logger = get_logger(__name__)
 
@@ -90,9 +96,7 @@ def _account_provisioner(request, provisioned_storage: dict) -> Tuple[dict, List
         desired_location = acct_marker.kwargs.get("location")
         desired_tags = acct_marker.kwargs.get("tags")
         desired_count = acct_marker.kwargs.get("count", 1)
-        desired_public_network_access = acct_marker.kwargs.get(
-            "public_network_access"
-        )
+        desired_public_network_access = acct_marker.kwargs.get("public_network_access")
         desired_identity = acct_marker.kwargs.get("identity")
         desired_role = acct_marker.kwargs.get("role")
         desired_sku = acct_marker.kwargs.get("sku")
@@ -108,13 +112,11 @@ def _account_provisioner(request, provisioned_storage: dict) -> Tuple[dict, List
     if desired_sku:
         base_create_command = base_create_command + f" --sku {desired_sku}"
 
-    base_create_command, user_identities, system_identity = _process_identity(
-        base_create_command, desired_identity
-    )
+    base_create_command, user_identities, system_identity = _process_identity(base_create_command, desired_identity)
 
     desired_scope = None
     if system_identity and provisioned_storage:
-        desired_scope = provisioned_storage['id']
+        desired_scope = provisioned_storage["id"]
         base_create_command = base_create_command + f" --scopes {desired_scope}"
         if desired_role:
             base_create_command = base_create_command + f" --role '{desired_role}'"
@@ -202,9 +204,7 @@ def _account_removal(request, accounts: dict, user_identities: Optional[List[dic
         logger.error(clean_up_error)
 
 
-def _process_identity(
-    base_command: str, identity_request: str
-) -> Tuple[str, List[dict], bool]:
+def _process_identity(base_command: str, identity_request: str) -> Tuple[str, List[dict], bool]:
     user_id_result: List[dict] = []
     system_processed = False
     if not identity_request:
@@ -214,11 +214,7 @@ def _process_identity(
     for id in split_identities:
         if id in split_identities:
             if id == "user":
-                user_id_result.append(
-                    cli.invoke(
-                        f"identity create -n {generate_useridentity_id()} -g {ACCOUNT_RG}"
-                    ).as_json()
-                )
+                user_id_result.append(cli.invoke(f"identity create -n {generate_useridentity_id()} -g {ACCOUNT_RG}").as_json())
             elif id == "system" and not system_processed:
                 system_processed = True
 
@@ -271,7 +267,7 @@ def _instance_provisioner(request, provisioned_accounts: dict, provisioned_iothu
             target_instance = instance_create_result.as_json()
             assert target_instance["name"] == target_instance_name
             assert target_instance["provisioningState"] == "Succeeded"
-            instance_hub_ids = [hub['resourceId'] for hub in target_instance["iotHubs"]]
+            instance_hub_ids = [hub["resourceId"] for hub in target_instance["iotHubs"]]
             assert hub_id in instance_hub_ids
             if desired_instance_diagnostics:
                 assert target_instance["enableDiagnostics"]
@@ -364,3 +360,55 @@ def _storage_removal(storage_account: dict):
     delete_result = cli.invoke(f"storage account delete -g {ACCOUNT_RG} -n {storage_account['name']} -y")
     if not delete_result.success():
         logger.error(f"Failed to delete storage account resource {storage_account['name']}.")
+
+
+mock_account_id = generate_generic_id()
+mock_instance_id = generate_generic_id()
+
+
+@pytest.fixture()
+def discovery_client(mocked_response):
+    def discovery_callback(request):
+        headers = {"Content-Type": "application/json; charset=utf-8"}
+        split_url = request.url.split("/")
+        resource_id = (
+            f"/subscriptions/{split_url[3]}/resourceGroups" f"/mock/providers/Microsoft.DeviceUpdate/accounts/{mock_account_id}"
+        )
+
+        return (
+            200,
+            headers,
+            json.dumps(
+                {
+                    "value": [
+                        {
+                            "id": resource_id,
+                            "name": mock_account_id,
+                            "properties": {"hostName": f"{mock_account_id}.api.adu.microsoft.com"},
+                        }
+                    ]
+                }
+            ),
+        )
+
+    mocked_response.add_callback(
+        responses.GET,
+        re.compile(r"https://management.azure.com/subscriptions/(.*)/providers/Microsoft.DeviceUpdate/accounts"),
+        callback=discovery_callback,
+    )
+
+    yield mocked_response
+
+
+@pytest.fixture()
+def profile_mock(mocker):
+    patched_get_raw_token = mocker.patch(
+        "azure.cli.core._profile.Profile.get_login_credentials"
+    )
+    creds_mock = mocker.MagicMock(name="creds")
+    creds_mock.get_token().expires_on = sys.maxsize
+    patched_get_raw_token.return_value = (
+        creds_mock,
+        mocker.MagicMock(name="subscription"),
+        mocker.MagicMock(name="tenant"),
+    )
