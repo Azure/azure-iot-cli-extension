@@ -234,7 +234,6 @@ def manifest_init_v5(
     deployable: bool = None,
     no_validation: Optional[bool] = None,
 ):
-    import json
     from datetime import datetime
     from pathlib import PurePath
     from azure.cli.core.azclierror import ArgumentUsageError, InvalidArgumentValueError
