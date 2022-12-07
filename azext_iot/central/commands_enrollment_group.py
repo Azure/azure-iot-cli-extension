@@ -100,11 +100,13 @@ def create_enrollment_group(
     if attestation == 'x509':
         if primary_cert_path:
             primary_cert = open_certificate(primary_cert_path)
-            primary_cert = base64.encodebytes((primary_cert.replace('\r', '') + '\n').encode()).decode().replace('\n', '')
+            if primary_cert_path.endswith(".pem"):
+                        primary_cert = base64.encodebytes((primary_cert.replace('\r', '') + '\n').encode()).decode().replace('\n', '')
 
         if secondary_cert_path:
             secondary_cert = open_certificate(secondary_cert_path)
-            secondary_cert = base64.encodebytes((secondary_cert.replace('\r', '') + '\n').encode()).decode().replace('\n', '')
+            if secondary_cert_path.endswith(".pem"):
+                secondary_cert = base64.encodebytes((secondary_cert.replace('\r', '') + '\n').encode()).decode().replace('\n', '')
 
         if primary_cert_path or secondary_cert_path:
             response["x509"] = create_x509(
@@ -157,9 +159,13 @@ def update_enrollment_group(
 
     if primary_cert_path:
         primary_cert = open_certificate(primary_cert_path)
+        if primary_cert_path.endswith(".pem"):
+            primary_cert = base64.encodebytes((primary_cert.replace('\r', '') + '\n').encode()).decode().replace('\n', '')
 
     if secondary_cert_path:
         secondary_cert = open_certificate(secondary_cert_path)
+        if secondary_cert_path.endswith(".pem"):
+            secondary_cert = base64.encodebytes((secondary_cert.replace('\r', '') + '\n').encode()).decode().replace('\n', '')
 
     if primary_cert_path or secondary_cert_path:
         response["x509"] = create_x509(
@@ -251,11 +257,13 @@ def verify_x509(
 
     if primary_cert_path:
         primary_cert = open_certificate(primary_cert_path)
-        primary_cert = base64.encodebytes((primary_cert.replace('\r', '') + '\n').encode()).decode().replace('\n', '')
+        if primary_cert_path.endswith(".pem"):
+            primary_cert = base64.encodebytes((primary_cert.replace('\r', '') + '\n').encode()).decode().replace('\n', '')
 
     if secondary_cert_path:
         secondary_cert = open_certificate(secondary_cert_path)
-        secondary_cert = base64.encodebytes((secondary_cert.replace('\r', '') + '\n').encode()).decode().replace('\n', '')
+        if secondary_cert_path.endswith(".pem"):
+            secondary_cert = base64.encodebytes((secondary_cert.replace('\r', '') + '\n').encode()).decode().replace('\n', '')
 
     return provider.verify_x509(
         group_id=group_id,
@@ -317,7 +325,6 @@ def generate_verification_code(
     provider = CentralEnrollmentGroupProvider(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
-
     return provider.generate_verification_code(
         group_id=group_id,
         certificate_entry=certificate_entry,
