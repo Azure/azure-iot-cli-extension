@@ -101,7 +101,7 @@ def create_enrollment_group(
         if primary_cert_path:
             primary_cert = open_certificate(primary_cert_path)
             if primary_cert_path.endswith(".pem"):
-                        primary_cert = base64.encodebytes((primary_cert.replace('\r', '') + '\n').encode()).decode().replace('\n', '')
+                primary_cert = base64.encodebytes((primary_cert.replace('\r', '') + '\n').encode()).decode().replace('\n', '')
 
         if secondary_cert_path:
             secondary_cert = open_certificate(secondary_cert_path)
