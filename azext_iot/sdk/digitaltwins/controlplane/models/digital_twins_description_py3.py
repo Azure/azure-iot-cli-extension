@@ -42,8 +42,7 @@ class DigitalTwinsDescription(DigitalTwinsResource):
     :ivar provisioning_state: The provisioning state. Possible values include:
      'Provisioning', 'Deleting', 'Updating', 'Succeeded', 'Failed', 'Canceled',
      'Deleted', 'Warning', 'Suspending', 'Restoring', 'Moving'
-    :vartype provisioning_state: str or
-     ~controlplane.models.ProvisioningState
+    :vartype provisioning_state: str or ~controlplane.models.ProvisioningState
     :ivar host_name: Api endpoint to work with DigitalTwinsInstance.
     :vartype host_name: str
     :param private_endpoint_connections: The private endpoint connections.

@@ -80,7 +80,7 @@ class TestDTImportJobs(DTLiveScenarioTest):
         ).get_output_in_json()["id"]
         instance_name = generate_resource_id()
         create_output = self.cmd(
-            "dt create -n {} -g {} -l {} --assign-identity --scopes {} --role 'Storage Blob Data Contributor'".format(
+            "dt create -n {} -g {} -l {} --mi-system-assigned --scopes {} --role 'Storage Blob Data Contributor'".format(
                 instance_name,
                 self.rg,
                 self.region,

@@ -78,7 +78,7 @@ class TestDTConnections(DTLiveScenarioTest):
         self.add_eventhub_consumer_group(consumer_group=consumer_group)
 
         create_output = self.cmd(
-            "dt create -n {} -g {} --assign-identity".format(
+            "dt create -n {} -g {} --mi-system-assigned".format(
                 instance_name,
                 self.rg,
             )
@@ -216,7 +216,7 @@ class TestDTConnections(DTLiveScenarioTest):
         connection_name = f"cn-{generate_generic_id()}"
 
         create_output = self.cmd(
-            "dt create -n {} -g {} --assign-identity".format(
+            "dt create -n {} -g {} --mi-system-assigned".format(
                 instance_name,
                 self.rg,
             )
@@ -334,7 +334,7 @@ class TestDTConnections(DTLiveScenarioTest):
         self.add_eventhub_consumer_group(consumer_group=consumer_group)
 
         create_output = self.cmd(
-            "dt create -n {} -g {} --assign-identity".format(
+            "dt create -n {} -g {} --mi-system-assigned".format(
                 instance_name,
                 self.rg,
             )
