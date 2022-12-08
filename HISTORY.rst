@@ -52,7 +52,7 @@ unreleased
   * The `eventgrid` endpoint does not support managed identities.
 * Resource group for endpoint resources are no longer required - if not present, the resource group of the
   digital twins instance is used.
-  
+
 
 0.18.1
 +++++++++++++++
