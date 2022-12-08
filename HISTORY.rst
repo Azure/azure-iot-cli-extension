@@ -22,6 +22,11 @@ unreleased
   To learn more about this transition, visit http://aka.ms/iot-ca-updates/.
 
 
+**IoT Central updates**
+
+* Fixed an issue with enrollement group certificate encoding 
+
+
 0.18.2
 +++++++++++++++
 
@@ -47,10 +52,6 @@ unreleased
   * The `eventgrid` endpoint does not support managed identities.
 * Resource group for endpoint resources are no longer required - if not present, the resource group of the
   digital twins instance is used.
-
-**IoT Central updates**
-
-* Fixed an issue with enrollement group certificate encoding 
 
 0.18.1
 +++++++++++++++
