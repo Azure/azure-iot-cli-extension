@@ -148,7 +148,7 @@ def load_digitaltwins_arguments(self, _):
             arg_group="Managed Service Identity",
             options_list=["--mi-system-assigned"],
             arg_type=get_three_state_flag(),
-            help="Assign a system generated identity to the Digital Twins instance.",
+            help="Assign a system generated identity to this Digital Twins instance.",
         )
         context.argument(
             "user_identities",

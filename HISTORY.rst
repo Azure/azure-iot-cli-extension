@@ -8,17 +8,18 @@ unreleased
 
 0.18.3
 +++++++++++++++
+
 **IoT Hub updates**
 
 * The root-authority migration feature is now available. Since the Baltimore root will soon expire, IoT Hub will
   transition to the DigiCert Global G2 root starting February 15, 2023. You will need to update all device certificates
   to use the new G2 root.
-  
+
   **These commands are temporary** and will be removed once all IoT Hubs have been transitioned:
-    
+
   - az iot hub certificate root-authority show
   - az iot hub certificate root-authority set
-  
+
   To learn more about this transition, visit http://aka.ms/iot-ca-updates/.
 
 
@@ -29,7 +30,7 @@ unreleased
 
 `az iot du update init v5` improvements:
 
-* Fixed an issue where duplicate `files[]` / `relatedFiles[]` entries were created via multiple usage of --file or 
+* Fixed an issue where duplicate `files[]` / `relatedFiles[]` entries were created via multiple usage of --file or
   --related-file against the same update file asset.
 * If the inline step content handler requires `handlerProperties.installedCriteria` and a value was not provided,
   a default value will be automatically added with a warning.

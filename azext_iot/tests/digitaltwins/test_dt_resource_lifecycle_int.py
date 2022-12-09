@@ -43,6 +43,12 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
     def tearDownSuite(self):
         yield None
         try:
+            self.delete_user_identity()
+        except Exception as e:
+            logger.warning(
+                "Failed to delete the User Identity resource. Additional details: " +
+                unpack_msrest_error(e))
+        try:
             self.delete_eventhub_resources()
         except Exception as e:
             logger.warning(
@@ -61,12 +67,6 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         except Exception as e:
             logger.warning(
                 "Failed to delete the ServiceBus resources. Additional details: " +
-                unpack_msrest_error(e))
-        try:
-            self.delete_user_identity()
-        except Exception as e:
-            logger.warning(
-                "Failed to delete the User Identity resource. Additional details: " +
                 unpack_msrest_error(e))
 
     def test_dt_resource(self):
