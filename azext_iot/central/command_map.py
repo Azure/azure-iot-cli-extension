@@ -55,6 +55,14 @@ central_export_ops = CliCommandType(
     operations_tmpl="azext_iot.central.commands_export#{}"
 )
 
+central_enrollment_groups_ops = CliCommandType(
+    operations_tmpl="azext_iot.central.commands_enrollment_group#{}"
+)
+
+central_scheduled_jobs_ops = CliCommandType(
+    operations_tmpl="azext_iot.central.commands_scheduled_job#{}"
+)
+
 
 # Dev note - think of this as the "router" and all self.command_group as the controllers
 def load_central_commands(self, _):
@@ -195,7 +203,6 @@ def load_central_commands(self, _):
     with self.command_group(
         "iot central device-group",
         command_type=central_device_groups_ops,
-        is_preview=True,
     ) as cmd_group:
         cmd_group.command("list", "list_device_groups")
         cmd_group.show_command("show", "get_device_group")
@@ -204,7 +211,7 @@ def load_central_commands(self, _):
         cmd_group.command("delete", "delete_device_group")
 
     with self.command_group(
-        "iot central role", command_type=central_roles_ops, is_preview=True
+        "iot central role", command_type=central_roles_ops,
     ) as cmd_group:
         cmd_group.show_command("show", "get_role")
         cmd_group.command("list", "list_roles")
@@ -212,7 +219,6 @@ def load_central_commands(self, _):
     with self.command_group(
         "iot central file-upload-config",
         command_type=central_file_uploads_ops,
-        is_preview=True,
     ) as cmd_group:
         cmd_group.show_command("show", "get_fileupload")
         cmd_group.show_command("delete", "delete_fileupload")
@@ -220,7 +226,7 @@ def load_central_commands(self, _):
         cmd_group.show_command("update", "update_fileupload")
 
     with self.command_group(
-        "iot central organization", command_type=central_orgs_ops, is_preview=True
+        "iot central organization", command_type=central_orgs_ops,
     ) as cmd_group:
         cmd_group.show_command("show", "get_org")
         cmd_group.command("list", "list_orgs")
@@ -229,7 +235,7 @@ def load_central_commands(self, _):
         cmd_group.command("update", "update_org")
 
     with self.command_group(
-        "iot central job", command_type=central_jobs_ops, is_preview=True
+        "iot central job", command_type=central_jobs_ops,
     ) as cmd_group:
         cmd_group.show_command("show", "get_job")
         cmd_group.command("list", "list_jobs")
@@ -238,6 +244,27 @@ def load_central_commands(self, _):
         cmd_group.command("resume", "resume_job")
         cmd_group.command("get-devices", "get_job_devices")
         cmd_group.command("rerun", "rerun_job")
+
+    with self.command_group(
+        "iot central enrollment-group", command_type=central_enrollment_groups_ops,
+    ) as cmd_group:
+        cmd_group.show_command("show", "get_enrollment_group")
+        cmd_group.command("list", "list_enrollment_groups")
+        cmd_group.command("create", "create_enrollment_group")
+        cmd_group.command("delete", "delete_enrollment_group")
+        cmd_group.command("update", "update_enrollment_group")
+        cmd_group.command("verify-certificate", "verify_x509")
+        cmd_group.command("generate-verification-code", "generate_verification_code")
+
+    with self.command_group(
+        "iot central scheduled-job", command_type=central_scheduled_jobs_ops,
+    ) as cmd_group:
+        cmd_group.show_command("show", "get_scheduled_job")
+        cmd_group.command("list", "list_scheduled_jobs")
+        cmd_group.command("create", "create_scheduled_job")
+        cmd_group.command("delete", "delete_scheduled_job")
+        cmd_group.command("update", "update_scheduled_job")
+        cmd_group.command("list-runs", "list_runs")
 
     with self.command_group(
         "iot central device edge children", command_type=central_device_ops

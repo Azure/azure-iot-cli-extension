@@ -3,6 +3,128 @@
 Release History
 ===============
 
+unreleased
++++++++++++++++
+
+0.18.3
++++++++++++++++
+**IoT Hub updates**
+
+* The root-authority migration feature is now available. Since the Baltimore root will soon expire, IoT Hub will
+  transition to the DigiCert Global G2 root starting February 15, 2023. You will need to update all device certificates
+  to use the new G2 root.
+  
+  **These commands are temporary** and will be removed once all IoT Hubs have been transitioned:
+    
+  - az iot hub certificate root-authority show
+  - az iot hub certificate root-authority set
+  
+  To learn more about this transition, visit http://aka.ms/iot-ca-updates/.
+
+
+**IoT Central updates**
+
+* Fixed an issue with enrollement group certificate encoding 
+
+
+0.18.2
++++++++++++++++
+
+**Device Update**
+
+`az iot du update init v5` improvements:
+
+* Fixed an issue where duplicate `files[]` / `relatedFiles[]` entries were created via multiple usage of --file or 
+  --related-file against the same update file asset.
+* If the inline step content handler requires `handlerProperties.installedCriteria` and a value was not provided,
+  a default value will be automatically added with a warning.
+* If the inline step content handler starts with 'microsoft' (case-insensitive), valid first-party handler values
+  will be enforced.
+* Inline json rules and examples provided for every shell.
+* Improves error handling for free-form json properties.
+
+**Digital Twins**
+
+* New command group `az dt identity` to easily manage instance identities.
+* `az dt create` supports adding user-managed identities on create.
+* `az dt endpoint create <type>` commands support identity parameters - you are able to leverage managed identities
+  to integrate with the target endpoint.
+  * The `eventgrid` endpoint does not support managed identities.
+* Resource group for endpoint resources are no longer required - if not present, the resource group of the
+  digital twins instance is used.
+
+
+0.18.1
++++++++++++++++
+
+**Device Update**
+
+* Removed preview classification from the root Azure Device Update command group.
+  Commands are GA with the exception of `az iot du update stage` and `az iot du update init` which are still preview.
+
+
+0.18.0
++++++++++++++++
+
+**IoT Hub updates**
+
+* **[Breaking Change]** The `az iot hub device-identity export` and `az iot hub device-identity import` commands have been migrated to use IoT Hub APIs instead of ARM.
+* **[Breaking Change]** Device identity export/import commands now expect the parameter `--auth-type` to specify the IoT Hub API data access auth type (instead of storage access auth type).
+* Updated the IoT Hub service SDK to now use the newer `2021-04-12` API version.
+* Device identity export/import commands now support optional parameters for storage account and blob container names - users no longer need to supply input/output Blob container SAS URIs.
+* Device identity export/import commands now automatically derive storage auth type - hence the parameter `storage_authentication_type` has been deprecated.
+* Adds `az iot hub device-twin list` as a highly recommended alternative to `az iot hub device-identity list`.
+  Functionality remains the same as both return a list of device twins and `az iot hub device-identity list` may be altered or deprecated in the future.
+
+**Device Update**
+
+* The in-preview Azure Device Update CLI root namespace changed from `az iot device-update` to `az iot du`.
+* The in-preview `az iot device-update update init calculate-hash` command moved to `az iot du update calculate-hash`.
+* Introducing the preview `az iot du update stage` command. The update stage command is designed to automate
+  the pre-requisite steps of importing an update. Read the command reference to learn more.
+
+**General updates**
+
+* The Azure IoT CLI extension min core CLI version incremented to `2.32.0`.
+
+
+0.17.3
++++++++++++++++
+
+**Device Update**
+
+* Adds `az iot device-update update init calculate-hash`, a utility command used to calculate the base64 hash representation of one or more files.
+* The `update init v5` command will by default validate the generated import manifest using the official json schema definition. Client-side validation can be skipped by using `--no-validation`.
+* The `update init v5` command support level has changed from `experimental` to `preview`.
+
+**IoT Central updates**
+
+* `--api-version` parameter will be deprecated and ignored. The IoT Central API will alway call latest GA version or latest preview version (if any API only exists in preview).
+
+* Add support for enrollment groups CRUD.
+
+  - az iot central enrollment-group
+
+    - az iot central enrollment-group list
+    - az iot central enrollment-group show
+    - az iot central enrollment-group create
+    - az iot central enrollment-group delete
+    - az iot central enrollment-group update
+    - az iot central enrollment-group verify-certificate
+    - az iot central enrollment-group generate-verification-code
+
+* Add support for scheduled jobs CRUD.
+
+  - az iot central scheduled-job
+
+    - az iot central scheduled-job list
+    - az iot central scheduled-job show
+    - az iot central scheduled-job create
+    - az iot central scheduled-job delete
+    - az iot central scheduled-job update
+    - az iot central scheduled-job list-runs
+
+
 0.17.2
 +++++++++++++++
 

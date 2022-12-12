@@ -6,7 +6,10 @@
 
 
 import json
-from azext_iot.central.models.enum import ApiVersion, Role, get_enum_values
+import pytest
+from knack.log import get_logger
+
+from azext_iot.central.models.enum import Role, get_enum_values
 from azure.iot.device import Message
 from azext_iot.common import utility
 from azext_iot.monitor.parsers import strings
@@ -16,26 +19,16 @@ from azext_iot.tests.central import (
     DEFAULT_FILE_UPLOAD_TTL,
     sync_command_params,
 )
-import pytest
-from knack.log import get_logger
 
 
 logger = get_logger(__name__)
 
 
-IS_1_1_PREVIEW = True
-
-
 class TestIotCentral(CentralLiveScenarioTest):
     @pytest.fixture(autouse=True)
-    def fixture_api_version(self, request):
-        self._api_version = request.config.getoption("--api-version")
-        IS_1_1_PREVIEW = (
-            self._api_version == ApiVersion.v1_1_preview.value
-            or self._api_version is None
-        )  # either explicitely selected or omitted
-        if IS_1_1_PREVIEW:
-            logger.info("Testing 1.1-preview")
+    def fixture_api_version(self):
+        # No need to pass api version here
+        self._api_version = None
         yield
 
     @pytest.fixture(scope="class", autouse=True)
@@ -344,10 +337,6 @@ class TestIotCentral(CentralLiveScenarioTest):
         # check that run result and show result indeed match
         assert run_result["response"] == show_result["value"][0]["response"]
 
-    @pytest.mark.xfail(
-        condition=not IS_1_1_PREVIEW,
-        reason="Api version not supported",
-    )
     def test_central_fileupload_methods_CRUD_required(self):
         file_upload = self._create_fileupload(api_version=self._api_version)
 
@@ -413,10 +402,6 @@ class TestIotCentral(CentralLiveScenarioTest):
         assert result["state"] == "deleting"
         self._wait_for_storage_configured(api_version=self._api_version)
 
-    @pytest.mark.xfail(
-        condition=not IS_1_1_PREVIEW,
-        reason="Api version not supported",
-    )
     def test_central_organization_methods_CRUD(self):
         org = self._create_organization(api_version=self._api_version)
         command = "iot central organization show -n {} --org-id {}".format(
@@ -434,10 +419,6 @@ class TestIotCentral(CentralLiveScenarioTest):
         # DELETE
         self._delete_organization(org_id=org["id"], api_version=self._api_version)
 
-    @pytest.mark.xfail(
-        condition=not IS_1_1_PREVIEW,
-        reason="Api version not supported",
-    )
     def test_central_destination_export_methods_CRD(self):
         dest_id = "aztestdest0001"
         export_id = "aztestexport001"
@@ -462,10 +443,6 @@ class TestIotCentral(CentralLiveScenarioTest):
         self._delete_export(export_id=export["id"], api_version=self._api_version)
         self._delete_destination(dest_id=dest_id, api_version=self._api_version)
 
-    @pytest.mark.xfail(
-        condition=not IS_1_1_PREVIEW,
-        reason="Api version not supported",
-    )
     def test_central_query_methods_run(self):
         (template_id, _) = self._create_device_template(api_version=self._api_version)
         (device_id, _) = self._create_device(
@@ -483,3 +460,81 @@ class TestIotCentral(CentralLiveScenarioTest):
         self._delete_device_template(
             api_version=self._api_version, template_id=template_id
         )
+
+    def test_central_enrollment_group_methods_CRUD(self):
+        # create
+        group = self._create_enrollment_group(api_version=self._api_version)
+
+        # show
+        command = "iot central enrollment-group show -n {} --group-id {}".format(
+            self.app_id, group["id"]
+        )
+        result = self.cmd(command, api_version=self._api_version).get_output_in_json()
+        assert result["id"] == group["id"]
+
+        # update
+        self._update_enrollment_group(group_id=group["id"], api_version=self._api_version)
+
+        # delete
+        self._delete_enrollment_group(group_id=group["id"], api_version=self._api_version)
+
+    def test_central_enrollment_group_with_certificate_methods_CRUD(self):
+        cert_info = self._create_certs()
+
+        cert_name = cert_info['cert_name']
+        cert_output_dir = cert_info['cert_output_dir']
+        root_cert_obj = cert_info['root_cert_obj']
+
+        # create
+        symmetric_group = self._create_enrollment_group_with_symmetric_key(api_version=self._api_version)
+        x509_group = self._create_enrollment_group_with_x509(api_version=self._api_version, cert_name=cert_name)
+
+        # show
+        command = "iot central enrollment-group show -n {} --group-id {}".format(
+            self.app_id, symmetric_group["id"]
+        )
+        result = self.cmd(command, api_version=self._api_version).get_output_in_json()
+        assert result["id"] == symmetric_group["id"]
+
+        command = "iot central enrollment-group show -n {} --group-id {}".format(
+            self.app_id, x509_group["id"]
+        )
+        result = self.cmd(command, api_version=self._api_version).get_output_in_json()
+        assert result["id"] == x509_group["id"]
+
+        # generate x509 verification code
+        verification_code = self._generate_x509_verification_code(group_id=x509_group["id"], api_version=self._api_version)
+
+        # verify x509 certification
+        self._verify_x509_certification(
+            group_id=x509_group["id"],
+            api_version=self._api_version,
+            cert_output_dir=cert_output_dir,
+            root_cert_obj=root_cert_obj,
+            verification_code=verification_code
+        )
+
+        # remove x509
+        self._remove_x509(group_id=x509_group["id"], api_version=self._api_version)
+
+        # delete
+        self._delete_enrollment_group(group_id=symmetric_group["id"], api_version=self._api_version)
+        self._delete_enrollment_group(group_id=x509_group["id"], api_version=self._api_version)
+        self._delete_test_certs(cert_output_dir)
+
+    def test_central_scheduled_job_methods_CRUD(self):
+        # create
+        job = self._create_scheduled_job(api_version=self._api_version)
+
+        # show
+        command = "iot central scheduled-job show -n {} --job-id {}".format(
+            self.app_id, job["id"]
+        )
+        result = self.cmd(command, api_version=self._api_version).get_output_in_json()
+        assert result["id"] == job["id"]
+
+        # update
+        self._update_scheduled_job(job_id=job["id"], api_version=self._api_version)
+
+        # delete
+        self._delete_scheduled_job(job_id=job["id"], api_version=self._api_version)

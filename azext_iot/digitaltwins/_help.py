@@ -32,12 +32,20 @@ def load_digitaltwins_help():
 
         - name: Create instance in the target resource group with a system managed identity.
           text: >
-            az dt create -n {instance_name} -g {resouce_group} --assign-identity
+            az dt create -n {instance_name} -g {resouce_group} --mi-system-assigned
+
+        - name: Create instance in the target resource group with a user managed identity.
+          text: >
+            az dt create -n {instance_name} -g {resouce_group} --mi-user-assigned {resource_id}
+
+        - name: Create instance in the target resource group with a system managed identity and multiple user managed identities.
+          text: >
+            az dt create -n {instance_name} -g {resouce_group} --mi-system-assigned --mi-user-assigned {resource_id} {resource_id}
 
         - name: Create instance in the target resource group with a system managed identity then
                 assign the identity to one or more scopes (space-separated) with the role of Contributor.
           text: >
-            az dt create -n {instance_name} -g {resouce_group} --assign-identity
+            az dt create -n {instance_name} -g {resouce_group} --mi-system-assigned
             --scopes
             "/subscriptions/a12345ea-bb21-994d-2263-c716348e32a1/resourceGroups/ProResourceGroup/providers/Microsoft.EventHub/namespaces/myEventHubNamespace/eventhubs/myEventHub"
             "/subscriptions/a12345ea-bb21-994d-2263-c716348e32a1/resourceGroups/ProResourceGroup/providers/Microsoft.ServiceBus/namespaces/myServiceBusNamespace/topics/myTopic"
@@ -45,19 +53,11 @@ def load_digitaltwins_help():
         - name: Create instance in the target resource group with a system managed identity then
                 assign the identity to one or more scopes with a custom specified role.
           text: >
-            az dt create -n {instance_name} -g {resouce_group} --assign-identity
+            az dt create -n {instance_name} -g {resouce_group} --mi-system-assigned
             --scopes
             "/subscriptions/a12345ea-bb21-994d-2263-c716348e32a1/resourceGroups/ProResourceGroup/providers/Microsoft.EventHub/namespaces/myEventHubNamespace/eventhubs/myEventHub"
             "/subscriptions/a12345ea-bb21-994d-2263-c716348e32a1/resourceGroups/ProResourceGroup/providers/Microsoft.ServiceBus/namespaces/myServiceBusNamespace/topics/myTopic"
             --role MyCustomRole
-
-        - name: Update an instance in the target resource group to enable system managed identity.
-          text: >
-            az dt create -n {instance_name} -g {resouce_group} --assign-identity
-
-        - name: Update an instance in the target resource group to disable system managed identity.
-          text: >
-            az dt create -n {instance_name} -g {resouce_group} --assign-identity false
 
         - name: Update an instance in the target resource group with new tag values and disable public network access.
           text: >
@@ -271,6 +271,7 @@ def load_digitaltwins_help():
         type: command
         short-summary: Adds an EventGrid Topic endpoint to a Digital Twins instance.
             Requires pre-created resource.
+        long-summary: EventGrid topic endpoints do not support identity based endpoint integration.
 
         examples:
         - name: Adds an EventGrid Topic endpoint to a target instance.
@@ -284,8 +285,11 @@ def load_digitaltwins_help():
     helps["dt endpoint create eventhub"] = """
         type: command
         short-summary: Adds an EventHub endpoint to a Digital Twins instance.
-            Requires pre-created resource. The instance must be created
-            with a managed identity to support identity based endpoint integration
+            Requires pre-created resource.
+        long-summary: |
+            The instance must have a system-assigned identity to support system-assigned identity based endpoint
+            integration. The instance must have the user-assigned identity associated to support user-assigned
+            identity based endpoint integration.
 
         examples:
         - name: Adds an EventHub endpoint to a target instance using Key based auth.
@@ -297,21 +301,33 @@ def load_digitaltwins_help():
             --eventhub-policy {eventhub_policy}
             -n {instance_name}
 
-        - name: Adds an EventHub endpoint to a target instance using Identity based auth.
+        - name: Adds an EventHub endpoint to a target instance using the system-assigned identity for authentication.
           text: >
             az dt endpoint create eventhub --endpoint-name {endpoint_name}
             --eventhub-resource-group {eventhub_resource_group}
             --eventhub-namespace {eventhub_namespace}
             --eventhub {eventhub_name}
-            --auth-type IdentityBased
+            --mi-system-assigned
+            -n {instance_name}
+
+        - name: Adds an EventHub endpoint to a target instance using an user-assigned identity for authentication.
+          text: >
+            az dt endpoint create eventhub --endpoint-name {endpoint_name}
+            --eventhub-resource-group {eventhub_resource_group}
+            --eventhub-namespace {eventhub_namespace}
+            --eventhub {eventhub_name}
+            --mi-user-assigned {resource_id}
             -n {instance_name}
     """
 
     helps["dt endpoint create servicebus"] = """
         type: command
         short-summary: Adds a ServiceBus Topic endpoint to a Digital Twins instance.
-            Requires pre-created resource. The instance must be created
-            with a managed identity to support identity based endpoint integration
+            Requires pre-created resource.
+        long-summary: |
+            The instance must have a system-assigned identity to support system-assigned identity based endpoint
+            integration. The instance must have the user-assigned identity associated to support user-assigned
+            identity based endpoint integration.
 
         examples:
         - name: Adds a ServiceBus Topic endpoint to a target instance using Key based auth.
@@ -323,12 +339,22 @@ def load_digitaltwins_help():
             --servicebus-policy {servicebus_policy}
             -n {instance_name}
 
-        - name: Adds a ServiceBus Topic endpoint to a target instance using Identity based auth.
+        - name: Adds a ServiceBus Topic endpoint to a target instance using the system-assigned identity for authentication.
           text: >
             az dt endpoint create servicebus --endpoint-name {endpoint_name}
             --servicebus-resource-group {servicebus_resource_group}
             --servicebus-namespace {servicebus_namespace}
             --servicebus-topic {servicebus_topic_name}
+            --mi-system-assigned
+            -n {instance_name}
+
+        - name: Adds a ServiceBus Topic endpoint to a target instance using an user-assigned identity for authentication.
+          text: >
+            az dt endpoint create servicebus --endpoint-name {endpoint_name}
+            --servicebus-resource-group {servicebus_resource_group}
+            --servicebus-namespace {servicebus_namespace}
+            --servicebus-topic {servicebus_topic_name}
+            --mi-user-assigned {resource_id}
             -n {instance_name}
     """
 
@@ -379,6 +405,50 @@ def load_digitaltwins_help():
         - name: Wait until an existing endpoint's primaryConnectionString is null.
           text: >
             az dt endpoint wait -n {instance_name} --endpoint-name {endpoint_name} --custom "properties.primaryConnectionString==null"
+    """
+
+    helps["dt identity"] = """
+        type: group
+        short-summary: Manage identites of a Digital Twins instance.
+    """
+
+    helps["dt identity assign"] = """
+        type: command
+        short-summary: Assign managed identities to a Digital Twins instance.
+
+        examples:
+        - name: Assign a system-assigned identity to a Digital Twins instance and assign a role to that identity.
+          text: >
+            az dt identity assign -n {instance_name} --mi-system-assigned --role "Azure Event Hubs Data Sender" --scopes {resource_id}
+        - name: Assign two user-assigned identities to a Digital Twins instace.
+          text: >
+            az dt identity assign -n {instance_name} --mi-user-assigned {resource_id} {resource_id}
+    """
+
+    helps["dt identity remove"] = """
+        type: command
+        short-summary: Remove managed identities from a Digital Twins instance.
+
+        examples:
+        - name: Remove the system-assigned identity from a Digital Twins instance.
+          text: >
+            az dt identity remove -n {instance_name} --mi-system-assigned
+        - name: Remove two user-assigned identities from a Digital Twins instance.
+          text: >
+            az dt identity remove -n {instance_name} --mi-user-assigned {resource_id} {resource_id}
+        - name: Remove all identities from a Digital Twins instance.
+          text: >
+            az dt identity remove -n {instance_name} --mi-user-assigned --mi-system-assigned
+    """
+
+    helps["dt identity show"] = """
+        type: command
+        short-summary: Show the identity properties of a Digital Twins instance.
+
+        examples:
+        - name: Show identity properties of a Digital Twins instance.
+          text: >
+            az dt identity show -n {instance_name} -g {resource_group}
     """
 
     helps["dt network"] = """

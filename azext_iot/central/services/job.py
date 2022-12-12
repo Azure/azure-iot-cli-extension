@@ -11,10 +11,10 @@ from knack.log import get_logger
 
 from azure.cli.core.azclierror import AzureResponseError
 from azext_iot.constants import CENTRAL_ENDPOINT
+from azext_iot.central.common import API_VERSION
 from azext_iot.central.services import _utility
 from azure.cli.core.util import should_disable_connection_verify
-from azext_iot.central.models.v1_1_preview import JobV1_1_preview
-from azext_iot.central.models.preview import JobPreview
+from azext_iot.central.models.ga_2022_07_31 import JobGa
 
 
 logger = get_logger(__name__)
@@ -30,9 +30,11 @@ def _call_job(
     job_id: str,
     body: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[dict, JobV1_1_preview, JobPreview]:
+) -> Union[dict, JobGa]:
+    api_version = API_VERSION
+
     url = "https://{}.{}/{}/{}".format(app_id, central_dns_suffix, BASE_PATH, job_id)
     headers = _utility.get_headers(token, cmd)
 
@@ -64,10 +66,10 @@ def _list_job(
     app_id: str,
     path: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> List[Union[JobPreview, JobV1_1_preview]]:
+) -> List[JobGa]:
     """
     Get a list of all jobs in IoTC app
 
@@ -81,6 +83,7 @@ def _list_job(
     Returns:
         list of jobs
     """
+    api_version = API_VERSION
 
     values = []
 
@@ -120,9 +123,9 @@ def get_job(
     app_id: str,
     job_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[JobPreview, JobV1_1_preview]:
+) -> JobGa:
     """
     Get job info given a job id
 
@@ -137,6 +140,7 @@ def get_job(
     Returns:
         job: dict
     """
+    api_version = API_VERSION
 
     result = _call_job(
         cmd=cmd,
@@ -157,9 +161,9 @@ def stop_job(
     app_id: str,
     job_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[JobPreview, JobV1_1_preview]:
+) -> JobGa:
     """
     Stop a running job
 
@@ -174,6 +178,7 @@ def stop_job(
     Returns:
         job: dict
     """
+    api_version = API_VERSION
 
     result = _call_job(
         cmd=cmd,
@@ -194,9 +199,9 @@ def resume_job(
     app_id: str,
     job_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[JobPreview, JobV1_1_preview]:
+) -> JobGa:
     """
     Resume a stopped job
 
@@ -211,6 +216,7 @@ def resume_job(
     Returns:
         job: dict
     """
+    api_version = API_VERSION
 
     result = _call_job(
         cmd=cmd,
@@ -232,9 +238,9 @@ def rerun_job(
     job_id: str,
     rerun_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[JobPreview, JobV1_1_preview]:
+) -> JobGa:
     """
     Rerun a job on failed devices
 
@@ -250,6 +256,7 @@ def rerun_job(
     Returns:
         job: dict
     """
+    api_version = API_VERSION
 
     result = _call_job(
         cmd=cmd,
@@ -270,7 +277,7 @@ def get_job_devices(
     app_id: str,
     job_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
 ):
@@ -288,6 +295,7 @@ def get_job_devices(
     Returns:
         job: dict
     """
+    api_version = API_VERSION
 
     return _list_job(
         cmd=cmd,
@@ -304,10 +312,11 @@ def list_jobs(
     cmd,
     app_id: str,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     max_pages=0,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> List[Union[JobPreview, JobV1_1_preview]]:
+) -> List[JobGa]:
+    api_version = API_VERSION
 
     values = _list_job(
         cmd=cmd,
@@ -336,9 +345,9 @@ def create_job(
     batch: int,
     threshold: int,
     token: str,
-    api_version: str,
+    api_version=API_VERSION,
     central_dns_suffix=CENTRAL_ENDPOINT,
-) -> Union[JobPreview, JobV1_1_preview]:
+) -> JobGa:
     """
     Create a job in IoTC
 
@@ -360,6 +369,7 @@ def create_job(
     Returns:
         job: dict
     """
+    api_version = API_VERSION
 
     if not job_name:
         job_name = job_id

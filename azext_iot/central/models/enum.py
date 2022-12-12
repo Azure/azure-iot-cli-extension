@@ -34,17 +34,7 @@ class Role(Enum):
     operator = "ae2c9854-393b-4f97-8c42-479d70ce626e"
 
 
-class UserTypePreview(Enum):
-    """
-    Types of users , supported under the preview route, that can be added to use/manage a Central app
-    (service principal, email, etc)
-    """
-
-    service_principal = "ServicePrincipalUser"
-    email = "EmailUser"
-
-
-class UserTypeV1(Enum):
+class UserType(Enum):
     """
     Types of users, supported under V1/1.0 route, that can be added to use/manage a Central app
     (service principal, email, etc)
@@ -56,13 +46,10 @@ class UserTypeV1(Enum):
 
 class ApiVersion(Enum):
     """
-    API version's supported
+    Only support latest GA/preview version
     """
-
-    preview = "preview"
-    v1 = "1.0"
-    v1_1_preview = "1.1-preview"
-    ga_2022_05_31 = "2022-05-31"
+    ga = "2022-07-31"
+    preview = '2022-06-30-preview'
 
 
 def get_enum_keys(enum: Enum) -> List[str]:
