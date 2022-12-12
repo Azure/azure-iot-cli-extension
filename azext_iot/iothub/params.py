@@ -254,9 +254,11 @@ def load_iothub_arguments(self, _):
             nargs="+",
             action="append",
             help="Space-separated key=value pairs corresponding to properties of the edge device to create. "
-            "The following key values are supported: `id`, `deployment` (inline json or path to file), `hostname`, "
-            "`parent`, `edge_agent`, and `container_auth` (inline json or path to file). "
-            "--device can be used 1 or more times. Review help examples for parameter usage."
+            "The following key values are supported: `id` (device_id), `deployment` (inline json or path to file), `hostname`, "
+            "`parent` (device_id), `edge_agent` (image URL), and `container_auth` (inline json or path to file). "
+            "--device can be used 1 or more times. Review help examples for full parameter usage  - these parameters also refer "
+            "to their corresponding values in our sample configuration file: "
+            "https://github.com/Azure/azure-iot-cli-extension/tree/dev/docs/samples/sample_devices_config.yaml"
         )
         context.argument(
             "clean",
@@ -330,4 +332,9 @@ def load_iothub_arguments(self, _):
             ],
             help="Root key password",
             arg_group="Root Certificate"
+        )
+        context.argument(
+            "yes",
+            options_list=['--yes', '-y'],
+            help='Do not prompt for confirmation when --clean switch is used to delete existing hub devices.',
         )

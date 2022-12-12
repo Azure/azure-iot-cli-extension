@@ -136,11 +136,22 @@ def open_certificate(certificate_path: str) -> str:
     return certificate.rstrip()
 
 
-def create_root_certificate(
+def create_v3_self_signed_root_certificate(
     subject: str = "Azure_IoT_CLI_Extension_Cert",
     valid_days: int = 365,
     key_size: int = 4096,
 ) -> Dict[str, str]:
+    """
+    Function used to create a self-signed certificate with X.509 v3 extensions.
+
+    Args:
+        subject (str): Certificate common name field.
+        valid_days (int): number of days certificate is valid for.
+        key_size (int): size of the generated private key.
+
+    Returns:
+        result (dict): dict with certificate value, private key and thumbprint.
+    """
     key = rsa.generate_private_key(public_exponent=65537, key_size=key_size)
     serial = x509.random_serial_number()
     subject_name = x509.Name(
@@ -199,16 +210,33 @@ def create_root_certificate(
     }
 
 
-def create_signed_cert(
+def create_ca_signed_certificate(
     subject: str,
     ca_public: str,
     ca_private: str,
     cert_output_dir: Optional[str] = None,
     cert_file: Optional[str] = None,
+    key_size: int = 4096,
     valid_days: Optional[int] = 365,
 ) -> Dict[str, str]:
+    """
+    Function used to create a new X.509 v3 certificate signed by an existing CA cert.
 
-    private_key = rsa.generate_private_key(public_exponent=65537, key_size=4096)
+    Args:
+        subject (str): Certificate common name field.
+        ca_public (str): Signing CA public key
+        ca_private (str): Signing CA private key
+        cert_output_dir (str): string value of output directory.
+        cert_file (bool): Certificate file name if it needs to be different from the subject.
+        key_size (str): The size of the generated private key
+        valid_days (int): number of days certificate is valid for; used to calculate
+            certificate expiry.
+
+    Returns:
+        result (dict): dict with certificate value, private key and thumbprint.
+    """
+
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=key_size)
     ca_public_key = ca_public.encode("utf-8")
     ca_private_key = ca_private.encode("utf-8")
     ca_key = serialization.load_pem_private_key(ca_private_key, password=None)
@@ -284,10 +312,22 @@ def create_signed_cert(
 def load_ca_cert_info(
     cert_path: str, key_path: str, password: Optional[str] = None
 ) -> Dict[str, str]:
+    """
+    Function used to load CA certificate public and private key content
+    into our certificate / thumprint / privateKey format.
+
+    Args:
+        cert_path (str): Path to certificate public key file.
+        key_path (str): Path to the certificate private key file.
+        password (str): Optional password used to unlock the private key.
+
+    Returns:
+        result (dict): dict with certificate value, private key and thumbprint.
+    """
     for path in [cert_path, key_path]:
         if not exists(path):
             raise FileOperationError(
-                "Error loading certificates. " f"No file found at path '{path}'"
+                f"Error loading certificates. No file found at path '{path}'"
             )
     # open cert files and get string contents
     key_str = open_certificate(key_path).encode("utf-8")
@@ -323,6 +363,17 @@ def make_cert_chain(
     output_dir: Optional[str] = None,
     output_file: Optional[str] = None,
 ) -> str:
+    """
+    Function used to create a simple chain certificate file on disk.
+
+    Args:
+        certs List[str]: List of certificate contents (strings) to write to the file.
+        output_dir str: The output directory to write the chained cert to.
+        output_file str: The file name of the written certificate chain file.
+
+    Returns:
+        cert_content str: String content of chained certs
+    """
     cert_content = "".join(certs)
     if output_dir and exists(output_dir) and len(certs):
         write_content_to_file(

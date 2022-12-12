@@ -150,12 +150,16 @@ def process_json_arg(
         )
 
 
+_file_location_error = f"{0} file not found - Please ensure the path '{1}' is correct."
+_file_parse_error = f"Failed to parse {0} file located at '{1}' with exception:\n{2}"
+
+
 def process_yaml_arg(path: str) -> Dict[str, Any]:
     """Primary processor of yaml file input"""
 
     if not os.path.exists(path):
         raise FileOperationError(
-            f"YAML file not found - Please ensure the path '{path}' is correct."
+            _file_location_error.format("YAML", path)
         )
 
     try:
@@ -165,7 +169,7 @@ def process_yaml_arg(path: str) -> Dict[str, Any]:
             return yaml.load(f, Loader=yaml.SafeLoader)
     except Exception as ex:
         raise InvalidArgumentValueError(
-            "Failed to parse yaml for file '{}' with exception:\n{}".format(path, ex)
+            _file_parse_error.format("YAML", path, ex)
         )
 
 
@@ -174,7 +178,7 @@ def process_toml_arg(path: str) -> Dict[str, Any]:
 
     if not os.path.exists(path):
         raise FileOperationError(
-            f"TOML file not found - Please ensure the path '{path}' is correct."
+            _file_location_error.format("TOML", path)
         )
 
     try:
@@ -184,7 +188,7 @@ def process_toml_arg(path: str) -> Dict[str, Any]:
             return tomli.load(f)
     except Exception as ex:
         raise InvalidArgumentValueError(
-            "Failed to parse TOML for file '{}' with exception:\n{}".format(path, ex)
+            _file_parse_error.format("TOML", path, ex)
         )
 
 

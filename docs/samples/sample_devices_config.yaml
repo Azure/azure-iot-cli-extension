@@ -1,25 +1,30 @@
+# This is a sample edge device creation configuration file.
+# The following are sample values used to setup a nested edge scenario with 
+# one parent device (parentDevice) and two child devices (childDevice and secondChildDevice)
+
 configVersion: "1.0"
 
 iotHub:
   authenticationMethod: symmetricKey # Options: [symmetricKey, x509Certificate]
 
-certificates: # Optional, a self-signed CA will be generated if not provided here or in command arguments
-  rootCACertPath: "rootCA.cert.pem"
-  rootCACertKeyPath: "rootCA.key.pem"
+# certificates: # Optional, a self-signed CA will be generated if not provided here or in command arguments
+#   rootCACertPath: "rootCA.cert.pem"
+#   rootCACertKeyPath: "rootCA.key.pem"
 
+# Edge-specific configuration for device config templates and default edge agent.
 edgeConfiguration:
   templateConfigPath: "./device_configs/config_template.toml" # Optional, an empty device configuration is created if not provided here or in command arguments
-  defaultEdgeAgent: "$upstream:443/azureiotedge-agent:1.2"
+  defaultEdgeAgent: "$upstream:443/azureiotedge-agent:1.4" # In this nested scenario, these child devices will use an upstream container registry.
 
 edgeDevices:
   - deviceId: "parentDevice" # Hub Device Identity
     edgeAgent: "mcr.microsoft.com/azureiotedge-agent:1.2" # Edge agent image URI
     hostname: "parentDeviceHostname.local" # FQDN or IP address
-    deployment: "parentDeviceDeployment.json" # Path to deployment JSON
+    deployment: "parentDeviceDeployment.json" # Path to edge deployment configuration JSON
     children:
       - deviceId: "childDevice"
         hostname: "childDeviceHostname.local"
-        edgeAgent: "$upstream:443/azureiotedge-agent:1.2" # Optional, will use `defaultEdgeAgent` if not provided
+        edgeAgent: "$upstream:443/azureiotedge-agent:1.2" # Optional, will use `edgeConfiguration.defaultEdgeAgent` if not provided
         deployment: "childDeviceDeployment.json"
       - deviceId: "secondChildDevice"
         hostname: "secondChildDeviceHostname.local"

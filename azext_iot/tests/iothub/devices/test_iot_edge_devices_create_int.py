@@ -40,7 +40,7 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
 
         device_arg_string = self._generate_device_arg_string(devices)
         self.cmd(
-            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c {device_arg_string} "
+            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c -y {device_arg_string} "
             "--out bundles --device-auth x509_thumbprint"
         )
 
@@ -72,7 +72,7 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
         # Clean on first run
         device_arg_string = self._generate_device_arg_string(partial_devices_primary)
         self.cmd(
-            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c {device_arg_string} --out primary"
+            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c -y {device_arg_string} --out primary"
         )
 
         self._validate_results(partial_devices_primary, "primary")
@@ -115,7 +115,7 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
         ]
 
         self.cmd(
-            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c --cfg {config_path} "
+            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c -y --cfg {config_path} "
             "--out device_bundles --device-auth x509_thumbprint"
         )
 
@@ -155,7 +155,7 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
             ("device_400", "device_300", self.deployment_lower),
         ]
         self.cmd(
-            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c --cfg {primary_config_path} --out output"
+            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c -y --cfg {primary_config_path} --out output"
         )
 
         self._validate_results(devices_primary, "output")
@@ -179,7 +179,7 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
 
         device_arg_string = self._generate_device_arg_string(devices)
         self.cmd(
-            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c {device_arg_string}"
+            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c -y {device_arg_string}"
         )
 
         self._validate_results(devices, None)
@@ -198,7 +198,7 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
 
         # file has cert auth, call with overrides: keyAuth, custom config path, default edge agent
         self.cmd(
-            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c --cfg {config_path} --dt {config_template} "
+            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c -y --cfg {config_path} --dt {config_template} "
             f"--out device_bundles --device-auth {override_auth_type} --default-edge-agent {default_edge_agent}"
         )
 

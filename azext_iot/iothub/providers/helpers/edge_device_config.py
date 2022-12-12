@@ -7,7 +7,7 @@
 
 from typing import Optional, List, Dict, Any
 from azext_iot.common.fileops import write_content_to_file
-from azext_iot.common.certops import create_root_certificate, load_ca_cert_info
+from azext_iot.common.certops import create_v3_self_signed_root_certificate, load_ca_cert_info
 from azext_iot.common.shared import (
     ConfigType,
     DeviceAuthType,
@@ -360,7 +360,7 @@ def process_edge_devices_config_file_content(
             root_ca_cert, root_ca_key, password=override_root_password
         )
     else:
-        root_cert = create_root_certificate()
+        root_cert = create_v3_self_signed_root_certificate()
 
     # device auth
     # default to symmetric key
@@ -492,7 +492,7 @@ def process_edge_devices_config_args(
     root_cert = (
         load_ca_cert_info(root_cert_path, root_key_path, root_cert_password)
         if all([root_cert_path, root_key_path])
-        else create_root_certificate()
+        else create_v3_self_signed_root_certificate()
     )
 
     config = EdgeDevicesConfig(

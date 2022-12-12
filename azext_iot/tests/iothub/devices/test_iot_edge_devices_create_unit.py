@@ -9,7 +9,7 @@ import json
 import responses
 import re
 from os.path import exists, join
-from azext_iot.common.certops import create_root_certificate
+from azext_iot.common.certops import create_v3_self_signed_root_certificate
 from azext_iot.common.fileops import write_content_to_file
 from azext_iot.common.shared import DeviceAuthType
 from azext_iot.common.utility import process_json_arg, process_yaml_arg
@@ -553,8 +553,7 @@ class TestHierarchyCreateConfig:
 
         # create cert if we need
         if ca_cert_override and ca_key_override:
-            # create_root_certificate()
-            root_cert = create_root_certificate()
+            root_cert = create_v3_self_signed_root_certificate()
             write_content_to_file(
                 content=root_cert["certificate"],
                 destination=test_certs_folder,
@@ -634,7 +633,7 @@ class TestHierarchyCreateConfig:
 
 class TestEdgeHierarchyConfigFunctions:
     def create_test_root_cert(self, path):
-        root_cert = create_root_certificate()
+        root_cert = create_v3_self_signed_root_certificate()
         write_content_to_file(
             content=root_cert["certificate"],
             destination=path,

@@ -4,18 +4,23 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-# Utility classes for edge device configs
 from typing import NamedTuple, Optional, List, Dict
 from azext_iot.sdk.iothub.service.models import ConfigurationContent
 
 
 class EdgeContainerAuth(NamedTuple):
+    """
+    Edge container authentication datatype
+    """
     serveraddress: str
     username: str
     password: str
 
 
 class EdgeDeviceConfig(NamedTuple):
+    """
+    Individual Edge device configuration data format.
+    """
     device_id: str
     deployment: Optional[ConfigurationContent] = None
     parent_id: Optional[str] = None
@@ -26,6 +31,9 @@ class EdgeDeviceConfig(NamedTuple):
 
 
 class EdgeDevicesConfig(NamedTuple):
+    """
+    Edge device configuration file data format.
+    """
     version: str
     auth_method: str
     root_cert: Dict[str, str]

@@ -312,12 +312,12 @@ def load_iothub_help():
 
     helps["iot edge devices"] = """
         type: group
-        short-summary: Commands to create and manage IoT Edge devices.
+        short-summary: Commands to manage IoT Edge devices.
     """
 
     helps["iot edge devices create"] = """
         type: command
-        short-summary: Create configuratations of edge devices in an IoT Hub.
+        short-summary: Create multiple edge devices in an IoT Hub.
         long-summary: |
           This operation accepts inline device arguments or an edge devices configuration file in YAML or JSON format.
           Inline command args (like '--device-auth') will take precedence and override configuration file properties if they are provided.
@@ -331,12 +331,12 @@ def load_iothub_help():
 
         - name: Create a flat list of edge devices using self-signed certificate authentication with various edge property configurations, using inline arguments.
           text: |
-            az iot edge devices create -n {hub_name} --device-auth x509_thumbprint --default-edge-agent {default_edge_agent}
+            az iot edge devices create -n {hub_name} --device-auth x509_thumbprint --default-edge-agent "mcr.microsoft.com/azureiotedge-agent:1.4"
             --device id=device_1 hostname={FQDN}
-            --device id=device_2 edge_agent={custom_agent}
-            --device id=parent hostname={FQDN} edge_agent={custom_agent} container_auth={path_or_json_string}
+            --device id=device_2 edge_agent={agent_image}
+            --device id=parent hostname={FQDN} edge_agent={agent_image} container_auth={path_or_json_string}
 
-        - name: Delete all existing devices on a hub and create new devices based on a configuration file (with progress bars and visualization).
+        - name: Delete all existing device-identities on a hub and create new devices based on a configuration file (with progress bars and visualization output).
           text: >
             az iot edge devices create -n {hub_name} --cfg path/to/config_yml_or_json -c -v
 
