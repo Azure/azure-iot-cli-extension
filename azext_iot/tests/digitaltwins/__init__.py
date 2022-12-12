@@ -528,6 +528,7 @@ class DTLiveScenarioTest(LiveScenarioTest):
     def delete_user_identity(self):
         """Delete user identity if created"""
         if hasattr(self, "user_identity_name"):
+            print("Deleting" + self.user_identity_name)
             self.embedded_cli.invoke(f"identity delete -n {self.user_identity_name} -g {self.rg}")
 
     def get_role_assignment(self, scope, role, assignee):
