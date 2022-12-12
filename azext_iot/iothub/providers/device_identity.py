@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 from pathlib import PurePath
+from knack.prompting import prompt_y_n
 from os import makedirs
 from os.path import exists, abspath
 from shutil import rmtree
@@ -43,6 +44,7 @@ from azext_iot.operations.generic import _execute_query
 from azure.cli.core.azclierror import (
     AzureResponseError,
     InvalidArgumentValueError,
+    ManualInterrupt,
     MutuallyExclusiveArgumentError,
 )
 from azext_iot.operations.hub import _assemble_device
@@ -75,6 +77,7 @@ class DeviceIdentityProvider(IoTHubProvider):
         config_file: Optional[str] = None,
         visualize: bool = False,
         clean: bool = False,
+        yes: bool = False,
         auth_type: Optional[str] = None,
         default_edge_agent: Optional[str] = None,
         device_config_template: Optional[str] = None,
@@ -201,10 +204,12 @@ class DeviceIdentityProvider(IoTHubProvider):
         query_args = ["SELECT deviceId FROM devices"]
         query_method = self.service_sdk.query.get_twins
         existing_devices = _execute_query(query_args, query_method)
-        existing_device_ids = list(map(lambda x: x["deviceId"], existing_devices))
+        existing_device_ids = [x["deviceId"] for x in existing_devices]
 
         # Clear devices if necessary
         if clean and len(existing_device_ids):
+            if not yes and not prompt_y_n(msg=f"Confirm you want to delete all devices in '{self.hub_name}'", default='Y'):
+                raise ManualInterrupt("Operation was aborted, existing device deletion was not confirmed.")
             delete_iterator = (
                 tqdm(existing_device_ids, "Deleting existing device identities")
                 if visualize

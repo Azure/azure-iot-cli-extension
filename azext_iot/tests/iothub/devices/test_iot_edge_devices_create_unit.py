@@ -192,6 +192,8 @@ class TestEdgeHierarchyCreateArgs:
             config_file=config,
             visualize=visualize,
             clean=clean,
+            # can't prompt in unit test
+            yes=clean,
             device_auth_type=auth,
             bundle_output_path=output,
         )
@@ -573,6 +575,8 @@ class TestHierarchyCreateConfig:
             config_file=config,
             visualize=visualize,
             clean=clean,
+            # can't prompt in unit test
+            yes=clean,
             bundle_output_path=out,
             device_auth_type=auth_override,
             device_config_template=template_override,
