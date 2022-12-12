@@ -364,9 +364,8 @@ class DeviceIdentityProvider(IoTHubProvider):
         query_method = self.service_sdk.query.get_twins
         all_hub_devices = _execute_query(query_args, query_method)
 
-        # Sanity check we got all device scopes
+        # Ensure we retrieve all device scopes
         while len(all_hub_devices) < len(config.devices) and scope_retries < MAX_DEVICE_SCOPE_RETRIES:
-            # Give device registry a chance to catch up
             sleep(3)
             scope_retries += 1
             logger.info("Retrying device scope query - attempt {} of {}"
@@ -424,7 +423,6 @@ class DeviceIdentityProvider(IoTHubProvider):
             bundle_plural = '' if num_bundles == 1 else 's'
             print(f"{num_bundles} device bundle{bundle_plural} created in folder: {abspath(bundle_output_directory)}")
 
-    # TODO - Unit test
     def delete_device_identities(self, device_ids: List[str], confirm: bool = False):
         for id in device_ids:
             try:

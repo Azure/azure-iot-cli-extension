@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from unittest.mock import call
 import pytest
 import json
 import responses
@@ -37,6 +38,7 @@ from azext_iot.iothub.common import (
 from azext_iot.tests.conftest import fixture_cmd, mock_target
 
 from azure.cli.core.azclierror import (
+    AzureResponseError,
     FileOperationError,
     InvalidArgumentValueError,
     MutuallyExclusiveArgumentError,
@@ -58,6 +60,16 @@ mock_container_auth = {
 test_certs_folder = "./test_certs"
 test_root_cert = "root-cert.pem"
 test_root_key = "root-key.pem"
+
+test_device_scopes = [
+    {"deviceId": "device_1", "deviceScope": "dev1-scope-value"},
+    {"deviceId": "device_2", "deviceScope": "dev2-scope-value"},
+    {"deviceId": "device_3", "deviceScope": "dev3-scope-value"},
+    {"deviceId": "device_4", "deviceScope": "dev4-scope-value"},
+    {"deviceId": "device_5", "deviceScope": "dev5-scope-value"},
+    {"deviceId": "device_6", "deviceScope": "dev6-scope-value"},
+    {"deviceId": "device_7", "deviceScope": "dev7-scope-value"},
+]
 
 
 class TestEdgeHierarchyCreateArgs:
@@ -383,25 +395,20 @@ class TestHierarchyCreateConfig:
     def service_client(self, mocked_response, fixture_ghcs, fixture_sas):
         mocked_response.assert_all_requests_are_fired = False
         devices_url = f"https://{hub_entity}/devices"
-        # Query devices
-        mocked_response.add(
-            method=responses.POST,
-            url=f"{devices_url}/query",
-            body=json.dumps(
-                [
-                    {"deviceId": "device_1", "deviceScope": "dev1-scope-value"},
-                    {"deviceId": "device_2", "deviceScope": "dev2-scope-value"},
-                    {"deviceId": "device_3", "deviceScope": "dev3-scope-value"},
-                    {"deviceId": "device_4", "deviceScope": "dev4-scope-value"},
-                    {"deviceId": "device_5", "deviceScope": "dev5-scope-value"},
-                    {"deviceId": "device_6", "deviceScope": "dev6-scope-value"},
-                    {"deviceId": "device_7", "deviceScope": "dev7-scope-value"},
-                ]
-            ),
-            status=200,
-            content_type="application/json",
-            match_querystring=False,
-        )
+        # get scopes (force retry)
+        for scope_response in [
+            [],  # Query existing devices
+            test_device_scopes[:-2],  # Get Scopes [missing last 2]
+            test_device_scopes  # On retry, return full list
+        ]:
+            mocked_response.add(
+                method=responses.POST,
+                url=f"{devices_url}/query",
+                body=json.dumps(scope_response),
+                status=200,
+                content_type="application/json",
+                match_querystring=False,
+            )
 
         # delete any existing devices
         mocked_response.add(
@@ -458,6 +465,32 @@ class TestHierarchyCreateConfig:
         )
 
         yield mocked_response
+
+    @pytest.fixture()
+    def scope_retry_failed_client(self, mocked_response, fixture_ghcs, fixture_sas):
+        devices_url = f"https://{hub_entity}/devices"
+        # always return empty query
+        mocked_response.add(
+            method=responses.POST,
+            url=f"{devices_url}/query",
+            body="[]",
+            status=200,
+            content_type="application/json",
+            match_querystring=False,
+        )
+
+        # Create / Update device-identities
+        mocked_response.add(
+            method=responses.PUT,
+            url=re.compile(r"{}/device_\d+".format(devices_url)),
+            body=json.dumps(
+                {"authentication": {"symmetricKey": {"primaryKey": "devicePrimaryKey"}}}
+            ),
+            status=200,
+            content_type="application/json",
+            match_querystring=False,
+        )
+        return mocked_response
 
     @pytest.fixture()
     def mock_config_parse(self, mocker):
@@ -633,6 +666,14 @@ class TestHierarchyCreateConfig:
                 assert exists(join(out, f"{device_id}.tgz"))
 
             rmtree(out)
+
+    def test_edge_devices_scope_retry_failure(self, fixture_cmd, scope_retry_failed_client, set_cwd):
+        with pytest.raises(AzureResponseError):
+            subject.iot_edge_devices_create(
+                cmd=fixture_cmd,
+                devices=None,
+                config_file="device_configs/nested_edge_config.yml"
+            )
 
 
 class TestEdgeHierarchyConfigFunctions:
@@ -1148,3 +1189,84 @@ class TestEdgeHierarchyConfigFunctions:
         )
 
         assert script_content == "\n".join(segments)
+
+
+class TestDevicesDelete:
+    @pytest.fixture()
+    def service_client(self, mocked_response, fixture_ghcs, fixture_sas):
+        mocked_response.assert_all_requests_are_fired = False
+        devices_url = f"https://{hub_entity}/devices"
+        # delete devices
+        mocked_response.add(
+            method=responses.DELETE,
+            url=re.compile(r"{}/device_\d+".format(devices_url)),
+            body="{}",
+            status=204,
+            content_type="application/json",
+            match_querystring=False,
+        )
+
+        # GET existing devices
+        mocked_response.add(
+            method=responses.GET,
+            url=devices_url,
+            body="[]",
+            status=200,
+            content_type="application/json",
+            match_querystring=False,
+        )
+        yield mocked_response
+
+    @pytest.fixture()
+    def mock_bulk_delete(self, mocker):
+        from azext_iot.iothub.providers.device_identity import DeviceIdentityProvider
+
+        return mocker.spy(DeviceIdentityProvider, "delete_device_identities")
+
+    @pytest.fixture()
+    def mock_service_delete(self, mocker):
+        from azext_iot.sdk.iothub.service.operations.devices_operations import DevicesOperations
+
+        mock = mocker.spy(DevicesOperations, "delete_identity")
+        mock.metadata = {'url': '/devices/{id}'}
+        return mock
+
+    @pytest.mark.parametrize(
+        "devices, confirm",
+        [
+            (
+                [
+                    'device_1',
+                    'device_2',
+                    'device_3',
+                ],
+                True
+            ),
+            (
+                [
+                    'device_1'
+                ],
+                False
+            )
+        ]
+    )
+    def test_delete_bulk_devices(
+        self,
+        service_client,
+        mock_bulk_delete,
+        mock_service_delete,
+        fixture_ghcs,
+        fixture_sas,
+        devices,
+        confirm
+    ):
+        subject.iot_delete_devices(
+            cmd=fixture_cmd,
+            device_ids=devices,
+            confirm=confirm
+        )
+        assert mock_bulk_delete.call_args[1]["device_ids"] == devices
+        assert mock_bulk_delete.call_args[1]["confirm"] == confirm
+        mock_self = mock_service_delete.call_args[0][0]
+        calls = [call(mock_self, id=device, if_match="*") for device in devices]
+        mock_service_delete.assert_has_calls(calls)
