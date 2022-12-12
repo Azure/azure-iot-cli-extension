@@ -123,9 +123,8 @@ def isBase64(content: str) -> bool:
 def getCertificateFormatValidation(certificate: str) -> str:
     """
     Checks if the certificate format is valid
-    1. start with -----BEGIN CERTIFICATE----- (prefix)
-    2. end with -----END CERTIFICATE----- (suffix)
-    3. content should be valid base64 string without prefix and suffix
+    1. contain matched BEGIN and END segments
+    2. content should be valid base64 string without BEGIN and END segments
 
     Args:
         certificate (str): certificate string.
@@ -133,18 +132,19 @@ def getCertificateFormatValidation(certificate: str) -> str:
     Returns:
         validation string (str): returns validation string when content format is incorrect.
     """
-    if (
-        certificate.find("-----BEGIN CERTIFICATE-----") != -1
-        and certificate.find("-----END CERTIFICATE-----") != -1
-    ):
-        certificate = certificate.replace("-----BEGIN CERTIFICATE-----", "")
-        certificate = certificate.replace("-----END CERTIFICATE-----", "")
-        if isBase64(certificate):
-            return ""
+    if certificate.find("CERTIFICATE") != -1:
+        if (
+            certificate.find("-----BEGIN CERTIFICATE-----") != -1
+            and certificate.find("-----END CERTIFICATE-----") != -1
+        ):
+            certificate = certificate.replace("-----BEGIN CERTIFICATE-----", "")
+            certificate = certificate.replace("-----END CERTIFICATE-----", "")
         else:
-            return "The certificate content is not a valid base64 string value"
+            return "The certificate does not contain matched BEGIN and END segments, please either have both '-----BEGIN CERTIFICATE-----' and '-----END CERTIFICATE-----', or consider deleting them."
+    if isBase64(certificate):
+        return ""
     else:
-        return "The certificate should start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----'"
+        return "The certificate content is not a valid base64 string value"
 
 
 def open_certificate(certificate_path: str) -> str:
