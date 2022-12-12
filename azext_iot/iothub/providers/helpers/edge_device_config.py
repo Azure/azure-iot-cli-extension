@@ -32,6 +32,8 @@ from knack.log import get_logger
 
 logger = get_logger(__name__)
 
+MAX_DEVICE_SCOPE_RETRIES = 5
+
 DEVICE_CONFIG_SCHEMA_VALID_VERSIONS: Dict[str, Any] = {}
 
 DEVICE_CONFIG_SCHEMA_VALID_VERSIONS["1.0"] = {

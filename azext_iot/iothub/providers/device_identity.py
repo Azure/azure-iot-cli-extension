@@ -18,6 +18,7 @@ from azext_iot.common.fileops import tar_directory, write_content_to_file
 from azext_iot.iothub.providers.helpers.edge_device_config import (
     DEVICE_README,
     EDGE_ROOT_CERTIFICATE_FILENAME,
+    MAX_DEVICE_SCOPE_RETRIES,
     create_edge_device_config,
     process_edge_devices_config_args,
     process_edge_devices_config_file_content,
@@ -357,18 +358,25 @@ class DeviceIdentityProvider(IoTHubProvider):
                 # delete uncompressed files
                 rmtree(device_cert_output_directory)
 
-        # Give device registry a chance to catch up
-        sleep(1)
-
         # Get all device ids and scopes (inconsistent timing, hence sleep)
+        scope_retries = 0
         query_args = ["SELECT deviceId, deviceScope FROM devices"]
         query_method = self.service_sdk.query.get_twins
         all_hub_devices = _execute_query(query_args, query_method)
 
         # Sanity check we got all device scopes
+        while len(all_hub_devices) < len(config.devices) and scope_retries < MAX_DEVICE_SCOPE_RETRIES:
+            # Give device registry a chance to catch up
+            sleep(3)
+            scope_retries += 1
+            logger.info("Retrying device scope query - attempt {} of {}"
+                        .format(scope_retries, MAX_DEVICE_SCOPE_RETRIES))
+            all_hub_devices = _execute_query(query_args, query_method)
+
         if len(all_hub_devices) < len(config.devices):
             raise AzureResponseError(
-                "An error occurred - Failed to fetch device scopes for all devices"
+                "An error occurred - Failed to fetch device scopes for all devices after {} retries"
+                .format(scope_retries)
             )
 
         # set all device scopes
