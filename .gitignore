@@ -324,3 +324,6 @@ src/build
 *.sh
 
 /extensions
+
+# .env environment file
+.env

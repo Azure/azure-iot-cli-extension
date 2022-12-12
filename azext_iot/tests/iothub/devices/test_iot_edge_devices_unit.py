@@ -217,7 +217,6 @@ class TestEdgeHierarchyCreateArgs:
                 assert exists(join(output, f"{device_id}.tgz"))
 
             rmtree(output)
-        pass
 
 
 class TestHierarchyCreateFailures:

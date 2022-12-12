@@ -10,7 +10,6 @@ import tarfile
 from shutil import rmtree
 from os.path import exists
 from azext_iot.tests.iothub import IoTLiveScenarioTest
-from azext_iot.iothub.common import EdgeContainerAuth
 
 
 class EdgeDevicesTestConfig(NamedTuple):

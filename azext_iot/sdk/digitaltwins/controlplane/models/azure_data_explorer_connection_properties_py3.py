@@ -22,10 +22,13 @@ class AzureDataExplorerConnectionProperties(TimeSeriesDatabaseConnectionProperti
     All required parameters must be populated in order to send to Azure.
 
     :ivar provisioning_state: The provisioning state. Possible values include:
-     'Provisioning', 'Deleting', 'Succeeded', 'Failed', 'Canceled', 'Deleted',
-     'Warning', 'Suspending', 'Restoring', 'Moving', 'Disabled'
+     'Provisioning', 'Deleting', 'Updating', 'Succeeded', 'Failed', 'Canceled',
+     'Deleted', 'Warning', 'Suspending', 'Restoring', 'Moving', 'Disabled'
     :vartype provisioning_state: str or
      ~controlplane.models.TimeSeriesDatabaseConnectionState
+    :param identity: Managed identity properties for the time series database
+     connection resource.
+    :type identity: ~controlplane.models.ManagedIdentityReference
     :param connection_type: Required. Constant filled by server.
     :type connection_type: str
     :param adx_resource_id: Required. The resource ID of the Azure Data
@@ -37,7 +40,8 @@ class AzureDataExplorerConnectionProperties(TimeSeriesDatabaseConnectionProperti
     :param adx_database_name: Required. The name of the Azure Data Explorer
      database.
     :type adx_database_name: str
-    :param adx_table_name: The name of the Azure Data Explorer table.
+    :param adx_table_name: The name of the Azure Data Explorer table. Defaults
+     to AdtPropertyEvents. Default value: "AdtPropertyEvents" .
     :type adx_table_name: str
     :param event_hub_endpoint_uri: Required. The URL of the EventHub namespace
      for identity-based authentication. It must include the protocol sb://
@@ -49,7 +53,7 @@ class AzureDataExplorerConnectionProperties(TimeSeriesDatabaseConnectionProperti
      EventHub namespace.
     :type event_hub_namespace_resource_id: str
     :param event_hub_consumer_group: The EventHub consumer group to use when
-     ADX reads from EventHub. Defaults to $Default.
+     ADX reads from EventHub. Defaults to $Default. Default value: "$Default" .
     :type event_hub_consumer_group: str
     """
 
@@ -66,6 +70,7 @@ class AzureDataExplorerConnectionProperties(TimeSeriesDatabaseConnectionProperti
 
     _attribute_map = {
         'provisioning_state': {'key': 'provisioningState', 'type': 'str'},
+        'identity': {'key': 'identity', 'type': 'ManagedIdentityReference'},
         'connection_type': {'key': 'connectionType', 'type': 'str'},
         'adx_resource_id': {'key': 'adxResourceId', 'type': 'str'},
         'adx_endpoint_uri': {'key': 'adxEndpointUri', 'type': 'str'},
@@ -77,8 +82,8 @@ class AzureDataExplorerConnectionProperties(TimeSeriesDatabaseConnectionProperti
         'event_hub_consumer_group': {'key': 'eventHubConsumerGroup', 'type': 'str'},
     }
 
-    def __init__(self, *, adx_resource_id: str, adx_endpoint_uri: str, adx_database_name: str, event_hub_endpoint_uri: str, event_hub_entity_path: str, event_hub_namespace_resource_id: str, adx_table_name: str=None, event_hub_consumer_group: str=None, **kwargs) -> None:
-        super(AzureDataExplorerConnectionProperties, self).__init__(**kwargs)
+    def __init__(self, *, adx_resource_id: str, adx_endpoint_uri: str, adx_database_name: str, event_hub_endpoint_uri: str, event_hub_entity_path: str, event_hub_namespace_resource_id: str, identity=None, adx_table_name: str="AdtPropertyEvents", event_hub_consumer_group: str="$Default", **kwargs) -> None:
+        super(AzureDataExplorerConnectionProperties, self).__init__(identity=identity, **kwargs)
         self.adx_resource_id = adx_resource_id
         self.adx_endpoint_uri = adx_endpoint_uri
         self.adx_database_name = adx_database_name

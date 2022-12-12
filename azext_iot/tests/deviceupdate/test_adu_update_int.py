@@ -12,6 +12,7 @@ from azext_iot.common.utility import process_json_arg
 from azext_iot.tests.conftest import get_context_path
 from azext_iot.tests.deviceupdate.conftest import DEFAULT_ADU_RBAC_SLEEP_SEC, ADU_CLIENT_DTMI, ACCOUNT_RG
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests.settings import DynamoSettings
 from time import sleep
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List
@@ -20,12 +21,17 @@ cli = EmbeddedCLI()
 
 logger = get_logger(__name__)
 
+
+settings = DynamoSettings(opt_env_set=["azext_iot_adu_it_skip_logcollection"])
+SKIP_LOG_COLLECTION = settings.env.azext_iot_adu_it_skip_logcollection
+
+
 #  Instance creation and manipulation takes an extra long time overhead.
 #  Therefore we are aiming to provision instance resources conservatively.
 
 
 pytestmark = pytest.mark.adu_infrastructure(
-    location="eastus2euap",
+    location="westus2",
     instance_count=1,
     instance_diagnostics=True,
     instance_diagnostics_user_storage=True)
@@ -284,36 +290,37 @@ def test_instance_update_lifecycle(provisioned_instances_module: Dict[str, dict]
         show_device_group_template_cmd.replace("#", device_group_show_flags[2])).as_json()
     assert show_device_group_update_compliance == show_device_class_update_compliance
 
-    log_collection_desc = generate_generic_id()
-    log_collection_id = generate_generic_id()
-    create_diagnostic_log_collect = cli.invoke(
-        f"iot du device log collect -n {account_name} -i {instance_name} --log-collection-id {log_collection_id} "
-        f"--description {log_collection_desc} --agent-id deviceId={device_id}").as_json()
-    assert create_diagnostic_log_collect["logCollectionId"] == log_collection_id
-    assert create_diagnostic_log_collect["description"] == log_collection_desc
-    assert create_diagnostic_log_collect["deviceList"][0]["deviceId"] == device_id
-    assert create_diagnostic_log_collect["status"] == "NotStarted"
+    if not SKIP_LOG_COLLECTION:
+        log_collection_desc = generate_generic_id()
+        log_collection_id = generate_generic_id()
+        create_diagnostic_log_collect = cli.invoke(
+            f"iot du device log collect -n {account_name} -i {instance_name} --log-collection-id {log_collection_id} "
+            f"--description {log_collection_desc} --agent-id deviceId={device_id}").as_json()
+        assert create_diagnostic_log_collect["logCollectionId"] == log_collection_id
+        assert create_diagnostic_log_collect["description"] == log_collection_desc
+        assert create_diagnostic_log_collect["deviceList"][0]["deviceId"] == device_id
+        assert create_diagnostic_log_collect["status"] == "NotStarted"
 
-    list_diagnostic_log = cli.invoke(
-        f"iot du device log list -n {account_name} -i {instance_name}"
-    ).as_json()
-    assert len(list_diagnostic_log) == 1
-    assert list_diagnostic_log[0]["logCollectionId"] == log_collection_id
-    assert "status" in list_diagnostic_log[0]
-
-    show_diagnostic_log_flags = ["", "--detailed"]
-    for flag in show_diagnostic_log_flags:
-        show_diagnostic_log = cli.invoke(
-            f"iot du device log show -n {account_name} -i {instance_name} --log-collection-id {log_collection_id} "
-            f"{flag}"
+        list_diagnostic_log = cli.invoke(
+            f"iot du device log list -n {account_name} -i {instance_name}"
         ).as_json()
-        show_diagnostic_log["logCollectionId"] == log_collection_id
-        assert "status" in show_diagnostic_log
-        if flag == "--detailed":
-            # TODO: Not consistently working from the service
-            # assert show_diagnostic_log["deviceStatus"][0]["deviceId"] == device_id
-            # assert "logLocation" in show_diagnostic_log["deviceStatus"][0]
-            pass
+        assert len(list_diagnostic_log) == 1
+        assert list_diagnostic_log[0]["logCollectionId"] == log_collection_id
+        assert "status" in list_diagnostic_log[0]
+
+        show_diagnostic_log_flags = ["", "--detailed"]
+        for flag in show_diagnostic_log_flags:
+            show_diagnostic_log = cli.invoke(
+                f"iot du device log show -n {account_name} -i {instance_name} --log-collection-id {log_collection_id} "
+                f"{flag}"
+            ).as_json()
+            show_diagnostic_log["logCollectionId"] == log_collection_id
+            assert "status" in show_diagnostic_log
+            if flag == "--detailed":
+                # TODO: Not consistently working from the service
+                # assert show_diagnostic_log["deviceStatus"][0]["deviceId"] == device_id
+                # assert "logLocation" in show_diagnostic_log["deviceStatus"][0]
+                pass
 
     start_date_time = datetime.now(tz=timezone.utc) + timedelta(hours=8)
     start_date_time_iso = start_date_time.isoformat()

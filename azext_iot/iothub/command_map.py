@@ -19,6 +19,9 @@ device_messaging_ops = CliCommandType(
 device_identity_ops = CliCommandType(
     operations_tmpl="azext_iot.iothub.commands_device_identity#{}"
 )
+iothub_resource_ops = CliCommandType(
+    operations_tmpl="azext_iot.iothub.commands_certificate#{}"
+)
 
 
 def load_iothub_commands(self, _):
@@ -59,3 +62,9 @@ def load_iothub_commands(self, _):
         "iot edge devices", command_type=device_identity_ops
     ) as cmd_group:
         cmd_group.command("create", "iot_edge_devices_create", is_experimental=True)
+
+    with self.command_group(
+        "iot hub certificate root-authority", command_type=iothub_resource_ops, is_experimental=True
+    ) as cmd_group:
+        cmd_group.show_command("show", "certificate_root_authority_show")
+        cmd_group.command("set", "certificate_root_authority_set")

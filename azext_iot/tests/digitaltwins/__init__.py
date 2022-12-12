@@ -422,6 +422,20 @@ class DTLiveScenarioTest(LiveScenarioTest):
                 )
             )
 
+    def ensure_user_identity(self):
+        """Create a user identity to use with the test. Will populate self.user_identity_name
+
+        Returns the user identity object."""
+        if not hasattr(self, "user_identity_name"):
+            self.user_identity_name = generate_resource_id()
+            return self.embedded_cli.invoke(
+                f"identity create -n {self.user_identity_name} -g {self.rg}"
+            ).as_json()
+        else:
+            return self.embedded_cli.invoke(
+                f"identity show -n {self.user_identity_name} -g {self.rg}"
+            ).as_json()
+
     def delete_adx_resources(self):
         """Delete all created ADX resources."""
         # Once the az kusto is no longer private, enable just in time resource generation
@@ -511,12 +525,33 @@ class DTLiveScenarioTest(LiveScenarioTest):
                 )
             )
 
+    def delete_user_identity(self):
+        """Delete user identity if created"""
+        if hasattr(self, "user_identity_name"):
+            self.embedded_cli.invoke(f"identity delete -n {self.user_identity_name} -g {self.rg}")
+
     def get_role_assignment(self, scope, role, assignee):
         return self.cmd(
             'role assignment list --scope "{}" --role "{}" --assignee {}'.format(
                 scope, role, assignee
             )
         ).get_output_in_json()
+
+    def assign_role_assignment(self, scope, role, assignee, max_tries=10):
+        tries = 0
+        while tries < max_tries:
+            role_assignments = self.get_role_assignment(scope, role, assignee)
+            role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
+            if assignee in role_assignment_principal_ids:
+                break
+            # else assign role to scope and check again
+            self.cmd(
+                'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
+                    assignee, role, scope
+                )
+            )
+            sleep(10)
+            tries += 1
 
     def track_instance(self, instance: dict):
         self.tracked_instances.append((instance["name"], instance["resourceGroup"]))
