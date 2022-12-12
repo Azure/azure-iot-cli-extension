@@ -528,7 +528,15 @@ class DTLiveScenarioTest(LiveScenarioTest):
     def delete_user_identity(self):
         """Delete user identity if created"""
         if hasattr(self, "user_identity_name"):
-            print("Deleting" + self.user_identity_name)
+            # disassociate the identites
+            for instance in self.tracked_instances:
+                try:
+                    self.embedded_cli.invoke(
+                       f"dt identity remove -n {instance[0]} -g {instance[1]} --user"
+                    )
+                except Exception:
+                    logger.info("The user identites for DT instance {} cannot be deleted.".format(instance))
+
             self.embedded_cli.invoke(f"identity delete -n {self.user_identity_name} -g {self.rg}")
 
     def get_role_assignment(self, scope, role, assignee):
