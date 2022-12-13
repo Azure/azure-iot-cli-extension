@@ -6,6 +6,54 @@ Release History
 unreleased
 +++++++++++++++
 
+0.18.3
++++++++++++++++
+**IoT Hub updates**
+
+* The root-authority migration feature is now available. Since the Baltimore root will soon expire, IoT Hub will
+  transition to the DigiCert Global G2 root starting February 15, 2023. You will need to update all device certificates
+  to use the new G2 root.
+  
+  **These commands are temporary** and will be removed once all IoT Hubs have been transitioned:
+    
+  - az iot hub certificate root-authority show
+  - az iot hub certificate root-authority set
+  
+  To learn more about this transition, visit http://aka.ms/iot-ca-updates/.
+
+
+**IoT Central updates**
+
+* Fixed an issue with enrollement group certificate encoding 
+
+
+0.18.2
++++++++++++++++
+
+**Device Update**
+
+`az iot du update init v5` improvements:
+
+* Fixed an issue where duplicate `files[]` / `relatedFiles[]` entries were created via multiple usage of --file or 
+  --related-file against the same update file asset.
+* If the inline step content handler requires `handlerProperties.installedCriteria` and a value was not provided,
+  a default value will be automatically added with a warning.
+* If the inline step content handler starts with 'microsoft' (case-insensitive), valid first-party handler values
+  will be enforced.
+* Inline json rules and examples provided for every shell.
+* Improves error handling for free-form json properties.
+
+**Digital Twins**
+
+* New command group `az dt identity` to easily manage instance identities.
+* `az dt create` supports adding user-managed identities on create.
+* `az dt endpoint create <type>` commands support identity parameters - you are able to leverage managed identities
+  to integrate with the target endpoint.
+  * The `eventgrid` endpoint does not support managed identities.
+* Resource group for endpoint resources are no longer required - if not present, the resource group of the
+  digital twins instance is used.
+
+
 0.18.1
 +++++++++++++++
 

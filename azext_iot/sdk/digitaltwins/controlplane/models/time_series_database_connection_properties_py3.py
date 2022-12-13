@@ -24,10 +24,13 @@ class TimeSeriesDatabaseConnectionProperties(Model):
     All required parameters must be populated in order to send to Azure.
 
     :ivar provisioning_state: The provisioning state. Possible values include:
-     'Provisioning', 'Deleting', 'Succeeded', 'Failed', 'Canceled', 'Deleted',
-     'Warning', 'Suspending', 'Restoring', 'Moving', 'Disabled'
+     'Provisioning', 'Deleting', 'Updating', 'Succeeded', 'Failed', 'Canceled',
+     'Deleted', 'Warning', 'Suspending', 'Restoring', 'Moving', 'Disabled'
     :vartype provisioning_state: str or
      ~controlplane.models.TimeSeriesDatabaseConnectionState
+    :param identity: Managed identity properties for the time series database
+     connection resource.
+    :type identity: ~controlplane.models.ManagedIdentityReference
     :param connection_type: Required. Constant filled by server.
     :type connection_type: str
     """
@@ -39,6 +42,7 @@ class TimeSeriesDatabaseConnectionProperties(Model):
 
     _attribute_map = {
         'provisioning_state': {'key': 'provisioningState', 'type': 'str'},
+        'identity': {'key': 'identity', 'type': 'ManagedIdentityReference'},
         'connection_type': {'key': 'connectionType', 'type': 'str'},
     }
 
@@ -46,7 +50,8 @@ class TimeSeriesDatabaseConnectionProperties(Model):
         'connection_type': {'AzureDataExplorer': 'AzureDataExplorerConnectionProperties'}
     }
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, *, identity=None, **kwargs) -> None:
         super(TimeSeriesDatabaseConnectionProperties, self).__init__(**kwargs)
         self.provisioning_state = None
+        self.identity = identity
         self.connection_type = None

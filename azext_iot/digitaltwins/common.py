@@ -17,6 +17,11 @@ ADT_CREATE_RETRY_AFTER = 60
 MAX_ADT_DH_CREATE_RETRIES = 20
 
 
+# Identity params
+SYSTEM_IDENTITY = "[system]"
+LRO_TIMER = 60
+
+
 # Data History strings
 DT_IDENTITY_ERROR = "Digital Twins instance does not have System-Assigned Identity enabled. Please enable and try again."
 FINISHED_CHECK_RESOURCE_LOG_MSG = "Finished checking the {0} resource."
@@ -95,3 +100,13 @@ class ADTModelCreateFailurePolicy(Enum):
     """
     ROLLBACK = "Rollback"
     NONE = "None"
+
+
+class IdentityType(Enum):
+    """
+    Type of managed identity for the Digital Twin.
+    """
+    system_assigned = "SystemAssigned"
+    user_assigned = "UserAssigned"
+    system_assigned_user_assigned = "SystemAssigned,UserAssigned"
+    none = "None"

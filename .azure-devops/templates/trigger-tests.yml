@@ -92,7 +92,7 @@ jobs:
       serviceConnection: $(AzureServiceConnection)
 
 - job: 'testHub_job_1'
-  displayName: 'Test IoT Hub - config, core, message endpoints, and jobs'
+  displayName: 'Test IoT Hub - certificate, config, core, message endpoints, and jobs'
   condition: and(succeeded(), eq('${{ parameters.testHub }}', true))
   strategy:
     matrix: $[ variables['pythonVersions'] ]
@@ -100,7 +100,7 @@ jobs:
   steps:
   - template: run-tests-parallel.yml
     parameters:
-      path: 'azext_iot/tests/iothub/configurations azext_iot/tests/iothub/core azext_iot/tests/iothub/message_endpoint azext_iot/tests/iothub/jobs'
+      path: 'azext_iot/tests/iothub/certificate azext_iot/tests/iothub/configurations azext_iot/tests/iothub/core azext_iot/tests/iothub/message_endpoint azext_iot/tests/iothub/jobs'
       name: 'iot-hub-1'
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
       pythonVersion: $(python)
@@ -122,7 +122,7 @@ jobs:
       serviceConnection: $(AzureServiceConnection)
 
 - job: 'testADU'
-  timeoutInMinutes: 120
+  timeoutInMinutes: 150
   displayName: 'Test Azure Device Update'
   condition: and(succeeded(), eq('${{ parameters.testADU }}', true))
   strategy:
@@ -136,7 +136,6 @@ jobs:
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
       pythonVersion: $(python)
       num_reruns: 0
-      num_threads: 4
       serviceConnection: $(AzureServiceConnectionAlt)
 
 - job: 'unitTests'

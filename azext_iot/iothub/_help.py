@@ -626,3 +626,33 @@ def load_iothub_help():
             text: >
                 az iot hub message-route fallback set -n {iothub_name} --enabled false
     """
+                
+    helps["iot hub certificate root-authority"] = """
+        type: group
+        short-summary: Manage the certificate root-authority for an IoT Hub instance.
+    """
+
+    helps["iot hub certificate root-authority set"] = """
+        type: command
+        short-summary: Set the certificate root-authority for an IoT Hub instance to a specific version.
+        long-summary: Transition this resource to a certificate on the DigiCert Global G2 root (v2) or revert to Baltimore root (v1).
+          Before making this transition, please ensure all devices are updated to contain the public portion of the root
+          that the IoT Hub will be transitioned to. Devices will disconnect and reconnect using the new root.
+          We suggest monitoring current connections but an user defined metric may be more appropriate for your situation.
+        examples:
+        - name: Transition the target IoT Hub certificate root authority to Digicert.
+          text: >
+            az iot hub certificate root-authority set --hub-name {iothub_name} --certificate-authority v2
+        - name: Revert the target IoT Hub certificate root authority to Baltimore.
+          text: >
+            az iot hub certificate root-authority set --hub-name {iothub_name} --certificate-authority v1
+    """
+
+    helps["iot hub certificate root-authority show"] = """
+        type: command
+        short-summary: Show the current certificate root-authority for an IoT Hub instance.
+        examples:
+        - name: Show the target IoT Hub certificate root authority.
+          text: >
+            az iot hub certificate root-authority show --hub-name {iothub_name}
+    """

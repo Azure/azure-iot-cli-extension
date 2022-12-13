@@ -21,8 +21,8 @@ class EventHub(DigitalTwinsEndpointResourceProperties):
     All required parameters must be populated in order to send to Azure.
 
     :ivar provisioning_state: The provisioning state. Possible values include:
-     'Provisioning', 'Deleting', 'Succeeded', 'Failed', 'Canceled', 'Deleted',
-     'Warning', 'Suspending', 'Restoring', 'Moving', 'Disabled'
+     'Provisioning', 'Deleting', 'Updating', 'Succeeded', 'Failed', 'Canceled',
+     'Deleted', 'Warning', 'Suspending', 'Restoring', 'Moving', 'Disabled'
     :vartype provisioning_state: str or
      ~controlplane.models.EndpointProvisioningState
     :ivar created_time: Time when the Endpoint was added to
@@ -34,14 +34,15 @@ class EventHub(DigitalTwinsEndpointResourceProperties):
      connection string). If 'IdentityBased' is select, the endpointUri and
      entityPath properties must be specified. Possible values include:
      'KeyBased', 'IdentityBased'
-    :type authentication_type: str or
-     ~controlplane.models.AuthenticationType
+    :type authentication_type: str or ~controlplane.models.AuthenticationType
     :param dead_letter_secret: Dead letter storage secret for key-based
      authentication. Will be obfuscated during read.
     :type dead_letter_secret: str
     :param dead_letter_uri: Dead letter storage URL for identity-based
      authentication.
     :type dead_letter_uri: str
+    :param identity: Managed identity properties for the endpoint.
+    :type identity: ~controlplane.models.ManagedIdentityReference
     :param endpoint_type: Required. Constant filled by server.
     :type endpoint_type: str
     :param connection_string_primary_key: PrimaryConnectionString of the
@@ -70,6 +71,7 @@ class EventHub(DigitalTwinsEndpointResourceProperties):
         'authentication_type': {'key': 'authenticationType', 'type': 'str'},
         'dead_letter_secret': {'key': 'deadLetterSecret', 'type': 'str'},
         'dead_letter_uri': {'key': 'deadLetterUri', 'type': 'str'},
+        'identity': {'key': 'identity', 'type': 'ManagedIdentityReference'},
         'endpoint_type': {'key': 'endpointType', 'type': 'str'},
         'connection_string_primary_key': {'key': 'connectionStringPrimaryKey', 'type': 'str'},
         'connection_string_secondary_key': {'key': 'connectionStringSecondaryKey', 'type': 'str'},
@@ -77,8 +79,8 @@ class EventHub(DigitalTwinsEndpointResourceProperties):
         'entity_path': {'key': 'entityPath', 'type': 'str'},
     }
 
-    def __init__(self, *, authentication_type=None, dead_letter_secret: str=None, dead_letter_uri: str=None, connection_string_primary_key: str=None, connection_string_secondary_key: str=None, endpoint_uri: str=None, entity_path: str=None, **kwargs) -> None:
-        super(EventHub, self).__init__(authentication_type=authentication_type, dead_letter_secret=dead_letter_secret, dead_letter_uri=dead_letter_uri, **kwargs)
+    def __init__(self, *, authentication_type=None, dead_letter_secret: str=None, dead_letter_uri: str=None, identity=None, connection_string_primary_key: str=None, connection_string_secondary_key: str=None, endpoint_uri: str=None, entity_path: str=None, **kwargs) -> None:
+        super(EventHub, self).__init__(authentication_type=authentication_type, dead_letter_secret=dead_letter_secret, dead_letter_uri=dead_letter_uri, identity=identity, **kwargs)
         self.connection_string_primary_key = connection_string_primary_key
         self.connection_string_secondary_key = connection_string_secondary_key
         self.endpoint_uri = endpoint_uri
