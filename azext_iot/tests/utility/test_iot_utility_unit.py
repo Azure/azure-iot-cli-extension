@@ -25,6 +25,12 @@ from azext_iot.common.deps import ensure_uamqp
 from azext_iot.constants import EVENT_LIB, EXTENSION_NAME
 from azext_iot._validators import mode2_iot_login_handler
 from azext_iot.common.embedded_cli import EmbeddedCLI
+from azext_iot.tests.test_utils import create_certificate
+from azext_iot.common.certops import (
+    getCertificateFormatValidation,
+    isBase64
+)
+from azext_iot.tests.test_constants import Certificates
 
 
 class TestMinPython(object):
@@ -475,3 +481,23 @@ class TestHandleServiceException(object):
 
         with pytest.raises(expected_error):
             handle_service_exception(error)
+
+class TestCertificateValidators(object):
+    def test_base64_content(self):
+        base64_content = "aGVsbG8="
+        non_base64_content = "hello"
+
+        assert isBase64(base64_content) == True
+        assert isBase64(non_base64_content) == False
+
+    def test_getCertificateFormatValidation(self):
+        # BEGIN CERTIFICATE + base64 content + END CERTIFICATE
+        assert getCertificateFormatValidation(Certificates.certificate_scenario_one) == ""
+        # base64 content only
+        assert getCertificateFormatValidation(Certificates.certificate_scenario_two) == ""
+        # non-base64 content only
+        assert getCertificateFormatValidation(Certificates.certificate_scenario_three) == "The certificate content is not a valid base64 string value"
+        # EncodeBase64(BEGIN CERTIFICATE + base64 content + END CERTIFICATE)
+        assert getCertificateFormatValidation(Certificates.certificate_scenario_four) == ""
+        # BEGIN CERTIFICATE + base64 content
+        assert getCertificateFormatValidation(Certificates.certificate_scenario_five) == "The certificate does not contain matched BEGIN and END segments, please either have both '-----BEGIN CERTIFICATE-----' and '-----END CERTIFICATE-----', or consider deleting them."
