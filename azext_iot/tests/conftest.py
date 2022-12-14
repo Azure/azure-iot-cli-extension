@@ -433,12 +433,3 @@ def fixture_dps_sas(mocker):
                                mock_dps_target['primarykey'])
     sas = mocker.patch(path_sas)
     sas.return_value = r
-
-
-@pytest.fixture
-def patch_certificate_open(mocker):
-    patch = mocker.patch(
-        "azext_iot.operations.dps.open_certificate"
-    )
-    patch.return_value = ""
-    return patch

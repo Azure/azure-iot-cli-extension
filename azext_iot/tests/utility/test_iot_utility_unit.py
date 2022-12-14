@@ -8,6 +8,7 @@ import json
 import pytest
 import os
 import sys
+import base64
 
 from unittest import mock
 from knack.util import CLIError
@@ -25,12 +26,13 @@ from azext_iot.common.deps import ensure_uamqp
 from azext_iot.constants import EVENT_LIB, EXTENSION_NAME
 from azext_iot._validators import mode2_iot_login_handler
 from azext_iot.common.embedded_cli import EmbeddedCLI
-from azext_iot.tests.test_utils import create_certificate
 from azext_iot.common.certops import (
     getCertificateFormatValidation,
-    isBase64
+    isBase64,
+    open_certificate
 )
-from azext_iot.tests.test_constants import Certificates
+from azext_iot.tests.test_constants import CertificatesMessage
+from azext_iot.tests.test_utils import create_certificate
 
 
 class TestMinPython(object):
@@ -482,22 +484,39 @@ class TestHandleServiceException(object):
         with pytest.raises(expected_error):
             handle_service_exception(error)
 
+
 class TestCertificateValidators(object):
     def test_base64_content(self):
         base64_content = "aGVsbG8="
         non_base64_content = "hello"
 
-        assert isBase64(base64_content) == True
-        assert isBase64(non_base64_content) == False
+        assert isBase64(base64_content)
+        assert not isBase64(non_base64_content)
 
     def test_getCertificateFormatValidation(self):
+        # Set up certificate
+        output_dir = os.getcwd()
+        cert = create_certificate(subject="openCertTest", valid_days=1, cert_output_dir=output_dir)['certificate']
         # BEGIN CERTIFICATE + base64 content + END CERTIFICATE
-        assert getCertificateFormatValidation(Certificates.certificate_scenario_one) == ""
+        assert getCertificateFormatValidation(cert) == ""
         # base64 content only
-        assert getCertificateFormatValidation(Certificates.certificate_scenario_two) == ""
+        newCert = cert.replace("-----BEGIN CERTIFICATE-----", "")
+        newCert = newCert.replace("-----END CERTIFICATE-----", "")
+        assert getCertificateFormatValidation(newCert) == ""
         # non-base64 content only
-        assert getCertificateFormatValidation(Certificates.certificate_scenario_three) == "The certificate content is not a valid base64 string value"
+        newCert = newCert.join("Hello")
+        assert getCertificateFormatValidation(newCert) == CertificatesMessage.invalidBase64
         # EncodeBase64(BEGIN CERTIFICATE + base64 content + END CERTIFICATE)
-        assert getCertificateFormatValidation(Certificates.certificate_scenario_four) == ""
+        cert_string_bytes = cert.encode("ascii")
+        base64_bytes = base64.b64encode(cert_string_bytes)
+        base64_string = base64_bytes.decode("ascii")
+        assert getCertificateFormatValidation(base64_string) == ""
         # BEGIN CERTIFICATE + base64 content
-        assert getCertificateFormatValidation(Certificates.certificate_scenario_five) == "The certificate does not contain matched BEGIN and END segments, please either have both '-----BEGIN CERTIFICATE-----' and '-----END CERTIFICATE-----', or consider deleting them."
+        newCert = cert.replace("-----END CERTIFICATE-----", "")
+        assert getCertificateFormatValidation(newCert) == CertificatesMessage.unmatchedSegment
+
+    def test_open_certificate(self):
+        # Set up certificate
+        output_dir = os.getcwd()
+        cert = create_certificate(subject="openCertTest", valid_days=1, cert_output_dir=output_dir)['certificate']
+        assert open_certificate("./openCertTest-cert.pem").replace('\r', '').replace('\n', '') == cert.replace('\n', '')

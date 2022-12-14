@@ -200,7 +200,7 @@ def create_certificate(
         subject (str): Certificate common name; host name or wildcard.
         valid_days (int): number of days certificate is valid for; used to calculate
             certificate expiry.
-        cert_putput_dir (str): string value of output directory.
+        cert_output_dir (str): string value of output directory.
         file_prefix (str): Certificate and key file name if it needs to be different from the subject.
         cert_path (str): Path to certificate pem file.
         key_path (str): Path to key pem file.

@@ -140,7 +140,8 @@ def getCertificateFormatValidation(certificate: str) -> str:
             certificate = certificate.replace("-----BEGIN CERTIFICATE-----", "")
             certificate = certificate.replace("-----END CERTIFICATE-----", "")
         else:
-            return "The certificate does not contain matched BEGIN and END segments, please either have both '-----BEGIN CERTIFICATE-----' and '-----END CERTIFICATE-----', or consider deleting them."
+            return ("The certificate does not contain matched BEGIN and END segments, please either have both '-----BEGIN "
+                    "CERTIFICATE-----' and '-----END CERTIFICATE-----', or consider deleting them.")
     if isBase64(certificate):
         return ""
     else:
