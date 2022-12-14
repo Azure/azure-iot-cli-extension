@@ -11,7 +11,7 @@ from azext_iot.deviceupdate.providers.base import (
     DeviceUpdateDataManager,
     AzureError,
 )
-from typing import Optional
+from typing import Optional, List
 
 logger = get_logger(__name__)
 
@@ -21,7 +21,7 @@ def collect_logs(
     name: str,
     instance_name: str,
     log_collection_id: str,
-    agent_id: str,
+    agent_id: List[List[str]],
     description: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
@@ -56,7 +56,7 @@ def show_log_collection(
     name: str,
     instance_name: str,
     log_collection_id: str,
-    detailed_status: Optional[str] = None,
+    detailed_status: Optional[bool] = None,
     resource_group_name: Optional[str] = None,
 ):
     data_manager = DeviceUpdateDataManager(
