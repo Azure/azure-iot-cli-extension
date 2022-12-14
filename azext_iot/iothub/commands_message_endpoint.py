@@ -127,7 +127,7 @@ def message_endpoint_create_cosmos_db_container(
     )
     return message_endpoint_provider.create(
         endpoint_name=endpoint_name,
-        endpoint_type=EndpointType.CosmosDBCollection.value,
+        endpoint_type=EndpointType.CosmosDBContainer.value,
         endpoint_account_name=endpoint_account_name,
         endpoint_resource_group=endpoint_resource_group,
         endpoint_subscription_id=endpoint_subscription_id,

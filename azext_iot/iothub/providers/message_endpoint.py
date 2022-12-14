@@ -84,7 +84,9 @@ class MessageEndpoint(IoTHubProvider):
                     error_msg + " or endpoint namespace '--endpoint-namespace', endpoint "
                     "entity path '--entity-path', and policy name '--policy-name'."
                 )
-            elif not endpoint_account_name and endpoint_type.lower() == EndpointType.AzureStorageContainer.value:
+            elif not endpoint_account_name and endpoint_type.lower() in [
+                EndpointType.AzureStorageContainer.value, EndpointType.CosmosDBContainer.value
+            ]:
                 raise ArgumentUsageError(
                     error_msg + " or endpoint account '--endpoint-account'."
                 )
