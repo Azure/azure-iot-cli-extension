@@ -1195,13 +1195,13 @@ helps[
     long-summary: |
                   Please provide certificate format using Base64 ASCII encoding and the certificate
                   should have matching BEGIN and END segments, for example:
-                  start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----''.
+                  start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----'.
     examples:
     - name: Create an enrollment '{enrollment_id}' with attestation type 'x509' in the Azure
             IoT Device Provisioning Service '{dps_name}' in the resource group
             '{resource_group_name}' with provisioning status 'disabled',
             device id '{device_id}', initial twin properties '{"location":{"region":"US"}}',
-            initial twin tags '{"version":"1"}', and device information '{"color":"red"}'
+            initial twin tags '{"version":"1"}', and device information '{"color":"red"}'.
       text: >
         az iot dps enrollment create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --attestation-type x509
@@ -1253,7 +1253,7 @@ helps[
     long-summary: |
                   Please provide certificate format using Base64 ASCII encoding and the certificate
                   should have matching BEGIN and END segments, for example:
-                  start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----''.
+                  start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----'.
     examples:
     - name: Update enrollment '{enrollment_id}' with a new x509 certificate in the Azure IoT
             Device Provisioning Service '{dps_name}' in the resource group '{resource_group_name}'.
@@ -1363,10 +1363,10 @@ helps[
     long-summary: |
                   Please provide certificate format using Base64 ASCII encoding and the certificate
                   should have matching BEGIN and END segments, for example:
-                  start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----''.
+                  start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----'.
     examples:
     - name: Create an enrollment group '{enrollment_id}' in the Azure IoT provisioning service
-            '{dps_name}' in the resource group '{resource_group_name} using an intermediate certificate as primary certificate.
+            '{dps_name}' in the resource group '{resource_group_name} using an intermediate certificate as primary certificate'.
       text: >
         az iot dps enrollment-group create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --certificate-path /certificates/Certificate.pem
@@ -1380,7 +1380,7 @@ helps[
             'MyDps' in the resource group '{resource_group_name}' with provisioning status
             'enabled', initial twin properties
             '{"location":{"region":"US"}}' and initial twin tags '{"version_dps":"1"}'
-            using an intermediate certificate as primary certificate'
+            using an intermediate certificate as primary certificate.
       text: >
         az iot dps enrollment-group create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --certificate-path /certificates/Certificate.pem
@@ -1407,7 +1407,7 @@ helps[
     long-summary: |
                   Please provide certificate format using Base64 ASCII encoding and the certificate
                   should have matching BEGIN and END segments, for example:
-                  start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----''.
+                  start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----'.
     examples:
     - name: Update enrollment group '{enrollment_id}' in the Azure IoT provisioning service '{dps_name}'
             in the resource group '{resource_group_name}' with initial twin properties and initial twin tags.
@@ -1417,7 +1417,7 @@ helps[
         --initial-twin-tags "{'version_dps':'2'}" --etag AAAAAAAAAAA=
     - name: Update enrollment group '{enrollment_id}' in the Azure IoT provisioning service '{dps_name}'
             in the resource group '{resource_group_name}' with new primary intermediate certificate
-            and remove existing secondary intermediate certificate
+            and remove existing secondary intermediate certificate.
       text: >
         az iot dps enrollment-group update -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --certificate-path /certificates/NewCertificate.pem

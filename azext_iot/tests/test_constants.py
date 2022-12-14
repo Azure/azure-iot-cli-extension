@@ -44,9 +44,3 @@ class FileNames:
     central_query_response_file = "central/json/query_response.json"
     central_destination_file = "central/json/destination.json"
     central_export_file = "central/json/export.json"
-
-
-class CertificatesMessage:
-    invalidBase64 = "The certificate content is not a valid base64 string value"
-    unmatchedSegment = ("The certificate does not contain matched BEGIN and END segments, please either have both '-----BEGIN "
-                        "CERTIFICATE-----' and '-----END CERTIFICATE-----', or consider deleting them.")

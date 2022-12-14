@@ -16,7 +16,11 @@ from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
-from azext_iot.common.shared import SHAHashVersions
+from azext_iot.common.shared import (
+    INVALID_BASE64,
+    SHAHashVersions,
+    UNMATCHED_SEGMENT
+)
 
 
 def create_self_signed_certificate(
@@ -102,7 +106,7 @@ def create_self_signed_certificate(
     return result
 
 
-def isBase64(content: str) -> bool:
+def is_base64(content: str) -> bool:
     """
     Checks if certificant content should be valid base64 string without prefix and suffix
 
@@ -110,7 +114,7 @@ def isBase64(content: str) -> bool:
         content (str): certificant content without prefix and suffix.
 
     Returns:
-        isBase64 (bool): returns where the certificant content is valid base64 value.
+        is_base64 (bool): returns where the certificant content is valid base64 value.
     """
     try:
         sb_bytes = bytes(content, "ascii")
@@ -120,7 +124,7 @@ def isBase64(content: str) -> bool:
     return True
 
 
-def getCertificateFormatValidation(certificate: str) -> str:
+def get_certificate_format_validation(certificate: str) -> str:
     """
     Checks if the certificate format is valid
     1. contain matched BEGIN and END segments
@@ -130,7 +134,7 @@ def getCertificateFormatValidation(certificate: str) -> str:
         certificate (str): certificate string.
 
     Returns:
-        validation string (str): returns validation string when content format is incorrect.
+        validation_string (str): returns validation string when content format is incorrect.
     """
     if certificate.find("CERTIFICATE") != -1:
         if (
@@ -140,12 +144,11 @@ def getCertificateFormatValidation(certificate: str) -> str:
             certificate = certificate.replace("-----BEGIN CERTIFICATE-----", "")
             certificate = certificate.replace("-----END CERTIFICATE-----", "")
         else:
-            return ("The certificate does not contain matched BEGIN and END segments, please either have both '-----BEGIN "
-                    "CERTIFICATE-----' and '-----END CERTIFICATE-----', or consider deleting them.")
-    if isBase64(certificate):
+            return UNMATCHED_SEGMENT
+    if is_base64(certificate):
         return ""
     else:
-        return "The certificate content is not a valid base64 string value"
+        return INVALID_BASE64
 
 
 def open_certificate(certificate_path: str) -> str:
@@ -166,7 +169,7 @@ def open_certificate(certificate_path: str) -> str:
             certificate = certificate.decode("utf-8")
         except UnicodeError:
             certificate = base64.b64encode(certificate).decode("utf-8")
-        validationString = getCertificateFormatValidation(certificate)
+        validationString = get_certificate_format_validation(certificate)
         if validationString != "":
             raise ValueError(validationString)
     # Remove trailing white space from the certificate content

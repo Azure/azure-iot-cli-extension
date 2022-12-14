@@ -27,12 +27,15 @@ from azext_iot.constants import EVENT_LIB, EXTENSION_NAME
 from azext_iot._validators import mode2_iot_login_handler
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.common.certops import (
-    getCertificateFormatValidation,
-    isBase64,
+    get_certificate_format_validation,
+    is_base64,
     open_certificate
 )
-from azext_iot.tests.test_constants import CertificatesMessage
 from azext_iot.tests.test_utils import create_certificate
+from azext_iot.common.shared import (
+    INVALID_BASE64,
+    UNMATCHED_SEGMENT
+)
 
 
 class TestMinPython(object):
@@ -490,30 +493,30 @@ class TestCertificateValidators(object):
         base64_content = "aGVsbG8="
         non_base64_content = "hello"
 
-        assert isBase64(base64_content)
-        assert not isBase64(non_base64_content)
+        assert is_base64(base64_content)
+        assert not is_base64(non_base64_content)
 
-    def test_getCertificateFormatValidation(self):
+    def test_get_certificate_format_validation(self):
         # Set up certificate
         output_dir = os.getcwd()
         cert = create_certificate(subject="openCertTest", valid_days=1, cert_output_dir=output_dir)['certificate']
         # BEGIN CERTIFICATE + base64 content + END CERTIFICATE
-        assert getCertificateFormatValidation(cert) == ""
+        assert get_certificate_format_validation(cert) == ""
         # base64 content only
         newCert = cert.replace("-----BEGIN CERTIFICATE-----", "")
         newCert = newCert.replace("-----END CERTIFICATE-----", "")
-        assert getCertificateFormatValidation(newCert) == ""
+        assert get_certificate_format_validation(newCert) == ""
         # non-base64 content only
         newCert = newCert.join("Hello")
-        assert getCertificateFormatValidation(newCert) == CertificatesMessage.invalidBase64
+        assert get_certificate_format_validation(newCert) == INVALID_BASE64
         # EncodeBase64(BEGIN CERTIFICATE + base64 content + END CERTIFICATE)
         cert_string_bytes = cert.encode("ascii")
         base64_bytes = base64.b64encode(cert_string_bytes)
         base64_string = base64_bytes.decode("ascii")
-        assert getCertificateFormatValidation(base64_string) == ""
+        assert get_certificate_format_validation(base64_string) == ""
         # BEGIN CERTIFICATE + base64 content
         newCert = cert.replace("-----END CERTIFICATE-----", "")
-        assert getCertificateFormatValidation(newCert) == CertificatesMessage.unmatchedSegment
+        assert get_certificate_format_validation(newCert) == UNMATCHED_SEGMENT
 
     def test_open_certificate(self):
         # Set up certificate
