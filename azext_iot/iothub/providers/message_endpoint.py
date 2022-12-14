@@ -14,7 +14,7 @@ from azure.cli.core.azclierror import (
 )
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.iothub.common import (
-    SYSTEM_ASSIGNED_IDENTITY, AuthenticationType, EncodingFormat, EndpointType, IdentityType
+    INVALID_CLI_CORE_FOR_COSMOS, SYSTEM_ASSIGNED_IDENTITY, AuthenticationType, EncodingFormat, EndpointType
 )
 from azext_iot.iothub.providers.base import IoTHubProvider
 from azext_iot.common._azure import parse_cosmos_db_connection_string
@@ -49,7 +49,6 @@ class MessageEndpoint(IoTHubProvider):
         batch_frequency: int = 300,
         chunk_size_window: int = 300,
         file_name_format: str = '{iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}',
-        authentication_type: Optional[str] = None,
         endpoint_uri: Optional[str] = None,
         entity_path: Optional[str] = None,
         database_name: Optional[str] = None,
@@ -65,17 +64,16 @@ class MessageEndpoint(IoTHubProvider):
         if not endpoint_subscription_id:
             endpoint_subscription_id = self.hub_resource.additional_properties['subscriptionid']
 
+        authentication_type = AuthenticationType.KeyBased.value
         endpoint_identity = None
-        if identity and authentication_type != AuthenticationType.IdentityBased.value:
-            raise ArgumentUsageError(
-                "In order to use an identity for authentication, you must select --auth-type as 'identityBased'."
-            )
-        elif identity and identity not in [IdentityType.none.value, SYSTEM_ASSIGNED_IDENTITY]:
-            endpoint_identity = ManagedIdentity(
-                user_assigned_identity=identity
-            )
-        elif authentication_type != AuthenticationType.IdentityBased.value and not connection_string:
-            # check for connection string args
+        if identity:
+            authentication_type = AuthenticationType.IdentityBased.value
+            if identity != SYSTEM_ASSIGNED_IDENTITY:
+                endpoint_identity = ManagedIdentity(
+                    user_assigned_identity=identity
+                )
+        elif not connection_string:
+            # check for args to get the connection string
             error_msg = "Please provide a connection string '--connection-string/-c'"
             if not (
                 endpoint_account_name and entity_path and endpoint_policy_name
@@ -101,7 +99,7 @@ class MessageEndpoint(IoTHubProvider):
             "endpointUri": endpoint_uri,
             "identity": endpoint_identity
         }
-        fetch_connection_string = authentication_type != AuthenticationType.IdentityBased.value and not connection_string
+        fetch_connection_string = identity is None and not connection_string
 
         endpoints = self.hub_resource.properties.routing.endpoints
         if EndpointType.EventHub.value == endpoint_type.lower():
@@ -140,7 +138,7 @@ class MessageEndpoint(IoTHubProvider):
                 )
             new_endpoint["entityPath"] = entity_path
             endpoints.service_bus_topics.append(new_endpoint)
-        elif EndpointType.CosmosDBCollection.value == endpoint_type.lower():
+        elif EndpointType.CosmosDBContainer.value == endpoint_type.lower():
             if fetch_connection_string:
                 # try to get connection string
                 connection_string = get_cosmos_db_cstring(
@@ -237,12 +235,10 @@ class MessageEndpoint(IoTHubProvider):
             return endpoints.service_bus_queues
         elif EndpointType.ServiceBusTopic.value == endpoint_type:
             return endpoints.service_bus_topics
-        elif EndpointType.CosmosDBCollection.value == endpoint_type and self.support_cosmos:
+        elif EndpointType.CosmosDBContainer.value == endpoint_type and self.support_cosmos:
             return endpoints.cosmos_db_sql_collections
-        elif EndpointType.CosmosDBCollection.value == endpoint_type:
-            raise InvalidArgumentValueError(
-                "This version of the azure cli core does not support Cosmos Db Endpoints for IoT Hub."
-            )
+        elif EndpointType.CosmosDBContainer.value == endpoint_type:
+            raise InvalidArgumentValueError(INVALID_CLI_CORE_FOR_COSMOS)
         elif EndpointType.AzureStorageContainer.value == endpoint_type:
             return endpoints.storage_containers
 
@@ -250,10 +246,8 @@ class MessageEndpoint(IoTHubProvider):
         endpoints = self.hub_resource.properties.routing.endpoints
         if endpoint_type:
             endpoint_type = endpoint_type.lower()
-            if EndpointType.CosmosDBCollection.value == endpoint_type and not self.support_cosmos:
-                raise InvalidArgumentValueError(
-                    "This version of the azure cli core does not support Cosmos Db Endpoints for IoT Hub."
-                )
+            if EndpointType.CosmosDBContainer.value == endpoint_type and not self.support_cosmos:
+                raise InvalidArgumentValueError(INVALID_CLI_CORE_FOR_COSMOS)
 
         if endpoint_name:
             # Delete endpoint by name
@@ -265,7 +259,7 @@ class MessageEndpoint(IoTHubProvider):
                 endpoints.service_bus_queues = [e for e in endpoints.service_bus_queues if e.name.lower() != endpoint_name]
             if not endpoint_type or EndpointType.ServiceBusTopic.value == endpoint_type:
                 endpoints.service_bus_topics = [e for e in endpoints.service_bus_topics if e.name.lower() != endpoint_name]
-            if self.support_cosmos and not endpoint_type or EndpointType.CosmosDBCollection.value == endpoint_type:
+            if self.support_cosmos and not endpoint_type or EndpointType.CosmosDBContainer.value == endpoint_type:
                 endpoints.cosmos_db_sql_collections = [
                     e for e in endpoints.cosmos_db_sql_collections if e.name.lower() != endpoint_name
                 ]
@@ -279,7 +273,7 @@ class MessageEndpoint(IoTHubProvider):
                 endpoints.service_bus_queues = []
             elif EndpointType.ServiceBusTopic.value == endpoint_type:
                 endpoints.service_bus_topics = []
-            elif EndpointType.CosmosDBCollection.value == endpoint_type and self.support_cosmos:
+            elif EndpointType.CosmosDBContainer.value == endpoint_type and self.support_cosmos:
                 endpoints.cosmos_db_sql_collections = []
             elif EndpointType.AzureStorageContainer.value == endpoint_type:
                 endpoints.storage_containers = []

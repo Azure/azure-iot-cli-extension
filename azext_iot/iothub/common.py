@@ -13,6 +13,29 @@ from enum import Enum
 
 SYSTEM_ASSIGNED_IDENTITY = '[system]'
 
+# Message Endpoint Messages
+INVALID_CLI_CORE_FOR_COSMOS = "This version of the azure cli core does not support Cosmos Db Endpoints for IoT Hub."
+
+CA_TRANSITION_API_VERSION = "2022-04-30-preview"
+HUB_PROVIDER = "Microsoft.Devices/IotHubs"
+DEFAULT_ROOT_AUTHORITY = {"enableRootCertificateV2": False}
+
+# Certificate Migration Messages
+CA_TRANSITION_WARNING = "Please ensure the following: \n\
+    You must update all devices to trust the DigiCert Global G2 root. \n\
+    Any devices not updated will not be able to connect. \n\
+    The IP address for this IoT Hub resource may change as part of this migration, \
+and that it can take up to an hour for devices to reconnect. \n\
+    The devices will be disconnected and reconnect with the DigiCert Global G2 root."
+CA_REVERT_WARNING = "This will revert the resource Root Certificate to Baltimore. \n\
+    Any devices without the Baltimore root will not be able to connect. \n\
+    The IP address for this IoT Hub resource may change as part of this migration, \
+and that it can take up to an hour for devices to reconnect. \n\
+    The devices will be disconnected and reconnect with the Baltimore root."
+CONT_INPUT_MSG = "Continue?"
+ABORT_MSG = "Command was aborted."
+NO_CHANGE_MSG = "Current Certificate Root Authority is already {0}. No updates are needed."
+
 
 class AuthenticationType(Enum):
     """
@@ -38,7 +61,7 @@ class EndpointType(Enum):
     ServiceBusQueue = 'servicebus-queue'
     ServiceBusTopic = 'servicebus-topic'
     AzureStorageContainer = 'storage-container'
-    CosmosDBCollection = 'cosmosdb-collection'
+    CosmosDBContainer = 'cosmosdb-container'
 
 
 class IdentityType(Enum):
@@ -72,28 +95,6 @@ class RouteSourceType(Enum):
         return list(filter(lambda d: d != RouteSourceType.Invalid.value, map(lambda c: c.value, cls)))
 
 
-CA_TRANSITION_API_VERSION = "2022-04-30-preview"
-HUB_PROVIDER = "Microsoft.Devices/IotHubs"
-DEFAULT_ROOT_AUTHORITY = {"enableRootCertificateV2": False}
-
-# Certificate Migration Messages
-CA_TRANSITION_WARNING = "Please ensure the following: \n\
-    You must update all devices to trust the DigiCert Global G2 root. \n\
-    Any devices not updated will not be able to connect. \n\
-    The IP address for this IoT Hub resource may change as part of this migration, \
-and that it can take up to an hour for devices to reconnect. \n\
-    The devices will be disconnected and reconnect with the DigiCert Global G2 root."
-CA_REVERT_WARNING = "This will revert the resource Root Certificate to Baltimore. \n\
-    Any devices without the Baltimore root will not be able to connect. \n\
-    The IP address for this IoT Hub resource may change as part of this migration, \
-and that it can take up to an hour for devices to reconnect. \n\
-    The devices will be disconnected and reconnect with the Baltimore root."
-CONT_INPUT_MSG = "Continue?"
-ABORT_MSG = "Command was aborted."
-NO_CHANGE_MSG = "Current Certificate Root Authority is already {0}. No updates are needed."
-
-
-# Enums
 class CertificateAuthorityVersions(Enum):
     """
     Certificate Authority Versions

@@ -63,7 +63,7 @@ def test_iot_eventhub_endpoint_lifecycle(provisioned_event_hub_with_identity_mod
     # Use hub identity
     cli.invoke(
         "iot hub message-endpoint create eventhub -n {} -g {} --en {} --erg {} --endpoint-uri {} --entity-path {} "
-        "--identity [system] --auth-type identityBased".format(
+        "--identity [system]".format(
             iot_hub, iot_rg, endpoint_names[1], iot_rg, endpoint_uri, eventhub_instance
         )
     )
@@ -88,7 +88,7 @@ def test_iot_eventhub_endpoint_lifecycle(provisioned_event_hub_with_identity_mod
     # Use user identity
     cli.invoke(
         "iot hub message-endpoint create eventhub -n {} -g {} --en {} --erg {} --endpoint-uri {} --entity-path {} "
-        "--identity {} --auth-type identityBased".format(
+        "--identity {}".format(
             iot_hub,
             iot_rg,
             endpoint_names[2],
@@ -204,7 +204,7 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     # topic - Use hub identity
     cli.invoke(
         "iot hub message-endpoint create servicebus-topic -n {} -g {} --en {} --erg {} --endpoint-uri {} "
-        "--entity-path {} --identity [system] --auth-type identityBased".format(
+        "--entity-path {} --identity [system]".format(
             iot_hub, iot_rg, endpoint_names[1], iot_rg, endpoint_uri, topic_instance
         )
     )
@@ -228,7 +228,7 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     # topic - Use user identity
     cli.invoke(
         "iot hub message-endpoint create servicebus-topic -n {} -g {} --en {} --erg {} --endpoint-uri {} "
-        "--entity-path {} --identity {} --auth-type identityBased".format(
+        "--entity-path {} --identity {}".format(
             iot_hub,
             iot_rg,
             endpoint_names[2],
@@ -279,7 +279,7 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     # queue - Use hub identity
     cli.invoke(
         "iot hub message-endpoint create servicebus-queue -n {} -g {} --en {} --erg {} --endpoint-uri {} "
-        "--entity-path {} --identity [system] --auth-type identityBased".format(
+        "--entity-path {} --identity [system]".format(
             iot_hub, iot_rg, endpoint_names[4], iot_rg, endpoint_uri, queue_instance
         )
     )
@@ -304,7 +304,7 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     # queue - Use user identity
     cli.invoke(
         "iot hub message-endpoint create servicebus-queue -n {} -g {} --en {} --erg {} --endpoint-uri {} "
-        "--entity-path {} --identity {} --auth-type identityBased".format(
+        "--entity-path {} --identity {}".format(
             iot_hub,
             iot_rg,
             endpoint_names[5],
@@ -491,7 +491,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     custom_file_format = default_file_format.replace("/", "_")
     cli.invoke(
         "iot hub message-endpoint create storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {} "
-        "--identity [system] --auth-type identityBased -b {} -w {} --encoding {} --ff {}".format(
+        "--identity [system] -b {} -w {} --encoding {} --ff {}".format(
             iot_hub,
             iot_rg,
             endpoint_names[1],
@@ -528,7 +528,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     # Use user identity
     cli.invoke(
         "iot hub message-endpoint create storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {} "
-        "--identity {} --auth-type identityBased -b {} -w {}".format(
+        "--identity {} -b {} -w {}".format(
             iot_hub,
             iot_rg,
             endpoint_names[2],
@@ -664,7 +664,7 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
     # system assigned identity - pkn and default pkt
     cli.invoke(
         "iot hub message-endpoint create cosmosdb-container -n {} -g {} --en {} --erg {} --endpoint-uri {} "
-        "--identity [system] --auth-type identityBased --container {} --db {} --pkn {}".format(
+        "--identity [system] --container {} --db {} --pkn {}".format(
             iot_hub,
             iot_rg,
             endpoint_names[1],
@@ -684,7 +684,7 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
         container_name=container,
         database_name=database,
         partition_key_name=partition_path,
-        authentication_type="identityBased",
+        authentication_type=AuthenticationType.IdentityBased.value,
         partition_key_template=partition_template_default
     )
 
@@ -699,7 +699,7 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
     # user assigned identity - pkn and pkt
     cli.invoke(
         "iot hub message-endpoint create cosmosdb-container -n {} -g {} --en {} --erg {} --endpoint-uri {} "
-        "--identity {} --auth-type identityBased --container {} --db {} --pkn {} --pkt {}".format(
+        "--identity {} --container {} --db {} --pkn {} --pkt {}".format(
             iot_hub,
             iot_rg,
             endpoint_names[2],
@@ -721,7 +721,7 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
         container_name=container,
         database_name=database,
         partition_key_name=partition_path,
-        authentication_type="identityBased",
+        authentication_type=AuthenticationType.IdentityBased.value,
         partition_key_template=partition_template,
         identity=user_id
     )
@@ -783,7 +783,7 @@ def build_expected_endpoint(
     name: str,
     resource_group: str,
     subscription_id: str,
-    authentication_type: Optional[str] = None,
+    authentication_type: str = AuthenticationType.KeyBased.value,
     endpoint_uri: Optional[str] = None,
     identity: Optional[str] = None,
     connection_string: Optional[str] = None,
@@ -802,11 +802,10 @@ def build_expected_endpoint(
     expected = {
         "name": name,
         "resourceGroup": resource_group,
-        "subscriptionId": subscription_id
+        "subscriptionId": subscription_id,
+        "authenticationType": authentication_type
     }
 
-    if authentication_type:
-        expected["authenticationType"] = authentication_type
     if endpoint_uri:
         expected["endpointUri"] = endpoint_uri
     if identity:
@@ -831,7 +830,7 @@ def build_expected_endpoint(
         expected["databaseName"] = database_name
     if container_name and database_name:
         # cosmosdb container
-        expected["containerName"] = container_name
+        expected["collectionName"] = container_name
     if partition_key_name:
         expected["partitionKeyName"] = partition_key_name
     if partition_key_template:
@@ -850,10 +849,9 @@ def assert_endpoint_properties(result: dict, expected: dict):
     assert result["resourceGroup"] == expected["resourceGroup"]
     assert result["subscriptionId"] == expected["subscriptionId"]
     assert result["id"]
+    assert result["authenticationType"] == expected["authenticationType"]
 
     # Properties that may or may not be populated. Shared between all.
-    if "authenticationType" in expected:
-        assert result["authenticationType"] == expected["authenticationType"]
     if "endpointUri" in expected:
         assert result["endpointUri"] == expected["endpointUri"]
     if "identity" in expected:
@@ -896,8 +894,8 @@ def assert_endpoint_properties(result: dict, expected: dict):
     # Cosmos DB only
     if "databaseName" in expected:
         assert result["databaseName"] == expected["databaseName"]
-    if "containerName" in expected:
-        assert result["containerName"] == expected["containerName"]
+    if "collectionName" in expected:
+        assert result["collectionName"] == expected["collectionName"]
     if "partitionKeyName" in expected:
         assert result["partitionKeyName"] == expected["partitionKeyName"]
     if "partitionKeyTemplate" in expected:

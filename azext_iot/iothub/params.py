@@ -9,7 +9,7 @@ from azure.cli.core.commands.parameters import get_enum_type, get_three_state_fl
 from azext_iot.common.shared import SettleType, ProtocolType, AckType
 from azext_iot.assets.user_messages import info_param_properties_device
 from azext_iot._params import hub_auth_type_dataplane_param_type
-from azext_iot.iothub.common import AuthenticationType, EncodingFormat, EndpointType, RouteSourceType
+from azext_iot.iothub.common import EncodingFormat, EndpointType, RouteSourceType
 from azext_iot.iothub._validators import validate_device_model_id
 
 
@@ -270,17 +270,10 @@ def load_iothub_arguments(self, _):
 
     with self.argument_context("iot hub message-endpoint create") as context:
         context.argument(
-            'authentication_type',
-            options_list=['--auth-type'],
-            arg_type=get_enum_type(AuthenticationType),
-            help='Authentication type for the endpoint. The default is keyBased.'
-        )
-        context.argument(
             'identity',
             help='Use a system-assigned or user-assigned managed identity for endpoint '
                  'authentication. Use "[system]" to refer to the system-assigned identity or a resource ID '
-                 'to refer to a user-assigned identity. If you use --auth-type without this parameter, '
-                 'system-assigned managed identity is assumed.'
+                 'to refer to a user-assigned identity.',
         )
         context.argument(
             "endpoint_resource_group",
