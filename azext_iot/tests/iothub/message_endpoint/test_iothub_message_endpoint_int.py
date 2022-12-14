@@ -628,7 +628,7 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
     partition_path = "example"
     # use connection string - no pkn or pkt
     cli.invoke(
-        "iot hub message-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} -c {} --collection {} "
+        "iot hub message-endpoint create cosmosdb-container -n {} -g {} --en {} --erg {} -c {} --container {} "
         "--db {}".format(
             iot_hub,
             iot_rg,
@@ -649,7 +649,7 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
         primary_key=parsed_cs["AccountKey"],
         secondary_key=parsed_cs["AccountKey"],
         endpoint_uri=endpoint_uri,
-        collection_name=container,
+        container_name=container,
         database_name=database
     )
 
@@ -663,8 +663,8 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
 
     # system assigned identity - pkn and default pkt
     cli.invoke(
-        "iot hub message-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} --endpoint-uri {} "
-        "--identity [system] --auth-type identityBased --collection {} --db {} --pkn {}".format(
+        "iot hub message-endpoint create cosmosdb-container -n {} -g {} --en {} --erg {} --endpoint-uri {} "
+        "--identity [system] --auth-type identityBased --container {} --db {} --pkn {}".format(
             iot_hub,
             iot_rg,
             endpoint_names[1],
@@ -681,7 +681,7 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
         iot_rg,
         iot_sub,
         endpoint_uri=endpoint_uri,
-        collection_name=container,
+        container_name=container,
         database_name=database,
         partition_key_name=partition_path,
         authentication_type="identityBased",
@@ -698,8 +698,8 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
 
     # user assigned identity - pkn and pkt
     cli.invoke(
-        "iot hub message-endpoint create cosmosdb-collection -n {} -g {} --en {} --erg {} --endpoint-uri {} "
-        "--identity {} --auth-type identityBased --collection {} --db {} --pkn {} --pkt {}".format(
+        "iot hub message-endpoint create cosmosdb-container -n {} -g {} --en {} --erg {} --endpoint-uri {} "
+        "--identity {} --auth-type identityBased --container {} --db {} --pkn {} --pkt {}".format(
             iot_hub,
             iot_rg,
             endpoint_names[2],
@@ -718,7 +718,7 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
         iot_rg,
         iot_sub,
         endpoint_uri=endpoint_uri,
-        collection_name=container,
+        container_name=container,
         database_name=database,
         partition_key_name=partition_path,
         authentication_type="identityBased",
@@ -742,12 +742,12 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
 
     cosmos_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
-            iot_hub, iot_rg, "cosmosdb-collection"
+            iot_hub, iot_rg, "cosmosdb-container"
         )
     ).as_json()
 
     assert len(cosmos_list) == 3
-    assert endpoint_list["cosmosDbSqlCollections"] == cosmos_list
+    assert endpoint_list["cosmosDbSqlcontainers"] == cosmos_list
 
     # Delete one cosmos endpoint
     cli.invoke(
@@ -757,7 +757,7 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
     )
     cosmos_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
-            iot_hub, iot_rg, "cosmosdb-collection"
+            iot_hub, iot_rg, "cosmosdb-container"
         )
     ).as_json()
 
@@ -766,13 +766,13 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
     # Delete all cosmos endpoints
     cli.invoke(
         "iot hub message-endpoint delete -n {} -g {} -t {} -y".format(
-            iot_hub, iot_rg, "cosmosdb-collection"
+            iot_hub, iot_rg, "cosmosdb-container"
         )
     )
 
     endpoint_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
-            iot_hub, iot_rg, "cosmosdb-collection"
+            iot_hub, iot_rg, "cosmosdb-container"
         )
     ).as_json()
 
@@ -794,7 +794,6 @@ def build_expected_endpoint(
     batch_frequency_in_seconds: Optional[int] = None,
     max_chunk_size_in_bytes: Optional[int] = None,
     database_name: Optional[str] = None,
-    collection_name: Optional[str] = None,
     partition_key_name: Optional[str] = None,
     partition_key_template: Optional[str] = None,
     primary_key: Optional[str] = None,
@@ -816,7 +815,8 @@ def build_expected_endpoint(
         expected["connectionString"] = connection_string
     if entity_path:
         expected["entityPath"] = entity_path
-    if container_name:
+    if container_name and not database_name:
+        # storage container
         expected["containerName"] = container_name
     if encoding:
         expected["encoding"] = encoding
@@ -829,8 +829,9 @@ def build_expected_endpoint(
         expected["maxChunkSizeInBytes"] = max_chunk_size_in_bytes * max_chunk_size_constant
     if database_name:
         expected["databaseName"] = database_name
-    if collection_name:
-        expected["collectionName"] = collection_name
+    if container_name and database_name:
+        # cosmosdb container
+        expected["containerName"] = container_name
     if partition_key_name:
         expected["partitionKeyName"] = partition_key_name
     if partition_key_template:
@@ -895,8 +896,8 @@ def assert_endpoint_properties(result: dict, expected: dict):
     # Cosmos DB only
     if "databaseName" in expected:
         assert result["databaseName"] == expected["databaseName"]
-    if "collectionName" in expected:
-        assert result["collectionName"] == expected["collectionName"]
+    if "containerName" in expected:
+        assert result["containerName"] == expected["containerName"]
     if "partitionKeyName" in expected:
         assert result["partitionKeyName"] == expected["partitionKeyName"]
     if "partitionKeyTemplate" in expected:

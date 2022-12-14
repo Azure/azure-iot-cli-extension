@@ -83,8 +83,8 @@ def load_iothub_commands(self, _):
             transform=EndpointUpdateResultTransform(self.cli_ctx)
         )
         cmd_group.command(
-            "cosmosdb-collection",
-            "message_endpoint_create_cosmos_db_collection",
+            "cosmosdb-container",
+            "message_endpoint_create_cosmos_db_container",
             transform=EndpointUpdateResultTransform(self.cli_ctx),
             resource_type=ResourceType.MGMT_IOTHUB,
             min_api="2022-04-30-preview"

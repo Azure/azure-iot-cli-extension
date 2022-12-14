@@ -325,32 +325,32 @@ def load_iothub_help():
     """
 
     helps[
-        "iot hub message-endpoint create cosmosdb-collection"
+        "iot hub message-endpoint create cosmosdb-container"
     ] = """
         type: command
-        short-summary: Add a Cosmos DB Collection endpoint for an IoT Hub.
+        short-summary: Add a Cosmos DB Container endpoint for an IoT Hub.
         examples:
-          - name: Create a key-based Cosmos DB Collection endpoint for an IoT Hub.
+          - name: Create a key-based Cosmos DB Container endpoint for an IoT Hub.
             text: >
-                az iot hub message-endpoint create cosmosdb-collection -n {iothub_name} --en {endpoint_name} --collection {collection}
+                az iot hub message-endpoint create cosmosdb-container -n {iothub_name} --en {endpoint_name} --container {container}
                 --db {database} --endpoint-account {account_name}
-          - name: Create a Cosmos DB Collection endpoint for an IoT Hub using a connection string.
+          - name: Create a Cosmos DB Container endpoint for an IoT Hub using a connection string.
             text: >
-                az iot hub message-endpoint create cosmosdb-collection -n {iothub_name} --en {endpoint_name} -c {connection_string}
-                --collection {collection} --db {database}
-          - name: Create a Cosmos DB Collection endpoint for an IoT Hub using the specified primary key and endpoint uri.
+                az iot hub message-endpoint create cosmosdb-container -n {iothub_name} --en {endpoint_name} -c {connection_string}
+                --container {container} --db {database}
+          - name: Create a Cosmos DB Container endpoint for an IoT Hub using the specified primary key and endpoint uri.
             text: >
-                az iot hub message-endpoint create cosmosdb-collection -n {iothub_name} --en {endpoint_name} --pk {primary_key}
-                --endpoint-uri {endpoint_uri} --collection {collection} --db {database}
-          - name: Create a Cosmos DB Collection endpoint for an IoT Hub using system assigned identity and a partition key name.
+                az iot hub message-endpoint create cosmosdb-container -n {iothub_name} --en {endpoint_name} --pk {primary_key}
+                --endpoint-uri {endpoint_uri} --container {container} --db {database}
+          - name: Create a Cosmos DB Container endpoint for an IoT Hub using system assigned identity and a partition key name.
                   The partition key template will be the default.
             text: >
-                az iot hub message-endpoint create cosmosdb-collection -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
-                --collection {collection} --db {database} --auth-type identityBased --pkn {partition_key_name}
-          - name: Create a Cosmos DB Collection endpoint for an IoT Hub using user assigned identity, partition key name, and partition key template.
+                az iot hub message-endpoint create cosmosdb-container -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
+                --container {container} --db {database} --auth-type identityBased --pkn {partition_key_name}
+          - name: Create a Cosmos DB Container endpoint for an IoT Hub using user assigned identity, partition key name, and partition key template.
             text: >
-                az iot hub message-endpoint create cosmosdb-collection -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
-                --collection {collection} --db {database} --auth-type identityBased --pkn {partition_key_name} --pkt {partition_key_template}
+                az iot hub message-endpoint create cosmosdb-container -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
+                --container {container} --db {database} --auth-type identityBased --pkn {partition_key_name} --pkt {partition_key_template}
                 --identity {user_identity_resource_id}
     """
 
@@ -626,7 +626,7 @@ def load_iothub_help():
             text: >
                 az iot hub message-route fallback set -n {iothub_name} --enabled false
     """
-                
+
     helps["iot hub certificate root-authority"] = """
         type: group
         short-summary: Manage the certificate root-authority for an IoT Hub instance.

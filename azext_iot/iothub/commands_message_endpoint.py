@@ -110,11 +110,11 @@ def message_endpoint_create_service_bus_topic(
     )
 
 
-def message_endpoint_create_cosmos_db_collection(
+def message_endpoint_create_cosmos_db_container(
     cmd,
     hub_name: str,
     endpoint_name: str,
-    collection_name: str,
+    container_name: str,
     database_name: str,
     endpoint_account_name: Optional[str] = None,
     endpoint_resource_group: Optional[str] = None,
@@ -141,7 +141,7 @@ def message_endpoint_create_cosmos_db_collection(
         connection_string=connection_string,
         authentication_type=authentication_type,
         endpoint_uri=endpoint_uri,
-        collection_name=collection_name,
+        container_name=container_name,
         database_name=database_name,
         primary_key=primary_key,
         secondary_key=secondary_key,

@@ -361,16 +361,16 @@ def load_iothub_arguments(self, _):
             help="The account name for the endpoint resource."
         )
 
-    with self.argument_context("iot hub message-endpoint create cosmosdb-collection") as context:
+    with self.argument_context("iot hub message-endpoint create cosmosdb-container") as context:
         context.argument(
             'database_name',
             options_list=['--database-name', '--db'],
-            help='The name of the cosmos DB database in the cosmos DB account. Required for Cosmos DB SQL Collection Endpoints.',
+            help='The name of the cosmos DB database in the cosmos DB account. Required for Cosmos DB SQL Container Endpoints.',
         )
         context.argument(
-            'collection_name',
-            options_list=['--collection-name', '--collection'],
-            help='The name of the cosmos DB sql collection in the cosmos DB database. Required for Cosmos DB SQL Collection '
+            'container_name',
+            options_list=['--container-name', '--container'],
+            help='The name of the Cosmos DB SQL Container in the cosmos DB Database. Required for Cosmos DB SQL Container '
                  'Endpoints.',
         )
         context.argument(
@@ -388,12 +388,12 @@ def load_iothub_arguments(self, _):
         context.argument(
             'partition_key_name',
             options_list=['--partition-key-name', '--pkn'],
-            help='The name of the partition key associated with this cosmos DB sql collection if one exists.',
+            help='The name of the partition key associated with this Cosmos DB SQL Container if one exists.',
         )
         context.argument(
             'partition_key_template',
             options_list=['--partition-key-template', '--pkt'],
-            help='The template for generating a synthetic partition key value for use with this cosmos DB sql collection. '
+            help='The template for generating a synthetic partition key value for use with this Cosmos DB SQL Container. '
                  'The template must include at least one of the following placeholders: {iothub}, {deviceid}, {DD}, {MM}, and '
                  '{YYYY}. Any one placeholder may be specified at most once, but order and non-placeholder components are '
                  'arbitrary. If partition key name is provided, partition key template defaults to {deviceid}-{YYYY}-{MM}',
@@ -455,7 +455,7 @@ def load_iothub_arguments(self, _):
             options_list=["--system-properties", "--sp"],
             help="System properties of the route message.",
         )
-            
+
     with self.argument_context("iot hub certificate root-authority set") as context:
         context.argument(
             "ca_version",

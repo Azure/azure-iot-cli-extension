@@ -12,6 +12,7 @@ from azure.cli.core.azclierror import (
     ResourceNotFoundError,
     InvalidArgumentValueError
 )
+from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.iothub.common import (
     SYSTEM_ASSIGNED_IDENTITY, AuthenticationType, EncodingFormat, EndpointType, IdentityType
 )
@@ -32,6 +33,7 @@ class MessageEndpoint(IoTHubProvider):
     ):
         super(MessageEndpoint, self).__init__(cmd, hub_name, rg, dataplane=False)
         self.support_cosmos = hasattr(self.hub_resource.properties.routing.endpoints, "cosmos_db_sql_collections")
+        self.cli = EmbeddedCLI(cli_ctx=self.cmd.cli_ctx)
 
     def create(
         self,
@@ -50,7 +52,6 @@ class MessageEndpoint(IoTHubProvider):
         authentication_type: Optional[str] = None,
         endpoint_uri: Optional[str] = None,
         entity_path: Optional[str] = None,
-        collection_name: Optional[str] = None,
         database_name: Optional[str] = None,
         primary_key: Optional[str] = None,
         secondary_key: Optional[str] = None,
@@ -90,72 +91,60 @@ class MessageEndpoint(IoTHubProvider):
                     error_msg + " or endpoint account '--endpoint-account'."
                 )
 
+        # Base props shared among all endpoints
+        new_endpoint = {
+            "connectionString": connection_string,
+            "name": endpoint_name,
+            "subscriptionId": endpoint_subscription_id,
+            "resourceGroup": endpoint_resource_group,
+            "authenticationType": authentication_type,
+            "endpointUri": endpoint_uri,
+            "identity": endpoint_identity
+        }
+        fetch_connection_string = authentication_type != AuthenticationType.IdentityBased.value and not connection_string
+
         endpoints = self.hub_resource.properties.routing.endpoints
         if EndpointType.EventHub.value == endpoint_type.lower():
-            if authentication_type != AuthenticationType.IdentityBased.value and not connection_string:
-                connection_string = get_eventhub_cstring(
-                    cmd=self.cmd,
+            if fetch_connection_string:
+                new_endpoint["connectionString"] = get_eventhub_cstring(
+                    cmd=self.cli,
                     namespace_name=endpoint_account_name,
                     eventhub_name=entity_path,
                     policy_name=endpoint_policy_name,
                     rg=endpoint_resource_group,
                     sub=endpoint_subscription_id
                 )
-            endpoints.event_hubs.append({
-                "connectionString": connection_string,
-                "name": endpoint_name,
-                "subscriptionId": endpoint_subscription_id,
-                "resourceGroup": endpoint_resource_group,
-                "authenticationType": authentication_type,
-                "endpointUri": endpoint_uri,
-                "entityPath": entity_path,
-                "identity": endpoint_identity
-            })
+            new_endpoint["entityPath"] = entity_path
+            endpoints.event_hubs.append(new_endpoint)
         elif EndpointType.ServiceBusQueue.value == endpoint_type.lower():
-            if authentication_type != AuthenticationType.IdentityBased.value and not connection_string:
+            if fetch_connection_string:
                 connection_string = get_servicebus_queue_cstring(
-                    cmd=self.cmd,
+                    cmd=self.cli,
                     namespace_name=endpoint_account_name,
                     queue_name=entity_path,
                     policy_name=endpoint_policy_name,
                     rg=endpoint_resource_group,
                     sub=endpoint_subscription_id
                 )
-            endpoints.service_bus_queues.append({
-                "connectionString": connection_string,
-                "name": endpoint_name,
-                "subscriptionId": endpoint_subscription_id,
-                "resourceGroup": endpoint_resource_group,
-                "authenticationType": authentication_type,
-                "endpointUri": endpoint_uri,
-                "entityPath": entity_path,
-                "identity": endpoint_identity
-            })
+            new_endpoint["entityPath"] = entity_path
+            endpoints.service_bus_queues.append(new_endpoint)
         elif EndpointType.ServiceBusTopic.value == endpoint_type.lower():
-            if authentication_type != AuthenticationType.IdentityBased.value and not connection_string:
+            if fetch_connection_string:
                 connection_string = get_servicebus_topic_cstring(
-                    cmd=self.cmd,
+                    cmd=self.cli,
                     namespace_name=endpoint_account_name,
                     topic_name=entity_path,
                     policy_name=endpoint_policy_name,
                     rg=endpoint_resource_group,
                     sub=endpoint_subscription_id
                 )
-            endpoints.service_bus_topics.append({
-                "connectionString": connection_string,
-                "name": endpoint_name,
-                "subscriptionId": endpoint_subscription_id,
-                "resourceGroup": endpoint_resource_group,
-                "authenticationType": authentication_type,
-                "endpointUri": endpoint_uri,
-                "entityPath": entity_path,
-                "identity": endpoint_identity
-            })
+            new_endpoint["entityPath"] = entity_path
+            endpoints.service_bus_topics.append(new_endpoint)
         elif EndpointType.CosmosDBCollection.value == endpoint_type.lower():
-            if authentication_type != AuthenticationType.IdentityBased.value and not connection_string:
+            if fetch_connection_string:
                 # try to get connection string
                 connection_string = get_cosmos_db_cstring(
-                    cmd=self.cmd,
+                    cmd=self.cli,
                     account_name=endpoint_account_name,
                     rg=endpoint_resource_group,
                     sub=endpoint_subscription_id
@@ -168,7 +157,7 @@ class MessageEndpoint(IoTHubProvider):
                     secondary_key = parsed_cs["AccountKey"]
                 # parse out endpoint uri from connection string
                 if not endpoint_uri:
-                    endpoint_uri = parsed_cs["AccountEndpoint"]
+                    new_endpoint["endpointUri"] = parsed_cs["AccountEndpoint"]
             if authentication_type != AuthenticationType.IdentityBased.value and not any([primary_key, secondary_key]):
                 raise RequiredArgumentMissingError(
                     "Primary key via --primary-key, secondary key via --secondary-key, or connection string via "
@@ -178,51 +167,41 @@ class MessageEndpoint(IoTHubProvider):
                 secondary_key = primary_key
             if secondary_key and not primary_key:
                 primary_key = secondary_key
-            if not endpoint_uri:
+            if not new_endpoint["endpointUri"]:
                 raise RequiredArgumentMissingError(
                     "Endpoint uri via --endpoint-uri or connection string via --connection-string is required."
                 )
             if partition_key_name and not partition_key_template:
                 partition_key_template = '{deviceid}-{YYYY}-{MM}'
-            endpoints.cosmos_db_sql_collections.append({
-                "name": endpoint_name,
+            del new_endpoint["connectionString"]
+            new_endpoint.update({
                 "databaseName": database_name,
-                "collectionName": collection_name,
+                "collectionName": container_name,
                 "primaryKey": primary_key,
                 "secondaryKey": secondary_key,
                 "partitionKeyName": partition_key_name,
                 "partitionKeyTemplate": partition_key_template,
-                "subscriptionId": endpoint_subscription_id,
-                "resourceGroup": endpoint_resource_group,
-                "authenticationType": authentication_type,
-                "endpointUri": endpoint_uri,
-                "identity": endpoint_identity
             })
+            endpoints.cosmos_db_sql_collections.append(new_endpoint)
         elif EndpointType.AzureStorageContainer.value == endpoint_type.lower():
-            if authentication_type != AuthenticationType.IdentityBased.value and not connection_string:
+            if fetch_connection_string:
                 # try to get connection string
                 connection_string = get_storage_cstring(
-                    cmd=self.cmd,
+                    cmd=self.cli,
                     account_name=endpoint_account_name,
                     rg=endpoint_resource_group,
                     sub=endpoint_subscription_id
                 )
             if not container_name:
                 raise RequiredArgumentMissingError("Container name is required.")
-            endpoints.storage_containers.append({
-                "connectionString": connection_string,
-                "name": endpoint_name,
-                "subscriptionId": endpoint_subscription_id,
-                "resourceGroup": endpoint_resource_group,
+            new_endpoint.update({
                 "containerName": container_name,
                 "encoding": encoding.lower() if encoding else EncodingFormat.AVRO.value,
                 "fileNameFormat": file_name_format,
                 "batchFrequencyInSeconds": batch_frequency,
                 "maxChunkSizeInBytes": (chunk_size_window * 1048576),
-                "authenticationType": authentication_type,
-                "endpointUri": endpoint_uri,
-                "identity": endpoint_identity
             })
+            endpoints.storage_containers.append(new_endpoint)
 
         return self.discovery.client.begin_create_or_update(
             resource_group_name,
@@ -324,44 +303,44 @@ class MessageEndpoint(IoTHubProvider):
 def get_eventhub_cstring(
     cmd, namespace_name: str, eventhub_name: str, policy_name: str, rg: str, sub: str
 ) -> str:
-    return cmd(
+    return cmd.invoke(
         "eventhubs eventhub authorization-rule keys list --namespace-name {} --resource-group {} "
         "--eventhub-name {} --name {} --subscription {}".format(
             namespace_name, rg, eventhub_name, policy_name, sub
         )
-    ).get_output_as_json()["primaryConnectionString"]
+    ).as_json()["primaryConnectionString"]
 
 
 def get_servicebus_topic_cstring(
     cmd, namespace_name: str, topic_name: str, policy_name: str, rg: str, sub: str
 ) -> str:
-    return cmd(
+    return cmd.invoke(
         "servicebus topic authorization-rule keys list --namespace-name {} --resource-group {} "
         "--topic-name {} --name {} --subscription {}".format(
             namespace_name, rg, topic_name, policy_name, sub
         )
-    ).get_output_as_json()["primaryConnectionString"]
+    ).as_json()["primaryConnectionString"]
 
 
 def get_servicebus_queue_cstring(
     cmd, namespace_name: str, queue_name: str, policy_name: str, rg: str, sub: str
 ) -> str:
-    return cmd(
+    return cmd.invoke(
         "servicebus queue authorization-rule keys list --namespace-name {} --resource-group {} "
         "--queue-name {} --name {}  --subscription {}".format(
             namespace_name, rg, queue_name, policy_name, sub
         )
-    ).get_output_as_json()["primaryConnectionString"]
+    ).as_json()["primaryConnectionString"]
 
 
 def get_cosmos_db_cstring(
     cmd, account_name: str, rg: str, sub: str
 ) -> str:
-    output = cmd(
-        'cosmosdb keys list --resource-group {} --name {} --type connection-strings  --subscription {}'.format(
+    output = cmd.invoke(
+        'cosmosdb keys list --resource-group {} --name {} --type connection-strings --subscription {}'.format(
             rg, account_name, sub
         )
-    ).get_output_as_json()
+    ).as_json()
 
     for cs_object in output["connectionStrings"]:
         if cs_object["description"] == "Primary SQL Connection String":
@@ -369,8 +348,8 @@ def get_cosmos_db_cstring(
 
 
 def get_storage_cstring(cmd, account_name: str, rg: str, sub: str) -> str:
-    return cmd(
+    return cmd.invoke(
         "storage account show-connection-string -n {} -g {}  --subscription {}".format(
             account_name, rg, sub
         )
-    ).get_output_as_json()["connectionString"]
+    ).as_json()["connectionString"]
