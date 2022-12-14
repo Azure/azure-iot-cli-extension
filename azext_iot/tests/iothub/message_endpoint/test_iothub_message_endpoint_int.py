@@ -747,7 +747,7 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
     ).as_json()
 
     assert len(cosmos_list) == 3
-    assert endpoint_list["cosmosDbSqlcontainers"] == cosmos_list
+    assert endpoint_list["cosmosDbSqlCollections"] == cosmos_list
 
     # Delete one cosmos endpoint
     cli.invoke(
