@@ -33,8 +33,8 @@ from azext_iot.common.certops import (
 )
 from azext_iot.tests.test_utils import create_certificate
 from azext_iot.common.shared import (
-    INVALID_BASE64,
-    UNMATCHED_SEGMENT
+    INVALID_B64_CERTIFICATE_FILE,
+    UNMATCHED_SEGMENT_CERTIFICATE_FILE
 )
 
 
@@ -508,7 +508,7 @@ class TestCertificateValidators(object):
         assert get_certificate_format_validation(newCert) == ""
         # non-base64 content only
         newCert = newCert.join("Hello")
-        assert get_certificate_format_validation(newCert) == INVALID_BASE64
+        assert get_certificate_format_validation(newCert) == INVALID_B64_CERTIFICATE_FILE
         # EncodeBase64(BEGIN CERTIFICATE + base64 content + END CERTIFICATE)
         cert_string_bytes = cert.encode("ascii")
         base64_bytes = base64.b64encode(cert_string_bytes)
@@ -516,7 +516,13 @@ class TestCertificateValidators(object):
         assert get_certificate_format_validation(base64_string) == ""
         # BEGIN CERTIFICATE + base64 content
         newCert = cert.replace("-----END CERTIFICATE-----", "")
-        assert get_certificate_format_validation(newCert) == UNMATCHED_SEGMENT
+        assert get_certificate_format_validation(newCert) == UNMATCHED_SEGMENT_CERTIFICATE_FILE
+        if os.path.exists("openCertTest-cert.pem") and os.path.exists("openCertTest-key.pem"):
+            try:
+                os.remove("openCertTest-cert.pem")
+                os.remove("openCertTest-key.pem")
+            except OSError as e:
+                logger.error(f"Failed to remove certificate. {e}")
 
     def test_open_certificate(self):
         # Set up certificate
@@ -524,3 +530,9 @@ class TestCertificateValidators(object):
         cert = create_certificate(subject="openCertTest", valid_days=1, cert_output_dir=output_dir)['certificate']
         certContent = cert.replace('\r', '').replace('\n', '')
         assert open_certificate("./openCertTest-cert.pem").replace('\r', '').replace('\n', '') == certContent
+        if os.path.exists("openCertTest-cert.pem") and os.path.exists("openCertTest-key.pem"):
+            try:
+                os.remove("openCertTest-cert.pem")
+                os.remove("openCertTest-key.pem")
+            except OSError as e:
+                logger.error(f"Failed to remove certificate. {e}")

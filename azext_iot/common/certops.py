@@ -17,9 +17,9 @@ from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
 from azext_iot.common.shared import (
-    INVALID_BASE64,
+    INVALID_B64_CERTIFICATE_FILE,
     SHAHashVersions,
-    UNMATCHED_SEGMENT
+    UNMATCHED_SEGMENT_CERTIFICATE_FILE
 )
 
 
@@ -144,11 +144,11 @@ def get_certificate_format_validation(certificate: str) -> str:
             certificate = certificate.replace("-----BEGIN CERTIFICATE-----", "")
             certificate = certificate.replace("-----END CERTIFICATE-----", "")
         else:
-            return UNMATCHED_SEGMENT
+            return UNMATCHED_SEGMENT_CERTIFICATE_FILE
     if is_base64(certificate):
         return ""
     else:
-        return INVALID_BASE64
+        return INVALID_B64_CERTIFICATE_FILE
 
 
 def open_certificate(certificate_path: str) -> str:
