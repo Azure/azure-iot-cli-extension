@@ -519,4 +519,4 @@ class TestCertificateValidators(object):
         # Set up certificate
         output_dir = os.getcwd()
         cert = create_certificate(subject="openCertTest", valid_days=1, cert_output_dir=output_dir)['certificate']
-        assert open_certificate("./openCertTest-cert.pem").replace('\r', '').replace('\n', '') == cert.replace('\n', '')
+        assert open_certificate("./openCertTest-cert.pem").replace('\r', '').replace('\n', '') == cert.replace('\r', '').replace('\n', '')
