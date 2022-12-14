@@ -346,11 +346,11 @@ def load_iothub_help():
                   The partition key template will be the default.
             text: >
                 az iot hub message-endpoint create cosmosdb-container -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
-                --container {container} --db {database} --auth-type identityBased --pkn {partition_key_name}
+                --container {container} --db {database} --pkn {partition_key_name} --identity [system]
           - name: Create a Cosmos DB Container endpoint for an IoT Hub using user assigned identity, partition key name, and partition key template.
             text: >
                 az iot hub message-endpoint create cosmosdb-container -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
-                --container {container} --db {database} --auth-type identityBased --pkn {partition_key_name} --pkt {partition_key_template}
+                --container {container} --db {database} --pkn {partition_key_name} --pkt {partition_key_template}
                 --identity {user_identity_resource_id}
     """
 
@@ -370,11 +370,11 @@ def load_iothub_help():
           - name: Create an Event Hub endpoint for an IoT Hub using system assigned identity. The endpoint and entity path must be specified.
             text: >
                 az iot hub message-endpoint create eventhub -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
-                --auth-type identityBased --entity-path {entity_path}
+               --entity-path {entity_path} --identity [system]
           - name: Create an Event Hub endpoint for an IoT Hub using user assigned identity. The endpoint and entity path must be specified.
             text: >
                 az iot hub message-endpoint create eventhub -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
-                --auth-type identityBased --entity-path {entity_path} --identity {user_identity_resource_id}
+               --entity-path {entity_path} --identity {user_identity_resource_id}
     """
 
     helps[
@@ -393,11 +393,11 @@ def load_iothub_help():
           - name: Create a Service Bus Queue endpoint for an IoT Hub using system assigned identity. The endpoint and entity path must be specified.
             text: >
                 az iot hub message-endpoint create servicebus-queue -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
-                --auth-type identityBased --entity-path {entity_path}
+               --entity-path {entity_path} --identity [system]
           - name: Create a Service Bus Queue endpoint for an IoT Hub using user assigned identity. The endpoint and entity path must be specified.
             text: >
                 az iot hub message-endpoint create servicebus-queue -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
-                --auth-type identityBased --entity-path {entity_path} --identity {user_identity_resource_id}
+               --entity-path {entity_path} --identity {user_identity_resource_id}
     """
 
     helps[
@@ -416,11 +416,11 @@ def load_iothub_help():
           - name: Create a Service Bus Topic endpoint for an IoT Hub using system assigned identity. The endpoint and entity path must be specified.
             text: >
                 az iot hub message-endpoint create servicebus-topic -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
-                --auth-type identityBased --entity-path {entity_path}
+               --entity-path {entity_path} --identity [system]
           - name: Create a Service Bus Topic endpoint for an IoT Hub using user assigned identity. The endpoint and entity path must be specified.
             text: >
                 az iot hub message-endpoint create servicebus-topic -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
-                --auth-type identityBased --entity-path {entity_path} --identity {user_identity_resource_id}
+               --entity-path {entity_path} --identity {user_identity_resource_id}
     """
 
     helps[
@@ -441,11 +441,11 @@ def load_iothub_help():
                   and file name format. The endpoint must be specified.
             text: >
                 az iot hub message-endpoint create storage-container -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
-                --auth-type identityBased --container {container_name} -b {batch_frequency} -w {chunk_size} --ff {file_format}
+               --container {container_name} -b {batch_frequency} -w {chunk_size} --ff {file_format} --identity [system]
           - name: Create a Storage Container endpoint for an IoT Hub using user assigned identity with json encoding. The endpoint must be specified.
             text: >
                 az iot hub message-endpoint create storage-container -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
-                --auth-type identityBased --container {container_name} --encoding json --identity {user_identity_resource_id}
+               --container {container_name} --encoding json --identity {user_identity_resource_id}
     """
 
     helps[
