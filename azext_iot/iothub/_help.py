@@ -105,7 +105,7 @@ def load_iothub_help():
         examples:
         - name: Invoke root level command "reboot" which takes a payload that includes the "delay" property.
           text: >
-            az iot hub digital-twin invoke-command --command-name reboot -n {iothub_name} -d {device_id} --payload '{"delay":5}'
+            az iot hub digital-twin invoke-command --command-name reboot -n {iothub_name} -d {device_id} --payload "5"
 
         - name: Invoke command "getMaxMinReport" on component "thermostat1" that takes no input.
           text: >
