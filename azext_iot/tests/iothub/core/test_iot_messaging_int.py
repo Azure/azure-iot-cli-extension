@@ -178,7 +178,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         from azure.cli.core.mock import DummyCli
 
         cli_ctx = DummyCli()
-        client = iot_hub_service_factory(cli_ctx)
+        client = iot_hub_service_factory(cli_ctx).iot_hub_resource
 
         token, thread = execute_onthread(
             method=iot_simulate_device,
@@ -507,7 +507,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         from time import sleep
 
         cli_ctx = DummyCli()
-        client = iot_hub_service_factory(cli_ctx)
+        client = iot_hub_service_factory(cli_ctx).iot_hub_resource
 
         token, thread = execute_onthread(
             method=iot_simulate_device,
@@ -565,7 +565,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         from time import sleep
 
         cli_ctx = DummyCli()
-        client = iot_hub_service_factory(cli_ctx)
+        client = iot_hub_service_factory(cli_ctx).iot_hub_resource
 
         token, thread = execute_onthread(
             method=iot_simulate_device,
@@ -781,7 +781,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         from azure.cli.core.mock import DummyCli
 
         cli_ctx = DummyCli()
-        client = iot_hub_service_factory(cli_ctx)
+        client = iot_hub_service_factory(cli_ctx).iot_hub_resource
 
         device_count = 10
         device_ids = self.generate_device_names(device_count)
