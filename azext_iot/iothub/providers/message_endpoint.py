@@ -118,7 +118,7 @@ class MessageEndpoint(IoTHubProvider):
             endpoints.event_hubs.append(new_endpoint)
         elif EndpointType.ServiceBusQueue.value == endpoint_type.lower():
             if fetch_connection_string:
-                connection_string = get_servicebus_queue_cstring(
+                new_endpoint["connectionString"] = get_servicebus_queue_cstring(
                     cmd=self.cli,
                     namespace_name=endpoint_account_name,
                     queue_name=entity_path,
@@ -130,7 +130,7 @@ class MessageEndpoint(IoTHubProvider):
             endpoints.service_bus_queues.append(new_endpoint)
         elif EndpointType.ServiceBusTopic.value == endpoint_type.lower():
             if fetch_connection_string:
-                connection_string = get_servicebus_topic_cstring(
+                new_endpoint["connectionString"] = get_servicebus_topic_cstring(
                     cmd=self.cli,
                     namespace_name=endpoint_account_name,
                     topic_name=entity_path,
@@ -143,7 +143,7 @@ class MessageEndpoint(IoTHubProvider):
         elif EndpointType.CosmosDBContainer.value == endpoint_type.lower():
             if fetch_connection_string:
                 # try to get connection string
-                connection_string = get_cosmos_db_cstring(
+                new_endpoint["connectionString"] = get_cosmos_db_cstring(
                     cmd=self.cli,
                     account_name=endpoint_account_name,
                     rg=endpoint_resource_group,
@@ -186,7 +186,7 @@ class MessageEndpoint(IoTHubProvider):
         elif EndpointType.AzureStorageContainer.value == endpoint_type.lower():
             if fetch_connection_string:
                 # try to get connection string
-                connection_string = get_storage_cstring(
+                new_endpoint["connectionString"] = get_storage_cstring(
                     cmd=self.cli,
                     account_name=endpoint_account_name,
                     rg=endpoint_resource_group,

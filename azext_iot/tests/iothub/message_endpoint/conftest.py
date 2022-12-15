@@ -22,11 +22,11 @@ RG = settings.env.azext_iot_testrg
 
 
 def generate_hub_id() -> str:
-    return f"test-hub-{generate_generic_id()}"[:40]
+    return f"aziotclitest-hub-{generate_generic_id()}"[:35]
 
 
 def generate_hub_depenency_id() -> str:
-    return f"testhubdep{generate_generic_id()}"[:24]
+    return f"aziotclitest{generate_generic_id()}"[:24]
 
 
 def get_closest_marker(request: SubRequest) -> Mark:
@@ -45,6 +45,7 @@ def tags_to_dict(tags: str) -> dict:
     return result
 
 
+# IoT Hub fixtures
 @pytest.fixture(scope="module")
 def provisioned_iot_hub_module(request, provisioned_user_identity_module) -> Optional[dict]:
     result = _iot_hub_provisioner(request, provisioned_user_identity_module)
@@ -96,6 +97,7 @@ def _iot_hub_removal(name):
         logger.error(f"Failed to delete iot hub resource {name}.")
 
 
+# User Assigned Identity fixtures (UAI)
 @pytest.fixture(scope="module")
 def provisioned_user_identity_module() -> Optional[dict]:
     result = _user_identity_provisioner()
@@ -140,6 +142,7 @@ def _assign_rbac_role(assignee: str, scope: str, role: str, max_tries: int = 10)
         tries += 1
 
 
+# Storage Account fixtures
 @pytest.fixture(scope="module")
 def provisioned_storage_with_identity_module(request, provisioned_iot_hub_module, provisioned_storage_module):
     role = "Storage Blob Data Contributor"
@@ -219,6 +222,7 @@ def _storage_removal(account_name: str):
         logger.error(f"Failed to delete storage account resource {account_name}.")
 
 
+# Event Hub fixtures
 @pytest.fixture(scope="module")
 def provisioned_event_hub_with_identity_module(provisioned_iot_hub_module, provisioned_event_hub_module):
     role = "Azure Event Hubs Data Sender"
@@ -287,6 +291,7 @@ def _event_hub_removal(account_name: str):
         logger.error(f"Failed to delete eventhubs namespace resource {account_name}.")
 
 
+# Service Bus fixtures
 @pytest.fixture(scope="module")
 def provisioned_service_bus_with_identity_module(provisioned_iot_hub_module, provisioned_service_bus_module):
     role = "Azure Service Bus Data Sender"
@@ -385,6 +390,7 @@ def _service_bus_removal(account_name: str):
         logger.error(f"Failed to delete servicebus namespace resource {account_name}.")
 
 
+# Cosmos Db fixtures
 @pytest.fixture(scope="module")
 def provisioned_cosmosdb_with_identity_module(provisioned_iot_hub_module, provisioned_cosmos_db_module):
     role = "Cosmos DB Built-in Data Reader"

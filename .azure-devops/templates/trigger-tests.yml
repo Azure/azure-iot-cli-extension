@@ -107,6 +107,7 @@ jobs:
       serviceConnection: $(AzureServiceConnection)
 
 - job: 'testHub_job_2'
+  timeoutInMinutes: 90
   condition: and(succeeded(), eq('${{ parameters.testHub }}', true))
   displayName: 'Test IoT Hub - devices, message endpoints, messaging, and modules'
   strategy:
