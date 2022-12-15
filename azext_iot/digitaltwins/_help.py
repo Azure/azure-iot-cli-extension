@@ -160,7 +160,7 @@ def load_digitaltwins_help():
         short-summary: Creates a data history connection between a Digital Twins instance and an Azure
             Data Explorer database. Requires pre-created Azure Data Explorer and Event Hub resources.
         long-summary: |
-            Will prompt the user to add the following roles and permissions on the Digital Twins instance needed to successfully create the connection:
+            Will prompt the user to add the following roles and permissions on the Digital Twins instance or User Assigned Identity needed to successfully create the connection:
             - 'Contributor' role for the Azure Data Explorer Database scope
             - 'Database Admin' permission for the Azure Data Explorer Database scope
             - 'Azure Event Hubs Data Owner' role for the Event Hub scope
@@ -175,6 +175,16 @@ def load_digitaltwins_help():
             --adx-database-name {adx_database_name}
             --eventhub {event_hub}
             --eventhub-namespace {event_hub_namespace}
+        - name: Adds a data history connection to a target Digital Twins instance using a User Assigned Identity associated
+            with the Digital twin with the $Default Event Hub consumer group.
+          text: >
+            az dt data-history connection create adx -n {instance_name}
+            --cn {time_series_database_connection_name}
+            --adx-cluster-name {adx_cluster_name}
+            --adx-database-name {adx_database_name}
+            --eventhub {event_hub}
+            --eventhub-namespace {event_hub_namespace}
+            --mi-user-assigned {resource_id}
         - name: Adds a data history connection to a target Digital Twins instance with a custom Azure Data Explorer
             table name and Event Hub consumer group.
           text: >

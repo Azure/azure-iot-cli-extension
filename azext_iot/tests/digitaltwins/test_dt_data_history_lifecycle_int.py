@@ -55,6 +55,12 @@ class TestDTConnections(DTLiveScenarioTest):
     def tearDownSuite(self):
         yield None
         try:
+            self.delete_user_identity()
+        except Exception as e:
+            logger.warning(
+                "Failed to delete the User Identity resource. Additional details: " +
+                unpack_msrest_error(e))
+        try:
             self.delete_eventhub_resources()
         except Exception as e:
             logger.warning(
@@ -76,6 +82,9 @@ class TestDTConnections(DTLiveScenarioTest):
         table_name = f"tb_{generate_generic_id()}"
         consumer_group = f"cg-{generate_generic_id()}"
         self.add_eventhub_consumer_group(consumer_group=consumer_group)
+        user_identity = self.ensure_user_identity()
+        # TODO: lower sleep time to necessary amount
+        sleep(50)
 
         create_output = self.cmd(
             "dt create -n {} -g {} --mi-system-assigned".format(
@@ -140,10 +149,10 @@ class TestDTConnections(DTLiveScenarioTest):
         )) == 1
         assert len(self.get_adx_role(assignee_name=instance_name)) == 1
 
-        # Add custom consumer group and table
+        # Add custom consumer group and table and use user assigned identity
         connection_result = self.cmd(
             "dt data-history connection create adx -n {} -g {} --cn {} --adxt {} --adxd {} --adxg {} "
-            "--adxc {} --ehn {} --eh {} --ehg {} --ehc {} -y".format(
+            "--adxc {} --ehn {} --eh {} --ehg {} --ehc {} --user {} -y".format(
                 instance_name,
                 self.rg,
                 connection_name,
@@ -155,8 +164,15 @@ class TestDTConnections(DTLiveScenarioTest):
                 EP_EVENTHUB_TOPIC,
                 EP_RG,
                 consumer_group,
+                user_identity,
             )
         ).get_output_in_json()
+
+        expected_attributes["consumer_group"] = consumer_group
+        expected_attributes["table_name"] = table_name
+        assert_common_connection_attributes(
+            connection_output=connection_result, expected_attributes=expected_attributes
+        )
 
         expected_attributes["consumer_group"] = consumer_group
         expected_attributes["table_name"] = table_name

@@ -190,7 +190,7 @@ def load_digitaltwins_arguments(self, _):
         context.argument(
             'user_identity',
             options_list=['--mi-user-assigned', '--user'],
-            help="Use an user-assigned managed identities for endpoint authentication. "
+            help="Use an user-assigned managed identity for endpoint authentication. "
             "Accepts the identity resource id."
         )
 
@@ -552,21 +552,18 @@ def load_digitaltwins_arguments(self, _):
             help="Name of Azure Data Explorer cluster to integrate with.",
             arg_group="Azure Data Explorer",
         )
-
         context.argument(
             "adx_database_name",
             options_list=["--adx-database-name", "--adxd"],
             help="Name of Azure Data Explorer database to integrate with.",
             arg_group="Azure Data Explorer",
         )
-
         context.argument(
             "adx_resource_group",
             options_list=["--adx-resource-group", "--adxg"],
             help="Name of Azure Data Explorer resource group. If not provided, will use the Digital Twin's resource group.",
             arg_group="Azure Data Explorer",
         )
-
         context.argument(
             "adx_subscription",
             options_list=["--adx-subscription", "--adxs"],
@@ -574,7 +571,6 @@ def load_digitaltwins_arguments(self, _):
                  "that contains the Digital Twin Instance.",
             arg_group="Azure Data Explorer",
         )
-
         context.argument(
             "adx_table_name",
             options_list=["--adx-table-name", "--adxt"],
@@ -582,35 +578,30 @@ def load_digitaltwins_arguments(self, _):
                  "adt_dh_{dt_name}_{dt_location}.",
             arg_group="Azure Data Explorer",
         )
-
         context.argument(
             "eh_namespace",
             options_list=["--eventhub-namespace", "--ehn"],
             help="EventHub Namespace identifier.",
             arg_group="Event Hub",
         )
-
         context.argument(
             "eh_entity_path",
             options_list=["--eventhub", "--eh"],
             help="Name of EventHub to integrate with.",
             arg_group="Event Hub",
         )
-
         context.argument(
             "eh_consumer_group",
             options_list=["--eventhub-consumer-group", "--ehc"],
             help="The EventHub consumer group to use when ADX reads from EventHub.",
             arg_group="Event Hub",
         )
-
         context.argument(
             "eh_resource_group",
             options_list=["--eventhub-resource-group", "--ehg"],
             help="Name of EventHub resource group. If not provided, will use the Digital Twin's resource group.",
             arg_group="Event Hub",
         )
-
         context.argument(
             "eh_subscription",
             options_list=["--eventhub-subscription", "--ehs"],
@@ -618,11 +609,16 @@ def load_digitaltwins_arguments(self, _):
                  " the Digital Twin Instance.",
             arg_group="Event Hub",
         )
-
         context.argument(
             "yes",
             options_list=['--yes', '-y'],
             help='Do not prompt for confirmation when assigning required roles.',
+        )
+        context.argument(
+            'user_identity',
+            options_list=['--mi-user-assigned', '--user'],
+            help="Use an user-assigned managed identity for data history connection authentication. "
+            "Accepts the identity resource id. If not provided, will use system identity instead."
         )
 
     with self.argument_context("dt job import") as context:
@@ -632,7 +628,6 @@ def load_digitaltwins_arguments(self, _):
             help="Id of bulk import job. A system generated id is assigned when this parameter is ommitted during job creation.",
             arg_group="Bulk Import Job",
         )
-
         context.argument(
             "data_file_name",
             options_list=["--data-file", "--df"],
@@ -640,21 +635,18 @@ def load_digitaltwins_arguments(self, _):
             "file: https://github.com/Azure/azure-iot-cli-extension/tree/dev/docs/samples/adt-bulk-import-data-sample.ndjson",
             arg_group="Bulk Import Job",
         )
-
         context.argument(
             "input_blob_container_name",
             options_list=["--input-blob-container", "--ibc"],
             help="Name of Azure Storage blob container which contains the bulk import data file.",
             arg_group="Bulk Import Job",
         )
-
         context.argument(
             "input_storage_account_name",
             options_list=["--input-storage-account", "--isa"],
             help="Name of Azure Storage account containing blob container which stores the bulk import data file.",
             arg_group="Bulk Import Job",
         )
-
         context.argument(
             "output_file_name",
             options_list=["--output-file", "--of"],
@@ -663,7 +655,6 @@ def load_digitaltwins_arguments(self, _):
             "If not provided the output file is created with the name: <job_id>_output.txt",
             arg_group="Bulk Import Job",
         )
-
         context.argument(
             "output_blob_container_name",
             options_list=["--output-blob-container", "--obc"],
@@ -671,7 +662,6 @@ def load_digitaltwins_arguments(self, _):
             "If not provided, will use the input blob container.",
             arg_group="Bulk Import Job",
         )
-
         context.argument(
             "output_storage_account_name",
             options_list=["--output-storage-account", "--osa"],
