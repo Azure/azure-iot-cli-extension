@@ -92,7 +92,7 @@ jobs:
       serviceConnection: $(AzureServiceConnection)
 
 - job: 'testHub_job_1'
-  timeoutInMinutes: 90
+  timeoutInMinutes: 150
   displayName: 'Test IoT Hub - certificate, config, core, and jobs'
   condition: and(succeeded(), eq('${{ parameters.testHub }}', true))
   strategy:
