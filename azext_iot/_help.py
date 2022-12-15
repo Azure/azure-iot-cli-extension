@@ -1192,6 +1192,10 @@ helps[
 ] = """
     type: command
     short-summary: Create an individual device enrollment in an Azure IoT Hub Device Provisioning Service.
+    long-summary: |
+                  Please provide certificate format using Base64 ASCII encoding and the certificate
+                  should have matching BEGIN and END segments, for example:
+                  start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----'.
     examples:
     - name: Create an enrollment '{enrollment_id}' with attestation type 'x509' in the Azure
             IoT Device Provisioning Service '{dps_name}' in the resource group
@@ -1246,6 +1250,10 @@ helps[
 ] = """
     type: command
     short-summary: Update an individual device enrollment in an Azure IoT Hub Device Provisioning Service.
+    long-summary: |
+                  Please provide certificate format using Base64 ASCII encoding and the certificate
+                  should have matching BEGIN and END segments, for example:
+                  start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----'.
     examples:
     - name: Update enrollment '{enrollment_id}' with a new x509 certificate in the Azure IoT
             Device Provisioning Service '{dps_name}' in the resource group '{resource_group_name}'.
@@ -1352,6 +1360,10 @@ helps[
 ] = """
     type: command
     short-summary: Create an enrollment group in an Azure IoT Hub Device Provisioning Service.
+    long-summary: |
+                  Please provide certificate format using Base64 ASCII encoding and the certificate
+                  should have matching BEGIN and END segments, for example:
+                  start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----'.
     examples:
     - name: Create an enrollment group '{enrollment_id}' in the Azure IoT provisioning service
             '{dps_name}' in the resource group '{resource_group_name} using an intermediate certificate as primary certificate'.
@@ -1368,7 +1380,7 @@ helps[
             'MyDps' in the resource group '{resource_group_name}' with provisioning status
             'enabled', initial twin properties
             '{"location":{"region":"US"}}' and initial twin tags '{"version_dps":"1"}'
-            using an intermediate certificate as primary certificate'.
+            using an intermediate certificate as primary certificate.
       text: >
         az iot dps enrollment-group create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --certificate-path /certificates/Certificate.pem
@@ -1392,6 +1404,10 @@ helps[
 ] = """
     type: command
     short-summary: Update an enrollment group in an Azure IoT Hub Device Provisioning Service.
+    long-summary: |
+                  Please provide certificate format using Base64 ASCII encoding and the certificate
+                  should have matching BEGIN and END segments, for example:
+                  start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----'.
     examples:
     - name: Update enrollment group '{enrollment_id}' in the Azure IoT provisioning service '{dps_name}'
             in the resource group '{resource_group_name}' with initial twin properties and initial twin tags.

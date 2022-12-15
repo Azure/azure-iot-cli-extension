@@ -8,6 +8,7 @@ import json
 import pytest
 import os
 import sys
+import base64
 
 from unittest import mock
 from knack.util import CLIError
@@ -25,6 +26,16 @@ from azext_iot.common.deps import ensure_uamqp
 from azext_iot.constants import EVENT_LIB, EXTENSION_NAME
 from azext_iot._validators import mode2_iot_login_handler
 from azext_iot.common.embedded_cli import EmbeddedCLI
+from azext_iot.common.certops import (
+    get_certificate_format_validation,
+    is_base64,
+    open_certificate
+)
+from azext_iot.tests.test_utils import create_certificate
+from azext_iot.common.shared import (
+    INVALID_B64_CERTIFICATE_FILE,
+    UNMATCHED_SEGMENT_CERTIFICATE_FILE
+)
 
 
 class TestMinPython(object):
@@ -477,3 +488,53 @@ class TestHandleServiceException(object):
 
         with pytest.raises(expected_error):
             handle_service_exception(error)
+
+
+class TestCertificateValidators(object):
+    def test_base64_content(self):
+        base64_content = "aGVsbG8="
+        non_base64_content = "hello"
+
+        assert is_base64(base64_content)
+        assert not is_base64(non_base64_content)
+
+    def test_get_certificate_format_validation(self):
+        # Set up certificate
+        output_dir = os.getcwd()
+        cert = create_certificate(subject="openCertTest", valid_days=1, cert_output_dir=output_dir)['certificate']
+        # BEGIN CERTIFICATE + base64 content + END CERTIFICATE
+        assert get_certificate_format_validation(cert) == ""
+        # base64 content only
+        newCert = cert.replace("-----BEGIN CERTIFICATE-----", "")
+        newCert = newCert.replace("-----END CERTIFICATE-----", "")
+        assert get_certificate_format_validation(newCert) == ""
+        # non-base64 content only
+        newCert = newCert.join("Hello")
+        assert get_certificate_format_validation(newCert) == INVALID_B64_CERTIFICATE_FILE
+        # EncodeBase64(BEGIN CERTIFICATE + base64 content + END CERTIFICATE)
+        cert_string_bytes = cert.encode("ascii")
+        base64_bytes = base64.b64encode(cert_string_bytes)
+        base64_string = base64_bytes.decode("ascii")
+        assert get_certificate_format_validation(base64_string) == ""
+        # BEGIN CERTIFICATE + base64 content
+        newCert = cert.replace("-----END CERTIFICATE-----", "")
+        assert get_certificate_format_validation(newCert) == UNMATCHED_SEGMENT_CERTIFICATE_FILE
+        if os.path.exists("openCertTest-cert.pem") and os.path.exists("openCertTest-key.pem"):
+            try:
+                os.remove("openCertTest-cert.pem")
+                os.remove("openCertTest-key.pem")
+            except OSError as e:
+                logger.error(f"Failed to remove certificate. {e}")
+
+    def test_open_certificate(self):
+        # Set up certificate
+        output_dir = os.getcwd()
+        cert = create_certificate(subject="openCertTest", valid_days=1, cert_output_dir=output_dir)['certificate']
+        certContent = cert.replace('\r', '').replace('\n', '')
+        assert open_certificate("./openCertTest-cert.pem").replace('\r', '').replace('\n', '') == certContent
+        if os.path.exists("openCertTest-cert.pem") and os.path.exists("openCertTest-key.pem"):
+            try:
+                os.remove("openCertTest-cert.pem")
+                os.remove("openCertTest-key.pem")
+            except OSError as e:
+                logger.error(f"Failed to remove certificate. {e}")
