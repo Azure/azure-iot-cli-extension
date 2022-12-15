@@ -23,6 +23,11 @@ unreleased
   To learn more about this transition, visit http://aka.ms/iot-ca-updates/.
 
 
+**IoT Central updates**
+
+* Fixed an issue with enrollement group certificate encoding 
+
+
 0.18.2
 +++++++++++++++
 
