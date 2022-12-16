@@ -17,17 +17,6 @@ ENV_SET_TEST_IOTHUB_OPTIONAL = [
     "azext_iot_teststoragecontainer",
     "azext_iot_rbac_max_tries",
     "azext_iot_ep_rg",
-    "azext_iot_eventhub_namespace",
-    "azext_iot_eventhub_instance",
-    "azext_iot_eventhub_policy",
-    "azext_iot_servicebus_namespace",
-    "azext_iot_servicebus_queue",
-    "azext_iot_servicebus_topic",
-    "azext_iot_servicebus_policy",
-    "azext_iot_cosmos_namespace",
-    "azext_iot_cosmos_database",
-    "azext_iot_cosmos_collection",
-    "azext_iot_user_identity"
 ]
 
 ENV_SET_TEST_IOTDPS_OPTIONAL = [

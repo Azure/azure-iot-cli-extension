@@ -14,7 +14,7 @@ from azure.cli.core.azclierror import (
 )
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.iothub.common import (
-    INVALID_CLI_CORE_FOR_COSMOS, SYSTEM_ASSIGNED_IDENTITY, AuthenticationType, EncodingFormat, EndpointType
+    BYTES_PER_MEGABYTE, INVALID_CLI_CORE_FOR_COSMOS, SYSTEM_ASSIGNED_IDENTITY, AuthenticationType, EncodingFormat, EndpointType
 )
 from azext_iot.iothub.providers.base import IoTHubProvider
 from azext_iot.common._azure import parse_cosmos_db_connection_string
@@ -58,9 +58,8 @@ class MessageEndpoint(IoTHubProvider):
         partition_key_template: Optional[str] = None,
         identity: Optional[str] = None
     ):
-        resource_group_name = self.hub_resource.additional_properties["resourcegroup"]
         if not endpoint_resource_group:
-            endpoint_resource_group = resource_group_name
+            endpoint_resource_group = self.hub_resource.additional_properties["resourcegroup"]
         if not endpoint_subscription_id:
             endpoint_subscription_id = self.hub_resource.additional_properties['subscriptionid']
 
@@ -199,12 +198,12 @@ class MessageEndpoint(IoTHubProvider):
                 "encoding": encoding.lower() if encoding else EncodingFormat.AVRO.value,
                 "fileNameFormat": file_name_format,
                 "batchFrequencyInSeconds": batch_frequency,
-                "maxChunkSizeInBytes": (chunk_size_window * 1048576),
+                "maxChunkSizeInBytes": (chunk_size_window * BYTES_PER_MEGABYTE),
             })
             endpoints.storage_containers.append(new_endpoint)
 
         return self.discovery.client.begin_create_or_update(
-            resource_group_name,
+            self.hub_resource.additional_properties["resourcegroup"],
             self.hub_resource.name,
             self.hub_resource,
             if_match=self.hub_resource.etag

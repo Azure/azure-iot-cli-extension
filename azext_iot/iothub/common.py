@@ -12,6 +12,7 @@ from enum import Enum
 
 
 SYSTEM_ASSIGNED_IDENTITY = '[system]'
+BYTES_PER_MEGABYTE = 1048576
 
 # Message Endpoint Messages
 INVALID_CLI_CORE_FOR_COSMOS = "This version of the azure cli core does not support Cosmos Db Endpoints for IoT Hub."
