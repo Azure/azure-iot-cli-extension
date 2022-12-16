@@ -57,7 +57,7 @@ class DynamoSettings(object):
         for key in env_set:
             value = environ.get(key)
             # Null out value if it is set to default pipeline value
-            if value == "sentinel":
+            if value and (value == "sentinel" or value.startswith("$(azext")):
                 value = None
             if not value:
                 if not optional:

@@ -172,6 +172,7 @@ class MessageEndpoint(IoTHubProvider):
                 )
             if partition_key_name and not partition_key_template:
                 partition_key_template = '{deviceid}-{YYYY}-{MM}'
+            # cosmos db doesn't need connection strings
             del new_endpoint["connectionString"]
             new_endpoint.update({
                 "databaseName": database_name,
