@@ -141,8 +141,8 @@ class MessageEndpoint(IoTHubProvider):
             endpoints.service_bus_topics.append(new_endpoint)
         elif EndpointType.CosmosDBContainer.value == endpoint_type.lower():
             if fetch_connection_string:
-                # try to get connection string
-                new_endpoint["connectionString"] = get_cosmos_db_cstring(
+                # try to get connection string - this will be used to get keys + uri
+                connection_string = get_cosmos_db_cstring(
                     cmd=self.cli,
                     account_name=endpoint_account_name,
                     rg=endpoint_resource_group,
