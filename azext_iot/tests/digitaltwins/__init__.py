@@ -532,7 +532,7 @@ class DTLiveScenarioTest(LiveScenarioTest):
             for instance in self.tracked_instances:
                 try:
                     self.embedded_cli.invoke(
-                       f"dt identity remove -n {instance[0]} -g {instance[1]} --user"
+                        f"dt identity remove -n {instance[0]} -g {instance[1]} --user"
                     )
                 except Exception:
                     logger.info("The user identites for DT instance {} cannot be deleted.".format(instance))
