@@ -8,6 +8,7 @@ from time import sleep
 from knack.log import get_logger
 import pytest
 from azext_iot.common.utility import unpack_msrest_error
+from azext_iot.digitaltwins.common import IdentityType
 from azext_iot.tests.digitaltwins.dt_helpers import assert_system_data_attributes
 from . import DTLiveScenarioTest, generate_resource_id
 from . import (
@@ -118,7 +119,9 @@ class TestDTConnections(DTLiveScenarioTest):
             "table_name": "adt_dh_{}_{}".format(
                 instance_name.replace("-", "_"),
                 create_output["location"]
-            )
+            ),
+            "identity_type": IdentityType.system_assigned.value,
+            "identity_uai": None
         }
 
         connection_result = self.cmd(
@@ -168,12 +171,8 @@ class TestDTConnections(DTLiveScenarioTest):
             )
         ).get_output_in_json()
 
-        expected_attributes["consumer_group"] = consumer_group
-        expected_attributes["table_name"] = table_name
-        assert_common_connection_attributes(
-            connection_output=connection_result, expected_attributes=expected_attributes
-        )
-
+        expected_attributes["identity_type"] = IdentityType.user_assigned.value
+        expected_attributes["identity_uai"] = user_identity
         expected_attributes["consumer_group"] = consumer_group
         expected_attributes["table_name"] = table_name
         assert_common_connection_attributes(
@@ -381,7 +380,9 @@ class TestDTConnections(DTLiveScenarioTest):
             "table_name": "adt_dh_{}_{}".format(
                 instance_name.replace("-", "_"),
                 create_output["location"]
-            )
+            ),
+            "identity_type": IdentityType.system_assigned.value,
+            "identity_uai": None
         }
 
         self.cmd(
@@ -492,3 +493,5 @@ def assert_common_connection_attributes(
     assert expected_attributes["eventhub_namespace"] in properties["eventHubNamespaceResourceId"]
     assert properties["eventHubEntityPath"] == expected_attributes["eventhub_name"]
     assert properties["provisioningState"] == "Succeeded"
+    assert properties["identity"]["type"] == expected_attributes["identity_type"]
+    assert properties["identity"]["userAssignedIdentity"] == expected_attributes["identity_uai"]
