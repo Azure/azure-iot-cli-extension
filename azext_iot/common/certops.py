@@ -17,6 +17,7 @@ from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
 from azext_iot.common.fileops import write_content_to_file
+from azext_iot.common.utility import read_file_content
 from azure.cli.core.azclierror import FileOperationError
 from azext_iot.common.shared import (
     INVALID_B64_CERTIFICATE_FILE,
@@ -379,8 +380,8 @@ def load_ca_cert_info(
                 f"Error loading certificates. No file found at path '{path}'"
             )
     # open cert files and get string contents
-    key_str = open_certificate(key_path).encode("utf-8")
-    cert_str = open_certificate(cert_path).encode("utf-8")
+    key_str = read_file_content(key_path).encode("utf-8")
+    cert_str = read_file_content(cert_path).encode("utf-8")
 
     # load certificates
     try:
