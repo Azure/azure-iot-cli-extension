@@ -63,9 +63,11 @@ class AdxConnectionValidator(object):
         if self.dt.identity is None and identity == SYSTEM_IDENTITY:
             raise BadRequestError(DT_SYS_IDENTITY_ERROR)
         elif (
-            self.dt.identity is None
-            or identity not in self.dt.identity.user_assigned_identities
-            and identity != SYSTEM_IDENTITY
+            identity != SYSTEM_IDENTITY and (
+                self.dt.identity is None
+                or self.dt.identity.user_assigned_identities is None
+                or identity not in self.dt.identity.user_assigned_identities
+            )
         ):
             raise BadRequestError(DT_UAI_IDENTITY_ERROR)
         # set the identity to be principal id for ease

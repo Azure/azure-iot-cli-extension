@@ -83,14 +83,15 @@ class TestDTConnections(DTLiveScenarioTest):
         table_name = f"tb_{generate_generic_id()}"
         consumer_group = f"cg-{generate_generic_id()}"
         self.add_eventhub_consumer_group(consumer_group=consumer_group)
-        user_identity = self.ensure_user_identity()
+        user_identity = self.ensure_user_identity()["id"]
         # TODO: lower sleep time to necessary amount
         sleep(50)
 
         create_output = self.cmd(
-            "dt create -n {} -g {} --mi-system-assigned".format(
+            "dt create -n {} -g {} --mi-system-assigned --mi-user-assigned {}".format(
                 instance_name,
                 self.rg,
+                user_identity
             )
         ).get_output_in_json()
         self.track_instance(create_output)
