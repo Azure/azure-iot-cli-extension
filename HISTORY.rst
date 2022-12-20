@@ -26,6 +26,9 @@ unreleased
 
 * Fixed an issue with enrollement group certificate encoding 
 
+**IoT DPS updates**
+
+* Removed file extension restriction when user attach certificate for enrollment groups creation/update commands.
 
 0.18.2
 +++++++++++++++
