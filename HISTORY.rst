@@ -28,7 +28,8 @@ unreleased
 
 **IoT DPS updates**
 
-* Removed file extension restriction when user attach certificate for enrollment groups creation/update commands.
+* Removed file extension restriction when user attach certificate for enrollment groups creation/update commands,
+  and added suggested certificate format in `--help` docs.
 
 0.18.2
 +++++++++++++++
