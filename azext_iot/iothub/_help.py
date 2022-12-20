@@ -310,6 +310,323 @@ def load_iothub_help():
         short-summary: Upload a local file as a device to a pre-configured blob storage container.
     """
 
+    helps[
+        "iot hub message-endpoint"
+    ] = """
+        type: group
+        short-summary: Manage custom endpoints of an IoT hub.
+    """
+
+    helps[
+        "iot hub message-endpoint create"
+    ] = """
+        type: group
+        short-summary: Add an endpoint to an IoT Hub.
+    """
+
+    helps[
+        "iot hub message-endpoint create cosmosdb-container"
+    ] = """
+        type: command
+        short-summary: Add a Cosmos DB Container endpoint for an IoT Hub.
+        examples:
+          - name: Create a key-based Cosmos DB Container endpoint for an IoT Hub.
+            text: >
+              az iot hub message-endpoint create cosmosdb-container -n {iothub_name} --en {endpoint_name} --container {container}
+              --db {database} --endpoint-account {account_name}
+          - name: Create a Cosmos DB Container endpoint for an IoT Hub using a connection string.
+            text: >
+                az iot hub message-endpoint create cosmosdb-container -n {iothub_name} --en {endpoint_name} -c {connection_string}
+                --container {container} --db {database}
+          - name: Create a Cosmos DB Container endpoint for an IoT Hub using the specified primary key and endpoint uri.
+            text: >
+              az iot hub message-endpoint create cosmosdb-container -n {iothub_name} --en {endpoint_name} --pk {primary_key}
+              --endpoint-uri {endpoint_uri} --container {container} --db {database}
+          - name: Create a Cosmos DB Container endpoint for an IoT Hub using system assigned identity and a partition key name.
+                  The partition key template will be the default.
+            text: >
+              az iot hub message-endpoint create cosmosdb-container -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
+              --container {container} --db {database} --pkn {partition_key_name} --identity [system]
+          - name: Create a Cosmos DB Container endpoint for an IoT Hub using user assigned identity, partition key name, and partition key template.
+            text: >
+              az iot hub message-endpoint create cosmosdb-container -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
+              --container {container} --db {database} --pkn {partition_key_name} --pkt {partition_key_template}
+              --identity {user_identity_resource_id}
+    """
+
+    helps[
+        "iot hub message-endpoint create eventhub"
+    ] = """
+        type: command
+        short-summary: Add an Event Hub endpoint for an IoT Hub.
+        examples:
+          - name: Create a key-based Event Hub endpoint for an IoT Hub.
+            text: >
+              az iot hub message-endpoint create eventhub -n {iothub_name} --en {endpoint_name} --namespace {namespace_name}
+              --entity-path {entity_path} --policy {policy_name}
+          - name: Create an Event Hub endpoint for an IoT Hub using a connection string. The endpoint uri and entity path are omitted.
+            text: >
+              az iot hub message-endpoint create eventhub -n {iothub_name} --en {endpoint_name} -c {connection_string}
+          - name: Create an Event Hub endpoint for an IoT Hub using system assigned identity. The endpoint and entity path must be specified.
+            text: >
+              az iot hub message-endpoint create eventhub -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
+              --entity-path {entity_path} --identity [system]
+          - name: Create an Event Hub endpoint for an IoT Hub using user assigned identity. The endpoint and entity path must be specified.
+            text: >
+              az iot hub message-endpoint create eventhub -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
+              --entity-path {entity_path} --identity {user_identity_resource_id}
+    """
+
+    helps[
+        "iot hub message-endpoint create servicebus-queue"
+    ] = """
+        type: command
+        short-summary: Add a Service Bus Queue endpoint for an IoT Hub.
+        examples:
+          - name: Create a key-based Service Bus Queue endpoint for an IoT Hub.
+            text: >
+              az iot hub message-endpoint create servicebus-queue -n {iothub_name} --en {endpoint_name} --namespace {namespace_name}
+              --entity-path {entity_path} --policy {policy_name}
+          - name: Create a Service Bus Queue endpoint for an IoT Hub using a connection string. The endpoint uri and entity path are omitted.
+            text: >
+              az iot hub message-endpoint create servicebus-queue -n {iothub_name} --en {endpoint_name} -c {connection_string}
+          - name: Create a Service Bus Queue endpoint for an IoT Hub using system assigned identity. The endpoint and entity path must be specified.
+            text: >
+              az iot hub message-endpoint create servicebus-queue -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
+              --entity-path {entity_path} --identity [system]
+          - name: Create a Service Bus Queue endpoint for an IoT Hub using user assigned identity. The endpoint and entity path must be specified.
+            text: >
+              az iot hub message-endpoint create servicebus-queue -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
+              --entity-path {entity_path} --identity {user_identity_resource_id}
+    """
+
+    helps[
+        "iot hub message-endpoint create servicebus-topic"
+    ] = """
+        type: command
+        short-summary: Add a Service Bus Topic endpoint for an IoT Hub.
+        examples:
+          - name: Create a key-based Service Bus Topic endpoint for an IoT Hub.
+            text: >
+              az iot hub message-endpoint create servicebus-topic -n {iothub_name} --en {endpoint_name} --namespace {namespace_name}
+              --entity-path {entity_path} --policy {policy_name}
+          - name: Create a Service Bus Topic endpoint for an IoT Hub using a connection string. The endpoint uri and entity path are omitted.
+            text: >
+              az iot hub message-endpoint create servicebus-topic -n {iothub_name} --en {endpoint_name} -c {connection_string}
+          - name: Create a Service Bus Topic endpoint for an IoT Hub using system assigned identity. The endpoint and entity path must be specified.
+            text: >
+              az iot hub message-endpoint create servicebus-topic -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
+              --entity-path {entity_path} --identity [system]
+          - name: Create a Service Bus Topic endpoint for an IoT Hub using user assigned identity. The endpoint and entity path must be specified.
+            text: >
+              az iot hub message-endpoint create servicebus-topic -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
+              --entity-path {entity_path} --identity {user_identity_resource_id}
+    """
+
+    helps[
+        "iot hub message-endpoint create storage-container"
+    ] = """
+        type: command
+        short-summary: Add a Storage Container endpoint for an IoT Hub.
+        examples:
+          - name: Create a key-based Storage Container endpoint for an IoT Hub.
+            text: >
+              az iot hub message-endpoint create storage-container -n {iothub_name} --en {endpoint_name} --container {container_name}
+              --endpoint-account {account_name}
+          - name: Create a Storage Container endpoint for an IoT Hub using a connection string. The endpoint uri is omitted.
+            text: >
+              az iot hub message-endpoint create storage-container -n {iothub_name} --en {endpoint_name} -c {connection_string}
+              --container {container_name}
+          - name: Create a Storage Container endpoint for an IoT Hub using system assigned identity with the given batch frequency, chunk size,
+                  and file name format. The endpoint must be specified.
+            text: >
+              az iot hub message-endpoint create storage-container -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
+              --container {container_name} -b {batch_frequency} -w {chunk_size} --ff {file_format} --identity [system]
+          - name: Create a Storage Container endpoint for an IoT Hub using user assigned identity with json encoding. The endpoint must be specified.
+            text: >
+              az iot hub message-endpoint create storage-container -n {iothub_name} --en {endpoint_name} --endpoint-uri {endpoint_uri}
+              --container {container_name} --encoding json --identity {user_identity_resource_id}
+    """
+
+    helps[
+        "iot hub message-endpoint list"
+    ] = """
+        type: command
+        short-summary: Get information on all the endpoints for an IoT Hub.
+        long-summary: Get information on all endpoints in an IoT Hub. You can also specify which endpoint type you want to get information on.
+        examples:
+          - name: Get all the endpoints from an IoT Hub.
+            text: >
+              az iot hub message-endpoint list -n {iothub_name}
+          - name: Get all the endpoints of type "EventHub" from an IoT Hub.
+            text: >
+              az iot hub message-endpoint list -n {iothub_name} --endpoint-type eventhub
+    """
+
+    helps[
+        "iot hub message-endpoint show"
+    ] = """
+        type: command
+        short-summary: Get information on mentioned endpoint for an IoT Hub.
+        examples:
+          - name: Get an endpoint information from an IoT Hub.
+            text: |
+              az iot hub message-endpoint show -n {iothub_name} --endpoint-name {endpoint_name}
+    """
+
+    helps[
+        "iot hub message-endpoint delete"
+    ] = """
+        type: command
+        short-summary: Delete all or mentioned endpoint for an IoT Hub.
+        long-summary: Delete an endpoint for an IoT Hub. We recommend that you delete any routes to the endpoint, before deleting the endpoint.
+        examples:
+          - name: Delete an endpoint from an IoT Hub.
+            text: >
+              az iot hub message-endpoint delete -n {iothub_name} --endpoint-name {endpoint_name}
+          - name: Delete all the endpoints of type "EventHub" from an IoT Hub.
+            text: >
+              az iot hub message-endpoint delete -n {iothub_name} --endpoint-type eventhub
+          - name: Delete all the endpoints from an IoT Hub.
+            text: >
+              az iot hub message-endpoint delete -n {iothub_name}
+    """
+
+    helps[
+        "iot hub message-route"
+    ] = """
+        type: group
+        short-summary: Manage routes of an IoT hub.
+    """
+
+    helps[
+        "iot hub message-route create"
+    ] = """
+        type: command
+        short-summary: Add a route for an IoT Hub.
+        examples:
+          - name: Create a route for an IoT Hub with the given endpoint and source type "DeviceMessages".
+            text: >
+              az iot hub message-route create -n {iothub_name} --route-name {route_name} --endpoint-name {endpoint_name} --source DeviceMessages
+          - name: Create a route for an IoT Hub with the built-in endpoint and source type "DeviceMessages".
+            text: >
+              az iot hub message-route create -n {iothub_name} --route-name {route_name} --endpoint-name events --source DeviceMessages
+          - name: Create a disabled route for an IoT Hub with the given endpoint, source type "DigitalTwinChangeEvents" and custom condition.
+            text: >
+              az iot hub message-route create -n {iothub_name} --route-name {route_name} --endpoint-name {endpoint_name} --source DigitalTwinChangeEvents
+              --condition {condition} --enabled false
+    """
+
+    helps[
+        "iot hub message-route update"
+    ] = """
+        type: command
+        short-summary: Update a route for an IoT Hub.
+        long-summary: You can change the source, endpoint, condition, or enabled state on the route.
+        examples:
+          - name: Update a route to a given endpoint and source type "DeviceMessages".
+            text: >
+              az iot hub message-route update -n {iothub_name} --route-name {route_name} --endpoint-name {endpoint_name} --source DeviceMessages
+          - name: Disable a route.
+            text: >
+              az iot hub message-route update -n {iothub_name} --route-name {route_name} --enabled false
+          - name: Change a route's condition.
+            text: >
+              az iot hub message-route update -n {iothub_name} --route-name {route_name} --condition {condition}
+    """
+
+    helps[
+        "iot hub message-route show"
+    ] = """
+        type: command
+        short-summary: Get information about the route in an IoT Hub.
+        examples:
+          - name: Get route information from an IoT Hub.
+            text: >
+              az iot hub message-route show -n {iothub_name} --route-name {route_name}
+    """
+
+    helps[
+        "iot hub message-route list"
+    ] = """
+        type: command
+        short-summary: Get all the routes in an IoT Hub.
+        examples:
+          - name: Get all routes from an IoT Hub.
+            text: >
+              az iot hub message-route list -n {iothub_name}
+          - name: Get all the routes of source type "DeviceMessages" from an IoT Hub.
+            text: >
+              az iot hub message-route list -n {iothub_name} --source DeviceMessages
+    """
+
+    helps[
+        "iot hub message-route delete"
+    ] = """
+        type: command
+        short-summary: Delete all routes or a mentioned route in an IoT Hub.
+        examples:
+          - name: Delete a route from an IoT Hub.
+            text: >
+              az iot hub message-route delete -n {iothub_name} --route-name {route_name}
+          - name: Delete all routes of source type "DeviceMessages" from an IoT Hub.
+            text: >
+              az iot hub message-route delete -n {iothub_name} --source DeviceMessages
+          - name: Delete all routes from an IoT Hub.
+            text: >
+              az iot hub message-route delete -n {iothub_name}
+    """
+
+    helps[
+        "iot hub message-route test"
+    ] = """
+        type: command
+        short-summary: Test all routes or a mentioned route in an IoT Hub.
+        long-summary: You can provide a sample message to test your routes.
+        examples:
+          - name: Test a route from an IoT Hub.
+            text: >
+              az iot hub message-route test -n {iothub_name} --route-name {route_name}
+          - name: Test all routes of source type "DeviceMessages" from an IoT Hub.
+            text: >
+              az iot hub message-route test -n {iothub_name} --source DeviceMessages
+          - name: Test all route from an IoT Hub with a custom message, including body, app properties, and system properties.
+            text: >
+              az iot hub message-route test -n {iothub_name} -b {body} --ap {app_properties} --sp {system_properties}
+    """
+
+    helps[
+        "iot hub message-route fallback"
+    ] = """
+        type: group
+        short-summary: Manage the fallback route of an IoT hub.
+    """
+
+    helps[
+        "iot hub message-route fallback show"
+    ] = """
+        type: command
+        short-summary: Show the fallback route of an IoT Hub
+        examples:
+          - name: Show the fallback route from an IoT Hub.
+            text: >
+              az iot hub message-route fallback show -n {iothub_name}
+    """
+
+    helps[
+        "iot hub message-route fallback set"
+    ] = """
+        type: command
+        short-summary: Enable or disable the fallback route in an IoT Hub.
+        examples:
+          - name: Enable the fallback route in an IoT Hub
+            text: >
+              az iot hub message-route fallback set -n {iothub_name} --enabled true
+          - name: Disable the fallback route in an IoT Hub.
+            text: >
+              az iot hub message-route fallback set -n {iothub_name} --enabled false
+    """
+
     helps["iot hub certificate root-authority"] = """
         type: group
         short-summary: Manage the certificate root-authority for an IoT Hub instance.
