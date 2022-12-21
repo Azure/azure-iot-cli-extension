@@ -109,9 +109,9 @@ def load_iothub_help():
           text: >
             az iot hub digital-twin invoke-command --command-name reboot -n {iothub_name} -d {device_id} --payload "5"
 
-        - name: Invoke root level command which takes a payload that includes certain property using inline JSON.
+        - name: In general, invoke command which takes a payload that includes certain property using inline JSON.
           text: >
-            az iot hub digital-twin invoke-command --command-name {command_name} -n {iothub_name} -d {device_id} --payload '{\\"property_name\\":property_value}'
+            az iot hub digital-twin invoke-command --command-name {command_name} -n {iothub_name} -d {device_id} --payload '{"property_name": "property_value"}'
 
         - name: Invoke command "getMaxMinReport" on component "thermostat1" that takes no input.
           text: >
