@@ -24,7 +24,7 @@ class TimeSeriesDatabaseConnectionsOperations(object):
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: Version of the DigitalTwinsInstance Management API. Constant value: "2022-10-31".
+    :ivar api_version: Version of the DigitalTwinsInstance Management API. Constant value: "2023-01-31".
     """
 
     models = models
@@ -34,7 +34,7 @@ class TimeSeriesDatabaseConnectionsOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2022-10-31"
+        self.api_version = "2023-01-31"
 
         self.config = config
 
@@ -290,7 +290,7 @@ class TimeSeriesDatabaseConnectionsOperations(object):
 
 
     def _delete_initial(
-            self, resource_group_name, resource_name, time_series_database_connection_name, custom_headers=None, raw=False, **operation_config):
+            self, resource_group_name, resource_name, time_series_database_connection_name, cleanup_connection_artifacts=None, custom_headers=None, raw=False, **operation_config):
         # Construct URL
         url = self.delete.metadata['url']
         path_format_arguments = {
@@ -304,6 +304,8 @@ class TimeSeriesDatabaseConnectionsOperations(object):
         # Construct parameters
         query_parameters = {}
         query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=10)
+        if cleanup_connection_artifacts is not None:
+            query_parameters['cleanupConnectionArtifacts'] = self._serialize.query("cleanup_connection_artifacts", cleanup_connection_artifacts, 'bool')
 
         # Construct headers
         header_parameters = {}
@@ -336,7 +338,7 @@ class TimeSeriesDatabaseConnectionsOperations(object):
         return deserialized
 
     def delete(
-            self, resource_group_name, resource_name, time_series_database_connection_name, custom_headers=None, raw=False, polling=True, **operation_config):
+            self, resource_group_name, resource_name, time_series_database_connection_name, cleanup_connection_artifacts=None, custom_headers=None, raw=False, polling=True, **operation_config):
         """Delete a time series database connection.
 
         :param resource_group_name: The name of the resource group that
@@ -347,6 +349,12 @@ class TimeSeriesDatabaseConnectionsOperations(object):
         :param time_series_database_connection_name: Name of time series
          database connection.
         :type time_series_database_connection_name: str
+        :param cleanup_connection_artifacts: Specifies whether or not to
+         attempt to clean up artifacts that were created in order to establish
+         a connection to the time series database. This is a best-effort
+         attempt that will fail if appropriate permissions are not in place.
+         Setting this to 'true' does not delete any recorded data.
+        :type cleanup_connection_artifacts: bool
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: The poller return type is ClientRawResponse, the
          direct response alongside the deserialized response
@@ -366,6 +374,7 @@ class TimeSeriesDatabaseConnectionsOperations(object):
             resource_group_name=resource_group_name,
             resource_name=resource_name,
             time_series_database_connection_name=time_series_database_connection_name,
+            cleanup_connection_artifacts=cleanup_connection_artifacts,
             custom_headers=custom_headers,
             raw=True,
             **operation_config
