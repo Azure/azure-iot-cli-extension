@@ -25,9 +25,10 @@ parameters:
   type: string
   default: 'ubuntu-20.04'
   values:
+  - 'ubuntu-18.04'
   - 'ubuntu-20.04'
-  - 'ubuntu-latest'
   - 'ubuntu-22.04'
+  - 'ubuntu-latest'
 
 jobs:
 
