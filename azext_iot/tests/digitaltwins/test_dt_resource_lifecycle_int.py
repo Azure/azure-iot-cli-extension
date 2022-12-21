@@ -525,8 +525,6 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         self.wait_for_capacity()
         endpoints_instance_name = generate_resource_id()
         user_identity = self.ensure_user_identity()
-        # TODO: lower sleep time to necessary amount
-        sleep(50)
         user_identity_principal_id = user_identity["principalId"]
         user_identity_id = user_identity["id"]
         target_scope_role = "Contributor"

@@ -84,8 +84,6 @@ class TestDTConnections(DTLiveScenarioTest):
         consumer_group = f"cg-{generate_generic_id()}"
         self.add_eventhub_consumer_group(consumer_group=consumer_group)
         user_identity = self.ensure_user_identity()["id"]
-        # TODO: lower sleep time to necessary amount
-        sleep(50)
 
         create_output = self.cmd(
             "dt create -n {} -g {} --mi-system-assigned --mi-user-assigned {}".format(
@@ -328,6 +326,23 @@ class TestDTConnections(DTLiveScenarioTest):
         self.cmd(
             "dt data-history connection create adx -n {} -g {} --cn {} --adxd {} --adxg {} "
             "--adxc {} --ehn {} --eh {} --ehg {} --ehc {} -y".format(
+                instance_name,
+                self.rg,
+                connection_name,
+                ADX_DATABASE,
+                ADX_RG,
+                ADX_CLUSTER,
+                EP_EVENTHUB_NAMESPACE,
+                EP_EVENTHUB_TOPIC,
+                EP_RG,
+                "testresource",
+            ),
+            expect_failure=True
+        )
+
+        self.cmd(
+            "dt data-history connection create adx -n {} -g {} --cn {} --adxd {} --adxg {} "
+            "--adxc {} --ehn {} --eh {} --ehg {} --mi-user-assigned {} -y".format(
                 instance_name,
                 self.rg,
                 connection_name,
