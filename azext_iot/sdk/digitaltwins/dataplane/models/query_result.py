@@ -15,12 +15,18 @@ from msrest.serialization import Model
 class QueryResult(Model):
     """The results of a query operation and an optional continuation token.
 
-    :param value: The query results.
+    All required parameters must be populated in order to send to Azure.
+
+    :param value: Required. The query results.
     :type value: list[object]
     :param continuation_token: A token which can be used to construct a new
      QuerySpecification to retrieve the next set of results.
     :type continuation_token: str
     """
+
+    _validation = {
+        'value': {'required': True},
+    }
 
     _attribute_map = {
         'value': {'key': 'value', 'type': '[object]'},

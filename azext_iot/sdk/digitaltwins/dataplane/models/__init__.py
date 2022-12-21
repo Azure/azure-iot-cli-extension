@@ -17,6 +17,7 @@ try:
     from .query_result_py3 import QueryResult
     from .inner_error_py3 import InnerError
     from .error_py3 import Error
+    from .bulk_import_job_py3 import BulkImportJob
     from .error_response_py3 import ErrorResponse, ErrorResponseException
     from .digital_twin_models_add_options_py3 import DigitalTwinModelsAddOptions
     from .digital_twin_models_list_options_py3 import DigitalTwinModelsListOptions
@@ -42,8 +43,11 @@ try:
     from .event_routes_get_by_id_options_py3 import EventRoutesGetByIdOptions
     from .event_routes_add_options_py3 import EventRoutesAddOptions
     from .event_routes_delete_options_py3 import EventRoutesDeleteOptions
-    from .bulk_import_job_py3 import BulkImportJob, ImportJobError
     from .import_jobs_list_options_py3 import ImportJobsListOptions
+    from .import_jobs_add_options_py3 import ImportJobsAddOptions
+    from .import_jobs_get_by_id_options_py3 import ImportJobsGetByIdOptions
+    from .import_jobs_delete_options_py3 import ImportJobsDeleteOptions
+    from .import_jobs_cancel_options_py3 import ImportJobsCancelOptions
 except (SyntaxError, ImportError):
     from .event_route import EventRoute
     from .digital_twins_model_data import DigitalTwinsModelData
@@ -52,6 +56,7 @@ except (SyntaxError, ImportError):
     from .query_result import QueryResult
     from .inner_error import InnerError
     from .error import Error
+    from .bulk_import_job import BulkImportJob
     from .error_response import ErrorResponse, ErrorResponseException
     from .digital_twin_models_add_options import DigitalTwinModelsAddOptions
     from .digital_twin_models_list_options import DigitalTwinModelsListOptions
@@ -77,11 +82,19 @@ except (SyntaxError, ImportError):
     from .event_routes_get_by_id_options import EventRoutesGetByIdOptions
     from .event_routes_add_options import EventRoutesAddOptions
     from .event_routes_delete_options import EventRoutesDeleteOptions
+    from .import_jobs_list_options import ImportJobsListOptions
+    from .import_jobs_add_options import ImportJobsAddOptions
+    from .import_jobs_get_by_id_options import ImportJobsGetByIdOptions
+    from .import_jobs_delete_options import ImportJobsDeleteOptions
+    from .import_jobs_cancel_options import ImportJobsCancelOptions
 from .digital_twins_model_data_paged import DigitalTwinsModelDataPaged
 from .object_paged import ObjectPaged
 from .incoming_relationship_paged import IncomingRelationshipPaged
 from .event_route_paged import EventRoutePaged
 from .bulk_import_job_paged import BulkImportJobPaged
+from .azure_digital_twins_api_enums import (
+    Status,
+)
 
 __all__ = [
     'EventRoute',
@@ -91,6 +104,7 @@ __all__ = [
     'QueryResult',
     'InnerError',
     'Error',
+    'BulkImportJob',
     'ErrorResponse', 'ErrorResponseException',
     'DigitalTwinModelsAddOptions',
     'DigitalTwinModelsListOptions',
@@ -116,12 +130,15 @@ __all__ = [
     'EventRoutesGetByIdOptions',
     'EventRoutesAddOptions',
     'EventRoutesDeleteOptions',
+    'ImportJobsListOptions',
+    'ImportJobsAddOptions',
+    'ImportJobsGetByIdOptions',
+    'ImportJobsDeleteOptions',
+    'ImportJobsCancelOptions',
     'DigitalTwinsModelDataPaged',
     'ObjectPaged',
     'IncomingRelationshipPaged',
     'EventRoutePaged',
-    'ImportJobsListOptions',
-    'BulkImportJob',
     'BulkImportJobPaged',
-    'ImportJobError'
+    'Status',
 ]

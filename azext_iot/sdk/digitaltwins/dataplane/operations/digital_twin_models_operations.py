@@ -22,7 +22,7 @@ class DigitalTwinModelsOperations(object):
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: The requested API version. Constant value: "2022-05-31".
+    :ivar api_version: The requested API version. Constant value: "2023-02-27-preview".
     """
 
     models = models
@@ -32,12 +32,12 @@ class DigitalTwinModelsOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2022-05-31"
+        self.api_version = "2023-02-27-preview"
 
         self.config = config
 
     def add(
-            self, models_to_add=None, digital_twin_models_add_options=None, custom_headers=None, raw=False, **operation_config):
+            self, models, digital_twin_models_add_options=None, custom_headers=None, raw=False, **operation_config):
         """Uploads one or more models. When any error occurs, no models are
         uploaded.
         Status codes:
@@ -80,7 +80,7 @@ class DigitalTwinModelsOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
         # Construct headers
         header_parameters = {}
@@ -96,26 +96,20 @@ class DigitalTwinModelsOperations(object):
         if tracestate is not None:
             header_parameters['tracestate'] = self._serialize.header("tracestate", tracestate, 'str')
 
-        # @vilit - when regenerating the sdk, models the parameter should be changed so it does not conflict
-        #          with the imported models.
         # Construct body
-        if models_to_add is not None:
-            body_content = self._serialize.body(models_to_add, '[object]')
-        else:
-            body_content = None
+        body_content = self._serialize.body(models, '[object]')
 
         # Construct and send request
         request = self._client.post(url, query_parameters)
         response = self._client.send(
             request, header_parameters, body_content, stream=False, **operation_config)
 
-        # @vilit - update the generated sdk to support both 200 and 201. Custom error message for 403.
-        if response.status_code not in [200, 201]:
+        if response.status_code not in [201]:
             raise models.ErrorResponseException(self._deserialize, response)
 
         deserialized = None
 
-        if response.status_code in [200, 201]:
+        if response.status_code == 201:
             deserialized = self._deserialize('[DigitalTwinsModelData]', response)
 
         if raw:
@@ -137,8 +131,9 @@ class DigitalTwinModelsOperations(object):
         * 404 Not Found
         * ModelNotFound - The model was not found.
 
-        :param dependencies_for: The set of the models which will have their
-         dependencies retrieved. If omitted, all models are retrieved.
+        :param dependencies_for: If specified, only return the set of the
+         specified models along with their dependencies. If omitted, all models
+         are retrieved.
         :type dependencies_for: list[str]
         :param include_model_definition: When true the model definition will
          be returned as part of the result.
@@ -177,11 +172,10 @@ class DigitalTwinModelsOperations(object):
                 # Construct parameters
                 query_parameters = {}
                 if dependencies_for is not None:
-                    # @vilit - the div should be "&dependenciesFor=" not ","
-                    query_parameters['dependenciesFor'] = self._serialize.query("dependencies_for", dependencies_for, '[str]', div='&dependenciesFor=')
+                    query_parameters['dependenciesFor'] = self._serialize.query("dependencies_for", dependencies_for, '[str]', div=',')
                 if include_model_definition is not None:
                     query_parameters['includeModelDefinition'] = self._serialize.query("include_model_definition", include_model_definition, 'bool')
-                query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+                query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
             else:
                 url = next_link
@@ -274,7 +268,7 @@ class DigitalTwinModelsOperations(object):
         query_parameters = {}
         if include_model_definition is not None:
             query_parameters['includeModelDefinition'] = self._serialize.query("include_model_definition", include_model_definition, 'bool')
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
         # Construct headers
         header_parameters = {}
@@ -360,7 +354,7 @@ class DigitalTwinModelsOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
         # Construct headers
         header_parameters = {}
@@ -440,7 +434,7 @@ class DigitalTwinModelsOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
         # Construct headers
         header_parameters = {}

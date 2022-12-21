@@ -42,7 +42,7 @@ class AzureDigitalTwinsAPIConfiguration(AzureConfiguration):
 
         super(AzureDigitalTwinsAPIConfiguration, self).__init__(base_url)
 
-        self.add_user_agent('azuredigitaltwinsapi/{}'.format(VERSION))
+        self.add_user_agent('digitaltwins/{}'.format(VERSION))
         self.add_user_agent('Azure-SDK-For-Python')
 
         self.credentials = credentials
@@ -78,7 +78,7 @@ class AzureDigitalTwinsAPI(SDKClient):
         super(AzureDigitalTwinsAPI, self).__init__(self.config.credentials, self.config)
 
         client_models = {k: v for k, v in models.__dict__.items() if isinstance(v, type)}
-        self.api_version = '2022-05-31'
+        self.api_version = '2023-02-27-preview'
         self._serialize = Serializer(client_models)
         self._deserialize = Deserializer(client_models)
 

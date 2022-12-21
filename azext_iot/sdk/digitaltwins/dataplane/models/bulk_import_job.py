@@ -73,14 +73,14 @@ class BulkImportJob(Model):
         'error': {'key': 'error', 'type': 'Error'},
     }
 
-    def __init__(self, *, input_blob_uri: str, output_blob_uri: str, error=None, **kwargs) -> None:
+    def __init__(self, **kwargs):
         super(BulkImportJob, self).__init__(**kwargs)
         self.id = None
-        self.input_blob_uri = input_blob_uri
-        self.output_blob_uri = output_blob_uri
+        self.input_blob_uri = kwargs.get('input_blob_uri', None)
+        self.output_blob_uri = kwargs.get('output_blob_uri', None)
         self.status = None
         self.created_date_time = None
         self.last_action_date_time = None
         self.finished_date_time = None
         self.purge_date_time = None
-        self.error = error
+        self.error = kwargs.get('error', None)

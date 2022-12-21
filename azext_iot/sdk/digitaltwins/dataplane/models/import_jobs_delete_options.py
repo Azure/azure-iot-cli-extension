@@ -12,8 +12,8 @@
 from msrest.serialization import Model
 
 
-class ImportJobsPutOptions(Model):
-    """Additional parameters for put operation.
+class ImportJobsDeleteOptions(Model):
+    """Additional parameters for delete operation.
 
     :param traceparent: Identifies the request in a distributed tracing
      system.
@@ -28,7 +28,7 @@ class ImportJobsPutOptions(Model):
         'tracestate': {'key': '', 'type': 'str'},
     }
 
-    def __init__(self, *, traceparent: str=None, tracestate: str=None, **kwargs) -> None:
-        super(ImportJobsPutOptions, self).__init__(**kwargs)
-        self.traceparent = traceparent
-        self.tracestate = tracestate
+    def __init__(self, **kwargs):
+        super(ImportJobsDeleteOptions, self).__init__(**kwargs)
+        self.traceparent = kwargs.get('traceparent', None)
+        self.tracestate = kwargs.get('tracestate', None)

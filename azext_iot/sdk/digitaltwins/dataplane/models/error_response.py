@@ -16,9 +16,15 @@ from msrest.exceptions import HttpOperationError
 class ErrorResponse(Model):
     """Error response.
 
-    :param error: The error details.
+    All required parameters must be populated in order to send to Azure.
+
+    :param error: Required. The error details.
     :type error: ~dataplane.models.Error
     """
+
+    _validation = {
+        'error': {'required': True},
+    }
 
     _attribute_map = {
         'error': {'key': 'error', 'type': 'Error'},
