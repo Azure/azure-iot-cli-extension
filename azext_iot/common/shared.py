@@ -11,12 +11,6 @@ shared: Define shared data types(enums); hub and dps connection string functions
 
 from enum import Enum
 
-# Open certificate validation strings
-INVALID_B64_CERTIFICATE_FILE = "The certificate file does not have a valid base64 string value."
-UNMATCHED_SEGMENT_CERTIFICATE_FILE = ("The certificate file does not have matched BEGIN and END segments, "
-                                      "please either have both '-----BEGIN CERTIFICATE-----' and '-----END CERTIFICATE-----', "
-                                      "or consider deleting them.")
-
 
 class SdkType(Enum):
     """

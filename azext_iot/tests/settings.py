@@ -15,7 +15,8 @@ ENV_SET_TEST_IOTHUB_OPTIONAL = [
     "azext_iot_testhub",
     "azext_iot_teststorageaccount",
     "azext_iot_teststoragecontainer",
-    "azext_iot_rbac_max_tries"
+    "azext_iot_rbac_max_tries",
+    "azext_iot_ep_rg",
 ]
 
 ENV_SET_TEST_IOTDPS_OPTIONAL = [
@@ -56,7 +57,7 @@ class DynamoSettings(object):
         for key in env_set:
             value = environ.get(key)
             # Null out value if it is set to default pipeline value
-            if value == "sentinel":
+            if value and (value == "sentinel" or value.startswith("$(azext")):
                 value = None
             if not value:
                 if not optional:

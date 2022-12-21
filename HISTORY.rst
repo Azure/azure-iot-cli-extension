@@ -6,6 +6,31 @@ Release History
 unreleased
 +++++++++++++++
 
+**IoT Hub updates**
+
+* Addition of `az iot hub message-endpoint` and `az iot hub message-route` commands, which function similarly to
+  existing `az iot hub routing-endpoint` and  `az iot hub route` commands respectively. These new commands will
+  use the newer IoT Hub Service API (2022-04-30-preview) if the Azure CLI supports it (min version 2.43.0). If the
+  Azure CLI is not updated, the older API version will be used. A new endpoint type, Cosmos DB Containers is added
+  with the newer API. Most of the command and parameter structure is the same, except for creation of endpoints,
+  in which the type is specified in the command as so:
+
+ - az iot hub message-endpoint create cosmosdb-container * this will be hidden if the Azure CLI version does not
+    support this
+ - az iot hub message-endpoint create eventhub
+ - az iot hub message-endpoint create servicebus-queue
+ - az iot hub message-endpoint create servicebus-topic
+ - az iot hub message-endpoint create storage-container
+
+ Other notable changes, which are not affected by API versions, include:
+
+  * Addition of fallback route management through `az iot hub message-route fallback set` and
+    `az iot hub message-route fallback show`
+
+  * Modification of how route testing works for testing all route sources. If `az iot hub message-route test` is called
+    without specifying a route name or type, all types will be tested rather than only DeviceMessage routes.
+
+
 0.18.3
 +++++++++++++++
 
@@ -25,8 +50,12 @@ unreleased
 
 **IoT Central updates**
 
-* Fixed an issue with enrollement group certificate encoding 
+* Fixed an issue with enrollement group certificate encoding
 
+**IoT DPS updates**
+
+* Removed file extension restriction for attached certificates in individual enrollments and enrollment groups creation/update commands,
+  and added suggested certificate format in `--help` docs.
 
 0.18.2
 +++++++++++++++
