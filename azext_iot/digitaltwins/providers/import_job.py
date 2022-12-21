@@ -77,12 +77,18 @@ class ImportJobProvider(DigitalTwinsProvider):
 
         try:
             import_job = BulkImportJob(input_blob_uri=input_blob_url, output_blob_uri=output_blob_url)
-            return self.sdk.put(id=job_id, import_job=import_job)
+            return self.sdk.add(id=job_id, import_job=import_job)
         except ErrorResponseException as e:
             handle_service_exception(e)
 
     def delete(self, job_id: str):
         try:
             return self.sdk.delete(id=job_id)
+        except ErrorResponseException as e:
+            handle_service_exception(e)
+
+    def cancel(self, job_id: str):
+        try:
+            return self.sdk.cancel(id=job_id)
         except ErrorResponseException as e:
             handle_service_exception(e)

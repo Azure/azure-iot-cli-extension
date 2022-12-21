@@ -37,7 +37,7 @@ class DigitalTwinModelsOperations(object):
         self.config = config
 
     def add(
-            self, models, digital_twin_models_add_options=None, custom_headers=None, raw=False, **operation_config):
+            self, models_to_add=None, digital_twin_models_add_options=None, custom_headers=None, raw=False, **operation_config):
         """Uploads one or more models. When any error occurs, no models are
         uploaded.
         Status codes:
@@ -96,20 +96,26 @@ class DigitalTwinModelsOperations(object):
         if tracestate is not None:
             header_parameters['tracestate'] = self._serialize.header("tracestate", tracestate, 'str')
 
+        # @vilit - when regenerating the sdk, models the parameter should be changed so it does not conflict
+        #          with the imported models.
         # Construct body
-        body_content = self._serialize.body(models, '[object]')
+        if models_to_add is not None:
+            body_content = self._serialize.body(models_to_add, '[object]')
+        else:
+            body_content = None
 
         # Construct and send request
         request = self._client.post(url, query_parameters)
         response = self._client.send(
             request, header_parameters, body_content, stream=False, **operation_config)
 
-        if response.status_code not in [201]:
+        # @vilit - update the generated sdk to support both 200 and 201. Custom error message for 403.
+        if response.status_code not in [200, 201]:
             raise models.ErrorResponseException(self._deserialize, response)
 
         deserialized = None
 
-        if response.status_code == 201:
+        if response.status_code in [200, 201]:
             deserialized = self._deserialize('[DigitalTwinsModelData]', response)
 
         if raw:
@@ -172,7 +178,8 @@ class DigitalTwinModelsOperations(object):
                 # Construct parameters
                 query_parameters = {}
                 if dependencies_for is not None:
-                    query_parameters['dependenciesFor'] = self._serialize.query("dependencies_for", dependencies_for, '[str]', div=',')
+                    # @vilit - the div should be "&dependenciesFor=" not ","
+                    query_parameters['dependenciesFor'] = self._serialize.query("dependencies_for", dependencies_for, '[str]', div='&dependenciesFor=')
                 if include_model_definition is not None:
                     query_parameters['includeModelDefinition'] = self._serialize.query("include_model_definition", include_model_definition, 'bool')
                 query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
