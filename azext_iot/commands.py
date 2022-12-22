@@ -125,6 +125,7 @@ def load_command_table(self, _):
             getter_name="iot_hub_configuration_show",
             setter_name="iot_hub_configuration_update",
         )
+        cmd_group.command("test-queries", "iot_hub_configuration_test_queries")
 
     with self.command_group(
         "iot hub distributed-tracing", command_type=iothub_ops, is_preview=True

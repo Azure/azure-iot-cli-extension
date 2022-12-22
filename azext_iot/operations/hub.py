@@ -1618,6 +1618,35 @@ def iot_hub_configuration_delete(
         handle_service_exception(e)
 
 
+def iot_hub_configuration_test_queries(
+    cmd,
+    target_condition=None,
+    custom_metric_queries=None,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
+    etag=None,
+):
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        resource_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
+    try:
+        headers = {}
+        headers["If-Match"] = '"{}"'.format(etag if etag else "*")
+        result = service_sdk.configuration.test_queries(target_condition, custom_metric_queries)
+        print(result.target_condition_error)
+    except CloudError as e:
+        handle_service_exception(e)
+
+
 def iot_edge_deployment_metric_show(
     cmd,
     config_id,
