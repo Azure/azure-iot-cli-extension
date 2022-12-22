@@ -428,9 +428,12 @@ class DTLiveScenarioTest(LiveScenarioTest):
         Returns the user identity object."""
         if not hasattr(self, "user_identity_name"):
             self.user_identity_name = generate_resource_id()
-            return self.embedded_cli.invoke(
+            identity = self.embedded_cli.invoke(
                 f"identity create -n {self.user_identity_name} -g {self.rg}"
             ).as_json()
+            # TODO: lower sleep time to necessary amount
+            sleep(50)
+            return identity
         else:
             return self.embedded_cli.invoke(
                 f"identity show -n {self.user_identity_name} -g {self.rg}"
@@ -528,6 +531,15 @@ class DTLiveScenarioTest(LiveScenarioTest):
     def delete_user_identity(self):
         """Delete user identity if created"""
         if hasattr(self, "user_identity_name"):
+            # disassociate the identites
+            for instance in self.tracked_instances:
+                try:
+                    self.embedded_cli.invoke(
+                        f"dt identity remove -n {instance[0]} -g {instance[1]} --user {self.user_identity_name}"
+                    )
+                except Exception:
+                    logger.info("The user identites for DT instance {} cannot be deleted.".format(instance))
+
             self.embedded_cli.invoke(f"identity delete -n {self.user_identity_name} -g {self.rg}")
 
     def get_role_assignment(self, scope, role, assignee):

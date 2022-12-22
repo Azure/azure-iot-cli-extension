@@ -19,11 +19,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from azext_iot.common.fileops import write_content_to_file
 from azext_iot.common.utility import read_file_content
 from azure.cli.core.azclierror import FileOperationError
-from azext_iot.common.shared import (
-    INVALID_B64_CERTIFICATE_FILE,
-    SHAHashVersions,
-    UNMATCHED_SEGMENT_CERTIFICATE_FILE
-)
+from azext_iot.common.shared import SHAHashVersions
 
 
 def create_self_signed_certificate(
@@ -116,51 +112,6 @@ def create_self_signed_certificate(
     return result
 
 
-def is_base64(content: str) -> bool:
-    """
-    Checks if certificant content should be valid base64 string without prefix and suffix
-
-    Args:
-        content (str): certificant content without prefix and suffix.
-
-    Returns:
-        is_base64 (bool): returns where the certificant content is valid base64 value.
-    """
-    try:
-        sb_bytes = bytes(content, "ascii")
-        base64.b64decode(sb_bytes)
-    except Exception:
-        return False
-    return True
-
-
-def get_certificate_format_validation(certificate: str) -> str:
-    """
-    Checks if the certificate format is valid
-    1. contain matched BEGIN and END segments
-    2. content should be valid base64 string without BEGIN and END segments
-
-    Args:
-        certificate (str): certificate string.
-
-    Returns:
-        validation_string (str): returns validation string when content format is incorrect.
-    """
-    if certificate.find("CERTIFICATE") != -1:
-        if (
-            certificate.find("-----BEGIN CERTIFICATE-----") != -1
-            and certificate.find("-----END CERTIFICATE-----") != -1
-        ):
-            certificate = certificate.replace("-----BEGIN CERTIFICATE-----", "")
-            certificate = certificate.replace("-----END CERTIFICATE-----", "")
-        else:
-            return UNMATCHED_SEGMENT_CERTIFICATE_FILE
-    if is_base64(certificate):
-        return ""
-    else:
-        return INVALID_B64_CERTIFICATE_FILE
-
-
 def open_certificate(certificate_path: str) -> str:
     """
     Opens certificate file (as read binary) from the file system and
@@ -179,9 +130,6 @@ def open_certificate(certificate_path: str) -> str:
             certificate = certificate.decode("utf-8")
         except UnicodeError:
             certificate = base64.b64encode(certificate).decode("utf-8")
-        validationString = get_certificate_format_validation(certificate)
-        if validationString != "":
-            raise ValueError(validationString)
     # Remove trailing white space from the certificate content
     return certificate.rstrip()
 

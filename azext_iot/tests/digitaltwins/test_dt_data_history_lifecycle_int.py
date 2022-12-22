@@ -8,6 +8,7 @@ from time import sleep
 from knack.log import get_logger
 import pytest
 from azext_iot.common.utility import unpack_msrest_error
+from azext_iot.digitaltwins.common import IdentityType
 from azext_iot.tests.digitaltwins.dt_helpers import assert_system_data_attributes
 from . import DTLiveScenarioTest, generate_resource_id
 from . import (
@@ -55,6 +56,12 @@ class TestDTConnections(DTLiveScenarioTest):
     def tearDownSuite(self):
         yield None
         try:
+            self.delete_user_identity()
+        except Exception as e:
+            logger.warning(
+                "Failed to delete the User Identity resource. Additional details: " +
+                unpack_msrest_error(e))
+        try:
             self.delete_eventhub_resources()
         except Exception as e:
             logger.warning(
@@ -76,11 +83,13 @@ class TestDTConnections(DTLiveScenarioTest):
         table_name = f"tb_{generate_generic_id()}"
         consumer_group = f"cg-{generate_generic_id()}"
         self.add_eventhub_consumer_group(consumer_group=consumer_group)
+        user_identity = self.ensure_user_identity()["id"]
 
         create_output = self.cmd(
-            "dt create -n {} -g {} --mi-system-assigned".format(
+            "dt create -n {} -g {} --mi-system-assigned --mi-user-assigned {}".format(
                 instance_name,
                 self.rg,
+                user_identity
             )
         ).get_output_in_json()
         self.track_instance(create_output)
@@ -109,7 +118,9 @@ class TestDTConnections(DTLiveScenarioTest):
             "table_name": "adt_dh_{}_{}".format(
                 instance_name.replace("-", "_"),
                 create_output["location"]
-            )
+            ),
+            "identity_type": IdentityType.system_assigned.value,
+            "identity_uai": None
         }
 
         connection_result = self.cmd(
@@ -140,10 +151,10 @@ class TestDTConnections(DTLiveScenarioTest):
         )) == 1
         assert len(self.get_adx_role(assignee_name=instance_name)) == 1
 
-        # Add custom consumer group and table
+        # Add custom consumer group and table and use user assigned identity
         connection_result = self.cmd(
             "dt data-history connection create adx -n {} -g {} --cn {} --adxt {} --adxd {} --adxg {} "
-            "--adxc {} --ehn {} --eh {} --ehg {} --ehc {} -y".format(
+            "--adxc {} --ehn {} --eh {} --ehg {} --ehc {} --user {} -y".format(
                 instance_name,
                 self.rg,
                 connection_name,
@@ -155,9 +166,12 @@ class TestDTConnections(DTLiveScenarioTest):
                 EP_EVENTHUB_TOPIC,
                 EP_RG,
                 consumer_group,
+                user_identity,
             )
         ).get_output_in_json()
 
+        expected_attributes["identity_type"] = IdentityType.user_assigned.value
+        expected_attributes["identity_uai"] = user_identity
         expected_attributes["consumer_group"] = consumer_group
         expected_attributes["table_name"] = table_name
         assert_common_connection_attributes(
@@ -326,6 +340,23 @@ class TestDTConnections(DTLiveScenarioTest):
             expect_failure=True
         )
 
+        self.cmd(
+            "dt data-history connection create adx -n {} -g {} --cn {} --adxd {} --adxg {} "
+            "--adxc {} --ehn {} --eh {} --ehg {} --mi-user-assigned {} -y".format(
+                instance_name,
+                self.rg,
+                connection_name,
+                ADX_DATABASE,
+                ADX_RG,
+                ADX_CLUSTER,
+                EP_EVENTHUB_NAMESPACE,
+                EP_EVENTHUB_TOPIC,
+                EP_RG,
+                "testresource",
+            ),
+            expect_failure=True
+        )
+
     def test_dt_data_history_adx_wait(self):
         self.wait_for_capacity()
         instance_name = generate_resource_id()
@@ -365,7 +396,9 @@ class TestDTConnections(DTLiveScenarioTest):
             "table_name": "adt_dh_{}_{}".format(
                 instance_name.replace("-", "_"),
                 create_output["location"]
-            )
+            ),
+            "identity_type": IdentityType.system_assigned.value,
+            "identity_uai": None
         }
 
         self.cmd(
@@ -476,3 +509,5 @@ def assert_common_connection_attributes(
     assert expected_attributes["eventhub_namespace"] in properties["eventHubNamespaceResourceId"]
     assert properties["eventHubEntityPath"] == expected_attributes["eventhub_name"]
     assert properties["provisioningState"] == "Succeeded"
+    assert properties["identity"]["type"] == expected_attributes["identity_type"]
+    assert properties["identity"]["userAssignedIdentity"] == expected_attributes["identity_uai"]

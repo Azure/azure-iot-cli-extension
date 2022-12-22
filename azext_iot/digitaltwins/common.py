@@ -23,15 +23,19 @@ LRO_TIMER = 60
 
 
 # Data History strings
-DT_IDENTITY_ERROR = "Digital Twins instance does not have System-Assigned Identity enabled. Please enable and try again."
+DT_INSTANCE = "Digital Twins instance"
+USER_ASSIGNED_IDENTITY = "User Assigned Identity"
+DT_SYS_IDENTITY_ERROR = "Digital Twins instance does not have System-Assigned Identity enabled. Please enable and try again."
+DT_UAI_IDENTITY_ERROR = "Digital Twins instance does not have the given User Assigned Identity associated. Please add the \
+identity and try again."
 FINISHED_CHECK_RESOURCE_LOG_MSG = "Finished checking the {0} resource."
 ERROR_PREFIX = "Unable to"
 FAIL_GENERIC_MSG = ERROR_PREFIX + " assign {0}. Please assign this role manually."
 FAIL_RBAC_MSG = ERROR_PREFIX + " assign {0}. Please assign this role manually with the command `az {1}`."
 ABORT_MSG = "Command was aborted."
 CONT_INPUT_MSG = "Continue with Data History connection creation anyway?"
-ADX_ROLE_MSG = "'Database Admin' permission on the Digital Twins instance for the Azure Data Explorer database '{0}'"
-RBAC_ROLE_MSG = "'{0}' role on the Digital Twins instance for the scope '{1}'"
+ADX_ROLE_MSG = "'Database Admin' permission on the {0} for the Azure Data Explorer database '{1}'"
+RBAC_ROLE_MSG = "'{0}' role on the {1} for the scope '{2}'"
 # Messages to be used with ADX_ROLE_MSG or RBAC_ROLE_MSG
 # Example: "Trying to add the '{0}' role on the Digital Twins instance for the scope '{1}'.
 TRY_ADD_ROLE_LOG_MSG = "Trying to add the {0}."

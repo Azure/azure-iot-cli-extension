@@ -46,6 +46,12 @@ class EdgeDevicesConfig(NamedTuple):
     default_edge_agent: Optional[str] = None
 
 
+SYSTEM_ASSIGNED_IDENTITY = '[system]'
+BYTES_PER_MEGABYTE = 1048576
+
+# Message Endpoint Messages
+INVALID_CLI_CORE_FOR_COSMOS = "This version of the azure cli core does not support Cosmos Db Endpoints for IoT Hub."
+
 CA_TRANSITION_API_VERSION = "2022-04-30-preview"
 HUB_PROVIDER = "Microsoft.Devices/IotHubs"
 DEFAULT_ROOT_AUTHORITY = {"enableRootCertificateV2": False}
@@ -67,7 +73,64 @@ ABORT_MSG = "Command was aborted."
 NO_CHANGE_MSG = "Current Certificate Root Authority is already {0}. No updates are needed."
 
 
-# Enums
+class AuthenticationType(Enum):
+    """
+    Type of the Authentication for the routing endpoint.
+    """
+    KeyBased = 'keyBased'
+    IdentityBased = 'identityBased'
+
+
+class EncodingFormat(Enum):
+    """
+    Type of the encoding format for the container.
+    """
+    JSON = 'json'
+    AVRO = 'avro'
+
+
+class EndpointType(Enum):
+    """
+    Type of the routing endpoint.
+    """
+    EventHub = 'eventhub'
+    ServiceBusQueue = 'servicebus-queue'
+    ServiceBusTopic = 'servicebus-topic'
+    AzureStorageContainer = 'storage-container'
+    CosmosDBContainer = 'cosmosdb-container'
+
+
+class IdentityType(Enum):
+    """
+    Type of managed identity for the IoT Hub.
+    """
+    system_assigned = "SystemAssigned"
+    user_assigned = "UserAssigned"
+    system_assigned_user_assigned = "SystemAssigned, UserAssigned"
+    none = "None"
+
+
+class RouteSourceType(Enum):
+    """
+    Type of the route source.
+    """
+    Invalid = 'invalid'
+    DeviceMessages = 'devicemessages'
+    TwinChangeEvents = 'twinchangeevents'
+    DeviceLifecycleEvents = 'devicelifecycleevents'
+    DeviceJobLifecycleEvents = 'devicejoblifecycleevents'
+    DigitalTwinChangeEvents = 'digitaltwinchangeevents'
+    DeviceConnectionStateEvents = 'deviceconnectionstateevents'
+
+    @classmethod
+    def list(cls):
+        return list(map(lambda c: c.value, cls))
+
+    @classmethod
+    def list_valid_types(cls):
+        return list(filter(lambda d: d != RouteSourceType.Invalid.value, map(lambda c: c.value, cls)))
+
+
 class CertificateAuthorityVersions(Enum):
     """
     Certificate Authority Versions
