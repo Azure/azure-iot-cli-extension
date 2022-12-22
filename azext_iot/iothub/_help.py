@@ -108,8 +108,8 @@ def load_iothub_help():
             az iot hub digital-twin invoke-command --command-name {command_name} -n {iothub_name} -d {device_id} --payload '{"property_name": "property_value"}'
 
         - name: Invoke root level command "reboot" which takes a payload that includes the "delay" property with pre-configured DTDL model
-        such as https://github.com/Azure/opendigitaltwins-dtdl/blob/master/DTDL/v2/samples/TemperatureController.json. In the DTDL model
-        example, the "delay" property is defined as an integer, therefore integer in the payload will be mapped to set "delay".
+          such as https://github.com/Azure/opendigitaltwins-dtdl/blob/master/DTDL/v2/samples/TemperatureController.json. In the DTDL model
+          example, the "delay" property is defined as an integer, therefore integer in the payload will be mapped to set "delay".
           text: >
             az iot hub digital-twin invoke-command --command-name reboot -n {iothub_name} -d {device_id} --payload "5"
 
