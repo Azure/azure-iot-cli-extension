@@ -285,6 +285,7 @@ def create_adx_data_connection(
     eh_consumer_group: str = "$Default",
     eh_resource_group: Optional[str] = None,
     eh_subscription: Optional[str] = None,
+    user_identity: Optional[str] = None,
     resource_group_name: Optional[str] = None,
     yes: bool = False,
 ):
@@ -302,6 +303,7 @@ def create_adx_data_connection(
         eh_consumer_group=eh_consumer_group,
         eh_resource_group=eh_resource_group,
         eh_subscription=eh_subscription,
+        user_identity=user_identity,
         resource_group_name=resource_group_name,
         yes=yes,
     )
