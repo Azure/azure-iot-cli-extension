@@ -13,6 +13,7 @@ from azure.cli.core.azclierror import (
     MutuallyExclusiveArgumentError
 )
 from azext_iot.digitaltwins.common import (
+    ADX_DEFAULT_TABLE,
     DEFAULT_CONSUMER_GROUP,
     LRO_TIMER,
     MAX_ADT_DH_CREATE_RETRIES,
@@ -693,7 +694,9 @@ class ResourceProvider(DigitalTwinsResourceManager):
         adx_database_name: str,
         eh_namespace: str,
         eh_entity_path: str,
-        adx_table_name: Optional[str] = None,
+        adx_table_name: str = ADX_DEFAULT_TABLE,
+        adx_twin_lifecycle_events_table_name: Optional[str] = None,
+        adx_relationship_lifecycle_events_table_name: Optional[str] = None,
         adx_resource_group: Optional[str] = None,
         adx_subscription: Optional[str] = None,
         eh_consumer_group: str = DEFAULT_CONSUMER_GROUP,
@@ -701,6 +704,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
         eh_subscription: Optional[str] = None,
         user_identity: Optional[str] = None,
         resource_group_name: Optional[str] = None,
+        record_property_and_item_removals: bool = False,
         yes: bool = False,
     ):
         target_instance = self.find_instance(
@@ -725,6 +729,8 @@ class ResourceProvider(DigitalTwinsResourceManager):
             adx_cluster_name=adx_cluster_name,
             adx_database_name=adx_database_name,
             adx_table_name=adx_table_name,
+            adx_twin_lifecycle_events_table_name=adx_twin_lifecycle_events_table_name,
+            adx_relationship_lifecycle_events_table_name=adx_relationship_lifecycle_events_table_name,
             adx_resource_group=adx_resource_group,
             adx_subscription=adx_subscription,
             dt_instance=target_instance,
@@ -734,6 +740,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
             eh_resource_group=eh_resource_group,
             eh_subscription=eh_subscription,
             identity=user_identity or SYSTEM_IDENTITY,
+            record_property_and_item_removals=record_property_and_item_removals,
             yes=yes,
         )
 
@@ -794,7 +801,13 @@ class ResourceProvider(DigitalTwinsResourceManager):
         except ErrorResponseException as e:
             handle_service_exception(e)
 
-    def delete_data_connection(self, name: str, conn_name: str, resource_group_name: Optional[str] = None):
+    def delete_data_connection(
+        self,
+        name: str,
+        conn_name: str,
+        cleanup_connection_artifacts: bool = False,
+        resource_group_name: Optional[str] = None
+    ):
         target_instance = self.find_instance(
             name=name, resource_group_name=resource_group_name
         )
@@ -806,6 +819,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
                 resource_group_name=resource_group_name,
                 resource_name=name,
                 time_series_database_connection_name=conn_name,
+                cleanup_connection_artifacts=cleanup_connection_artifacts,
             )
         except ErrorResponseException as e:
             handle_service_exception(e)

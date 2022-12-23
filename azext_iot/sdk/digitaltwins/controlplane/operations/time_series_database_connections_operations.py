@@ -176,7 +176,6 @@ class TimeSeriesDatabaseConnectionsOperations(object):
         return deserialized
     get.metadata = {'url': '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DigitalTwins/digitalTwinsInstances/{resourceName}/timeSeriesDatabaseConnections/{timeSeriesDatabaseConnectionName}'}
 
-
     def _create_or_update_initial(
             self, resource_group_name, resource_name, time_series_database_connection_name, properties=None, custom_headers=None, raw=False, **operation_config):
         time_series_database_connection_description = models.TimeSeriesDatabaseConnection(properties=properties)

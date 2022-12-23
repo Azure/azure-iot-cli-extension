@@ -218,6 +218,29 @@ def load_digitaltwins_help():
             --adx-database-name {adx_database_name}
             --eventhub {event_hub}
             --eventhub-namespace {event_hub_namespace}
+        - name: Adds a data history connection to a target Digital Twins instance with the $Default Event Hub
+            consumer group and enables record property and item removals. An additional column will be added to the table used
+            for storing updates to properties of twins and relationships (defaulted to AdtPropertyEvents).
+          text: >
+            az dt data-history connection create adx -n {instance_name}
+            --cn {time_series_database_connection_name}
+            --adx-cluster-name {adx_cluster_name}
+            --adx-database-name {adx_database_name}
+            --eventhub {event_hub}
+            --eventhub-namespace {event_hub_namespace}
+            --adx-record-property-item-removals true
+        - name: Adds a data history connection to a target Digital Twins instance with the $Default Event Hub
+            consumer group and creates two extra tables in the Azure Data Explorer database. One table will be for recording twin
+            lifecycle events and the other for relationship lifecycle events.
+          text: >
+            az dt data-history connection create adx -n {instance_name}
+            --cn {time_series_database_connection_name}
+            --adx-cluster-name {adx_cluster_name}
+            --adx-database-name {adx_database_name}
+            --eventhub {event_hub}
+            --eventhub-namespace {event_hub_namespace}
+            --adx-twin-lifecycle-events-table-name {adx_twin_lifecycle_events_table_name}
+            --adx-relationship-lifecycle-events-table-name {adx_relationship_lifecycle_events_table_name}
     """
 
     helps["dt data-history connection list"] = """
@@ -254,17 +277,18 @@ def load_digitaltwins_help():
         type: command
         short-summary: Delete a data history connection configured on a Digital Twins instance.
         examples:
-        - name: Delete a data history connection configured on an instance
-            and block until the operation is complete.
+        - name: Delete a data history connection configured on an instance and block until the operation is complete.
           text: >
-            az dt data-history connection delete -n {instance_name}
-            --cn {time_series_database_connection_name}
-        - name: Delete a data history connection configured on an instance
-            without confirmation or blocking.
+            az dt data-history connection delete -n {instance_name} --cn {time_series_database_connection_name}
+        - name: Delete a data history connection configured on an instance without confirmation or blocking.
           text: >
-            az dt data-history connection delete -n {instance_name}
-            --cn {time_series_database_connection_name}
+            az dt data-history connection delete -n {instance_name} --cn {time_series_database_connection_name}
             -y --no-wait
+        - name: Delete a data history connection configured on an instance and attempt to clean up artifacts that were created
+            when the connection was created. If appropriate permissions are not in place, the attempt may fail. Recorded data will
+            not be deleted.
+          text: >
+            az dt data-history connection delete -n {instance_name} --cn {time_series_database_connection_name} --clean
     """
 
     helps["dt endpoint"] = """

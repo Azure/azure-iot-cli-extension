@@ -9,6 +9,8 @@ from azext_iot.digitaltwins.commands_twins import delete_all_twin
 from azext_iot.digitaltwins.commands_models import delete_all_models
 from azext_iot.digitaltwins.providers.resource import ResourceProvider
 from azext_iot.digitaltwins.common import (
+    ADX_DEFAULT_TABLE,
+    DEFAULT_CONSUMER_GROUP,
     ADTEndpointType,
     ADTEndpointAuthType,
     ADTPublicNetworkAccessType,
@@ -279,13 +281,16 @@ def create_adx_data_connection(
     adx_database_name: str,
     eh_namespace: str,
     eh_entity_path: str,
-    adx_table_name: Optional[str] = None,
+    adx_table_name: str = ADX_DEFAULT_TABLE,
+    adx_twin_lifecycle_events_table_name: Optional[str] = None,
+    adx_relationship_lifecycle_events_table_name: Optional[str] = None,
     adx_resource_group: Optional[str] = None,
     adx_subscription: Optional[str] = None,
-    eh_consumer_group: str = "$Default",
+    eh_consumer_group: str = DEFAULT_CONSUMER_GROUP,
     eh_resource_group: Optional[str] = None,
     eh_subscription: Optional[str] = None,
     user_identity: Optional[str] = None,
+    record_property_and_item_removals: bool = False,
     resource_group_name: Optional[str] = None,
     yes: bool = False,
 ):
@@ -296,6 +301,8 @@ def create_adx_data_connection(
         adx_cluster_name=adx_cluster_name,
         adx_database_name=adx_database_name,
         adx_table_name=adx_table_name,
+        adx_twin_lifecycle_events_table_name=adx_twin_lifecycle_events_table_name,
+        adx_relationship_lifecycle_events_table_name=adx_relationship_lifecycle_events_table_name,
         adx_resource_group=adx_resource_group,
         adx_subscription=adx_subscription,
         eh_namespace=eh_namespace,
@@ -304,6 +311,7 @@ def create_adx_data_connection(
         eh_resource_group=eh_resource_group,
         eh_subscription=eh_subscription,
         user_identity=user_identity,
+        record_property_and_item_removals=record_property_and_item_removals,
         resource_group_name=resource_group_name,
         yes=yes,
     )
@@ -324,6 +332,12 @@ def list_data_connection(cmd, name: str, resource_group_name: Optional[str] = No
     return rp.list_data_connection(name=name, resource_group_name=resource_group_name)
 
 
-def delete_data_connection(cmd, name: str, conn_name: str, resource_group_name: Optional[str] = None):
+def delete_data_connection(
+    cmd,
+    name: str,
+    conn_name: str,
+    resource_group_name: Optional[str] = None,
+    cleanup_connection_artifacts: bool = False,
+):
     rp = ResourceProvider(cmd)
     return rp.delete_data_connection(name=name, conn_name=conn_name, resource_group_name=resource_group_name)
