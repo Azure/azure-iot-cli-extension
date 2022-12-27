@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from typing import List, Optional
 from azext_iot.digitaltwins.commands_twins import delete_all_twin
 from azext_iot.digitaltwins.commands_models import delete_all_models
 from azext_iot.digitaltwins.providers.resource import ResourceProvider
@@ -20,15 +21,17 @@ logger = get_logger(__name__)
 
 def create_instance(
     cmd,
-    name,
-    resource_group_name,
-    location=None,
-    tags=None,
-    assign_identity=None,
-    scopes=None,
-    role_type="Contributor",
-    public_network_access=ADTPublicNetworkAccessType.enabled.value,
-    no_wait=False,
+    name: str,
+    resource_group_name: str,
+    location: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+    assign_identity: Optional[bool] = None,
+    scopes: Optional[List[str]] = None,
+    role_type: str = "Contributor",
+    public_network_access: str = ADTPublicNetworkAccessType.enabled.value,
+    system_identity: Optional[bool] = None,
+    user_identities: Optional[List[str]] = None,
+    no_wait: bool = False,
 ):
     if no_wait and scopes:
         raise MutuallyExclusiveArgumentError(
@@ -44,10 +47,12 @@ def create_instance(
         scopes=scopes,
         role_type=role_type,
         public_network_access=public_network_access,
+        system_identity=system_identity,
+        user_identities=user_identities
     )
 
 
-def list_instances(cmd, resource_group_name=None):
+def list_instances(cmd, resource_group_name: Optional[str] = None):
     rp = ResourceProvider(cmd)
 
     if not resource_group_name:
@@ -55,46 +60,46 @@ def list_instances(cmd, resource_group_name=None):
     return rp.list_by_resouce_group(resource_group_name)
 
 
-def show_instance(cmd, name, resource_group_name=None):
+def show_instance(cmd, name: str, resource_group_name: Optional[str] = None):
     rp = ResourceProvider(cmd)
     return rp.find_instance(name=name, resource_group_name=resource_group_name)
 
 
-def delete_instance(cmd, name, resource_group_name=None):
+def delete_instance(cmd, name: str, resource_group_name: Optional[str] = None):
     rp = ResourceProvider(cmd)
     return rp.delete(name=name, resource_group_name=resource_group_name)
 
 
-def wait_instance(cmd, name, resource_group_name=None):
+def wait_instance(cmd, name: str, resource_group_name: Optional[str] = None):
     rp = ResourceProvider(cmd)
     return rp.find_instance(name=name, resource_group_name=resource_group_name, wait=True)
 
 
-def reset_instance(cmd, name, resource_group_name=None):
+def reset_instance(cmd, name: str, resource_group_name: Optional[str] = None):
     delete_all_models(cmd, name, resource_group_name)
     delete_all_twin(cmd, name, resource_group_name)
 
 
-def list_endpoints(cmd, name, resource_group_name=None):
+def list_endpoints(cmd, name: str, resource_group_name: Optional[str] = None):
     rp = ResourceProvider(cmd)
     return rp.list_endpoints(name=name, resource_group_name=resource_group_name)
 
 
-def show_endpoint(cmd, name, endpoint_name, resource_group_name=None):
+def show_endpoint(cmd, name: str, endpoint_name: str, resource_group_name: Optional[str] = None):
     rp = ResourceProvider(cmd)
     return rp.get_endpoint(
         name=name, endpoint_name=endpoint_name, resource_group_name=resource_group_name
     )
 
 
-def delete_endpoint(cmd, name, endpoint_name, resource_group_name=None):
+def delete_endpoint(cmd, name: str, endpoint_name: str, resource_group_name: Optional[str] = None):
     rp = ResourceProvider(cmd)
     return rp.delete_endpoint(
         name=name, endpoint_name=endpoint_name, resource_group_name=resource_group_name
     )
 
 
-def wait_endpoint(cmd, name, endpoint_name, resource_group_name=None):
+def wait_endpoint(cmd, name: str, endpoint_name: str, resource_group_name: Optional[str] = None):
     rp = ResourceProvider(cmd)
     return rp.get_endpoint(
         name=name,
@@ -106,15 +111,15 @@ def wait_endpoint(cmd, name, endpoint_name, resource_group_name=None):
 
 def add_endpoint_eventgrid(
     cmd,
-    name,
-    endpoint_name,
-    eventgrid_topic_name,
-    eventgrid_resource_group,
-    resource_group_name=None,
-    endpoint_subscription=None,
-    dead_letter_uri=None,
-    dead_letter_secret=None,
-    auth_type=ADTEndpointAuthType.keybased.value,
+    name: str,
+    endpoint_name: str,
+    eventgrid_topic_name: str,
+    eventgrid_resource_group: Optional[str] = None,
+    resource_group_name: Optional[str] = None,
+    endpoint_subscription: Optional[str] = None,
+    dead_letter_uri: Optional[str] = None,
+    dead_letter_secret: Optional[str] = None,
+    auth_type: str = ADTEndpointAuthType.keybased.value,
 ):
     rp = ResourceProvider(cmd)
     return rp.add_endpoint(
@@ -133,17 +138,19 @@ def add_endpoint_eventgrid(
 
 def add_endpoint_servicebus(
     cmd,
-    name,
-    endpoint_name,
-    servicebus_topic_name,
-    servicebus_resource_group,
-    servicebus_namespace,
-    servicebus_policy=None,
-    resource_group_name=None,
-    endpoint_subscription=None,
-    dead_letter_uri=None,
-    dead_letter_secret=None,
-    auth_type=ADTEndpointAuthType.keybased.value,
+    name: str,
+    endpoint_name: str,
+    servicebus_topic_name: str,
+    servicebus_namespace: str,
+    servicebus_resource_group: Optional[str] = None,
+    servicebus_policy: Optional[str] = None,
+    resource_group_name: Optional[str] = None,
+    endpoint_subscription: Optional[str] = None,
+    dead_letter_uri: Optional[str] = None,
+    dead_letter_secret: Optional[str] = None,
+    auth_type: str = ADTEndpointAuthType.keybased.value,
+    system_identity: Optional[bool] = None,
+    user_identity: Optional[List[str]] = None,
 ):
     rp = ResourceProvider(cmd)
     return rp.add_endpoint(
@@ -159,22 +166,26 @@ def add_endpoint_servicebus(
         dead_letter_uri=dead_letter_uri,
         dead_letter_secret=dead_letter_secret,
         auth_type=auth_type,
+        system_identity=system_identity,
+        user_identity=user_identity
     )
 
 
 def add_endpoint_eventhub(
     cmd,
-    name,
-    endpoint_name,
-    eventhub_name,
-    eventhub_resource_group,
-    eventhub_namespace,
-    eventhub_policy=None,
-    resource_group_name=None,
-    endpoint_subscription=None,
-    dead_letter_uri=None,
-    dead_letter_secret=None,
-    auth_type=ADTEndpointAuthType.keybased.value,
+    name: str,
+    endpoint_name: str,
+    eventhub_name: str,
+    eventhub_namespace: str,
+    eventhub_resource_group: Optional[str] = None,
+    eventhub_policy: Optional[str] = None,
+    resource_group_name: Optional[str] = None,
+    endpoint_subscription: Optional[str] = None,
+    dead_letter_uri: Optional[str] = None,
+    dead_letter_secret: Optional[str] = None,
+    auth_type: str = ADTEndpointAuthType.keybased.value,
+    system_identity: Optional[bool] = None,
+    user_identity: Optional[List[str]] = None,
 ):
     rp = ResourceProvider(cmd)
     return rp.add_endpoint(
@@ -190,30 +201,32 @@ def add_endpoint_eventhub(
         dead_letter_uri=dead_letter_uri,
         dead_letter_secret=dead_letter_secret,
         auth_type=auth_type,
+        system_identity=system_identity,
+        user_identity=user_identity
     )
 
 
-def show_private_link(cmd, name, link_name, resource_group_name=None):
+def show_private_link(cmd, name: str, link_name: str, resource_group_name: Optional[str] = None):
     rp = ResourceProvider(cmd)
     return rp.get_private_link(
         name=name, resource_group_name=resource_group_name, link_name=link_name
     )
 
 
-def list_private_links(cmd, name, resource_group_name=None):
+def list_private_links(cmd, name: str, resource_group_name: Optional[str] = None):
     rp = ResourceProvider(cmd)
     return rp.list_private_links(name=name, resource_group_name=resource_group_name)
 
 
 def set_private_endpoint_conn(
     cmd,
-    name,
-    conn_name,
-    status,
-    description=None,
+    name: str,
+    conn_name: str,
+    status: str,
+    description: Optional[str] = None,
     group_ids=None,
-    actions_required=None,
-    resource_group_name=None,
+    actions_required: Optional[str] = None,
+    resource_group_name: Optional[str] = None,
 ):
     rp = ResourceProvider(cmd)
     return rp.set_private_endpoint_conn(
@@ -227,28 +240,28 @@ def set_private_endpoint_conn(
     )
 
 
-def show_private_endpoint_conn(cmd, name, conn_name, resource_group_name=None):
+def show_private_endpoint_conn(cmd, name: str, conn_name: str, resource_group_name: Optional[str] = None):
     rp = ResourceProvider(cmd)
     return rp.get_private_endpoint_conn(
         name=name, resource_group_name=resource_group_name, conn_name=conn_name
     )
 
 
-def list_private_endpoint_conns(cmd, name, resource_group_name=None):
+def list_private_endpoint_conns(cmd, name: str, resource_group_name: Optional[str] = None):
     rp = ResourceProvider(cmd)
     return rp.list_private_endpoint_conns(
         name=name, resource_group_name=resource_group_name
     )
 
 
-def delete_private_endpoint_conn(cmd, name, conn_name, resource_group_name=None):
+def delete_private_endpoint_conn(cmd, name: str, conn_name: str, resource_group_name: Optional[str] = None):
     rp = ResourceProvider(cmd)
     return rp.delete_private_endpoint_conn(
         name=name, resource_group_name=resource_group_name, conn_name=conn_name
     )
 
 
-def wait_private_endpoint_conn(cmd, name, conn_name, resource_group_name=None):
+def wait_private_endpoint_conn(cmd, name: str, conn_name: str, resource_group_name: Optional[str] = None):
     rp = ResourceProvider(cmd)
     return rp.get_private_endpoint_conn(
         name=name,
@@ -260,20 +273,21 @@ def wait_private_endpoint_conn(cmd, name, conn_name, resource_group_name=None):
 
 def create_adx_data_connection(
     cmd,
-    name,
-    conn_name,
-    adx_cluster_name,
-    adx_database_name,
-    eh_namespace,
-    eh_entity_path,
-    adx_table_name=None,
-    adx_resource_group=None,
-    adx_subscription=None,
-    eh_consumer_group="$Default",
-    eh_resource_group=None,
-    eh_subscription=None,
-    resource_group_name=None,
-    yes=False,
+    name: str,
+    conn_name: str,
+    adx_cluster_name: str,
+    adx_database_name: str,
+    eh_namespace: str,
+    eh_entity_path: str,
+    adx_table_name: Optional[str] = None,
+    adx_resource_group: Optional[str] = None,
+    adx_subscription: Optional[str] = None,
+    eh_consumer_group: str = "$Default",
+    eh_resource_group: Optional[str] = None,
+    eh_subscription: Optional[str] = None,
+    user_identity: Optional[str] = None,
+    resource_group_name: Optional[str] = None,
+    yes: bool = False,
 ):
     rp = ResourceProvider(cmd)
     return rp.create_adx_data_connection(
@@ -289,26 +303,27 @@ def create_adx_data_connection(
         eh_consumer_group=eh_consumer_group,
         eh_resource_group=eh_resource_group,
         eh_subscription=eh_subscription,
+        user_identity=user_identity,
         resource_group_name=resource_group_name,
         yes=yes,
     )
 
 
-def show_data_connection(cmd, name, conn_name, resource_group_name=None):
+def show_data_connection(cmd, name: str, conn_name: str, resource_group_name: Optional[str] = None):
     rp = ResourceProvider(cmd)
     return rp.get_data_connection(name=name, conn_name=conn_name, resource_group_name=resource_group_name)
 
 
-def wait_data_connection(cmd, name, conn_name, resource_group_name=None):
+def wait_data_connection(cmd, name: str, conn_name: str, resource_group_name: Optional[str] = None):
     rp = ResourceProvider(cmd)
     return rp.get_data_connection(name=name, conn_name=conn_name, resource_group_name=resource_group_name, wait=True)
 
 
-def list_data_connection(cmd, name, resource_group_name=None):
+def list_data_connection(cmd, name: str, resource_group_name: Optional[str] = None):
     rp = ResourceProvider(cmd)
     return rp.list_data_connection(name=name, resource_group_name=resource_group_name)
 
 
-def delete_data_connection(cmd, name, conn_name, resource_group_name=None):
+def delete_data_connection(cmd, name: str, conn_name: str, resource_group_name: Optional[str] = None):
     rp = ResourceProvider(cmd)
     return rp.delete_data_connection(name=name, conn_name=conn_name, resource_group_name=resource_group_name)

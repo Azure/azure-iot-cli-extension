@@ -10,7 +10,7 @@ from time import sleep
 from knack.log import get_logger
 import pytest
 from azext_iot.common.utility import unpack_msrest_error
-from azext_iot.digitaltwins.common import ADTEndpointAuthType, ADTEndpointType
+from azext_iot.digitaltwins.common import ADTEndpointAuthType, ADTEndpointType, IdentityType
 from azext_iot.tests.digitaltwins.dt_helpers import assert_system_data_attributes
 from . import DTLiveScenarioTest
 from . import (
@@ -42,6 +42,12 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
     @pytest.fixture(scope='class', autouse=True)
     def tearDownSuite(self):
         yield None
+        try:
+            self.delete_user_identity()
+        except Exception as e:
+            logger.warning(
+                "Failed to delete the User Identity resource. Additional details: " +
+                unpack_msrest_error(e))
         try:
             self.delete_eventhub_resources()
         except Exception as e:
@@ -126,7 +132,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         # Assert that --no-wait and --scopes will not work
         self.cmd(
-            "dt create -n {} -g {} --assign-identity --scopes {} --no-wait".format(
+            "dt create -n {} -g {} --mi-system-assigned --scopes {} --no-wait".format(
                 instance_names[1], self.rg, " ".join(scope_ids)
             ),
             expect_failure=True,
@@ -134,7 +140,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         # No location specified. Use the resource group location.
         create_msi_output = self.cmd(
-            "dt create -n {} -g {} --assign-identity --scopes {}".format(
+            "dt create -n {} -g {} --mi-system-assigned --scopes {}".format(
                 instance_names[1], self.rg, " ".join(scope_ids)
             )
         ).get_output_in_json()
@@ -184,7 +190,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         updated_tags = "env=test tier=premium"
         updated_tags_dict = {"env": "test", "tier": "premium"}
         self.cmd(
-            "dt create -n {} -g {} --assign-identity false --tags {} --no-wait".format(
+            "dt create -n {} -g {} --mi-system-assigned false --tags {} --no-wait".format(
                 instance_names[1], self.rg, updated_tags
             )
         )
@@ -342,9 +348,8 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 EP_RG,
             )
         ).as_json()["id"]
-
         endpoint_instance = self.cmd(
-            "dt create -n {} -g {} -l {} --assign-identity --scopes {} {} --role {}".format(
+            "dt create -n {} -g {} -l {} --mi-system-assigned --scopes {} {} --role {}".format(
                 endpoints_instance_name,
                 self.rg,
                 self.region,
@@ -380,10 +385,10 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         logger.debug("Adding key based eventgrid endpoint...")
         self.cmd(
-            "dt endpoint create eventgrid -n {} -g {} --egg {} --egt {} --en {} --dsu {} --no-wait".format(
+            "dt endpoint create eventgrid -n {} -g {} {} --egt {} --en {} --dsu {} --no-wait".format(
                 endpoints_instance_name,
                 self.rg,
-                EP_RG,
+                "" if EP_RG == self.rg else f"--egg {EP_RG}",
                 EP_EVENTGRID_TOPIC,
                 eventgrid_endpoint,
                 MOCK_DEAD_LETTER_SECRET,
@@ -401,9 +406,9 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         logger.debug("Adding key based servicebus topic endpoint...")
         self.cmd(
-            "dt endpoint create servicebus -n {} --sbg {} --sbn {} --sbp {} --sbt {} --en {} --dsu {} --no-wait".format(
+            "dt endpoint create servicebus -n {} {} --sbn {} --sbp {} --sbt {} --en {} --dsu {} --no-wait".format(
                 endpoints_instance_name,
-                EP_RG,
+                "" if EP_RG == self.rg else f"--sbg {EP_RG}",
                 EP_SERVICEBUS_NAMESPACE,
                 EP_SERVICEBUS_POLICY,
                 EP_SERVICEBUS_TOPIC,
@@ -423,10 +428,10 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         logger.debug("Adding identity based eventhub endpoint...")
         self.cmd(
-            "dt endpoint create eventhub -n {} --ehg {} --ehn {} --eh {} --ehs {} --en {} --du {} "
-            "--auth-type IdentityBased --no-wait".format(
+            "dt endpoint create eventhub -n {} {} --ehn {} --eh {} --ehs {} --en {} --du {} "
+            "--system --no-wait".format(
                 endpoints_instance_name,
-                EP_RG,
+                "" if EP_RG == self.rg else f"--ehg {EP_RG}",
                 EP_EVENTHUB_NAMESPACE,
                 EP_EVENTHUB_TOPIC,
                 self.current_subscription,
@@ -519,6 +524,9 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
     def test_dt_endpoints(self):
         self.wait_for_capacity()
         endpoints_instance_name = generate_resource_id()
+        user_identity = self.ensure_user_identity()
+        user_identity_principal_id = user_identity["principalId"]
+        user_identity_id = user_identity["id"]
         target_scope_role = "Contributor"
 
         sb_topic_resource_id = self.embedded_cli.invoke(
@@ -537,14 +545,23 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             )
         ).as_json()["id"]
 
+        self.assign_role_assignment(
+            scope=sb_topic_resource_id, role=target_scope_role, assignee=user_identity_principal_id
+        )
+
+        self.assign_role_assignment(
+            scope=eh_resource_id, role=target_scope_role, assignee=user_identity_principal_id
+        )
+
         endpoint_instance = self.cmd(
-            "dt create -n {} -g {} -l {} --assign-identity --scopes {} {} --role {}".format(
+            "dt create -n {} -g {} -l {} --mi-system-assigned --scopes {} {} --role {} --mi-user-assigned {}".format(
                 endpoints_instance_name,
                 self.rg,
                 self.region,
                 sb_topic_resource_id,
                 eh_resource_id,
                 target_scope_role,
+                user_identity_id
             )
         ).get_output_in_json()
         self.track_instance(endpoint_instance)
@@ -640,6 +657,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         servicebus_endpoint = "myservicebusendpoint"
         servicebus_endpoint_msi = "{}identity".format(servicebus_endpoint)
+        servicebus_endpoint_uai = "{}user".format(servicebus_endpoint)
 
         logger.debug("Adding key based servicebus topic endpoint...")
         add_ep_sb_key_output = self.cmd(
@@ -724,7 +742,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         logger.debug("Adding identity based servicebus topic endpoint...")
         add_ep_sb_identity_output = self.cmd(
-            "dt endpoint create servicebus -n {} --sbg {} --sbn {} --sbt {} --en {} --du {} --auth-type IdentityBased".format(
+            "dt endpoint create servicebus -n {} --sbg {} --sbn {} --sbt {} --en {} --du {} --system".format(
                 endpoints_instance_name,
                 EP_RG,
                 EP_SERVICEBUS_NAMESPACE,
@@ -757,8 +775,64 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             )
         )
 
+        logger.debug("Adding User identity based servicebus topic endpoint...")
+        add_ep_sb_identity_output = self.cmd(
+            "dt endpoint create servicebus -n {} --sbg {} --sbn {} --sbt {} --en {} --du {} --user {}".format(
+                endpoints_instance_name,
+                EP_RG,
+                EP_SERVICEBUS_NAMESPACE,
+                EP_SERVICEBUS_TOPIC,
+                servicebus_endpoint_uai,
+                MOCK_DEAD_LETTER_ENDPOINT,
+                user_identity_id
+            )
+        ).get_output_in_json()
+
+        self.cmd(
+            "dt endpoint wait --created -n {} -g {} --en {} --interval 1".format(
+                endpoints_instance_name,
+                self.rg,
+                servicebus_endpoint_uai,
+            )
+        )
+
+        assert_common_endpoint_attributes(
+            add_ep_sb_identity_output,
+            servicebus_endpoint_uai,
+            endpoint_type=ADTEndpointType.servicebus,
+            auth_type=ADTEndpointAuthType.identitybased,
+            dead_letter_endpoint=MOCK_DEAD_LETTER_ENDPOINT,
+        )
+
+        # Delete endpoint to avoid endpoint limits
+        self.cmd(
+            "dt endpoint delete -n {} -g {} --en {} -y".format(
+                endpoints_instance_name,
+                self.rg,
+                servicebus_endpoint_uai,
+            )
+        )
+
         eventhub_endpoint = "myeventhubendpoint"
         eventhub_endpoint_msi = "{}identity".format(eventhub_endpoint)
+        eventhub_endpoint_uai = "{}user".format(eventhub_endpoint)
+
+        # Cannot use both system and user identities
+        add_ep_output = self.cmd(
+            "dt endpoint create eventhub -n {} --ehg {} --ehn {} --ehp {} --eh {} --ehs {} --en {}"
+            " --dsu '{}' --system --user {}".format(
+                endpoints_instance_name,
+                EP_RG,
+                EP_EVENTHUB_NAMESPACE,
+                EP_EVENTHUB_POLICY,
+                EP_EVENTHUB_TOPIC,
+                self.current_subscription,
+                eventhub_endpoint,
+                MOCK_DEAD_LETTER_SECRET,
+                user_identity_id
+            ),
+            expect_failure=True
+        )
 
         logger.debug("Adding key based eventhub endpoint...")
         add_ep_output = self.cmd(
@@ -800,7 +874,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         logger.debug("Adding identity based eventhub endpoint...")
         add_ep_output = self.cmd(
             "dt endpoint create eventhub -n {} --ehg {} --ehn {} --eh {} --ehs {} --en {} --du {} "
-            "--auth-type IdentityBased".format(
+            "--system".format(
                 endpoints_instance_name,
                 EP_RG,
                 EP_EVENTHUB_NAMESPACE,
@@ -838,7 +912,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         self.cmd(
             "dt endpoint create eventhub -n {} --ehg {} --ehn {} --eh {} --ehs {} --en {} --du {} "
-            "--auth-type IdentityBased --no-wait".format(
+            "--system --no-wait".format(
                 endpoints_instance_name,
                 EP_RG,
                 EP_EVENTHUB_NAMESPACE,
@@ -880,6 +954,44 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             )
         )
 
+        logger.debug("Adding user identity based eventhub endpoint...")
+        add_ep_output = self.cmd(
+            "dt endpoint create eventhub -n {} --ehg {} --ehn {} --eh {} --ehs {} --en {} --du {} "
+            "--user {}".format(
+                endpoints_instance_name,
+                EP_RG,
+                EP_EVENTHUB_NAMESPACE,
+                EP_EVENTHUB_TOPIC,
+                self.current_subscription,
+                eventhub_endpoint_uai,
+                MOCK_DEAD_LETTER_ENDPOINT,
+                user_identity_id
+            )
+        ).get_output_in_json()
+
+        self.cmd(
+            "dt endpoint wait -n {} -g {} --en {} --created --interval 1".format(
+                endpoints_instance_name,
+                self.rg,
+                eventhub_endpoint_uai,
+            )
+        )
+
+        assert_common_endpoint_attributes(
+            add_ep_output,
+            eventhub_endpoint_uai,
+            endpoint_type=ADTEndpointType.eventhub,
+            auth_type=ADTEndpointAuthType.identitybased,
+            dead_letter_endpoint=MOCK_DEAD_LETTER_ENDPOINT,
+        )
+        endpoint_tuple_collection.append(
+            EndpointTuple(
+                eventhub_endpoint_uai,
+                ADTEndpointType.eventhub,
+                ADTEndpointAuthType.identitybased,
+            )
+        )
+
         for ep in endpoint_tuple_collection:
             is_last = ep.endpoint_name == endpoint_tuple_collection[-1].endpoint_name
             show_ep_output = self.cmd(
@@ -900,7 +1012,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         list_ep_output = self.cmd(
             "dt endpoint list -n {} -g {}".format(endpoints_instance_name, self.rg)
         ).get_output_in_json()
-        assert len(list_ep_output) == 5
+        assert len(list_ep_output) == 6
 
         for ep in endpoint_tuple_collection:
             logger.debug("Deleting endpoint {}...".format(ep.endpoint_name))
@@ -935,9 +1047,174 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             == 0
         )
 
+    def test_dt_identity(self):
+        self.wait_for_capacity()
+        target_scope_role = "Contributor"
+        user_identity = self.ensure_user_identity()
+        user_identity_id = user_identity["id"]
+
+        dt_instance_name = generate_resource_id()
+        dt_instance = self.cmd(
+            "dt create -n {} -g {} -l {}".format(
+                dt_instance_name,
+                self.rg,
+                self.region,
+            )
+        ).get_output_in_json()
+        self.track_instance(dt_instance)
+
+        self.cmd(
+            "dt identity assign -n {} -g {}".format(
+                dt_instance_name,
+                self.rg,
+            ),
+            expect_failure=True
+        )
+
+        self.cmd(
+            "dt identity assign -n {} -g {} --role {}".format(
+                dt_instance_name,
+                self.rg,
+                target_scope_role
+            ),
+            expect_failure=True
+        )
+
+        self.cmd(
+            "dt identity assign -n {} -g {} --scopes {}".format(
+                dt_instance_name,
+                self.rg,
+                target_scope_role
+            ),
+            expect_failure=True
+        )
+
+        # Assign only system
+        assign_output = self.cmd(
+            "dt identity assign -n {} -g {} --system".format(
+                dt_instance_name,
+                self.rg
+            )
+        ).get_output_in_json()
+        assert assign_output["principalId"]
+        assert assign_output["tenantId"]
+        assert assign_output["type"] == IdentityType.system_assigned.value
+        assert assign_output.get("userIdentities") is None
+
+        # Assign user - system should not be removed
+        assign_user_output = self.cmd(
+            "dt identity assign -n {} -g {} --user {}".format(
+                dt_instance_name,
+                self.rg,
+                user_identity_id
+            )
+        ).get_output_in_json()
+        assert assign_output["principalId"] == assign_user_output["principalId"]
+        assert assign_output["tenantId"] == assign_user_output["tenantId"]
+        assert assign_user_output["type"] == IdentityType.system_assigned_user_assigned.value
+        assert len(assign_user_output["userAssignedIdentities"]) == 1
+        assert assign_user_output["userAssignedIdentities"].get(user_identity_id)
+
+        show_output = self.cmd(
+            "dt identity show -n {} -g {}".format(
+                dt_instance_name,
+                self.rg,
+            )
+        ).get_output_in_json()
+        assert assign_user_output["principalId"] == show_output["principalId"]
+        assert assign_user_output["tenantId"] == show_output["tenantId"]
+        assert assign_user_output["type"] == show_output["type"]
+        assert assign_user_output["userAssignedIdentities"] == show_output["userAssignedIdentities"]
+
+        # Remove user identities only, system identities stay the same
+        remove_output = self.cmd(
+            "dt identity remove -n {} -g {} --user {}".format(
+                dt_instance_name,
+                self.rg,
+                user_identity_id
+            )
+        ).get_output_in_json()
+        assert assign_output["principalId"] == remove_output["principalId"]
+        assert assign_output["tenantId"] == remove_output["tenantId"]
+        assert remove_output["type"] == IdentityType.system_assigned.value
+        assert remove_output.get("userIdentities") is None
+
+        # Readd user
+        assign_user_output = self.cmd(
+            "dt identity assign -n {} -g {} --user {}".format(
+                dt_instance_name,
+                self.rg,
+                user_identity_id
+            )
+        ).get_output_in_json()
+        assert assign_output["principalId"] == assign_user_output["principalId"]
+        assert assign_output["tenantId"] == assign_user_output["tenantId"]
+        assert assign_user_output["type"] == IdentityType.system_assigned_user_assigned.value
+        assert len(assign_user_output["userAssignedIdentities"]) == 1
+        assert assign_user_output["userAssignedIdentities"].get(user_identity_id)
+
+        # Remove system
+        remove_output = self.cmd(
+            "dt identity remove -n {} -g {} --system".format(
+                dt_instance_name,
+                self.rg,
+            )
+        ).get_output_in_json()
+        assert remove_output["principalId"] is None
+        assert remove_output["tenantId"]
+        assert remove_output["type"] == IdentityType.user_assigned.value
+        assert len(remove_output["userAssignedIdentities"]) == 1
+        assert remove_output["userAssignedIdentities"].get(user_identity_id)
+
+        # Remove user
+        remove_output = self.cmd(
+            "dt identity remove -n {} -g {} --user {}".format(
+                dt_instance_name,
+                self.rg,
+                user_identity_id
+            )
+        )
+        assert remove_output.output == ''
+
+        # Assign only user
+        assign_output = self.cmd(
+            "dt identity assign -n {} -g {} --user {}".format(
+                dt_instance_name,
+                self.rg,
+                user_identity_id
+            )
+        ).get_output_in_json()
+        assert assign_output["principalId"] is None
+        assert assign_output["tenantId"]
+        assert assign_output["type"] == IdentityType.user_assigned.value
+        assert len(assign_output["userAssignedIdentities"]) == 1
+        assert assign_output["userAssignedIdentities"].get(user_identity_id)
+
+        # Assign system - user not removed; principal id may be different from original
+        assign_output = self.cmd(
+            "dt identity assign -n {} -g {} --system".format(
+                dt_instance_name,
+                self.rg,
+            )
+        ).get_output_in_json()
+        assert assign_output["principalId"]
+        assert assign_output["tenantId"]
+        assert assign_output["type"] == IdentityType.system_assigned_user_assigned.value
+        assert len(assign_output["userAssignedIdentities"]) == 1
+        assert assign_output["userAssignedIdentities"].get(user_identity_id)
+
+        # Remove all identities
+        remove_output = self.cmd(
+            "dt identity remove -n {} -g {} --user --system".format(
+                dt_instance_name,
+                self.rg,
+            )
+        )
+        assert remove_output.output == ''
+
 
 def assert_common_resource_attributes(
-    instance_output, resource_id, group_id, location, tags=None, assign_identity=False
+    instance_output, resource_id, group_id, location, tags=None, assign_identity=None
 ):
     assert instance_output["createdTime"]
     assert_system_data_attributes(instance_output.get("systemData"))

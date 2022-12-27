@@ -19,10 +19,9 @@ class DigitalTwinsIdentity(Model):
     sending a request.
 
     :param type: The type of Managed Identity used by the
-     DigitalTwinsInstance. Only SystemAssigned is supported. Possible values
-     include: 'None', 'SystemAssigned'
-    :type type: str or
-     ~controlplane.models.DigitalTwinsIdentityType
+     DigitalTwinsInstance. Possible values include: 'None', 'SystemAssigned',
+     'UserAssigned', 'SystemAssigned,UserAssigned'
+    :type type: str or ~controlplane.models.DigitalTwinsIdentityType
     :ivar principal_id: The object id of the Managed Identity Resource. This
      will be sent to the RP from ARM via the x-ms-identity-principal-id header
      in the PUT request if the resource has a systemAssigned(implicit) identity
@@ -31,6 +30,13 @@ class DigitalTwinsIdentity(Model):
      be sent to the RP from ARM via the x-ms-client-tenant-id header in the PUT
      request if the resource has a systemAssigned(implicit) identity
     :vartype tenant_id: str
+    :param user_assigned_identities: The list of user identities associated
+     with the resource. The user identity dictionary key references will be ARM
+     resource ids in the form:
+     '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/{identityName}'.
+     .
+    :type user_assigned_identities: dict[str,
+     ~controlplane.models.UserAssignedIdentity]
     """
 
     _validation = {
@@ -42,10 +48,12 @@ class DigitalTwinsIdentity(Model):
         'type': {'key': 'type', 'type': 'str'},
         'principal_id': {'key': 'principalId', 'type': 'str'},
         'tenant_id': {'key': 'tenantId', 'type': 'str'},
+        'user_assigned_identities': {'key': 'userAssignedIdentities', 'type': '{UserAssignedIdentity}'},
     }
 
-    def __init__(self, *, type=None, **kwargs) -> None:
+    def __init__(self, *, type=None, user_assigned_identities=None, **kwargs) -> None:
         super(DigitalTwinsIdentity, self).__init__(**kwargs)
         self.type = type
         self.principal_id = None
         self.tenant_id = None
+        self.user_assigned_identities = user_assigned_identities

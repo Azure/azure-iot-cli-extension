@@ -6,6 +6,92 @@ Release History
 unreleased
 +++++++++++++++
 
+**IoT Hub updates**
+
+* Addition of `az iot hub message-endpoint` and `az iot hub message-route` commands, which function similarly to
+  existing `az iot hub routing-endpoint` and  `az iot hub route` commands respectively. These new commands will
+  use the newer IoT Hub Service API (2022-04-30-preview) if the Azure CLI supports it (min version 2.43.0). If the
+  Azure CLI is not updated, the older API version will be used. A new endpoint type, Cosmos DB Containers is added
+  with the newer API. Most of the command and parameter structure is the same, except for creation of endpoints,
+  in which the type is specified in the command as so:
+
+ - az iot hub message-endpoint create cosmosdb-container * this will be hidden if the Azure CLI version does not
+    support this
+ - az iot hub message-endpoint create eventhub
+ - az iot hub message-endpoint create servicebus-queue
+ - az iot hub message-endpoint create servicebus-topic
+ - az iot hub message-endpoint create storage-container
+
+ Other notable changes, which are not affected by API versions, include:
+
+  * Addition of fallback route management through `az iot hub message-route fallback set` and
+    `az iot hub message-route fallback show`
+
+  * Modification of how route testing works for testing all route sources. If `az iot hub message-route test` is called
+    without specifying a route name or type, all types will be tested rather than only DeviceMessage routes.
+
+
+**Digital Twins updates**
+
+* Addition of User Assigned Identities for data history connections. The command `az dt data-history connection create adx`
+  now can take an extra parameter `--mi-user-assigned` to use an associated User Assigned Identity for the connection
+  creation rather than the system assigned identity for the Digital Twin.
+* Some minor improvements to command documentation involving managed identities.
+
+
+0.18.3
++++++++++++++++
+
+**IoT Hub updates**
+
+* The root-authority migration feature is now available. Since the Baltimore root will soon expire, IoT Hub will
+  transition to the DigiCert Global G2 root starting February 15, 2023. You will need to update all device certificates
+  to use the new G2 root.
+
+  **These commands are temporary** and will be removed once all IoT Hubs have been transitioned:
+
+  - az iot hub certificate root-authority show
+  - az iot hub certificate root-authority set
+
+  To learn more about this transition, visit http://aka.ms/iot-ca-updates/.
+
+
+**IoT Central updates**
+
+* Fixed an issue with enrollement group certificate encoding
+
+**IoT DPS updates**
+
+* Removed file extension restriction for attached certificates in individual enrollments and enrollment groups creation/update commands,
+  and added suggested certificate format in `--help` docs.
+
+0.18.2
++++++++++++++++
+
+**Device Update**
+
+`az iot du update init v5` improvements:
+
+* Fixed an issue where duplicate `files[]` / `relatedFiles[]` entries were created via multiple usage of --file or
+  --related-file against the same update file asset.
+* If the inline step content handler requires `handlerProperties.installedCriteria` and a value was not provided,
+  a default value will be automatically added with a warning.
+* If the inline step content handler starts with 'microsoft' (case-insensitive), valid first-party handler values
+  will be enforced.
+* Inline json rules and examples provided for every shell.
+* Improves error handling for free-form json properties.
+
+**Digital Twins**
+
+* New command group `az dt identity` to easily manage instance identities.
+* `az dt create` supports adding user-managed identities on create.
+* `az dt endpoint create <type>` commands support identity parameters - you are able to leverage managed identities
+  to integrate with the target endpoint.
+  * The `eventgrid` endpoint does not support managed identities.
+* Resource group for endpoint resources are no longer required - if not present, the resource group of the
+  digital twins instance is used.
+
+
 0.18.1
 +++++++++++++++
 

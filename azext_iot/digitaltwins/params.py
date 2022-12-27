@@ -128,6 +128,7 @@ def load_digitaltwins_arguments(self, _):
             arg_group="Managed Service Identity",
             help="Assign a system generated identity to the Digital Twins instance.",
             arg_type=get_three_state_flag(),
+            deprecate_info=context.deprecate(redirect="--mi-system-assigned")
         )
         context.argument(
             "scopes",
@@ -141,6 +142,20 @@ def load_digitaltwins_arguments(self, _):
             arg_group="Managed Service Identity",
             options_list=["--role"],
             help="Role name or Id the system assigned identity will have.",
+        )
+        context.argument(
+            "system_identity",
+            arg_group="Managed Service Identity",
+            options_list=["--mi-system-assigned"],
+            arg_type=get_three_state_flag(),
+            help="Assign a system generated identity to this Digital Twins instance.",
+        )
+        context.argument(
+            "user_identities",
+            arg_group="Managed Service Identity",
+            nargs="+",
+            options_list=["--mi-user-assigned"],
+            help="Space-separated user identity resource ids to add to the Digital Twins instance.",
         )
 
     with self.argument_context("dt wait") as context:
@@ -164,6 +179,19 @@ def load_digitaltwins_arguments(self, _):
             options_list=["--auth-type"],
             help="Endpoint authentication type.",
             arg_type=get_enum_type(ADTEndpointAuthType),
+            deprecate_info=context.deprecate(redirect="identity")
+        )
+        context.argument(
+            'system_identity',
+            options_list=['--mi-system-assigned', '--system'],
+            arg_type=get_three_state_flag(),
+            help="Use the system-assigned managed identity for endpoint authentication."
+        )
+        context.argument(
+            'user_identity',
+            options_list=['--mi-user-assigned', '--user'],
+            help="Use an user-assigned managed identity for endpoint authentication. "
+            "Accepts the identity resource id."
         )
 
     with self.argument_context("dt endpoint create eventgrid") as context:
@@ -176,15 +204,23 @@ def load_digitaltwins_arguments(self, _):
         context.argument(
             "eventgrid_resource_group",
             options_list=["--eventgrid-resource-group", "--egg"],
-            help="Name of EventGrid Topic resource group.",
+            help="Name of EventGrid Topic resource group. If not provided, the Digital Twin "
+            "instance resource group will be used.",
             arg_group="Event Grid Topic",
         )
         context.argument(
             "endpoint_subscription",
             options_list=["--eventgrid-subscription", "--egs"],
-            help="Name or ID of subscription where the endpoint resource exists. "
+            help="Name or id of subscription where the endpoint resource exists. "
             "If no subscription is provided the default subscription is used.",
             arg_group="Event Grid Topic",
+        )
+        context.argument(
+            "auth_type",
+            options_list=["--auth-type"],
+            help="Endpoint authentication type.",
+            arg_type=get_enum_type(ADTEndpointAuthType),
+            deprecate_info=context.deprecate(redirect="identity", hide=True)
         )
 
     with self.argument_context("dt endpoint create eventhub") as context:
@@ -209,13 +245,14 @@ def load_digitaltwins_arguments(self, _):
         context.argument(
             "eventhub_resource_group",
             options_list=["--eventhub-resource-group", "--ehg"],
-            help="Name of EventHub resource group.",
+            help="Name of EventHub resource group. If not provided, the Digital Twin instance "
+            "resource group will be used.",
             arg_group="Event Hub",
         )
         context.argument(
             "endpoint_subscription",
             options_list=["--eventhub-subscription", "--ehs"],
-            help="Name or ID of subscription where the endpoint resource exists. "
+            help="Name or id of subscription where the endpoint resource exists. "
             "If no subscription is provided the default subscription is used.",
             arg_group="Event Hub",
         )
@@ -242,19 +279,63 @@ def load_digitaltwins_arguments(self, _):
         context.argument(
             "servicebus_resource_group",
             options_list=["--servicebus-resource-group", "--sbg"],
-            help="Name of ServiceBus resource group.",
+            help="Name of ServiceBus resource group. If not provided, the Digital Twin instance "
+            "resource group will be used.",
             arg_group="Service Bus Topic",
         )
         context.argument(
             "endpoint_subscription",
             options_list=["--servicebus-subscription", "--sbs"],
-            help="Name or ID of subscription where the endpoint resource exists. "
+            help="Name or id of subscription where the endpoint resource exists. "
             "If no subscription is provided the default subscription is used.",
             arg_group="Service Bus Topic",
         )
 
     with self.argument_context("dt endpoint wait") as context:
         context.ignore("updated")
+
+    with self.argument_context("dt identity assign") as context:
+        context.argument(
+            'system_identity',
+            options_list=['--mi-system-assigned', '--system'],
+            arg_type=get_three_state_flag(),
+            help="Assign a system-assigned managed identity to this Digital Twin instance."
+        )
+        context.argument(
+            'user_identities',
+            options_list=['--mi-user-assigned', '--user'],
+            nargs='+',
+            help="Assign user-assigned managed identities to this Digital Twin instance. "
+            "Accepts space-separated list of identity resource ids."
+        )
+        context.argument(
+            'identity_role',
+            options_list=['--role'],
+            help="Role to assign to the digital twin's system-assigned managed identity."
+        )
+        context.argument(
+            'identity_scopes',
+            options_list=['--scopes'],
+            nargs='*',
+            help="Space separated list of scopes to assign the role (--role) "
+                 "for the system-assigned managed identity."
+        )
+
+    with self.argument_context("dt identity remove") as context:
+        context.argument(
+            'system_identity',
+            options_list=['--mi-system-assigned', '--system'],
+            arg_type=get_three_state_flag(),
+            nargs='*',
+            help="Remove the system-assigned managed identity to this Digital Twin instance."
+        )
+        context.argument(
+            'user_identities',
+            options_list=['--mi-user-assigned', '--user'],
+            nargs='*',
+            help="Remove user-assigned managed identities to this Digital Twin instance. "
+            "Accepts space-separated list of identity resource ids."
+        )
 
     with self.argument_context("dt twin") as context:
         context.argument(
@@ -471,29 +552,25 @@ def load_digitaltwins_arguments(self, _):
             help="Name of Azure Data Explorer cluster to integrate with.",
             arg_group="Azure Data Explorer",
         )
-
         context.argument(
             "adx_database_name",
             options_list=["--adx-database-name", "--adxd"],
             help="Name of Azure Data Explorer database to integrate with.",
             arg_group="Azure Data Explorer",
         )
-
         context.argument(
             "adx_resource_group",
             options_list=["--adx-resource-group", "--adxg"],
             help="Name of Azure Data Explorer resource group. If not provided, will use the Digital Twin's resource group.",
             arg_group="Azure Data Explorer",
         )
-
         context.argument(
             "adx_subscription",
             options_list=["--adx-subscription", "--adxs"],
-            help="Name or ID of subscription where the Azure Data Explorer exists. If not provided, will use the subscription "
+            help="Name or id of subscription where the Azure Data Explorer exists. If not provided, will use the subscription "
                  "that contains the Digital Twin Instance.",
             arg_group="Azure Data Explorer",
         )
-
         context.argument(
             "adx_table_name",
             options_list=["--adx-table-name", "--adxt"],
@@ -501,57 +578,56 @@ def load_digitaltwins_arguments(self, _):
                  "adt_dh_{dt_name}_{dt_location}.",
             arg_group="Azure Data Explorer",
         )
-
         context.argument(
             "eh_namespace",
             options_list=["--eventhub-namespace", "--ehn"],
             help="EventHub Namespace identifier.",
             arg_group="Event Hub",
         )
-
         context.argument(
             "eh_entity_path",
             options_list=["--eventhub", "--eh"],
             help="Name of EventHub to integrate with.",
             arg_group="Event Hub",
         )
-
         context.argument(
             "eh_consumer_group",
             options_list=["--eventhub-consumer-group", "--ehc"],
             help="The EventHub consumer group to use when ADX reads from EventHub.",
             arg_group="Event Hub",
         )
-
         context.argument(
             "eh_resource_group",
             options_list=["--eventhub-resource-group", "--ehg"],
             help="Name of EventHub resource group. If not provided, will use the Digital Twin's resource group.",
             arg_group="Event Hub",
         )
-
         context.argument(
             "eh_subscription",
             options_list=["--eventhub-subscription", "--ehs"],
-            help="Name or ID of subscription where the EventHub exists. If not provided, will use the subscription that contains"
+            help="Name or id of subscription where the EventHub exists. If not provided, will use the subscription that contains"
                  " the Digital Twin Instance.",
             arg_group="Event Hub",
         )
-
         context.argument(
             "yes",
             options_list=['--yes', '-y'],
             help='Do not prompt for confirmation when assigning required roles.',
+        )
+        context.argument(
+            'user_identity',
+            options_list=['--mi-user-assigned', '--user'],
+            help="Use an user-assigned managed identity for data history connection authentication. "
+            "Accepts the identity resource id. If not provided, will use system identity instead."
         )
 
     with self.argument_context("dt job import") as context:
         context.argument(
             "job_id",
             options_list=["--job-id", "-j"],
-            help="ID of bulk import job. A system generated ID is assigned when this parameter is ommitted during job creation.",
+            help="Id of bulk import job. A system generated id is assigned when this parameter is ommitted during job creation.",
             arg_group="Bulk Import Job",
         )
-
         context.argument(
             "data_file_name",
             options_list=["--data-file", "--df"],
@@ -559,21 +635,18 @@ def load_digitaltwins_arguments(self, _):
             "file: https://github.com/Azure/azure-iot-cli-extension/tree/dev/docs/samples/adt-bulk-import-data-sample.ndjson",
             arg_group="Bulk Import Job",
         )
-
         context.argument(
             "input_blob_container_name",
             options_list=["--input-blob-container", "--ibc"],
             help="Name of Azure Storage blob container which contains the bulk import data file.",
             arg_group="Bulk Import Job",
         )
-
         context.argument(
             "input_storage_account_name",
             options_list=["--input-storage-account", "--isa"],
             help="Name of Azure Storage account containing blob container which stores the bulk import data file.",
             arg_group="Bulk Import Job",
         )
-
         context.argument(
             "output_file_name",
             options_list=["--output-file", "--of"],
@@ -582,7 +655,6 @@ def load_digitaltwins_arguments(self, _):
             "If not provided the output file is created with the name: <job_id>_output.txt",
             arg_group="Bulk Import Job",
         )
-
         context.argument(
             "output_blob_container_name",
             options_list=["--output-blob-container", "--obc"],
@@ -590,7 +662,6 @@ def load_digitaltwins_arguments(self, _):
             "If not provided, will use the input blob container.",
             arg_group="Bulk Import Job",
         )
-
         context.argument(
             "output_storage_account_name",
             options_list=["--output-storage-account", "--osa"],

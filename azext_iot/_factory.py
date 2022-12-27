@@ -37,8 +37,8 @@ def iot_hub_service_factory(cli_ctx, *_):
         *_ : all other args ignored.
 
     Returns:
-        service_client (IotHubClient): operational resource for
-            working with IoT Hub.
+        service_client (IoTHubClient): operational resource for
+            working with IoT Hub Service.
     """
     from azure.cli.core.commands.client_factory import get_mgmt_service_client
     from azure.cli.core.profiles import ResourceType

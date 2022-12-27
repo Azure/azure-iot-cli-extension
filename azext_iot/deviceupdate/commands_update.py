@@ -234,10 +234,11 @@ def manifest_init_v5(
     deployable: bool = None,
     no_validation: Optional[bool] = None,
 ):
-    import json
     from datetime import datetime
     from pathlib import PurePath
-    from azure.cli.core.azclierror import ArgumentUsageError
+    from azure.cli.core.azclierror import ArgumentUsageError, InvalidArgumentValueError
+    from azext_iot.deviceupdate.common import FP_HANDLERS, FP_HANDLERS_REQUIRE_CRITERIA
+    from azext_iot.deviceupdate.providers.utility import parse_manifest_json
 
     def _sanitize_safe_params(safe_params: list, keep: list) -> list:
         """
@@ -321,7 +322,14 @@ def manifest_init_v5(
                 "type": "inline",
                 "handler": assembled_step["handler"],
             }
-            step["files"] = [f.strip() for f in assembled_step["files"].split(",")] if "files" in assembled_step else []
+
+            if step["handler"].lower().startswith("microsoft") and step["handler"] not in FP_HANDLERS:
+                if not no_validation:
+                    raise InvalidArgumentValueError(f"Valid Microsoft handlers: {', '.join(FP_HANDLERS)}")
+
+            step["files"] = (
+                list(set([f.strip() for f in assembled_step["files"].split(",")])) if "files" in assembled_step else []
+            )
             if not step["files"]:
                 derived_step_files = []
                 for f in related_step_file_map[s]:
@@ -330,11 +338,24 @@ def manifest_init_v5(
                         continue
                     assembled_step_file = DeviceUpdateDataManager.assemble_nargs_to_dict(step_file)
                     if "path" in assembled_step_file:
-                        derived_step_files.append(PurePath(assembled_step_file["path"]).name)
+                        step_filename = PurePath(assembled_step_file["path"]).name
+                        if step_filename not in derived_step_files:
+                            derived_step_files.append(step_filename)
                 step["files"] = derived_step_files
 
             if "properties" in assembled_step and assembled_step["properties"]:
-                step["handlerProperties"] = json.loads(assembled_step["properties"])
+                step["handlerProperties"] = parse_manifest_json(assembled_step["properties"], "handlerProperties")
+
+            if step["handler"] in FP_HANDLERS_REQUIRE_CRITERIA:
+                if not no_validation:
+                    input_handler_properties = step.get("handlerProperties", {})
+                    if "installedCriteria" not in input_handler_properties:
+                        input_handler_properties["installedCriteria"] = "1.0"
+                        step["handlerProperties"] = input_handler_properties
+                        logger.warning(
+                            "The handler '%s' requires handlerProperties.installedCriteria. A default value has been added.",
+                            step["handler"],
+                        )
 
         if not step:
             raise ArgumentUsageError(
@@ -355,6 +376,7 @@ def manifest_init_v5(
         related_file_map = _associate_related(file_params, "--file")
 
         processed_files = []
+        processed_files_map = {}
         for f in range(len(files)):
             if not files[f] or not files[f][0]:
                 continue
@@ -368,12 +390,13 @@ def manifest_init_v5(
             processed_file["sizeInBytes"] = assembled_file_metadata.bytes
 
             if "properties" in assembled_file and assembled_file["properties"]:
-                processed_file["properties"] = json.loads(assembled_file["properties"])
+                processed_file["properties"] = parse_manifest_json(assembled_file["properties"], "properties")
 
             if "downloadHandler" in assembled_file and assembled_file["downloadHandler"]:
                 processed_file["downloadHandler"] = {"id": assembled_file["downloadHandler"]}
 
             processed_related_files = []
+            processed_related_files_map = {}
             for r in related_file_map[f]:
                 related_file = related_files[r]
                 if not related_file or not related_file[0]:
@@ -388,16 +411,24 @@ def manifest_init_v5(
                 processed_related_file["sizeInBytes"] = related_file_metadata.bytes
 
                 if "properties" in assembled_related_file and assembled_related_file["properties"]:
-                    processed_related_file["properties"] = json.loads(assembled_related_file["properties"])
+                    processed_related_file["properties"] = parse_manifest_json(assembled_related_file["properties"], "properties")
 
                 if processed_related_file:
-                    processed_related_files.append(processed_related_file)
+                    processed_related_files_map[processed_related_file["filename"]] = processed_related_file
+
+            if processed_related_files_map:
+                for _rf in processed_related_files_map:
+                    processed_related_files.append(processed_related_files_map[_rf])
 
             if processed_related_files:
                 processed_file["relatedFiles"] = processed_related_files
 
             if processed_file:
-                processed_files.append(processed_file)
+                processed_files_map[processed_file["filename"]] = processed_file
+
+        if processed_files_map:
+            for _f in processed_files_map:
+                processed_files.append(processed_files_map[_f])
 
         payload["files"] = processed_files
 
@@ -405,6 +436,7 @@ def manifest_init_v5(
         import jsonschema
         from azure.cli.core.azclierror import ValidationError
         from azext_iot.deviceupdate.schemas import DEVICE_UPDATE_MANIFEST_V5, DEVICE_UPDATE_MANIFEST_V5_DEFS
+
         validator = jsonschema.Draft7Validator(DEVICE_UPDATE_MANIFEST_V5)
         validator.resolver.store[DEVICE_UPDATE_MANIFEST_V5_DEFS["$id"]] = DEVICE_UPDATE_MANIFEST_V5_DEFS
 
@@ -482,15 +514,16 @@ def stage_update(
             blob_client = None
             with open(file_path, "rb") as data:
                 blob_client = container_client.upload_blob(
-                    name=f"{container_directory}{file_name}", data=data, overwrite=overwrite)
+                    name=f"{container_directory}{file_name}", data=data, overwrite=overwrite
+                )
 
-            target_datetime_expiry = (datetime.utcnow() + timedelta(hours=3.0))
+            target_datetime_expiry = datetime.utcnow() + timedelta(hours=3.0)
             sas_token = generate_account_sas(
                 account_name=blob_service_client.credential.account_name,
                 account_key=blob_service_client.credential.account_key,
                 resource_types=ResourceTypes(object=True),
                 permission=AccountSasPermissions(read=True),
-                expiry=target_datetime_expiry
+                expiry=target_datetime_expiry,
             )
             file_sas_result.append(f"{blob_client.url}?{sas_token}")
 
@@ -527,11 +560,11 @@ def stage_update(
                         file_paths.append(PurePath(manifest_directory_path, related_filename).as_posix())
                         uploaded_files_map[related_filename] = 1
 
-        updateId = manifest['updateId']
+        updateId = manifest["updateId"]
         qualifier = f"{updateId['provider']}_{updateId['name']}_{updateId['version']}"
         manifest_sas_uris_map[manifest_path] = (
             _stage_update_assets(file_paths, f"{manifest_directory_name}/{qualifier}/"),
-            file_names
+            file_names,
         )
 
     data_manager = DeviceUpdateDataManager(

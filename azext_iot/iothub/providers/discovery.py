@@ -56,6 +56,7 @@ class IotHubDiscovery(BaseDiscovery):
         # same result as _azure.get_iot_hub_connection_string()
         # In future iteration we will return a 'Target' object rather than dict
         # but that will be better served aligning with vNext pattern for Iot Hub
+
         include_events = kwargs.get("include_events", False)
 
         target = {}
