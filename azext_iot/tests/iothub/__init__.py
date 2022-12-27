@@ -8,7 +8,10 @@ import pytest
 
 from time import sleep
 from typing import List
-from azext_iot.tests.helpers import add_test_tag, create_storage_account
+from azext_iot.tests.helpers import (
+    add_test_tag,
+    create_storage_account
+)
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests import CaptureOutputLiveScenarioTest
@@ -273,7 +276,6 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         return f"{command} --auth-type {auth_type}"
 
     def get_role_assignments(self, scope, role):
-
         role_assignments = self.cmd(
             'role assignment list --scope "{}" --role "{}"'.format(
                 scope, role
