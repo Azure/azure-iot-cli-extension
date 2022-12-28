@@ -819,6 +819,13 @@ def load_arguments(self, _):
             type=int,
             help="Maximum number of configurations to return. By default all configurations are returned.",
         )
+        context.argument(
+            "custom_metric_queries",
+            options_list=["--custom-metric-queries"],
+            type=dict,
+            help="Map of custrom metric queries for configuration. "
+            'Format example: {"mertic1":"select *", "metric2":"select moduleId from devices.modules where tags.location=''US''"}',
+        )
 
     with self.argument_context("iot edge") as context:
         context.argument(
