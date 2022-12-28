@@ -914,18 +914,17 @@ class TestConfigTestQueries:
             (
                 mock_target["entity"],
                 "tags.building=43 and tags.environment='test'",
-                "{\"hi\": \"sd\"}",
+                '{"hi": "sd"}',
                 [generate_generic_id(), None],
             )
         ],
     )
-    def test_config_queries(self, fixture_cmd, serviceclient, hub_name, etag, target_condition, custom_metric_queries):
+    def test_config_queries(self, fixture_cmd, serviceclient, hub_name, target_condition, custom_metric_queries):
         subject.iot_hub_configuration_test_queries(
             cmd=fixture_cmd,
             hub_name=hub_name,
             target_condition=target_condition,
             custom_metric_queries=custom_metric_queries,
-            etag=etag,
         )
         args = serviceclient.call_args
         url = args[0][0].url
@@ -950,7 +949,7 @@ class TestConfigTestQueries:
         ],
     )
     def test_config_queries_invalid_args(
-        self, fixture_cmd, serviceclient, hub_name, etag, target_condition, custom_metric_queries
+        self, fixture_cmd, serviceclient, hub_name, target_condition, custom_metric_queries
     ):
         with pytest.raises(CLIError):
             subject.iot_hub_configuration_test_queries(
@@ -958,5 +957,4 @@ class TestConfigTestQueries:
                 hub_name=hub_name,
                 target_condition=target_condition,
                 custom_metric_queries=custom_metric_queries,
-                etag=etag,
             )

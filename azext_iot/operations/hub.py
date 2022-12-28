@@ -1639,17 +1639,16 @@ def iot_hub_configuration_test_queries(
 
     try:
         if custom_metric_queries:
-            custom_metric_queries = process_json_arg(custom_metric_queries, argument_name="content")
+            custom_metric_queries = process_json_arg(custom_metric_queries, argument_name="custom_metric_queries")
 
         result = service_sdk.configuration.test_queries(target_condition, custom_metric_queries)
 
         if not result.target_condition_error and not result.custom_metric_query_errors:
-            print("Validation passed!")
-            return
+            return 'Validation passed!'
         if result.target_condition_error:
-            logger.error('Target condition validation failed: "%s".', result.target_condition_error)
+            return 'Target condition validation failed: {}.'.format(result.target_condition_error)
         if result.custom_metric_query_errors:
-            logger.error('Target condition validation failed: "%s".', result.custom_metric_query_errors)
+            return 'Custom metric query validation failed: {}.'.format(result.custom_metric_query_errors)
     except CloudError as e:
         handle_service_exception(e)
 

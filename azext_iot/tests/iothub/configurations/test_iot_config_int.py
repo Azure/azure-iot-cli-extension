@@ -686,7 +686,6 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
                     ),
                     auth_type=auth_phase,
                 ),
-                expect_failure=False,
             )
 
             # Validate custom metric queries for configuration
@@ -697,7 +696,6 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
                     ),
                     auth_type=auth_phase,
                 ),
-                expect_failure=False,
             )
 
             # Create Edge deployment to ensure it doesn't show up on ADM list

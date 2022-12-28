@@ -5,6 +5,12 @@ Release History
 
 unreleased
 +++++++++++++++
+**IoT Hub updates**
+
+* Added test queries commands for configuration, it validates target condition and custom metric queries for a
+  configuration on the IoT Hub:
+
+    - az iot hub configuration test-queries
 
 0.18.3
 +++++++++++++++
@@ -20,12 +26,6 @@ unreleased
   - az iot hub certificate root-authority set
   
   To learn more about this transition, visit http://aka.ms/iot-ca-updates/.
-
-* Added test queries commands for configuration, it validates target condition and custom metric queries for a
-  configuration on the IoT Hub:
-
-    - az iot hub configuration test-queries
-
 
 **IoT Central updates**
 
