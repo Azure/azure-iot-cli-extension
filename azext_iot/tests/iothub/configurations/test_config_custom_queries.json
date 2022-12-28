@@ -1,0 +1,1 @@
+{"mymetric": "SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200"}

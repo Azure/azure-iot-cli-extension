@@ -24,6 +24,7 @@ edge_content_malformed_path = get_context_path(
 generic_metrics_path = get_context_path(__file__, "test_config_generic_metrics.json")
 adm_content_module_path = get_context_path(__file__, "test_adm_module_content.json")
 adm_content_device_path = get_context_path(__file__, "test_adm_device_content.json")
+custom_queries_path = get_context_path(__file__, "test_config_custom_queries.json")
 
 
 class TestIoTConfigurations(IoTLiveScenarioTest):
@@ -674,6 +675,29 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
                     auth_type=auth_phase,
                 ),
                 expect_failure=True,
+            )
+
+            # Validate target condition for configuration
+            target_condition = "from devices.modules where tags.building=9"
+            self.cmd(
+                self.set_cmd_auth_type(
+                    "iot hub configuration test-queries -n {} --target-condition \"{}\"".format(
+                        self.entity_name, target_condition
+                    ),
+                    auth_type=auth_phase,
+                ),
+                expect_failure=False,
+            )
+
+            # Validate custom metric queries for configuration
+            self.cmd(
+                self.set_cmd_auth_type(
+                    "iot hub configuration test-queries -n {} --custom-metric-queries '{}'".format(
+                        self.entity_name, custom_queries_path
+                    ),
+                    auth_type=auth_phase,
+                ),
+                expect_failure=False,
             )
 
             # Create Edge deployment to ensure it doesn't show up on ADM list

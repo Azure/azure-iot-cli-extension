@@ -21,6 +21,11 @@ unreleased
   
   To learn more about this transition, visit http://aka.ms/iot-ca-updates/.
 
+* Added test queries commands for configuration, it validates target condition and custom metric queries for a
+  configuration on the IoT Hub:
+
+    - az iot hub configuration test-queries
+
 
 **IoT Central updates**
 

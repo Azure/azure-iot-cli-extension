@@ -899,3 +899,64 @@ class TestConfigApply:
                 hub_name=mock_target["entity"],
                 content=sample_config_edge_malformed,
             )
+
+
+class TestConfigTestQueries:
+    @pytest.fixture(params=[200])
+    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        service_client.return_value = build_mock_response(mocker, request.param, {})
+        return service_client
+
+    @pytest.mark.parametrize(
+        "hub_name, target_condition, custom_metric_queries, etag",
+        [
+            (
+                mock_target["entity"],
+                "tags.building=43 and tags.environment='test'",
+                "{\"hi\": \"sd\"}",
+                [generate_generic_id(), None],
+            )
+        ],
+    )
+    def test_config_queries(self, fixture_cmd, serviceclient, hub_name, etag, target_condition, custom_metric_queries):
+        subject.iot_hub_configuration_test_queries(
+            cmd=fixture_cmd,
+            hub_name=hub_name,
+            target_condition=target_condition,
+            custom_metric_queries=custom_metric_queries,
+            etag=etag,
+        )
+        args = serviceclient.call_args
+        url = args[0][0].url
+        method = args[0][0].method
+        body = args[0][2]
+
+        assert "/configurations/testQueries" in url
+        assert method == "POST"
+
+        assert body.get("targetCondition") == "tags.building=43 and tags.environment='test'"
+        assert body.get("customMetricQueries") == {'hi': 'sd'}
+
+    @pytest.mark.parametrize(
+        "hub_name, target_condition, custom_metric_queries, etag",
+        [
+            (
+                mock_target["entity"],
+                "targetCondition",
+                "hello.txt",
+                [generate_generic_id(), None],
+            )
+        ],
+    )
+    def test_config_queries_invalid_args(
+        self, fixture_cmd, serviceclient, hub_name, etag, target_condition, custom_metric_queries
+    ):
+        with pytest.raises(CLIError):
+            subject.iot_hub_configuration_test_queries(
+                cmd=fixture_cmd,
+                hub_name=hub_name,
+                target_condition=target_condition,
+                custom_metric_queries=custom_metric_queries,
+                etag=etag,
+            )

@@ -821,6 +821,31 @@ helps[
 """
 
 helps[
+    "iot hub configuration test-queries"
+] = """
+    type: command
+    short-summary: Validates target condition and custom metric queries for a configuration on the IoT Hub
+    long-summary: |
+      This command supports both inline json and file input for custom metric queries `--custom-metric-queries`.
+      Review examples and parameter description for details on how to fully utilize the operation.
+
+      - For bash inline json format use '{"key":"value"}' and \\ (backslash) for command continuation.
+      - For powershell inline json format use '{\\"key\\":\\"value\\"}' and ` (tilde) for command continuation.
+      - For cmd inline json format use \"{\\"key\\":\\"value\\"}\" and ^ (caret) for command continuation.
+      - For file based json input use "@/path/to/file". File based input avoids shell quotation issues.
+
+    examples:
+    - name: Validate the target condition and custom metric queries with inline json.
+      text: >
+        az iot hub configuration test-queries -n {iothub_name} --target-condition "from devices.modules where tags.building=9"
+        --custom-metric-queries '{\\"mymetric\\":""select moduleId from devices.modules where tags.location=''US''""}'
+    - name: Validate the target condition and custom metric queries with json file.
+      text: >
+        az iot hub configuration test-queries -n {iothub_name} --target-condition "from devices.modules where tags.building=9"
+        --custom-metric-queries '/path/to/file'
+"""
+
+helps[
     "iot hub distributed-tracing"
 ] = """
     type: group

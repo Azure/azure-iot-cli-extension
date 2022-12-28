@@ -49,7 +49,6 @@ from azext_iot._factory import SdkResolver, CloudError
 from azext_iot.operations.generic import _execute_query, _process_top
 from typing import Optional
 import pprint
-from azext_iot.common.utility import validate_key_value_pairs
 
 logger = get_logger(__name__)
 printer = pprint.PrettyPrinter(indent=2)
@@ -1627,7 +1626,6 @@ def iot_hub_configuration_test_queries(
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
-    etag=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
@@ -1640,14 +1638,17 @@ def iot_hub_configuration_test_queries(
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
     try:
-        headers = {}
-        headers["If-Match"] = '"{}"'.format(etag if etag else "*")
         if custom_metric_queries:
             custom_metric_queries = process_json_arg(custom_metric_queries, argument_name="content")
+
         result = service_sdk.configuration.test_queries(target_condition, custom_metric_queries)
-        if result.target_condition_error is not None:
+
+        if not result.target_condition_error and not result.custom_metric_query_errors:
+            print("Validation passed!")
+            return
+        if result.target_condition_error:
             logger.error('Target condition validation failed: "%s".', result.target_condition_error)
-        if result.custom_metric_query_errors is not None:
+        if result.custom_metric_query_errors:
             logger.error('Target condition validation failed: "%s".', result.custom_metric_query_errors)
     except CloudError as e:
         handle_service_exception(e)
