@@ -51,49 +51,10 @@ import json
 from tqdm import tqdm
 from typing import List, Optional
 import os
+import azext_iot.iothub.providers.state_constants as constants
 
 logger = get_logger(__name__)
 cli = EmbeddedCLI()
-
-
-OVERWRITE_FILE_MSG = "File {0} is not empty. Overwrite file? "
-FILE_NOT_EMPTY_ERROR = "Command aborted. Include the --replace flag to overwrite file."
-FILE_NOT_FOUND_ERROR = 'File {0} does not exist.'
-LOGIN_WITH_ARM_ERROR = "Hub aspect 'arm' is not supported with connection string via --login."
-TARGET_HUB_NOT_FOUND_MSG = "Destination IoT Hub {0} was not found and cannot be created with current hub aspects."
-MISSING_RG_ON_CREATE_ERROR = "Please provide the resource group for the hub that will be created."
-SAVE_STATE_MSG = "Saved state of IoT Hub '{0}' to {1}"
-UPLOAD_STATE_MSG = "Uploaded state from '{0}' to IoT Hub '{1}'"
-MIGRATE_STATE_MSG = "Migrated state from IoT Hub '{0}' to IoT Hub '{1}'"
-FAILED_ARM_MSG = "Arm deployment for IoT Hub {0} failed."
-HUB_NOT_CREATED_MSG = "IoT Hub {0} was not created because the arm template was missing in the state file."
-DELETE_CERT_DESC = "Deleting certificates from destination hub"
-SAVE_CONFIGURATIONS_DESC = "Saving ADM configurations and Edge Deployments"
-SAVE_CONFIGURATIONS_RETRIEVE_FAIL_MSG = "Failed to retrieve configurations. Skipping configuration retrieval."
-SAVE_DEVICE_DESC = "Saving devices and modules"
-SAVE_ARM_DESC = "Saved ARM template."
-PRIVATE_ENDPOINT_WARNING_MSG = "Private endpoints for IoT Hub will be ignored for state import."
-CREATE_IOT_HUB_MSG = "Created IoT Hub {0}."
-UPDATED_IOT_HUB_MSG = "Updated IoT Hub {0}."
-UPLOAD_CONFIGURATIONS_DESC = "Uploading ADM configurations and Edge Deployments."
-UPLOAD_ADM_CONFIG_ERROR_MSG = " Failed to upload ADM configuration {0}. Error Message: {1}"
-UPLOAD_EDGE_DEPLOYMENT_ERROR_MSG = " Failed to upload Edge Deployment {0}. Error Message: {1}"
-UPLOAD_DEVICE_MSG = "Uploading devices and modules"
-UPLOAD_DEVICE_IDENTITY_MSG = " Failed to upload device identity for {0}. Proceeding to next device. Error Message: {1}"
-UPLOAD_DEVICE_TWIN_MSG = " Failed to upload device twin for {0}. Proceeding to next device. Error Message: {1}"
-UPLOAD_DEVICE_MODULE_IDENTITY_MSG = " Failed to upload module identity for {0} for the device {1}. Proceeding to next module. Error Message: {2}"
-UPLOAD_DEVICE_MODULE_TWIN_MSG = " Failed to upload module twin for {0} for the device {1}. Proceeding to next module. Error Message: {2}"
-UPLOAD_EDGE_MODULE_MSG = " Failed to upload edge modules for the device {0}. Proceeding to next device. Error Message: {1}"
-UPLOAD_DEVICE_RELATIONSHIP_MSG = " Failed to set parent-child relationship for the parent device {0} to the child device {1}. Error Message: {2}"
-MISSING_HUB_ASPECTS_MSG = " Some hub aspects ({0}) were not uploaded because the necessary aspects were not found in the file."
-BAD_DEVICE_AUTHORIZATION_MSG = "Authorization type for module '{0}' in device '{1}' not recognized."
-BAD_DEVICE_MODULE_AUTHORIZATION_MSG = "Authorization type for module '{0}' in device '{1}' not recognized."
-SKIP_CONFIGURATION_DELETE_MSG = "Failed to retrieve configurations. Skipping configuration deletion."
-DELETE_CONFIGURATION_DESC = "Deleting configurations from destination hub",
-DELETE_CONFIGURATION_FAILURE_MSG = "Configuration '{0}' not found during hub clean-up."
-DELETE_DEVICES_DESC = "Deleting device identities from destination hub"
-DELETE_DEVICES_FAILURE_MSG = "Device identity '{0}' not found during hub clean-up."
-
 
 
 class StateProvider(IoTHubProvider):
@@ -104,6 +65,7 @@ class StateProvider(IoTHubProvider):
         rg: Optional[str] = None,
         login: Optional[str] = None,
         auth_type_dataplane: Optional[str] = None,
+        export: bool = False,
     ):
         try:
             super(StateProvider, self).__init__(
@@ -113,7 +75,9 @@ class StateProvider(IoTHubProvider):
                 login=login,
                 auth_type_dataplane=auth_type_dataplane
             )
-        except ResourceNotFoundError:
+        except ResourceNotFoundError as e:
+            if export:
+                raise e
             self.target = None
             self.resolver = None
         self.auth_type = auth_type_dataplane
@@ -122,7 +86,7 @@ class StateProvider(IoTHubProvider):
         if not self.hub_name:
             self.hub_name = self.target["entity"].split('.')[0]
         if not self.rg and not self.target:
-            raise RequiredArgumentMissingError(MISSING_RG_ON_CREATE_ERROR)
+            raise RequiredArgumentMissingError(constants.MISSING_RG_ON_CREATE_ERROR)
         if not self.rg and self.target:
             self.rg = self.target.get("resourcegroup")
 
@@ -135,14 +99,14 @@ class StateProvider(IoTHubProvider):
             os.path.exists(state_file)
             and os.stat(state_file).st_size
             and not replace
-            and not prompt_y_n(msg=OVERWRITE_FILE_MSG.format(state_file), default="n")
+            and not prompt_y_n(msg=constants.OVERWRITE_FILE_MSG.format(state_file), default="n")
         ):
-            raise FileOperationError(FILE_NOT_EMPTY_ERROR)
+            raise FileOperationError(constants.FILE_NOT_EMPTY_ERROR)
 
         if not hub_aspects:
             hub_aspects = HubAspects.list()
         if HubAspects.Arm.value in hub_aspects and self.login:
-            raise MutuallyExclusiveArgumentError(LOGIN_WITH_ARM_ERROR)
+            raise MutuallyExclusiveArgumentError(constants.LOGIN_WITH_ARM_ERROR)
 
         hub_state = self.process_hub_to_dict(self.target, hub_aspects)
 
@@ -150,19 +114,19 @@ class StateProvider(IoTHubProvider):
             with open(state_file, 'w', encoding='utf-8') as f:
                 json.dump(hub_state, f, indent=4, sort_keys=True)
 
-            logger.info(SAVE_STATE_MSG.format(self.hub_name, state_file))
+            logger.info(constants.SAVE_STATE_MSG.format(self.hub_name, state_file))
 
         except FileNotFoundError:
-            raise FileOperationError(FILE_NOT_FOUND_ERROR.format(state_file))
+            raise FileOperationError(constants.FILE_NOT_FOUND_ERROR.format(state_file))
 
     def upload_state(self, state_file: str, replace: bool = False, hub_aspects: List[str] = None):
         '''Uses hub state from file to recreate the hub state'''
         if not hub_aspects:
             hub_aspects = HubAspects.list()
         if HubAspects.Arm.value in hub_aspects and self.login:
-            raise MutuallyExclusiveArgumentError(LOGIN_WITH_ARM_ERROR)
+            raise MutuallyExclusiveArgumentError(constants.LOGIN_WITH_ARM_ERROR)
         if HubAspects.Arm.value not in hub_aspects and not self.target:
-            raise ResourceNotFoundError(TARGET_HUB_NOT_FOUND_MSG.format(self.hub_name))
+            raise ResourceNotFoundError(constants.TARGET_HUB_NOT_FOUND_MSG.format(self.hub_name))
 
         self.delete_aspects(replace, hub_aspects)
 
@@ -171,10 +135,10 @@ class StateProvider(IoTHubProvider):
                 hub_state = json.load(f)
 
             self.upload_hub_from_dict(hub_state, hub_aspects)
-            logger.info(UPLOAD_STATE_MSG.format(state_file, self.hub_name))
+            logger.info(constants.UPLOAD_STATE_MSG.format(state_file, self.hub_name))
 
         except FileNotFoundError:
-            raise FileOperationError(FILE_NOT_FOUND_ERROR.format(state_file))
+            raise FileOperationError(constants.FILE_NOT_FOUND_ERROR.format(state_file))
 
     def migrate_state(
         self,
@@ -195,16 +159,16 @@ class StateProvider(IoTHubProvider):
         if not hub_aspects:
             hub_aspects = HubAspects.list()
         if HubAspects.Arm.value in hub_aspects and self.login:
-            raise MutuallyExclusiveArgumentError(LOGIN_WITH_ARM_ERROR)
+            raise MutuallyExclusiveArgumentError(constants.LOGIN_WITH_ARM_ERROR)
         if HubAspects.Arm.value not in hub_aspects and not self.target:
-            raise ResourceNotFoundError(TARGET_HUB_NOT_FOUND_MSG.format(self.hub_name))
+            raise ResourceNotFoundError(constants.TARGET_HUB_NOT_FOUND_MSG.format(self.hub_name))
 
         # Command modifies hub_aspect - make copy so we can reuse for upload
         hub_state = self.process_hub_to_dict(orig_hub_target, hub_aspects[:])
         self.delete_aspects(replace, hub_aspects)
         self.upload_hub_from_dict(hub_state, hub_aspects)
 
-        logger.info(MIGRATE_STATE_MSG.format(orig_hub, self.hub_name))
+        logger.info(constants.MIGRATE_STATE_MSG.format(orig_hub, self.hub_name))
 
     def delete_aspects(self, replace, hub_aspects=[]):
         """
@@ -222,10 +186,10 @@ class StateProvider(IoTHubProvider):
                 # serialize strips name and etag - use as_dict instead
                 certificates = cert_client.list_by_iot_hub(self.rg, self.hub_name).as_dict()
 
-                for cert in tqdm(certificates["value"], desc=DELETE_CERT_DESC, ascii=" #"):
+                for cert in tqdm(certificates["value"], desc=constants.DELETE_CERT_DESC, ascii=" #"):
                     cert_client.delete(self.rg, self.hub_name, cert["name"], cert["etag"])
 
-    def process_hub_to_dict(self, target: dict, hub_aspects: list = []) -> dict:
+    def process_hub_to_dict(self, target: dict, hub_aspects: list) -> dict:
         '''Returns a dictionary containing the hub state'''
         hub_state = {}
 
@@ -236,7 +200,7 @@ class StateProvider(IoTHubProvider):
                 all_configs = _iot_hub_configuration_list(target=self.target)
                 hub_state["configurations"] = {}
                 adm_configs = {}
-                for c in tqdm(all_configs, desc=SAVE_CONFIGURATIONS_DESC, ascii=" #"):
+                for c in tqdm(all_configs, desc=constants.SAVE_CONFIGURATIONS_DESC, ascii=" #"):
                     if c["content"].get("deviceContent") or c["content"].get("moduleContent"):
                         for key in ["createdTimeUtc", "etag", "lastUpdatedTimeUtc", "schemaVersion"]:
                             c.pop(key, None)
@@ -248,14 +212,14 @@ class StateProvider(IoTHubProvider):
                     c["id"]: c for c in all_configs if c["content"].get("modulesContent")
                 }
             except AzCLIError:
-                logger.warning(SAVE_CONFIGURATIONS_RETRIEVE_FAIL_MSG)
+                logger.warning(constants.SAVE_CONFIGURATIONS_RETRIEVE_FAIL_MSG)
 
         if HubAspects.Devices.value in hub_aspects:
             hub_aspects.remove(HubAspects.Devices.value)
             hub_state["devices"] = {}
             twins = _iot_device_twin_list(target=target, top=-1)
 
-            for i in tqdm(range(len(twins)), desc=SAVE_DEVICE_DESC, ascii=" #"):
+            for i in tqdm(range(len(twins)), desc=constants.SAVE_DEVICE_DESC, ascii=" #"):
                 device_twin = twins[i]
                 device_id = device_twin["deviceId"]
                 device_obj = {}
@@ -413,11 +377,11 @@ class StateProvider(IoTHubProvider):
                         endpoint_props["AccountName"]
                     )
                 ).as_json()["connectionString"]
-            print(SAVE_ARM_DESC)
+            print(constants.SAVE_ARM_DESC)
 
         return hub_state
 
-    def upload_hub_from_dict(self, hub_state: dict, hub_aspects: list = []):
+    def upload_hub_from_dict(self, hub_state: dict, hub_aspects: list):
         # Control plane
         if HubAspects.Arm.value in hub_aspects and hub_state.get("arm"):
             hub_aspects.remove(HubAspects.Arm.value)
@@ -446,7 +410,7 @@ class StateProvider(IoTHubProvider):
 
             hub_certs = [res for res in hub_state["arm"]["resources"][1:] if res["type"].endswith("certificates")]
             if len(hub_certs) < len(hub_state["arm"]["resources"]) - 1:
-                logger.warning(PRIVATE_ENDPOINT_WARNING_MSG)
+                logger.warning(constants.PRIVATE_ENDPOINT_WARNING_MSG)
 
             for res in hub_certs:
                 res["name"] = self.hub_name + "/" + res["name"].split("/")[1]
@@ -467,21 +431,21 @@ class StateProvider(IoTHubProvider):
             os.remove(state_file)
 
             if not arm_result.success():
-                raise BadRequestError(FAILED_ARM_MSG.format(self.hub_name))
+                raise BadRequestError(constants.FAILED_ARM_MSG.format(self.hub_name))
 
             if not self.target:
                 self.target = self.discovery.get_target(
                     hub_resource["name"],
                     resource_group_name=arm_result.as_json()["resourceGroup"]
                 )
-                print(CREATE_IOT_HUB_MSG.format(self.hub_name))
+                print(constants.CREATE_IOT_HUB_MSG.format(self.hub_name))
             else:
-                print(UPDATED_IOT_HUB_MSG.format(self.hub_name))
+                print(constants.UPDATED_IOT_HUB_MSG.format(self.hub_name))
 
         # block if the arm aspect is specified, the state file does not have the arm aspect, and the
         # hub does not exist
         if not self.target:
-            raise BadRequestError(HUB_NOT_CREATED_MSG.format(self.hub_name))
+            raise BadRequestError(constants.HUB_NOT_CREATED_MSG.format(self.hub_name))
 
         # Data plane
         # upload configurations
@@ -491,7 +455,7 @@ class StateProvider(IoTHubProvider):
             edge_deployments = hub_state["configurations"]["edgeDeployments"]
             config_progress = tqdm(
                 total=len(configs) + len(edge_deployments),
-                desc=UPLOAD_CONFIGURATIONS_DESC,
+                desc=constants.UPLOAD_CONFIGURATIONS_DESC,
                 ascii=" #"
             )
             for config_id, config_obj in configs.items():
@@ -506,7 +470,7 @@ class StateProvider(IoTHubProvider):
                         metrics=json.dumps(config_obj["metrics"])
                     )
                 except AzCLIError as e:
-                    logger.error(UPLOAD_ADM_CONFIG_ERROR_MSG.format(config_id, e))
+                    logger.error(constants.UPLOAD_ADM_CONFIG_ERROR_MSG.format(config_id, e))
                 config_progress.update(1)
 
             layered_configs = {}
@@ -528,7 +492,7 @@ class StateProvider(IoTHubProvider):
                             config_type=config_type
                         )
                     except AzCLIError as e:
-                        logger.error(UPLOAD_EDGE_DEPLOYMENT_ERROR_MSG.format(config_id, e))
+                        logger.error(constants.UPLOAD_EDGE_DEPLOYMENT_ERROR_MSG.format(config_id, e))
                     config_progress.update(1)
 
             # Do layered configs after edge configs.
@@ -546,19 +510,19 @@ class StateProvider(IoTHubProvider):
                         config_type=config_type
                     )
                 except AzCLIError as e:
-                    logger.error(UPLOAD_EDGE_DEPLOYMENT_ERROR_MSG.format(config_id, e))
+                    logger.error(constants.UPLOAD_EDGE_DEPLOYMENT_ERROR_MSG.format(config_id, e))
                 config_progress.update(1)
 
         # Devices
         if HubAspects.Devices.value in hub_aspects and hub_state.get("devices"):
             hub_aspects.remove(HubAspects.Devices.value)
             child_to_parent = {}
-            for device_id, device_obj in tqdm(hub_state["devices"].items(), desc=UPLOAD_DEVICE_MSG, ascii=" #"):
+            for device_id, device_obj in tqdm(hub_state["devices"].items(), desc=constants.UPLOAD_DEVICE_MSG, ascii=" #"):
                 # upload device identity and twin
                 try:
                     self.upload_device_identity(device_id, device_obj["identity"])
                 except AzCLIError as e:
-                    logger.error(UPLOAD_DEVICE_IDENTITY_MSG.format(device_id, e))
+                    logger.error(constants.UPLOAD_DEVICE_IDENTITY_MSG.format(device_id, e))
                     continue
 
                 try:
@@ -566,7 +530,7 @@ class StateProvider(IoTHubProvider):
                         target=self.target, device_id=device_id, parameters=device_obj["twin"]
                     )
                 except AzCLIError as e:
-                    logger.error(UPLOAD_DEVICE_TWIN_MSG.format(device_id, e))
+                    logger.error(constants.UPLOAD_DEVICE_TWIN_MSG.format(device_id, e))
                     continue
 
                 edge_modules = {}
@@ -584,7 +548,7 @@ class StateProvider(IoTHubProvider):
                         try:
                             self.upload_module_identity(device_id, module_id, module_identity)
                         except AzCLIError as e:
-                            logger.error(UPLOAD_DEVICE_MODULE_IDENTITY_MSG.format(module_id, device_id, e))
+                            logger.error(constants.UPLOAD_DEVICE_MODULE_IDENTITY_MSG.format(module_id, device_id, e))
                             continue
                         try:
                             _iot_device_module_twin_update(
@@ -594,7 +558,7 @@ class StateProvider(IoTHubProvider):
                                 parameters=module_twin
                             )
                         except AzCLIError as e:
-                            logger.error(UPLOAD_DEVICE_TWIN_MSG.format(module_id, device_id, e))
+                            logger.error(constants.UPLOAD_DEVICE_TWIN_MSG.format(module_id, device_id, e))
                             continue
 
                 if edge_modules:
@@ -603,7 +567,7 @@ class StateProvider(IoTHubProvider):
                             target=self.target, device_id=device_id, content=json.dumps({"modulesContent": edge_modules})
                         )
                     except AzCLIError as e:
-                        logger.error(UPLOAD_EDGE_MODULE_MSG.format(device_id, e))
+                        logger.error(constants.UPLOAD_EDGE_MODULE_MSG.format(device_id, e))
                         continue
 
                 if device_obj.get("parent"):
@@ -614,12 +578,12 @@ class StateProvider(IoTHubProvider):
                 try:
                     _iot_device_set_parent(target=self.target, parent_id=child_to_parent[device_id], device_id=device_id)
                 except AzCLIError as e:
-                    logger.error(UPLOAD_DEVICE_RELATIONSHIP_MSG.format(child_to_parent[device_id], device_id, e))
+                    logger.error(constants.UPLOAD_DEVICE_RELATIONSHIP_MSG.format(child_to_parent[device_id], device_id, e))
                     continue
 
         # Leftover aspects
         if hub_aspects:
-            logger.warning(MISSING_HUB_ASPECTS_MSG.format(', '.join(hub_aspects)))
+            logger.warning(constants.MISSING_HUB_ASPECTS_MSG.format(', '.join(hub_aspects)))
 
     # Upload commands
     def upload_device_identity(self, device_id: str, identity: dict):
@@ -673,7 +637,7 @@ class StateProvider(IoTHubProvider):
             )
 
         else:
-            logger.error(BAD_DEVICE_AUTHORIZATION_MSG.format(device_id))
+            logger.error(constants.BAD_DEVICE_AUTHORIZATION_MSG.format(device_id))
 
         _iot_device_show(target=self.target, device_id=device_id)
 
@@ -700,7 +664,7 @@ class StateProvider(IoTHubProvider):
                                       auth_method=DeviceAuthType.x509_ca.value)
 
         else:
-            logger.error(BAD_DEVICE_MODULE_AUTHORIZATION_MSG.format(module_id, device_id))
+            logger.error(constants.BAD_DEVICE_MODULE_AUTHORIZATION_MSG.format(module_id, device_id))
 
     # Delete Commands
     def delete_all_configs(self):
@@ -709,20 +673,20 @@ class StateProvider(IoTHubProvider):
         try:
             all_configs = _iot_hub_configuration_list(target=self.target)
         except AzCLIError:
-            logger.warning(SKIP_CONFIGURATION_DELETE_MSG)
+            logger.warning(constants.SKIP_CONFIGURATION_DELETE_MSG)
             return
 
-        for config in tqdm(all_configs, desc=DELETE_CONFIGURATION_DESC, ascii=" #"):
+        for config in tqdm(all_configs, desc=constants.DELETE_CONFIGURATION_DESC, ascii=" #"):
             try:
                 _iot_hub_configuration_delete(target=self.target, config_id=config["id"])
             except ResourceNotFoundError:
-                logger.warning(DELETE_CONFIGURATION_FAILURE_MSG.format(config["id"]))
+                logger.warning(constants.DELETE_CONFIGURATION_FAILURE_MSG.format(config["id"]))
 
     def delete_all_devices(self):
         """Delete all devices if possible."""
         identities = _iot_device_twin_list(target=self.target, top=-1)
-        for d in tqdm(identities, desc=DELETE_DEVICES_DESC, ascii=" #"):
+        for d in tqdm(identities, desc=constants.DELETE_DEVICES_DESC, ascii=" #"):
             try:
                 _iot_device_delete(target=self.target, device_id=d["deviceId"])
             except ResourceNotFoundError:
-                logger.warning(DELETE_DEVICES_FAILURE_MSG.format(d["deviceId"]))
+                logger.warning(constants.DELETE_DEVICES_FAILURE_MSG.format(d["deviceId"]))

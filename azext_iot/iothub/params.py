@@ -268,7 +268,7 @@ def load_iothub_arguments(self, _):
             options_list=["--aspects"],
             nargs="+",
             arg_type=get_enum_type(HubAspects),
-            help="Hub Aspects (space separated)."
+            help="Hub Aspects (space-separated)."
         )
 
     with self.argument_context("iot hub state import") as context:
@@ -287,7 +287,8 @@ def load_iothub_arguments(self, _):
         context.argument(
             "resource_group_name",
             options_list=["--destination-resource-group", "--dg"],
-            help="Name of resource group of the IoT Hub to which the origin hub will be copied."
+            help="Name of resource group of the IoT Hub to which the origin hub will be copied.",
+            arg_group="IoT Hub Identifier"
         )
         context.argument(
             "login",
@@ -308,7 +309,8 @@ def load_iothub_arguments(self, _):
         context.argument(
             "orig_resource_group_name",
             options_list=["--origin-resource-group", "--og"],
-            help="Name of resource group of the IoT Hub which will be copied."
+            help="Name of resource group of the IoT Hub which will be copied.",
+            arg_group="IoT Hub Identifier"
         )
         context.argument(
             "orig_hub_login",
@@ -319,7 +321,8 @@ def load_iothub_arguments(self, _):
             "If both an entity connection string and name are provided the connection string takes priority. "
             "Required if --origin-hub is not provided.",
             arg_group="IoT Hub Identifier"
-            
+        )
+
     with self.argument_context("iot hub message-endpoint") as context:
         context.argument(
             "hub_name",

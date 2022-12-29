@@ -80,6 +80,7 @@ class EndpointType(Enum):
     ServiceBusQueue = 'servicebusqueue'
     ServiceBusTopic = 'servicebustopic'
     AzureStorageContainer = 'azurestoragecontainer'
+    CosmosDBContainer = 'cosmosdb-container'
 
 
 class HubAspects(Enum):
@@ -89,7 +90,11 @@ class HubAspects(Enum):
     Configurations = "configurations"
     Devices = "devices"
     Arm = "arm"
-    
+
+    @classmethod
+    def list(cls):
+        return list(map(lambda c: c.value, cls))
+
 
 class AuthenticationType(Enum):
     """
@@ -105,17 +110,6 @@ class EncodingFormat(Enum):
     """
     JSON = 'json'
     AVRO = 'avro'
-
-
-class EndpointType(Enum):
-    """
-    Type of the routing endpoint.
-    """
-    EventHub = 'eventhub'
-    ServiceBusQueue = 'servicebus-queue'
-    ServiceBusTopic = 'servicebus-topic'
-    AzureStorageContainer = 'storage-container'
-    CosmosDBContainer = 'cosmosdb-container'
 
 
 class IdentityType(Enum):

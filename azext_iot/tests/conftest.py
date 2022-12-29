@@ -258,10 +258,7 @@ def fixture_device_messaging_iot_device_show_sas(mocker):
 def build_mock_response(
     mocker=None, status_code=200, payload=None, headers=None, **kwargs
 ):
-    try:
-        from unittest.mock import MagicMock
-    except ImportError:
-        from mock import MagicMock
+    from unittest.mock import MagicMock
 
     response = (
         mocker.MagicMock(name="response") if mocker else MagicMock(name="response")

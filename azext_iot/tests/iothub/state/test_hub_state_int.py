@@ -19,6 +19,7 @@ from azext_iot.tests.iothub import (
     DEVICE_TYPES,
 )
 from azext_iot.common._azure import parse_iot_hub_message_endpoint_connection_string, parse_storage_container_connection_string
+from azure.cli.core.azclierror import ResourceNotFoundError, RequiredArgumentMissingError
 
 settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL)
 CWD = os.path.dirname(os.path.abspath(__file__))
@@ -331,6 +332,8 @@ def test_export_import_controlplane_with_create(setup_hub_states_controlplane):
     time.sleep(10)  # gives the hub time to update before the checks
     compare_hub_controlplane_to_file(filename, dest_name, hub_rg)
 
+
+# TODO ensure these pass
 @pytest.mark.hub_infrastructure(count=2)
 def test_migrate_dataplane(setup_hub_states):
     origin_name = setup_hub_states[0]["name"]
@@ -363,6 +366,7 @@ def test_migrate_dataplane(setup_hub_states):
 # TODO figure out better way to force two hubs to be made that wont make this test create
 # two hubs if ran by it
 # Make sure this is just dataplane to split up functionality
+# TODO: ensure this passes
 @pytest.mark.hub_infrastructure(count=1)
 def test_export_import_dataplane(setup_hub_states):
     filename = setup_hub_states[0]["filename"]
@@ -391,6 +395,74 @@ def test_export_import_dataplane(setup_hub_states):
         )
         time.sleep(10)  # gives the hub time to update before the checks
         compare_hub_dataplane_to_file(filename, hub_cstring)
+
+
+# TODO ensure this passes, make it make a vanilla hub with no dataplane
+@pytest.mark.hub_infrastructure(count=1)
+def test_mirgate_hub_dataplane_error(provisioned_iothubs):
+    """
+    Have origin hub be there, try to create a destination hub with using dataplane
+    """
+    hub_name = provisioned_iothubs[0]["name"]
+    hub_rg = provisioned_iothubs[0]["rg"]
+    fake_hub_name = "fakehub"
+    fake_hub_rg = "fakerg"
+    result = cli.invoke(
+        f"iot hub state migrate --origin-hub {hub_name} --origin-resource-group {hub_rg} "
+        f"--destination-hub {fake_hub_name} --destination-resource-group {fake_hub_rg} --aspects {DATAPLANE}"
+    )
+    assert isinstance(result.get_error(), ResourceNotFoundError)
+    result = cli.invoke(
+        f"iot hub state migrate --origin-hub {hub_name} --destination-hub {fake_hub_name}  --aspects {DATAPLANE}"
+    )
+    assert isinstance(result.get_error(), RequiredArgumentMissingError)
+
+
+# TODO ensure these pass + ensure that get_error doesnt destroy with a successful run
+# also see if we can somehow silence the logging for error calls
+def test_export_import_migrate_missing_hubs_error():
+    """
+    All of these tests do not need a hub created.
+    """
+    filename = "./somefile.json"
+    hub_name = "fakehub"
+    hub_rg = "fakerg"
+    # Export
+    # with pytest.raises(ResourceNotFoundError):
+    result = cli.invoke(
+        f"iot hub state export -n {hub_name} -f {filename} -g {hub_rg}"
+    )
+    assert isinstance(result.get_error(), ResourceNotFoundError)
+
+    result = cli.invoke(
+        f"iot hub state export -n {hub_name} -f {filename}"
+    )
+    assert isinstance(result.get_error(), ResourceNotFoundError)
+
+    # Import - dataplane - may need the file to have stuffs
+    result = cli.invoke(
+        f"iot hub state import -n {hub_name} -f {filename} -g {hub_rg} --aspects {DATAPLANE}"
+    )
+    assert isinstance(result.get_error(), ResourceNotFoundError)
+
+    # RequiredArgumentMissingError because no resource group
+    result = cli.invoke(
+        f"iot hub state import -n {hub_name} -f {filename} --aspects {DATAPLANE}"
+    )
+    assert isinstance(result.get_error(), RequiredArgumentMissingError)
+
+    # Migrate
+    result = cli.invoke(
+        f"iot hub state migrate --origin-hub {hub_name} --origin-resource-group {hub_rg} "
+        f"--destination-hub {hub_name} --destination-resource-group {hub_rg}"
+    )
+    assert isinstance(result.get_error(), ResourceNotFoundError)
+
+    # RequiredArgumentMissingError because no resource group
+    result = cli.invoke(
+        f"iot hub state migrate --origin-hub {hub_name} --destination-hub {hub_name}"
+    )
+    assert isinstance(result.get_error(), RequiredArgumentMissingError)
 
 
 # Dataplane main compare commands
@@ -609,6 +681,7 @@ def compare_hub_dataplane_to_file(filename: str, cstring: str):
             assert file_device["parent"] == device_parent[:device_parent.rfind("-")]
 
 
+# Controlplane main compare commands
 def compare_hub_controlplane_to_file(filename: str, hub_name: str, rg: str):
     with open(filename, 'r', encoding='utf-8') as f:
         file_hub_info = json.load(f)["arm"]["resources"]
@@ -685,7 +758,18 @@ def compare_hub_controlplane_to_file(filename: str, hub_name: str, rg: str):
     # compare certificates
     file_certs = file_hub_info[1:]
     arm_certs = arm_hub_info[1:]
-    assert file_certs == arm_certs
+    file_hub_name = file_hub["name"]
+    assert len(file_certs) == len(arm_certs)
+    for i in range(len(file_certs)):
+        # Remove hub names
+        orig_certificate = file_certs[i]
+        orig_certificate["dependsOn"][0] = orig_certificate["dependsOn"][0].replace(file_hub_name, "")
+        orig_certificate["name"] = orig_certificate["name"].replace(file_hub_name, "")
+        dest_certificate = arm_certs[i]
+        dest_certificate["dependsOn"][0] = dest_certificate["dependsOn"][0].replace(hub_name, "")
+        dest_certificate["name"] = dest_certificate["name"].replace(hub_name, "")
+
+        assert orig_certificate == dest_certificate
 
 
 def compare_hubs_controlplane(origin_hub_name: str, dest_hub_name: str, rg: str):

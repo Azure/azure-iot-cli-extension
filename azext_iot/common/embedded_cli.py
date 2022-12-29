@@ -69,6 +69,9 @@ class EmbeddedCLI(object):
         logger.debug("Operation error code: %s", self.error_code)
         return self.error_code == 0
 
+    def get_error(self) -> Exception:
+        return self.az_cli.result.error
+
     def _ensure_json_output(self, command: str) -> str:
         return "{} -o json".format(command)
 

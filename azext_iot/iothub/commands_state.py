@@ -18,7 +18,9 @@ def state_export(
     auth_type_dataplane: Optional[str] = None,
     replace: bool = False
 ):
-    sp = StateProvider(cmd=cmd, hub=hub_name, rg=resource_group_name, login=login, auth_type_dataplane=auth_type_dataplane)
+    sp = StateProvider(
+        cmd=cmd, hub=hub_name, rg=resource_group_name, login=login, auth_type_dataplane=auth_type_dataplane, export=True
+    )
     sp.save_state(state_file, replace, hub_aspects)
 
 
