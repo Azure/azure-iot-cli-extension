@@ -103,9 +103,15 @@ def load_iothub_help():
         short-summary: Invoke a root or component level command of a digital twin device.
 
         examples:
-        - name: Invoke root level command "reboot" which takes a payload that includes the "delay" property.
+        - name: In general, invoke command which takes a payload that includes certain property using inline JSON.
           text: >
-            az iot hub digital-twin invoke-command --command-name reboot -n {iothub_name} -d {device_id} --payload '{"delay":5}'
+            az iot hub digital-twin invoke-command --command-name {command_name} -n {iothub_name} -d {device_id} --payload '{"property_name": "property_value"}'
+
+        - name: |
+                Invoke root level command "reboot" which takes a payload named "delay" conforming to DTDL model
+                https://github.com/Azure/opendigitaltwins-dtdl/blob/master/DTDL/v2/samples/TemperatureController.json.
+          text: >
+            az iot hub digital-twin invoke-command --command-name reboot -n {iothub_name} -d {device_id} --payload 5
 
         - name: Invoke command "getMaxMinReport" on component "thermostat1" that takes no input.
           text: >
