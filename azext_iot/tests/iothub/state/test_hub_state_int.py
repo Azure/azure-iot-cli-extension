@@ -333,7 +333,6 @@ def test_export_import_controlplane_with_create(setup_hub_states_controlplane):
     compare_hub_controlplane_to_file(filename, dest_name, hub_rg)
 
 
-# TODO ensure these pass
 @pytest.mark.hub_infrastructure(count=2)
 def test_migrate_dataplane(setup_hub_states):
     origin_name = setup_hub_states[0]["name"]
@@ -363,10 +362,6 @@ def test_migrate_dataplane(setup_hub_states):
         clean_up_hub_dataplane(dest_cstring)
 
 
-# TODO figure out better way to force two hubs to be made that wont make this test create
-# two hubs if ran by it
-# Make sure this is just dataplane to split up functionality
-# TODO: ensure this passes
 @pytest.mark.hub_infrastructure(count=1)
 def test_export_import_dataplane(setup_hub_states):
     filename = setup_hub_states[0]["filename"]
@@ -397,7 +392,6 @@ def test_export_import_dataplane(setup_hub_states):
         compare_hub_dataplane_to_file(filename, hub_cstring)
 
 
-# TODO ensure this passes, make it make a vanilla hub with no dataplane
 @pytest.mark.hub_infrastructure(count=1)
 def test_mirgate_hub_dataplane_error(provisioned_iothubs):
     """
@@ -418,8 +412,7 @@ def test_mirgate_hub_dataplane_error(provisioned_iothubs):
     assert isinstance(result.get_error(), RequiredArgumentMissingError)
 
 
-# TODO ensure these pass + ensure that get_error doesnt destroy with a successful run
-# also see if we can somehow silence the logging for error calls
+@pytest.mark.hub_infrastructure(count=0)
 def test_export_import_migrate_missing_hubs_error():
     """
     All of these tests do not need a hub created.

@@ -28,7 +28,7 @@ class TestHubStateExport:
 
         # make a temporary file
         fake_file = "fake_file.json"
-        with open(fake_file, "w") as f:
+        with open(fake_file, "w", encoding='utf-8') as f:
             f.write("Hello World")
 
         with pytest.raises(FileOperationError) as error:
@@ -54,7 +54,7 @@ class TestHubStateExport:
 
 
 class TestHubStateImport:
-    def test_missing_file(self, fixture_cmd):
+    def test_missing_file(self, fixture_cmd, fixture_ghcs):
         file_name = "./file.json"
         with pytest.raises(FileOperationError) as error:
             subject.state_import(
@@ -74,11 +74,11 @@ class TestHubStateImport:
             )
         assert constants.LOGIN_WITH_ARM_ERROR == str(error.value)
 
-    def test_missing_arm_file(self, fixture_cmd):
+    def test_missing_arm_file(self, fixture_cmd, fixture_ghcs):
         hub_name = "someHub"
         # make a temporary file
         fake_file = "fake_file.json"
-        with open(fake_file, "w") as f:
+        with open(fake_file, "w", encoding='utf-8') as f:
             f.write("{}")
 
         with pytest.raises(BadRequestError) as error:
