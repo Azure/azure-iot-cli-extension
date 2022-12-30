@@ -256,6 +256,7 @@ def _assign_dataplane_rbac_role(hub_results):
                 )
             )
             sleep(10)
+            tries += 1
 
         if tries == MAX_RBAC_ASSIGNMENT_TRIES:
             raise Exception(
