@@ -1625,7 +1625,7 @@ def iot_hub_configuration_test_queries(
     hub_name=None,
     resource_group_name=None,
     login=None,
-    auth_type_dataplane=None,
+    auth_type_dataplane=None
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
@@ -1641,14 +1641,17 @@ def iot_hub_configuration_test_queries(
         if custom_metric_queries:
             custom_metric_queries = process_json_arg(custom_metric_queries, argument_name="custom_metric_queries")
 
-        result = service_sdk.configuration.test_queries(target_condition, custom_metric_queries)
+        result = service_sdk.configuration.test_queries(target_condition, custom_metric_queries, raw=True).response.json()
+        validation_errors = []
 
-        if not result.target_condition_error and not result.custom_metric_query_errors:
+        if not result['targetConditionError'] and not result['customMetricQueryErrors']:
             return 'Validation passed!'
-        if result.target_condition_error:
-            return 'Target condition validation failed: {}.'.format(result.target_condition_error)
-        if result.custom_metric_query_errors:
-            return 'Custom metric query validation failed: {}.'.format(result.custom_metric_query_errors)
+        if result['targetConditionError']:
+            validation_errors.append('Target condition validation failed: {}.'.format(result['targetConditionError']))
+        if result['customMetricQueryErrors']:
+            validation_errors.append('Custom metric query validation failed: {}.'.format(result['customMetricQueryErrors']))
+
+        return validation_errors
     except CloudError as e:
         handle_service_exception(e)
 

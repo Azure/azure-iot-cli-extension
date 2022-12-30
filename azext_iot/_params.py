@@ -822,9 +822,7 @@ def load_arguments(self, _):
         context.argument(
             "custom_metric_queries",
             options_list=["--custom-metric-queries"],
-            type=dict,
-            help="Map of custrom metric queries for configuration. "
-            'Format example: {"mertic1":"select *", "metric2":"select moduleId from devices.modules where tags.location=''US''"}',
+            help="Inline custom metric queries JSON or file path to custom metric queries JSON. "
         )
 
     with self.argument_context("iot edge") as context:

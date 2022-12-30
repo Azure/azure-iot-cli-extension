@@ -1,1 +1,4 @@
-{"mymetric": "SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200"}
+{
+    "metric1": "SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200",
+    "mertic2": "SELECT moduleId from devices.modules where tags.location='US'"
+}

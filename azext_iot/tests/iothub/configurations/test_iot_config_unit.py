@@ -901,33 +901,110 @@ class TestConfigApply:
             )
 
 
-class TestConfigTestQueries:
-    @pytest.fixture(params=[200])
-    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
-        service_client = mocker.patch(path_service_client)
-        service_client.return_value = build_mock_response(mocker, request.param, {})
-        return service_client
+def generate_validation_payload(is_valid):
+    if is_valid:
+        payload = {'targetConditionError': None, 'customMetricQueryErrors': None}
+    else:
+        payload = {'targetConditionError': 'Target condition validation failed',
+                   'customMetricQueryErrors': {'metric': 'Custom metric query validation failed'}}
+    return payload
 
-    def test_config_queries(self, fixture_cmd, serviceclient):
-        subject.iot_hub_configuration_test_queries(
+
+class TestConfigTestQueries:
+    @pytest.fixture()
+    def valid_queries(self, fixture_ghcs, request, mocked_response):
+
+        mocked_response.add(
+            method=responses.POST,
+            url=(
+                "https://{}/configurations/testQueries".format(
+                    mock_target["entity"]
+                )
+            ),
+            body=json.dumps(generate_validation_payload(True)),
+            headers={"x-ms-continuation": ""},
+            status=200,
+            content_type="application/json",
+            match_querystring=False
+        )
+
+        yield mocked_response
+
+    @pytest.fixture()
+    def invalid_queries(self, mocker, fixture_ghcs, request, mocked_response):
+
+        mocked_response.add(
+            method=responses.POST,
+            url=(
+                "https://{}/configurations/testQueries".format(
+                    mock_target["entity"]
+                )
+            ),
+            body=json.dumps(generate_validation_payload(False)),
+            headers={"x-ms-continuation": ""},
+            status=200,
+            content_type="application/json",
+            match_querystring=False
+        )
+
+        yield mocked_response
+
+    @pytest.mark.parametrize(
+        "target_condition, custom_metric_queries", [
+            ("tags.building=43 and tags.environment='test'",
+                {"mertic1": "SELECT moduleId from devices.modules where tags.location=''US''"}),
+            ("tags.building=43 and tags.environment='test'",
+                {"mertic1": "SELECT *", "metric2": "SELECT deviceId from devices where tags.location = 200"}),
+            ("tags.building=43 and tags.environment='test'",
+                {"mertic1": "SELECT *", "metric2": "file.json"}),
+        ]
+    )
+    def test_config_valid_queries(self, fixture_cmd, valid_queries, target_condition, custom_metric_queries):
+        result = subject.iot_hub_configuration_test_queries(
             cmd=fixture_cmd,
             hub_name=mock_target["entity"],
-            target_condition="tags.building=43 and tags.environment='test'",
-            custom_metric_queries='{"hi": "sd"}',
+            target_condition=target_condition,
+            custom_metric_queries=str(custom_metric_queries)
         )
-        args = serviceclient.call_args
-        url = args[0][0].url
-        method = args[0][0].method
-        body = args[0][2]
+        request = valid_queries.calls[0].request
+        body = request.body
+        url = request.url
+        method = request.method
 
         assert "/configurations/testQueries" in url
         assert method == "POST"
 
-        assert body.get("targetCondition") == "tags.building=43 and tags.environment='test'"
-        assert body.get("customMetricQueries") == {'hi': 'sd'}
+        assert json.loads(body)["targetCondition"] == target_condition
+        assert json.loads(body)["customMetricQueries"] == custom_metric_queries
+        assert result == "Validation passed!"
 
-    def test_config_queries_invalid_args(
-        self, fixture_cmd, serviceclient
+    @pytest.mark.parametrize(
+        "target_condition, custom_metric_queries", [
+            ("tags.building=43 and tags.environment='test'", {"hi": "sd"}),
+            ("target_condition", {"hi": "sd"})
+        ]
+    )
+    def test_config_invalid_queries(self, fixture_cmd, invalid_queries, target_condition, custom_metric_queries):
+        result = subject.iot_hub_configuration_test_queries(
+            cmd=fixture_cmd,
+            hub_name=mock_target["entity"],
+            target_condition=target_condition,
+            custom_metric_queries=str(custom_metric_queries),
+        )
+        request = invalid_queries.calls[0].request
+        body = request.body
+        url = request.url
+        method = request.method
+
+        assert "/configurations/testQueries" in url
+        assert method == "POST"
+
+        assert json.loads(body)["targetCondition"] == target_condition
+        assert json.loads(body)["customMetricQueries"] == custom_metric_queries
+        assert result != "Validation passed!"
+
+    def test_config_queries_invalid_file(
+        self, fixture_cmd
     ):
         with pytest.raises(CLIError):
             subject.iot_hub_configuration_test_queries(
@@ -935,4 +1012,15 @@ class TestConfigTestQueries:
                 hub_name=mock_target["entity"],
                 target_condition="targetCondition",
                 custom_metric_queries="hello.txt",
+            )
+
+    def test_config_queries_invalid_json(
+        self, fixture_cmd
+    ):
+        with pytest.raises(CLIError):
+            subject.iot_hub_configuration_test_queries(
+                cmd=fixture_cmd,
+                hub_name=mock_target["entity"],
+                target_condition="targetCondition",
+                custom_metric_queries=str({"json"}),
             )
