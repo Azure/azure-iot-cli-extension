@@ -138,7 +138,7 @@ def load_iothub_commands(self, _):
         cmd_group.command("export", "state_export")
         cmd_group.command("import", "state_import")
         cmd_group.command("migrate", "state_migrate")
-        
+
     with self.command_group(
         "iot hub certificate root-authority", command_type=iothub_resource_ops, is_experimental=True
     ) as cmd_group:
