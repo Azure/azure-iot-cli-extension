@@ -77,9 +77,9 @@ class EndpointType(Enum):
     Type of the message endpoint.
     """
     EventHub = 'eventhub'
-    ServiceBusQueue = 'servicebusqueue'
-    ServiceBusTopic = 'servicebustopic'
-    AzureStorageContainer = 'azurestoragecontainer'
+    ServiceBusQueue = 'servicebus-queue'
+    ServiceBusTopic = 'servicebus-topic'
+    AzureStorageContainer = 'storage-container'
     CosmosDBContainer = 'cosmosdb-container'
 
 

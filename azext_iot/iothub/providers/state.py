@@ -4,54 +4,46 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from knack.log import get_logger
+import json
+import os
+from typing import List, Optional
 
-from azext_iot.common.shared import DeviceAuthApiType, DeviceAuthType, ConfigType
+from azure.cli.core.azclierror import (AzCLIError, BadRequestError,
+                                       FileOperationError,
+                                       MutuallyExclusiveArgumentError,
+                                       RequiredArgumentMissingError,
+                                       ResourceNotFoundError)
+from knack.log import get_logger
+from knack.prompting import prompt_y_n
+from tqdm import tqdm
+
+import azext_iot.iothub.providers.state_constants as constants
+from azext_iot._factory import iot_hub_service_factory
+from azext_iot.common._azure import (
+    parse_cosmos_db_connection_string,
+    parse_iot_hub_message_endpoint_connection_string,
+    parse_storage_container_connection_string)
+from azext_iot.common.embedded_cli import EmbeddedCLI
+from azext_iot.common.shared import (ConfigType, DeviceAuthApiType,
+                                     DeviceAuthType)
 from azext_iot.iothub.common import (
     IMMUTABLE_AND_DUPLICATE_MODULE_TWIN_FIELDS,
-    IMMUTABLE_DEVICE_IDENTITY_FIELDS,
-    IMMUTABLE_MODULE_IDENTITY_FIELDS,
-    HubAspects
-)
+    IMMUTABLE_DEVICE_IDENTITY_FIELDS, IMMUTABLE_MODULE_IDENTITY_FIELDS,
+    HubAspects)
 from azext_iot.iothub.providers.base import IoTHubProvider
-from azext_iot.common._azure import (
-    parse_iot_hub_message_endpoint_connection_string,
-    parse_storage_container_connection_string,
-    # parse_cosmos_db_connection_string
-)
-from azure.cli.core.azclierror import (
-    FileOperationError,
-    ResourceNotFoundError,
-    BadRequestError,
-    AzCLIError,
-    RequiredArgumentMissingError,
-    MutuallyExclusiveArgumentError
-)
-from azext_iot.common.embedded_cli import EmbeddedCLI
-from azext_iot.operations.hub import (
-    _iot_device_set_parent,
-    _iot_device_show,
-    _iot_device_module_twin_show,
-    _iot_device_module_create,
-    _iot_device_module_show,
-    _iot_device_create,
-    _iot_device_delete,
-    _iot_edge_set_modules,
-    _iot_hub_configuration_delete,
-    _iot_device_module_list,
-    _iot_device_twin_list,
-    _iot_hub_configuration_list,
-    _iot_hub_configuration_create,
-    _iot_device_twin_update,
-    _iot_device_module_twin_update,
-)
-from azext_iot._factory import iot_hub_service_factory
-from knack.prompting import prompt_y_n
-import json
-from tqdm import tqdm
-from typing import List, Optional
-import os
-import azext_iot.iothub.providers.state_constants as constants
+from azext_iot.operations.hub import (_iot_device_create, _iot_device_delete,
+                                      _iot_device_module_create,
+                                      _iot_device_module_list,
+                                      _iot_device_module_show,
+                                      _iot_device_module_twin_show,
+                                      _iot_device_module_twin_update,
+                                      _iot_device_set_parent, _iot_device_show,
+                                      _iot_device_twin_list,
+                                      _iot_device_twin_update,
+                                      _iot_edge_set_modules,
+                                      _iot_hub_configuration_create,
+                                      _iot_hub_configuration_delete,
+                                      _iot_hub_configuration_list)
 
 logger = get_logger(__name__)
 cli = EmbeddedCLI()
@@ -307,19 +299,19 @@ class StateProvider(IoTHubProvider):
             for ep in endpoints["cosmosDBSqlCollections"]:
                 pass
                 # TODO: test when cosmos db endpoint feature is out
-                # if ep.get("primaryKey") or ep.get("secondaryKey"):
-                #     account_name = ep["endpointUri"].strip("https://").split(".")[0]
-                #     cosmos_keys = cli.invoke(
-                #         'cosmosdb keys list --resource-group {} --name {} --type connection-strings'.format(
-                #             account_name,
-                #             ep["resourceGroup"]
-                #         )
-                #     ).as_json()
-                #     for cs_object in cosmos_keys["connectionStrings"]:
-                #         if cs_object["description"] == "Primary SQL Connection String" and ep.get("primaryKey"):
-                #             ep["primaryKey"] = parse_cosmos_db_connection_string(cs_object["connectionString"])["AccountKey"]
-                #         if cs_object["description"] == "Secondary SQL Connection String" and ep.get("secondaryKey"):
-                #             ep["secondaryKey"] = parse_cosmos_db_connection_string(cs_object["connectionString"])["AccountKey"]
+                if ep.get("primaryKey") or ep.get("secondaryKey"):
+                    account_name = ep["endpointUri"].strip("https://").split(".")[0]
+                    cosmos_keys = cli.invoke(
+                        'cosmosdb keys list --resource-group {} --name {} --type connection-strings'.format(
+                            account_name,
+                            ep["resourceGroup"]
+                        )
+                    ).as_json()
+                    for cs_object in cosmos_keys["connectionStrings"]:
+                        if cs_object["description"] == "Primary SQL Connection String" and ep.get("primaryKey"):
+                            ep["primaryKey"] = parse_cosmos_db_connection_string(cs_object["connectionString"])["AccountKey"]
+                        if cs_object["description"] == "Secondary SQL Connection String" and ep.get("secondaryKey"):
+                            ep["secondaryKey"] = parse_cosmos_db_connection_string(cs_object["connectionString"])["AccountKey"]
             for ep in endpoints["eventHubs"]:
                 if ep.get("connectionString"):
                     endpoint_props = parse_iot_hub_message_endpoint_connection_string(ep["connectionString"])

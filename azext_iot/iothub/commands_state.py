@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from azext_iot.iothub.providers.state import StateProvider
-from typing import Optional
+from typing import Optional, List
 
 
 def state_export(
@@ -13,7 +13,7 @@ def state_export(
     state_file: str,
     hub_name: Optional[str] = None,
     resource_group_name: Optional[str] = None,
-    hub_aspects=None,
+    hub_aspects: Optional[List[str]] = None,
     login: Optional[str] = None,
     auth_type_dataplane: Optional[str] = None,
     replace: bool = False
@@ -29,7 +29,7 @@ def state_import(
     state_file: str,
     hub_name: Optional[str] = None,
     resource_group_name: Optional[str] = None,
-    hub_aspects=None,
+    hub_aspects: Optional[List[str]] = None,
     login: Optional[str] = None,
     auth_type_dataplane: Optional[str] = None,
     replace: bool = False
@@ -42,7 +42,7 @@ def state_migrate(
     cmd,
     hub_name: Optional[str] = None,
     resource_group_name: Optional[str] = None,
-    hub_aspects=None,
+    hub_aspects: Optional[List[str]] = None,
     login: Optional[str] = None,
     orig_hub: Optional[str] = None,
     orig_resource_group_name: Optional[str] = None,

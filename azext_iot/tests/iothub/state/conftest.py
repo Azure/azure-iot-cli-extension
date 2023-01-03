@@ -9,49 +9,21 @@ from time import sleep
 import pytest
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.iothub.common import EndpointType
+from azext_iot.tests.helpers import get_closest_marker
+from azext_iot.tests.iothub import generate_hub_depenency_id, generate_hub_id
 from azext_iot.tests.settings import DynamoSettings
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.certops import create_self_signed_certificate
-from typing import Optional, TypeVar
+from typing import Optional
 from knack.log import get_logger
 
 logger = get_logger(__name__)
-SubRequest = TypeVar('SubRequest')
-Mark = TypeVar('Mark')
-
-
 MAX_RBAC_ASSIGNMENT_TRIES = 10
 USER_ROLE = "IoT Hub Data Contributor"
-
-
 cli = EmbeddedCLI()
 REQUIRED_TEST_ENV_VARS = ["azext_iot_testrg"]
 settings = DynamoSettings(req_env_set=REQUIRED_TEST_ENV_VARS)
 RG = settings.env.azext_iot_testrg
-
-
-def generate_hub_id() -> str:
-    return f"test-hub-{generate_generic_id()}"[:23]
-
-
-def generate_hub_depenency_id() -> str:
-    return f"testhubdep{generate_generic_id()}"[:24]
-
-
-def tags_to_dict(tags: str) -> dict:
-    result = {}
-    split_tags = tags.split()
-    for tag in split_tags:
-        kvp = tag.split("=")
-        result[kvp[0]] = kvp[1]
-    return result
-
-
-def get_closest_marker(request: SubRequest) -> Mark:
-    for item in request.session.items:
-        if item.get_closest_marker("hub_infrastructure"):
-            return item.get_closest_marker("hub_infrastructure")
-    return request.node.get_closest_marker("hub_infrastructure")
 
 
 def _assign_rbac_role(assignee: str, scope: str, role: str, max_tries: int = 10):
@@ -153,7 +125,6 @@ def setup_hub_controlplane_states(
 
     # add certificate
     cert = create_self_signed_certificate(subject="aziotcli", valid_days=1, cert_output_dir=None)["certificate"]
-    print(cert)
     cert_file = "testCert" + generate_generic_id() + ".cer"
     with open(cert_file, 'w', encoding='utf-8') as f:
         f.write(cert)

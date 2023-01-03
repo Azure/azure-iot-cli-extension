@@ -52,6 +52,14 @@ MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries or 10
 ROLE_ASSIGNMENT_REFRESH_TIME = 120
 
 
+def generate_hub_id() -> str:
+    return f"aziotclitest-hub-{generate_generic_id()}"[:35]
+
+
+def generate_hub_depenency_id() -> str:
+    return f"aziotclitest{generate_generic_id()}"[:24]
+
+
 class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def __init__(self, test_scenario, add_data_contributor=True):
         assert test_scenario

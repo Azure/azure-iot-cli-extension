@@ -7,42 +7,17 @@
 from time import sleep
 import pytest
 from azext_iot.common.embedded_cli import EmbeddedCLI
+from azext_iot.tests.helpers import get_closest_marker
+from azext_iot.tests.iothub import generate_hub_depenency_id, generate_hub_id
 from azext_iot.tests.settings import DynamoSettings
-from azext_iot.tests.generators import generate_generic_id
-from typing import Optional, TypeVar
+from typing import Optional
 from knack.log import get_logger
 
 logger = get_logger(__name__)
-SubRequest = TypeVar('SubRequest')
-Mark = TypeVar('Mark')
 cli = EmbeddedCLI()
 REQUIRED_TEST_ENV_VARS = ["azext_iot_testrg"]
 settings = DynamoSettings(req_env_set=REQUIRED_TEST_ENV_VARS)
 RG = settings.env.azext_iot_testrg
-
-
-def generate_hub_id() -> str:
-    return f"aziotclitest-hub-{generate_generic_id()}"[:35]
-
-
-def generate_hub_depenency_id() -> str:
-    return f"aziotclitest{generate_generic_id()}"[:24]
-
-
-def get_closest_marker(request: SubRequest) -> Mark:
-    for item in request.session.items:
-        if item.get_closest_marker("hub_infrastructure"):
-            return item.get_closest_marker("hub_infrastructure")
-    return request.node.get_closest_marker("hub_infrastructure")
-
-
-def tags_to_dict(tags: str) -> dict:
-    result = {}
-    split_tags = tags.split()
-    for tag in split_tags:
-        kvp = tag.split("=")
-        result[kvp[0]] = kvp[1]
-    return result
 
 
 # IoT Hub fixtures

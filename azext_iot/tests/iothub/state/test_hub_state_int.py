@@ -169,9 +169,9 @@ def _setup_hub_state(cstring):
             )
 
 
-# Test with an empty hub to save all, upload all, migrate all - will need to have seperate hubs created
 @pytest.fixture()
 def setup_hub_states(provisioned_iothubs):
+    """Fixture to setup hubs with dataplane aspects."""
     filename = generate_generic_id() + ".json"
     provisioned_iothubs[0]["filename"] = filename
     _setup_hub_state(provisioned_iothubs[0]["connectionString"])
@@ -183,6 +183,7 @@ def setup_hub_states(provisioned_iothubs):
 
 @pytest.fixture()
 def setup_hub_states_controlplane(setup_hub_controlplane_states):
+    """Fixture to setup hubs with controlplane aspects."""
     filename = generate_generic_id() + ".json"
     setup_hub_controlplane_states[0]["filename"] = filename
     yield setup_hub_controlplane_states

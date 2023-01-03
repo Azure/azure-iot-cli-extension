@@ -1,4 +1,4 @@
-# IoT Hub State Trouble Shooting Guide
+# IoT Hub State Trouble-Shooting Guide
 
 This section aims to provide additional help for the command group `az iot hub state` and answers to common questions.
 
@@ -35,7 +35,7 @@ devices:
    + module identities
    + module twins
 
-### Data structure for Arm
+### Data structure for Azure Resource Manager (ARM)
 
 When the arm hub aspect is specified, an arm template with no parameters will be downloaded and stored under "arm". You can take the template from arm, save it to another file and use that in an arm deployment.
 
