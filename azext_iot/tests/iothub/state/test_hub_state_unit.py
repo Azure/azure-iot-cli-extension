@@ -74,7 +74,7 @@ class TestHubStateImport:
             )
         assert constants.LOGIN_WITH_ARM_ERROR == str(error.value)
 
-    def test_missing_arm_file(self, fixture_cmd):
+    def test_missing_arm_file(self, fixture_cmd, fixture_ghcs_resource_not_found_error):
         hub_name = "someHub"
         # make a temporary file
         fake_file = "fake_file.json"

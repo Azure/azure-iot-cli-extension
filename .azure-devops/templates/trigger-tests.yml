@@ -92,7 +92,8 @@ jobs:
       serviceConnection: $(AzureServiceConnection)
 
 - job: 'testHub_job_1'
-  displayName: 'Test IoT Hub - certificate, config, core, and jobs'
+  timeoutInMinutes: 90
+  displayName: 'Test IoT Hub - certificate, config, core, jobs, state'
   condition: and(succeeded(), eq('${{ parameters.testHub }}', true))
   strategy:
     matrix: $[ variables['pythonVersions'] ]
@@ -100,7 +101,7 @@ jobs:
   steps:
   - template: run-tests-parallel.yml
     parameters:
-      path: 'azext_iot/tests/iothub/certificate azext_iot/tests/iothub/configurations azext_iot/tests/iothub/core azext_iot/tests/iothub/jobs'
+      path: 'azext_iot/tests/iothub/certificate azext_iot/tests/iothub/configurations azext_iot/tests/iothub/core azext_iot/tests/iothub/jobs azext_iot/tests/iothub/state'
       name: 'iot-hub-1'
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
       pythonVersion: $(python)
