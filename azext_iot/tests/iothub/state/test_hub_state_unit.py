@@ -12,7 +12,7 @@ from azure.cli.core.azclierror import (
     BadRequestError,
     MutuallyExclusiveArgumentError
 )
-import azext_iot.iothub.providers.state_constants as constants
+import azext_iot.iothub.providers.helpers.state_constants as constants
 
 from azext_iot.tests.conftest import generate_cs
 

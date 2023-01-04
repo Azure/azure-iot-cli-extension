@@ -17,7 +17,7 @@ from knack.log import get_logger
 from knack.prompting import prompt_y_n
 from tqdm import tqdm
 
-import azext_iot.iothub.providers.state_constants as constants
+import azext_iot.iothub.providers.helpers.state_constants as constants
 from azext_iot._factory import iot_hub_service_factory
 from azext_iot.common._azure import (
     parse_cosmos_db_connection_string,

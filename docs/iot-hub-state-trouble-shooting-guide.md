@@ -133,3 +133,7 @@ Private endpoints and restricted public network access would limit whether you c
 ### Limitations with different IoT Hub Skus
 
 There are some limitations with different IoT Hub Skus which can cause failures, especially when downgrading Skus. Please refer to the documentation [here](https://learn.microsoft.com/en-us/azure/iot-hub/iot-hub-scaling).
+
+## Further Reading
+
+For a manual guide, please refer to the documention [here](https://learn.microsoft.com/en-us/azure/iot-hub/iot-hub-how-to-clone).
