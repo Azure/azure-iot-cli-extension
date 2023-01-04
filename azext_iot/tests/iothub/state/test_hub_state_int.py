@@ -7,7 +7,7 @@ from pathlib import Path
 from azext_iot.common.shared import DeviceAuthApiType
 
 from azext_iot.common.embedded_cli import EmbeddedCLI
-from azext_iot.tests.iothub.state.conftest import generate_hub_id
+from azext_iot.tests.iothub.conftest import _assign_iot_hub_dataplane_rbac_role, generate_hub_id
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.utility import generate_key, read_file_content
@@ -28,7 +28,6 @@ cli = EmbeddedCLI()
 DATAPLANE = "configurations devices"
 CONTROLPLANE = "arm"
 MAX_RETRIES = 5
-# DATAPLANE_AUTH_TYPES = ["cstring"]
 
 
 def generate_device_names(count, edge=False):
@@ -40,7 +39,7 @@ def generate_device_names(count, edge=False):
     return names
 
 
-def _setup_hub_state(cstring):
+def _setup_hub_dataplane_state(cstring):
     # make a configuration for the hub (applies to 0 devices, this is just to test the configuration settings)
     labels = {generate_generic_id() : generate_generic_id(), generate_generic_id() : generate_generic_id()}
     labels = json.dumps(labels)
@@ -170,13 +169,14 @@ def _setup_hub_state(cstring):
 
 
 @pytest.fixture()
-def setup_hub_states(provisioned_iothubs):
+def setup_hub_states_dataplane(provisioned_iot_hubs_with_storage_user_module):
     """Fixture to setup hubs with dataplane aspects."""
     filename = generate_generic_id() + ".json"
-    provisioned_iothubs[0]["filename"] = filename
-    _setup_hub_state(provisioned_iothubs[0]["connectionString"])
+    provisioned_iot_hubs_with_storage_user_module[0]["filename"] = filename
+    _assign_iot_hub_dataplane_rbac_role(provisioned_iot_hubs_with_storage_user_module)
+    _setup_hub_dataplane_state(provisioned_iot_hubs_with_storage_user_module[0]["connectionString"])
     time.sleep(5)
-    yield provisioned_iothubs
+    yield provisioned_iot_hubs_with_storage_user_module
     if os.path.isfile(filename):
         os.remove(filename)
 
@@ -335,13 +335,13 @@ def test_export_import_controlplane_with_create(setup_hub_states_controlplane):
 
 
 @pytest.mark.hub_infrastructure(count=2)
-def test_migrate_dataplane(setup_hub_states):
-    origin_name = setup_hub_states[0]["name"]
-    origin_rg = setup_hub_states[0]["rg"]
-    origin_cstring = setup_hub_states[0]["connectionString"]
-    dest_name = setup_hub_states[1]["name"]
-    dest_rg = setup_hub_states[1]["rg"]
-    dest_cstring = setup_hub_states[1]["connectionString"]
+def test_migrate_dataplane(setup_hub_states_dataplane):
+    origin_name = setup_hub_states_dataplane[0]["name"]
+    origin_rg = setup_hub_states_dataplane[0]["rg"]
+    origin_cstring = setup_hub_states_dataplane[0]["connectionString"]
+    dest_name = setup_hub_states_dataplane[1]["name"]
+    dest_rg = setup_hub_states_dataplane[1]["rg"]
+    dest_cstring = setup_hub_states_dataplane[1]["connectionString"]
     for auth_phase in DATAPLANE_AUTH_TYPES:
         if auth_phase == "cstring":
             cli.invoke(
@@ -364,11 +364,11 @@ def test_migrate_dataplane(setup_hub_states):
 
 
 @pytest.mark.hub_infrastructure(count=1)
-def test_export_import_dataplane(setup_hub_states):
-    filename = setup_hub_states[0]["filename"]
-    hub_name = setup_hub_states[0]["name"]
-    hub_rg = setup_hub_states[0]["rg"]
-    hub_cstring = setup_hub_states[0]["connectionString"]
+def test_export_import_dataplane(setup_hub_states_dataplane):
+    filename = setup_hub_states_dataplane[0]["filename"]
+    hub_name = setup_hub_states_dataplane[0]["name"]
+    hub_rg = setup_hub_states_dataplane[0]["rg"]
+    hub_cstring = setup_hub_states_dataplane[0]["connectionString"]
     for auth_phase in DATAPLANE_AUTH_TYPES:
         cli.invoke(
             set_cmd_auth_type(
@@ -733,6 +733,19 @@ def compare_hub_controlplane_to_file(filename: str, hub_name: str, rg: str):
             endpoint["connectionString"].pop("AccountKey")
     assert file_endpoints == arm_endpoints
 
+    # cosmos db endpoint
+    file_endpoints = file_hub_routes["endpoints"]["cosmosDBSqlCollections"]
+    for endpoint in file_endpoints:
+        endpoint.pop("id")
+        endpoint.pop("primaryKey")
+        endpoint.pop("secondaryKey")
+    arm_endpoints = arm_hub_routes["endpoints"]["cosmosDBSqlCollections"]
+    for endpoint in arm_endpoints:
+        endpoint.pop("id")
+        endpoint.pop("primaryKey")
+        endpoint.pop("secondaryKey")
+    assert file_endpoints == arm_endpoints
+
     # Other endpoint types
     for endpoint_type in ["eventHubs", "serviceBusQueues", "serviceBusTopics"]:
         file_endpoints = file_hub_routes["endpoints"][endpoint_type]
@@ -914,6 +927,7 @@ def compare_endpoints(endpoints1, endpoints2, endpoint_type):
         assert endpoint["identity"] == target["identity"]
         assert endpoint["resourceGroup"] == target["resourceGroup"]
         assert endpoint["subscriptionId"] == target["subscriptionId"]
+        assert endpoint["endpointUri"] == target["endpointUri"]
 
         # Ignore keys for connection string
         if endpoint.get("connectionString"):
@@ -939,6 +953,12 @@ def compare_endpoints(endpoints1, endpoints2, endpoint_type):
             assert endpoint["containerName"] == target["containerName"]
             assert endpoint["encoding"] == target["encoding"]
             assert endpoint["fileNameFormat"] == target["fileNameFormat"]
+
+        if endpoint_type == "cosmosDBSqlCollections":
+            assert endpoint["collectionName"] == target["collectionName"]
+            assert endpoint["databaseName"] == target["databaseName"]
+            assert endpoint["partitionKeyName"] == target["partitionKeyName"]
+            assert endpoint["partitionKeyTemplate"] == target["partitionKeyTemplate"]
 
 
 def compare_routes(routes1, routes2):

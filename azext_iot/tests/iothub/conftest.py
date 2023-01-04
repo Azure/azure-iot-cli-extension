@@ -5,71 +5,292 @@
 # --------------------------------------------------------------------------------------------
 
 from time import sleep
-import pytest
-from azext_iot.common.embedded_cli import EmbeddedCLI
-from azext_iot.tests.helpers import get_closest_marker
-from azext_iot.tests.iothub import generate_hub_depenency_id, generate_hub_id
-from azext_iot.tests.settings import DynamoSettings
 from typing import Optional
+import os
+
+import pytest
 from knack.log import get_logger
 
+from azext_iot.common.embedded_cli import EmbeddedCLI
+from azext_iot.tests.generators import generate_generic_id
+from azext_iot.common.certops import create_self_signed_certificate
+from azext_iot.tests.helpers import get_closest_marker
+from azext_iot.tests.settings import DynamoSettings
+
 logger = get_logger(__name__)
+MAX_RBAC_ASSIGNMENT_TRIES = 10
+USER_ROLE = "IoT Hub Data Contributor"
 cli = EmbeddedCLI()
 REQUIRED_TEST_ENV_VARS = ["azext_iot_testrg"]
 settings = DynamoSettings(req_env_set=REQUIRED_TEST_ENV_VARS)
 RG = settings.env.azext_iot_testrg
 
 
+def generate_hub_id() -> str:
+    return f"aziotclitest-hub-{generate_generic_id()}"[:35]
+
+
+def generate_hub_depenency_id() -> str:
+    return f"aziotclitest{generate_generic_id()}"[:24]
+
+
+def _assign_rbac_role(assignee: str, scope: str, role: str, max_tries: int = 10):
+    tries = 0
+    while tries < max_tries:
+        role_assignments = _get_role_assignments(scope, role)
+        role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
+        if assignee in role_assignment_principal_ids:
+            break
+        # else assign role to scope and check again
+        cli.invoke(
+            'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
+                assignee, role, scope
+            )
+        )
+        sleep(10)
+        tries += 1
+
+
 # IoT Hub fixtures
 @pytest.fixture(scope="module")
-def provisioned_iot_hub_module(request, provisioned_user_identity_module) -> Optional[dict]:
-    result = _iot_hub_provisioner(request, provisioned_user_identity_module)
-    yield result
-    if result:
-        _iot_hub_removal(result["name"])
+def setup_hub_controlplane_states(
+    request,
+    provisioned_iot_hubs_with_storage_user_module,
+    provisioned_event_hub_module,
+    provisioned_service_bus_module,
+    provisioned_cosmos_db_module
+) -> Optional[dict]:
+    """
+    For Iot Hub State
+    Set up so that first hub will have all permissions, endpoints, etc and the other one(s) have correct
+    permissions.
+    """
+    hub_name = provisioned_iot_hubs_with_storage_user_module[0]["name"]
+    hub_rg = provisioned_iot_hubs_with_storage_user_module[0]["rg"]
+
+    eventhub_name = provisioned_event_hub_module["eventhub"]["name"]
+    eventhub_endpoint_uri = "sb:" + provisioned_event_hub_module["namespace"]["serviceBusEndpoint"].split(":")[1]
+
+    servicebus_queue = provisioned_service_bus_module["queue"]["name"]
+    servicebus_topic = provisioned_service_bus_module["topic"]["name"]
+    servicebus_endpoint_uri = "sb:" + provisioned_service_bus_module["namespace"]["serviceBusEndpoint"].split(":")[1]
+
+    provisioned_storage = provisioned_iot_hubs_with_storage_user_module[0]["storage"]
+    storage_cstring = provisioned_storage["connectionString"]
+    storage_container = provisioned_storage["container"]["name"]
+
+    cosmosdb_container_name = provisioned_cosmos_db_module["container"]["name"]
+    cosmosdb_database_name = provisioned_cosmos_db_module["database"]["name"]
+    cosmosdb_cstring = provisioned_cosmos_db_module["connectionString"]
+
+    use_system_endpoints = get_closest_marker(request).kwargs.get("system_endpoints", True)
+
+    # add endpoints
+    hub_principal_ids = [
+        hub_obj["hub"]["identity"]["principalId"] for hub_obj in provisioned_iot_hubs_with_storage_user_module
+    ]
+    user_identities = list(
+        provisioned_iot_hubs_with_storage_user_module[0]["hub"]["identity"]["userAssignedIdentities"].values()
+    )
+    user_principal_id = user_identities[0]["principalId"]
+    user_id = list(
+        provisioned_iot_hubs_with_storage_user_module[0]["hub"]["identity"]["userAssignedIdentities"].keys()
+    )[0]
+
+    # mapping of scope to role
+    scope_dict = {
+        provisioned_storage["storage"]["id"]: "Storage Blob Data Contributor",
+        provisioned_event_hub_module["eventhub"]["id"]: "Azure Event Hubs Data Sender",
+        provisioned_service_bus_module["queue"]["id"]: "Azure Service Bus Data Sender",
+        provisioned_service_bus_module["topic"]["id"]: "Azure Service Bus Data Sender"
+    }
+    for scope, role in scope_dict.items():
+        _assign_rbac_role(assignee=user_principal_id, scope=scope, role=role)
+        if use_system_endpoints:
+            for hub_principal_id in hub_principal_ids:
+                _assign_rbac_role(assignee=hub_principal_id, scope=scope, role=role)
+    sleep(30)
+
+    suffix = "systemid" if use_system_endpoints else "userid"
+    user_identity_parameter = "[system]" if use_system_endpoints else user_id
+    cli.invoke(
+        f"iot hub message-endpoint create eventhub --en eventhub-{suffix} -g {hub_rg} -n {hub_name} --endpoint-uri "
+        f"{eventhub_endpoint_uri} --entity-path {eventhub_name} --identity {user_identity_parameter}"
+    )
+
+    cli.invoke(
+        f"iot hub message-endpoint create servicebus-queue --en queue-{suffix} -g {hub_rg} -n {hub_name} "
+        f"--endpoint-uri {servicebus_endpoint_uri} --entity-path {servicebus_queue} --identity {user_identity_parameter}"
+    )
+
+    cli.invoke(
+        f"iot hub message-endpoint create servicebus-topic --en topic-userid -g {hub_rg} -n {hub_name} --endpoint-uri "
+        f"{servicebus_endpoint_uri} --entity-path {servicebus_topic} --identity {user_id}"
+    )
+
+    cli.invoke(
+        f"iot hub message-endpoint create storage-container --en storagecontainer-key -g {hub_rg} -n {hub_name} -c "
+        f"{storage_cstring} --container {storage_container}  -b 350 -w 250 --encoding json")
+
+    cli.invoke(
+        f"iot hub message-endpoint create cosmosdb-container --en cosmosdb-key -g {hub_rg} -n {hub_name} --container "
+        f"{cosmosdb_container_name} --db {cosmosdb_database_name} -c {cosmosdb_cstring}"
+    )
+
+    # add routes - prob change one to be custom endpoint
+    cli.invoke(
+        f"iot hub message-route create --endpoint events -n {hub_name} -g {hub_rg}"
+        f" --rn {generate_generic_id()} --source devicelifecycleevents --condition false --enabled true"
+    )
+    cli.invoke(
+        f"iot hub message-route create --endpoint events -n {hub_name} -g {hub_rg}"
+        f" --rn {generate_generic_id()} --source twinchangeevents --condition true --enabled false"
+    )
+
+    # add certificate
+    cert = create_self_signed_certificate(subject="aziotcli", valid_days=1, cert_output_dir=None)["certificate"]
+    cert_file = "testCert" + generate_generic_id() + ".cer"
+    with open(cert_file, 'w', encoding='utf-8') as f:
+        f.write(cert)
+
+    cli.invoke(
+        f"iot hub certificate create --hub-name {hub_name} --name cert1 --path {cert_file} -g {hub_rg} -v True"
+    )
+
+    if os.path.isfile(cert_file):
+        os.remove(cert_file)
+
+    # add ip filter rule
+    cli.invoke(
+        f"resource update --name {hub_name} -g {hub_rg} --resource-type "
+        "\"Microsoft.Devices/IotHubs\" --set properties.networkRuleSets='{}'"
+    )
+    cli.invoke(
+        f"resource update --name {hub_name} -g {hub_rg} --resource-type Microsoft.Devices/IotHubs "
+        "--add properties.networkRuleSets.ipRules '{\"action\":\"Allow\",\"filterName\":\"Trusted\",\"ipMask\":\"192.168.0.1\"}'"
+    )
+    yield provisioned_iot_hubs_with_storage_user_module
 
 
 @pytest.fixture(scope="module")
-def provisioned_only_iot_hub_module(request) -> Optional[dict]:
-    result = _iot_hub_provisioner(request)
+def provisioned_iot_hubs_with_storage_user_module(
+    request, provisioned_user_identity_module, provisioned_storage_module
+) -> Optional[dict]:
+    result = _iot_hubs_provisioner(
+        request, provisioned_user_identity_module, provisioned_storage_module
+    )
     yield result
     if result:
-        _iot_hub_removal(result["name"])
+        _iot_hubs_removal(result)
 
 
-def _iot_hub_provisioner(request, provisioned_user_identity=None):
-    name = generate_hub_id()
-    base_create_command = f"iot hub create -n {name} -g {RG} --sku S1"
+@pytest.fixture(scope="module")
+def provisioned_iot_hubs_with_user_module(request, provisioned_user_identity_module) -> Optional[dict]:
+    result = _iot_hubs_provisioner(request, provisioned_user_identity_module)
+    yield result
+    if result:
+        _iot_hubs_removal(result)
 
+
+@pytest.fixture(scope="module")
+def provisioned_only_iot_hubs_module(request) -> Optional[dict]:
+    result = _iot_hubs_provisioner(request)
+    yield result
+    if result:
+        _iot_hubs_removal(result)
+
+
+def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_storage=None):
     hub_marker = get_closest_marker(request)
     desired_location = None
     desired_tags = None
     desired_sys_identity = False
     desired_user_identity = False
+    desired_storage = None
+    desired_count = 1
 
     if hub_marker:
         desired_location = hub_marker.kwargs.get("location")
         desired_tags = hub_marker.kwargs.get("desired_tags")
-        desired_sys_identity = hub_marker.kwargs.get("sys_identity")
-        desired_user_identity = hub_marker.kwargs.get("user_identity")
+        desired_sys_identity = hub_marker.kwargs.get("sys_identity", False)
+        desired_user_identity = hub_marker.kwargs.get("user_identity", False)
+        desired_storage = hub_marker.kwargs.get("storage")
+        desired_count = hub_marker.kwargs.get("count", 1)
 
-    if desired_sys_identity:
-        base_create_command += " --mi-system-assigned"
-    if desired_user_identity and provisioned_user_identity:
-        user_identity_id = provisioned_user_identity["id"]
-        base_create_command += f" --mi-user-assigned {user_identity_id}"
-    if desired_tags:
-        base_create_command = base_create_command + f" --tags {desired_tags}"
-    if desired_location:
-        base_create_command = base_create_command + f" -l {desired_location}"
+    hub_results = []
+    for _ in range(desired_count):
+        name = generate_hub_id()
+        base_create_command = f"iot hub create -n {name} -g {RG} --sku S1"
+        if desired_sys_identity:
+            base_create_command += " --mi-system-assigned"
+        if desired_user_identity and provisioned_user_identity:
+            user_identity_id = provisioned_user_identity["id"]
+            base_create_command += f" --mi-user-assigned {user_identity_id}"
+        if desired_tags:
+            base_create_command += f" --tags {desired_tags}"
+        if desired_location:
+            base_create_command += f" -l {desired_location}"
+        if desired_storage and provisioned_storage:
+            storage_cstring = provisioned_storage["connectionString"]
+            base_create_command += f" --fcs {storage_cstring} --fc fileupload"
 
-    return cli.invoke(base_create_command).as_json()
+        hub_obj = cli.invoke(base_create_command).as_json()
+        hub_results.append({
+            "hub": hub_obj,
+            "name": name,
+            "rg": RG,
+            "connectionString": _get_hub_connection_string(name, RG),
+            "storage": provisioned_storage
+        })
+    return hub_results
 
 
-def _iot_hub_removal(name):
-    delete_result = cli.invoke(f"iot hub delete -n {name} -g {RG}")
-    if not delete_result.success():
-        logger.error(f"Failed to delete iot hub resource {name}.")
+def _get_hub_connection_string(name, rg, policy="iothubowner"):
+    return cli.invoke(
+        "iot hub connection-string show -n {} -g {} --policy-name {}".format(
+            name, rg, policy
+        )
+    ).as_json()["connectionString"]
+
+
+def _assign_iot_hub_dataplane_rbac_role(hub_results):
+    """Add IoT Hub Data Contributor role to current user"""
+    for hub in hub_results:
+        target_hub_id = hub["hub"]["id"]
+        account = cli.invoke("account show").as_json()
+        user = account["user"]
+
+        if user["name"] is None:
+            raise Exception("User not found")
+
+        tries = 0
+        while tries < MAX_RBAC_ASSIGNMENT_TRIES:
+            role_assignments = _get_role_assignments(target_hub_id, USER_ROLE)
+            role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
+            if user["name"] in role_assignment_principal_names:
+                break
+            # else assign IoT Hub Data Contributor role to current user and check again
+            cli.invoke(
+                'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
+                    user["name"], USER_ROLE, target_hub_id
+                )
+            )
+            sleep(10)
+            tries += 1
+
+        if tries == MAX_RBAC_ASSIGNMENT_TRIES:
+            raise Exception(
+                "Reached max ({}) number of tries to assign RBAC role. Please re-run the test later "
+                "or with more max number of tries.".format(MAX_RBAC_ASSIGNMENT_TRIES)
+            )
+
+
+def _iot_hubs_removal(hub_result):
+    for hub in hub_result:
+        name = hub["name"]
+        delete_result = cli.invoke(f"iot hub delete -n {name} -g {RG}")
+        if not delete_result.success():
+            logger.error(f"Failed to delete iot hub resource {name}.")
 
 
 # User Assigned Identity fixtures (UAI)
@@ -100,34 +321,20 @@ def _user_identity_removal(name):
         logger.error(f"Failed to delete user identity resource {name}.")
 
 
-def _assign_rbac_role(assignee: str, scope: str, role: str, max_tries: int = 10):
-    tries = 0
-    while tries < max_tries:
-        role_assignments = _get_role_assignments(scope, role)
-        role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
-        if assignee in role_assignment_principal_ids:
-            break
-        # else assign role to scope and check again
-        cli.invoke(
-            'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
-                assignee, role, scope
-            )
-        )
-        sleep(10)
-        tries += 1
-
-
 # Storage Account fixtures
 @pytest.fixture(scope="module")
-def provisioned_storage_with_identity_module(request, provisioned_iot_hub_module, provisioned_storage_module):
+def provisioned_storage_with_identity_module(
+    request, provisioned_iot_hubs_with_user_module, provisioned_storage_module
+):
+    provisioned_iot_hubs_with_user_module = provisioned_iot_hubs_with_user_module[0]["hub"]
     role = "Storage Blob Data Contributor"
     scope = provisioned_storage_module["storage"]["id"]
-    hub_principal_id = provisioned_iot_hub_module["identity"]["principalId"]
-    user_identities = list(provisioned_iot_hub_module["identity"]["userAssignedIdentities"].values())
+    hub_principal_id = provisioned_iot_hubs_with_user_module["identity"]["principalId"]
+    user_identities = list(provisioned_iot_hubs_with_user_module["identity"]["userAssignedIdentities"].values())
     user_id = user_identities[0]["principalId"]
     _assign_rbac_role(assignee=hub_principal_id, scope=scope, role=role)
     _assign_rbac_role(assignee=user_id, scope=scope, role=role)
-    yield provisioned_iot_hub_module, provisioned_storage_module
+    yield provisioned_iot_hubs_with_user_module, provisioned_storage_module
 
 
 @pytest.fixture(scope="module")
@@ -199,15 +406,18 @@ def _storage_removal(account_name: str):
 
 # Event Hub fixtures
 @pytest.fixture(scope="module")
-def provisioned_event_hub_with_identity_module(provisioned_iot_hub_module, provisioned_event_hub_module):
+def provisioned_event_hub_with_identity_module(
+    provisioned_iot_hubs_with_user_module, provisioned_event_hub_module
+):
+    provisioned_iot_hubs_with_user_module = provisioned_iot_hubs_with_user_module[0]["hub"]
     role = "Azure Event Hubs Data Sender"
     scope = provisioned_event_hub_module["eventhub"]["id"]
-    hub_principal_id = provisioned_iot_hub_module["identity"]["principalId"]
-    user_identities = list(provisioned_iot_hub_module["identity"]["userAssignedIdentities"].values())
+    hub_principal_id = provisioned_iot_hubs_with_user_module["identity"]["principalId"]
+    user_identities = list(provisioned_iot_hubs_with_user_module["identity"]["userAssignedIdentities"].values())
     user_id = user_identities[0]["principalId"]
     _assign_rbac_role(assignee=hub_principal_id, scope=scope, role=role)
     _assign_rbac_role(assignee=user_id, scope=scope, role=role)
-    yield provisioned_iot_hub_module, provisioned_event_hub_module
+    yield provisioned_iot_hubs_with_user_module, provisioned_event_hub_module
 
 
 @pytest.fixture(scope="module")
@@ -268,18 +478,21 @@ def _event_hub_removal(account_name: str):
 
 # Service Bus fixtures
 @pytest.fixture(scope="module")
-def provisioned_service_bus_with_identity_module(provisioned_iot_hub_module, provisioned_service_bus_module):
+def provisioned_service_bus_with_identity_module(
+    provisioned_iot_hubs_with_user_module, provisioned_service_bus_module
+):
+    provisioned_iot_hubs_with_user_module = provisioned_iot_hubs_with_user_module[0]["hub"]
     role = "Azure Service Bus Data Sender"
     queue_scope = provisioned_service_bus_module["queue"]["id"]
     topic_scope = provisioned_service_bus_module["topic"]["id"]
-    hub_principal_id = provisioned_iot_hub_module["identity"]["principalId"]
-    user_identities = list(provisioned_iot_hub_module["identity"]["userAssignedIdentities"].values())
+    hub_principal_id = provisioned_iot_hubs_with_user_module["identity"]["principalId"]
+    user_identities = list(provisioned_iot_hubs_with_user_module["identity"]["userAssignedIdentities"].values())
     user_id = user_identities[0]["principalId"]
     _assign_rbac_role(assignee=hub_principal_id, scope=queue_scope, role=role)
     _assign_rbac_role(assignee=user_id, scope=queue_scope, role=role)
     _assign_rbac_role(assignee=hub_principal_id, scope=topic_scope, role=role)
     _assign_rbac_role(assignee=user_id, scope=topic_scope, role=role)
-    yield provisioned_iot_hub_module, provisioned_service_bus_module
+    yield provisioned_iot_hubs_with_user_module, provisioned_service_bus_module
 
 
 @pytest.fixture(scope="module")
@@ -367,16 +580,19 @@ def _service_bus_removal(account_name: str):
 
 # Cosmos Db fixtures
 @pytest.fixture(scope="module")
-def provisioned_cosmosdb_with_identity_module(provisioned_iot_hub_module, provisioned_cosmos_db_module):
+def provisioned_cosmosdb_with_identity_module(
+    provisioned_iot_hubs_with_user_module, provisioned_cosmos_db_module
+):
+    provisioned_iot_hubs_with_user_module = provisioned_iot_hubs_with_user_module[0]["hub"]
     role = "Cosmos DB Built-in Data Reader"
     cosmosdb_rg = provisioned_cosmos_db_module["cosmosdb"]["resourceGroup"]
     cosmosdb_account = provisioned_cosmos_db_module["cosmosdb"]["name"]
-    hub_principal_id = provisioned_iot_hub_module["identity"]["principalId"]
-    user_identities = list(provisioned_iot_hub_module["identity"]["userAssignedIdentities"].values())
+    hub_principal_id = provisioned_iot_hubs_with_user_module["identity"]["principalId"]
+    user_identities = list(provisioned_iot_hubs_with_user_module["identity"]["userAssignedIdentities"].values())
     user_id = user_identities[0]["principalId"]
     assign_cosmos_db_role(principal_id=hub_principal_id, cosmos_db_account=cosmosdb_account, role=role, rg=cosmosdb_rg)
     assign_cosmos_db_role(principal_id=user_id, cosmos_db_account=cosmosdb_account, role=role, rg=cosmosdb_rg)
-    yield provisioned_iot_hub_module, provisioned_cosmos_db_module
+    yield provisioned_iot_hubs_with_user_module, provisioned_cosmos_db_module
 
 
 def assign_cosmos_db_role(principal_id: str, role: str, cosmos_db_account: str, rg: str):

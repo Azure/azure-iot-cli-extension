@@ -6,7 +6,7 @@
 
 import json
 import os
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from azure.cli.core.azclierror import (AzCLIError, BadRequestError,
                                        FileOperationError,
@@ -181,7 +181,7 @@ class StateProvider(IoTHubProvider):
                 for cert in tqdm(certificates["value"], desc=constants.DELETE_CERT_DESC, ascii=" #"):
                     cert_client.delete(self.rg, self.hub_name, cert["name"], cert["etag"])
 
-    def process_hub_to_dict(self, target: dict, hub_aspects: list) -> dict:
+    def process_hub_to_dict(self, target: Dict[str, str], hub_aspects: list) -> dict:
         '''Returns a dictionary containing the hub state'''
         hub_state = {}
 
@@ -189,7 +189,7 @@ class StateProvider(IoTHubProvider):
             hub_aspects.remove(HubAspects.Configurations.value)
             # Basic tier does not support list config
             try:
-                all_configs = _iot_hub_configuration_list(target=self.target)
+                all_configs = _iot_hub_configuration_list(target=target)
                 hub_state["configurations"] = {}
                 adm_configs = {}
                 for c in tqdm(all_configs, desc=constants.SAVE_CONFIGURATIONS_DESC, ascii=" #"):
@@ -297,12 +297,10 @@ class StateProvider(IoTHubProvider):
             # get connection strings if needed
             endpoints = hub_resource["properties"]["routing"]["endpoints"]
             for ep in endpoints["cosmosDBSqlCollections"]:
-                pass
-                # TODO: test when cosmos db endpoint feature is out
                 if ep.get("primaryKey") or ep.get("secondaryKey"):
                     account_name = ep["endpointUri"].strip("https://").split(".")[0]
                     cosmos_keys = cli.invoke(
-                        'cosmosdb keys list --resource-group {} --name {} --type connection-strings'.format(
+                        'cosmosdb keys list --name {} --resource-group {} --type connection-strings'.format(
                             account_name,
                             ep["resourceGroup"]
                         )
