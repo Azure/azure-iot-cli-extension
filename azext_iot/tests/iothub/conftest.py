@@ -34,6 +34,40 @@ def generate_hub_depenency_id() -> str:
     return f"aziotclitest{generate_generic_id()}"[:24]
 
 
+def assign_iot_hub_dataplane_rbac_role(hub_results):
+    """Add IoT Hub Data Contributor role to current user"""
+    for hub in hub_results:
+        # Only add dataplane roles to the hubs that were not created mid test
+        if hub.get("hub"):
+            target_hub_id = hub["hub"]["id"]
+            account = cli.invoke("account show").as_json()
+            user = account["user"]
+
+            if user["name"] is None:
+                raise Exception("User not found")
+
+            tries = 0
+            while tries < MAX_RBAC_ASSIGNMENT_TRIES:
+                role_assignments = _get_role_assignments(target_hub_id, USER_ROLE)
+                role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
+                if user["name"] in role_assignment_principal_names:
+                    break
+                # else assign IoT Hub Data Contributor role to current user and check again
+                cli.invoke(
+                    'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
+                        user["name"], USER_ROLE, target_hub_id
+                    )
+                )
+                sleep(10)
+                tries += 1
+
+            if tries == MAX_RBAC_ASSIGNMENT_TRIES:
+                raise Exception(
+                    "Reached max ({}) number of tries to assign RBAC role. Please re-run the test later "
+                    "or with more max number of tries.".format(MAX_RBAC_ASSIGNMENT_TRIES)
+                )
+
+
 def _assign_rbac_role(assignee: str, scope: str, role: str, max_tries: int = 10):
     tries = 0
     while tries < max_tries:
@@ -251,38 +285,6 @@ def _get_hub_connection_string(name, rg, policy="iothubowner"):
             name, rg, policy
         )
     ).as_json()["connectionString"]
-
-
-def _assign_iot_hub_dataplane_rbac_role(hub_results):
-    """Add IoT Hub Data Contributor role to current user"""
-    for hub in hub_results:
-        target_hub_id = hub["hub"]["id"]
-        account = cli.invoke("account show").as_json()
-        user = account["user"]
-
-        if user["name"] is None:
-            raise Exception("User not found")
-
-        tries = 0
-        while tries < MAX_RBAC_ASSIGNMENT_TRIES:
-            role_assignments = _get_role_assignments(target_hub_id, USER_ROLE)
-            role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
-            if user["name"] in role_assignment_principal_names:
-                break
-            # else assign IoT Hub Data Contributor role to current user and check again
-            cli.invoke(
-                'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
-                    user["name"], USER_ROLE, target_hub_id
-                )
-            )
-            sleep(10)
-            tries += 1
-
-        if tries == MAX_RBAC_ASSIGNMENT_TRIES:
-            raise Exception(
-                "Reached max ({}) number of tries to assign RBAC role. Please re-run the test later "
-                "or with more max number of tries.".format(MAX_RBAC_ASSIGNMENT_TRIES)
-            )
 
 
 def _iot_hubs_removal(hub_result):
