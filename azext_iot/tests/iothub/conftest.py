@@ -326,11 +326,10 @@ def _user_identity_removal(name):
 def provisioned_storage_with_identity_module(
     request, provisioned_iot_hubs_with_user_module, provisioned_storage_module
 ):
-    provisioned_iot_hubs_with_user_module = provisioned_iot_hubs_with_user_module[0]["hub"]
     role = "Storage Blob Data Contributor"
     scope = provisioned_storage_module["storage"]["id"]
-    hub_principal_id = provisioned_iot_hubs_with_user_module["identity"]["principalId"]
-    user_identities = list(provisioned_iot_hubs_with_user_module["identity"]["userAssignedIdentities"].values())
+    hub_principal_id = provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["principalId"]
+    user_identities = list(provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["userAssignedIdentities"].values())
     user_id = user_identities[0]["principalId"]
     _assign_rbac_role(assignee=hub_principal_id, scope=scope, role=role)
     _assign_rbac_role(assignee=user_id, scope=scope, role=role)
@@ -409,11 +408,10 @@ def _storage_removal(account_name: str):
 def provisioned_event_hub_with_identity_module(
     provisioned_iot_hubs_with_user_module, provisioned_event_hub_module
 ):
-    provisioned_iot_hubs_with_user_module = provisioned_iot_hubs_with_user_module[0]["hub"]
     role = "Azure Event Hubs Data Sender"
     scope = provisioned_event_hub_module["eventhub"]["id"]
-    hub_principal_id = provisioned_iot_hubs_with_user_module["identity"]["principalId"]
-    user_identities = list(provisioned_iot_hubs_with_user_module["identity"]["userAssignedIdentities"].values())
+    hub_principal_id = provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["principalId"]
+    user_identities = list(provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["userAssignedIdentities"].values())
     user_id = user_identities[0]["principalId"]
     _assign_rbac_role(assignee=hub_principal_id, scope=scope, role=role)
     _assign_rbac_role(assignee=user_id, scope=scope, role=role)
@@ -481,12 +479,11 @@ def _event_hub_removal(account_name: str):
 def provisioned_service_bus_with_identity_module(
     provisioned_iot_hubs_with_user_module, provisioned_service_bus_module
 ):
-    provisioned_iot_hubs_with_user_module = provisioned_iot_hubs_with_user_module[0]["hub"]
     role = "Azure Service Bus Data Sender"
     queue_scope = provisioned_service_bus_module["queue"]["id"]
     topic_scope = provisioned_service_bus_module["topic"]["id"]
-    hub_principal_id = provisioned_iot_hubs_with_user_module["identity"]["principalId"]
-    user_identities = list(provisioned_iot_hubs_with_user_module["identity"]["userAssignedIdentities"].values())
+    hub_principal_id = provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["principalId"]
+    user_identities = list(provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["userAssignedIdentities"].values())
     user_id = user_identities[0]["principalId"]
     _assign_rbac_role(assignee=hub_principal_id, scope=queue_scope, role=role)
     _assign_rbac_role(assignee=user_id, scope=queue_scope, role=role)
@@ -583,12 +580,11 @@ def _service_bus_removal(account_name: str):
 def provisioned_cosmosdb_with_identity_module(
     provisioned_iot_hubs_with_user_module, provisioned_cosmos_db_module
 ):
-    provisioned_iot_hubs_with_user_module = provisioned_iot_hubs_with_user_module[0]["hub"]
     role = "Cosmos DB Built-in Data Reader"
     cosmosdb_rg = provisioned_cosmos_db_module["cosmosdb"]["resourceGroup"]
     cosmosdb_account = provisioned_cosmos_db_module["cosmosdb"]["name"]
-    hub_principal_id = provisioned_iot_hubs_with_user_module["identity"]["principalId"]
-    user_identities = list(provisioned_iot_hubs_with_user_module["identity"]["userAssignedIdentities"].values())
+    hub_principal_id = provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["principalId"]
+    user_identities = list(provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["userAssignedIdentities"].values())
     user_id = user_identities[0]["principalId"]
     assign_cosmos_db_role(principal_id=hub_principal_id, cosmos_db_account=cosmosdb_account, role=role, rg=cosmosdb_rg)
     assign_cosmos_db_role(principal_id=user_id, cosmos_db_account=cosmosdb_account, role=role, rg=cosmosdb_rg)
