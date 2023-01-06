@@ -194,14 +194,18 @@ def setup_hub_controlplane_states(
     if os.path.isfile(cert_file):
         os.remove(cert_file)
 
-    # add ip filter rule
+    # add ip filter rule - make sure to add public ip address so dataplane isn't screwed up
+    import requests
+    public_ip = requests.get("https://api.ipify.org/").text.strip()
     cli.invoke(
         f"resource update --name {hub_name} -g {hub_rg} --resource-type "
         "\"Microsoft.Devices/IotHubs\" --set properties.networkRuleSets='{}'"
     )
     cli.invoke(
         f"resource update --name {hub_name} -g {hub_rg} --resource-type Microsoft.Devices/IotHubs "
-        "--add properties.networkRuleSets.ipRules '{\"action\":\"Allow\",\"filterName\":\"Trusted\",\"ipMask\":\"192.168.0.1\"}'"
+        "--add properties.networkRuleSets.ipRules '{\"action\":\"Allow\",\"filterName\":\"Trusted\",\"ipMask\":\""
+        f"{public_ip}"
+        "\"}'"
     )
     yield provisioned_iot_hubs_with_storage_user_module
 
