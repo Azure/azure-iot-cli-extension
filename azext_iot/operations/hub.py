@@ -4,7 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import json
 from os.path import exists
 from knack.log import get_logger
 from enum import Enum, EnumMeta
