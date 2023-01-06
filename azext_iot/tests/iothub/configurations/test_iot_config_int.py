@@ -83,7 +83,7 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
 
     def test_edge_deployments(self):
         for auth_phase in DATAPLANE_AUTH_TYPES:
-            config_count = 5
+            config_count = 6
             config_ids = self.generate_config_names(config_count)
 
             self.kwargs["generic_metrics"] = read_file_content(generic_metrics_path)
@@ -96,6 +96,9 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
                 edge_content_malformed_path
             )
             self.kwargs["labels"] = '{"key0": "value0"}'
+            self.kwargs["custom_labels"] = "key0=value0"
+            self.kwargs["custom_metric_queries"] = "mymetric=SELECT deviceId FROM devices {}".format(
+                "WHERE properties.reported.lastDesiredStatus.code = 200")
 
             priority = random.randint(1, 10)
             condition = "tags.building=9 and tags.environment='test'"
@@ -136,12 +139,47 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot edge deployment create -d {} --pri {} --tc \"{}\" --lab '{}' -k '{}' --metrics '{}' -n {} -g {}".format(
-                        config_ids[1].upper(),
+                        config_ids[5],
                         priority,
                         condition,
                         "{labels}",
                         edge_content_path,
                         edge_content_path,
+                        self.entity_name,
+                        self.entity_rg
+                    ),
+                    auth_type=auth_phase
+                ),
+                checks=[
+                    self.check("id", config_ids[1].lower()),
+                    self.check("priority", priority),
+                    self.check("targetCondition", condition),
+                    self.check("labels", json.loads(self.kwargs["labels"])),
+                    self.check(
+                        "content.modulesContent",
+                        json.loads(self.kwargs["edge_content"])["content"][
+                            "modulesContent"
+                        ],
+                    ),
+                    self.check(
+                        "metrics.queries",
+                        json.loads(self.kwargs["edge_content"])["metrics"]["queries"],
+                    ),
+                ],
+            )
+
+            # Metrics + labels using narg kvp parameters. Configurations must be lowercase and will be lower()'ed.
+            # Note: $schema is included as a nested property in the sample content.
+            self.cmd(
+                self.set_cmd_auth_type(
+                    """iot edge deployment create -d {} --pri {} --tc \"{}\" --custom-labels '{}' -k '{}'
+                    --custom-metric-queries '{}' -n {} -g {}""".format(
+                        config_ids[1].upper(),
+                        priority,
+                        condition,
+                        "{custom_labels}",
+                        edge_content_path,
+                        "{custom_metric_queries}",
                         self.entity_name,
                         self.entity_rg
                     ),
@@ -433,7 +471,7 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
             self.tearDown()
 
     def test_device_configurations(self):
-        config_count = 3
+        config_count = 4
         config_ids = self.generate_config_names(config_count)
         edge_config_ids = self.generate_config_names(1, True)
 
@@ -442,6 +480,9 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
         self.kwargs["adm_content_module"] = read_file_content(adm_content_module_path)
         self.kwargs["edge_content"] = read_file_content(edge_content_path)
         self.kwargs["labels"] = '{"key0": "value0"}'
+        self.kwargs["custom_labels"] = "key0=value0"
+        self.kwargs["custom_metric_queries"] = "mymetric=SELECT deviceId FROM devices {}".format(
+            "WHERE properties.reported.lastDesiredStatus.code = 200")
 
         priority = random.randint(1, 10)
         condition = "tags.building=9 and tags.environment='test'"
@@ -498,6 +539,43 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
                 ),
                 checks=[
                     self.check("id", config_ids[1].lower()),
+                    self.check("priority", priority),
+                    self.check("targetCondition", module_condition),
+                    self.check("labels", json.loads(self.kwargs["labels"])),
+                    self.check(
+                        "content.moduleContent",
+                        json.loads(self.kwargs["adm_content_module"])["content"][
+                            "moduleContent"
+                        ],
+                    ),
+                    self.check(
+                        "metrics.queries",
+                        json.loads(self.kwargs["adm_content_module"])["metrics"]["queries"],
+                    ),
+                ],
+            )
+
+            # Metrics + labels using narg kvp parameters.
+            # Configurations must be lowercase and will be lower()'ed.
+            # Note: $schema is included as a nested property in the sample content.
+            self.cmd(
+                self.set_cmd_auth_type(
+                    """iot hub configuration create -c {} --pri {} --tc \"{}\" --custom-labels '{}'
+                     -k '{}' --custom-metric-queries '{}' -n {} -g {}"""
+                    .format(
+                        config_ids[3].upper(),
+                        priority,
+                        module_condition,
+                        "{custom_labels}",
+                        adm_content_module_path,
+                        "{custom_metric_queries}",
+                        self.entity_name,
+                        self.entity_rg
+                    ),
+                    auth_type=auth_phase,
+                ),
+                checks=[
+                    self.check("id", config_ids[3].lower()),
                     self.check("priority", priority),
                     self.check("targetCondition", module_condition),
                     self.check("labels", json.loads(self.kwargs["labels"])),

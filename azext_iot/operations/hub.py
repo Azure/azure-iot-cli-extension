@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
 from os.path import exists
 from knack.log import get_logger
 from enum import Enum, EnumMeta
@@ -44,6 +45,7 @@ from azext_iot.common.utility import (
     process_json_arg,
     generate_key,
     generate_storage_account_sas_token,
+    validate_key_value_pairs
 )
 from azext_iot._factory import SdkResolver, CloudError
 from azext_iot.operations.generic import _execute_query, _process_top
@@ -1188,6 +1190,8 @@ def iot_edge_deployment_create(
     cmd,
     config_id,
     content,
+    custom_labels=None,
+    custom_metric_queries=None,
     hub_name=None,
     target_condition="",
     priority=0,
@@ -1205,6 +1209,8 @@ def iot_edge_deployment_create(
         cmd=cmd,
         config_id=config_id,
         content=content,
+        custom_labels=custom_labels,
+        custom_metric_queries=custom_metric_queries,
         hub_name=hub_name,
         target_condition=target_condition,
         priority=priority,
@@ -1221,6 +1227,8 @@ def iot_hub_configuration_create(
     cmd,
     config_id,
     content,
+    custom_labels=None,
+    custom_metric_queries=None,
     hub_name=None,
     target_condition="",
     priority=0,
@@ -1234,6 +1242,8 @@ def iot_hub_configuration_create(
         cmd=cmd,
         config_id=config_id,
         content=content,
+        custom_labels=custom_labels,
+        custom_metric_queries=custom_metric_queries,
         hub_name=hub_name,
         target_condition=target_condition,
         priority=priority,
@@ -1251,6 +1261,8 @@ def _iot_hub_configuration_create(
     config_id,
     content,
     config_type,
+    custom_labels=None,
+    custom_metric_queries=None,
     hub_name=None,
     target_condition="",
     priority=0,
@@ -1302,9 +1314,13 @@ def _iot_hub_configuration_create(
                 "metrics json must include the '{}' property".format(metrics_key)
             )
         metrics = metrics[metrics_key]
+    elif custom_metric_queries:
+        metrics = validate_key_value_pairs(";".join(custom_metric_queries))
 
     if labels:
         labels = process_json_arg(labels, argument_name="labels")
+    elif custom_labels:
+        labels = validate_key_value_pairs(";".join(custom_labels))
 
     config_content = ConfigurationContent(**processed_content)
 

@@ -842,13 +842,8 @@ def load_deviceupdate_help():
           `--related-file`. Review examples and parameter descriptions for details on how
           to fully utilize the operation.
 
-          - For bash inline json format use '{"key":"value"}' and \\ (backslash) for command continuation.
-          - For powershell inline json format use '{\\"key\\":\\"value\\"}' and ` (tilde) for command continuation.
-          - For cmd inline json format use \"{\\"key\\":\\"value\\"}\" and ^ (caret) for command continuation.
-          - For file based json input use "@/path/to/file". File based input avoids shell quotation issues.
-
-          For a detailed explanation of shell quoting rules please goto
-            https://learn.microsoft.com/en-us/cli/azure/use-cli-effectively
+          Read more about using quotation marks and escapes characters in different shells here
+            https://github.com/Azure/azure-iot-cli-extension/wiki/Inline-JSON-help
 
         examples:
         - name: Initialize a minimum content import manifest. Inline json optimized for `bash`.

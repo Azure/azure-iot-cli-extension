@@ -819,6 +819,18 @@ def load_arguments(self, _):
             type=int,
             help="Maximum number of configurations to return. By default all configurations are returned.",
         )
+        context.argument(
+            "custom_metric_queries",
+            nargs="+",
+            options_list=["--custom-metric-queries"],
+            help="An altervative way of input style(narg key-value pair) to --metrics.",
+        )
+        context.argument(
+            "custom_labels",
+            nargs="+",
+            options_list=["--custom-labels"],
+            help="An altervative way of input style(narg key-value pair) to --labels.",
+        )
 
     with self.argument_context("iot edge") as context:
         context.argument(
@@ -878,6 +890,18 @@ def load_arguments(self, _):
             "auth_type_dataplane",
             options_list=["--auth-type"],
             arg_type=hub_auth_type_dataplane_param_type,
+        )
+        context.argument(
+            "custom_metric_queries",
+            nargs="+",
+            options_list=["--custom-metric-queries"],
+            help="An altervative way of input style(narg key-value pair) to --metrics.",
+        )
+        context.argument(
+            "custom_labels",
+            nargs="+",
+            options_list=["--custom-labels"],
+            help="An altervative way of input style(narg key-value pair) to --labels.",
         )
 
     with self.argument_context("iot dps") as context:

@@ -764,6 +764,11 @@ helps[
         --content '{\\"moduleContent\\": {\\"properties.desired.chillerWaterSettings\\": {\\"temperature\\": 38, \\"pressure\\": 78}}}'
         --target-condition "from devices.modules where tags.building=9" --priority 1
         --metrics '{\\"metrics\\": {\\"queries\\": {\\"mymetric\\":\\"select moduleId from devices.modules where tags.location=''US''\\"}}}'
+    - name: Create a device configuration with an alternative input style of labels and metrics (powershell syntax example)
+      text: >
+        az iot hub configuration create -c {config_name} -n {iothub_name} --content device_content.json
+        --target-condition "from devices.modules where tags.building=9" --custom-labels key0="value0", key1="value1" --priority 10
+        --custom-metric-queries mymetric1="select deviceId from devices where tags.location='US'" mymetric2="select *"
 """
 
 helps[
@@ -1095,6 +1100,14 @@ helps[
         --content layered_modules_content.json
         --target-condition "tags.building=9 and tags.environment='test'"
         --metrics metrics_content.json
+        --layered
+    - name: Create a layered deployment with an alternative input style of labels and metrics (powershell syntax example)
+      text: >
+        az iot edge deployment create -d {deployment_name} -n {iothub_name}
+        --content layered_modules_content.json
+        --target-condition "tags.building=9 and tags.environment='test'"
+        --custom-labels key0="value0", key1="value1"
+        --custom-metric-queries mymetric1="select deviceId from devices where tags.location='US'" mymetric2="select *"
         --layered
 """
 
