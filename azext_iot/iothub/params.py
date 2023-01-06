@@ -271,7 +271,7 @@ def load_iothub_arguments(self, _):
             help="Hub Aspects (space-separated)."
         )
 
-    with self.argument_context("iot hub state import") as context:
+    with self.argument_context("iot hub state export") as context:
         context.argument(
             "replace",
             options_list=["--replace", "-r"],

@@ -162,7 +162,7 @@ class StateProvider(IoTHubProvider):
 
         logger.info(constants.MIGRATE_STATE_MSG.format(orig_hub, self.hub_name))
 
-    def delete_aspects(self, replace, hub_aspects=[]):
+    def delete_aspects(self, replace, hub_aspects: List[str] = None):
         """
         Delete all necessary hub aspects if the hub exists.
 
@@ -181,8 +181,33 @@ class StateProvider(IoTHubProvider):
                 for cert in tqdm(certificates["value"], desc=constants.DELETE_CERT_DESC, ascii=" #"):
                     cert_client.delete(self.rg, self.hub_name, cert["name"], cert["etag"])
 
-    def process_hub_to_dict(self, target: Dict[str, str], hub_aspects: list) -> dict:
-        '''Returns a dictionary containing the hub state'''
+    def process_hub_to_dict(self, target: Dict[str, str], hub_aspects: List[str]) -> dict:
+        '''Returns a dictionary containing the hub state
+        Full structure:
+        {
+            "arm": full_arm_template,
+            "configurations": {
+                "admConfigurations": {
+                    "config_id": { config_properties }
+                },
+                "edgeDeployments": {
+                    "config_id": { config_properties }
+                }
+            }
+            "devices": {
+                "device_id": {
+                    "identity": { identity_properties (and properties shared with twin) },
+                    "twin" : { twin_properties },
+                    "modules" : {
+                        "module_id" : {
+                            "identity": { identity_properties },
+                            "twin": { twin_properties }
+                        }
+                    }
+                }
+            }
+        }
+        '''
         hub_state = {}
 
         if HubAspects.Configurations.value in hub_aspects:
@@ -371,7 +396,7 @@ class StateProvider(IoTHubProvider):
 
         return hub_state
 
-    def upload_hub_from_dict(self, hub_state: dict, hub_aspects: list):
+    def upload_hub_from_dict(self, hub_state: dict, hub_aspects: List[str]):
         # Control plane
         if HubAspects.Arm.value in hub_aspects and hub_state.get("arm"):
             hub_aspects.remove(HubAspects.Arm.value)
