@@ -10,7 +10,7 @@ import json
 import responses
 import re
 from os.path import exists, join
-from azext_iot.common.certops import create_v3_self_signed_root_certificate
+from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.common.fileops import write_content_to_file
 from azext_iot.common.shared import DeviceAuthType
 from azext_iot.common.utility import process_json_arg, process_yaml_arg
@@ -24,6 +24,7 @@ from azext_iot.iothub.providers.helpers.edge_device_config import (
     EDGE_CONFIG_SCRIPT_HUB_AUTH_CERTS,
     EDGE_CONFIG_SCRIPT_PARENT_HOSTNAME,
     EDGE_ROOT_CERTIFICATE_FILENAME,
+    EDGE_ROOT_CERTIFICATE_SUBJECT,
     create_edge_device_config_script,
     process_edge_devices_config_args,
     process_edge_devices_config_file_content,
@@ -587,7 +588,12 @@ class TestHierarchyCreateConfig:
 
         # create cert if we need
         if ca_cert_override and ca_key_override:
-            root_cert = create_v3_self_signed_root_certificate()
+            root_cert = create_self_signed_certificate(
+                subject=EDGE_ROOT_CERTIFICATE_SUBJECT,
+                key_size=4096,
+                sha_version=256,
+                v3_extensions=True
+            )
             write_content_to_file(
                 content=root_cert["certificate"],
                 destination=test_certs_folder,
@@ -677,7 +683,12 @@ class TestHierarchyCreateConfig:
 
 class TestEdgeHierarchyConfigFunctions:
     def create_test_root_cert(self, path):
-        root_cert = create_v3_self_signed_root_certificate()
+        root_cert = create_self_signed_certificate(
+            subject=EDGE_ROOT_CERTIFICATE_SUBJECT,
+            key_size=4096,
+            sha_version=256,
+            v3_extensions=True
+        )
         write_content_to_file(
             content=root_cert["certificate"],
             destination=path,

@@ -24,11 +24,13 @@ from azext_iot.common.shared import SHAHashVersions
 
 def create_self_signed_certificate(
     subject: str,
-    valid_days: int,
-    cert_output_dir: str,
+    valid_days: int = 365,
+    cert_output_dir: str = None,
+    key_size: int = 2048,
     cert_only: bool = False,
     file_prefix: str = None,
     sha_version: int = SHAHashVersions.SHA1.value,
+    v3_extensions: bool = False,
 ) -> Dict[str, str]:
     """
     Function used to create a basic self-signed certificate with no extensions.
@@ -47,8 +49,8 @@ def create_self_signed_certificate(
         result (dict): dict with certificate value, private key and thumbprint.
     """
     # create a key pair
-    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-
+    key = rsa.generate_private_key(public_exponent=65537, key_size=key_size)
+    serial = x509.random_serial_number()
     # create a self-signed cert
     subject_name = x509.Name(
         [
@@ -60,19 +62,52 @@ def create_self_signed_certificate(
         .subject_name(subject_name)
         .issuer_name(subject_name)
         .public_key(key.public_key())
-        .serial_number(x509.random_serial_number())
+        .serial_number(serial)
         .not_valid_before(datetime.datetime.utcnow())
         .not_valid_after(
             datetime.datetime.utcnow() + datetime.timedelta(days=valid_days)
         )
-        .sign(key, hashes.SHA256())
     )
 
+    # v3_ca extensions
+    if v3_extensions:
+        subject_key_id = x509.SubjectKeyIdentifier.from_public_key(key.public_key())
+        authority_key_id = x509.AuthorityKeyIdentifier(
+            authority_cert_issuer=[x509.DirectoryName(subject_name)],
+            authority_cert_serial_number=serial,
+            key_identifier=subject_key_id.digest
+        )
+        basic = x509.BasicConstraints(ca=True, path_length=None)
+        key_usage = x509.KeyUsage(
+            digital_signature=True,
+            crl_sign=True,
+            key_cert_sign=True,
+            content_commitment=False,
+            data_encipherment=False,
+            decipher_only=False,
+            encipher_only=False,
+            key_agreement=False,
+            key_encipherment=False,
+        )
+        cert = (
+            cert
+            .add_extension(subject_key_id, critical=False)
+            .add_extension(authority_key_id, critical=False)
+            .add_extension(basic, critical=True)
+            .add_extension(key_usage, critical=True)
+        )
+
+    # sign
+    cert = cert.sign(key, hashes.SHA256())
+
+    # private key
     key_dump = key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.TraditionalOpenSSL,
         encryption_algorithm=serialization.NoEncryption(),
     ).decode("utf-8")
+
+    # certificate string
     cert_dump = cert.public_bytes(serialization.Encoding.PEM).decode("utf-8")
 
     hash = None
@@ -83,6 +118,7 @@ def create_self_signed_certificate(
     else:
         raise ValueError("Only SHA1 and SHA256 supported for now.")
 
+    # thumbprint
     thumbprint = cert.fingerprint(hash).hex().upper()
 
     if cert_output_dir and exists(cert_output_dir):
@@ -132,80 +168,6 @@ def open_certificate(certificate_path: str) -> str:
             certificate = base64.b64encode(certificate).decode("utf-8")
     # Remove trailing white space from the certificate content
     return certificate.rstrip()
-
-
-def create_v3_self_signed_root_certificate(
-    subject: str = "Azure_IoT_CLI_Extension_Cert",
-    valid_days: int = 365,
-    key_size: int = 4096,
-) -> Dict[str, str]:
-    """
-    Function used to create a self-signed certificate with X.509 v3 extensions.
-
-    Args:
-        subject (str): Certificate common name field.
-        valid_days (int): number of days certificate is valid for.
-        key_size (int): size of the generated private key.
-
-    Returns:
-        result (dict): dict with certificate value, private key and thumbprint.
-    """
-    key = rsa.generate_private_key(public_exponent=65537, key_size=key_size)
-    serial = x509.random_serial_number()
-    subject_name = x509.Name(
-        [
-            x509.NameAttribute(NameOID.COMMON_NAME, subject),
-        ]
-    )
-
-    # v3_ca extensions
-    subject_key_id = x509.SubjectKeyIdentifier.from_public_key(key.public_key())
-    authority_key_id = x509.AuthorityKeyIdentifier(
-        authority_cert_issuer=[x509.DirectoryName(subject_name)],
-        authority_cert_serial_number=serial,
-        key_identifier=subject_key_id.digest
-    )
-    basic = x509.BasicConstraints(ca=True, path_length=None)
-    key_usage = x509.KeyUsage(
-        digital_signature=True,
-        crl_sign=True,
-        key_cert_sign=True,
-        content_commitment=False,
-        data_encipherment=False,
-        decipher_only=False,
-        encipher_only=False,
-        key_agreement=False,
-        key_encipherment=False,
-    )
-    cert = (
-        x509.CertificateBuilder()
-        .subject_name(subject_name)
-        .issuer_name(subject_name)
-        .public_key(key.public_key())
-        .serial_number(serial)
-        .not_valid_before(datetime.datetime.utcnow())
-        .not_valid_after(
-            datetime.datetime.utcnow() + datetime.timedelta(days=valid_days)
-        )
-        .add_extension(subject_key_id, critical=False)
-        .add_extension(authority_key_id, critical=False)
-        .add_extension(basic, critical=True)
-        .add_extension(key_usage, critical=True)
-        .sign(key, hashes.SHA256())
-    )
-    certificate = cert.public_bytes(serialization.Encoding.PEM).decode("utf-8")
-    thumbprint = cert.fingerprint(hashes.SHA256()).hex().upper()
-    private_key = key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.TraditionalOpenSSL,
-        encryption_algorithm=serialization.NoEncryption(),
-    ).decode("utf-8")
-
-    return {
-        "certificate": certificate,
-        "privateKey": private_key,
-        "thumbprint": thumbprint,
-    }
 
 
 def create_ca_signed_certificate(

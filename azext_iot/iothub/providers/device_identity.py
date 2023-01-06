@@ -9,7 +9,7 @@ from os import makedirs
 from os.path import exists, abspath
 from shutil import rmtree
 from azext_iot.common.certops import (
-    create_v3_self_signed_root_certificate,
+    create_self_signed_certificate,
     create_ca_signed_certificate,
     make_cert_chain,
 )
@@ -260,9 +260,12 @@ class DeviceIdentityProvider(IoTHubProvider):
             # if using x509 device auth
             if hub_cert_auth:
                 # hub auth cert for device
-                device_hub_cert = create_v3_self_signed_root_certificate(
+                device_hub_cert = create_self_signed_certificate(
                     subject=device_id,
                     valid_days=365,
+                    key_size=4096,
+                    sha_version=256,
+                    v3_extensions=True
                 )
                 device_pk = signed_device_cert["thumbprint"]
                 device_sk = device_hub_cert["thumbprint"]
