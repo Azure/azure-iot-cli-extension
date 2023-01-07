@@ -172,8 +172,8 @@ def open_certificate(certificate_path: str) -> str:
 
 def create_ca_signed_certificate(
     subject: str,
-    ca_public: str,
-    ca_private: str,
+    ca_public_key: str,
+    ca_private_key: str,
     cert_output_dir: Optional[str] = None,
     cert_file: Optional[str] = None,
     key_size: int = 4096,
@@ -197,8 +197,8 @@ def create_ca_signed_certificate(
     """
 
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=key_size)
-    ca_public_key = ca_public.encode("utf-8")
-    ca_private_key = ca_private.encode("utf-8")
+    ca_public_key = ca_public_key.encode("utf-8")
+    ca_private_key = ca_private_key.encode("utf-8")
     ca_key = serialization.load_pem_private_key(ca_private_key, password=None)
     ca_cert = x509.load_pem_x509_certificate(ca_public_key)
 

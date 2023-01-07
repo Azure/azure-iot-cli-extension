@@ -203,8 +203,8 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
 
         # file has cert auth, call with overrides: keyAuth, custom config path, default edge agent
         self.cmd(
-            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c -y --cfg {config_path} --dt {config_template} "
-            f"--out device_bundles --device-auth {override_auth_type} --default-edge-agent {default_edge_agent}"
+            f"iot edge devices create -n {self.entity_name} -g {self.entity_rg} -c -y --cfg {config_path} --dct {config_template}"
+            f" --out device_bundles --device-auth {override_auth_type} --default-edge-agent {default_edge_agent}"
         )
 
         self._validate_results(devices, "device_bundles", cert_auth=False, custom_device_template=True)

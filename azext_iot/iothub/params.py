@@ -260,7 +260,7 @@ def load_iothub_arguments(self, _):
             "`parent` (device_id), `edge_agent` (image URL), and `container_auth` (inline json or path to file). "
             "--device can be used 1 or more times. Review help examples for full parameter usage  - these parameters also refer "
             "to their corresponding values in our sample configuration file: "
-            "https://github.com/Azure/azure-iot-cli-extension/tree/dev/docs/samples/sample_devices_config.yaml"
+            "https://aka.ms/aziotcli-edge-devices-config"
         )
         context.argument(
             "clean",
@@ -279,7 +279,7 @@ def load_iothub_arguments(self, _):
             "config_file",
             options_list=["--config-file", "--config", "--cfg"],
             help="Path to devices configuration file. Sample configuration file: "
-            "https://github.com/Azure/azure-iot-cli-extension/tree/dev/docs/samples/sample_devices_config.yaml",
+            "https://aka.ms/aziotcli-edge-devices-config",
         )
         context.argument(
             "device_auth_type",
@@ -296,7 +296,7 @@ def load_iothub_arguments(self, _):
         )
         context.argument(
             "device_config_template",
-            options_list=["--device-template", "--dt"],
+            options_list=["--device-config-template", "--dct"],
             help="Path to IoT Edge config.toml file to use as a basis for edge device configs.",
         )
         context.argument(

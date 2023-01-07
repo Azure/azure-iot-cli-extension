@@ -209,7 +209,7 @@ class DeviceIdentityProvider(IoTHubProvider):
 
         # Clear devices if necessary
         if clean and len(existing_device_ids):
-            if not yes and not prompt_y_n(msg=f"Confirm you want to delete all devices in '{self.hub_name}'", default='y'):
+            if not yes and not prompt_y_n(msg=f"Confirm you want to delete all devices in '{self.hub_name}'", default='n'):
                 raise ManualInterrupt("Operation was aborted, existing device deletion was not confirmed.")
             delete_iterator = (
                 tqdm(existing_device_ids, "Deleting existing device identities")
@@ -249,8 +249,8 @@ class DeviceIdentityProvider(IoTHubProvider):
             # signed device cert
             signed_device_cert = create_ca_signed_certificate(
                 subject=f"{device_id}.deviceca",
-                ca_public=config.root_cert["certificate"],
-                ca_private=config.root_cert["privateKey"],
+                ca_public_key=config.root_cert["certificate"],
+                ca_private_key=config.root_cert["privateKey"],
                 cert_output_dir=device_cert_output_directory,
                 cert_file=device_id,
             )

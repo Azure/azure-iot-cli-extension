@@ -323,11 +323,11 @@ def load_iothub_help():
 
     helps["iot edge devices create"] = """
         type: command
-        short-summary: Create multiple edge devices in an IoT Hub.
+        short-summary: Create and configure multiple edge devices in an IoT Hub.
         long-summary: |
           This operation accepts inline device arguments or an edge devices configuration file in YAML or JSON format.
           Inline command args (like '--device-auth') will take precedence and override configuration file properties if they are provided.
-          A sample configuration file can be found here: https://github.com/Azure/azure-iot-cli-extension/tree/dev/docs/samples/sample_devices_config.yaml
+          A sample configuration file can be found here: https://aka.ms/aziotcli-edge-devices-config
           Review examples and parameter descriptions for details on how to fully utilize this operation.
 
         examples:
