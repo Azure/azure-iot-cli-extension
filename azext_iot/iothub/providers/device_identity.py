@@ -208,7 +208,7 @@ class DeviceIdentityProvider(IoTHubProvider):
         existing_device_ids = [x["deviceId"] for x in existing_devices]
 
         # Clear devices if necessary
-        if clean and len(existing_device_ids):
+        if clean and existing_device_ids:
             if not yes and not prompt_y_n(msg=f"Confirm you want to delete all devices in '{self.hub_name}'", default='n'):
                 raise ManualInterrupt("Operation was aborted, existing device deletion was not confirmed.")
             delete_iterator = (
