@@ -19,12 +19,11 @@ import re
 import hmac
 import hashlib
 
-from typing import Any, Dict
+from typing import Any, Optional, List, Dict
 
 from threading import Event, Thread
 from datetime import datetime
 from knack.log import get_logger
-from typing import Optional
 from azure.cli.core.azclierror import (
     CLIInternalError,
     FileOperationError,
@@ -701,3 +700,25 @@ def generate_storage_account_sas_token(
     )
 
     return sas_token
+
+
+def assemble_nargs_to_dict(hash_list: List[str]) -> Dict[str, str]:
+    result = {}
+    if not hash_list:
+        return result
+    for hash in hash_list:
+        if "=" not in hash:
+            logger.warning(
+                "Skipping processing of '%s', input format is key=value | key='value value'.",
+                hash,
+            )
+            continue
+        split_hash = hash.split("=", 1)
+        result[split_hash[0]] = split_hash[1]
+    for key in result:
+        if not result.get(key):
+            logger.warning(
+                "No value assigned to key '%s', input format is key=value | key='value value'.",
+                key,
+            )
+    return result

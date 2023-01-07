@@ -17,7 +17,7 @@ from azext_iot.iothub.common import (
     EdgeDeviceConfig,
     EdgeContainerAuth,
 )
-from azext_iot.common.utility import process_json_arg, process_toml_arg
+from azext_iot.common.utility import process_json_arg, process_toml_arg, assemble_nargs_to_dict
 
 from azure.cli.core.azclierror import (
     CLIInternalError,
@@ -568,25 +568,3 @@ def process_edge_devices_config_args(
         )
         config.devices.append(device_config)
     return config
-
-
-def assemble_nargs_to_dict(hash_list: List[str]) -> Dict[str, str]:
-    result = {}
-    if not hash_list:
-        return result
-    for hash in hash_list:
-        if "=" not in hash:
-            logger.warning(
-                "Skipping processing of '%s', input format is key=value | key='value value'.",
-                hash,
-            )
-            continue
-        split_hash = hash.split("=", 1)
-        result[split_hash[0]] = split_hash[1]
-    for key in result:
-        if not result.get(key):
-            logger.warning(
-                "No value assigned to key '%s', input format is key=value | key='value value'.",
-                key,
-            )
-    return result
