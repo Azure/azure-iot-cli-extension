@@ -56,7 +56,6 @@ def iot_edge_devices_create(
 def iot_delete_devices(
     cmd,
     device_ids: List[str],
-    confirm: bool = True,
     hub_name: Optional[str] = None,
     resource_group_name: Optional[str] = None,
     login: Optional[str] = None,
@@ -70,6 +69,5 @@ def iot_delete_devices(
         auth_type_dataplane=auth_type_dataplane,
     )
     return device_identity_provider.delete_device_identities(
-        device_ids=device_ids,
-        confirm=confirm
+        device_ids=device_ids
     )

@@ -181,7 +181,7 @@ class TestEdgeHierarchyCreateArgs:
                 ],
                 None,
                 True,
-                False,
+                True,
                 DeviceAuthType.x509_thumbprint.value,
                 "new_device_bundle_folder",
             ),
@@ -1216,15 +1216,6 @@ class TestDevicesDelete:
             match_querystring=False,
         )
 
-        # GET existing devices
-        mocked_response.add(
-            method=responses.GET,
-            url=devices_url,
-            body="[]",
-            status=200,
-            content_type="application/json",
-            match_querystring=False,
-        )
         yield mocked_response
 
     @pytest.fixture()
@@ -1242,22 +1233,16 @@ class TestDevicesDelete:
         return mock
 
     @pytest.mark.parametrize(
-        "devices, confirm",
+        "devices",
         [
-            (
-                [
-                    'device_1',
-                    'device_2',
-                    'device_3',
-                ],
-                True
-            ),
-            (
-                [
-                    'device_1'
-                ],
-                False
-            )
+            [
+                'device_1',
+                'device_2',
+                'device_3',
+            ],
+            [
+                'device_1'
+            ],
         ]
     )
     def test_delete_bulk_devices(
@@ -1268,15 +1253,12 @@ class TestDevicesDelete:
         fixture_ghcs,
         fixture_sas,
         devices,
-        confirm
     ):
         subject.iot_delete_devices(
             cmd=fixture_cmd,
-            device_ids=devices,
-            confirm=confirm
+            device_ids=devices
         )
         assert mock_bulk_delete.call_args[1]["device_ids"] == devices
-        assert mock_bulk_delete.call_args[1]["confirm"] == confirm
         mock_self = mock_service_delete.call_args[0][0]
         calls = [call(mock_self, id=device, if_match="*") for device in devices]
         mock_service_delete.assert_has_calls(calls)

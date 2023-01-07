@@ -216,7 +216,11 @@ class DeviceIdentityProvider(IoTHubProvider):
                 if visualize
                 else existing_device_ids
             )
-            self.delete_device_identities(delete_iterator, confirm=True)
+            self.delete_device_identities(delete_iterator)
+            if self.service_sdk.devices.get_devices():
+                raise AzureResponseError(
+                    "An error has occurred - Not all devices were deleted."
+                )
         else:
             # If not cleaning the hub, ensure no duplicate device ids
             duplicates = list(
@@ -426,15 +430,9 @@ class DeviceIdentityProvider(IoTHubProvider):
             bundle_plural = '' if num_bundles == 1 else 's'
             print(f"{num_bundles} device bundle{bundle_plural} created in folder: {abspath(bundle_output_directory)}")
 
-    def delete_device_identities(self, device_ids: List[str], confirm: bool = False):
+    def delete_device_identities(self, device_ids: List[str]):
         for id in device_ids:
             try:
                 self.service_sdk.devices.delete_identity(id=id, if_match="*")
             except Exception as err:
                 raise AzureResponseError(err)
-        if confirm:
-            existing_devices = self.service_sdk.devices.get_devices()
-            if len(existing_devices):
-                raise AzureResponseError(
-                    "An error has occurred - Not all devices were deleted."
-                )
