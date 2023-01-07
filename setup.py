@@ -53,10 +53,10 @@ DEPENDENCIES = [
     "jsonschema~=3.2.0",
     "importlib_metadata;python_version<'3.8'",
     "azure-iot-device~=2.11",
-    "tomli",
-    "tomli-w",
+    "tomli~=2.0",
+    "tomli-w~=1.0",
     "tqdm~=4.62",
-    "treelib",
+    "treelib~=1.6",
     "packaging"
 ]
 EXTRAS = {"uamqp": ["uamqp~=1.2"]}
