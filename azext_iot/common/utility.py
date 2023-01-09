@@ -149,8 +149,8 @@ def process_json_arg(
         )
 
 
-_file_location_error = f"{0} file not found - Please ensure the path '{1}' is correct."
-_file_parse_error = f"Failed to parse {0} file located at '{1}' with exception:\n{2}"
+_file_location_error = "{0} file not found - Please ensure the path '{1}' is correct."
+_file_parse_error = "Failed to parse {0} file located at '{1}' with exception:\n{2}"
 
 
 def process_yaml_arg(path: str) -> Dict[str, Any]:
