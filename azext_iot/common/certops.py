@@ -177,7 +177,7 @@ def create_ca_signed_certificate(
     cert_output_dir: Optional[str] = None,
     cert_file: Optional[str] = None,
     key_size: int = 4096,
-    valid_days: Optional[int] = 365,
+    valid_days: int = 365,
 ) -> Dict[str, str]:
     """
     Function used to create a new X.509 v3 certificate signed by an existing CA cert.
