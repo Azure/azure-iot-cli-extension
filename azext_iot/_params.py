@@ -822,14 +822,15 @@ def load_arguments(self, _):
         context.argument(
             "custom_metric_queries",
             nargs="+",
-            options_list=["--custom-metric-queries"],
-            help="An altervative way of input style(narg key-value pair) to --metrics.",
+            options_list=["--custom-metric-queries", "--cmq"],
+            help="An alternative way of input style(narg key-value pair) to --metrics and and intended to replace "
+            "it in the future.",
         )
         context.argument(
             "custom_labels",
             nargs="+",
-            options_list=["--custom-labels"],
-            help="An altervative way of input style(narg key-value pair) to --labels.",
+            options_list=["--custom-labels", "--cl"],
+            help="An alternative way of input style(narg key-value pair) to --labels and intended to replace it in the future.",
         )
 
     with self.argument_context("iot edge") as context:
@@ -894,14 +895,14 @@ def load_arguments(self, _):
         context.argument(
             "custom_metric_queries",
             nargs="+",
-            options_list=["--custom-metric-queries"],
-            help="An altervative way of input style(narg key-value pair) to --metrics.",
+            options_list=["--custom-metric-queries", "--cmq"],
+            help="An alternative way of input style(narg key-value pair) to --metrics and intended to replace it in the future.",
         )
         context.argument(
             "custom_labels",
             nargs="+",
-            options_list=["--custom-labels"],
-            help="An altervative way of input style(narg key-value pair) to --labels.",
+            options_list=["--custom-labels", "--cl"],
+            help="An alternative way of input style(narg key-value pair) to --labels and intended to replace it in the future.",
         )
 
     with self.argument_context("iot dps") as context:

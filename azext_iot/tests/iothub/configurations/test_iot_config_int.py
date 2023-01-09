@@ -139,7 +139,7 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot edge deployment create -d {} --pri {} --tc \"{}\" --lab '{}' -k '{}' --metrics '{}' -n {} -g {}".format(
-                        config_ids[5],
+                        config_ids[1].upper(),
                         priority,
                         condition,
                         "{labels}",
@@ -172,9 +172,9 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
             # Note: $schema is included as a nested property in the sample content.
             self.cmd(
                 self.set_cmd_auth_type(
-                    """iot edge deployment create -d {} --pri {} --tc \"{}\" --custom-labels '{}' -k '{}'
-                    --custom-metric-queries '{}' -n {} -g {}""".format(
-                        config_ids[1].upper(),
+                    """iot edge deployment create -d {} --pri {} --tc \"{}\" --cl '{}' -k '{}'
+                    --cmq '{}' -n {} -g {}""".format(
+                        config_ids[5],
                         priority,
                         condition,
                         "{custom_labels}",
@@ -186,7 +186,7 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
                     auth_type=auth_phase
                 ),
                 checks=[
-                    self.check("id", config_ids[1].lower()),
+                    self.check("id", config_ids[5]),
                     self.check("priority", priority),
                     self.check("targetCondition", condition),
                     self.check("labels", json.loads(self.kwargs["labels"])),
@@ -560,8 +560,8 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
             # Note: $schema is included as a nested property in the sample content.
             self.cmd(
                 self.set_cmd_auth_type(
-                    """iot hub configuration create -c {} --pri {} --tc \"{}\" --custom-labels '{}'
-                     -k '{}' --custom-metric-queries '{}' -n {} -g {}"""
+                    """iot hub configuration create -c {} --pri {} --tc \"{}\" --cl '{}'
+                     -k '{}' --cmq '{}' -n {} -g {}"""
                     .format(
                         config_ids[3].upper(),
                         priority,

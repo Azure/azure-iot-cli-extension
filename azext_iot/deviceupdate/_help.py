@@ -843,7 +843,7 @@ def load_deviceupdate_help():
           to fully utilize the operation.
 
           Read more about using quotation marks and escapes characters in different shells here
-            https://github.com/Azure/azure-iot-cli-extension/wiki/Inline-JSON-help
+            https://aka.ms/aziotcli-json
 
         examples:
         - name: Initialize a minimum content import manifest. Inline json optimized for `bash`.
