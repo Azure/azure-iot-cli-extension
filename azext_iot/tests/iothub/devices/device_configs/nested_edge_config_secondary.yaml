@@ -3,16 +3,16 @@ iotHub:
   authenticationMethod: symmetricKey
 edgeConfiguration:
   defaultEdgeAgent: "mcr.microsoft.com/azureiotedge-agent:1.2"
-  templateConfigPath: "./device_configs/device_config.toml"
+  templateConfigPath: "device_config.toml"
 
 edgeDevices:
   - deviceId: device_100
     edgeAgent: "mcr.microsoft.com/azureiotedge-agent:1.2"
-    deployment: "./device_configs/deploymentTopLayer.json"
+    deployment: "./deployments/deploymentTopLayer.json"
     children:
     - deviceId: device_200
       children:
         - deviceId: device_300
           children:
           - deviceId: device_400
-            deployment: "./device_configs/deploymentLowerLayer.json"
+            deployment: "./deployments/deploymentLowerLayer.json"

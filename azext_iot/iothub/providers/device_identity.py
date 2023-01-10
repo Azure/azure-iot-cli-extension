@@ -121,7 +121,11 @@ class DeviceIdentityProvider(IoTHubProvider):
             else:
                 raise InvalidArgumentValueError("Config file must be JSON or YAML")
 
+            # path arguments in config file are relative to the config file's path
+            config_path = PurePath(config_file).parent.as_posix()
+
             config = process_edge_devices_config_file_content(
+                config_path=config_path,
                 content=config_content,
                 override_auth_type=auth_type,
                 override_root_cert_path=root_cert_path,

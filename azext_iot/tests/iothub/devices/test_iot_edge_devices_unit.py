@@ -4,6 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from os import getcwd
+from pathlib import PurePath
 from unittest.mock import call
 import pytest
 import json
@@ -71,6 +73,7 @@ test_device_scopes = [
     {"deviceId": "device_6", "deviceScope": "dev6-scope-value"},
     {"deviceId": "device_7", "deviceScope": "dev7-scope-value"},
 ]
+test_path = getcwd()
 
 
 class TestEdgeHierarchyCreateArgs:
@@ -167,14 +170,14 @@ class TestEdgeHierarchyCreateArgs:
                     [
                         "id=dev4",
                         "hostname=device-hostname",
-                        "deployment=device_configs/deploymentTopLayer.json",
+                        "deployment=device_configs/deployments/deploymentTopLayer.json",
                         "edge_agent=my-edge-agent",
                         f"container_auth={json.dumps(mock_container_auth)}",
                     ],
                     [
                         "id=dev5",
                         "hostname=device-hostname",
-                        "deployment=device_configs/deploymentTopLayer.json",
+                        "deployment=device_configs/deployments/deploymentTopLayer.json",
                         "edge_agent=my-edge-agent",
                         "container_auth=device_configs/fake_edge_container_auth.json",
                     ],
@@ -843,7 +846,7 @@ class TestEdgeHierarchyConfigFunctions:
                 InvalidArgumentValueError,
             ),
             ("path_does_not_exist.json", FileOperationError),
-            ("device_configs/deploymentLowerLayer.json", None),
+            ("device_configs/deployments/deploymentLowerLayer.json", None),
         ],
     )
     def test_process_edge_config_content(self, set_cwd, deployment, error):
@@ -887,7 +890,7 @@ class TestEdgeHierarchyConfigFunctions:
                             hostname="parent-hostname",
                         ),
                     ],
-                    template_config_path="template-config-path.toml",
+                    template_config_path=PurePath(test_path, "template-config-path.toml").as_posix(),
                     default_edge_agent="edge-agent-1",
                 ),
             ),
@@ -941,7 +944,7 @@ class TestEdgeHierarchyConfigFunctions:
     def test_process_edge_devices_config_content(
         self, set_cwd, patch_create_edge_root_cert, content, expected
     ):
-        result = process_edge_devices_config_file_content(content)
+        result = process_edge_devices_config_file_content(content=content, config_path=test_path)
         assert result == expected
 
     def test_process_edge_devices_config_load_cert(
@@ -1086,7 +1089,7 @@ class TestEdgeHierarchyConfigFunctions:
                 ],
                 DeviceAuthType.x509_thumbprint.value,
                 None,
-                "device_configs/device_config.toml",
+                "device_config.toml",
                 EdgeDevicesConfig(
                     version="1.0",
                     auth_method=DeviceAuthType.x509_thumbprint.value,
@@ -1095,7 +1098,7 @@ class TestEdgeHierarchyConfigFunctions:
                         "thumbprint": "root_thumbprint",
                         "privateKey": "root_private_key",
                     },
-                    template_config_path="device_configs/device_config.toml",
+                    template_config_path="device_config.toml",
                     devices=[
                         EdgeDeviceConfig(
                             device_id="dev1",

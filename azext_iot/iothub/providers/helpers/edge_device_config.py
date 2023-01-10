@@ -5,6 +5,8 @@
 # --------------------------------------------------------------------------------------------
 """This module defines common values and functions for processing edge device configurations"""
 
+from pathlib import PurePath
+from os import getcwd
 from typing import Optional, List, Dict, Any
 from azext_iot.common.fileops import write_content_to_file
 from azext_iot.common.certops import create_self_signed_certificate, load_ca_cert_info
@@ -306,6 +308,7 @@ def create_edge_device_config(
 
 def process_edge_devices_config_file_content(
     content: dict,
+    config_path: Optional[str] = None,
     override_auth_type: Optional[str] = None,
     override_root_cert_path: Optional[str] = None,
     override_root_key_path: Optional[str] = None,
@@ -316,6 +319,9 @@ def process_edge_devices_config_file_content(
     """
     Process edge config file schema dictionary
     """
+
+    # Use current directory if no config file path
+    config_path = config_path or getcwd()
 
     # Warn about override values
     for value, name in [
@@ -390,9 +396,14 @@ def process_edge_devices_config_file_content(
     if edge_config or any(
         [override_default_edge_agent, override_device_config_template]
     ):
-        template_config_path = override_device_config_template or edge_config.get(
-            "templateConfigPath", None
-        )
+        # do not use path relative to config file if overridden from CLI context
+        if override_device_config_template:
+            template_config_path = override_device_config_template
+        else:
+            template_config_path = edge_config.get("templateConfigPath", None)
+            if template_config_path:  # relative path to config file to device.toml
+                template_config_path = PurePath(config_path, template_config_path).as_posix()
+
         default_edge_agent = override_default_edge_agent or edge_config.get(
             "defaultEdgeAgent", None
         )
@@ -406,6 +417,8 @@ def process_edge_devices_config_file_content(
             )
         deployment = device.get("deployment", None)
         if deployment:
+            # relative path from config file to deployment.json
+            deployment = PurePath(config_path, deployment).as_posix()
             deployment = try_parse_valid_deployment_config(deployment)
 
         child_devices = device.get("children", [])
