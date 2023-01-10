@@ -39,6 +39,15 @@ unreleased
 * Some minor improvements to command documentation involving managed identities.
 
 
+**IoT Edge updates**
+
+* Introduces a new experimental command `az iot edge devices create` that enables advanced IoT Edge device creation and configuration.
+  This command allows users to specify either multiple inline arguments (`--device property=value`) or a [configuration file](https://aka.ms/aziotcli-edge-devices-config)
+  to create multiple edge devices (including nested device scenarios) and configure their deployments.
+
+  If an output path is specified, this command will also create tar files containing each device's certificate bundle, an IoT Edge
+  `config.toml` config file and an installation script to configure a target Edge device with these settings.
+
 0.18.3
 +++++++++++++++
 

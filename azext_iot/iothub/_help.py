@@ -316,6 +316,53 @@ def load_iothub_help():
         short-summary: Upload a local file as a device to a pre-configured blob storage container.
     """
 
+    helps["iot edge devices"] = """
+        type: group
+        short-summary: Commands to manage IoT Edge devices.
+    """
+
+    helps["iot edge devices create"] = """
+        type: command
+        short-summary: Create and configure multiple edge devices in an IoT Hub.
+        long-summary: |
+          This operation accepts inline device arguments or an edge devices configuration file in YAML or JSON format.
+          Inline command args (like '--device-auth') will take precedence and override configuration file properties if they are provided.
+          A sample configuration file can be found here: https://aka.ms/aziotcli-edge-devices-config
+          Review examples and parameter descriptions for details on how to fully utilize this operation.
+
+        examples:
+        - name: Create a couple of edge devices using symmetric key auth (default)
+          text: |
+            az iot edge devices create -n {hub_name} --device id=device_1 --device id=device_2
+
+        - name: Create a flat list of edge devices using self-signed certificate authentication with various edge property configurations, using inline arguments.
+          text: |
+            az iot edge devices create -n {hub_name} --device-auth x509_thumbprint --default-edge-agent "mcr.microsoft.com/azureiotedge-agent:1.4"
+            --device id=device_1 hostname={FQDN}
+            --device id=device_2 edge_agent={agent_image}
+            --device id=parent hostname={FQDN} edge_agent={agent_image} container_auth={path_or_json_string}
+
+        - name: Delete all existing device-identities on a hub and create new devices based on a configuration file (with progress bars and visualization output).
+          text: >
+            az iot edge devices create -n {hub_name} --cfg path/to/config_yml_or_json -c -v
+
+        - name: Create a group of nested edge devices with custom module deployments - containing 2 parent devices with 1 child device each, using inline arguments.
+            Also specifies output path for device certificate bundles.
+          text: |
+            az iot edge devices create -n {hub_name} --out {device_bundle_path}
+            --device id=parent_1 deployment=/path/to/parentDeployment_1.json
+            --device id=child_1 parent=parent_1 deployment=/path/to/child_deployment_1.json
+            --device id=parent_2 deployment=/path/to/parentDeployment_2.json
+            --device id=child_2 parent=parent_2 deployment=/path/to/child_deployment_2.json
+
+        - name: Create a simple nested edge device configuration with an existing root CA, using x509 auth, and specify a custom device bundle output path.
+          text: |
+            az iot edge devices create -n {hub_name} --out {device_bundle_path}
+            --root-cert "root_cert.pem" --root-key "root_key.pem" --device-auth x509_thumbprint
+            --device id=parent1
+            --device id=child1 parent=parent1
+    """
+
     helps[
         "iot hub message-endpoint"
     ] = """
