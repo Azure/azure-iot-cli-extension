@@ -699,6 +699,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
         eh_consumer_group: str = DEFAULT_CONSUMER_GROUP,
         eh_resource_group: Optional[str] = None,
         eh_subscription: Optional[str] = None,
+        user_identity: Optional[str] = None,
         resource_group_name: Optional[str] = None,
         yes: bool = False,
     ):
@@ -732,6 +733,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
             eh_consumer_group=eh_consumer_group,
             eh_resource_group=eh_resource_group,
             eh_subscription=eh_subscription,
+            identity=user_identity or SYSTEM_IDENTITY,
             yes=yes,
         )
 

@@ -31,6 +31,14 @@ unreleased
     without specifying a route name or type, all types will be tested rather than only DeviceMessage routes.
 
 
+**Digital Twins updates**
+
+* Addition of User Assigned Identities for data history connections. The command `az dt data-history connection create adx`
+  now can take an extra parameter `--mi-user-assigned` to use an associated User Assigned Identity for the connection
+  creation rather than the system assigned identity for the Digital Twin.
+* Some minor improvements to command documentation involving managed identities.
+
+
 0.18.3
 +++++++++++++++
 
@@ -52,6 +60,10 @@ unreleased
 
 * Fixed an issue with enrollement group certificate encoding
 
+**IoT DPS updates**
+
+* Removed file extension restriction for attached certificates in individual enrollments and enrollment groups creation/update commands,
+  and added suggested certificate format in `--help` docs.
 
 0.18.2
 +++++++++++++++
