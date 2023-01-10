@@ -230,6 +230,22 @@ def load_arguments(self, _):
             " from the supplied symmetric key without further validation. All other command parameters aside from"
             " duration will be ignored. Supported connection string types: Iot Hub, Device, Module."
         )
+        context.argument(
+            "custom_metric_queries",
+            nargs="+",
+            options_list=["--custom-metric-queries", "--cmq"],
+            help="An alternative way of input style(space separated key-value pairs) to --metrics and intended to replace "
+            "it in the future."
+            'For example: metric1="select deviceId from devices where tags.location=''US''" metric2="select *"',
+        )
+        context.argument(
+            "custom_labels",
+            nargs="+",
+            options_list=["--custom-labels", "--cl"],
+            help="An alternative way of input style(space separated key-value pairs) to --labels and intended to replace "
+            "it in the future."
+            'For example: key1=value1 key2="this is my value"',
+        )
 
     with self.argument_context("iot hub") as context:
         context.argument(
@@ -819,19 +835,6 @@ def load_arguments(self, _):
             type=int,
             help="Maximum number of configurations to return. By default all configurations are returned.",
         )
-        context.argument(
-            "custom_metric_queries",
-            nargs="+",
-            options_list=["--custom-metric-queries", "--cmq"],
-            help="An alternative way of input style(narg key-value pair) to --metrics and and intended to replace "
-            "it in the future.",
-        )
-        context.argument(
-            "custom_labels",
-            nargs="+",
-            options_list=["--custom-labels", "--cl"],
-            help="An alternative way of input style(narg key-value pair) to --labels and intended to replace it in the future.",
-        )
 
     with self.argument_context("iot edge") as context:
         context.argument(
@@ -891,18 +894,6 @@ def load_arguments(self, _):
             "auth_type_dataplane",
             options_list=["--auth-type"],
             arg_type=hub_auth_type_dataplane_param_type,
-        )
-        context.argument(
-            "custom_metric_queries",
-            nargs="+",
-            options_list=["--custom-metric-queries", "--cmq"],
-            help="An alternative way of input style(narg key-value pair) to --metrics and intended to replace it in the future.",
-        )
-        context.argument(
-            "custom_labels",
-            nargs="+",
-            options_list=["--custom-labels", "--cl"],
-            help="An alternative way of input style(narg key-value pair) to --labels and intended to replace it in the future.",
         )
 
     with self.argument_context("iot dps") as context:
