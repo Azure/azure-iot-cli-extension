@@ -1,0 +1,11 @@
+configVersion: "1.0"
+iotHub:
+  authenticationMethod: symmetricKey
+edgeConfiguration:
+  templateConfigPath: "./device_configs/device_config.toml"
+
+edgeDevices:
+  - deviceId: device_1
+  # duplicate deviceID
+  - deviceId: device_1
+  - deviceId: device_2
