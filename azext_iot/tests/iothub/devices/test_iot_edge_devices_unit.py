@@ -813,11 +813,15 @@ class TestEdgeHierarchyConfigFunctions:
             device_config.hostname if device_config.hostname else "{{HOSTNAME}}"
         )
 
-        # respect existing config reprovisioning mode
+        # respect existing config reprovisioning mode, or use "Dynamic" if not present
         if device_config_path:
             with open(device_config_path, "rb") as file:
                 expected_config = tomli.load(file)
-                assert device_toml["auto_reprovisioning_mode"] == getattr(expected_config, "auto_reprovisioning_mode", "Dynamic")
+                if not getattr(expected_config, "auto_reprovisioning_mode", None):
+                    assert device_toml["auto_reprovisioning_mode"] == "Dynamic"
+                else:
+                    assert device_toml["auto_reprovisioning_mode"] == expected_config["auto_provisioning_mode"]
+        # default should be dynamic
         else:
             assert device_toml["auto_reprovisioning_mode"] == "Dynamic"
 
