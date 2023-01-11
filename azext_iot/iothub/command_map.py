@@ -19,6 +19,9 @@ iothub_message_route_ops = CliCommandType(operations_tmpl="azext_iot.iothub.comm
 device_messaging_ops = CliCommandType(
     operations_tmpl="azext_iot.iothub.commands_device_messaging#{}"
 )
+device_identity_ops = CliCommandType(
+    operations_tmpl="azext_iot.iothub.commands_device_identity#{}"
+)
 iothub_resource_ops = CliCommandType(
     operations_tmpl="azext_iot.iothub.commands_certificate#{}"
 )
@@ -46,7 +49,9 @@ def load_iothub_commands(self, _):
         cmd_group.command("list", "job_list")
         cmd_group.command("cancel", "job_cancel")
 
-    with self.command_group("iot hub digital-twin", command_type=pnp_runtime_ops) as cmd_group:
+    with self.command_group(
+        "iot hub digital-twin", command_type=pnp_runtime_ops
+    ) as cmd_group:
         cmd_group.command("invoke-command", "invoke_device_command")
         cmd_group.show_command("show", "get_digital_twin")
         cmd_group.command("update", "patch_digital_twin")
@@ -132,6 +137,11 @@ def load_iothub_commands(self, _):
         cmd_group.command("receive", "iot_c2d_message_receive")
         cmd_group.command("send", "iot_c2d_message_send")
         cmd_group.command("purge", "iot_c2d_message_purge")
+
+    with self.command_group(
+        "iot edge devices", command_type=device_identity_ops
+    ) as cmd_group:
+        cmd_group.command("create", "iot_edge_devices_create", is_experimental=True)
 
     with self.command_group(
         "iot hub certificate root-authority", command_type=iothub_resource_ops, is_experimental=True
