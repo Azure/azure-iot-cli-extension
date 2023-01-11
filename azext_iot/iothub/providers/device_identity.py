@@ -233,7 +233,7 @@ class DeviceIdentityProvider(IoTHubProvider):
             if any(duplicates):
                 raise InvalidArgumentValueError(
                     f"The following devices already exist on hub '{self.hub_name}': {duplicates}. "
-                    "To clear all devices before creating the hierarchy, please utilize the `--clean` switch."
+                    "To delete all existing devices before creating new ones, please utilize the `--clean` switch."
                 )
 
         # Create all devices and configs
