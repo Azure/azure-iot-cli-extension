@@ -38,13 +38,13 @@ from azext_iot.common.shared import (
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
+    assemble_nargs_to_dict,
     handle_service_exception,
     read_file_content,
     init_monitoring,
     process_json_arg,
     generate_key,
     generate_storage_account_sas_token,
-    validate_key_value_pairs
 )
 from azext_iot._factory import SdkResolver, CloudError
 from azext_iot.operations.generic import _execute_query, _process_top
@@ -1314,12 +1314,12 @@ def _iot_hub_configuration_create(
             )
         metrics = metrics[metrics_key]
     elif custom_metric_queries:
-        metrics = validate_key_value_pairs(";".join(custom_metric_queries))
+        metrics = assemble_nargs_to_dict(custom_metric_queries)
 
     if labels:
         labels = process_json_arg(labels, argument_name="labels")
     elif custom_labels:
-        labels = validate_key_value_pairs(";".join(custom_labels))
+        labels = assemble_nargs_to_dict(custom_labels)
 
     config_content = ConfigurationContent(**processed_content)
 

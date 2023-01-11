@@ -22,6 +22,7 @@ edge_content_malformed_path = get_context_path(
     __file__, "test_edge_deployment_malformed.json"
 )
 generic_metrics_path = get_context_path(__file__, "test_config_generic_metrics.json")
+kvp_metrics_path = get_context_path(__file__, "test_config_kvp_metrics.json")
 adm_content_module_path = get_context_path(__file__, "test_adm_module_content.json")
 adm_content_device_path = get_context_path(__file__, "test_adm_device_content.json")
 
@@ -96,9 +97,8 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
                 edge_content_malformed_path
             )
             self.kwargs["labels"] = '{"key0": "value0"}'
-            self.kwargs["custom_labels"] = "key0=value0"
-            self.kwargs["custom_metric_queries"] = "mymetric=SELECT deviceId FROM devices {}".format(
-                "WHERE properties.reported.lastDesiredStatus.code = 200")
+            self.kwargs["custom_labels"] = '{"key0": "value0", "key1": "value1"}'
+            self.kwargs["custom_metric_queries"] = read_file_content(kvp_metrics_path)
 
             priority = random.randint(1, 10)
             condition = "tags.building=9 and tags.environment='test'"
@@ -172,14 +172,14 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
             # Note: $schema is included as a nested property in the sample content.
             self.cmd(
                 self.set_cmd_auth_type(
-                    """iot edge deployment create -d {} --pri {} --tc \"{}\" --cl '{}' -k '{}'
-                    --cmq '{}' -n {} -g {}""".format(
+                    """iot edge deployment create -d {} --pri {} --tc \"{}\" --cl {} -k '{}'
+                    --cmq {} -n {} -g {}""".format(
                         config_ids[5],
                         priority,
                         condition,
-                        "{custom_labels}",
+                        "key0=value0 key1=value1",
                         edge_content_path,
-                        "{custom_metric_queries}",
+                        'mymetric1="select deviceId from devices where tags.location=\'US\'" mymetric2="select *"',
                         self.entity_name,
                         self.entity_rg
                     ),
@@ -189,7 +189,7 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
                     self.check("id", config_ids[5]),
                     self.check("priority", priority),
                     self.check("targetCondition", condition),
-                    self.check("labels", json.loads(self.kwargs["labels"])),
+                    self.check("labels", json.loads(self.kwargs["custom_labels"])),
                     self.check(
                         "content.modulesContent",
                         json.loads(self.kwargs["edge_content"])["content"][
@@ -198,7 +198,7 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
                     ),
                     self.check(
                         "metrics.queries",
-                        json.loads(self.kwargs["edge_content"])["metrics"]["queries"],
+                        json.loads(self.kwargs["custom_metric_queries"]),
                     ),
                 ],
             )
@@ -480,10 +480,8 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
         self.kwargs["adm_content_module"] = read_file_content(adm_content_module_path)
         self.kwargs["edge_content"] = read_file_content(edge_content_path)
         self.kwargs["labels"] = '{"key0": "value0"}'
-        self.kwargs["custom_labels"] = "key0=value0"
-        self.kwargs["custom_metric_queries"] = "mymetric=SELECT deviceId FROM devices {}".format(
-            "WHERE properties.reported.lastDesiredStatus.code = 200")
-
+        self.kwargs["custom_labels"] = '{"key0": "value0", "key1": "this is value"}'
+        self.kwargs["custom_metric_queries"] = read_file_content(kvp_metrics_path)
         priority = random.randint(1, 10)
         condition = "tags.building=9 and tags.environment='test'"
 
@@ -560,15 +558,15 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
             # Note: $schema is included as a nested property in the sample content.
             self.cmd(
                 self.set_cmd_auth_type(
-                    """iot hub configuration create -c {} --pri {} --tc \"{}\" --cl '{}'
-                     -k '{}' --cmq '{}' -n {} -g {}"""
+                    """iot hub configuration create -c {} --pri {} --tc \"{}\" --cl {}
+                     -k '{}' --cmq {} -n {} -g {}"""
                     .format(
                         config_ids[3].upper(),
                         priority,
                         module_condition,
-                        "{custom_labels}",
+                        'key0=value0 key1="this is value"',
                         adm_content_module_path,
-                        "{custom_metric_queries}",
+                        'mymetric1="select deviceId from devices where tags.location=\'US\'" mymetric2="select *"',
                         self.entity_name,
                         self.entity_rg
                     ),
@@ -578,7 +576,7 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
                     self.check("id", config_ids[3].lower()),
                     self.check("priority", priority),
                     self.check("targetCondition", module_condition),
-                    self.check("labels", json.loads(self.kwargs["labels"])),
+                    self.check("labels", json.loads(self.kwargs["custom_labels"])),
                     self.check(
                         "content.moduleContent",
                         json.loads(self.kwargs["adm_content_module"])["content"][
@@ -587,7 +585,7 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
                     ),
                     self.check(
                         "metrics.queries",
-                        json.loads(self.kwargs["adm_content_module"])["metrics"]["queries"],
+                        json.loads(self.kwargs["custom_metric_queries"]),
                     ),
                 ],
             )

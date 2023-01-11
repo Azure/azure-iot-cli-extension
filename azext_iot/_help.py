@@ -767,7 +767,7 @@ helps[
     - name: Create a device configuration with an alternative input style of labels and metrics (shell agnostic)
       text: >
         az iot hub configuration create -c {config_name} -n {iothub_name} --content device_content.json
-        --target-condition "from devices.modules where tags.building=9" --custom-labels key0="value0", key1="value1" --priority 10
+        --target-condition "from devices.modules where tags.building=9" --custom-labels key0="value0" key1="value1" --priority 10
         --custom-metric-queries mymetric1="select deviceId from devices where tags.location='US'" mymetric2="select *"
 """
 
@@ -1106,7 +1106,7 @@ helps[
         az iot edge deployment create -d {deployment_name} -n {iothub_name}
         --content layered_modules_content.json
         --target-condition "tags.building=9 and tags.environment='test'"
-        --custom-labels key0="value0", key1="value1"
+        --custom-labels key0="value0" key1="value1"
         --custom-metric-queries mymetric1="select deviceId from devices where tags.location='US'" mymetric2="select *"
         --layered
 """
