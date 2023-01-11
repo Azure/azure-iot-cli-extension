@@ -11,6 +11,8 @@ import pytest
 import json
 import responses
 import re
+import tomli
+from shutil import rmtree
 from os.path import exists, join
 from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.common.fileops import write_content_to_file
@@ -47,9 +49,6 @@ from azure.cli.core.azclierror import (
     MutuallyExclusiveArgumentError,
     RequiredArgumentMissingError,
 )
-
-from shutil import rmtree
-
 hub_name = "myhub"
 hub_entity = mock_target["entity"]
 resource_group_name = "RESOURCEGROUP"
@@ -224,6 +223,25 @@ class TestEdgeHierarchyCreateArgs:
 
 
 class TestHierarchyCreateFailures:
+    @pytest.fixture()
+    def duplicate_device_service_client(self, mocked_response, fixture_ghcs, fixture_sas):
+        devices_url = f"https://{hub_entity}/devices"
+        # Query devices (existing devices will conflict)
+        mocked_response.add(
+            method=responses.POST,
+            url=f"{devices_url}/query",
+            body=json.dumps(
+                [
+                    {"deviceId": "device_1"},
+                    {"deviceId": "device_2"},
+                ]
+            ),
+            status=200,
+            content_type="application/json",
+            match_querystring=False,
+        )
+        yield mocked_response
+
     @pytest.mark.parametrize(
         "devices, config, root_cert, root_key, exception",
         [
@@ -390,6 +408,16 @@ class TestHierarchyCreateFailures:
                 cmd=fixture_cmd,
                 devices=devices,
                 config_file=config,
+            )
+
+    def test_existing_devices_without_clean(self, fixture_cmd, duplicate_device_service_client, set_cwd):
+        with pytest.raises(InvalidArgumentValueError):
+            subject.iot_edge_devices_create(
+                cmd=fixture_cmd,
+                devices=None,
+                config_file="device_configs/nested_edge_config.yml",
+                clean=False,
+                visualize=False
             )
 
 
@@ -776,7 +804,6 @@ class TestEdgeHierarchyConfigFunctions:
             device_toml["trust_bundle_cert"]
             == f"file:///etc/aziot/certificates/{EDGE_ROOT_CERTIFICATE_FILENAME}"
         )
-        assert device_toml["auto_reprovisioning_mode"] == "Dynamic"
         assert device_toml["edge_ca"] == {
             "cert": f"file:///etc/aziot/certificates/{device_id}.full-chain.cert.pem",
             "pk": f"file:///etc/aziot/certificates/{device_id}.key.pem",
@@ -785,6 +812,14 @@ class TestEdgeHierarchyConfigFunctions:
         assert device_toml["hostname"] == (
             device_config.hostname if device_config.hostname else "{{HOSTNAME}}"
         )
+
+        # respect existing config reprovisioning mode
+        if device_config_path:
+            with open(device_config_path, "rb") as file:
+                expected_config = tomli.load(file)
+                assert device_toml["auto_reprovisioning_mode"] == getattr(expected_config, "auto_reprovisioning_mode", "Dynamic")
+        else:
+            assert device_toml["auto_reprovisioning_mode"] == "Dynamic"
 
         # parent hostname config
         if device_config.parent_id:

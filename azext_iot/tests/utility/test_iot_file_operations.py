@@ -38,6 +38,7 @@ class TestFileOperations(object):
                     os.rmdir(destination)
         except Exception as ex:
             assert (error and isinstance(ex, error))
+        assert error is None
 
     @pytest.mark.parametrize(
         "target_directory, tarfile_path, tarfile_name, overwrite, error, delete_after_test",
