@@ -51,6 +51,12 @@ unreleased
   If an output path is specified, this command will also create tar files containing each device's certificate bundle, an IoT Edge
   `config.toml` config file and an installation script to configure a target Edge device with these settings.
 
+
+**IoT DPS updates**
+
+* Removed file extension restriction for attached certificates in individual enrollments and enrollment groups creation/update commands,
+  and added suggested certificate format in `--help` docs.
+
 0.18.3
 +++++++++++++++
 
@@ -71,11 +77,6 @@ unreleased
 **IoT Central updates**
 
 * Fixed an issue with enrollement group certificate encoding
-
-**IoT DPS updates**
-
-* Removed file extension restriction for attached certificates in individual enrollments and enrollment groups creation/update commands,
-  and added suggested certificate format in `--help` docs.
 
 0.18.2
 +++++++++++++++
