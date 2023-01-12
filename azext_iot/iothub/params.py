@@ -267,7 +267,6 @@ def load_iothub_arguments(self, _):
             "hub_aspects",
             options_list=["--aspects"],
             nargs="+",
-            action="append",
             arg_type=get_enum_type(HubAspects),
             help="Hub Aspects (space-separated)."
         )
