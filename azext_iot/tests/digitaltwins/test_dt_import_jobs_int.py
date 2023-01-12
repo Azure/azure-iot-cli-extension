@@ -55,6 +55,16 @@ class TestDTImportJobs(DTLiveScenarioTest):
         )
 
     def _cleanup_import_job(self, instance_name, import_job_id, import_job_output_file):
+        # # Cancel import jobs
+        # self.cmd(
+        #     "dt job import cancel -n '{}' -g '{}' -j '{}' -y".format(instance_name, self.rg, import_job_id)
+        # )
+        # # Make sure job is cancelled
+        # show_import_job_output = self.cmd(
+        #     "dt job import show -n '{}' -g '{}' -j '{}'".format(instance_name, self.rg, import_job_id)
+        # ).get_output_in_json()
+        # assert show_import_job_output["status"] == "cancelled"
+
         # Delete import jobs
         self.cmd(
             "dt job import delete -n '{}' -g '{}' -j '{}' -y".format(instance_name, self.rg, import_job_id)
@@ -124,6 +134,38 @@ class TestDTImportJobs(DTLiveScenarioTest):
         ).get_output_in_json()
         assert show_import_job_output["id"] == valid_import_job_id
 
+        # Run through import job lifecycle
+        # Cancel import job
+        self.cmd(
+            "dt job import cancel -n '{}' -g '{}' -j '{}' -y".format(instance_name, self.rg, valid_import_job_id)
+        )
+
+        # Poll to make sure job is cancelled
+        num_tries = 0
+        while num_tries < MAX_TRIES:
+            num_tries += 1
+            show_import_job_output = self.cmd(
+                "dt job import show -n '{}' -g '{}' -j '{}'".format(instance_name, self.rg, valid_import_job_id)
+            ).get_output_in_json()
+            assert show_import_job_output["status"] in ["cancelled", "cancelling"]
+            if show_import_job_output["status"] == "cancelled":
+                assert show_import_job_output["error"] is None
+                break
+            sleep(POLL_SLEEP_INTERVAL)
+
+        # Delete import job
+        self.cmd(
+            "dt job import delete -n '{}' -g '{}' -j '{}' -y".format(instance_name, self.rg, valid_import_job_id)
+        )
+
+        # Recreate import job
+        self.cmd(
+            "dt job import create -n '{}' -g '{}' -j '{}' --df '{}' --ibc '{}' --isa '{}'".format(
+                instance_name, self.rg, valid_import_job_id,
+                valid_import_data_filename, self.storage_container, self.storage_account_name
+            )
+        ).get_output_in_json()
+
         # Create import job for invalid import data
         invalid_import_job_output_filename = "{}_invalid_import_job_output.txt".format(instance_name)
         create_invalid_import_job_output = self.cmd(
@@ -165,45 +207,54 @@ class TestDTImportJobs(DTLiveScenarioTest):
                 break
             sleep(POLL_SLEEP_INTERVAL)
 
-        list_models_output = self.cmd(
-            "dt model list -n {} -g {} --definition".format(instance_name, self.rg)
-        ).get_output_in_json()
-        model_ids = []
-        for model in list_models_output:
-            assert model["id"]
-            assert model["model"]
-            model_ids.append(model["id"])
-        assert len(model_ids) == len(EXPECTED_MODEL_IDS)
-        assert set(model_ids) == set(EXPECTED_MODEL_IDS)
+        # TODO: once supported, uncomment
+        # list_models_output = self.cmd(
+        #     "dt model list -n {} -g {} --definition".format(instance_name, self.rg)
+        # ).get_output_in_json()
+        # model_ids = []
+        # for model in list_models_output:
+        #     assert model["id"]
+        #     assert model["model"]
+        #     model_ids.append(model["id"])
+        # assert len(model_ids) == len(EXPECTED_MODEL_IDS)
+        # assert set(model_ids) == set(EXPECTED_MODEL_IDS)
 
-        twin_query_result = self.cmd(
-            "dt twin query -n {} -q 'select * from digitaltwins'".format(instance_name)
-        ).get_output_in_json()
-        twin_ids = []
-        relationship = "has"
-        for twin in twin_query_result["result"]:
-            assert twin["$dtId"]
-            assert twin["$metadata"]
-            twin_ids.append(twin["$dtId"])
-        assert len(twin_ids) == len(EXPECTED_TWIN_IDS)
-        assert set(twin_ids) == set(EXPECTED_TWIN_IDS)
-        for twin_id in twin_ids:
-            twin_relationship_list_result = self.cmd(
-                "dt twin relationship list -n {} -g {} --twin-id {} --relationship {}".format(
-                    instance_name, self.rg, twin_id, relationship
-                )
-            ).get_output_in_json()
-            assert len(twin_relationship_list_result) == 1
+        # twin_query_result = self.cmd(
+        #     "dt twin query -n {} -q 'select * from digitaltwins'".format(instance_name)
+        # ).get_output_in_json()
+        # twin_ids = []
+        # relationship = "has"
+        # for twin in twin_query_result["result"]:
+        #     assert twin["$dtId"]
+        #     assert twin["$metadata"]
+        #     twin_ids.append(twin["$dtId"])
+        # assert len(twin_ids) == len(EXPECTED_TWIN_IDS)
+        # assert set(twin_ids) == set(EXPECTED_TWIN_IDS)
+        # for twin_id in twin_ids:
+        #     twin_relationship_list_result = self.cmd(
+        #         "dt twin relationship list -n {} -g {} --twin-id {} --relationship {}".format(
+        #             instance_name, self.rg, twin_id, relationship
+        #         )
+        #     ).get_output_in_json()
+        #     assert len(twin_relationship_list_result) == 1
 
         # Delete import jobs and their output files
         self._cleanup_import_job(instance_name, valid_import_job_id, valid_import_job_output_filename)
         self._cleanup_import_job(instance_name, invalid_import_job_id, invalid_import_job_output_filename)
+        list_import_jobs_output = self.cmd(
+            "dt job import list -n '{}' -g '{}'".format(instance_name, self.rg)
+        ).get_output_in_json()
+        assert len(list_import_jobs_output) == 0
 
 
 def assert_import_job_creation(
     create_import_job_output: dict, expected_input_blob_name: str, expected_output_blob_name: str, expected_job_id: str = None
 ):
-    assert create_import_job_output is not None
+    assert create_import_job_output
+    assert create_import_job_output["createdDateTime"]
+    assert create_import_job_output["lastActionDateTime"]
+    assert create_import_job_output["purgeDateTime"]
+    assert create_import_job_output["finishedDateTime"] is None
     assert create_import_job_output["error"] is None
     assert create_import_job_output["status"] == "notstarted"
     assert create_import_job_output["inputBlobUri"]

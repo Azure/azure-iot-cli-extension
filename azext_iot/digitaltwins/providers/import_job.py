@@ -54,7 +54,7 @@ class ImportJobProvider(DigitalTwinsProvider):
     def list(self, top: int = None):  # top is guarded for int() in arg def
         from azext_iot.sdk.digitaltwins.dataplane.models import ImportJobsListOptions
 
-        list_options = ImportJobsListOptions(max_item_count=top)
+        list_options = ImportJobsListOptions(max_items_per_page=top)
 
         try:
             return self.sdk.list(import_jobs_list_options=list_options,)

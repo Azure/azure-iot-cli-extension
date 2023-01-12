@@ -30,7 +30,8 @@ class ErrorResponse(Model):
         'error': {'key': 'error', 'type': 'Error'},
     }
 
-    def __init__(self, *, error, **kwargs) -> None:
+    # @vilit: had to make error optional so 403's (and other errors with no body) won't break the model
+    def __init__(self, *, error=None, **kwargs) -> None:
         super(ErrorResponse, self).__init__(**kwargs)
         self.error = error
 
