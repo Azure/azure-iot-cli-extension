@@ -304,7 +304,7 @@ def _assemble_auth(auth_method, pk, sk):
 def _create_self_signed_cert(subject, valid_days, output_path=None):
     from azext_iot.common.certops import create_self_signed_certificate
 
-    return create_self_signed_certificate(subject, valid_days, output_path)
+    return create_self_signed_certificate(subject=subject, valid_days=valid_days, cert_output_dir=output_path)
 
 
 def update_iot_device_custom(

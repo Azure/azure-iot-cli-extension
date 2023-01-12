@@ -1,0 +1,15 @@
+configVersion: "1.0"
+iotHub:
+  authenticationMethod: x509Certificate
+
+edgeConfiguration:
+  defaultEdgeAgent: "$upstream:443/azureiotedge-agent:1.1"
+
+edgeDevices:
+  - deviceId: device_1
+    edgeAgent: "mcr.microsoft.com/azureiotedge-agent:1.2"
+    children:
+    - deviceId: device_2
+    - deviceId: device_3
+      edgeAgent: "mcr.microsoft.com/azureiotedge-agent:1.4"
+  - deviceId: device_4

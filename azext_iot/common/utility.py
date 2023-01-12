@@ -18,10 +18,10 @@ import sys
 import re
 import hmac
 import hashlib
+from typing import Any, Optional, List, Dict
 from threading import Event, Thread
 from datetime import datetime
 from knack.log import get_logger
-from typing import Optional
 from azure.cli.core.azclierror import (
     CLIInternalError,
     FileOperationError,
@@ -118,7 +118,9 @@ def validate_key_value_pairs(string):
     return result
 
 
-def process_json_arg(content: str, argument_name: str = "content", preserve_order=False):
+def process_json_arg(
+    content: str, argument_name: str = "content", preserve_order=False
+):
     """Primary processor of json input"""
 
     json_from_file = None
@@ -142,6 +144,48 @@ def process_json_arg(content: str, argument_name: str = "content", preserve_orde
             "Failed to parse json {}for argument '{}' with exception:\n    {}".format(
                 file_content_error if json_from_file else "", argument_name, ex
             )
+        )
+
+
+_file_location_error = "{0} file not found - Please ensure the path '{1}' is correct."
+_file_parse_error = "Failed to parse {0} file located at '{1}' with exception:\n{2}"
+
+
+def process_yaml_arg(path: str) -> Dict[str, Any]:
+    """Primary processor of yaml file input"""
+
+    if not os.path.exists(path):
+        raise FileOperationError(
+            _file_location_error.format("YAML", path)
+        )
+
+    try:
+        import yaml
+
+        with open(path, "rb") as f:
+            return yaml.load(f, Loader=yaml.SafeLoader)
+    except Exception as ex:
+        raise InvalidArgumentValueError(
+            _file_parse_error.format("YAML", path, ex)
+        )
+
+
+def process_toml_arg(path: str) -> Dict[str, Any]:
+    """Primary processor of TOML file input"""
+
+    if not os.path.exists(path):
+        raise FileOperationError(
+            _file_location_error.format("TOML", path)
+        )
+
+    try:
+        import tomli
+
+        with open(path, "rb") as f:
+            return tomli.load(f)
+    except Exception as ex:
+        raise InvalidArgumentValueError(
+            _file_parse_error.format("TOML", path, ex)
         )
 
 
@@ -411,7 +455,15 @@ def calculate_millisec_since_unix_epoch_utc(offset_seconds: int = 0):
     return int(1000 * ((now - epoch).total_seconds() + offset_seconds))
 
 
-def init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes, message_count: Optional[int] = None):
+def init_monitoring(
+    cmd,
+    timeout,
+    properties,
+    enqueued_time,
+    repair,
+    yes,
+    message_count: Optional[int] = None,
+):
     from azext_iot.common.deps import ensure_uamqp
 
     if timeout < 0:
@@ -421,9 +473,7 @@ def init_monitoring(cmd, timeout, properties, enqueued_time, repair, yes, messag
     timeout = timeout * 1000
 
     if message_count and message_count <= 0:
-        raise InvalidArgumentValueError(
-            "Message count must be greater than 0."
-        )
+        raise InvalidArgumentValueError("Message count must be greater than 0.")
 
     config = cmd.cli_ctx.config
     output = cmd.cli_ctx.invocation.data.get("output", None)
@@ -648,3 +698,25 @@ def generate_storage_account_sas_token(
     )
 
     return sas_token
+
+
+def assemble_nargs_to_dict(hash_list: List[str]) -> Dict[str, str]:
+    result = {}
+    if not hash_list:
+        return result
+    for hash in hash_list:
+        if "=" not in hash:
+            logger.warning(
+                "Skipping processing of '%s', input format is key=value | key='value value'.",
+                hash,
+            )
+            continue
+        split_hash = hash.split("=", 1)
+        result[split_hash[0]] = split_hash[1]
+    for key in result:
+        if not result.get(key):
+            logger.warning(
+                "No value assigned to key '%s', input format is key=value | key='value value'.",
+                key,
+            )
+    return result

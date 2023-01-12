@@ -20,6 +20,9 @@ device_messaging_ops = CliCommandType(
     operations_tmpl="azext_iot.iothub.commands_device_messaging#{}"
 )
 iothub_state_ops = CliCommandType(operations_tmpl="azext_iot.iothub.commands_state#{}")
+device_identity_ops = CliCommandType(
+    operations_tmpl="azext_iot.iothub.commands_device_identity#{}"
+)
 iothub_resource_ops = CliCommandType(
     operations_tmpl="azext_iot.iothub.commands_certificate#{}"
 )
@@ -47,7 +50,9 @@ def load_iothub_commands(self, _):
         cmd_group.command("list", "job_list")
         cmd_group.command("cancel", "job_cancel")
 
-    with self.command_group("iot hub digital-twin", command_type=pnp_runtime_ops) as cmd_group:
+    with self.command_group(
+        "iot hub digital-twin", command_type=pnp_runtime_ops
+    ) as cmd_group:
         cmd_group.command("invoke-command", "invoke_device_command")
         cmd_group.show_command("show", "get_digital_twin")
         cmd_group.command("update", "patch_digital_twin")
@@ -138,6 +143,11 @@ def load_iothub_commands(self, _):
         cmd_group.command("export", "state_export")
         cmd_group.command("import", "state_import")
         cmd_group.command("migrate", "state_migrate")
+
+    with self.command_group(
+        "iot edge devices", command_type=device_identity_ops
+    ) as cmd_group:
+        cmd_group.command("create", "iot_edge_devices_create", is_experimental=True)
 
     with self.command_group(
         "iot hub certificate root-authority", command_type=iothub_resource_ops, is_experimental=True
