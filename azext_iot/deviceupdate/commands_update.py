@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from knack.log import get_logger
-from azext_iot.common.utility import handle_service_exception
+from azext_iot.common.utility import handle_service_exception, assemble_nargs_to_dict
 from azext_iot.deviceupdate.providers.base import (
     DeviceUpdateDataModels,
     DeviceUpdateDataManager,
@@ -141,7 +141,7 @@ def import_update(
         if not size or not hashes:
             client_calculated_meta = data_manager.calculate_manifest_metadata(url)
 
-        hashes = data_manager.assemble_nargs_to_dict(hash_list=hashes) or {"sha256": client_calculated_meta.hash}
+        hashes = assemble_nargs_to_dict(hash_list=hashes) or {"sha256": client_calculated_meta.hash}
         size = size or client_calculated_meta.bytes
 
         manifest_metadata = DeviceUpdateDataModels.ImportManifestMetadata(url=url, size_in_bytes=size, hashes=hashes)
@@ -292,7 +292,7 @@ def manifest_init_v5(
     for compat in compatibility:
         if not compat or not compat[0]:
             continue
-        processed_compatibility.append(DeviceUpdateDataManager.assemble_nargs_to_dict(compat))
+        processed_compatibility.append(assemble_nargs_to_dict(compat))
     payload["compatibility"] = processed_compatibility
 
     safe_params = cmd.cli_ctx.data.get("safe_params", [])
@@ -304,7 +304,7 @@ def manifest_init_v5(
         step_file_params = _sanitize_safe_params(safe_params, ["--step", "--file"])
         related_step_file_map = _associate_related(step_file_params, "--step")
 
-        assembled_step = DeviceUpdateDataManager.assemble_nargs_to_dict(steps[s])
+        assembled_step = assemble_nargs_to_dict(steps[s])
         step = {}
         if all(k in assembled_step for k in ("updateId.provider", "updateId.name", "updateId.version")):
             # reference step
@@ -336,7 +336,7 @@ def manifest_init_v5(
                     step_file = files[f]
                     if not step_file or not step_file[0]:
                         continue
-                    assembled_step_file = DeviceUpdateDataManager.assemble_nargs_to_dict(step_file)
+                    assembled_step_file = assemble_nargs_to_dict(step_file)
                     if "path" in assembled_step_file:
                         step_filename = PurePath(assembled_step_file["path"]).name
                         if step_filename not in derived_step_files:
@@ -381,7 +381,7 @@ def manifest_init_v5(
             if not files[f] or not files[f][0]:
                 continue
             processed_file = {}
-            assembled_file = DeviceUpdateDataManager.assemble_nargs_to_dict(files[f])
+            assembled_file = assemble_nargs_to_dict(files[f])
             if "path" not in assembled_file:
                 raise ArgumentUsageError("When using --file path is required.")
             assembled_file_metadata = DeviceUpdateDataManager.calculate_file_metadata(assembled_file["path"])
@@ -402,7 +402,7 @@ def manifest_init_v5(
                 if not related_file or not related_file[0]:
                     continue
                 processed_related_file = {}
-                assembled_related_file = DeviceUpdateDataManager.assemble_nargs_to_dict(related_file)
+                assembled_related_file = assemble_nargs_to_dict(related_file)
                 if "path" not in assembled_related_file:
                     raise ArgumentUsageError("When using --related-file path is required.")
                 related_file_metadata = DeviceUpdateDataManager.calculate_file_metadata(assembled_related_file["path"])
