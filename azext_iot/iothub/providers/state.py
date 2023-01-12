@@ -97,6 +97,9 @@ class StateProvider(IoTHubProvider):
 
         if not hub_aspects:
             hub_aspects = HubAspects.list()
+        else:
+            # flatten hub_aspects
+            hub_aspects = sum(hub_aspects, [])
         if HubAspects.Arm.value in hub_aspects and self.login:
             raise MutuallyExclusiveArgumentError(constants.LOGIN_WITH_ARM_ERROR)
 
@@ -115,6 +118,9 @@ class StateProvider(IoTHubProvider):
         '''Uses hub state from file to recreate the hub state'''
         if not hub_aspects:
             hub_aspects = HubAspects.list()
+        else:
+            # flatten hub_aspects
+            hub_aspects = sum(hub_aspects, [])
         if HubAspects.Arm.value in hub_aspects and self.login:
             raise MutuallyExclusiveArgumentError(constants.LOGIN_WITH_ARM_ERROR)
         if HubAspects.Arm.value not in hub_aspects and not self.target:
@@ -150,6 +156,9 @@ class StateProvider(IoTHubProvider):
 
         if not hub_aspects:
             hub_aspects = HubAspects.list()
+        else:
+            # flatten hub_aspects
+            hub_aspects = sum(hub_aspects, [])
         if HubAspects.Arm.value in hub_aspects and self.login:
             raise MutuallyExclusiveArgumentError(constants.LOGIN_WITH_ARM_ERROR)
         if HubAspects.Arm.value not in hub_aspects and not self.target:
@@ -198,6 +207,7 @@ class StateProvider(IoTHubProvider):
                 "device_id": {
                     "identity": { identity_properties (and properties shared with twin) },
                     "twin" : { twin_properties },
+                    "parent" : parent_id,
                     "modules" : {
                         "module_id" : {
                             "identity": { identity_properties },

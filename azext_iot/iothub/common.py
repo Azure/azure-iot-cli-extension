@@ -45,6 +45,7 @@ class EdgeDevicesConfig(NamedTuple):
     template_config_path: Optional[str] = None
     default_edge_agent: Optional[str] = None
 
+
 IMMUTABLE_DEVICE_IDENTITY_FIELDS = [
     "cloudToDeviceMessageCount",
     "configurations",
