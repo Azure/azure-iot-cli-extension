@@ -196,7 +196,7 @@ def setup_hub_controlplane_states(
 
     # add ip filter rule - make sure to add public ip address so dataplane isn't screwed up
     import requests
-    public_ip = requests.get("https://api.ipify.org/").text.strip()
+    public_ip = requests.head("https://www.wikipedia.org").headers["X-Client-IP"]
     cli.invoke(
         f"resource update --name {hub_name} -g {hub_rg} --resource-type "
         "\"Microsoft.Devices/IotHubs\" --set properties.networkRuleSets='{}'"

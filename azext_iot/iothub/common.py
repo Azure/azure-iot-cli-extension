@@ -45,7 +45,7 @@ IMMUTABLE_AND_DUPLICATE_MODULE_TWIN_FIELDS = [
     "x509Thumbprint"
 ]
 
-SYSTEM_ASSIGNED_IDENTITY = '[system]'
+SYSTEM_ASSIGNED_IDENTITY = "[system]"
 BYTES_PER_MEGABYTE = 1048576
 
 # Message Endpoint Messages
@@ -76,11 +76,11 @@ class EndpointType(Enum):
     """
     Type of the message endpoint.
     """
-    EventHub = 'eventhub'
-    ServiceBusQueue = 'servicebus-queue'
-    ServiceBusTopic = 'servicebus-topic'
-    AzureStorageContainer = 'storage-container'
-    CosmosDBContainer = 'cosmosdb-container'
+    EventHub = "eventhub"
+    ServiceBusQueue = "servicebus-queue"
+    ServiceBusTopic = "servicebus-topic"
+    AzureStorageContainer = "storage-container"
+    CosmosDBContainer = "cosmosdb-container"
 
 
 class HubAspects(Enum):
@@ -100,16 +100,16 @@ class AuthenticationType(Enum):
     """
     Type of the Authentication for the routing endpoint.
     """
-    KeyBased = 'keyBased'
-    IdentityBased = 'identityBased'
+    KeyBased = "keyBased"
+    IdentityBased = "identityBased"
 
 
 class EncodingFormat(Enum):
     """
     Type of the encoding format for the container.
     """
-    JSON = 'json'
-    AVRO = 'avro'
+    JSON = "json"
+    AVRO = "avro"
 
 
 class IdentityType(Enum):
@@ -126,13 +126,13 @@ class RouteSourceType(Enum):
     """
     Type of the route source.
     """
-    Invalid = 'invalid'
-    DeviceMessages = 'devicemessages'
-    TwinChangeEvents = 'twinchangeevents'
-    DeviceLifecycleEvents = 'devicelifecycleevents'
-    DeviceJobLifecycleEvents = 'devicejoblifecycleevents'
-    DigitalTwinChangeEvents = 'digitaltwinchangeevents'
-    DeviceConnectionStateEvents = 'deviceconnectionstateevents'
+    Invalid = "invalid"
+    DeviceMessages = "devicemessages"
+    TwinChangeEvents = "twinchangeevents"
+    DeviceLifecycleEvents = "devicelifecycleevents"
+    DeviceJobLifecycleEvents = "devicejoblifecycleevents"
+    DigitalTwinChangeEvents = "digitaltwinchangeevents"
+    DeviceConnectionStateEvents = "deviceconnectionstateevents"
 
     @classmethod
     def list(cls):

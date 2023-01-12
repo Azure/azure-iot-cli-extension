@@ -6,6 +6,7 @@
 
 import json
 import shlex
+from typing import Optional
 from azure.cli.core import get_default_cli
 from azure.cli.core.azclierror import CLIInternalError
 from knack.log import get_logger
@@ -69,7 +70,7 @@ class EmbeddedCLI(object):
         logger.debug("Operation error code: %s", self.error_code)
         return self.error_code == 0
 
-    def get_error(self) -> Exception:
+    def get_error(self) -> Optional[Exception]:
         return self.az_cli.result.error
 
     def _ensure_json_output(self, command: str) -> str:

@@ -267,6 +267,7 @@ def load_iothub_arguments(self, _):
             "hub_aspects",
             options_list=["--aspects"],
             nargs="+",
+            action="append",
             arg_type=get_enum_type(HubAspects),
             help="Hub Aspects (space-separated)."
         )
@@ -282,12 +283,12 @@ def load_iothub_arguments(self, _):
         context.argument(
             "hub_name",
             options_list=["--destination-hub", "--dh"],
-            help="Name of IoT Hub to which the origin hub will be copied."
+            help="Name of IoT Hub to which the origin hub will be copied to."
         )
         context.argument(
             "resource_group_name",
             options_list=["--destination-resource-group", "--dg"],
-            help="Name of resource group of the IoT Hub to which the origin hub will be copied.",
+            help="Name of resource group of the IoT Hub to which the origin hub will be copied to.",
             arg_group="IoT Hub Identifier"
         )
         context.argument(

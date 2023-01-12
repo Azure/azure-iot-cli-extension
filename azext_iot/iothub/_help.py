@@ -321,7 +321,7 @@ def load_iothub_help():
     ] = """
         type: group
         short-summary: Manage the state of an IoT Hub.
-        long-summary: For more information, see aka.ms/iothubstate
+        long-summary: For more information, see aka.ms/aziotcli-iot-hub-state
     """
 
     helps[
@@ -330,11 +330,11 @@ def load_iothub_help():
         type: command
         short-summary: Export the state of an IoT Hub to a file.
         long-summary: |
-                       The exported state will include: arm template for hub, hub configurations (including ADM
+                       By default, the exported state will include: arm template for hub, hub configurations (including ADM
                        configurations and edge deployments), device information (including device identites,
                        device twins, module identities and module twins).
 
-                       For more information, see aka.ms/iothubstate
+                       For more information, see aka.ms/aziotcli-iot-hub-state
         examples:
         - name: Export the supported state of the specified hub to the specified file.
           text: >
@@ -355,7 +355,7 @@ def load_iothub_help():
         long-summary: |
                        If the arm aspect is specified, the hub will be created if it does not exist.
 
-                       The imported state will include: arm template for hub, hub configurations (including ADM
+                       By default, the imported state will include: arm template for hub, hub configurations (including ADM
                        configurations and edge deployments), device information (including device identites,
                        device twins, module identities and module twins).
 
@@ -364,7 +364,7 @@ def load_iothub_help():
 
                        Private endpoints will be ignored in the import process.
 
-                       For more information, see aka.ms/iothubstate
+                       For more information, see aka.ms/aziotcli-iot-hub-state
         examples:
         - name: Import the supported state from the specified file to the specified hub.
           text: >
@@ -392,7 +392,7 @@ def load_iothub_help():
         long-summary: |
                        If the arm aspect is specified, the hub will be created if it does not exist.
 
-                       The migrated state will include: arm template for hub, hub configurations (including ADM
+                       By default, the migrated state will include: arm template for hub, hub configurations (including ADM
                        configurations and edge deployments), device information (including device identites,
                        device twins, module identities and module twins).
 
@@ -403,12 +403,12 @@ def load_iothub_help():
 
                        If you have trouble migrating, please use the export and import commands to have a file as a backup.
 
-                       For more information, see aka.ms/iothubstate
+                       For more information, see aka.ms/aziotcli-iot-hub-state
         examples:
-        - name: Migrate the supported state of the original hub to the destination hub.
+        - name: Migrate the supported state of the origin hub to the destination hub.
           text: >
             az iot hub state migrate --destination-hub {dest_hub_name} --origin-hub {orig_hub_name}
-        - name: Migrate the supported state of the original hub to the destination hub, overwriting the previous state of the hub. All
+        - name: Migrate the supported state of the origin hub to the destination hub, overwriting the previous state of the hub. All
                 certificates, configurations, and devices in the destination hub will be deleted before the new state is uploaded.
           text: >
             az iot hub state migrate --destination-hub {dest_hub_name} --origin-hub {orig_hub_name} -r
