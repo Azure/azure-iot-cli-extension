@@ -23,7 +23,7 @@ parameters:
 
 
 steps:
-- checkout: None
+- checkout: none
 
 - task: AzureCLI@2
   continueOnError: true
