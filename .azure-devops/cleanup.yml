@@ -4,13 +4,13 @@
 trigger: none
 pr: none
 
-# Run weekly at midnight (Pacific).
-# schedules:
-# - cron: "0 8 * * 1"
-#   displayName: 'Weekly Cleanup'
-#   branches:
-#     include:
-#     - dev
+# Run daily at 5 am (Pacific).
+schedules:
+- cron: "0 13 * * *"
+  displayName: 'Daily Cleanup'
+  branches:
+    include:
+    - dev
 
 parameters:
 - name: resourceGroup
