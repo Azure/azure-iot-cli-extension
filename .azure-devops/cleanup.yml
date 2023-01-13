@@ -32,9 +32,7 @@ steps:
     inlineScript: |
       names=(${{ parameters.exclusions }})
       query=$(printf '[?name!='"'"%q"'"']|' "${names[@]}")
-      echo $query
-      az resource list -g ${{ parameters.resourceGroup }} --query "$query[*].id" --debug
-      resources=$(az resource list -g ${{ parameters.resourceGroup }} --query "$query|[*].id" -o tsv)
+      resources=$(az resource list -g ${{ parameters.resourceGroup }} --query "$query[*].id" -o tsv)
       echo "Deleting Resources"
       echo $resources
-      # az resource delete --ids $resources
+      az resource delete --ids $resources
