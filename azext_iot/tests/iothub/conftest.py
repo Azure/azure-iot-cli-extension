@@ -14,7 +14,7 @@ from knack.log import get_logger
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.certops import create_self_signed_certificate
-from azext_iot.tests.helpers import get_closest_marker
+from azext_iot.tests.helpers import get_closest_marker, get_agent_public_ip
 from azext_iot.tests.settings import DynamoSettings
 
 logger = get_logger(__name__)
@@ -34,41 +34,7 @@ def generate_hub_depenency_id() -> str:
     return f"aziotclitest{generate_generic_id()}"[:24]
 
 
-def assign_iot_hub_dataplane_rbac_role(hub_results):
-    """Add IoT Hub Data Contributor role to current user"""
-    for hub in hub_results:
-        # Only add dataplane roles to the hubs that were not created mid test
-        if hub.get("hub"):
-            target_hub_id = hub["hub"]["id"]
-            account = cli.invoke("account show").as_json()
-            user = account["user"]
-
-            if user["name"] is None:
-                raise Exception("User not found")
-
-            tries = 0
-            while tries < MAX_RBAC_ASSIGNMENT_TRIES:
-                role_assignments = _get_role_assignments(target_hub_id, USER_ROLE)
-                role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
-                if user["name"] in role_assignment_principal_names:
-                    break
-                # else assign IoT Hub Data Contributor role to current user and check again
-                cli.invoke(
-                    'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
-                        user["name"], USER_ROLE, target_hub_id
-                    )
-                )
-                sleep(10)
-                tries += 1
-
-            if tries == MAX_RBAC_ASSIGNMENT_TRIES:
-                raise Exception(
-                    "Reached max ({}) number of tries to assign RBAC role. Please re-run the test later "
-                    "or with more max number of tries.".format(MAX_RBAC_ASSIGNMENT_TRIES)
-                )
-
-
-def _assign_rbac_role(assignee: str, scope: str, role: str, max_tries: int = 10):
+def _assign_rbac_role(assignee: str, scope: str, role: str, max_tries: int = MAX_RBAC_ASSIGNMENT_TRIES):
     tries = 0
     while tries < max_tries:
         role_assignments = _get_role_assignments(scope, role)
@@ -84,6 +50,31 @@ def _assign_rbac_role(assignee: str, scope: str, role: str, max_tries: int = 10)
         sleep(10)
         tries += 1
 
+    if tries == max_tries:
+        raise Exception(
+            "Reached max ({}) number of tries to assign role {} to scope {} for assignee {}. Please "
+            "re-run the test later or with more max number of tries.".format(
+                max_tries, role, scope, assignee
+            )
+        )
+
+
+def assign_iot_hub_dataplane_rbac_role(hub_results):
+    """Add IoT Hub Data Contributor role to current user"""
+    for hub in hub_results:
+        # Only add dataplane roles to the hubs that were not created mid test
+        if hub.get("hub"):
+            target_hub_id = hub["hub"]["id"]
+            account = cli.invoke("account show").as_json()
+            user = account["user"]
+
+            if user["name"] is None:
+                raise Exception("User not found")
+
+            _assign_rbac_role(
+                assignee=user["name"], scope=target_hub_id, role=USER_ROLE
+            )
+
 
 # IoT Hub fixtures
 @pytest.fixture(scope="module")
@@ -93,7 +84,7 @@ def setup_hub_controlplane_states(
     provisioned_event_hub_module,
     provisioned_service_bus_module,
     provisioned_cosmos_db_module
-) -> Optional[dict]:
+) -> dict:
     """
     For Iot Hub State
     Set up so that first hub will have all permissions, endpoints, etc and the other one(s) have correct
@@ -195,8 +186,7 @@ def setup_hub_controlplane_states(
         os.remove(cert_file)
 
     # add ip filter rule - make sure to add public ip address so dataplane isn't screwed up
-    import requests
-    public_ip = requests.head("https://www.wikipedia.org").headers["X-Client-IP"]
+    public_ip = get_agent_public_ip()
     cli.invoke(
         f"resource update --name {hub_name} -g {hub_rg} --resource-type "
         "\"Microsoft.Devices/IotHubs\" --set properties.networkRuleSets='{}'"
@@ -213,7 +203,7 @@ def setup_hub_controlplane_states(
 @pytest.fixture(scope="module")
 def provisioned_iot_hubs_with_storage_user_module(
     request, provisioned_user_identity_module, provisioned_storage_module
-) -> Optional[dict]:
+) -> dict:
     result = _iot_hubs_provisioner(
         request, provisioned_user_identity_module, provisioned_storage_module
     )
@@ -223,7 +213,7 @@ def provisioned_iot_hubs_with_storage_user_module(
 
 
 @pytest.fixture(scope="module")
-def provisioned_iot_hubs_with_user_module(request, provisioned_user_identity_module) -> Optional[dict]:
+def provisioned_iot_hubs_with_user_module(request, provisioned_user_identity_module) -> dict:
     result = _iot_hubs_provisioner(request, provisioned_user_identity_module)
     yield result
     if result:
@@ -231,7 +221,7 @@ def provisioned_iot_hubs_with_user_module(request, provisioned_user_identity_mod
 
 
 @pytest.fixture(scope="module")
-def provisioned_only_iot_hubs_module(request) -> Optional[dict]:
+def provisioned_only_iot_hubs_module(request) -> dict:
     result = _iot_hubs_provisioner(request)
     yield result
     if result:
@@ -301,7 +291,7 @@ def _iot_hubs_removal(hub_result):
 
 # User Assigned Identity fixtures (UAI)
 @pytest.fixture(scope="module")
-def provisioned_user_identity_module() -> Optional[dict]:
+def provisioned_user_identity_module() -> dict:
     result = _user_identity_provisioner()
     yield result
     if result:
@@ -343,7 +333,7 @@ def provisioned_storage_with_identity_module(
 
 
 @pytest.fixture(scope="module")
-def provisioned_storage_module() -> Optional[dict]:
+def provisioned_storage_module() -> dict:
     result = _storage_provisioner()
     yield result
     if result:

@@ -108,17 +108,17 @@ If System Identity is already turned on, the principal id will not be regenerate
 
 If an endpoint has System Identity as the authentication method, the endpoint will be successfully copied over only if:
 
-1. the destination hub already has system assigned identity turned on
-2. the service the endpoint is connected to has the correct permissions to the destination hub's system identity.
+1. The destination hub already has system assigned identity turned on
+2. The service the endpoint is connected to has the correct permissions to the destination hub's system identity.
 
 If either of the above conditions are not met, the endpoint will not be copied over and the command will fail.
 
 To fix this, add the permissions needed for the system assigned identity and rerun the command. If this cannot be done because the hub does not exist yet (or system assigned permissions are not turned on):
- 1. make a copy of the state you want to import and remove the offending endpoint(s) in your copy
- 2. run `az iot hub state import` with the copied file
- 3. check that the hub has been created and system assigned identity is turned on
- 4. assign the correct permissions for the IoT Hub's system assigned identity to the correct endpoint scope(s)
- 5. run `az iot hub state import` with the original file (with the endpoint(s)) or create the endpoint manually
+ 1. Make a copy of the state you want to import and remove the offending endpoint(s) in your copy
+ 2. Run `az iot hub state import` with the copied file
+ 3. Check that the hub has been created and system assigned identity is turned on
+ 4. Assign the correct permissions for the IoT Hub's system assigned identity to the correct endpoint scope(s)
+ 5. Run `az iot hub state import` with the original file (with the endpoint(s)) or create the endpoint manually
 
 ### Private Endpoints
 

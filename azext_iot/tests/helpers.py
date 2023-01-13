@@ -148,6 +148,14 @@ def get_closest_marker(request: SubRequest) -> Mark:
     return request.node.get_closest_marker("hub_infrastructure")
 
 
+def get_agent_public_ip():
+    """
+    Poke the Wikipedia website to get Public IP.
+    """
+    import requests
+    return requests.head("https://www.wikipedia.org").headers["X-Client-IP"]
+
+
 class MockLogger:
     def info(self, msg):
         print(msg)

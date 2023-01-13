@@ -65,7 +65,6 @@ def iot_query(
     login=None,
     auth_type_dataplane=None,
 ):
-    top = _process_top(top)
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         resource_name=hub_name,
@@ -77,6 +76,7 @@ def iot_query(
 
 
 def _iot_query(target, query_command, top=None):
+    top = _process_top(top)
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
@@ -151,8 +151,19 @@ def iot_device_create(
         auth_type=auth_type_dataplane,
     )
     return _iot_device_create(
-        target, device_id, edge_enabled, auth_method, primary_key, secondary_key, primary_thumbprint,
-        secondary_thumbprint, status, status_reason, valid_days, output_dir, device_scope
+        target=target,
+        device_id=device_id,
+        edge_enabled=edge_enabled,
+        auth_method=auth_method,
+        primary_key=primary_key,
+        secondary_key=secondary_key,
+        primary_thumbprint=primary_thumbprint,
+        secondary_thumbprint=secondary_thumbprint,
+        status=status,
+        status_reason=status_reason,
+        valid_days=valid_days,
+        output_dir=output_dir,
+        device_scope=device_scope
     )
 
 
@@ -811,8 +822,16 @@ def iot_device_module_create(
         login=login,
         auth_type=auth_type_dataplane,
     )
-    return _iot_device_module_create(target, device_id, module_id, auth_method, primary_key, secondary_key, primary_thumbprint,
-                                     secondary_thumbprint)
+    return _iot_device_module_create(
+        target=target,
+        device_id=device_id,
+        module_id=module_id,
+        auth_method=auth_method,
+        primary_key=primary_key,
+        secondary_key=secondary_key,
+        primary_thumbprint=primary_thumbprint,
+        secondary_thumbprint=secondary_thumbprint
+    )
 
 
 def _iot_device_module_create(
@@ -1255,7 +1274,16 @@ def iot_edge_deployment_create(
         login=login,
         auth_type=auth_type_dataplane,
     )
-    return _iot_hub_configuration_create(target, config_id, content, target_condition, priority, labels, metrics, config_type)
+    return _iot_hub_configuration_create(
+        target=target,
+        config_id=config_id,
+        content=content,
+        target_condition=target_condition,
+        priority=priority,
+        labels=labels,
+        metrics=metrics,
+        config_type=config_type
+    )
 
 
 def iot_hub_configuration_create(
@@ -1278,7 +1306,16 @@ def iot_hub_configuration_create(
         login=login,
         auth_type=auth_type_dataplane,
     )
-    return _iot_hub_configuration_create(target, config_id, content, target_condition, priority, labels, metrics, ConfigType.adm)
+    return _iot_hub_configuration_create(
+        target=target,
+        config_id=config_id,
+        content=content,
+        target_condition=target_condition,
+        priority=priority,
+        labels=labels,
+        metrics=metrics,
+        config_type=ConfigType.adm
+    )
 
 
 def _iot_hub_configuration_create(
@@ -1602,7 +1639,7 @@ def _iot_hub_configuration_list(target):
     try:
         result = service_sdk.configuration.get_configurations(raw=True).response.json()
         if not result:
-            hub_name = target["entity"].split('.')[0]
+            hub_name = target["name"]
             logger.info('No configurations found on hub "%s".', hub_name)
         return result
     except CloudError as e:
@@ -1766,7 +1803,6 @@ def iot_device_twin_list(
 
 
 def _iot_device_twin_list(target, edge_enabled=False, top=1000):
-    top = _process_top(top)
     query = (
         "select * from devices where capabilities.iotEdge = true"
         if edge_enabled
@@ -1775,7 +1811,7 @@ def _iot_device_twin_list(target, edge_enabled=False, top=1000):
     result = _iot_query(target=target, query_command=query, top=top)
 
     if not result:
-        hub_name = target["entity"].split('.')[0]
+        hub_name = target["name"]
         logger.info('No registered devices found on hub "%s".', hub_name)
     return result
 

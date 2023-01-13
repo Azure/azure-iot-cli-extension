@@ -1,3 +1,9 @@
+# coding=utf-8
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See License.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
 import random
 import pytest
 import json
@@ -17,6 +23,7 @@ from azext_iot.tests.iothub import (
     SECONDARY_THUMBPRINT,
     DATAPLANE_AUTH_TYPES,
     DEVICE_TYPES,
+    set_cmd_auth_type,
 )
 from azext_iot.common._azure import parse_iot_hub_message_endpoint_connection_string, parse_storage_container_connection_string
 from azure.cli.core.azclierror import ResourceNotFoundError, RequiredArgumentMissingError
@@ -175,6 +182,7 @@ def setup_hub_states_dataplane(provisioned_iot_hubs_with_storage_user_module):
     provisioned_iot_hubs_with_storage_user_module[0]["filename"] = filename
     assign_iot_hub_dataplane_rbac_role(provisioned_iot_hubs_with_storage_user_module)
     _setup_hub_dataplane_state(provisioned_iot_hubs_with_storage_user_module[0]["connectionString"])
+    # let dataplane state in hub catch up
     time.sleep(5)
     yield provisioned_iot_hubs_with_storage_user_module
     if os.path.isfile(filename):
@@ -189,17 +197,6 @@ def setup_hub_states_controlplane(setup_hub_controlplane_states):
     yield setup_hub_controlplane_states
     if os.path.isfile(filename):
         os.remove(filename)
-
-
-def set_cmd_auth_type(command: str, auth_type: str, cstring: str) -> str:
-    if auth_type not in DATAPLANE_AUTH_TYPES:
-        raise RuntimeError(f"auth_type of: {auth_type} is unsupported.")
-
-    # cstring takes precedence
-    if auth_type == "cstring":
-        return f"{command} --login {cstring}"
-
-    return f"{command} --auth-type {auth_type}"
 
 
 def clean_up_hub_controlplane(hub_name, hub_rg, hub_location):
