@@ -24,18 +24,18 @@ parameters:
   default: 'iotintteststandard azcliintteststorage az-cli-int-test-servicebus-namespace az-cli-int-test-eventgrid az-cli-int-test-eventhub-namespace'
 
 
-stages:
-  - task: AzureCLI@2
-    continueOnError: true
-    displayName: 'Delete Test resources'
-    inputs:
-      azureSubscription: $(AzureServiceConnection)
-      scriptType: bash
-      scriptLocation: inlineScript
-      inlineScript: |
-        names=(iotintteststandard azcliintteststorage az-cli-int-test-servicebus-namespace az-cli-int-test-eventgrid az-cli-int-test-eventhub-namespace)
-        query=$(printf '[?name!='"'"%q"'"']|' "${names[@]}")
-        resources=$(az resource list -g cli-int-test-rg --query "$query|[*].id" -o tsv)
-        echo "Deleting Resources"
-        echo $resources
-        az resource delete --ids $resources
+steps:
+- task: AzureCLI@2
+  continueOnError: true
+  displayName: 'Delete Test resources'
+  inputs:
+    azureSubscription: $(AzureServiceConnection)
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      names=(iotintteststandard azcliintteststorage az-cli-int-test-servicebus-namespace az-cli-int-test-eventgrid az-cli-int-test-eventhub-namespace)
+      query=$(printf '[?name!='"'"%q"'"']|' "${names[@]}")
+      resources=$(az resource list -g cli-int-test-rg --query "$query|[*].id" -o tsv)
+      echo "Deleting Resources"
+      echo $resources
+      az resource delete --ids $resources
