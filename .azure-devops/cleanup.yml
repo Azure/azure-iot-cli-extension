@@ -32,7 +32,8 @@ steps:
     inlineScript: |
       names=(${{ parameters.exclusions }})
       query=$(printf '[?name!='"'"%q"'"']|' "${names[@]}")
+      echo "Resources found to delete:"
+      az resource list -g ${{ parameters.resourceGroup }} --query "$query[*].id"
       resources=$(az resource list -g ${{ parameters.resourceGroup }} --query "$query[*].id" -o tsv)
       echo "Deleting Resources"
-      echo $resources
       az resource delete --ids $resources
