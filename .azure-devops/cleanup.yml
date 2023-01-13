@@ -16,9 +16,6 @@ parameters:
 - name: resourceGroup
   type: string
   default: 'cli-int-test-rg'
-- name: servicePrincipal
-  type: string
-  default: 'cli-int-test-rg'
 - name: exclusions
   type: string
   default: 'iotintteststandard azcliintteststorage az-cli-int-test-servicebus-namespace az-cli-int-test-eventgrid az-cli-int-test-eventhub-namespace'
@@ -33,9 +30,11 @@ steps:
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
-      names=(iotintteststandard azcliintteststorage az-cli-int-test-servicebus-namespace az-cli-int-test-eventgrid az-cli-int-test-eventhub-namespace)
+      names=(${{ parameters.exclusions }})
       query=$(printf '[?name!='"'"%q"'"']|' "${names[@]}")
-      resources=$(az resource list -g cli-int-test-rg --query "$query|[*].id" -o tsv)
+      echo $query
+      az resource list -g ${{ parameters.resourceGroup }} --query "$query|[*].id" --debug
+      resources=$(az resource list -g ${{ parameters.resourceGroup }} --query "$query|[*].id" -o tsv)
       echo "Deleting Resources"
       echo $resources
       az resource delete --ids $resources
