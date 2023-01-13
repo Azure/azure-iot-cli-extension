@@ -11,6 +11,7 @@ schedules:
   branches:
     include:
     - dev
+  always: true
 
 parameters:
 - name: resourceGroup
@@ -22,6 +23,8 @@ parameters:
 
 
 steps:
+- checkout: None
+
 - task: AzureCLI@2
   continueOnError: true
   displayName: 'Delete Test resources'
