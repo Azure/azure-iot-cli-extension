@@ -55,6 +55,7 @@ hostname = "{}.subdomain.domain".format(instance_name)
 # Mock Iot Hub Target
 mock_target = {}
 mock_target["entity"] = hub_entity
+mock_target["name"] = "myhub"
 mock_target["primarykey"] = "rJx/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo="
 mock_target["secondarykey"] = "aCd/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo="
 mock_target["policy"] = "iothubowner"

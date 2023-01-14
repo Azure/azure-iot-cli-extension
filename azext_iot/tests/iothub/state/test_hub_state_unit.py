@@ -43,18 +43,19 @@ class TestHubStateExport:
         if os.path.isfile(fake_file):
             os.remove(fake_file)
 
-    def test_hub_login_with_arm_aspects(self, fixture_cmd):
+    def test_hub_login_with_arm_aspects(self, fixture_cmd, fixture_ghcs):
         with pytest.raises(MutuallyExclusiveArgumentError) as error:
             subject.state_export(
                 cmd=fixture_cmd,
                 state_file="./file.json",
-                login=generate_cs()
+                login=generate_cs(),
+                replace=True
             )
         assert constants.LOGIN_WITH_ARM_ERROR == str(error.value)
 
 
 class TestHubStateImport:
-    def test_missing_file(self, fixture_cmd, fixture_ghcs):
+    def test_missing_file(self, fixture_cmd):
         file_name = "./file.json"
         with pytest.raises(FileOperationError) as error:
             subject.state_import(
@@ -65,7 +66,7 @@ class TestHubStateImport:
             )
         assert constants.FILE_NOT_FOUND_ERROR.format(file_name) == str(error.value)
 
-    def test_hub_login_with_arm_aspects(self, fixture_cmd):
+    def test_hub_login_with_arm_aspects(self, fixture_cmd, fixture_ghcs):
         with pytest.raises(MutuallyExclusiveArgumentError) as error:
             subject.state_import(
                 cmd=fixture_cmd,
