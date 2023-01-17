@@ -1184,6 +1184,48 @@ def iot_edge_set_modules(
         handle_service_exception(e)
 
 
+def iot_edge_read_modules(
+    cmd,
+    device_id,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
+):
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        resource_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
+    module_twin_list = []
+
+    try:
+        module_list = iot_device_module_list(cmd, device_id, hub_name=hub_name, login=login)
+        for module in module_list:
+            module_twin = _iot_device_module_twin_show(
+                target=target, device_id=device_id, module_id=module.module_id)
+            module_twin_list.append(module_twin)
+
+        return _build_edge_modules_configuration(module_twin_list)
+    except CloudError as e:
+        handle_service_exception(e)
+
+
+def _build_edge_modules_configuration(module_twin_list):
+    modulesContent = {}
+    for module_twin in module_twin_list:
+        moduleId = module_twin["moduleId"]
+        desiredProperties = module_twin["properties"]["desired"]
+        if desiredProperties:
+            del desiredProperties["$metadata"]
+            del desiredProperties["$version"]
+            modulesContent[moduleId] = {"properties.desired": desiredProperties}
+
+    return {"content": {"modulesContent": modulesContent}}
+
+
 def iot_edge_deployment_create(
     cmd,
     config_id,
