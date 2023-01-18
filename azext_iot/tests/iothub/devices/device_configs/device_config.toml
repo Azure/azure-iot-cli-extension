@@ -3,6 +3,7 @@
 
 hostname = ""
 parent_hostname = ""
+auto_reprovisioning_mode = "OnErrorOnly"
 
 [provisioning]
 device_id = ""
