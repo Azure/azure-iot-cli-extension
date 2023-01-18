@@ -18,10 +18,20 @@ parameters:
 - name: variableGroup
   type: string
   default: 'cleanup_variables'
+- name: resourceGroupVar
+  type: string
+  default: 'RESOURCE_GROUP'
+- name: exclusionsVar
+  type: string
+  default: 'EXCLUSIONS'
 
 
 variables:
   - group: ${{ parameters.variableGroup }}
+  - name: resourceGroup
+    value: $[variables.${{ parameters.resourceGroupVar }}]
+  - name: exclusions
+    value: $[variables.${{ parameters.exclusionsVar }}]
 
 
 steps:
@@ -35,10 +45,10 @@ steps:
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
-      names=($(EXCLUSIONS))
+      names=($(exclusions))
       query=$(printf '[?name!='"'"%q"'"']|' "${names[@]}")
       echo "Resources found to delete:"
-      az resource list -g $(RESOURCE_GROUP) --query "$query[*].id"
-      resources=$(az resource list -g $(RESOURCE_GROUP) --query "$query[*].id" -o tsv)
+      az resource list -g $(resourceGroup) --query "$query[*].id"
+      resources=$(az resource list -g $(resourceGroup) --query "$query[*].id" -o tsv)
       echo "Deleting Resources"
       az resource delete --ids $resources
