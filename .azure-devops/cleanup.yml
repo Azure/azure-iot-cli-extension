@@ -45,9 +45,8 @@ steps:
 
       names=($EXCLUSIONS)
       query=$(printf '[?name!='"'"%q"'"']|' "${names[@]}")
-      echo $query
+
       echo "Resources found to delete:"
-      az resource list -g "$RESOURCEGROUP" --query "$query[*].id"
       resources=$(az resource list -g "$RESOURCEGROUP" --query "$query[*].id" -o tsv)
       if [[ -n "$resources" ]]; then
         echo "Deleting Resources"
