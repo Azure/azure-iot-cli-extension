@@ -842,7 +842,7 @@ def load_deviceupdate_help():
           `--related-file`. Review examples and parameter descriptions for details on how
           to fully utilize the operation.
 
-          Read more about using quotation marks and escapes characters in different shells here
+          Read more about using quotation marks and escape characters in different shells here:
             https://aka.ms/aziotcli-json
 
         examples:
