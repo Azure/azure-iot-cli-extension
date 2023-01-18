@@ -1,0 +1,4 @@
+{
+    "mymetric1": "select deviceId from devices where tags.location='US'",
+    "mymetric2": "select *"
+}

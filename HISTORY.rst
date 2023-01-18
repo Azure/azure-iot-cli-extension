@@ -30,6 +30,9 @@ unreleased
   * Modification of how route testing works for testing all route sources. If `az iot hub message-route test` is called
     without specifying a route name or type, all types will be tested rather than only DeviceMessage routes.
 
+  * Addition of new parameters is introduced in `az iot hub configuration create` and
+    `az iot edge deployment create` to let user insert labels and metrics in key-value pair style
+
 
 **Digital Twins updates**
 
@@ -47,6 +50,12 @@ unreleased
 
   If an output path is specified, this command will also create tar files containing each device's certificate bundle, an IoT Edge
   `config.toml` config file and an installation script to configure a target Edge device with these settings.
+
+
+**IoT DPS updates**
+
+* Removed file extension restriction for attached certificates in individual enrollments and enrollment groups creation/update commands,
+  and added suggested certificate format in `--help` docs.
 
 0.18.3
 +++++++++++++++
@@ -68,11 +77,6 @@ unreleased
 **IoT Central updates**
 
 * Fixed an issue with enrollement group certificate encoding
-
-**IoT DPS updates**
-
-* Removed file extension restriction for attached certificates in individual enrollments and enrollment groups creation/update commands,
-  and added suggested certificate format in `--help` docs.
 
 0.18.2
 +++++++++++++++
