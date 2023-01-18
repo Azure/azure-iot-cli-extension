@@ -49,7 +49,7 @@ steps:
       echo "Resources found to delete:"
       az resource list -g "$RESOURCEGROUP" --query "$query[*].id"
       resources=$(az resource list -g "$RESOURCEGROUP" --query "$query[*].id" -o tsv)
-      if [[ -n "$resources"]]; then
+      if [[ -n "$resources" ]]; then
         echo "Deleting Resources"
         az resource delete --ids $resources
       fi
