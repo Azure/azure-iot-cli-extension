@@ -41,4 +41,4 @@ steps:
       az resource list -g $(RESOURCE_GROUP) --query "$query[*].id"
       resources=$(az resource list -g $(RESOURCE_GROUP) --query "$query[*].id" -o tsv)
       echo "Deleting Resources"
-      # az resource delete --ids $resources
+      az resource delete --ids $resources
