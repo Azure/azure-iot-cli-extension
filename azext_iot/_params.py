@@ -234,7 +234,7 @@ def load_arguments(self, _):
             "custom_metric_queries",
             nargs="+",
             options_list=["--custom-metric-queries", "--cmq"],
-            help="An alternative input style (space separated key=value pairs) to --metrics and intended to replace "
+            help="An alternative input style (space separated key=value pairs) for --metrics and intended to replace "
             "it in the future."
             'For example: metric1="select deviceId from devices where tags.location=''US''" metric2="select *"',
         )
@@ -242,7 +242,7 @@ def load_arguments(self, _):
             "custom_labels",
             nargs="+",
             options_list=["--custom-labels", "--cl"],
-            help="An alternative input style (space separated key=value pairs) to --labels and intended to replace "
+            help="An alternative input style (space separated key=value pairs) for --labels and intended to replace "
             "it in the future."
             'For example: key1=value1 key2="this is my value"',
         )
