@@ -78,13 +78,15 @@ When the replace flag is given for import or migrate, certain hub aspects will b
 
 | Aspect         | Deleted Property                                                                     | Clarification                                                    |
 |----------------|--------------------------------------------------------------------------------------|------------------------------------------------------------------|
-| arm            | Certificates                                                                         | If a certificate is present, it will need an etag to be updated. |
+| arm            | Certificates*                                                                        | If a certificate is present, it will need an etag to be updated. |
 | devices        | (Edge and Non-edge) Device Identities, Device Twins, Module Identities, Module Twins | All devices will be deleted.                                     |
 | configurations | ADM configurations and Edge Deployments                                              | All configurations will be deleted.                              |
 
+Note: for arm, properties that are not Certificates will be replaced, even if the replace flag is not present, as a result of the arm template upload.
+
 ## Example Export File
 
-For an example of an export file, see https://github.com/Azure/azure-iot-cli-extension/tree/dev/docs/samples/iot_hub_state_export.json. In this file, private and sensitive data has been wiped so this file will not work with `az iot hub state import` but the file should provide an example of the overall structure.
+For an example of an export file, see [here](samples/iot_hub_state_export.json). In this file, private and sensitive data has been wiped so this file will not work with `az iot hub state import` but the file should provide an example of the overall structure.
 
 ## Common Issues
 

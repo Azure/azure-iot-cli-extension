@@ -55,7 +55,7 @@ class TestHubStateExport:
 
 
 class TestHubStateImport:
-    def test_missing_file(self, fixture_cmd):
+    def test_missing_file(self, fixture_cmd, fixture_ghcs):
         file_name = "./file.json"
         with pytest.raises(FileOperationError) as error:
             subject.state_import(
