@@ -13,13 +13,15 @@ schedules:
     - dev
   always: true
 
+
 parameters:
-- name: resourceGroup
+- name: variableGroup
   type: string
-  default: 'cli-int-test-rg'
-- name: exclusions
-  type: string
-  default: 'iotintteststandard azcliintteststorage az-cli-int-test-servicebus-namespace az-cli-int-test-eventgrid az-cli-int-test-eventhub-namespace'
+  default: 'cleanup_variables'
+
+
+variables:
+  - group: ${{ parameters.variableGroup }}
 
 
 steps:
@@ -33,10 +35,10 @@ steps:
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
-      names=(${{ parameters.exclusions }})
+      names=($(EXCLUSIONS))
       query=$(printf '[?name!='"'"%q"'"']|' "${names[@]}")
       echo "Resources found to delete:"
-      az resource list -g ${{ parameters.resourceGroup }} --query "$query[*].id"
-      resources=$(az resource list -g ${{ parameters.resourceGroup }} --query "$query[*].id" -o tsv)
+      az resource list -g $(RESOURCE_GROUP) --query "$query[*].id"
+      resources=$(az resource list -g $(RESOURCE_GROUP) --query "$query[*].id" -o tsv)
       echo "Deleting Resources"
-      az resource delete --ids $resources
+      # az resource delete --ids $resources
