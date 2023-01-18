@@ -1,0 +1,79 @@
+{ 
+    "moduleTwins":
+    [
+        {
+            "deviceId": "test-device-01",
+            "moduleId": "mymodule0",
+            "etag": "AAAAAAAAAAI=",
+            "deviceEtag": "NzMxMTM1OTQz",
+            "status": "enabled",
+            "statusUpdateTime": "0001-01-01T00:00:00Z",
+            "connectionState": "Disconnected",
+            "lastActivityTime": "0001-01-01T00:00:00Z",
+            "cloudToDeviceMessageCount": 0,
+            "authenticationType": "none",
+            "x509Thumbprint": {
+                "primaryThumbprint": null,
+                "secondaryThumbprint": null
+            },
+            "modelId": "",
+            "version": 3,
+            "properties": {
+                "desired": {
+                    "settings": {
+                        "prop0": "val0"
+                    },
+                    "$metadata": {
+                        "$lastUpdated": "2023-01-17T17:56:24.1626056Z",
+                        "$lastUpdatedVersion": 2
+                    },
+                    "$version": 2
+                },
+                "reported": {
+                    "$metadata": {
+                        "$lastUpdated": "2023-01-12T19:39:49.1669268Z",
+                        "$lastUpdatedVersion": 1
+                    },
+                    "$version": 1
+                }
+            }
+        },
+        {
+            "deviceId": "test-device-01",
+            "moduleId": "mymodule1",
+            "etag": "AAAAAAAAAAI=",
+            "deviceEtag": "NzMxMTM1OTQz",
+            "status": "enabled",
+            "statusUpdateTime": "0001-01-01T00:00:00Z",
+            "connectionState": "Disconnected",
+            "lastActivityTime": "0001-01-01T00:00:00Z",
+            "cloudToDeviceMessageCount": 0,
+            "authenticationType": "none",
+            "x509Thumbprint": {
+                "primaryThumbprint": null,
+                "secondaryThumbprint": null
+            },
+            "modelId": "",
+            "version": 3,
+            "properties": {
+                "desired": {
+                    "settings": {
+                        "prop0": "val0"
+                    },
+                    "$metadata": {
+                        "$lastUpdated": "2023-01-17T17:56:24.1626056Z",
+                        "$lastUpdatedVersion": 2
+                    },
+                    "$version": 2
+                },
+                "reported": {
+                    "$metadata": {
+                        "$lastUpdated": "2023-01-12T19:39:49.1669268Z",
+                        "$lastUpdatedVersion": 1
+                    },
+                    "$version": 1
+                }
+            }
+        }
+    ]
+}
