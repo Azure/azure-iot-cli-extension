@@ -24,9 +24,9 @@ parameters:
 
 
 variables:
-  - name: resourceGroup
+  - name: targetResourceGroup
     value: $[variables.${{ parameters.resourceGroupVar }}]
-  - name: exclusions
+  - name: deleteExclusions
     value: $[variables.${{ parameters.exclusionsVar }}]
 
 
@@ -41,14 +41,18 @@ steps:
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
+      set -x
+
       names=($EXCLUSIONS)
       query=$(printf '[?name!='"'"%q"'"']|' "${names[@]}")
       echo $query
       echo "Resources found to delete:"
       az resource list -g "$RESOURCEGROUP" --query "$query[*].id"
       resources=$(az resource list -g "$RESOURCEGROUP" --query "$query[*].id" -o tsv)
-      echo "Deleting Resources"
-      az resource delete --ids $resources
+      if [[ -n "$resources"]]; then
+        echo "Deleting Resources"
+        az resource delete --ids $resources
+      fi
   env:
-    RESOURCEGROUP: $(resourceGroup)
-    EXCLUSIONS: $(exclusions)
+    RESOURCEGROUP: $(targetResourceGroup)
+    EXCLUSIONS: $(deleteExclusions)
