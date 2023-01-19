@@ -1,0 +1,8 @@
+configVersion: "1.0"
+iotHub:
+  authenticationMethod: symmetricKey
+edgeConfiguration:
+  templateConfigPath: "./device_configs/device_config.toml"
+
+edgeDevices:
+  - deployment: './fake_deployment.json'

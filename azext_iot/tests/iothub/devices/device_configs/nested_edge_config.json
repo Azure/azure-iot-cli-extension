@@ -1,0 +1,59 @@
+{
+    "configVersion": "1.0",
+    "iotHub": {
+      "authenticationMethod": "symmetricKey"
+    },
+    "edgeConfiguration": {
+      "templateConfigPath": "device_config.toml",
+      "defaultEdgeAgent": "$upstream:443/azureiotedge-agent:1.2"
+    },
+    "edgeDevices": [
+      {
+        "deviceId": "device_1",
+        "edgeAgent": "mcr.microsoft.com/azureiotedge-agent:1.1",
+        "hostname": "device_1",
+        "deployment": "./deployments/deploymentTopLayer.json",
+        "children": [
+          {
+            "deviceId": "device_2",
+            "hostname": "device_2",
+            "deployment": "./deployments/deploymentLowerLayer.json",
+            "children": [
+              {
+                "deviceId": "device_3",
+                "hostname": "device_3",
+                "deployment": "./deployments/deploymentLowerLayer.json"
+              }
+            ]
+          },
+          {
+            "deviceId": "device_4",
+            "hostname": "device_4",
+            "deployment": "./deployments/deploymentTopLayer.json",
+            "children": [
+              {
+                "deviceId": "device_5",
+                "deployment": "./deployments/deploymentLowerLayer.json",
+                "hostname": "device_5"
+              },
+              {
+                "deviceId": "device_6",
+                "hostname": "device_6",
+                "deployment": "./deployments/deploymentLowerLayer.json"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "deviceId": "device_7",
+        "hostname": "device_7",
+        "edgeAgent": "mcr.microsoft.com/azureiotedge-agent:1.2",
+        "containerAuth": {
+          "serverAddress": "mcr.microsoft.com",
+          "username": "test-user",
+          "password": "$credential$"
+        }
+      }
+    ]
+  }

@@ -263,6 +263,7 @@ class IoTDPSStateType(Enum):
     """
     IoT Hub Device Provisioning Service State Property
     """
+
     Activating = "Activating"
     ActivationFailed = "ActivationFailed"
     Active = "Active"
@@ -279,12 +280,13 @@ class IoTDPSStateType(Enum):
 
 class ConnectionStringParser(Enum):
     """
-        All connection string parser with respective functions
+    All connection string parser with respective functions
     """
+
     from azext_iot.common._azure import (
         parse_iot_device_connection_string,
         parse_iot_device_module_connection_string,
-        parse_iot_hub_connection_string
+        parse_iot_hub_connection_string,
     )
 
     Module = parse_iot_device_module_connection_string
@@ -296,6 +298,7 @@ class DiscoveryResourceType(Enum):
     """
     Resource types supported by discovery.
     """
+
     IoTHub = "IoT Hub"
     DPS = "IoT Hub Device Provisioning Service"
 
@@ -304,5 +307,6 @@ class SHAHashVersions(Enum):
     """
     Supported SHA types for generating the certificate thumbprint.
     """
+
     SHA1 = 1
     SHA256 = 256

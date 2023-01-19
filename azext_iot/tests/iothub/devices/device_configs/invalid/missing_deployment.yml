@@ -1,0 +1,17 @@
+configVersion: "1.0"
+iotHub:
+  authenticationMethod: symmetricKey
+edgeConfiguration:
+  templateConfigPath: "./device_configs/device_config.toml"
+
+edgeDevices:
+  - deviceId: device_1
+    edgeAgent: "mcr.microsoft.com/azureiotedge-agent:1.2"
+    deployment: "../deploymentTopLayer.json"
+    children:
+    - deviceId: device_2
+      deployment: "../deploymentLowerLayer.json"
+      children:
+        - deviceId: device_3
+          # invalid deployment / config does not exist
+          deployment: "./path/does/not/exist.json"
