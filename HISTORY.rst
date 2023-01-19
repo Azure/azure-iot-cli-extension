@@ -29,6 +29,10 @@ unreleased
 
   * Modification of how route testing works for testing all route sources. If `az iot hub message-route test` is called
     without specifying a route name or type, all types will be tested rather than only DeviceMessage routes.
+  
+  * Addition of read modules command for edge device
+
+  - az iot edge read-modules
 
 
 **Digital Twins updates**

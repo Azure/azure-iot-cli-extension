@@ -1202,7 +1202,6 @@ def iot_edge_read_modules(
     module_twin_list = []
 
     try:
-        import pdb; pdb.set_trace()
         module_list = iot_device_module_list(cmd, device_id, hub_name=hub_name, login=login)
         for module in module_list:
             module_twin = _iot_device_module_twin_show(

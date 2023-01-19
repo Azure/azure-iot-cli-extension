@@ -81,6 +81,55 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
                 expect_failure=True,
             )
 
+    def test_edge_read_modules(self):
+        for auth_phase in DATAPLANE_AUTH_TYPES:
+            edge_device_count = 1
+            edge_device_ids = self.generate_device_names(edge_device_count, True)
+
+            self.cmd(
+                self.set_cmd_auth_type(
+                    "iot hub device-identity create -d {} -n {} -g {} --ee".format(
+                        edge_device_ids[0], self.entity_name, self.entity_rg
+                    ),
+                    auth_type=auth_phase,
+                )
+            )
+
+            self.kwargs["edge_content"] = read_file_content(edge_content_path)
+
+            # Set up modules
+            self.cmd(
+                self.set_cmd_auth_type(
+                    "iot edge set-modules -d {} -n {} -g {} --content '{}'".format(
+                        edge_device_ids[0], self.entity_name, self.entity_rg, "{edge_content}"
+                    ),
+                    auth_type=auth_phase,
+                ),
+            )
+
+            # Read the module set up previously
+            self.cmd(
+                self.set_cmd_auth_type(
+                    "iot edge read-modules -d {} -n {} -g {}".format(
+                        edge_device_ids[0], self.entity_name, self.entity_rg
+                    ),
+                    auth_type=auth_phase,
+                ),
+                checks=[self.check("content.modulesContent",
+                        json.loads(self.kwargs["edge_content"])["content"]["modulesContent"])],
+            )
+
+            # Error -- invalid resource
+            self.cmd(
+                self.set_cmd_auth_type(
+                    "iot edge read-modules -d {} -n {} -g {}".format(
+                        "invalid-device", self.entity_name, self.entity_rg
+                    ),
+                    auth_type=auth_phase
+                ),
+                expect_failure=True,
+            )
+
     def test_edge_deployments(self):
         for auth_phase in DATAPLANE_AUTH_TYPES:
             config_count = 5

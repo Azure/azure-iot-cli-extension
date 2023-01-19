@@ -1037,6 +1037,19 @@ helps[
 """
 
 helps[
+    "iot edge read-modules"
+] = """
+    type: command
+    short-summary: Read edge module twin configuration on a single device.
+    long-summary: |
+                  The module twin configuration output can be directly used as the --content of "az iot edge set-modules"
+    examples:
+    - name: Read module twin configuration on a target device.
+      text: >
+        az iot edge read-modules --hub-name {iothub_name} --device-id {device_id}
+"""
+
+helps[
     "iot edge deployment"
 ] = """
     type: group

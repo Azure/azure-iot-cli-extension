@@ -1,6 +1,5 @@
 { 
-    "moduleTwins":
-    [
+    "moduleTwins": [
         {
             "deviceId": "test-device-01",
             "moduleId": "mymodule0",
@@ -75,5 +74,25 @@
                 }
             }
         }
-    ]
+    ],
+    "configuration": {
+        "content": {
+            "modulesContent": {
+                "mymodule0": {
+                    "properties.desired": {
+                        "settings": {
+                            "prop0": "val0"
+                        }
+                    }
+                },
+                "mymodule1": {
+                    "properties.desired": {
+                        "settings": {
+                            "prop0": "val0"
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

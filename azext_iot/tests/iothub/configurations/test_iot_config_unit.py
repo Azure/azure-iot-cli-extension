@@ -32,6 +32,13 @@ def sample_config_show(set_cwd):
 
 
 @pytest.fixture
+def sample_config_read(set_cwd):
+    path = "test_config_modules_read.json"
+    result = json.loads(read_file_content(path))
+    return result
+    
+
+@pytest.fixture
 def sample_config_edge_malformed(set_cwd):
     path = "test_edge_deployment_malformed.json"
     result = json.dumps(json.loads(read_file_content(path)))
@@ -901,59 +908,14 @@ class TestConfigApply:
             )
 
 
-def generate_module_twin(
-    device_id,
-    module_id
-):
-    payload = {
-        "deviceId": device_id,
-        "moduleId": module_id,
-        "etag": "AAAAAAAAAAI=",
-        "deviceEtag": "NzMxMTM1OTQz",
-        "status": "enabled",
-        "statusUpdateTime": "0001-01-01T00:00:00Z",
-        "connectionState": "Disconnected",
-        "lastActivityTime": "0001-01-01T00:00:00Z",
-        "cloudToDeviceMessageCount": 0,
-        "authenticationType": "none",
-        "x509Thumbprint": {
-            "primaryThumbprint": None,
-            "secondaryThumbprint": None
-        },
-        "modelId": "",
-        "version": 3,
-        "properties": {
-            "desired": {
-                "settings": {
-                    "prop0": "val0"
-                },
-                "$metadata": {
-                    "$lastUpdated": "2023-01-17T17:56:24.1626056Z",
-                    "$lastUpdatedVersion": 2
-                },
-                "$version": 2
-            },
-            "reported": {
-                "$metadata": {
-                    "$lastUpdated": "2023-01-12T19:39:49.1669268Z",
-                    "$lastUpdatedVersion": 1
-                },
-                "$version": 1
-            }
-        }
-    }
-
-    return payload
-
-
 class TestConfigRead:
     @pytest.fixture(params=[200])
-    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
+    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request, sample_config_read):
         service_client = mocker.patch(path_service_client)
         service_client.side_effect = [
             build_mock_response(mocker, payload=[{"moduleId" : "$edgeAgent"}, {"moduleId" : "AzureBlobStorageonIoTEdge"}]),
-            build_mock_response(mocker, payload=generate_module_twin("test-device-01", "mymodule0")),
-            build_mock_response(mocker, payload=generate_module_twin("test-device-01", "mymodule1")),
+            build_mock_response(mocker, payload=sample_config_read["moduleTwins"][0]),
+            build_mock_response(mocker, payload=sample_config_read["moduleTwins"][1]),
         ]
         return service_client
 
@@ -961,62 +923,29 @@ class TestConfigRead:
         "device_id, hub_name", [("test-device-01", mock_target["entity"])]
     )
     def test_config_read_edge(
-        self, fixture_cmd, serviceclient, device_id, hub_name, sample_config_edge
+        self, fixture_cmd, serviceclient, device_id, hub_name, sample_config_read
     ):
-        # Not yet supporting layered deployments
-        # if sample_config_edge[0] == "layered":
-        #     return
-        import pdb; pdb.set_trace()
-
         result = subject.iot_edge_read_modules(
             cmd=fixture_cmd,
             device_id=device_id,
             hub_name=mock_target["entity"]
         )
 
-        assert result == 
+        assert result == sample_config_read["configuration"]
 
     @pytest.mark.parametrize(
         "device_id, hub_name", [("test-device-01", mock_target["entity"])]
     )
-    def test_config_apply_edge_malformed(
-        self,
-        fixture_cmd,
-        serviceclient,
-        device_id,
-        hub_name,
-        sample_config_edge_malformed,
-    ):
-        with pytest.raises(CLIError) as exc:
-            subject.iot_edge_set_modules(
-                cmd=fixture_cmd,
-                device_id=device_id,
-                hub_name=mock_target["entity"],
-                content=sample_config_edge_malformed,
-            )
-
-        exception_obj = json.loads(str(exc.value))
-        assert "validationErrors" in exception_obj
-        for error_element in exception_obj["validationErrors"]:
-            assert "description" in error_element
-            assert "contentPath" in error_element
-            assert "schemaPath" in error_element
-
-    @pytest.mark.parametrize(
-        "device_id, hub_name", [("test-device-01", mock_target["entity"])]
-    )
-    def test_config_apply_edge_error(
+    def test_config_read_edge_error(
         self,
         fixture_cmd,
         serviceclient_generic_error,
         device_id,
-        hub_name,
-        sample_config_edge_malformed,
+        hub_name
     ):
         with pytest.raises(CLIError):
-            subject.iot_edge_set_modules(
+            subject.iot_edge_read_modules(
                 cmd=fixture_cmd,
                 device_id=device_id,
-                hub_name=mock_target["entity"],
-                content=sample_config_edge_malformed,
+                hub_name=mock_target["entity"]
             )
