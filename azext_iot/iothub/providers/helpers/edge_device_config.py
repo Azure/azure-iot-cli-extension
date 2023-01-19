@@ -103,6 +103,7 @@ DEVICE_CONFIG_SCHEMA_VALID_VERSIONS["1.0"] = {
 
 # Edge device TOML default values
 DEVICE_CONFIG_TOML = {
+    "auto_reprovisioning_mode": "Dynamic",
     "hostname": "",
     "provisioning": {
         "device_id": "",
@@ -258,8 +259,9 @@ def create_edge_device_config(
     device_toml[
         "trust_bundle_cert"
     ] = f"file:///etc/aziot/certificates/{EDGE_ROOT_CERTIFICATE_FILENAME}"
-    # Dynamic, AlwaysOnStartup, OnErrorOnly
-    device_toml["auto_reprovisioning_mode"] = "Dynamic"
+    # Dynamic is the default auto reprovisioning mode, but respect config settings
+    device_toml["auto_reprovisioning_mode"] = getattr(device_toml, "auto_reprovisioning_mode", "Dynamic")
+
     device_toml["hostname"] = (
         device_config.hostname if device_config.hostname else "{{HOSTNAME}}"
     )
