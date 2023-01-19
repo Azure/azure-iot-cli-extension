@@ -38,6 +38,7 @@ from azext_iot.common.shared import (
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
+    assemble_nargs_to_dict,
     handle_service_exception,
     read_file_content,
     init_monitoring,
@@ -1234,6 +1235,8 @@ def iot_edge_deployment_create(
     cmd,
     config_id,
     content,
+    custom_labels=None,
+    custom_metric_queries=None,
     hub_name=None,
     target_condition="",
     priority=0,
@@ -1251,6 +1254,8 @@ def iot_edge_deployment_create(
         cmd=cmd,
         config_id=config_id,
         content=content,
+        custom_labels=custom_labels,
+        custom_metric_queries=custom_metric_queries,
         hub_name=hub_name,
         target_condition=target_condition,
         priority=priority,
@@ -1267,6 +1272,8 @@ def iot_hub_configuration_create(
     cmd,
     config_id,
     content,
+    custom_labels=None,
+    custom_metric_queries=None,
     hub_name=None,
     target_condition="",
     priority=0,
@@ -1280,6 +1287,8 @@ def iot_hub_configuration_create(
         cmd=cmd,
         config_id=config_id,
         content=content,
+        custom_labels=custom_labels,
+        custom_metric_queries=custom_metric_queries,
         hub_name=hub_name,
         target_condition=target_condition,
         priority=priority,
@@ -1297,6 +1306,8 @@ def _iot_hub_configuration_create(
     config_id,
     content,
     config_type,
+    custom_labels=None,
+    custom_metric_queries=None,
     hub_name=None,
     target_condition="",
     priority=0,
@@ -1348,9 +1359,13 @@ def _iot_hub_configuration_create(
                 "metrics json must include the '{}' property".format(metrics_key)
             )
         metrics = metrics[metrics_key]
+    elif custom_metric_queries:
+        metrics = assemble_nargs_to_dict(custom_metric_queries)
 
     if labels:
         labels = process_json_arg(labels, argument_name="labels")
+    elif custom_labels:
+        labels = assemble_nargs_to_dict(custom_labels)
 
     config_content = ConfigurationContent(**processed_content)
 

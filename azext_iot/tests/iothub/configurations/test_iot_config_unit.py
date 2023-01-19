@@ -13,7 +13,7 @@ from uuid import uuid4
 from random import randint
 from knack.cli import CLIError
 from azext_iot.operations import hub as subject
-from azext_iot.common.utility import read_file_content, evaluate_literal
+from azext_iot.common.utility import read_file_content, evaluate_literal, validate_key_value_pairs
 from azext_iot.tests.conftest import (
     build_mock_response,
     path_service_client,
@@ -268,7 +268,7 @@ class TestConfigCreate:
         return service_client
 
     @pytest.mark.parametrize(
-        "config_id, hub_name, target_condition, priority, labels",
+        "config_id, hub_name, target_condition, priority, labels, custom_labels, metrics, custom_metric_queries",
         [
             (
                 "UPPERCASEID",
@@ -276,6 +276,9 @@ class TestConfigCreate:
                 "tags.building=43 and tags.environment='test'",
                 randint(0, 100),
                 '{"key1":"value1"}',
+                None,
+                'test_config_generic_metrics.json',
+                None
             ),
             (
                 "lowercaseid",
@@ -283,8 +286,29 @@ class TestConfigCreate:
                 "tags.building=43 and tags.environment='test'",
                 randint(0, 100),
                 None,
+                None,
+                'test_config_generic_metrics.json',
+                None
             ),
-            ("mixedCaseId", mock_target["entity"], None, None, None),
+            (
+                "mixedCaseId",
+                mock_target["entity"],
+                None,
+                None,
+                None,
+                None,
+                'test_config_generic_metrics.json',
+                None),
+            (
+                "newid",
+                mock_target["entity"],
+                "tags.building=43 and tags.environment='test'",
+                randint(0, 100),
+                None,
+                ['key1=value1'],
+                None,
+                ['mymetric1=select deviceId from devices where tags.location=''US''', 'mymetric2=select *']
+            ),
         ],
     )
     def test_config_create_edge(
@@ -292,23 +316,27 @@ class TestConfigCreate:
         fixture_cmd,
         serviceclient,
         sample_config_edge,
-        sample_config_metrics,
         config_id,
+        custom_labels,
         hub_name,
         target_condition,
         priority,
         labels,
+        metrics,
+        custom_metric_queries
     ):
         subject.iot_edge_deployment_create(
             cmd=fixture_cmd,
             config_id=config_id,
             hub_name=hub_name,
             content=sample_config_edge[1],
+            custom_labels=custom_labels,
             target_condition=target_condition,
             priority=priority,
             labels=labels,
-            metrics=sample_config_metrics[1],
+            metrics=metrics,
             layered=(sample_config_edge[0] == "layered"),
+            custom_metric_queries=custom_metric_queries
         )
 
         args = serviceclient.call_args
@@ -321,7 +349,11 @@ class TestConfigCreate:
         assert body["id"] == config_id.lower()
         assert body.get("targetCondition") == target_condition
         assert body.get("priority") == priority
-        assert body.get("labels") == evaluate_literal(labels, dict)
+
+        if labels:
+            assert body.get("labels") == evaluate_literal(labels, dict)
+        elif custom_labels:
+            assert body.get("labels") == validate_key_value_pairs(";".join(custom_labels))
 
         if (
             sample_config_edge[0] == "inlineB"
@@ -351,10 +383,13 @@ class TestConfigCreate:
                 == json.loads(sample_config_edge[1])["content"]["modulesContent"]
             )
 
-        self._assert_config_metrics_request(sample_config_metrics, body)
+        if metrics:
+            assert body.get("metrics") == json.loads(read_file_content(metrics))['metrics']
+        elif custom_metric_queries:
+            assert body.get("metrics")['queries'] == validate_key_value_pairs(";".join(custom_metric_queries))
 
     @pytest.mark.parametrize(
-        "config_id, hub_name, target_condition, priority, labels",
+        "config_id, hub_name, target_condition, priority, labels, custom_labels, metrics, custom_metric_queries",
         [
             (
                 "lowercaseid",
@@ -362,6 +397,19 @@ class TestConfigCreate:
                 "tags.building=43 and tags.environment='test'",
                 randint(0, 100),
                 None,
+                None,
+                'test_config_generic_metrics.json',
+                None,
+            ),
+            (
+                "UPPERCASEID",
+                mock_target["entity"],
+                "tags.building=43 and tags.environment='test'",
+                randint(0, 100),
+                None,
+                ['key1=value1'],
+                None,
+                ['mymetric1=select deviceId from devices where tags.location=''US''', 'mymetric2=select *']
             )
         ],
     )
@@ -375,6 +423,9 @@ class TestConfigCreate:
         target_condition,
         priority,
         labels,
+        custom_labels,
+        metrics,
+        custom_metric_queries
     ):
         with pytest.raises(CLIError) as exc:
             subject.iot_edge_deployment_create(
@@ -385,6 +436,9 @@ class TestConfigCreate:
                 target_condition=target_condition,
                 priority=priority,
                 labels=labels,
+                custom_labels=custom_labels,
+                metrics=metrics,
+                custom_metric_queries=custom_metric_queries
             )
 
         exception_obj = json.loads(str(exc.value))
@@ -395,7 +449,7 @@ class TestConfigCreate:
             assert "schemaPath" in error_element
 
     @pytest.mark.parametrize(
-        "config_id, hub_name, target_condition, priority, labels",
+        "config_id, hub_name, target_condition, priority, labels, custom_labels, metrics, custom_metric_queries",
         [
             (
                 "UPPERCASEID",
@@ -403,6 +457,9 @@ class TestConfigCreate:
                 "tags.building=43 and tags.environment='test'",
                 randint(0, 100),
                 '{"key1":"value1"}',
+                None,
+                'test_config_generic_metrics.json',
+                None
             ),
             (
                 "lowercaseid",
@@ -410,8 +467,20 @@ class TestConfigCreate:
                 "tags.building=43 and tags.environment='test'",
                 randint(0, 100),
                 None,
+                None,
+                'test_config_generic_metrics.json',
+                None
             ),
-            ("mixedCaseId", mock_target["entity"], None, None, None),
+            (
+                "mixedCaseId",
+                mock_target["entity"],
+                None,
+                None,
+                None,
+                ['key1=value1'],
+                None,
+                ['mymetric1=select deviceId from devices where tags.location=''US''', 'mymetric2=select *']
+            ),
         ],
     )
     def test_config_create_adm(
@@ -419,12 +488,14 @@ class TestConfigCreate:
         fixture_cmd,
         serviceclient,
         sample_config_adm,
-        sample_config_metrics,
         config_id,
         hub_name,
         target_condition,
         priority,
         labels,
+        custom_labels,
+        metrics,
+        custom_metric_queries
     ):
 
         contentKey = (
@@ -445,7 +516,9 @@ class TestConfigCreate:
             target_condition=target_condition,
             priority=priority,
             labels=labels,
-            metrics=sample_config_metrics[1],
+            custom_labels=custom_labels,
+            metrics=metrics,
+            custom_metric_queries=custom_metric_queries
         )
 
         args = serviceclient.call_args
@@ -458,7 +531,11 @@ class TestConfigCreate:
         assert body["id"] == config_id.lower()
         assert body.get("targetCondition") == target_condition
         assert body.get("priority") == priority
-        assert body.get("labels") == evaluate_literal(labels, dict)
+
+        if labels:
+            assert body.get("labels") == evaluate_literal(labels, dict)
+        elif custom_labels:
+            assert body.get("labels") == validate_key_value_pairs(";".join(custom_labels))
 
         if sample_config_adm[0].endswith("Inline"):
             assert (
@@ -473,7 +550,10 @@ class TestConfigCreate:
                 ]
             )
 
-        self._assert_config_metrics_request(sample_config_metrics, body)
+        if metrics:
+            assert body.get("metrics") == json.loads(read_file_content(metrics))['metrics']
+        elif custom_metric_queries:
+            assert body.get("metrics")['queries'] == validate_key_value_pairs(";".join(custom_metric_queries))
 
     def _assert_config_metrics_request(self, sample_config_metrics, body):
         if sample_config_metrics[0]:
@@ -494,7 +574,7 @@ class TestConfigCreate:
             assert body["metrics"] == {}
 
     @pytest.mark.parametrize(
-        "config_id, hub_name, target_condition, priority, labels",
+        "config_id, hub_name, target_condition, priority, labels, custom_labels, metrics, custom_metric_queries",
         [
             (
                 "lowercaseid",
@@ -502,6 +582,19 @@ class TestConfigCreate:
                 "tags.building=43 and tags.environment='test'",
                 randint(0, 100),
                 None,
+                None,
+                'test_config_generic_metrics.json',
+                None,
+            ),
+            (
+                "UPPERCASEID",
+                mock_target["entity"],
+                "tags.building=43 and tags.environment='test'",
+                randint(0, 100),
+                None,
+                ['key1=value1'],
+                None,
+                ['mymetric1=select deviceId from devices where tags.location=''US''', 'mymetric2=select *']
             )
         ],
     )
@@ -510,20 +603,26 @@ class TestConfigCreate:
         fixture_cmd,
         serviceclient,
         config_id,
+        custom_labels,
         hub_name,
         target_condition,
         priority,
         labels,
+        metrics,
+        custom_metric_queries
     ):
         with pytest.raises(CLIError) as exc1:
             subject.iot_hub_configuration_create(
                 cmd=fixture_cmd,
                 config_id=config_id,
+                custom_labels=custom_labels,
                 hub_name=hub_name,
                 content=get_context_path(__file__, "test_edge_deployment.json"),
                 target_condition=target_condition,
                 priority=priority,
                 labels=labels,
+                metrics=metrics,
+                custom_metric_queries=custom_metric_queries
             )
 
         # API does not support both deviceContent and moduleContent at the same time.
@@ -534,9 +633,12 @@ class TestConfigCreate:
                 config_id=config_id,
                 hub_name=hub_name,
                 content=content,
+                custom_labels=custom_labels,
                 target_condition=target_condition,
                 priority=priority,
                 labels=labels,
+                metrics=metrics,
+                custom_metric_queries=custom_metric_queries
             )
 
         for exc in [exc1, exc2]:
@@ -553,9 +655,12 @@ class TestConfigCreate:
                 config_id=config_id,
                 hub_name=hub_name,
                 content=content,
+                custom_labels=custom_labels,
                 target_condition=target_condition,
                 priority=priority,
                 labels=labels,
+                metrics=metrics,
+                custom_metric_queries=custom_metric_queries
             )
 
         assert (
@@ -564,7 +669,7 @@ class TestConfigCreate:
         )
 
     @pytest.mark.parametrize(
-        "config_id, hub_name, target_condition, priority, labels",
+        "config_id, hub_name, target_condition, priority, labels, custom_labels, metrics, custom_metric_queries",
         [
             (
                 "lowercaseid",
@@ -572,6 +677,19 @@ class TestConfigCreate:
                 "tags.building=43 and tags.environment='test'",
                 randint(0, 100),
                 None,
+                None,
+                'test_config_generic_metrics.json',
+                None,
+            ),
+            (
+                "UPPERCASEID",
+                mock_target["entity"],
+                "tags.building=43 and tags.environment='test'",
+                randint(0, 100),
+                None,
+                ['key1=value1'],
+                None,
+                ['mymetric1=select deviceId from devices where tags.location=''US''', 'mymetric2=select *']
             )
         ],
     )
@@ -585,6 +703,9 @@ class TestConfigCreate:
         target_condition,
         priority,
         labels,
+        custom_labels,
+        metrics,
+        custom_metric_queries
     ):
         with pytest.raises(CLIError):
             subject.iot_edge_deployment_create(
@@ -595,6 +716,9 @@ class TestConfigCreate:
                 target_condition=target_condition,
                 priority=priority,
                 labels=labels,
+                custom_labels=custom_labels,
+                metrics=metrics,
+                custom_metric_queries=custom_metric_queries
             )
 
 
