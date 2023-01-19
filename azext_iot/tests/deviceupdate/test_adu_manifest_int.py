@@ -545,6 +545,7 @@ def test_adu_manifest_init_v5_validate_errors(options, no_validation):
         (1, 1024),
         (2, 512),
         (3, 256),
+        (1, 4097),  # 1 additional byte over chunk size.
     ],
 )
 def test_adu_manifest_calculate_hash(files_count, expected_bytes):
