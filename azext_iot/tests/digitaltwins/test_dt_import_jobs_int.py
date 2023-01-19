@@ -55,16 +55,6 @@ class TestDTImportJobs(DTLiveScenarioTest):
         )
 
     def _cleanup_import_job(self, instance_name, import_job_id, import_job_output_file):
-        # # Cancel import jobs
-        # self.cmd(
-        #     "dt job import cancel -n '{}' -g '{}' -j '{}' -y".format(instance_name, self.rg, import_job_id)
-        # )
-        # # Make sure job is cancelled
-        # show_import_job_output = self.cmd(
-        #     "dt job import show -n '{}' -g '{}' -j '{}'".format(instance_name, self.rg, import_job_id)
-        # ).get_output_in_json()
-        # assert show_import_job_output["status"] == "cancelled"
-
         # Delete import jobs
         self.cmd(
             "dt job import delete -n '{}' -g '{}' -j '{}' -y".format(instance_name, self.rg, import_job_id)
@@ -82,7 +72,7 @@ class TestDTImportJobs(DTLiveScenarioTest):
                 )
             )
 
-    def test_dt_importjobs(self):
+    def test_dt_import_jobs(self):
         self.wait_for_capacity()
 
         storage_account_id = self.cmd(
@@ -166,6 +156,19 @@ class TestDTImportJobs(DTLiveScenarioTest):
             )
         ).get_output_in_json()
 
+        # Poll to ensure desired status of valid import job before starting new one
+        num_tries = 0
+        while num_tries < MAX_TRIES:
+            num_tries += 1
+            show_valid_import_job_output = self.cmd(
+                "dt job import show -n '{}' -g '{}' -j '{}'".format(instance_name, self.rg, valid_import_job_id)
+            ).get_output_in_json()
+            assert show_valid_import_job_output["status"] != "failed"
+            if show_valid_import_job_output["status"] == "succeeded":
+                assert show_valid_import_job_output["error"] is None
+                break
+            sleep(POLL_SLEEP_INTERVAL)
+
         # Create import job for invalid import data
         invalid_import_job_output_filename = "{}_invalid_import_job_output.txt".format(instance_name)
         create_invalid_import_job_output = self.cmd(
@@ -189,36 +192,31 @@ class TestDTImportJobs(DTLiveScenarioTest):
         assert list_import_jobs_output[0]["id"] in import_job_ids
         assert list_import_jobs_output[1]["id"] in import_job_ids
 
-        # Poll to ensure desired status of import jobs
+        # Poll to ensure desired status of invalid import job
         num_tries = 0
         while num_tries < MAX_TRIES:
             num_tries += 1
-            show_valid_import_job_output = self.cmd(
-                "dt job import show -n '{}' -g '{}' -j '{}'".format(instance_name, self.rg, valid_import_job_id)
-            ).get_output_in_json()
-            assert show_valid_import_job_output["status"] != "failed"
             show_invalid_import_job_output = self.cmd(
                 "dt job import show -n '{}' -g '{}' -j '{}'".format(instance_name, self.rg, invalid_import_job_id)
             ).get_output_in_json()
             assert show_invalid_import_job_output["status"] != "succeeded"
-            if show_valid_import_job_output["status"] == "succeeded" and show_invalid_import_job_output["status"] == "failed":
-                assert show_invalid_import_job_output["error"]["error"]["code"] == "DTDLParsingError"
-                assert show_valid_import_job_output["error"] is None
+            if show_invalid_import_job_output["status"] == "failed":
+                assert show_invalid_import_job_output["error"]["code"] == "DTDLParsingError"
                 break
             sleep(POLL_SLEEP_INTERVAL)
 
-        # TODO: once supported, uncomment
-        # list_models_output = self.cmd(
-        #     "dt model list -n {} -g {} --definition".format(instance_name, self.rg)
-        # ).get_output_in_json()
-        # model_ids = []
-        # for model in list_models_output:
-        #     assert model["id"]
-        #     assert model["model"]
-        #     model_ids.append(model["id"])
-        # assert len(model_ids) == len(EXPECTED_MODEL_IDS)
-        # assert set(model_ids) == set(EXPECTED_MODEL_IDS)
+        list_models_output = self.cmd(
+            "dt model list -n {} -g {} --definition".format(instance_name, self.rg)
+        ).get_output_in_json()
+        model_ids = []
+        for model in list_models_output:
+            assert model["id"]
+            assert model["model"]
+            model_ids.append(model["id"])
+        assert len(model_ids) == len(EXPECTED_MODEL_IDS)
+        assert set(model_ids) == set(EXPECTED_MODEL_IDS)
 
+        # TODO: once supported, uncomment
         # twin_query_result = self.cmd(
         #     "dt twin query -n {} -q 'select * from digitaltwins'".format(instance_name)
         # ).get_output_in_json()
