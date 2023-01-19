@@ -30,6 +30,13 @@ unreleased
   * Modification of how route testing works for testing all route sources. If `az iot hub message-route test` is called
     without specifying a route name or type, all types will be tested rather than only DeviceMessage routes.
 
+* Addition of `az iot hub state` commands to introduce saving, uploading, and copying states between IoT Hubs. This will
+  allow for easier migration of IoT Hubs when changing location, IoT Hub SKU, number of Event Hub partitions and more.
+  For more information, please read the trouble shooting guide [here](https://github.com/Azure/azure-iot-cli-extension/tree/dev/docs/iot-hub-state-trouble-shooting-guide.md).
+  The commands are as follows:
+  - `az iot hub state import` to save the current state of an IoT Hub to a JSON file
+  - `az iot hub state export` to upload a state from a JSON file to an IoT Hub
+  - `az iot hub state migrate` to copy a state of an IoT Hub to another IoT Hub
 
 **Digital Twins updates**
 
@@ -37,7 +44,6 @@ unreleased
   now can take an extra parameter `--mi-user-assigned` to use an associated User Assigned Identity for the connection
   creation rather than the system assigned identity for the Digital Twin.
 * Some minor improvements to command documentation involving managed identities.
-
 
 **IoT Edge updates**
 
@@ -47,6 +53,7 @@ unreleased
 
   If an output path is specified, this command will also create tar files containing each device's certificate bundle, an IoT Edge
   `config.toml` config file and an installation script to configure a target Edge device with these settings.
+
 
 0.18.3
 +++++++++++++++
@@ -64,7 +71,6 @@ unreleased
 
   To learn more about this transition, visit http://aka.ms/iot-ca-updates/.
 
-
 **IoT Central updates**
 
 * Fixed an issue with enrollement group certificate encoding
@@ -73,6 +79,7 @@ unreleased
 
 * Removed file extension restriction for attached certificates in individual enrollments and enrollment groups creation/update commands,
   and added suggested certificate format in `--help` docs.
+
 
 0.18.2
 +++++++++++++++
