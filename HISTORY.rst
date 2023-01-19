@@ -35,8 +35,8 @@ Other notable changes, which are not affected by API versions, include:
 * Modification of how route testing works for testing all route sources. If `az iot hub message-route test` is called
   without specifying a route name or type, all types will be tested rather than only DeviceMessage routes.
 
-* Addition of new parameters is introduced in `az iot hub configuration create` and
-  `az iot edge deployment create` to let user insert labels and metrics in key-value pair style
+* Addition of new parameters `--custom-labels` and `--custom-metrics` for `az iot hub configuration create` and
+  `az iot edge deployment create` to let user input labels and metrics in key=value pair format.
 
 
 **Digital Twins updates**
