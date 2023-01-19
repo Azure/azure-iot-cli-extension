@@ -1869,8 +1869,16 @@ def _load_central_enrollment_group_help():
     type: command
     short-summary: Verify the primary or secondary x509 certificate of an enrollment group
     long-summary: |
-                    Verify the primary or secondary x509 certificate of an enrollment group
-                    by providing a certificate with the signed verification code.
+        Verify the primary or secondary x509 certificate of an enrollment group
+        by providing a certificate with the signed verification code.
+
+        Please note that if an enrollment group was created with an unverified x509
+        certificate, a verification certificate will need to be created using the 
+        unverified x509 certificate and a verification code before using this command.
+        A verification code can be generated via cli using
+        the 'enrollment-group generate-verification-code' command. Learn more on how to
+        create verification certificates using verification code at 
+        https://learn.microsoft.com/en-us/azure/iot-central/core/how-to-connect-devices-x509
     examples:
       - name: Verify the primary x509 certificate of an enrollment group
         text: >
