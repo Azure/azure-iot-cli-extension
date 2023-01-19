@@ -36,7 +36,7 @@ def sample_config_read(set_cwd):
     path = "test_config_modules_read.json"
     result = json.loads(read_file_content(path))
     return result
-    
+
 
 @pytest.fixture
 def sample_config_edge_malformed(set_cwd):
