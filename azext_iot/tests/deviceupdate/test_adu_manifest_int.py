@@ -555,10 +555,20 @@ def test_adu_manifest_calculate_hash(files_count, expected_bytes):
     for i in range(files_count):
         content_file_path = PurePath(get_context_path(__file__, "manifests", generate_generic_id()))
         target_bytes = os.urandom(expected_bytes)
-        with open(content_file_path, "wb") as f:
+        with open(content_file_path, "w+b") as f:
             f.write(target_bytes)
+            f.seek(0)
+            file_bytes: bytes = f.read()
+
         normalized_paths.append(content_file_path)
-        metadata.append(DeviceUpdateDataManager.calculate_file_metadata(content_file_path))
+        metadata.append(
+            FileMetadata(
+                len(file_bytes),
+                DeviceUpdateDataManager.calculate_hash_from_bytes(file_bytes),
+                content_file_path.name,
+                content_file_path,
+            )
+        )
 
     cli_path_input = ""
     for p in normalized_paths:

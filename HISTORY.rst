@@ -3,7 +3,12 @@
 Release History
 ===============
 
+
 unreleased
++++++++++++++++
+
+
+0.19.0
 +++++++++++++++
 
 **IoT Hub updates**
@@ -15,23 +20,23 @@ unreleased
   with the newer API. Most of the command and parameter structure is the same, except for creation of endpoints,
   in which the type is specified in the command as so:
 
- - az iot hub message-endpoint create cosmosdb-container * this will be hidden if the Azure CLI version does not
-    support this
- - az iot hub message-endpoint create eventhub
- - az iot hub message-endpoint create servicebus-queue
- - az iot hub message-endpoint create servicebus-topic
- - az iot hub message-endpoint create storage-container
+- az iot hub message-endpoint create cosmosdb-container
+  * Hidden if the Azure CLI version does not support it.
+- az iot hub message-endpoint create eventhub
+- az iot hub message-endpoint create servicebus-queue
+- az iot hub message-endpoint create servicebus-topic
+- az iot hub message-endpoint create storage-container
 
- Other notable changes, which are not affected by API versions, include:
+Other notable changes, which are not affected by API versions, include:
 
-  * Addition of fallback route management through `az iot hub message-route fallback set` and
-    `az iot hub message-route fallback show`
+* Addition of fallback route management through `az iot hub message-route fallback set` and 
+  `az iot hub message-route fallback show`
 
-  * Modification of how route testing works for testing all route sources. If `az iot hub message-route test` is called
-    without specifying a route name or type, all types will be tested rather than only DeviceMessage routes.
+* Modification of how route testing works for testing all route sources. If `az iot hub message-route test` is called
+  without specifying a route name or type, all types will be tested rather than only DeviceMessage routes.
 
-  * Addition of new parameters is introduced in `az iot hub configuration create` and
-    `az iot edge deployment create` to let user insert labels and metrics in key-value pair style
+* Addition of new parameters is introduced in `az iot hub configuration create` and
+  `az iot edge deployment create` to let user insert labels and metrics in key-value pair style
 
 
 **Digital Twins updates**
@@ -57,6 +62,13 @@ unreleased
 * Removed file extension restriction for attached certificates in individual enrollments and enrollment groups creation/update commands,
   and added suggested certificate format in `--help` docs.
 
+
+**Device Update**
+
+* Refactored file hash operations for better performance and to overcome Windows 32-bit process memory constraints.
+* Removed import manifest schema upper limit of file size in bytes.
+
+
 0.18.3
 +++++++++++++++
 
@@ -77,6 +89,7 @@ unreleased
 **IoT Central updates**
 
 * Fixed an issue with enrollement group certificate encoding
+
 
 0.18.2
 +++++++++++++++
