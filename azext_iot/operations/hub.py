@@ -1202,12 +1202,15 @@ def iot_edge_read_modules(
     module_twin_list = []
 
     try:
+        # Get all modules in the device
         module_list = iot_device_module_list(cmd, device_id, hub_name=hub_name, login=login)
         for module in module_list:
+            # Get module twins using module ids
             module_twin = _iot_device_module_twin_show(
                 target=target, device_id=device_id, module_id=module.module_id)
             module_twin_list.append(module_twin)
 
+        # Turn module twins list into module twin configuration
         return _build_edge_modules_configuration(module_twin_list)
     except CloudError as e:
         handle_service_exception(e)
@@ -1218,6 +1221,7 @@ def _build_edge_modules_configuration(module_twin_list):
     for module_twin in module_twin_list:
         moduleId = module_twin["moduleId"]
         desiredProperties = module_twin["properties"]["desired"]
+        # Add desired properties from module twin except $metadata and $version
         if desiredProperties:
             del desiredProperties["$metadata"]
             del desiredProperties["$version"]

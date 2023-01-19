@@ -1042,7 +1042,7 @@ helps[
     type: command
     short-summary: Read edge module twin configuration on a single device.
     long-summary: |
-                  The module twin configuration output can be directly used as the --content of "az iot edge set-modules"
+                  The module twin configuration output can be directly used as the --content of "az iot edge set-modules".
     examples:
     - name: Read module twin configuration on a target device.
       text: >
