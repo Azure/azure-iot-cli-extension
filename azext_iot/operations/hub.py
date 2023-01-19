@@ -65,6 +65,8 @@ def iot_query(
     login=None,
     auth_type_dataplane=None,
 ):
+    # TODO: make into validator to remove redundancy
+    top = _process_top(top)
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         resource_name=hub_name,
