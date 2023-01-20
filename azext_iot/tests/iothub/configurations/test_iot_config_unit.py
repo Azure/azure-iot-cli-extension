@@ -1043,6 +1043,22 @@ class TestConfigRead:
         ]
         return service_client
 
+    @pytest.fixture(params=[404])
+    def service_client_error(self, mocked_response, fixture_ghcs, fixture_sas, request, device_id):
+        mocked_response.add(
+            method=responses.GET,
+            url="https://{}/devices/{}/modules?api-version=2021-04-12".format(
+                mock_target["entity"],
+                device_id
+            ),
+            body=json.dumps({'Message': 'Operation failed with status: ''Not Found'''}),
+            status=request.param,
+            content_type="application/json",
+            match_querystring=False,
+        )
+
+        yield mocked_response
+
     @pytest.mark.parametrize(
         "device_id, hub_name", [("test-device-01", mock_target["entity"])]
     )
@@ -1060,16 +1076,18 @@ class TestConfigRead:
     @pytest.mark.parametrize(
         "device_id, hub_name", [("test-device-01", mock_target["entity"])]
     )
-    def test_config_read_edge_error(
+    def test_config_read_edge_device_error(
         self,
         fixture_cmd,
-        serviceclient_generic_error,
+        service_client_error,
         device_id,
         hub_name
     ):
-        with pytest.raises(CLIError):
+        with pytest.raises(CLIError) as error:
             subject.iot_edge_read_modules(
                 cmd=fixture_cmd,
                 device_id=device_id,
                 hub_name=mock_target["entity"]
             )
+
+        assert error.value.error_msg['Message'] == 'Operation failed with status: ''Not Found'''
