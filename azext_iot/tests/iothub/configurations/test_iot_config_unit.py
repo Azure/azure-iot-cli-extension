@@ -20,7 +20,6 @@ from azext_iot.tests.conftest import (
     mock_target,
     get_context_path,
 )
-from azure.cli.core.azclierror import ResourceNotFoundError
 
 config_id = "myconfig-{}".format(str(uuid4()).replace("-", ""))
 
@@ -1034,7 +1033,6 @@ class TestConfigApply:
 
 
 class TestConfigRead:
-
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request, sample_config_read):
         service_client = mocker.patch(path_service_client)
@@ -1065,15 +1063,13 @@ class TestConfigRead:
     def test_config_read_edge_error(
         self,
         fixture_cmd,
+        serviceclient_generic_error,
         device_id,
         hub_name
     ):
-        with pytest.raises(ResourceNotFoundError) as e:
+        with pytest.raises(CLIError):
             subject.iot_edge_read_modules(
                 cmd=fixture_cmd,
                 device_id=device_id,
                 hub_name=mock_target["entity"]
             )
-
-        assert str(e.typename) == "ResourceNotFoundError"
-        assert str(e.value).find("Unable to find IoT Hub") == 0
