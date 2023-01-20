@@ -20,6 +20,7 @@ from azext_iot.tests.conftest import (
     mock_target,
     get_context_path,
 )
+from azure.cli.core.azclierror import ResourceNotFoundError
 
 config_id = "myconfig-{}".format(str(uuid4()).replace("-", ""))
 
@@ -1067,7 +1068,7 @@ class TestConfigRead:
         device_id,
         hub_name
     ):
-        with pytest.raises(CLIError) as e:
+        with pytest.raises(ResourceNotFoundError) as e:
             subject.iot_edge_read_modules(
                 cmd=fixture_cmd,
                 device_id=device_id,
