@@ -1033,6 +1033,7 @@ class TestConfigApply:
 
 
 class TestConfigRead:
+
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request, sample_config_read):
         service_client = mocker.patch(path_service_client)
@@ -1072,4 +1073,6 @@ class TestConfigRead:
                 device_id=device_id,
                 hub_name=mock_target["entity"]
             )
-        assert str(e.value) == "Unable to find IoT Hub: myhub.azure-devices.net in current subscription a386d5ea-ea90-441a-8263-d816368c84a1"
+
+        assert str(e.typename) == "ResourceNotFoundError"
+        assert str(e.value).find("Unable to find IoT Hub") == 0
