@@ -1224,8 +1224,8 @@ def _build_edge_modules_configuration(module_twin_list):
         desiredProperties = module_twin["properties"]["desired"]
         # Add desired properties from module twin except $metadata and $version
         if desiredProperties:
-            del desiredProperties["$metadata"]
-            del desiredProperties["$version"]
+            desiredProperties.pop("$metadata")
+            desiredProperties.pop("$version")
             modulesContent[moduleId] = {"properties.desired": desiredProperties}
 
     return {"content": {"modulesContent": modulesContent}}

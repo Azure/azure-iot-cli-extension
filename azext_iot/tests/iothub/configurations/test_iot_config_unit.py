@@ -1063,13 +1063,13 @@ class TestConfigRead:
     def test_config_read_edge_error(
         self,
         fixture_cmd,
-        serviceclient_generic_error,
         device_id,
         hub_name
     ):
-        with pytest.raises(CLIError):
+        with pytest.raises(CLIError) as e:
             subject.iot_edge_read_modules(
                 cmd=fixture_cmd,
                 device_id=device_id,
                 hub_name=mock_target["entity"]
             )
+        assert str(e.value) == "Unable to find IoT Hub: myhub.azure-devices.net in current subscription a386d5ea-ea90-441a-8263-d816368c84a1"
