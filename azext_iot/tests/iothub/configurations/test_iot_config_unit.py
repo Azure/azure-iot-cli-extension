@@ -1032,7 +1032,7 @@ class TestConfigApply:
             )
 
 
-class TestConfigRead:
+class TestConfigExport:
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request, sample_config_read):
         service_client = mocker.patch(path_service_client)
@@ -1062,10 +1062,10 @@ class TestConfigRead:
     @pytest.mark.parametrize(
         "device_id, hub_name", [("test-device-01", mock_target["entity"])]
     )
-    def test_config_read_edge(
+    def test_config_export_edge(
         self, fixture_cmd, serviceclient, device_id, hub_name, sample_config_read
     ):
-        result = subject.iot_edge_read_modules(
+        result = subject.iot_edge_export_modules(
             cmd=fixture_cmd,
             device_id=device_id,
             hub_name=mock_target["entity"]
@@ -1076,7 +1076,7 @@ class TestConfigRead:
     @pytest.mark.parametrize(
         "device_id, hub_name", [("test-device-01", mock_target["entity"])]
     )
-    def test_config_read_edge_device_error(
+    def test_config_export_edge_device_error(
         self,
         fixture_cmd,
         service_client_error,
@@ -1084,7 +1084,7 @@ class TestConfigRead:
         hub_name
     ):
         with pytest.raises(CLIError) as error:
-            subject.iot_edge_read_modules(
+            subject.iot_edge_export_modules(
                 cmd=fixture_cmd,
                 device_id=device_id,
                 hub_name=mock_target["entity"]

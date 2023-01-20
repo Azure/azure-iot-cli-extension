@@ -82,7 +82,7 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
                 expect_failure=True,
             )
 
-    def test_edge_read_modules(self):
+    def test_edge_export_modules(self):
         for auth_phase in DATAPLANE_AUTH_TYPES:
             edge_device_count = 1
             edge_device_ids = self.generate_device_names(edge_device_count, True)
@@ -111,7 +111,7 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
             # Read the module set up previously
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot edge read-modules -d {} -n {} -g {}".format(
+                    "iot edge export-modules -d {} -n {} -g {}".format(
                         edge_device_ids[0], self.entity_name, self.entity_rg
                     ),
                     auth_type=auth_phase,
@@ -123,7 +123,7 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
             # Error -- invalid resource
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot edge read-modules -d {} -n {} -g {}".format(
+                    "iot edge export-modules -d {} -n {} -g {}".format(
                         "invalid-device", self.entity_name, self.entity_rg
                     ),
                     auth_type=auth_phase

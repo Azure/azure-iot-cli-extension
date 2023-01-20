@@ -1042,7 +1042,7 @@ helps[
 """
 
 helps[
-    "iot edge read-modules"
+    "iot edge export-modules"
 ] = """
     type: command
     short-summary: Read edge module twin configuration on a single device.
@@ -1051,7 +1051,7 @@ helps[
     examples:
     - name: Read module twin configuration on a target device.
       text: >
-        az iot edge read-modules --hub-name {iothub_name} --device-id {device_id}
+        az iot edge export-modules --hub-name {iothub_name} --device-id {device_id}
 """
 
 helps[

@@ -1185,7 +1185,7 @@ def iot_edge_set_modules(
         handle_service_exception(e)
 
 
-def iot_edge_read_modules(
+def iot_edge_export_modules(
     cmd,
     device_id,
     hub_name=None,
