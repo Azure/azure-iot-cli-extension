@@ -8,28 +8,30 @@ from azext_iot.deviceupdate.providers.loaders import reload_modules
 
 reload_modules()
 
-from knack.log import get_logger
-from azext_iot.constants import USER_AGENT
-from azext_iot.sdk.deviceupdate.controlplane import DeviceUpdate
-from azext_iot.sdk.deviceupdate.controlplane import (
-    models as DeviceUpdateMgmtModels,
-)
-from azext_iot.sdk.deviceupdate.dataplane import DeviceUpdateClient
-from azext_iot.sdk.deviceupdate.dataplane import models as DeviceUpdateDataModels
-
-from azext_iot.deviceupdate.common import SYSTEM_IDENTITY_ARG, AUTH_RESOURCE_ID
-from azext_iot.common.embedded_cli import EmbeddedCLI
-from azext_iot.common.utility import handle_service_exception
-from azure.cli.core.commands.client_factory import get_mgmt_service_client
-from azure.cli.core.azclierror import ResourceNotFoundError, CLIInternalError, InvalidArgumentValueError
-from azure.mgmt.core.polling.arm_polling import ARMPolling
-from azure.core.exceptions import AzureError, HttpResponseError
-from msrest.serialization import Model
-from pathlib import Path, PurePath
-from typing import Any, NamedTuple, Union, List, Tuple, Optional
+import hashlib
 import json
 import os
+from base64 import b64encode
+from pathlib import Path, PurePath
+from typing import Any, List, NamedTuple, Optional, Tuple, Union
 
+from azure.cli.core.azclierror import (CLIInternalError,
+                                       InvalidArgumentValueError,
+                                       ResourceNotFoundError)
+from azure.cli.core.commands.client_factory import get_mgmt_service_client
+from azure.core.exceptions import AzureError, HttpResponseError
+from azure.mgmt.core.polling.arm_polling import ARMPolling
+from knack.log import get_logger
+from msrest.serialization import Model
+
+from azext_iot.common.embedded_cli import EmbeddedCLI
+from azext_iot.common.utility import handle_service_exception
+from azext_iot.constants import USER_AGENT
+from azext_iot.deviceupdate.common import AUTH_RESOURCE_ID, SYSTEM_IDENTITY_ARG
+from azext_iot.sdk.deviceupdate.controlplane import DeviceUpdate
+from azext_iot.sdk.deviceupdate.controlplane import models as DeviceUpdateMgmtModels
+from azext_iot.sdk.deviceupdate.dataplane import DeviceUpdateClient
+from azext_iot.sdk.deviceupdate.dataplane import models as DeviceUpdateDataModels
 
 logger = get_logger(__name__)
 
@@ -83,8 +85,8 @@ class DeviceUpdateClientHandler(object):
         return client
 
     def get_data_client(self, endpoint: str, instance_id: str) -> DeviceUpdateClient:
-        from azure.cli.core.commands.client_factory import prepare_client_kwargs_track2
         from azure.cli.core._profile import Profile
+        from azure.cli.core.commands.client_factory import prepare_client_kwargs_track2
 
         profile = Profile()
         client: DeviceUpdateClient = DeviceUpdateClient(
@@ -247,20 +249,26 @@ class DeviceUpdateDataManager(DeviceUpdateAccountManager):
 
     @classmethod
     def calculate_file_metadata(cls, file_path: str) -> FileMetadata:
+        """
+        Calculates metadata for a file of arbitrary size.
+        """
+        import io
+        h = hashlib.sha256()
         file_pure_path = PurePath(file_path)
-        with open(file_pure_path.as_posix(), "rb") as file_path:
-            logger.debug("Attempting to read file %s as binary", file_path)
-            raw_bytes = file_path.read()
-            size_in_bytes = len(raw_bytes)
-            hash = cls.calculate_hash_from_bytes(raw_bytes)
-            return FileMetadata(size_in_bytes, hash, file_pure_path.name, file_pure_path)
+        size_in_bytes = 0
+        with io.open(file_pure_path.as_posix(), "rb") as file_io:
+            logger.debug("Reading file %s as binary...", file_pure_path)
+            for byte_chunk in iter(lambda: file_io.read(h.block_size**2), b''):
+                h.update(byte_chunk)
+                size_in_bytes = size_in_bytes + len(byte_chunk)
+            return FileMetadata(size_in_bytes, b64encode(h.digest()).decode("utf8"), file_pure_path.name, file_pure_path)
 
     @classmethod
     def calculate_hash_from_bytes(cls, raw_bytes: bytes) -> str:
-        from base64 import b64encode
-        from hashlib import sha256
-
-        return b64encode(sha256(raw_bytes).digest()).decode("utf8")
+        """
+        Calculates sha256 hash in base64 format for a set of bytes.
+        """
+        return b64encode(hashlib.sha256(raw_bytes).digest()).decode("utf8")
 
     def assemble_files(self, file_list_col: List[List[str]]) -> Union[DeviceUpdateDataModels.FileImportMetadata, None]:
         if not file_list_col:
@@ -319,7 +327,8 @@ class DeviceUpdateDataManager(DeviceUpdateAccountManager):
 class MicroObjectCache(object):
     def __init__(self, cmd, models):
         from azure.cli.core.commands.client_factory import get_subscription_id
-        from azext_iot.sdk.deviceupdate.dataplane._serialization import Deserializer, Serializer
+        from azext_iot.sdk.deviceupdate.dataplane._serialization import (
+            Deserializer, Serializer)
 
         client_models = {k: v for k, v in models.__dict__.items() if isinstance(v, type)}
         self._serializer = Serializer(client_models)
@@ -366,8 +375,8 @@ class MicroObjectCache(object):
         return directory, filename
 
     def _save(self, resource_name: str, resource_group: str, resource_type: str, payload: Any):
-        from knack.util import ensure_dir
         from datetime import datetime
+        from knack.util import ensure_dir
 
         directory, filename = self._get_file_path(
             resource_name=resource_name, resource_group=resource_group, resource_type=resource_type
