@@ -9,9 +9,9 @@ unreleased
 
 **IoT Hub updates**
 
-* Addition of read modules command for edge device
+* Addition of export modules command for edge device
 
-  - az iot edge read-modules
+  - az iot edge export-modules
 
 
 0.19.0

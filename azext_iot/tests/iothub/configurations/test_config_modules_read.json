@@ -1,10 +1,15 @@
 { 
+    "modules": [
+        {"moduleId" : "$edgeAgent"},
+        {"moduleId" : "$edgeHub"},
+        {"moduleId" : "mymodule0"}
+    ],
     "moduleTwins": [
         {
-            "deviceId": "test-device-01",
-            "moduleId": "mymodule0",
-            "etag": "AAAAAAAAAAI=",
-            "deviceEtag": "NzMxMTM1OTQz",
+            "deviceId": "device",
+            "moduleId": "$edgeAgent",
+            "etag": "AAAAAAAAAAE=",
+            "deviceEtag": "MjU2ODEyMDc5",
             "status": "enabled",
             "statusUpdateTime": "0001-01-01T00:00:00Z",
             "connectionState": "Disconnected",
@@ -16,22 +21,49 @@
                 "secondaryThumbprint": null
             },
             "modelId": "",
-            "version": 3,
+            "version": 2,
             "properties": {
                 "desired": {
-                    "settings": {
-                        "prop0": "val0"
-                    },
                     "$metadata": {
-                        "$lastUpdated": "2023-01-17T17:56:24.1626056Z",
-                        "$lastUpdatedVersion": 2
+                        "$lastUpdated": "0001-01-01T00:00:00Z"
                     },
-                    "$version": 2
+                    "$version": 1
                 },
                 "reported": {
                     "$metadata": {
-                        "$lastUpdated": "2023-01-12T19:39:49.1669268Z",
-                        "$lastUpdatedVersion": 1
+                        "$lastUpdated": "0001-01-01T00:00:00Z"
+                    },
+                    "$version": 1
+                }
+            }
+        },
+        {
+            "deviceId": "device",
+            "moduleId": "$edgeHub",
+            "etag": "AAAAAAAAAAE=",
+            "deviceEtag": "MjU2ODEyMDc5",
+            "status": "enabled",
+            "statusUpdateTime": "0001-01-01T00:00:00Z",
+            "connectionState": "Disconnected",
+            "lastActivityTime": "0001-01-01T00:00:00Z",
+            "cloudToDeviceMessageCount": 0,
+            "authenticationType": "none",
+            "x509Thumbprint": {
+                "primaryThumbprint": null,
+                "secondaryThumbprint": null
+            },
+            "modelId": "",
+            "version": 2,
+            "properties": {
+                "desired": {
+                    "$metadata": {
+                        "$lastUpdated": "0001-01-01T00:00:00Z"
+                    },
+                    "$version": 1
+                },
+                "reported": {
+                    "$metadata": {
+                        "$lastUpdated": "0001-01-01T00:00:00Z"
                     },
                     "$version": 1
                 }
@@ -39,7 +71,7 @@
         },
         {
             "deviceId": "test-device-01",
-            "moduleId": "mymodule1",
+            "moduleId": "mymodule0",
             "etag": "AAAAAAAAAAI=",
             "deviceEtag": "NzMxMTM1OTQz",
             "status": "enabled",
@@ -78,14 +110,13 @@
     "configuration": {
         "content": {
             "modulesContent": {
-                "mymodule0": {
-                    "properties.desired": {
-                        "settings": {
-                            "prop0": "val0"
-                        }
-                    }
+                "$edgeAgent": {
+                    "properties.desired": {}
                 },
-                "mymodule1": {
+                "$edgeHub": {
+                    "properties.desired": {}
+                },
+                "mymodule0": {
                     "properties.desired": {
                         "settings": {
                             "prop0": "val0"

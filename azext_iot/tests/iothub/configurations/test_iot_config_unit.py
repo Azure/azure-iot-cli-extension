@@ -1034,14 +1034,61 @@ class TestConfigApply:
 
 class TestConfigExport:
     @pytest.fixture(params=[200])
-    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request, sample_config_read):
-        service_client = mocker.patch(path_service_client)
-        service_client.side_effect = [
-            build_mock_response(mocker, payload=[{"moduleId" : "$edgeAgent"}, {"moduleId" : "AzureBlobStorageonIoTEdge"}]),
-            build_mock_response(mocker, payload=sample_config_read["moduleTwins"][0]),
-            build_mock_response(mocker, payload=sample_config_read["moduleTwins"][1]),
-        ]
-        return service_client
+    def serviceclient(self, mocked_response, fixture_ghcs, fixture_sas, request, sample_config_read, device_id):
+        # service_client = mocker.patch(path_service_client)
+        # service_client.side_effect = [
+        #     build_mock_response(mocker, payload=[{"moduleId" : "$edgeAgent"}, {"moduleId" : "AzureBlobStorageonIoTEdge"}]),
+        #     build_mock_response(mocker, payload=sample_config_read["moduleTwins"][0]),
+        #     build_mock_response(mocker, payload=sample_config_read["moduleTwins"][1]),
+        # ]
+        # return service_client
+        mocked_response.add(
+            method=responses.GET,
+            url="https://{}/devices/{}/modules?api-version=2021-04-12".format(
+                mock_target["entity"],
+                device_id
+            ),
+            body=json.dumps(sample_config_read["modules"]),
+            status=request.param,
+            content_type="application/json",
+            match_querystring=False,
+        )
+
+        mocked_response.add(
+            method=responses.GET,
+            url="https://{}/twins/{}/modules/%24edgeAgent?api-version=2021-04-12".format(
+                mock_target["entity"],
+                device_id
+            ),
+            body=json.dumps(sample_config_read["moduleTwins"][0]),
+            status=request.param,
+            content_type="application/json",
+            match_querystring=False,
+        )
+
+        mocked_response.add(
+            method=responses.GET,
+            url="https://{}/twins/{}/modules/%24edgeHub?api-version=2021-04-12".format(
+                mock_target["entity"],
+                device_id
+            ),
+            body=json.dumps(sample_config_read["moduleTwins"][1]),
+            status=request.param,
+            content_type="application/json",
+            match_querystring=False,
+        )
+
+        mocked_response.add(
+            method=responses.GET,
+            url="https://{}/twins/{}/modules/mymodule0?api-version=2021-04-12".format(
+                mock_target["entity"],
+                device_id
+            ),
+            body=json.dumps(sample_config_read["moduleTwins"][2]),
+            status=request.param,
+            content_type="application/json",
+            match_querystring=False,
+        )
 
     @pytest.fixture(params=[404])
     def service_client_error(self, mocked_response, fixture_ghcs, fixture_sas, request, device_id):

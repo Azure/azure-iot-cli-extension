@@ -1045,9 +1045,8 @@ helps[
     "iot edge export-modules"
 ] = """
     type: command
-    short-summary: Export the edge module configuration of a single edge device.
-    long-summary: |
-                  The module twin configuration output can be directly used as the --content of "az iot edge set-modules".
+    short-summary: Export the edge modules' configuration on a single edge device.
+    long-summary: The module twin configuration output can be directly used as the --content of "az iot edge set-modules".
     examples:
     - name: Export module twin configuration on a target device.
       text: >
