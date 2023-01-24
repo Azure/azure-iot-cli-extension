@@ -1035,13 +1035,6 @@ class TestConfigApply:
 class TestConfigExport:
     @pytest.fixture(params=[200])
     def serviceclient(self, mocked_response, fixture_ghcs, fixture_sas, request, sample_config_read, device_id):
-        # service_client = mocker.patch(path_service_client)
-        # service_client.side_effect = [
-        #     build_mock_response(mocker, payload=[{"moduleId" : "$edgeAgent"}, {"moduleId" : "AzureBlobStorageonIoTEdge"}]),
-        #     build_mock_response(mocker, payload=sample_config_read["moduleTwins"][0]),
-        #     build_mock_response(mocker, payload=sample_config_read["moduleTwins"][1]),
-        # ]
-        # return service_client
         mocked_response.add(
             method=responses.GET,
             url="https://{}/devices/{}/modules?api-version=2021-04-12".format(
