@@ -52,7 +52,7 @@ def parse_iot_hub_message_endpoint_connection_string(cs):
 
 
 def parse_storage_container_connection_string(cs):
-    validate = ["DefaultEndpointsProtocol", "EndpointSuffix", "AccountName", "AccountKey"]
+    validate = ["AccountName", "AccountKey"]
     return _parse_connection_string(cs, validate, "Storage Container")
 
 

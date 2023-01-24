@@ -86,7 +86,7 @@ class StateProvider(IoTHubProvider):
         return iot_hub_service_factory(self.cmd.cli_ctx)
 
     def save_state(self, state_file: str, replace: bool = False, hub_aspects: Optional[List[str]] = None):
-        '''Writes hub state to file'''
+        """Main command to writes hub state to file"""
         if (
             os.path.exists(state_file)
             and os.stat(state_file).st_size
@@ -112,7 +112,7 @@ class StateProvider(IoTHubProvider):
             raise FileOperationError(usr_msgs.FILE_NOT_FOUND_ERROR.format(state_file))
 
     def upload_state(self, state_file: str, replace: bool = False, hub_aspects: Optional[List[str]] = None):
-        '''Uses hub state from file to recreate the hub state'''
+        """Main command that uses hub state from file to recreate the hub state"""
         if not hub_aspects:
             hub_aspects = HubAspects.list()
         if HubAspects.Arm.value in hub_aspects and self.login:
@@ -140,7 +140,7 @@ class StateProvider(IoTHubProvider):
         replace: bool = False,
         hub_aspects: Optional[List[str]] = None
     ):
-        '''Migrates state from original hub to destination hub.'''
+        """Migrates state from original hub to destination hub."""
         orig_hub_target = self.discovery.get_target(
             resource_name=orig_hub,
             resource_group_name=orig_rg,
@@ -177,7 +177,7 @@ class StateProvider(IoTHubProvider):
                 self.delete_all_certificates()
 
     def process_hub_to_dict(self, target: Dict[str, str], hub_aspects: List[str]) -> dict:
-        '''Returns a dictionary containing the hub state
+        """Returns a dictionary containing the hub state
         Full structure:
         {
             "arm": full_arm_template,
@@ -203,7 +203,7 @@ class StateProvider(IoTHubProvider):
                 }
             }
         }
-        '''
+        """
         hub_state = {}
 
         if HubAspects.Configurations.value in hub_aspects:
@@ -229,78 +229,9 @@ class StateProvider(IoTHubProvider):
 
         if HubAspects.Devices.value in hub_aspects:
             hub_aspects.remove(HubAspects.Devices.value)
-            hub_state["devices"] = {}
-            twins = _iot_device_twin_list(target=target, top=-1)
-
-            for i in tqdm(range(len(twins)), desc=usr_msgs.SAVE_DEVICE_DESC, ascii=" #"):
-                device_twin = twins[i]
-                device_id = device_twin["deviceId"]
-                device_obj = {}
-
-                if device_twin.get("parentScopes"):
-                    device_parent = device_twin["parentScopes"][0].split("://")[1]
-                    device_obj["parent"] = device_parent[:device_parent.rfind("-")]
-
-                # Basic tier does not support device twins, modules
-                if not device_twin.get("properties"):
-                    continue
-                # put properties + tags into the saved twin
-                device_twin["properties"].pop("reported")
-                for key in ["$metadata", "$version"]:
-                    device_twin["properties"]["desired"].pop(key)
-
-                device_obj["twin"] = {
-                    "properties": device_twin.pop("properties")
-                }
-
-                if device_twin.get("tags"):
-                    device_obj["twin"]["tags"] = device_twin.pop("tags")
-
-                # create the device identity from the device twin
-                # primary and secondary keys show up in the "show" output but not in the "list" output
-                authentication = {
-                    "type": device_twin.pop("authenticationType"),
-                    "x509Thumbprint": device_twin.pop("x509Thumbprint")
-                }
-                if authentication["type"] == DeviceAuthApiType.sas.value:
-                    id2 = _iot_device_show(target=target, device_id=device_id)
-                    authentication["symmetricKey"] = id2["authentication"]["symmetricKey"]
-                device_twin["authentication"] = authentication
-
-                for key in IMMUTABLE_DEVICE_IDENTITY_FIELDS:
-                    device_twin.pop(key, None)
-                device_obj["identity"] = device_twin
-
-                module_objs = _iot_device_module_list(target=target, device_id=device_id)
-                if module_objs:
-                    device_obj["modules"] = {}
-
-                for module in module_objs:
-                    module = module.serialize()
-                    module_id = module["moduleId"]
-                    module_identity_show = _iot_device_module_show(
-                        target=target, device_id=device_id, module_id=module_id
-                    )
-                    module["authentication"] = module_identity_show["authentication"]
-
-                    for key in IMMUTABLE_MODULE_IDENTITY_FIELDS:
-                        module.pop(key)
-
-                    module_twin = _iot_device_module_twin_show(
-                        target=target, device_id=device_id, module_id=module_id
-                    )
-                    for key in IMMUTABLE_AND_DUPLICATE_MODULE_TWIN_FIELDS:
-                        module_twin.pop(key)
-                    for key in ["$metadata", "$version"]:
-                        module_twin["properties"]["desired"].pop(key)
-                    module_twin["properties"].pop("reported")
-
-                    device_obj["modules"][module_id] = {
-                        "identity": module,
-                        "twin": module_twin
-                    }
-
-                hub_state["devices"][device_id] = device_obj
+            devices = self.download_devices(target=target)
+            if devices:
+                hub_state["devices"] = devices
 
         # Controlplane using ARM
         if HubAspects.Arm.value in hub_aspects:
@@ -315,79 +246,7 @@ class StateProvider(IoTHubProvider):
             hub_arm = cli.invoke(f"group export -n {hub_rg} --resource-ids '{hub_resource_id}' --skip-all-params").as_json()
             hub_state["arm"] = hub_arm
             hub_resource = hub_state["arm"]["resources"][0]
-            # get connection strings if needed
-            endpoints = hub_resource["properties"]["routing"]["endpoints"]
-            for ep in endpoints["cosmosDBSqlCollections"]:
-                if ep.get("primaryKey") or ep.get("secondaryKey"):
-                    account_name = ep["endpointUri"].strip("https://").split(".")[0]
-                    cosmos_keys = cli.invoke(
-                        'cosmosdb keys list --name {} --resource-group {} --type connection-strings'.format(
-                            account_name,
-                            ep["resourceGroup"]
-                        )
-                    ).as_json()
-                    for cs_object in cosmos_keys["connectionStrings"]:
-                        if cs_object["description"] == "Primary SQL Connection String" and ep.get("primaryKey"):
-                            ep["primaryKey"] = parse_cosmos_db_connection_string(cs_object["connectionString"])["AccountKey"]
-                        if cs_object["description"] == "Secondary SQL Connection String" and ep.get("secondaryKey"):
-                            ep["secondaryKey"] = parse_cosmos_db_connection_string(cs_object["connectionString"])["AccountKey"]
-            for ep in endpoints["eventHubs"]:
-                if ep.get("connectionString"):
-                    endpoint_props = parse_iot_hub_message_endpoint_connection_string(ep["connectionString"])
-                    namespace = endpoint_props["Endpoint"].strip("sb://").split(".")[0]
-                    ep["connectionString"] = cli.invoke(
-                        "eventhubs eventhub authorization-rule keys list --namespace-name {} --resource-group {} "
-                        "--eventhub-name {} --name {}".format(
-                            namespace,
-                            ep["resourceGroup"],
-                            endpoint_props["EntityPath"],
-                            endpoint_props["SharedAccessKeyName"]
-                        )
-                    ).as_json()["primaryConnectionString"]
-            for ep in endpoints["serviceBusQueues"]:
-                if ep.get("connectionString"):
-                    endpoint_props = parse_iot_hub_message_endpoint_connection_string(ep["connectionString"])
-                    namespace = endpoint_props["Endpoint"].strip("sb://").split(".")[0]
-                    ep["connectionString"] = cli.invoke(
-                        "servicebus queue authorization-rule keys list --namespace-name {} --resource-group {} "
-                        "--queue-name {} --name {}".format(
-                            namespace,
-                            ep["resourceGroup"],
-                            endpoint_props["EntityPath"],
-                            endpoint_props["SharedAccessKeyName"]
-                        )
-                    ).as_json()["primaryConnectionString"]
-            for ep in endpoints["serviceBusTopics"]:
-                if ep.get("connectionString"):
-                    endpoint_props = parse_iot_hub_message_endpoint_connection_string(ep["connectionString"])
-                    namespace = endpoint_props["Endpoint"].strip("sb://").split(".")[0]
-                    ep["connectionString"] = cli.invoke(
-                        "servicebus topic authorization-rule keys list --namespace-name {} --resource-group {} "
-                        "--topic-name {} --name {}".format(
-                            namespace,
-                            ep["resourceGroup"],
-                            endpoint_props["EntityPath"],
-                            endpoint_props["SharedAccessKeyName"]
-                        )
-                    ).as_json()["primaryConnectionString"]
-            for ep in endpoints["storageContainers"]:
-                if ep.get("connectionString"):
-                    endpoint_props = parse_storage_container_connection_string(ep["connectionString"])
-                    ep["connectionString"] = cli.invoke(
-                        "storage account show-connection-string -n {} -g {}".format(
-                            endpoint_props["AccountName"],
-                            ep["resourceGroup"],
-                        )
-                    ).as_json()["connectionString"]
-
-            file_upload = hub_resource["properties"]["storageEndpoints"]["$default"]
-            if file_upload["connectionString"]:
-                endpoint_props = parse_storage_container_connection_string(file_upload["connectionString"])
-                file_upload["connectionString"] = cli.invoke(
-                    "storage account show-connection-string -n {}".format(
-                        endpoint_props["AccountName"]
-                    )
-                ).as_json()["connectionString"]
+            self.retrieve_endpoint_cstrings(hub_resource=hub_resource)
             print(usr_msgs.SAVE_ARM_DESC)
 
         return hub_state
@@ -595,6 +454,378 @@ class StateProvider(IoTHubProvider):
         # Leftover aspects
         if hub_aspects:
             logger.warning(usr_msgs.MISSING_HUB_ASPECTS_MSG.format(', '.join(hub_aspects)))
+
+    # Download commands
+    def download_devices(self, target: Dict[str, str]) -> dict:
+        """
+        Fetch devices and convert to the following structure:
+        {
+            "device_id": {
+                "identity": { identity_properties (and properties shared with twin) },
+                "twin" : { twin_properties },
+                "parent" : parent_id,
+                "modules" : {
+                    "module_id" : {
+                        "identity": { identity_properties },
+                        "twin": { twin_properties }
+                    }
+                }
+            }
+        }
+        """
+        # if incorrect permissions, will fail to retrieve any devices
+        devices = {}
+        try:
+            twins = _iot_device_twin_list(target=target, top=-1)
+        except AzCLIError:
+            logger.warning(usr_msgs.SAVE_DEVICES_RETRIEVE_FAIL_MSG)
+            return
+
+        for i in tqdm(range(len(twins)), desc=usr_msgs.SAVE_DEVICE_DESC, ascii=" #"):
+            device_twin = twins[i]
+            device_id = device_twin["deviceId"]
+            device_obj = {}
+
+            if device_twin.get("parentScopes"):
+                device_parent = device_twin["parentScopes"][0].split("://")[1]
+                device_obj["parent"] = device_parent[:device_parent.rfind("-")]
+
+            # Basic tier does not support device twins, modules
+            if not device_twin.get("properties"):
+                continue
+            # put properties + tags into the saved twin
+            device_twin["properties"].pop("reported")
+            for key in ["$metadata", "$version"]:
+                device_twin["properties"]["desired"].pop(key)
+
+            device_obj["twin"] = {
+                "properties": device_twin.pop("properties")
+            }
+
+            if device_twin.get("tags"):
+                device_obj["twin"]["tags"] = device_twin.pop("tags")
+
+            # create the device identity from the device twin
+            # primary and secondary keys show up in the "show" output but not in the "list" output
+            authentication = {
+                "type": device_twin.pop("authenticationType"),
+                "x509Thumbprint": device_twin.pop("x509Thumbprint")
+            }
+            if authentication["type"] == DeviceAuthApiType.sas.value:
+                # Cannot retrieve the sas key for some reason - throw out the device
+                try:
+                    id2 = _iot_device_show(target=target, device_id=device_id)
+                    authentication["symmetricKey"] = id2["authentication"]["symmetricKey"]
+                except AzCLIError:
+                    logger.warning(usr_msgs.SAVE_SPECIFIC_DEVICE_RETRIEVE_FAIL_MSG.format(device_id))
+                    continue
+            device_twin["authentication"] = authentication
+
+            for key in IMMUTABLE_DEVICE_IDENTITY_FIELDS:
+                device_twin.pop(key, None)
+            device_obj["identity"] = device_twin
+
+            # if unable to retrieve modules, log and continue without modules
+            module_objs = {}
+            try:
+                module_objs = _iot_device_module_list(target=target, device_id=device_id)
+            except AzCLIError:
+                logger.warning(usr_msgs.SAVE_SPECIFIC_DEVICE_MODULES_RETRIEVE_FAIL_MSG.format(device_id))
+
+            if module_objs:
+                device_obj["modules"] = {}
+
+            for module in module_objs:
+                module = module.serialize()
+                module_id = module["moduleId"]
+                # Fail to retrieve module identity - log and continue without module
+                try:
+                    module_identity_show = _iot_device_module_show(
+                        target=target, device_id=device_id, module_id=module_id
+                    )
+                except AzCLIError:
+                    logger.warning(
+                        usr_msgs.SAVE_SPECIFIC_DEVICE_SPECIFIC_MODULE_RETRIEVE_FAIL_MSG.format("identity", module_id, device_id)
+                    )
+                    continue
+                module["authentication"] = module_identity_show["authentication"]
+
+                for key in IMMUTABLE_MODULE_IDENTITY_FIELDS:
+                    module.pop(key)
+
+                # Fail to retrieve module twin - log and continue without module
+                try:
+                    module_twin = _iot_device_module_twin_show(
+                        target=target, device_id=device_id, module_id=module_id
+                    )
+                except AzCLIError:
+                    logger.warning(
+                        usr_msgs.SAVE_SPECIFIC_DEVICE_SPECIFIC_MODULE_RETRIEVE_FAIL_MSG.format("twin", module_id, device_id)
+                    )
+                    continue
+
+                for key in IMMUTABLE_AND_DUPLICATE_MODULE_TWIN_FIELDS:
+                    module_twin.pop(key)
+                for key in ["$metadata", "$version"]:
+                    module_twin["properties"]["desired"].pop(key)
+                module_twin["properties"].pop("reported")
+
+                device_obj["modules"][module_id] = {
+                    "identity": module,
+                    "twin": module_twin
+                }
+
+            devices[device_id] = device_obj
+
+        return devices
+
+    def retrieve_endpoint_cstrings(self, hub_resource: dict):
+        """
+        Fetch connection strings for endpoints and file upload if needed.
+
+        If cannot retrieve (due to missing permissions or resource), log and remove endpoint or file upload.
+
+        If an endpoint is removed, any route associated with it needs to be removed too.
+        """
+        # Endpoints - build up new list of endpoints we want to keep and track the removed ones
+        endpoints = hub_resource["properties"]["routing"]["endpoints"]
+        removed_endpoints = []
+
+        # Cosmos Db
+        cosmos_endpoints = []
+        for ep in endpoints["cosmosDBSqlCollections"]:
+            account_name = ep["endpointUri"].strip("https://").split(".")[0]
+            if ep.get("primaryKey") or ep.get("secondaryKey"):
+                try:
+                    cosmos_keys = cli.invoke(
+                        "cosmosdb keys list --name {} --resource-group {} --type connection-strings --subscription {}".format(
+                            account_name,
+                            ep["resourceGroup"],
+                            ep["subscriptionId"]
+                        )
+                    ).as_json()
+                except AzCLIError:
+                    logger.warning(
+                        usr_msgs.SAVE_ENDPOINT_RETRIEVE_FAIL_MSG.format("Cosmos DB Sql Collection", ep["name"])
+                    )
+                    removed_endpoints.append(ep["name"])
+                    continue
+
+                for cs_object in cosmos_keys["connectionStrings"]:
+                    if cs_object["description"] == "Primary SQL Connection String" and ep.get("primaryKey"):
+                        ep["primaryKey"] = parse_cosmos_db_connection_string(cs_object["connectionString"])["AccountKey"]
+                    if cs_object["description"] == "Secondary SQL Connection String" and ep.get("secondaryKey"):
+                        ep["secondaryKey"] = parse_cosmos_db_connection_string(cs_object["connectionString"])["AccountKey"]
+            else:
+                try:
+                    cli.invoke(
+                        "cosmosdb sql container show --account-name {} --resource-group {} --database-name {} "
+                        "--name {} --subscription {}".format(
+                            account_name,
+                            ep["resourceGroup"],
+                            ep["databaseName"],
+                            ep["collectionName"],
+                            ep["subscriptionId"]
+                        )
+                    )
+                except AzCLIError:
+                    logger.warning(
+                        usr_msgs.SAVE_ENDPOINT_INFO_RETRIEVE_FAIL_MSG.format("Cosmos DB Sql Collection", ep["name"])
+                    )
+                    removed_endpoints.append(ep["name"])
+                    continue
+
+            cosmos_endpoints.append(ep)
+        endpoints["cosmosDBSqlCollections"] = cosmos_endpoints
+
+        # Event Hub
+        eventhub_endpoints = []
+        for ep in endpoints["eventHubs"]:
+            if ep.get("connectionString"):
+                endpoint_props = parse_iot_hub_message_endpoint_connection_string(ep["connectionString"])
+                namespace = endpoint_props["Endpoint"].strip("sb://").split(".")[0]
+                try:
+                    ep["connectionString"] = cli.invoke(
+                        "eventhubs eventhub authorization-rule keys list --namespace-name {} --resource-group {} "
+                        "--eventhub-name {} --name {}  --subscription {}".format(
+                            namespace,
+                            ep["resourceGroup"],
+                            endpoint_props["EntityPath"],
+                            endpoint_props["SharedAccessKeyName"],
+                            ep["subscriptionId"]
+                        )
+                    ).as_json()["primaryConnectionString"]
+                except AzCLIError:
+                    logger.warning(usr_msgs.SAVE_ENDPOINT_RETRIEVE_FAIL_MSG.format("Event Hub", ep["name"]))
+                    removed_endpoints.append(ep["name"])
+                    continue
+            else:
+                namespace = ep["endpointUri"].strip("sb://").split(".")[0]
+                try:
+                    cli.invoke(
+                        "eventhubs eventhub show --namespace-name {} --resource-group {} "
+                        "--name {} --subscription {}".format(
+                            namespace,
+                            ep["resourceGroup"],
+                            ep["entityPath"],
+                            ep["subscriptionId"]
+                        )
+                    )
+                except AzCLIError:
+                    logger.warning(usr_msgs.SAVE_ENDPOINT_INFO_RETRIEVE_FAIL_MSG.format("Event Hub", ep["name"]))
+                    removed_endpoints.append(ep["name"])
+                    continue
+            eventhub_endpoints.append(ep)
+        endpoints["eventHubs"] = eventhub_endpoints
+
+        # Service Bus Queue
+        servicebus_queue_endpoints = []
+        for ep in endpoints["serviceBusQueues"]:
+            if ep.get("connectionString"):
+                endpoint_props = parse_iot_hub_message_endpoint_connection_string(ep["connectionString"])
+                namespace = endpoint_props["Endpoint"].strip("sb://").split(".")[0]
+                try:
+                    ep["connectionString"] = cli.invoke(
+                        "servicebus queue authorization-rule keys list --namespace-name {} --resource-group {} "
+                        "--queue-name {} --name {} --subscription {}".format(
+                            namespace,
+                            ep["resourceGroup"],
+                            endpoint_props["EntityPath"],
+                            endpoint_props["SharedAccessKeyName"],
+                            ep["subscriptionId"]
+                        )
+                    ).as_json()["primaryConnectionString"]
+                except AzCLIError:
+                    logger.warning(usr_msgs.SAVE_ENDPOINT_RETRIEVE_FAIL_MSG.format("Service Bus Queue", ep["name"]))
+                    removed_endpoints.append(ep["name"])
+                    continue
+            else:
+                namespace = ep["endpointUri"].strip("sb://").split(".")[0]
+                try:
+                    cli.invoke(
+                        "servicebus queue show --namespace-name {} --resource-group {} "
+                        "--name {} --subscription {}".format(
+                            namespace,
+                            ep["resourceGroup"],
+                            ep["entityPath"],
+                            ep["subscriptionId"]
+                        )
+                    )
+                except AzCLIError:
+                    logger.warning(usr_msgs.SAVE_ENDPOINT_INFO_RETRIEVE_FAIL_MSG.format("Service Bus Queue", ep["name"]))
+                    removed_endpoints.append(ep["name"])
+                    continue
+            servicebus_queue_endpoints.append(ep)
+        endpoints["serviceBusQueues"] = servicebus_queue_endpoints
+
+        # Service Bus Topic
+        servicebus_topic_endpoints = []
+        for ep in endpoints["serviceBusTopics"]:
+            if ep.get("connectionString"):
+                endpoint_props = parse_iot_hub_message_endpoint_connection_string(ep["connectionString"])
+                namespace = endpoint_props["Endpoint"].strip("sb://").split(".")[0]
+                try:
+                    ep["connectionString"] = cli.invoke(
+                        "servicebus topic authorization-rule keys list --namespace-name {} --resource-group {} "
+                        "--topic-name {} --name {} --subscription {}".format(
+                            namespace,
+                            ep["resourceGroup"],
+                            endpoint_props["EntityPath"],
+                            endpoint_props["SharedAccessKeyName"],
+                            ep["subscriptionId"]
+                        )
+                    ).as_json()["primaryConnectionString"]
+                except AzCLIError:
+                    logger.warning(
+                        usr_msgs.SAVE_ENDPOINT_RETRIEVE_FAIL_MSG.format("Service Topic Queue", ep["name"])
+                    )
+                    removed_endpoints.append(ep["name"])
+                    continue
+            else:
+                namespace = ep["endpointUri"].strip("sb://").split(".")[0]
+                try:
+                    cli.invoke(
+                        "servicebus topic show --namespace-name {} --resource-group {} "
+                        "--name {} --subscription {}".format(
+                            namespace,
+                            ep["resourceGroup"],
+                            ep["entityPath"],
+                            ep["subscriptionId"]
+                        )
+                    )
+                except AzCLIError:
+                    logger.warning(
+                        usr_msgs.SAVE_ENDPOINT_INFO_RETRIEVE_FAIL_MSG.format("Service Topic Queue", ep["name"])
+                    )
+                    removed_endpoints.append(ep["name"])
+                    continue
+            servicebus_topic_endpoints.append(ep)
+        endpoints["serviceBusTopics"] = servicebus_topic_endpoints
+
+        # Storage Account
+        storage_endpoints = []
+        for ep in endpoints["storageContainers"]:
+            if ep.get("connectionString"):
+                endpoint_props = parse_storage_container_connection_string(ep["connectionString"])
+                try:
+                    ep["connectionString"] = cli.invoke(
+                        "storage account show-connection-string -n {} -g {} --subscription {}".format(
+                            endpoint_props["AccountName"],
+                            ep["resourceGroup"],
+                            ep["subscriptionId"]
+                        )
+                    ).as_json()["connectionString"]
+                except AzCLIError:
+                    logger.warning(
+                        usr_msgs.SAVE_ENDPOINT_RETRIEVE_FAIL_MSG.format("Storage Container", ep["name"])
+                    )
+                    removed_endpoints.append(ep["name"])
+                    continue
+            else:
+                account_name = ep["endpointUri"].strip("https://").split(".")[0]
+                try:
+                    cli.invoke(
+                        "storage account show --name {} --subscription {}".format(
+                            account_name,
+                            ep["subscriptionId"],
+                        )
+                    )
+                except AzCLIError:
+                    logger.warning(
+                        usr_msgs.SAVE_ENDPOINT_INFO_RETRIEVE_FAIL_MSG.format("Storage Container", ep["name"])
+                    )
+                    removed_endpoints.append(ep["name"])
+                    continue
+            storage_endpoints.append(ep)
+        endpoints["storageContainers"] = storage_endpoints
+
+        # Go through routes to remove any that use removed endpoints
+        routes = hub_resource["properties"]["routing"]["routes"]
+        filtered_routes = [route for route in routes if route["endpointNames"][0] not in removed_endpoints]
+        hub_resource["properties"]["routing"]["routes"] = filtered_routes
+        filtered_routes = []
+        for route in routes:
+            if route["endpointNames"][0] in removed_endpoints:
+                logger.warning(usr_msgs.SAVE_ROUTE_FAIL_MSG.format(route["name"], route["endpointNames"][0]))
+            else:
+                filtered_routes.append(route)
+        hub_resource["properties"]["routing"]["routes"] = filtered_routes
+
+        # File upload
+        file_upload = hub_resource["properties"]["storageEndpoints"].get("$default", {})
+        if file_upload.get("connectionString"):
+            endpoint_props = parse_storage_container_connection_string(file_upload["connectionString"])
+            try:
+                file_upload["connectionString"] = cli.invoke(
+                    "storage account show-connection-string -n {}".format(
+                        endpoint_props["AccountName"]
+                    )
+                ).as_json()["connectionString"]
+            except AzCLIError:
+                logger.warning(usr_msgs.SAVE_FILE_UPLOAD_RETRIEVE_FAIL_MSG)
+                file_upload["authenticationType"] = None
+                file_upload["connectionString"] = None
+                file_upload["containerName"] = None
 
     # Upload commands
     def upload_device_identity(self, device_id: str, identity: dict):

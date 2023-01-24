@@ -1,10 +1,10 @@
-# IoT Hub State Trouble-Shooting Guide
+# IoT Hub State Troubleshooting Guide
 
-This section aims to provide additional help for the command group `az iot hub state` and answers to common questions.
+This document provides additional help for the command group `az iot hub state` and answers to common questions.
 
-## Defintions and Expected Behavior
+## Definitions and Expected Behavior
 
-Below is a table mapping aspects to hub properties. Anything that is not included in the list below may not be exported or imported correctly.
+The list below mapping hub aspects to hub properties. Any hub property that is not included in the list below may not be exported or imported correctly.
 
 arm:
  - built-in event hub's retention time
@@ -24,7 +24,7 @@ arm:
    + routes
  - tags
 
-configuratons:
+configurations:
  - ADM configurations
  - edge deployments
 
@@ -90,39 +90,46 @@ For an example of an export file, see [here](samples/iot_hub_state_export.json).
 
 ## Common Issues
 
-If `az iot hub state migrate` does not work, please use `az iot hub state export` with the origin hub followed by `az iot hub state import` with the destination hub. This will result in the same functionality but will also create a file. This will also help pinpoint issues - the information below will refer to export (which includes the export of hub aspects for the origin hub in migrate) and import (which includes the import of hub aspects for the destination hub in migrate).
+If `az iot hub state migrate` fails, please use `az iot hub state export` with the origin hub followed by `az iot hub state import` with the destination hub. Using these two commands will result in the same functionality but will also create a file. This action will also help pinpoint issues - the information below will refer to export (which includes the export of hub aspects for the origin hub in migrate) and import (which includes the import of hub aspects for the destination hub in migrate).
 
 If the arm aspect fails, the entire command will fail. Otherwise, if a device or configuration fails to upload or download, the rest of the command will continue with warnings.
 
 ### Certificates on Import
 
-If a certificate that is to be imported is already in the destination hub, it will need to be deleted before it can be replaced. This can be achieved by using the replace flag with the arm aspect.
+If a certificate that is to be imported is already in the destination hub, you will need to delete the certificate before it can be replaced. This can be achieved by using the replace flag with the arm aspect.
 
-An etag is needed to update the certificate in the destination hub but the arm template for IoT Hub does not take in etags. Thus, the only solution is to delete the current certificate and upload the imported certificate.
+An etag is needed to update the certificate in the destination hub, but the arm template for IoT Hub certificates does not accept etags. Thus, the only solution is to delete the current certificate and upload the imported certificate.
 
 ### System Identity Assignment on Import
 
-If System Identity is not turned on during Import, it will be turned on during import and a principal id will be assigned. This will not copy over any assigned permissions to the hub.
+If System Identity is not enabled during Import, it will be enabled during import and a principal id will be assigned. This will not copy over any assigned permissions to the hub.
 
-If System Identity is already turned on, the principal id will not be regenerated and any current permissions should work.
+If System Identity is already enabled, the principal id will not be regenerated and any current permissions should work.
 
 #### Endpoints with System Identity Authentication on Import
 
-If an endpoint has System Identity as the authentication method, the endpoint will be successfully copied over only if:
+Endpoints with System Identity authentication will be successfully copied over only if:
 
-1. The destination hub already has system assigned identity turned on
-2. The service the endpoint is connected to has the correct permissions to the destination hub's system identity.
+1. The destination hub already has system assigned identity enabled
+2. The service the endpoint is connected to exists
+3. The service the endpoint is connected to has the correct permissions to the destination hub's system identity.
 
-If either of the above conditions are not met, the endpoint will not be copied over and the command will fail.
+If either of the above conditions are not met, the endpoint will not be copied and the command will fail.
 
-To fix this, add the permissions needed for the system assigned identity and rerun the command. If this cannot be done because the hub does not exist yet (or system assigned permissions are not turned on):
+To fix this, add the permissions needed for the system assigned identity and rerun the command. If this cannot be done because the hub does not exist yet (or system assigned permissions are not enabled):
  1. Make a copy of the state you want to import and remove the offending endpoint(s) in your copy
  2. Run `az iot hub state import` with the copied file
- 3. Check that the hub has been created and system assigned identity is turned on
+ 3. Check that the hub has been created and system assigned identity is enabled
  4. Assign the correct permissions for the IoT Hub's system assigned identity to the correct endpoint scope(s)
  5. Run `az iot hub state import` with the original file (with the endpoint(s)) or create the endpoint manually
 
-### Private Endpoints
+### Endpoints and Routes on Export
+
+The export command will retrieve connection strings for endpoints that have key-based authentication. If the IoT hub has an endpoint that is connected to a deleted instance of a service, that endpoint and any routes using that endpoint will not be exported.
+
+The export command will not check if the service the endpoint is connected to exists for endpoints with System Identity or User Identity authentication.
+
+### Private Endpoints on Import
 
 Private Endpoints are not supported currently. They will be ignored during import.
 
