@@ -37,7 +37,6 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
         for auth_phase in DATAPLANE_AUTH_TYPES:
             edge_device_count = 1
             edge_device_ids = self.generate_device_names(edge_device_count, True)
-            # import pdb; pdb.set_trace()
 
             self.cmd(
                 self.set_cmd_auth_type(
