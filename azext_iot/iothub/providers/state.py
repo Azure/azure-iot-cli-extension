@@ -247,7 +247,7 @@ class StateProvider(IoTHubProvider):
             hub_arm = cli.invoke(f"group export -n {hub_rg} --resource-ids '{hub_resource_id}' --skip-all-params").as_json()
             hub_state["arm"] = hub_arm
             hub_resource = hub_state["arm"]["resources"][0]
-            self.retrieve_endpoint_cstrings(hub_resource=hub_resource)
+            self.check_controlplane(hub_resource=hub_resource)
             print(usr_msgs.SAVE_ARM_DESC)
 
         return hub_state
@@ -593,14 +593,34 @@ class StateProvider(IoTHubProvider):
 
         return devices
 
-    def retrieve_endpoint_cstrings(self, hub_resource: dict):
+    def check_controlplane(self, hub_resource: dict):
         """
-        Fetch connection strings for endpoints and file upload if needed.
+        Check the controlplane for missing resources and connection strings.
 
-        If cannot retrieve (due to missing permissions or resource), log and remove endpoint or file upload.
+        Specifically will fetch connection strings for endpoints and file upload and check for existance of
+        endpoint resources, file upload resources, and user assigned identity resources.
+
+        If cannot retrieve (due to missing permissions or resource), log and remove endpoint, file upload,
+        or user assigned identity.
 
         If an endpoint is removed, any route associated with it needs to be removed too.
         """
+        # User Assigned Identites
+        identities = hub_resource["identity"].get("userAssignedIdentities")
+        removed_identities = []
+        if identities:
+            existing_identities = []
+            for identity in identities:
+                success = cli.invoke(f"identity show --ids {identity}").success()
+                if success:
+                    existing_identities.append({identity: {}})
+                else:
+                    logger.warning(
+                        usr_msgs.SAVE_UAI_RETRIEVE_FAIL_MSG.format(identity)
+                    )
+                    removed_identities.append(identity)
+            hub_resource["identity"]["userAssignedIdentities"] = existing_identities
+
         # Endpoints - build up new list of endpoints we want to keep and track the removed ones
         endpoints = hub_resource["properties"]["routing"]["endpoints"]
         removed_endpoints = []
@@ -630,19 +650,25 @@ class StateProvider(IoTHubProvider):
                         ep["primaryKey"] = parse_cosmos_db_connection_string(cs_object["connectionString"])["AccountKey"]
                     if cs_object["description"] == "Secondary SQL Connection String" and ep.get("secondaryKey"):
                         ep["secondaryKey"] = parse_cosmos_db_connection_string(cs_object["connectionString"])["AccountKey"]
-            else:
-                try:
-                    cli.invoke(
-                        "cosmosdb sql container show --account-name {} --resource-group {} --database-name {} "
-                        "--name {} --subscription {}".format(
-                            account_name,
-                            ep["resourceGroup"],
-                            ep["databaseName"],
-                            ep["collectionName"],
-                            ep["subscriptionId"]
-                        )
+            elif isinstance(ep.get("identity"), dict) and ep["identity"]["userAssignedIdentity"] in removed_identities:
+                logger.warning(
+                    usr_msgs.SAVE_ENDPOINT_UAI_RETRIEVE_FAIL_MSG.format(
+                        "Cosmos DB Sql Collection", ep["name"], ep["identity"]["userAssignedIdentity"]
                     )
-                except AzCLIError:
+                )
+                removed_endpoints.append(ep["name"])
+            else:
+                success = cli.invoke(
+                    "cosmosdb sql container show --account-name {} --resource-group {} --database-name {} "
+                    "--name {} --subscription {}".format(
+                        account_name,
+                        ep["resourceGroup"],
+                        ep["databaseName"],
+                        ep["collectionName"],
+                        ep["subscriptionId"]
+                    )
+                ).success()
+                if not success:
                     logger.warning(
                         usr_msgs.SAVE_ENDPOINT_INFO_RETRIEVE_FAIL_MSG.format("Cosmos DB Sql Collection", ep["name"])
                     )
@@ -673,19 +699,25 @@ class StateProvider(IoTHubProvider):
                     logger.warning(usr_msgs.SAVE_ENDPOINT_RETRIEVE_FAIL_MSG.format("Event Hub", ep["name"]))
                     removed_endpoints.append(ep["name"])
                     continue
+            elif isinstance(ep.get("identity"), dict) and ep["identity"]["userAssignedIdentity"] in removed_identities:
+                logger.warning(
+                    usr_msgs.SAVE_ENDPOINT_UAI_RETRIEVE_FAIL_MSG.format(
+                        "Event Hub", ep["name"], ep["identity"]["userAssignedIdentity"]
+                    )
+                )
+                removed_endpoints.append(ep["name"])
             else:
                 namespace = ep["endpointUri"].strip("sb://").split(".")[0]
-                try:
-                    cli.invoke(
-                        "eventhubs eventhub show --namespace-name {} --resource-group {} "
-                        "--name {} --subscription {}".format(
-                            namespace,
-                            ep["resourceGroup"],
-                            ep["entityPath"],
-                            ep["subscriptionId"]
-                        )
+                success = cli.invoke(
+                    "eventhubs eventhub show --namespace-name {} --resource-group {} "
+                    "--name {} --subscription {}".format(
+                        namespace,
+                        ep["resourceGroup"],
+                        ep["entityPath"],
+                        ep["subscriptionId"]
                     )
-                except AzCLIError:
+                ).success()
+                if not success:
                     logger.warning(usr_msgs.SAVE_ENDPOINT_INFO_RETRIEVE_FAIL_MSG.format("Event Hub", ep["name"]))
                     removed_endpoints.append(ep["name"])
                     continue
@@ -713,19 +745,25 @@ class StateProvider(IoTHubProvider):
                     logger.warning(usr_msgs.SAVE_ENDPOINT_RETRIEVE_FAIL_MSG.format("Service Bus Queue", ep["name"]))
                     removed_endpoints.append(ep["name"])
                     continue
+            elif isinstance(ep.get("identity"), dict) and ep["identity"]["userAssignedIdentity"] in removed_identities:
+                logger.warning(
+                    usr_msgs.SAVE_ENDPOINT_UAI_RETRIEVE_FAIL_MSG.format(
+                        "Service Bus Queue", ep["name"], ep["identity"]["userAssignedIdentity"]
+                    )
+                )
+                removed_endpoints.append(ep["name"])
             else:
                 namespace = ep["endpointUri"].strip("sb://").split(".")[0]
-                try:
-                    cli.invoke(
-                        "servicebus queue show --namespace-name {} --resource-group {} "
-                        "--name {} --subscription {}".format(
-                            namespace,
-                            ep["resourceGroup"],
-                            ep["entityPath"],
-                            ep["subscriptionId"]
-                        )
+                success = cli.invoke(
+                    "servicebus queue show --namespace-name {} --resource-group {} "
+                    "--name {} --subscription {}".format(
+                        namespace,
+                        ep["resourceGroup"],
+                        ep["entityPath"],
+                        ep["subscriptionId"]
                     )
-                except AzCLIError:
+                ).success()
+                if not success:
                     logger.warning(usr_msgs.SAVE_ENDPOINT_INFO_RETRIEVE_FAIL_MSG.format("Service Bus Queue", ep["name"]))
                     removed_endpoints.append(ep["name"])
                     continue
@@ -751,25 +789,31 @@ class StateProvider(IoTHubProvider):
                     ).as_json()["primaryConnectionString"]
                 except AzCLIError:
                     logger.warning(
-                        usr_msgs.SAVE_ENDPOINT_RETRIEVE_FAIL_MSG.format("Service Topic Queue", ep["name"])
+                        usr_msgs.SAVE_ENDPOINT_RETRIEVE_FAIL_MSG.format("Service Bus Topic", ep["name"])
                     )
                     removed_endpoints.append(ep["name"])
                     continue
+            elif isinstance(ep.get("identity"), dict) and ep["identity"]["userAssignedIdentity"] in removed_identities:
+                logger.warning(
+                    usr_msgs.SAVE_ENDPOINT_UAI_RETRIEVE_FAIL_MSG.format(
+                        "Service Bus Topic", ep["name"], ep["identity"]["userAssignedIdentity"]
+                    )
+                )
+                removed_endpoints.append(ep["name"])
             else:
                 namespace = ep["endpointUri"].strip("sb://").split(".")[0]
-                try:
-                    cli.invoke(
-                        "servicebus topic show --namespace-name {} --resource-group {} "
-                        "--name {} --subscription {}".format(
-                            namespace,
-                            ep["resourceGroup"],
-                            ep["entityPath"],
-                            ep["subscriptionId"]
-                        )
+                success = cli.invoke(
+                    "servicebus topic show --namespace-name {} --resource-group {} "
+                    "--name {} --subscription {}".format(
+                        namespace,
+                        ep["resourceGroup"],
+                        ep["entityPath"],
+                        ep["subscriptionId"]
                     )
-                except AzCLIError:
+                ).success()
+                if not success:
                     logger.warning(
-                        usr_msgs.SAVE_ENDPOINT_INFO_RETRIEVE_FAIL_MSG.format("Service Topic Queue", ep["name"])
+                        usr_msgs.SAVE_ENDPOINT_INFO_RETRIEVE_FAIL_MSG.format("Service Bus Topic", ep["name"])
                     )
                     removed_endpoints.append(ep["name"])
                     continue
@@ -795,16 +839,22 @@ class StateProvider(IoTHubProvider):
                     )
                     removed_endpoints.append(ep["name"])
                     continue
+            elif isinstance(ep.get("identity"), dict) and ep["identity"]["userAssignedIdentity"] in removed_identities:
+                logger.warning(
+                    usr_msgs.SAVE_ENDPOINT_UAI_RETRIEVE_FAIL_MSG.format(
+                        "Storage Container", ep["name"], ep["identity"]["userAssignedIdentity"]
+                    )
+                )
+                removed_endpoints.append(ep["name"])
             else:
                 account_name = ep["endpointUri"].strip("https://").split(".")[0]
-                try:
-                    cli.invoke(
-                        "storage account show --name {} --subscription {}".format(
-                            account_name,
-                            ep["subscriptionId"],
-                        )
+                success = cli.invoke(
+                    "storage account show --name {} --subscription {}".format(
+                        account_name,
+                        ep["subscriptionId"],
                     )
-                except AzCLIError:
+                ).success()
+                if not success:
                     logger.warning(
                         usr_msgs.SAVE_ENDPOINT_INFO_RETRIEVE_FAIL_MSG.format("Storage Container", ep["name"])
                     )
@@ -827,7 +877,18 @@ class StateProvider(IoTHubProvider):
 
         # File upload
         file_upload = hub_resource["properties"]["storageEndpoints"].get("$default", {})
-        if file_upload.get("connectionString"):
+        if (
+            isinstance(file_upload.get("identity"), dict)
+            and file_upload["identity"]["userAssignedIdentity"] in removed_identities
+        ):
+            logger.warning(
+                usr_msgs.SAVE_FILE_UPLOAD_UAI_RETRIEVE_FAIL_MSG.format(file_upload["identity"]["userAssignedIdentity"])
+            )
+            file_upload["authenticationType"] = None
+            file_upload["connectionString"] = None
+            file_upload["containerName"] = None
+            file_upload["identity"] = None
+        elif file_upload.get("connectionString"):
             endpoint_props = parse_storage_container_connection_string(file_upload["connectionString"])
             try:
                 file_upload["connectionString"] = cli.invoke(
