@@ -38,6 +38,7 @@ from azext_iot.common.shared import (
 )
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
+    assemble_nargs_to_dict,
     handle_service_exception,
     read_file_content,
     init_monitoring,
@@ -1252,10 +1253,58 @@ def _iot_edge_set_modules(target, device_id, content):
         handle_service_exception(e)
 
 
+def iot_edge_export_modules(
+    cmd,
+    device_id,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
+):
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        resource_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
+    module_twin_list = []
+
+    try:
+        # Get all modules in the device
+        module_list = iot_device_module_list(cmd, device_id, hub_name=hub_name, login=login)
+        for module in module_list:
+            # Get module twins using module ids
+            module_twin = _iot_device_module_twin_show(
+                target=target, device_id=device_id, module_id=module.module_id)
+            module_twin_list.append(module_twin)
+
+        # Turn module twins list into module twin configuration
+        return _build_edge_modules_configuration(module_twin_list)
+    except CloudError as e:
+        handle_service_exception(e)
+
+
+def _build_edge_modules_configuration(module_twin_list):
+    modulesContent = {}
+    for module_twin in module_twin_list:
+        moduleId = module_twin["moduleId"]
+        desiredProperties = module_twin["properties"]["desired"]
+        # Add desired properties from module twin except $metadata and $version
+        if desiredProperties:
+            desiredProperties.pop("$metadata")
+            desiredProperties.pop("$version")
+            modulesContent[moduleId] = {"properties.desired": desiredProperties}
+
+    return {"content": {"modulesContent": modulesContent}}
+
+
 def iot_edge_deployment_create(
     cmd,
     config_id,
     content,
+    custom_labels=None,
+    custom_metric_queries=None,
     hub_name=None,
     target_condition="",
     priority=0,
@@ -1280,6 +1329,9 @@ def iot_edge_deployment_create(
         target=target,
         config_id=config_id,
         content=content,
+        custom_labels=custom_labels,
+        custom_metric_queries=custom_metric_queries,
+        hub_name=hub_name,
         target_condition=target_condition,
         priority=priority,
         labels=labels,
@@ -1292,6 +1344,8 @@ def iot_hub_configuration_create(
     cmd,
     config_id,
     content,
+    custom_labels=None,
+    custom_metric_queries=None,
     hub_name=None,
     target_condition="",
     priority=0,
@@ -1312,6 +1366,9 @@ def iot_hub_configuration_create(
         target=target,
         config_id=config_id,
         content=content,
+        custom_labels=custom_labels,
+        custom_metric_queries=custom_metric_queries,
+        hub_name=hub_name,
         target_condition=target_condition,
         priority=priority,
         labels=labels,
@@ -1324,6 +1381,10 @@ def _iot_hub_configuration_create(
     target,
     config_id,
     content,
+    config_type,
+    custom_labels=None,
+    custom_metric_queries=None,
+    hub_name=None,
     target_condition="",
     priority=0,
     labels=None,
@@ -1364,9 +1425,13 @@ def _iot_hub_configuration_create(
                 "metrics json must include the '{}' property".format(metrics_key)
             )
         metrics = metrics[metrics_key]
+    elif custom_metric_queries:
+        metrics = assemble_nargs_to_dict(custom_metric_queries)
 
     if labels:
         labels = process_json_arg(labels, argument_name="labels")
+    elif custom_labels:
+        labels = assemble_nargs_to_dict(custom_labels)
 
     config_content = ConfigurationContent(**processed_content)
 
