@@ -1331,7 +1331,6 @@ def iot_edge_deployment_create(
         content=content,
         custom_labels=custom_labels,
         custom_metric_queries=custom_metric_queries,
-        hub_name=hub_name,
         target_condition=target_condition,
         priority=priority,
         labels=labels,
@@ -1368,7 +1367,6 @@ def iot_hub_configuration_create(
         content=content,
         custom_labels=custom_labels,
         custom_metric_queries=custom_metric_queries,
-        hub_name=hub_name,
         target_condition=target_condition,
         priority=priority,
         labels=labels,
@@ -1384,12 +1382,10 @@ def _iot_hub_configuration_create(
     config_type,
     custom_labels=None,
     custom_metric_queries=None,
-    hub_name=None,
     target_condition="",
     priority=0,
     labels=None,
-    metrics=None,
-    config_type=ConfigType.adm
+    metrics=None
 ):
     from azext_iot.sdk.iothub.service.models import (
         Configuration,
