@@ -29,6 +29,7 @@ from azext_iot.common.shared import (ConfigType, DeviceAuthApiType,
 from azext_iot.iothub.common import (
     IMMUTABLE_AND_DUPLICATE_MODULE_TWIN_FIELDS,
     IMMUTABLE_DEVICE_IDENTITY_FIELDS, IMMUTABLE_MODULE_IDENTITY_FIELDS,
+    AuthenticationType,
     HubAspects)
 from azext_iot.iothub.providers.base import IoTHubProvider
 from azext_iot.operations.hub import (_iot_device_create, _iot_device_delete,
@@ -275,6 +276,19 @@ class StateProvider(IoTHubProvider):
                 # features - hub takes care of this but we will do this just incase
                 hub_resource["properties"]["features"] = current_hub_resource.properties.features
                 # TODO check for other props and add them as they pop up
+
+            else:
+                # If there is a system assigned identity endpoint, the ARM deployment may stall rather than failing
+                # outright. So warn and fail before deployment.
+                identity_endpoints = []
+                for endpoint_list in hub_resource["properties"]["routing"]["endpoints"].values():
+                    for endpoint in endpoint_list:
+                        if endpoint["authenticationType"] == AuthenticationType.IdentityBased.value:
+                            identity_endpoints.append(endpoint["name"])
+                if len(identity_endpoints) > 0:
+                    raise BadRequestError(
+                        usr_msgs.FAILED_ARM_IDENTITY_ENDPOINT_MSG.format(self.hub_name, identity_endpoints)
+                    )
 
             hub_resources.append(hub_resource)
 
