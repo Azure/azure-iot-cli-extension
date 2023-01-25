@@ -423,7 +423,7 @@ def load_iothub_help():
         - name: Import only the arm template from the specified file to the specified hub. Note that this will create a new hub if
                 it does not exist. The file may contain the devices and configurations but those will be ignored.
           text: >
-            az iot hub state import -n {iothub_name} -f {state_filename} --aspects arm
+            az iot hub state import -n {iothub_name} -g {resource_group} -f {state_filename} --aspects arm
         - name: Import only the devices and configurations from the specified file to the specified hub. Note that this will NOT
                 create a new hub if it does not exist and the command will fail. The file may contain the arm template but that
                 will be ignored.
@@ -462,7 +462,7 @@ def load_iothub_help():
         - name: Migrate only the arm template from the origin hub to the destination hub. Note that this will create a new hub if
                 the destination hub does not exist. The origin hub may contain the devices and configurations but those will be ignored.
           text: >
-            az iot hub state migrate --destination-hub {dest_hub_name} --origin-hub {orig_hub_name} --aspects arm
+            az iot hub state migrate --destination-hub {dest_hub_name} --destination-resource-group {dest_hub_resource_group} --origin-hub {orig_hub_name} --aspects arm
         - name: Migrate only the devices and configurations from the origin hub to the destination hub. Note that this will NOT
                 create a new hub if the destination hub does not exist and the command will fail. The arm template for the origin hub
                 will be ignored.
