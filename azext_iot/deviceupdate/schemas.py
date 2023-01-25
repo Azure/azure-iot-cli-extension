@@ -176,7 +176,6 @@ DEVICE_UPDATE_MANIFEST_V5_DEFS = {
                     "title": "File size",
                     "description": "File size in number of bytes.",
                     "minimum": 1,
-                    "maximum": 2147483648,
                 },
                 "hashes": {"$ref": "azure-deviceupdate-manifest-definitions-5.0.json#/definitions/fileHashes"},
                 "properties": {

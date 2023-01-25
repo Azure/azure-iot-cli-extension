@@ -748,7 +748,7 @@ helps[
       text: >
         az iot hub configuration create -c {config_name} -n {iothub_name} --content device_content.json
         --target-condition "tags.building=9 and tags.environment='test'" --priority 3
-    - name: Create a device configuration with labels and provide user metrics inline (bash syntax example)
+    - name: Create a device configuration with labels and provide user metrics inline (bash syntax example).
       text: >
         az iot hub configuration create -c {config_name} -n {iothub_name} --content device_content.json
         --target-condition "tags.building=9" --labels '{"key0":"value0", "key1":"value1"}' --priority 10
@@ -758,12 +758,17 @@ helps[
         az iot hub configuration create -c {config_name} -n {iothub_name} --content module_content.json
         --target-condition "from devices.modules where tags.building=9" --labels "{\\"key0\\":\\"value0\\", \\"key1\\":\\"value1\\"}"
         --metrics "{\\"metrics\\": {\\"queries\\": {\\"mymetric\\": \\"select moduleId from devices.modules where tags.location='US'\\"}}}"
-    - name: Create a module configuration with content and user metrics inline (powershell syntax example)
+    - name: Create a module configuration with content and user metrics inline (powershell syntax example).
       text: >
         az iot hub configuration create -c {config_name} -n {iothub_name}
         --content '{\\"moduleContent\\": {\\"properties.desired.chillerWaterSettings\\": {\\"temperature\\": 38, \\"pressure\\": 78}}}'
         --target-condition "from devices.modules where tags.building=9" --priority 1
         --metrics '{\\"metrics\\": {\\"queries\\": {\\"mymetric\\":\\"select moduleId from devices.modules where tags.location=''US''\\"}}}'
+    - name: Create a device configuration with an alternative input style of labels and metrics (shell agnostic).
+      text: >
+        az iot hub configuration create -c {config_name} -n {iothub_name} --content device_content.json
+        --target-condition "from devices.modules where tags.building=9" --custom-labels key0="value0" key1="value1" --priority 10
+        --custom-metric-queries mymetric1="select deviceId from devices where tags.location='US'" mymetric2="select *"
 """
 
 helps[
@@ -1037,6 +1042,18 @@ helps[
 """
 
 helps[
+    "iot edge export-modules"
+] = """
+    type: command
+    short-summary: Export the edge modules' configuration on a single edge device.
+    long-summary: The module twin configuration output can be directly used as the --content of "az iot edge set-modules".
+    examples:
+    - name: Export module twin configuration on a target device.
+      text: >
+        az iot edge export-modules --hub-name {iothub_name} --device-id {device_id}
+"""
+
+helps[
     "iot edge deployment"
 ] = """
     type: group
@@ -1095,6 +1112,14 @@ helps[
         --content layered_modules_content.json
         --target-condition "tags.building=9 and tags.environment='test'"
         --metrics metrics_content.json
+        --layered
+    - name: Create a layered deployment with an alternative input style of labels and metrics (shell agnostic)
+      text: >
+        az iot edge deployment create -d {deployment_name} -n {iothub_name}
+        --content layered_modules_content.json
+        --target-condition "tags.building=9 and tags.environment='test'"
+        --custom-labels key0="value0" key1="value1"
+        --custom-metric-queries mymetric1="select deviceId from devices where tags.location='US'" mymetric2="select *"
         --layered
 """
 
