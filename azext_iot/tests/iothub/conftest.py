@@ -39,7 +39,8 @@ def _assign_rbac_role(assignee: str, scope: str, role: str, max_tries: int = MAX
     while tries < max_tries:
         role_assignments = _get_role_assignments(scope, role)
         role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
-        if assignee in role_assignment_principal_ids:
+        role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
+        if assignee in role_assignment_principal_ids + role_assignment_principal_names:
             break
         # else assign role to scope and check again
         cli.invoke(

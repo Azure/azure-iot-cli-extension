@@ -1379,7 +1379,7 @@ def _iot_hub_configuration_create(
     target,
     config_id,
     content,
-    config_type,
+    config_type=ConfigType.adm,
     custom_labels=None,
     custom_metric_queries=None,
     target_condition="",
