@@ -1,3 +1,9 @@
+# coding=utf-8
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See License.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
 from azext_iot.central.models.v2022_06_30_preview.device import Device as DevicePreview
 from azext_iot.central.models.v2022_06_30_preview.query_response import (
     QueryResponse as QueryReponsePreview,
