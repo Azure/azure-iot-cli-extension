@@ -283,7 +283,10 @@ class StateProvider(IoTHubProvider):
                 identity_endpoints = []
                 for endpoint_list in hub_resource["properties"]["routing"]["endpoints"].values():
                     for endpoint in endpoint_list:
-                        if endpoint["authenticationType"] == AuthenticationType.IdentityBased.value:
+                        if (
+                            endpoint["authenticationType"] == AuthenticationType.IdentityBased.value
+                            and not endpoint.get("identity")
+                        ):
                             identity_endpoints.append(endpoint["name"])
                 if len(identity_endpoints) > 0:
                     raise BadRequestError(
