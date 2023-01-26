@@ -609,11 +609,11 @@ class StateProvider(IoTHubProvider):
         identities = hub_resource["identity"].get("userAssignedIdentities")
         removed_identities = []
         if identities:
-            existing_identities = []
+            existing_identities = {}
             for identity in identities:
                 success = cli.invoke(f"identity show --ids {identity}").success()
                 if success:
-                    existing_identities.append({identity: {}})
+                    existing_identities[identity] = {}
                 else:
                     logger.warning(
                         usr_msgs.SAVE_UAI_RETRIEVE_FAIL_MSG.format(identity)
