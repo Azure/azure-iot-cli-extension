@@ -92,7 +92,7 @@ jobs:
       serviceConnection: $(AzureServiceConnection)
 
 - job: 'testHub_job_1'
-  timeoutInMinutes: 90
+  timeoutInMinutes: 105
   displayName: 'Test IoT Hub - certificate, config, core, jobs, state'
   condition: and(succeeded(), eq('${{ parameters.testHub }}', true))
   strategy:
@@ -103,6 +103,7 @@ jobs:
     parameters:
       path: 'azext_iot/tests/iothub/certificate azext_iot/tests/iothub/configurations azext_iot/tests/iothub/core azext_iot/tests/iothub/jobs azext_iot/tests/iothub/state'
       name: 'iot-hub-1'
+      num_threads: 7
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
       pythonVersion: $(python)
       serviceConnection: $(AzureServiceConnection)
