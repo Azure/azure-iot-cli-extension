@@ -13,6 +13,14 @@ unreleased
 
   - az iot edge export-modules
 
+* Addition of `az iot hub state` commands to introduce saving, uploading, and copying states between IoT Hubs. This will
+  allow for easier migration of IoT Hubs when changing location, IoT Hub SKU, number of Event Hub partitions and more.
+  For more information, please read the trouble shooting guide [here](https://github.com/Azure/azure-iot-cli-extension/tree/dev/docs/iot-hub-state-trouble-shooting-guide.md).
+  The commands are as follows:
+  - `az iot hub state import` to save the current state of an IoT Hub to a JSON file
+  - `az iot hub state export` to upload a state from a JSON file to an IoT Hub
+  - `az iot hub state migrate` to copy a state of an IoT Hub to another IoT Hub
+
 
 0.19.0
 +++++++++++++++
@@ -35,7 +43,7 @@ unreleased
 
 Other notable changes, which are not affected by API versions, include:
 
-* Addition of fallback route management through `az iot hub message-route fallback set` and 
+* Addition of fallback route management through `az iot hub message-route fallback set` and
   `az iot hub message-route fallback show`
 
 * Modification of how route testing works for testing all route sources. If `az iot hub message-route test` is called
