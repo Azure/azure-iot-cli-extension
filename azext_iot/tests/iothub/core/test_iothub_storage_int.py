@@ -29,6 +29,7 @@ SETUP_MAX_ATTEMPTS = 3
 JOB_POLL_MAX_ATTEMPTS = 3
 SETUP_SLEEP_INTERVAL = 10
 IDENTITY_SLEEP_INTERVAL = 60
+REMOVE_HUB_STORAGE_CONNECTION = False
 
 
 class TestIoTStorage(IoTLiveScenarioTest):
@@ -36,6 +37,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
         self.storage_cstring = None
         super(TestIoTStorage, self).__init__(test_case)
         self.managed_identity = None
+        self.remove_hub_storage_connection = REMOVE_HUB_STORAGE_CONNECTION
 
         self.profile = Profile(cli_ctx=DummyCli())
         subscription = self.profile.get_subscription()
@@ -110,6 +112,18 @@ class TestIoTStorage(IoTLiveScenarioTest):
             self.cmd('identity delete -n {} -g {}'.format(
                 user_managed_identity_name, self.entity_rg
             ))
+
+        if self.remove_hub_storage_connection:
+            self.cmd(
+                'iot hub update -n {} --set {}'.format(
+                    self.entity_name,
+                    'properties.storageEndpoints.$default.connectionString=""'
+                ))
+            self.cmd(
+                'iot hub update -n {} --set {}'.format(
+                    self.entity_name,
+                    'properties.storageEndpoints.$default.containerName=""'
+                ))
         return super().tearDown()
 
     def test_storage(self):
@@ -117,6 +131,21 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         content_path = os.path.join(Path(CWD).parent, "test_generic_replace.json")
         device_ids = self.generate_device_names(device_count)
+
+        # Check if hub instance has valid storage endpoint
+        hubstate = self.cmd(
+            "iot hub show -n {}".format(
+                self.entity_name
+            )).get_output_in_json()
+        storage_cs = hubstate["properties"]["storageEndpoints"]["$default"]["connectionString"]
+
+        # Link storage conatiner to the hub instance if hub don't have one
+        if storage_cs is None or storage_cs == "":
+            self.cmd(
+                "iot hub update -n {} --fc {} --fcs {}".format(
+                    self.entity_name, self.storage_container, self.storage_cstring
+                ))
+            self.remove_hub_storage_connection = True
 
         self.cmd(
             "iot hub device-identity create -d {} -n {} -g {} --ee".format(

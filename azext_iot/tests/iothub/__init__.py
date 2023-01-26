@@ -57,6 +57,8 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         assert test_scenario
         self.entity_rg = ENTITY_RG
         self.entity_name = ENTITY_NAME
+        self.original_device_list = []
+        self.original_config_list = []
         super(IoTLiveScenarioTest, self).__init__(test_scenario)
 
         if hasattr(self, 'storage_cstring'):
@@ -114,6 +116,19 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             if(len(role_assignments) == 0):
                 self._add_data_contributor(target_hub)
 
+            # Note down current devices and configs so they can be excluded from tear down when tests are done
+            self.original_device_list.extend(d["deviceId"] for d in self.cmd(
+                f"iot hub device-twin list -n {self.entity_name} -g {self.entity_rg}"
+            ).get_output_in_json())
+
+            self.original_config_list.extend(c["id"] for c in self.cmd(
+                f"iot edge deployment list -n {self.entity_name} -g {self.entity_rg}"
+            ).get_output_in_json())
+
+            self.original_config_list.extend(c["id"] for c in self.cmd(
+                f"iot hub configuration list -n {self.entity_name} -g {self.entity_rg}"
+            ).get_output_in_json())
+
         self.region = self.get_region()
         self.connection_string = self.get_hub_cstring()
         add_test_tag(
@@ -152,6 +167,10 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             )
 
     def clean_up(self, device_ids: List[str] = None, config_ids: List[str] = None):
+        # Exclude the device exist before test from device list
+        for device in self.original_device_list:
+            device_ids.remove(device)
+
         if device_ids:
             device = device_ids.pop()
             self.cmd(
@@ -168,6 +187,10 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     ),
                     checks=self.is_empty(),
                 )
+
+        # Exclude the config exist before test from config list
+        for config in self.original_config_list:
+            config_ids.remove(config)
 
         if config_ids:
             config = config_ids.pop()

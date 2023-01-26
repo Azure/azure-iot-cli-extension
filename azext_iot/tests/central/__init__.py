@@ -224,7 +224,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         template = kwargs.get("template")
         if template:
-            command = command + " --template {}".format(template)
+            command = command + " --template '{}'".format(template)
             checks.append(self.check("template", template))
 
         simulated = bool(kwargs.get("simulated"))

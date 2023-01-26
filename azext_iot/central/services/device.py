@@ -922,6 +922,7 @@ def list_device_modules(
         verify=not should_disable_connection_verify(),
     )
 
+    import pdb; pdb.set_trace()
     response_data = _utility.try_extract_result(response).get("modules")
 
     if not response_data:
