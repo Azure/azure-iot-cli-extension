@@ -42,6 +42,12 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 except OSError as e:
                     logger.error(f"Failed to remove {cert}. {e}")
 
+        self.cmd(
+            "iot hub certificate delete --hub-name {} -g {} -n {} -e *".format(
+                self.entity_name, self.entity_rg, "root"
+            )
+        )
+
         super(TestIoTHubMessaging, self).tearDown()
 
     def test_uamqp_device_messaging(self):
@@ -601,6 +607,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 device_ids[0], self.connection_string
             )
         ).get_output_in_json()
+        # import pdb; pdb.set_trace()
 
         assert result is not None
         for key in test_twin_props:

@@ -168,8 +168,10 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def clean_up(self, device_ids: List[str] = None, config_ids: List[str] = None):
         # Exclude the device exist before test from device list
-        for device in self.original_device_list:
-            device_ids.remove(device)
+        for device in device_ids:
+            # import pdb; pdb.set_trace()
+            if self.original_device_list.count(device) > 0:
+                device_ids.remove(device)
 
         if device_ids:
             device = device_ids.pop()
@@ -189,8 +191,9 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 )
 
         # Exclude the config exist before test from config list
-        for config in self.original_config_list:
-            config_ids.remove(config)
+        for config in config_ids:
+            if self.original_config_list.count(config) > 0:
+                config_ids.remove(config)
 
         if config_ids:
             config = config_ids.pop()
