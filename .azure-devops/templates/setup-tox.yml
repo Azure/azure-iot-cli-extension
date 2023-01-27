@@ -1,0 +1,11 @@
+steps:
+  - task: UsePythonVersion@0
+    displayName: Get Python for Python tools.
+    inputs:
+      versionSpec: '3.7'
+      addToPath: false
+    name: pyTools
+  - script: $(pyTools.pythonLocation)/bin/pip install --upgrade tox
+    displayName: Install Tox
+  - script: git clone -b main --single-branch --depth 1 https://github.com/azure/azure-cli ../azure-cli
+    displayName: Clone CLI source for test SDK

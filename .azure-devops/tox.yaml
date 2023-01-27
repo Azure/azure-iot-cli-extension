@@ -1,0 +1,42 @@
+trigger: none
+pr: none
+
+pool:
+  vmImage: 'ubuntu-latest'
+jobs:
+- job: run
+  strategy:
+    matrix:
+      'linters':
+        python: '3.7'
+        toxEnvStr: 'lint'
+        desc: 'Flake8, Pylint'
+      'python 3.7 tests, min and current CLI':
+        python: '3.7'
+        toxEnvStr: 'py3.7-azmin-unit, py3.7-azcur-unit'
+        desc: 'Python 3.7 unit tests'
+      'python 3.8 tests, min and current CLI':
+        python: '3.8'
+        toxEnvStr: 'py3.8-azmin-unit, py3.8-azcur-unit'
+        desc: 'Python 3.7 unit tests'
+      'python 3.9 tests, min and current CLI':
+        python: '3.9'
+        toxEnvStr: 'py3.9-azmin-unit, py3.9-azcur-unit'
+        desc: 'Python 3.7 unit tests'
+      'python 3.10 tests, min and current CLI':
+        python: '3.10'
+        toxEnvStr: 'py3.10-azmin-unit, py3.10-azcur-unit'
+        desc: 'Python 3.7 unit tests'
+  steps:
+  - template: templates/setup-tox.yml
+  - template: templates/set-testenv-sentinel.yml
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: $(python)
+      architecture: 'x64'
+    displayName: 'Use cached Python $(python) for tests.'
+
+  - script: $(pyTools.pythonLocation)/bin/tox -e "$(toxEnvStr)" -p
+    displayName: $(desc)
+    env:
+        AZEXT_IOT_TESTRG: "test"
