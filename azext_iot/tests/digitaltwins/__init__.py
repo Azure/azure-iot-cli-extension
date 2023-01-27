@@ -195,7 +195,6 @@ class DTLiveScenarioTest(LiveScenarioTest):
 
     def is_region_available(self, region, capacity: int = 1):
         region_capacity = self.calculate_region_capacity
-        return True  # PPE DT test allows for more than expected number
         return (region_capacity.get(region, 0) + capacity) <= REGION_RESOURCE_LIMIT
 
     @property
