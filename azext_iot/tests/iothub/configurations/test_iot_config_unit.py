@@ -32,6 +32,13 @@ def sample_config_show(set_cwd):
 
 
 @pytest.fixture
+def sample_config_read(set_cwd):
+    path = "test_config_modules_read.json"
+    result = json.loads(read_file_content(path))
+    return result
+
+
+@pytest.fixture
 def sample_config_edge_malformed(set_cwd):
     path = "test_edge_deployment_malformed.json"
     result = json.dumps(json.loads(read_file_content(path)))
@@ -1023,3 +1030,104 @@ class TestConfigApply:
                 hub_name=mock_target["entity"],
                 content=sample_config_edge_malformed,
             )
+
+
+class TestConfigExport:
+    @pytest.fixture(params=[200])
+    def serviceclient(self, mocked_response, fixture_ghcs, fixture_sas, request, sample_config_read, device_id):
+        mocked_response.add(
+            method=responses.GET,
+            url="https://{}/devices/{}/modules?api-version=2021-04-12".format(
+                mock_target["entity"],
+                device_id
+            ),
+            body=json.dumps(sample_config_read["modules"]),
+            status=request.param,
+            content_type="application/json",
+            match_querystring=False,
+        )
+
+        mocked_response.add(
+            method=responses.GET,
+            url="https://{}/twins/{}/modules/%24edgeAgent?api-version=2021-04-12".format(
+                mock_target["entity"],
+                device_id
+            ),
+            body=json.dumps(sample_config_read["moduleTwins"][0]),
+            status=request.param,
+            content_type="application/json",
+            match_querystring=False,
+        )
+
+        mocked_response.add(
+            method=responses.GET,
+            url="https://{}/twins/{}/modules/%24edgeHub?api-version=2021-04-12".format(
+                mock_target["entity"],
+                device_id
+            ),
+            body=json.dumps(sample_config_read["moduleTwins"][1]),
+            status=request.param,
+            content_type="application/json",
+            match_querystring=False,
+        )
+
+        mocked_response.add(
+            method=responses.GET,
+            url="https://{}/twins/{}/modules/mymodule0?api-version=2021-04-12".format(
+                mock_target["entity"],
+                device_id
+            ),
+            body=json.dumps(sample_config_read["moduleTwins"][2]),
+            status=request.param,
+            content_type="application/json",
+            match_querystring=False,
+        )
+
+    @pytest.fixture(params=[404])
+    def service_client_error(self, mocked_response, fixture_ghcs, fixture_sas, request, device_id):
+        mocked_response.add(
+            method=responses.GET,
+            url="https://{}/devices/{}/modules?api-version=2021-04-12".format(
+                mock_target["entity"],
+                device_id
+            ),
+            body=json.dumps({'Message': 'Operation failed with status: ''Not Found'''}),
+            status=request.param,
+            content_type="application/json",
+            match_querystring=False,
+        )
+
+        yield mocked_response
+
+    @pytest.mark.parametrize(
+        "device_id, hub_name", [("test-device-01", mock_target["entity"])]
+    )
+    def test_config_export_edge(
+        self, fixture_cmd, serviceclient, device_id, hub_name, sample_config_read
+    ):
+        result = subject.iot_edge_export_modules(
+            cmd=fixture_cmd,
+            device_id=device_id,
+            hub_name=mock_target["entity"]
+        )
+
+        assert result == sample_config_read["configuration"]
+
+    @pytest.mark.parametrize(
+        "device_id, hub_name", [("test-device-01", mock_target["entity"])]
+    )
+    def test_config_export_edge_device_error(
+        self,
+        fixture_cmd,
+        service_client_error,
+        device_id,
+        hub_name
+    ):
+        with pytest.raises(CLIError) as error:
+            subject.iot_edge_export_modules(
+                cmd=fixture_cmd,
+                device_id=device_id,
+                hub_name=mock_target["entity"]
+            )
+
+        assert error.value.error_msg['Message'] == 'Operation failed with status: ''Not Found'''

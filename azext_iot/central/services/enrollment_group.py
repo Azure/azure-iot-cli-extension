@@ -461,8 +461,8 @@ def generate_verification_code(
     central_dns_suffix=CENTRAL_ENDPOINT,
 ) -> dict:
     """
-    Verify the primary or secondary x509 certificate of an enrollment group
-    by providing a certificate with the signed verification code.
+    Generate a verification code for the primary or secondary x509 certificate of
+    an enrollment group.
 
     Args:
         cmd: command passed into az

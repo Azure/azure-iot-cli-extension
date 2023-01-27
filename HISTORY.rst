@@ -7,6 +7,12 @@ Release History
 unreleased
 +++++++++++++++
 
+**IoT Hub updates**
+
+* Addition of export modules command for edge device
+
+  - az iot edge export-modules
+
 
 0.19.0
 +++++++++++++++
