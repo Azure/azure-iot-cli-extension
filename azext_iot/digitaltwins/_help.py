@@ -1143,7 +1143,7 @@ def load_digitaltwins_help():
         short-summary: Cancel a data import job executed on a digital twins instance.
 
         examples:
-        - name: cancel a data import job by job id.
+        - name: Cancel a data import job by job id.
           text: >
             az dt job import cancel -n {instance_or_hostname} -j {job_id}
     """
