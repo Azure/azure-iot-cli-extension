@@ -6,6 +6,7 @@
 import argparse
 from scripts.az_invoker import AzCliCommandInvoker
 from io import StringIO
+from contextlib import redirect_stdout
 
 example_text = """Examples:
 
@@ -63,9 +64,17 @@ def get_default_cli(**kwargs):
 if __name__ == "__main__":
     output_file = StringIO()
     cli = get_default_cli(invocation_cls=AzCliCommandInvoker)
-    arguments = args.commands + ["-h"]
+    arguments = args.commands
     # arguments = shlex.split(args.command)
     # import pdb; pdb.set_trace()
-    cli.invoke(arguments, out_file=output_file)
+    try:
+        with redirect_stdout(output_file):
+            cli.invoke(arguments, out_file=None)
+    except BaseException:
+        file_name = "help_" + "_".join(args.commands) + ".md"
+        help_contents = output_file.getvalue().replace("\x1b[36m", "")
+        help_contents = help_contents.replace("\x1b[0m", "")
+        with open(file_name, "w") as f:
+            f.write(help_contents)
 
     # cli.get_help("iot hub message-endpoint")

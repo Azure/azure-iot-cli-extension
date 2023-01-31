@@ -18,7 +18,8 @@ class AzCliCommandInvoker(CommandInvoker):
         command = self._rudimentary_get_command(args)
         self.cli_ctx.invocation.data['command_string'] = command
         # store the commands and sub commands to be printed out
-        commands = [command]
+        # tuple structure: (command_name, number of sub_headers for md file)
+        command_list = [(command, 1)]
 
         try:
             # The command is a non group command
@@ -37,18 +38,22 @@ class AzCliCommandInvoker(CommandInvoker):
                 cmd_stub = cmd_name[len(command):].strip()
                 group_name = cmd_stub.split(' ', 1)[0]
                 sub_group = command + " " + group_name
-                if sub_group != cmd_name and sub_group not in commands:
-                    commands.append(sub_group)
+                sub_group_tuple = (sub_group, group_name.count(" ") + 2)
+                if sub_group != cmd_name and sub_group_tuple not in command_list:
+                    # import pdb; pdb.set_trace()
+                    command_list.append(sub_group_tuple)
 
                 # Add the sub command we are looking at to order help correctly
-                commands.append(cmd_name)
+                command_list.append((cmd_name, cmd_stub.count(" ") + 2))
 
             self.commands_loader.command_table = cmd_table
 
         # Load all the arguments to avoid missing argument helps
         self.commands_loader.load_arguments()
 
-        for sub_command in commands:
+        for sub_command, header in command_list:
+            print("#" * header + " " + sub_command)
+            print("```")
             # Ensure that there is a help in the args
             args = sub_command.split() + ["-h"]
             # The usual prep the command loader and parser
@@ -60,6 +65,6 @@ class AzCliCommandInvoker(CommandInvoker):
                 self.parser.parse_args(args)
             except BaseException:
                 # Don't want to end before getting through everything
-                pass
+                print("```\n")
         # End program (the help usually sends an exit of 0)
         exit(0)
