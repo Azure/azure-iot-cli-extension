@@ -7,9 +7,29 @@ import argparse
 from scripts.az_invoker import AzCliCommandInvoker
 from io import StringIO
 
-parser = argparse.ArgumentParser(description='Prints out the help for the method given and any child method.')
+example_text = """Examples:
+
+Dump `az iot hub message-endpoint create eventhub`
+    python dump_help.py iot hub message-endpoint create eventhub
+
+Dump everything within `az iot hub message-endpoint create` (will include sub-commands, such as the one above)
+    python dump_help.py iot hub message-endpoint create
+
+Dump everything within `az iot hub message-endpoint` (will include sub-group and sub-commands, such as the one above)
+    python dump_help.py iot hub message-endpoint
+
+To save to a file, use > as so:
+    python dump_help.py iot hub message-endpoint > help_dump.txt
+
+"""
+
+parser = argparse.ArgumentParser(
+    description='Prints out the help for the method given and any child method.',
+    epilog=example_text,
+    formatter_class=argparse.RawDescriptionHelpFormatter
+)
 parser.add_argument('commands', type=str, nargs='+',
-                    help='command you want help to be printed out for')
+                    help='Command you want help to be printed out for.')
 args = parser.parse_args()
 
 
