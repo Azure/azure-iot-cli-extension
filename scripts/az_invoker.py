@@ -36,12 +36,15 @@ class AzCliCommandInvoker(CommandInvoker):
 
                 # See if there is a sub group (within this sub command) that was not accounted for yet.
                 cmd_stub = cmd_name[len(command):].strip()
-                group_name = cmd_stub.split(' ', 1)[0]
-                sub_group = command + " " + group_name
-                sub_group_tuple = (sub_group, group_name.count(" ") + 2)
-                if sub_group != cmd_name and sub_group_tuple not in command_list:
-                    # import pdb; pdb.set_trace()
-                    command_list.append(sub_group_tuple)
+                g = 0
+                while g < cmd_stub.count(" "):
+                    g += 1
+                    group_name = " ".join(cmd_stub.split(' ')[:g])
+                    sub_group = command + " " + group_name
+                    sub_group_tuple = (sub_group, g + 1)
+                    if sub_group != cmd_name and sub_group_tuple not in command_list:
+                        # import pdb; pdb.set_trace()
+                        command_list.append(sub_group_tuple)
 
                 # Add the sub command we are looking at to order help correctly
                 command_list.append((cmd_name, cmd_stub.count(" ") + 2))
