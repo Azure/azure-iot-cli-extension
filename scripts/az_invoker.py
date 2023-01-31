@@ -17,7 +17,6 @@ class AzCliCommandInvoker(CommandInvoker):
         self.commands_loader.load_command_table(args)
         command = self._rudimentary_get_command(args)
         self.cli_ctx.invocation.data['command_string'] = command
-        print(len(self.commands_loader.command_table))
 
         try:
             self.commands_loader.command_table = {command: self.commands_loader.command_table[command]}
@@ -30,7 +29,6 @@ class AzCliCommandInvoker(CommandInvoker):
 
                 cmd_table[cmd_name] = cmd
             self.commands_loader.command_table = cmd_table
-        print(len(self.commands_loader.command_table))
 
         commands = [command]
         commands.extend([c for c in self.commands_loader.command_table])
@@ -43,6 +41,6 @@ class AzCliCommandInvoker(CommandInvoker):
             self.parser.load_command_table(self.commands_loader)
             try:
                 self.parser.parse_args(args)
-            except:
+            except BaseException:
                 pass
         exit(0)
