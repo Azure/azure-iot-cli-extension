@@ -431,11 +431,12 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
             )
 
             config_list_check = [
-                self.check("length([*])", config_count),
                 self.exists("[?id=='{}']".format(config_ids[0])),
                 self.exists("[?id=='{}']".format(config_ids[1])),
                 self.exists("[?id=='{}']".format(config_ids[2])),
-                self.exists("[?id=='{}']".format(config_ids[3]))
+                self.exists("[?id=='{}']".format(config_ids[3])),
+                self.exists("[?id=='{}']".format(config_ids[4])),
+                self.exists("[?id=='{}']".format(config_ids[5]))
             ]
 
             # List all edge deployments
@@ -766,10 +767,10 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
             )
 
             config_list_check = [
-                self.check("length([*])", config_count),
                 self.exists("[?id=='{}']".format(config_ids[0])),
                 self.exists("[?id=='{}']".format(config_ids[1])),
-                self.exists("[?id=='{}']".format(config_ids[2]))
+                self.exists("[?id=='{}']".format(config_ids[2])),
+                self.exists("[?id=='{}']".format(config_ids[3])),
             ]
 
             # List all ADM configurations

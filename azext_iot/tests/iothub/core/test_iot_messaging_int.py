@@ -607,7 +607,6 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 device_ids[0], self.connection_string
             )
         ).get_output_in_json()
-        # import pdb; pdb.set_trace()
 
         assert result is not None
         for key in test_twin_props:

@@ -168,49 +168,44 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def clean_up(self, device_ids: List[str] = None, config_ids: List[str] = None):
         # Exclude the device exist before test from device list
-        for device in device_ids:
-            # import pdb; pdb.set_trace()
-            if self.original_device_list.count(device) > 0:
-                device_ids.remove(device)
-
         if device_ids:
             device = device_ids.pop()
-            self.cmd(
-                "iot hub device-identity delete -d {} --login {}".format(
-                    device, self.connection_string
-                ),
-                checks=self.is_empty(),
-            )
+            if device not in self.original_device_list:
+                self.cmd(
+                    "iot hub device-identity delete -d {} --login {}".format(
+                        device, self.connection_string
+                    ),
+                    checks=self.is_empty(),
+                )
 
             for device in device_ids:
-                self.cmd(
-                    "iot hub device-identity delete -d {} -n {} -g {}".format(
-                        device, self.entity_name, self.entity_rg
-                    ),
-                    checks=self.is_empty(),
-                )
+                if device not in self.original_device_list:
+                    self.cmd(
+                        "iot hub device-identity delete -d {} -n {} -g {}".format(
+                            device, self.entity_name, self.entity_rg
+                        ),
+                        checks=self.is_empty(),
+                    )
 
         # Exclude the config exist before test from config list
-        for config in config_ids:
-            if self.original_config_list.count(config) > 0:
-                config_ids.remove(config)
-
         if config_ids:
             config = config_ids.pop()
-            self.cmd(
-                "iot hub configuration delete -c {} --login {}".format(
-                    config, self.connection_string
-                ),
-                checks=self.is_empty(),
-            )
-
-            for config in config_ids:
+            if config not in self.original_config_list:
                 self.cmd(
-                    "iot hub configuration delete -c {} -n {} -g {}".format(
-                        config, self.entity_name, self.entity_rg
+                    "iot hub configuration delete -c {} --login {}".format(
+                        config, self.connection_string
                     ),
                     checks=self.is_empty(),
                 )
+
+            for config in config_ids:
+                if config not in self.original_config_list:
+                    self.cmd(
+                        "iot hub configuration delete -c {} -n {} -g {}".format(
+                            config, self.entity_name, self.entity_rg
+                        ),
+                        checks=self.is_empty(),
+                    )
 
     def generate_device_names(self, count=1, edge=False):
         names = [

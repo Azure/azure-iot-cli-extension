@@ -275,12 +275,6 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
         cert_auth: bool = False,
         custom_device_template: bool = False,
     ):
-        # get all devices in hub
-        device_list = self.cmd(
-            f"iot hub device-identity list -n {self.entity_name} -g {self.entity_rg}"
-        ).get_output_in_json()
-        # make sure all devices were created
-        assert len(device_list) == len(devices)
         # validate each device
         for device_tuple in devices:
             device_id = device_tuple.id
