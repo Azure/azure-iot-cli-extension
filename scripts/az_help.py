@@ -169,21 +169,22 @@ class AzCliHelp(CLIPrintMixin, CLIHelp):
             help_file.command = ''
         else:
             AzCliHelp.update_examples(help_file)
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         flattened_helps = []
-        to_check = [help_file]
+        to_check = [(help_file, parser)]
         while to_check:
-            child = to_check.pop(0)
+            child, child_parser = to_check.pop(0)
             flattened_helps.append(child)
             is_group = hasattr(child, "children")
             help_file = None
             if is_group:
-                help_file = self.group_help_cls(self, child.delimiters, parser)
-                to_check.extend(child.children)
+                help_file = self.group_help_cls(self, child.delimiters, child_parser)
+                for sub_child in child.children:
+                    to_check.append((sub_child, parser.choices[sub_child.name]))
             else:
-                help_file = self.command_help_cls(self, child.delimiters, parser)
+                help_file = self.command_help_cls(self, child.delimiters, child_parser)
 
-            self._print_detailed_help(cli_name, child)
+            self._print_detailed_help(cli_name, help_file)
 
         # self._print_detailed_help(cli_name, help_file)
         # from azure.cli.core.util import show_updates_available
