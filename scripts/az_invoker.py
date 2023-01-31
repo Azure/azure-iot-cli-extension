@@ -34,11 +34,11 @@ class AzCliCommandInvoker(CommandInvoker):
 
         commands = [command]
         commands.extend([c for c in self.commands_loader.command_table])
+        self.commands_loader.load_arguments()
 
         for sub_command in commands:
             args = sub_command.split() + ["-h"]
             self.commands_loader.command_name = sub_command
-            self.commands_loader.load_arguments(sub_command)
             self.parser.cli_ctx = self.cli_ctx
             self.parser.load_command_table(self.commands_loader)
             try:
