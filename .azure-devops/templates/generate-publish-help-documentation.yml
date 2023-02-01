@@ -5,7 +5,7 @@ parameters:
 steps:
   - task: PowerShell@2
     displayName: 'Generate help doc'
-    name: 'Install_Dev_tools'
+    name: 'Run_Dump_Help_Script'
     inputs:
       targetType: 'inline'
       script: |
