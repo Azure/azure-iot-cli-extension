@@ -57,8 +57,8 @@ jobs:
     steps:
     - task: UsePythonVersion@0
       inputs:
-        versionSpec: ${{ parameters.pythonVersion }}
-        architecture: ${{ parameters.architecture }}
+        versionSpec: '3.8'
+        architecture: 'x64'
 
     - template: templates/generate-publish-help-documentation.yml
       parameters:
