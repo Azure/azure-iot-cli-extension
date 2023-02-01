@@ -19,11 +19,6 @@ parameters:
   - 'ubuntu-latest'
 
 
-variables:
-  - name: targetRootCommand
-    value: $[variables.${{ parameters.rootCommand }}]
-
-
 jobs:
   - job: 'build_and_publish_azure_iot_cli_ext'
     pool:
