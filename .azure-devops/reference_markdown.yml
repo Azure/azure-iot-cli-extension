@@ -8,9 +8,7 @@ pr: none
 parameters:
 - name: rootCommand
   type: string
-- name: branch
-  type: string
-  default: 'dev'
+  default: 'iot'
 - name: linuxImage
   type: string
   default: 'ubuntu-20.04'
@@ -24,8 +22,6 @@ parameters:
 variables:
   - name: targetRootCommand
     value: $[variables.${{ parameters.rootCommand }}]
-  - name: targetBranch
-    value: $[variables.${{ parameters.branch }}]
 
 
 steps:
