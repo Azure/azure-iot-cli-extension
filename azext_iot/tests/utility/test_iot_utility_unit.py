@@ -338,12 +338,12 @@ class TestEmbeddedCli(object):
             (
                 "iot hub device-twin show -n 'abcd' -d 'dcba'",
                 "20a300e5-a444-4130-bb5a-1abd08ad930a",
-                None
+                None,
             ),
             (
                 "iot hub device-identity create -n abcd -d dcba",
                 None,
-                "20a300e5-a444-4130-bb5a-1abd08ad930a"
+                "20a300e5-a444-4130-bb5a-1abd08ad930a",
             ),
             (
                 "iot hub device-twin show -n 'abcd' -d 'dcba'",
@@ -352,7 +352,9 @@ class TestEmbeddedCli(object):
             ),
         ],
     )
-    def test_embedded_cli(self, mocker, mocked_azclient, command, user_subscription, subscription):
+    def test_embedded_cli(
+        self, mocker, mocked_azclient, command, user_subscription, subscription
+    ):
         import shlex
 
         cli_ctx = mocker.MagicMock()
@@ -465,7 +467,7 @@ class TestHandleServiceException(object):
             (502, AzureInternalError),
             (503, AzureInternalError),
             (504, AzureInternalError),
-            (None, AzureResponseError)
+            (None, AzureResponseError),
         ],
     )
     def test_handle_service_exception(self, mocker, status_code, expected_error):
