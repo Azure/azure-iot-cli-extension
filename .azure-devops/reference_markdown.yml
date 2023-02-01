@@ -48,7 +48,7 @@ jobs:
 
   - job: 'Generate_Help'
     displayName: 'Generate Help Documents'
-    dependsOn: [recordVersion]
+    dependsOn: [build_and_publish_azure_cli_test_sdk]
     steps:
     - task: UsePythonVersion@0
       inputs:
