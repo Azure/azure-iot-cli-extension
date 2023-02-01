@@ -340,4 +340,9 @@ def delete_data_connection(
     cleanup_connection_artifacts: bool = False,
 ):
     rp = ResourceProvider(cmd)
-    return rp.delete_data_connection(name=name, conn_name=conn_name, resource_group_name=resource_group_name)
+    return rp.delete_data_connection(
+        name=name,
+        conn_name=conn_name,
+        resource_group_name=resource_group_name,
+        cleanup_connection_artifacts=cleanup_connection_artifacts
+    )
