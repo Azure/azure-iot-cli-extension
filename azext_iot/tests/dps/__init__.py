@@ -80,9 +80,10 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
         if not settings.env.azext_iot_testdps_hub:
             self.create_hub()
 
-        # Assign correct roles for existed dps instance
         target_dps = self.cmd(
-            "iot dps show -n {} -g {}".format(self.entity_dps_name, self.entity_rg)
+            "iot dps update --name {} --resource-group {} --tags hubname={}".format(
+                self.entity_dps_name, self.entity_rg, self.entity_hub_name
+            )
         ).get_output_in_json()
 
         self._assign_roles_to_dps(target_dps)
