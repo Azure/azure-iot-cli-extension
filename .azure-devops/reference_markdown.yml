@@ -52,7 +52,7 @@ jobs:
     steps:
     - template: templates/setup-dev-test-env.yml
       parameters:
-        versionSpec: '3.8'
+        pythonVersion: '3.8'
         architecture: 'x64'
 
     - template: templates/install-and-record-version.yml

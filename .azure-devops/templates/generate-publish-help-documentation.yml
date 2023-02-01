@@ -9,7 +9,6 @@ steps:
     inputs:
       targetType: 'inline'
       script: |
-        ls
         python ./scripts/dump_help.py ${{ parameters.rootCommand }}
 
   - task: PublishBuildArtifacts@1
