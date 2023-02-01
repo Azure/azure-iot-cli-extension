@@ -24,7 +24,7 @@ variables:
     value: $[variables.${{ parameters.rootCommand }}]
 
 
-steps:
+jobs:
   - job: 'build_and_publish_azure_iot_cli_ext'
     pool:
       vmImage: ${{ parameters.linuxImage }}
