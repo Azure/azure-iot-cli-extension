@@ -1,0 +1,69 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+
+# Required for schedule only trigger
+trigger: none
+pr: none
+
+
+parameters:
+- name: rootCommand
+  type: string
+- name: branch
+  type: string
+  default: 'dev'
+- name: linuxImage
+  type: string
+  default: 'ubuntu-20.04'
+  values:
+  - 'ubuntu-18.04'
+  - 'ubuntu-20.04'
+  - 'ubuntu-22.04'
+  - 'ubuntu-latest'
+
+
+variables:
+  - name: targetRootCommand
+    value: $[variables.${{ parameters.rootCommand }}]
+  - name: targetBranch
+    value: $[variables.${{ parameters.branch }}]
+
+
+steps:
+  - job: 'build_and_publish_azure_iot_cli_ext'
+    pool:
+      vmImage: ${{ parameters.linuxImage }}
+
+    steps:
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '3.8'
+        architecture: 'x64'
+
+    - template: templates/setup-ci-machine.yml
+    - template: templates/build-publish-azure-iot-cli-extension.yml
+
+  - job: 'build_and_publish_azure_cli_test_sdk'
+    pool:
+      vmImage: ${{ parameters.linuxImage }}
+
+    steps:
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '3.8'
+        architecture: 'x64'
+
+    - template: templates/setup-ci-machine.yml
+    - template: templates/build-publish-azure-cli-test-sdk.yml
+
+  - job: 'Generate_Help'
+    displayName: 'Generate Help Documents'
+    dependsOn: [recordVersion]
+    steps:
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: ${{ parameters.pythonVersion }}
+        architecture: ${{ parameters.architecture }}
+
+    - template: templates/generate-publish-help-documentation.yml
+      parameters:
+        rootCommand: ${{ parameters.rootCommand }}

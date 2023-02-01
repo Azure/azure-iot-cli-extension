@@ -65,16 +65,23 @@ if __name__ == "__main__":
     output_file = StringIO()
     cli = get_default_cli(invocation_cls=AzCliCommandInvoker)
     arguments = args.commands
-    # arguments = shlex.split(args.command)
-    # import pdb; pdb.set_trace()
     try:
         with redirect_stdout(output_file):
             cli.invoke(arguments, out_file=None)
     except BaseException:
         file_name = "help_" + "_".join(args.commands) + ".md"
+
+        # Remove special characters with preview commands
         help_contents = output_file.getvalue().replace("\x1b[36m", "")
         help_contents = help_contents.replace("\x1b[0m", "")
+
+        # Remove deprecated
+        deprecated_lines = [i for i in range(len(help_contents)) if "deprecated" in help_contents[i].lower()]
+        while deprecated_lines:
+            start = deprecated_lines.pop(0)
+            end = deprecated_lines.pop(0) + 1
+            help_contents = help_contents[:start] + help_contents[end:]
+
         with open(file_name, "w") as f:
             f.write(help_contents)
 
-    # cli.get_help("iot hub message-endpoint")

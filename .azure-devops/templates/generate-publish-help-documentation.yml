@@ -1,0 +1,20 @@
+parameters:
+- name: rootCommand
+  type: string
+
+steps:
+  - task: PowerShell@2
+    displayName: 'Generate help doc'
+    name: 'Install_Dev_tools'
+    inputs:
+      targetType: 'inline'
+      script: |
+        python scripts/dump_help.py ${{ rootCommand }}
+
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish help contents'
+    inputs:
+      pathtoPublish: '.'
+      artifactName: 'help-file'
+      patterns: 'help_*.md'
+      publishLocation: 'Container'
