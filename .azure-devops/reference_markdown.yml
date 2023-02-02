@@ -32,7 +32,24 @@ jobs:
 
     - template: templates/setup-ci-machine.yml
     - template: templates/build-publish-azure-iot-cli-extension.yml
+
+  - job: 'build_and_publish_azure_cli_test_sdk'
+    pool:
+      vmImage: ${{ parameters.linuxImage }}
+
+    steps:
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '3.8'
+        architecture: 'x64'
+
+    - template: templates/setup-ci-machine.yml
     - template: templates/build-publish-azure-cli-test-sdk.yml
+
+  - job: 'Record_Version_Generate_Help'
+    displayName: 'Install and verify version'
+    dependsOn: [build_and_publish_azure_iot_cli_ext, build_and_publish_azure_cli_test_sdk]
+    steps:
     - template: templates/setup-dev-test-env.yml
       parameters:
         pythonVersion: '3.8'
