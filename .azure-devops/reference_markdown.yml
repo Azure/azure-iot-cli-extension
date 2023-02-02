@@ -33,11 +33,11 @@ jobs:
     - template: templates/setup-ci-machine.yml
     - template: templates/build-publish-azure-iot-cli-extension.yml
 
-    - template: install-azure-cli-released.yml
+    - template: templates/install-azure-cli-released.yml
 
-    - template: download-install-local-azure-iot-cli-extension.yml
+    - template: templates/download-install-local-azure-iot-cli-extension.yml
 
-    - template: set-pythonpath.yml
+    - template: templates/set-pythonpath.yml
 
     - template: templates/generate-publish-help-documentation.yml
       parameters:
