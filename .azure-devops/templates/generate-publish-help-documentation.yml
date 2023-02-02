@@ -16,5 +16,5 @@ steps:
     inputs:
       pathtoPublish: '.'
       artifactName: 'help-file'
-      patterns: 'help_*.md'
+      patterns: '*.md'
       publishLocation: 'Container'
