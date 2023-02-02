@@ -54,7 +54,7 @@ class ImportJobProvider(DigitalTwinsProvider):
     def list(self, top: int = None):  # top is guarded for int() in arg def
         from azext_iot.sdk.digitaltwins.dataplane.models import ImportJobsListOptions
 
-        list_options = ImportJobsListOptions(max_item_count=top)
+        list_options = ImportJobsListOptions(max_items_per_page=top)
 
         try:
             return self.sdk.list(import_jobs_list_options=list_options,)
@@ -77,12 +77,18 @@ class ImportJobProvider(DigitalTwinsProvider):
 
         try:
             import_job = BulkImportJob(input_blob_uri=input_blob_url, output_blob_uri=output_blob_url)
-            return self.sdk.put(id=job_id, import_job=import_job)
+            return self.sdk.add(id=job_id, import_job=import_job)
         except ErrorResponseException as e:
             handle_service_exception(e)
 
     def delete(self, job_id: str):
         try:
             return self.sdk.delete(id=job_id)
+        except ErrorResponseException as e:
+            handle_service_exception(e)
+
+    def cancel(self, job_id: str):
+        try:
+            return self.sdk.cancel(id=job_id)
         except ErrorResponseException as e:
             handle_service_exception(e)
