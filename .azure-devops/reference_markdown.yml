@@ -30,6 +30,15 @@ jobs:
         versionSpec: '3.8'
         architecture: 'x64'
 
+    - template: templates/setup-ci-machine.yml
+    - template: templates/build-publish-azure-iot-cli-extension.yml
+
+    - template: install-azure-cli-released.yml
+
+    - template: download-install-local-azure-iot-cli-extension.yml
+
+    - template: set-pythonpath.yml
+
     - template: templates/generate-publish-help-documentation.yml
       parameters:
         rootCommand: ${{ parameters.rootCommand }}

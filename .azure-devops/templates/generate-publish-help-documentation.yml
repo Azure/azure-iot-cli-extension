@@ -3,43 +3,8 @@ parameters:
   type: string
 
 steps:
-  - task: PowerShell@2
-    displayName: 'Upgrade pip, install dev_requirements and cryptography'
-    name: 'Install_Dev_tools'
-    inputs:
-      targetType: 'inline'
-      script: |
-        python -m pip install --upgrade pip
-        python -m pip install -r dev_requirements
-        python -m pip install cryptography
-
-  - script: 'python setup.py sdist bdist_wheel'
-    displayName: 'Build wheel for Azure IoT CLI extension'
-    workingDirectory: '.'
-
-  - task: AzureArtifacts.manifest-generator-task.manifest-generator-task.ManifestGeneratorTask@0
-    displayName: 'Generate Software Manifest'
-    inputs:
-      BuildDropPath: 'dist'
-
-  - task: PublishBuildArtifacts@1
-    displayName: 'Publish Azure IoT CLI extension as build artifact'
-    inputs:
-      pathtoPublish: 'dist'
-      artifactName: 'azure-iot'
-      publishLocation: 'Container'
-
-  - template: install-azure-cli-released.yml
-
-  - template: download-install-local-azure-iot-cli-extension.yml
-
-  - template: set-pythonpath.yml
-
   - script: 'python ./scripts/dump_help.py ${{ parameters.rootCommand }}'
     displayName: 'Generate help doc'
-
-  - script: 'ls -r ..'
-    displayName: 'print everything'
 
   - task: PublishBuildArtifacts@1
     displayName: 'Publish help contents'
