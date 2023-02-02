@@ -3,13 +3,8 @@ parameters:
   type: string
 
 steps:
-  - task: PowerShell@2
+  - script: 'python ./scripts/dump_help.py ${{ parameters.rootCommand }}'
     displayName: 'Generate help doc'
-    name: 'Run_Dump_Help_Script'
-    inputs:
-      targetType: 'inline'
-      script: |
-        python ./scripts/dump_help.py ${{ parameters.rootCommand }}
 
   - task: PublishBuildArtifacts@1
     displayName: 'Publish help contents'
