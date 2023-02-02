@@ -152,6 +152,9 @@ if __name__ == "__main__":
             end = deprecated_lines.pop(0) + 1
             help_contents = help_contents[:start] + help_contents[end:]
 
+        print(help_contents)
+        print(f"Writing to {file_name}")
+
         with open(file_name, "w") as f:
             f.write(help_contents)
 
