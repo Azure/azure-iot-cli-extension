@@ -9,7 +9,6 @@ steps:
   - task: PublishBuildArtifacts@1
     displayName: 'Publish help contents'
     inputs:
-      pathtoPublish: '.'
+      pathtoPublish: 'help.md'
       artifactName: 'help-file'
-      patterns: '*.md'
       publishLocation: 'Container'

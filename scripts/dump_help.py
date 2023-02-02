@@ -140,6 +140,7 @@ if __name__ == "__main__":
             cli.invoke(arguments, out_file=None)
     except BaseException:
         file_name = "help_" + "_".join(args.commands) + ".md"
+        file_name = "help.md"
 
         # Remove special characters with preview commands
         help_contents = output_file.getvalue().replace("\x1b[36m", "")
