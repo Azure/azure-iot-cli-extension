@@ -9,7 +9,6 @@ steps:
     inputs:
       targetType: 'inline'
       script: |
-        pip install -U knack
         python ./scripts/dump_help.py ${{ parameters.rootCommand }}
 
   - task: PublishBuildArtifacts@1

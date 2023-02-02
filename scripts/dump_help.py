@@ -130,8 +130,11 @@ def get_default_cli(**kwargs):
 
 if __name__ == "__main__":
     output_file = StringIO()
+    print(args.commands)
     cli = get_default_cli(invocation_cls=AzCliCommandInvoker)
+    print(cli)
     arguments = args.commands
+
     try:
         with redirect_stdout(output_file):
             cli.invoke(arguments, out_file=None)
