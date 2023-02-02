@@ -6,7 +6,7 @@ steps:
   - script: 'python ./scripts/dump_help.py ${{ parameters.rootCommand }}'
     displayName: 'Generate help doc'
 
-  - script: 'ls ..'
+  - script: 'ls -r ..'
     displayName: 'print everything'
 
   - task: PublishBuildArtifacts@1
