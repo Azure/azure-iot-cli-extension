@@ -22,7 +22,7 @@ class QueryOperations(object):
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: The requested API version. Constant value: "2022-05-31".
+    :ivar api_version: The requested API version. Constant value: "2023-02-27-preview".
     """
 
     models = models
@@ -32,7 +32,7 @@ class QueryOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2022-05-31"
+        self.api_version = "2023-02-27-preview"
 
         self.config = config
 
@@ -87,7 +87,7 @@ class QueryOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
         # Construct headers
         header_parameters = {}

@@ -3,8 +3,7 @@
 Release History
 ===============
 
-
-unreleased
+0.19.1
 +++++++++++++++
 
 **IoT Hub updates**
@@ -12,6 +11,15 @@ unreleased
 * Addition of export modules command for edge device
 
   - az iot edge export-modules
+
+
+**Digital Twins updates**
+* Digital Twins dataplane commands now use the newer 2023-02-27-preview API. The following command groups are affected:
+ - `az dt model`
+ - `az dt twin`
+ - `az dt job`
+
+* `az dt job import` now supports newer job statuses, including "cancelling" and "cancelled". Now, to delete a running job, the job must be first cancelled with `az dt job import cancel`.
 
 
 0.19.0
@@ -35,7 +43,7 @@ unreleased
 
 Other notable changes, which are not affected by API versions, include:
 
-* Addition of fallback route management through `az iot hub message-route fallback set` and 
+* Addition of fallback route management through `az iot hub message-route fallback set` and
   `az iot hub message-route fallback show`
 
 * Modification of how route testing works for testing all route sources. If `az iot hub message-route test` is called
