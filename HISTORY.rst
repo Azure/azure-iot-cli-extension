@@ -14,6 +14,7 @@ Release History
 
 
 **Digital Twins updates**
+
 * Digital Twins dataplane commands now use the newer 2023-02-27-preview API. The following command groups are affected:
  - `az dt model`
  - `az dt twin`
