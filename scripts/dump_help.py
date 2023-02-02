@@ -136,7 +136,7 @@ if __name__ == "__main__":
     arguments = args.commands
 
     try:
-        with redirect_stdout(output_file):
+        # with redirect_stdout(output_file):
             cli.invoke(arguments, out_file=None)
     except BaseException:
         file_name = "help_" + "_".join(args.commands) + ".md"
