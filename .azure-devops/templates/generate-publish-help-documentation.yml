@@ -29,7 +29,7 @@ steps:
       artifactName: 'azure-iot'
       publishLocation: 'Container'
 
-  - template: install-azure-cli-msi.yml
+  - template: install-azure-cli-released.yml
 
   - template: download-install-local-azure-iot-cli-extension.yml
 
