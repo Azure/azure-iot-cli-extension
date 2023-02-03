@@ -16,14 +16,21 @@ from msrest.exceptions import HttpOperationError
 class ErrorResponse(Model):
     """Error response.
 
-    :param error: The error details.
+    All required parameters must be populated in order to send to Azure.
+
+    :param error: Required. The error details.
     :type error: ~dataplane.models.Error
     """
+
+    _validation = {
+        'error': {'required': True},
+    }
 
     _attribute_map = {
         'error': {'key': 'error', 'type': 'Error'},
     }
 
+    # @vilit: had to make error optional so 403's (and other errors with no body) won't break the model
     def __init__(self, *, error=None, **kwargs) -> None:
         super(ErrorResponse, self).__init__(**kwargs)
         self.error = error

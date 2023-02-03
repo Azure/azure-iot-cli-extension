@@ -22,7 +22,7 @@ class ImportJobsOperations(object):
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: The requested API version. Constant value: "2021-06-30-preview".
+    :ivar api_version: The requested API version. Constant value: "2023-02-27-preview".
     """
 
     models = models
@@ -32,7 +32,7 @@ class ImportJobsOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2021-06-30-preview"
+        self.api_version = "2023-02-27-preview"
 
         self.config = config
 
@@ -75,7 +75,7 @@ class ImportJobsOperations(object):
 
                 # Construct parameters
                 query_parameters = {}
-                query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+                query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
             else:
                 url = next_link
@@ -116,10 +116,10 @@ class ImportJobsOperations(object):
             return client_raw_response
 
         return deserialized
-    list.metadata = {'url': '/jobs/import'}
+    list.metadata = {'url': '/jobs/imports'}
 
-    def put(
-            self, id, import_job, import_jobs_put_options=None, custom_headers=None, raw=False, **operation_config):
+    def add(
+            self, id, import_job, import_jobs_add_options=None, custom_headers=None, raw=False, **operation_config):
         """Creates a bulk import job.
         Status codes:
         * 201 Created
@@ -128,15 +128,14 @@ class ImportJobsOperations(object):
         been reached.
         * ValidationFailed - The bulk job request is not valid.
 
-        :param id: The id for a bulk import job. The id is unique within bulk
-         import jobs and case sensitive.
+        :param id: The id for the bulk import job. The id is unique within the
+         service and case sensitive.
         :type id: str
         :param import_job: The bulk import job being added.
         :type import_job: ~dataplane.models.BulkImportJob
-        :param import_jobs_put_options: Additional parameters for the
+        :param import_jobs_add_options: Additional parameters for the
          operation
-        :type import_jobs_put_options:
-         ~dataplane.models.ImportJobsPutOptions
+        :type import_jobs_add_options: ~dataplane.models.ImportJobsAddOptions
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
@@ -149,14 +148,14 @@ class ImportJobsOperations(object):
          :class:`ErrorResponseException<dataplane.models.ErrorResponseException>`
         """
         traceparent = None
-        if import_jobs_put_options is not None:
-            traceparent = import_jobs_put_options.traceparent
+        if import_jobs_add_options is not None:
+            traceparent = import_jobs_add_options.traceparent
         tracestate = None
-        if import_jobs_put_options is not None:
-            tracestate = import_jobs_put_options.tracestate
+        if import_jobs_add_options is not None:
+            tracestate = import_jobs_add_options.tracestate
 
         # Construct URL
-        url = self.put.metadata['url']
+        url = self.add.metadata['url']
         path_format_arguments = {
             'id': self._serialize.url("id", id, 'str')
         }
@@ -164,7 +163,7 @@ class ImportJobsOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
         # Construct headers
         header_parameters = {}
@@ -192,21 +191,16 @@ class ImportJobsOperations(object):
             raise models.ErrorResponseException(self._deserialize, response)
 
         deserialized = None
-        header_dict = {}
 
         if response.status_code == 201:
             deserialized = self._deserialize('BulkImportJob', response)
-            header_dict = {
-                'operation-location': 'str',
-            }
 
         if raw:
             client_raw_response = ClientRawResponse(deserialized, response)
-            client_raw_response.add_headers(header_dict)
             return client_raw_response
 
         return deserialized
-    put.metadata = {'url': '/jobs/import/{id}'}
+    add.metadata = {'url': '/jobs/imports/{id}'}
 
     def get_by_id(
             self, id, import_jobs_get_by_id_options=None, custom_headers=None, raw=False, **operation_config):
@@ -216,8 +210,8 @@ class ImportJobsOperations(object):
         * 404 Not Found
         * BulkJobNotFound - The bulk job was not found.
 
-        :param id: The id for a bulk import job. The id is unique within bulk
-         import jobs and case sensitive.
+        :param id: The id for the bulk import job. The id is unique within the
+         service and case sensitive.
         :type id: str
         :param import_jobs_get_by_id_options: Additional parameters for the
          operation
@@ -250,7 +244,7 @@ class ImportJobsOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
         # Construct headers
         header_parameters = {}
@@ -283,17 +277,18 @@ class ImportJobsOperations(object):
             return client_raw_response
 
         return deserialized
-    get_by_id.metadata = {'url': '/jobs/import/{id}'}
+    get_by_id.metadata = {'url': '/jobs/imports/{id}'}
 
     def delete(
             self, id, import_jobs_delete_options=None, custom_headers=None, raw=False, **operation_config):
         """Deletes a bulk import job.
         Status codes:
         * 204 No Content
-        .
+        * 400 Bad Request
+        * ValidationFailed - The bulk job request is not valid.
 
-        :param id: The id for a bulk import job. The id is unique within bulk
-         import jobs and case sensitive.
+        :param id: The id for the bulk import job. The id is unique within the
+         service and case sensitive.
         :type id: str
         :param import_jobs_delete_options: Additional parameters for the
          operation
@@ -325,7 +320,7 @@ class ImportJobsOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
         # Construct headers
         header_parameters = {}
@@ -351,4 +346,81 @@ class ImportJobsOperations(object):
         if raw:
             client_raw_response = ClientRawResponse(None, response)
             return client_raw_response
-    delete.metadata = {'url': '/jobs/import/{id}'}
+    delete.metadata = {'url': '/jobs/imports/{id}'}
+
+    def cancel(
+            self, id, import_jobs_cancel_options=None, custom_headers=None, raw=False, **operation_config):
+        """Cancels a bulk import job.
+        Status codes:
+        * 200 Request Accepted
+        * 400 Bad Request
+        * ValidationFailed - The bulk job request is not valid.
+
+        :param id: The id for the bulk import job. The id is unique within the
+         service and case sensitive.
+        :type id: str
+        :param import_jobs_cancel_options: Additional parameters for the
+         operation
+        :type import_jobs_cancel_options:
+         ~dataplane.models.ImportJobsCancelOptions
+        :param dict custom_headers: headers that will be added to the request
+        :param bool raw: returns the direct response alongside the
+         deserialized response
+        :param operation_config: :ref:`Operation configuration
+         overrides<msrest:optionsforoperations>`.
+        :return: BulkImportJob or ClientRawResponse if raw=true
+        :rtype: ~dataplane.models.BulkImportJob or
+         ~msrest.pipeline.ClientRawResponse
+        :raises:
+         :class:`ErrorResponseException<dataplane.models.ErrorResponseException>`
+        """
+        traceparent = None
+        if import_jobs_cancel_options is not None:
+            traceparent = import_jobs_cancel_options.traceparent
+        tracestate = None
+        if import_jobs_cancel_options is not None:
+            tracestate = import_jobs_cancel_options.tracestate
+
+        # Construct URL
+        url = self.cancel.metadata['url']
+        path_format_arguments = {
+            'id': self._serialize.url("id", id, 'str')
+        }
+        url = self._client.format_url(url, **path_format_arguments)
+
+        # Construct parameters
+        query_parameters = {}
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
+
+        # Construct headers
+        header_parameters = {}
+        header_parameters['Content-Type'] = 'application/json; charset=utf-8'
+        if self.config.generate_client_request_id:
+            header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
+        if custom_headers:
+            header_parameters.update(custom_headers)
+        if self.config.accept_language is not None:
+            header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
+        if traceparent is not None:
+            header_parameters['traceparent'] = self._serialize.header("traceparent", traceparent, 'str')
+        if tracestate is not None:
+            header_parameters['tracestate'] = self._serialize.header("tracestate", tracestate, 'str')
+
+        # Construct and send request
+        request = self._client.post(url, query_parameters)
+        response = self._client.send(request, header_parameters, stream=False, **operation_config)
+
+        if response.status_code not in [200]:
+            raise models.ErrorResponseException(self._deserialize, response)
+
+        deserialized = None
+
+        if response.status_code == 200:
+            deserialized = self._deserialize('BulkImportJob', response)
+
+        if raw:
+            client_raw_response = ClientRawResponse(deserialized, response)
+            return client_raw_response
+
+        return deserialized
+    cancel.metadata = {'url': '/jobs/imports/{id}/cancel'}
