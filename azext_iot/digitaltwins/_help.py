@@ -192,7 +192,7 @@ def load_digitaltwins_help():
             --cn {time_series_database_connection_name}
             --adx-cluster-name {adx_cluster_name}
             --adx-database-name {adx_database_name}
-            --adx-table-name {adx_table_name}
+            --adx-property-events-table {adx_property_events_table_name}
             --eventhub {event_hub}
             --eventhub-namespace {event_hub_namespace}
             --eventhub-consumer-group {event_hub_consumer_group}
@@ -228,7 +228,7 @@ def load_digitaltwins_help():
             --adx-database-name {adx_database_name}
             --eventhub {event_hub}
             --eventhub-namespace {event_hub_namespace}
-            --adx-record-property-item-removals true
+            --adx-record-removals true
         - name: Adds a data history connection to a target Digital Twins instance with the $Default Event Hub
             consumer group and creates two extra tables in the Azure Data Explorer database. One table will be for recording twin
             lifecycle events and the other for relationship lifecycle events.
@@ -239,8 +239,8 @@ def load_digitaltwins_help():
             --adx-database-name {adx_database_name}
             --eventhub {event_hub}
             --eventhub-namespace {event_hub_namespace}
-            --adx-twin-lifecycle-events-table-name {adx_twin_lifecycle_events_table_name}
-            --adx-relationship-lifecycle-events-table-name {adx_relationship_lifecycle_events_table_name}
+            --adx-twin-events-table {adx_twin_events_table_name}
+            --adx-relationship-events-table {adx_relationship_events_table_name}
         - name: Adds a data history connection to a target Digital Twins instance with the $Default Event Hub
             consumer group, uses a custom twin property event table name, and creates two extra tables in the Azure Data
             Explorer database.
@@ -251,9 +251,9 @@ def load_digitaltwins_help():
             --adx-database-name {adx_database_name}
             --eventhub {event_hub}
             --eventhub-namespace {event_hub_namespace}
-            --adx-table-name {adx_table_name}
-            --adx-twin-lifecycle-events-table-name {adx_twin_lifecycle_events_table_name}
-            --adx-relationship-lifecycle-events-table-name {adx_relationship_lifecycle_events_table_name}
+            --adx-property-events-table {adx_property_events_table_name}
+            --adx-twin-events-table {adx_twin_events_table_name}
+            --adx-relationship-events-table {adx_relationship_events_table_name}
     """
 
     helps["dt data-history connection list"] = """

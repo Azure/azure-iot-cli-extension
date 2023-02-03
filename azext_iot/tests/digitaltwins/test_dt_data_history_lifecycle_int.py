@@ -123,7 +123,7 @@ class TestDTConnections(DTLiveScenarioTest):
             "identity_uai": None,
             "rle_table_name": None,
             "tle_table_name": None,
-            "rpir": False,
+            "record_removals": False,
         }
 
         connection_result = self.cmd(
@@ -159,8 +159,8 @@ class TestDTConnections(DTLiveScenarioTest):
 
         # Add custom consumer group and table and use user assigned identity
         connection_result = self.cmd(
-            "dt data-history connection create adx -n {} -g {} --cn {} --adxt {} --adxd {} --adxg {} "
-            "--adxc {} --adxrpir --adxrlet {} --adxtlet {} --ehn {} --eh {} --ehg {} --ehc {} --user {} -y".format(
+            "dt data-history connection create adx -n {} -g {} --cn {} --adxpet {} --adxd {} --adxg {} "
+            "--adxc {} --adxrr --adxret {} --adxtet {} --ehn {} --eh {} --ehg {} --ehc {} --user {} -y".format(
                 instance_name,
                 self.rg,
                 connection_name,
@@ -184,7 +184,7 @@ class TestDTConnections(DTLiveScenarioTest):
         expected_attributes["table_name"] = table_name
         expected_attributes["rle_table_name"] = rlet_name
         expected_attributes["tle_table_name"] = tlet_name
-        expected_attributes["rpir"] = True
+        expected_attributes["record_removals"] = True
 
         assert_common_connection_attributes(
             connection_output=connection_result, expected_attributes=expected_attributes
@@ -425,7 +425,7 @@ class TestDTConnections(DTLiveScenarioTest):
             "identity_uai": None,
             "rle_table_name": None,
             "tle_table_name": None,
-            "rpir": False,
+            "record_removals": False,
         }
 
         self.cmd(
@@ -528,7 +528,7 @@ def assert_common_connection_attributes(
     assert properties["adxTableName"] == expected_attributes["table_name"]
     assert properties["adxRelationshipLifecycleEventsTableName"] == expected_attributes["rle_table_name"]
     assert properties["adxTwinLifecycleEventsTableName"] == expected_attributes["tle_table_name"]
-    assert properties["recordPropertyAndItemRemovals"] == expected_attributes["rpir"]
+    assert properties["recordPropertyAndItemRemovals"] == expected_attributes["record_removals"]
     assert properties["connectionType"] == "AzureDataExplorer"
     assert properties["eventHubConsumerGroup"] == expected_attributes["consumer_group"]
     assert properties["eventHubEndpointUri"] == (

@@ -573,27 +573,32 @@ def load_digitaltwins_arguments(self, _):
         )
         context.argument(
             "adx_table_name",
-            options_list=["--adx-property-event-table-name", "--adx-table-name", "--adxt"],
+            options_list=[
+                "--adx-property-events-table",
+                "--adxpet",
+                context.deprecate(target='--adx-table-name', redirect='--adx-property-events-table'),
+                context.deprecate(target='--adxt', redirect='--adxpet'),
+            ],
             help="The name of the Azure Data Explorer table used for storing updates to properties of twins and relationships.",
             arg_group="Azure Data Explorer",
         )
         context.argument(
             "adx_twin_lifecycle_events_table_name",
-            options_list=["--adx-twin-lifecycle-events-table-name", "--adxtlet"],
+            options_list=["--adx-twin-events-table", "--adxtet"],
             help="The name of the Azure Data Explorer table used for recording twin lifecycle events. The table will not be "
                  "created if this property is left unspecified.",
             arg_group="Azure Data Explorer",
         )
         context.argument(
             "adx_relationship_lifecycle_events_table_name",
-            options_list=["--adx-relationship-lifecycle-events-table-name", "--adxrlet"],
+            options_list=["--adx-relationship-events-table", "--adxret"],
             help="The name of the Azure Data Explorer table used for recording relationship lifecycle events. The table will "
                  "not be created if this property is left unspecified.",
             arg_group="Azure Data Explorer",
         )
         context.argument(
             "record_property_and_item_removals",
-            options_list=["--adx-record-property-item-removals", "--adxrpir"],
+            options_list=["--adx-record-removals", "--adxrr"],
             arg_type=get_three_state_flag(),
             help="Specifies whether or not to record twin / relationship property and item removals, including removals of "
                  "indexed or keyed values (such as map entries, array elements, etc.). Setting this property to 'true' will "
