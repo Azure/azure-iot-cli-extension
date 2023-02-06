@@ -308,6 +308,28 @@ def _iothub_provisioner(request) -> Optional[dict]:
         if desired_instance_count:
             hub_id_map = {}
             hub_names = []
+
+            # Assign Data Contributor role to resource group if it does not exist
+            account = cli.invoke("account show").as_json()
+            scope_id = "/subscriptions/{}/resourceGroups/{}".format(
+                account["id"],
+                ACCOUNT_RG
+            )
+            role_assignments = cli.invoke(
+                'role assignment list --scope "{}" --role "{}"'.format(
+                    scope_id, "IoT Hub Data Contributor"
+                )
+            ).as_json()
+            user = account["user"]
+            if user["name"] is None:
+                raise Exception("User not found")
+            role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
+            if user["name"] not in role_assignment_principal_names:
+                cli.invoke(
+                    '''role assignment create --assignee "{}" --role "{}" --scope "{}"'''.format(
+                        "https://api.adu.microsoft.com/", "IoT Hub Data Contributor", scope_id
+                    )
+                )
             for _ in range(desired_instance_count):
                 target_name = generate_linked_hub_id()
                 create_result = cli.invoke(f"iot hub create -g {ACCOUNT_RG} -n {target_name}")
