@@ -9,6 +9,7 @@ import json
 import responses
 from azext_iot.operations import dps as subject
 from knack.util import CLIError
+from urllib3.exceptions import MaxRetryError
 from azext_iot.tests.conftest import mock_dps_target, mock_symmetric_key_attestation
 
 
@@ -269,7 +270,7 @@ class TestEnrollmentCreate():
         (generate_enrollment_create_req(attestation_type='tpm', endorsement_key='mykey'))
     ])
     def test_enrollment_show_error(self, serviceclient_generic_error, fixture_cmd, req):
-        with pytest.raises(CLIError):
+        with pytest.raises((CLIError, MaxRetryError)) as e:
             subject.iot_dps_device_enrollment_create(
                 cmd=fixture_cmd,
                 enrollment_id=req['enrollment_id'],
@@ -283,6 +284,10 @@ class TestEnrollmentCreate():
                 initial_twin_properties=req['initial_twin_properties'],
                 provisioning_status=req['provisioning_status'],
             )
+        if serviceclient_generic_error.calls[0].response.status_code == 500:
+            assert isinstance(e.value, MaxRetryError)
+        else:
+            assert isinstance(e.value, CLIError)
 
 
 def generate_enrollment_show(**kvp):

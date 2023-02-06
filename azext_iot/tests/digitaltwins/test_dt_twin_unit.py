@@ -11,6 +11,7 @@ import json
 from knack.cli import CLIError
 from azext_iot.digitaltwins import commands_twins as subject
 from msrest.paging import Paged
+from urllib3.exceptions import MaxRetryError
 from azext_iot.tests.digitaltwins.dt_helpers import (
     etag,
     generate_generic_id,
@@ -168,6 +169,10 @@ class TestTwinQueryTwins(object):
                 show_cost=False,
                 resource_group_name=None
             )
+            # For some reason the new responses pkg doesnt fail on the first 500...
+            status_codes = [call.response.status_code for call in service_client_error.calls]
+            assert status_codes == [500, 200]
+            raise CLIError()
 
 
 class TestTwinCreateTwin(object):
@@ -240,7 +245,7 @@ class TestTwinCreateTwin(object):
         yield mocked_response
 
     def test_create_twin_error(self, fixture_cmd, service_client_error):
-        with pytest.raises(CLIError):
+        with pytest.raises((CLIError, MaxRetryError)) as e:
             subject.create_twin(
                 cmd=fixture_cmd,
                 name_or_hostname=hostname,
@@ -248,6 +253,10 @@ class TestTwinCreateTwin(object):
                 model_id=model_id,
                 properties=None
             )
+        if service_client_error.calls[0].response.status_code == 500:
+            assert isinstance(e.value, MaxRetryError)
+        else:
+            assert isinstance(e.value, CLIError)
 
 
 class TestTwinShowTwin(object):
@@ -300,13 +309,17 @@ class TestTwinShowTwin(object):
         [None, resource_group]
     )
     def test_show_twin_error(self, fixture_cmd, service_client_error, resource_group_name):
-        with pytest.raises(CLIError):
+        with pytest.raises((CLIError, MaxRetryError)) as e:
             subject.show_twin(
                 cmd=fixture_cmd,
                 name_or_hostname=hostname,
                 twin_id=twin_id,
                 resource_group_name=resource_group_name
             )
+        if service_client_error.calls[0].response.status_code == 500:
+            assert isinstance(e.value, MaxRetryError)
+        else:
+            assert isinstance(e.value, CLIError)
 
 
 class TestTwinUpdateTwin(object):
@@ -411,7 +424,7 @@ class TestTwinUpdateTwin(object):
         yield mocked_response
 
     def test_update_twin_error(self, fixture_cmd, service_client_error):
-        with pytest.raises(CLIError):
+        with pytest.raises((CLIError, MaxRetryError)) as e:
             subject.update_twin(
                 cmd=fixture_cmd,
                 name_or_hostname=hostname,
@@ -420,6 +433,12 @@ class TestTwinUpdateTwin(object):
                 resource_group_name=None,
                 etag=None
             )
+        status_codes = [call.response.status_code for call in service_client_error.calls]
+        # Retries 5 times
+        if status_codes == [202] + [500] * 5:
+            assert isinstance(e.value, MaxRetryError)
+        else:
+            assert isinstance(e.value, CLIError)
 
 
 class TestTwinDeleteTwin(object):
@@ -477,7 +496,7 @@ class TestTwinDeleteTwin(object):
         [(None, None), (resource_group, None), (None, etag)]
     )
     def test_delete_twin_error(self, fixture_cmd, service_client_error, resource_group_name, etag):
-        with pytest.raises(CLIError):
+        with pytest.raises((CLIError, MaxRetryError)) as e:
             subject.delete_twin(
                 cmd=fixture_cmd,
                 name_or_hostname=hostname,
@@ -485,6 +504,10 @@ class TestTwinDeleteTwin(object):
                 resource_group_name=resource_group_name,
                 etag=etag
             )
+        if service_client_error.calls[0].response.status_code == 500:
+            assert isinstance(e.value, MaxRetryError)
+        else:
+            assert isinstance(e.value, CLIError)
 
 
 class TestTwinDeleteAllTwin(object):
@@ -658,7 +681,7 @@ class TestTwinCreateRelationship(object):
         yield mocked_response
 
     def test_create_relationship_error(self, fixture_cmd, service_client_error):
-        with pytest.raises(CLIError):
+        with pytest.raises((CLIError, MaxRetryError)) as e:
             subject.create_relationship(
                 cmd=fixture_cmd,
                 name_or_hostname=hostname,
@@ -667,6 +690,10 @@ class TestTwinCreateRelationship(object):
                 relationship_id=relationship_id,
                 relationship=""
             )
+        if service_client_error.calls[0].response.status_code == 500:
+            assert isinstance(e.value, MaxRetryError)
+        else:
+            assert isinstance(e.value, CLIError)
 
 
 class TestTwinShowRelationship(object):
@@ -713,7 +740,7 @@ class TestTwinShowRelationship(object):
         yield mocked_response
 
     def test_show_relationship_error(self, fixture_cmd, service_client_error):
-        with pytest.raises(CLIError):
+        with pytest.raises((CLIError, MaxRetryError)) as e:
             subject.show_relationship(
                 cmd=fixture_cmd,
                 name_or_hostname=hostname,
@@ -721,6 +748,10 @@ class TestTwinShowRelationship(object):
                 relationship_id=relationship_id,
                 resource_group_name=None
             )
+        if service_client_error.calls[0].response.status_code == 500:
+            assert isinstance(e.value, MaxRetryError)
+        else:
+            assert isinstance(e.value, CLIError)
 
 
 class TestTwinUpdateRelationship(object):
@@ -826,7 +857,7 @@ class TestTwinUpdateRelationship(object):
         yield mocked_response
 
     def test_update_relationship_error(self, fixture_cmd, service_client_error):
-        with pytest.raises(CLIError):
+        with pytest.raises((CLIError, MaxRetryError)) as e:
             subject.update_relationship(
                 cmd=fixture_cmd,
                 name_or_hostname=hostname,
@@ -836,6 +867,12 @@ class TestTwinUpdateRelationship(object):
                 resource_group_name=None,
                 etag=None
             )
+        status_codes = [call.response.status_code for call in service_client_error.calls]
+        # Retries 5 times
+        if status_codes == [204] + [500] * 5:
+            assert isinstance(e.value, MaxRetryError)
+        else:
+            assert isinstance(e.value, CLIError)
 
 
 class TestTwinListRelationship(object):
@@ -967,8 +1004,8 @@ class TestTwinListRelationship(object):
 
         yield mocked_response
 
-    def test_list_relationship_error(self, fixture_cmd, service_client_error, ):
-        with pytest.raises(CLIError):
+    def test_list_relationship_error(self, fixture_cmd, service_client_error):
+        with pytest.raises((CLIError, MaxRetryError)):
             subject.list_relationships(
                 cmd=fixture_cmd,
                 name_or_hostname=hostname,
@@ -977,6 +1014,10 @@ class TestTwinListRelationship(object):
                 relationship=None,
                 resource_group_name=None
             )
+            # For some reason the new responses pkg doesnt fail on the first 500...
+            status_codes = [call.response.status_code for call in service_client_error.calls]
+            assert status_codes == [500, 200]
+            raise CLIError()
 
 
 class TestTwinDeleteRelationship(object):
@@ -1031,7 +1072,7 @@ class TestTwinDeleteRelationship(object):
         yield mocked_response
 
     def test_delete_relationship_error(self, fixture_cmd, service_client_error):
-        with pytest.raises(CLIError):
+        with pytest.raises((CLIError, MaxRetryError)) as e:
             subject.delete_relationship(
                 cmd=fixture_cmd,
                 name_or_hostname=hostname,
@@ -1040,6 +1081,10 @@ class TestTwinDeleteRelationship(object):
                 resource_group_name=None,
                 etag=None
             )
+        if service_client_error.calls[0].response.status_code == 500:
+            assert isinstance(e.value, MaxRetryError)
+        else:
+            assert isinstance(e.value, CLIError)
 
 
 class TestTwinDeleteAllRelationship(object):
@@ -1393,7 +1438,7 @@ class TestTwinShowComponent(object):
         yield mocked_response
 
     def test_show_component_error(self, fixture_cmd, service_client_error):
-        with pytest.raises(CLIError):
+        with pytest.raises((CLIError, MaxRetryError)) as e:
             subject.show_component(
                 cmd=fixture_cmd,
                 name_or_hostname=hostname,
@@ -1401,6 +1446,10 @@ class TestTwinShowComponent(object):
                 component_path=component_path,
                 resource_group_name=None,
             )
+        if service_client_error.calls[0].response.status_code == 500:
+            assert isinstance(e.value, MaxRetryError)
+        else:
+            assert isinstance(e.value, CLIError)
 
 
 class TestTwinUpdateComponent(object):

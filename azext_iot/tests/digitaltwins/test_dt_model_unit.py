@@ -13,6 +13,7 @@ from knack.cli import CLIError
 from azext_iot.digitaltwins import commands_models as subject
 from msrest.paging import Paged
 from urllib.parse import unquote
+from urllib3.exceptions import MaxRetryError
 from azext_iot.tests.digitaltwins.dt_helpers import (
     generate_model_id,
     generate_model_result,
@@ -320,7 +321,7 @@ class TestShowModel(object):
         yield mocked_response
 
     def test_show_model_error(self, fixture_cmd, service_client_error):
-        with pytest.raises(CLIError):
+        with pytest.raises((CLIError, MaxRetryError)) as e:
             subject.show_model(
                 cmd=fixture_cmd,
                 name_or_hostname=hostname,
@@ -328,6 +329,10 @@ class TestShowModel(object):
                 definition=False,
                 resource_group_name=None
             )
+        if service_client_error.calls[0].response.status_code == 500:
+            assert isinstance(e.value, MaxRetryError)
+        else:
+            assert isinstance(e.value, CLIError)
 
 
 class TestListModels(object):
@@ -513,7 +518,7 @@ class TestUpdateModel(object):
         yield mocked_response
 
     def test_update_model_error(self, fixture_cmd, service_client_error):
-        with pytest.raises(CLIError):
+        with pytest.raises((CLIError, MaxRetryError)) as e:
             subject.update_model(
                 cmd=fixture_cmd,
                 name_or_hostname=hostname,
@@ -521,6 +526,12 @@ class TestUpdateModel(object):
                 decommission=True,
                 resource_group_name=None
             )
+        status_codes = [call.response.status_code for call in service_client_error.calls]
+        # Retries 5 times
+        if status_codes == [204] + [500] * 5:
+            assert isinstance(e.value, MaxRetryError)
+        else:
+            assert isinstance(e.value, CLIError)
 
 
 class TestDeleteModel(object):
@@ -570,13 +581,17 @@ class TestDeleteModel(object):
         yield mocked_response
 
     def test_delete_model_error(self, fixture_cmd, service_client_error):
-        with pytest.raises(CLIError):
+        with pytest.raises((CLIError, MaxRetryError)) as e:
             subject.delete_model(
                 cmd=fixture_cmd,
                 name_or_hostname=hostname,
                 model_id=model_id,
                 resource_group_name=None
             )
+        if service_client_error.calls[0].response.status_code == 500:
+            assert isinstance(e.value, MaxRetryError)
+        else:
+            assert isinstance(e.value, CLIError)
 
 
 class TestDeleteAllModels(object):
@@ -679,9 +694,13 @@ class TestDeleteAllModels(object):
         yield mocked_response
 
     def test_delete_all_models_error(self, fixture_cmd, service_client_error):
-        with pytest.raises(CLIError):
+        with pytest.raises((CLIError, MaxRetryError)) as e:
             subject.delete_all_models(
                 cmd=fixture_cmd,
                 name_or_hostname=hostname,
                 resource_group_name=None
             )
+        if service_client_error.calls[0].response.status_code == 500:
+            assert isinstance(e.value, MaxRetryError)
+        else:
+            assert isinstance(e.value, CLIError)

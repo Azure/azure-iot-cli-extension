@@ -31,6 +31,7 @@ from azext_iot.tests.conftest import (
 )
 from azext_iot.common.shared import DeviceAuthApiType
 from pathlib import Path
+from urllib3.exceptions import MaxRetryError
 
 CWD = os.path.dirname(os.path.abspath(__file__))
 device_id = "mydevice"
@@ -658,11 +659,29 @@ class TestDeviceShow:
         )
         assert result["deviceId"] == device_id
 
-    def test_device_show_error(self, fixture_cmd, service_client_generic_errors):
-        with pytest.raises(CLIError):
+    @pytest.mark.parametrize("error_code", [400, 401, 500])
+    def test_device_show_error(self, fixture_cmd, mocked_response, fixture_ghcs, error_code):
+        device_id = generate_generic_id()
+        mocked_response.add(
+            method=responses.GET,
+            url=re.compile(
+                "https://{}/devices/{}".format(mock_target["entity"], device_id)
+            ),
+            body=json.dumps(generate_device_show(deviceId=device_id)),
+            status=error_code,
+            content_type="application/json",
+            match_querystring=False,
+        )
+
+        with pytest.raises((CLIError, MaxRetryError)) as e:
             subject.iot_device_show(
                 cmd=fixture_cmd, device_id=device_id, hub_name=mock_target["entity"]
             )
+
+        if error_code == 500:
+            assert isinstance(e.value, MaxRetryError)
+        else:
+            assert isinstance(e.value, CLIError)
 
 
 class TestDeviceTwinList:
