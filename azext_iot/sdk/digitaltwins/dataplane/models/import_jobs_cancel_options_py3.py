@@ -12,12 +12,9 @@
 from msrest.serialization import Model
 
 
-class DigitalTwinsUpdateComponentOptions(Model):
-    """Additional parameters for update_component operation.
+class ImportJobsCancelOptions(Model):
+    """Additional parameters for cancel operation.
 
-    :param if_match: Only perform the operation if the entity's etag matches
-     one of the etags provided or * is provided.
-    :type if_match: str
     :param traceparent: Identifies the request in a distributed tracing
      system.
     :type traceparent: str
@@ -27,13 +24,11 @@ class DigitalTwinsUpdateComponentOptions(Model):
     """
 
     _attribute_map = {
-        'if_match': {'key': '', 'type': 'str'},
         'traceparent': {'key': '', 'type': 'str'},
         'tracestate': {'key': '', 'type': 'str'},
     }
 
-    def __init__(self, **kwargs):
-        super(DigitalTwinsUpdateComponentOptions, self).__init__(**kwargs)
-        self.if_match = kwargs.get('if_match', None)
-        self.traceparent = kwargs.get('traceparent', None)
-        self.tracestate = kwargs.get('tracestate', None)
+    def __init__(self, *, traceparent: str=None, tracestate: str=None, **kwargs) -> None:
+        super(ImportJobsCancelOptions, self).__init__(**kwargs)
+        self.traceparent = traceparent
+        self.tracestate = tracestate

@@ -92,11 +92,6 @@ iot hub message-endpoint create storage-container:
     endpoint_resource_group:
       rule_exclusions:
       - parameter_should_not_end_in_resource_group
-iot hub module-twin update:
-  parameters:
-    auth_type_dataplane:
-      rule_exclusions:
-      - no_parameter_defaults_for_update_commands
 iot edge deployment update:
   parameters:
     auth_type_dataplane:

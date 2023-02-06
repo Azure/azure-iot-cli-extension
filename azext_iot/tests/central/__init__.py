@@ -196,11 +196,14 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 )
             self.app_rg = APP_RG
         else:
-            self.app_rg = self.cmd(
-                "iot central app show -n {}".format(
-                    self.app_id,
-                )
-            ).get_output_in_json()["resourceGroup"]
+            target_app = None
+            app_list = self.cmd('iot central app list').get_output_in_json()
+            for app in app_list:
+                if app["applicationId"] == self.app_id or app["name"] == self.app_id:
+                    self.app_rg = app['resourceGroup']
+                    return
+            # Throw if no resource group found
+            raise Exception(f"Please provide API token (azext_iot_central_token) in the setting for application {self.app_id}")
 
     def _create_device(self, api_version, **kwargs) -> Tuple[str, str]:
         """

@@ -139,6 +139,7 @@ def load_command_table(self, _):
 
     with self.command_group("iot edge", command_type=iothub_ops) as cmd_group:
         cmd_group.command("set-modules", "iot_edge_set_modules")
+        cmd_group.command("export-modules", "iot_edge_export_modules", is_preview=True)
 
     with self.command_group(
         "iot edge deployment", command_type=iothub_ops
