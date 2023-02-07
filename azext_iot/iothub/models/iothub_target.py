@@ -17,6 +17,7 @@ class IotHubTarget:
         self.policy = decomposed_lower.get("sharedaccesskeyname")
         self.shared_access_key = decomposed_lower.get("sharedaccesskey")
         self.entity = decomposed_lower.get("hostname")
+        self.name = self.entity.split(".")[0]
 
     @classmethod
     def from_connection_string(cls, cstring):
@@ -30,4 +31,5 @@ class IotHubTarget:
             "policy": self.policy,
             "primarykey": self.shared_access_key,
             "entity": self.entity,
+            "name": self.name
         }

@@ -15,6 +15,7 @@ from azure.cli.core.commands import AzCliCommand
 from azure.cli.core.mock import DummyCli
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.shared import DeviceAuthApiType
+from azure.cli.core.azclierror import ResourceNotFoundError
 
 # Patch paths
 path_get_device = "azext_iot.operations.hub._iot_device_show"
@@ -54,6 +55,7 @@ hostname = "{}.subdomain.domain".format(instance_name)
 # Mock Iot Hub Target
 mock_target = {}
 mock_target["entity"] = hub_entity
+mock_target["name"] = "myhub"
 mock_target["primarykey"] = "rJx/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo="
 mock_target["secondarykey"] = "aCd/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo="
 mock_target["policy"] = "iothubowner"
@@ -151,6 +153,16 @@ def serviceclient_generic_error(mocker, fixture_ghcs, fixture_sas, request):
 def fixture_ghcs(mocker):
     ghcs = mocker.patch(path_ghcs)
     ghcs.return_value = mock_target
+    mocker.patch(path_iot_hub_service_factory)
+    mocker.patch(path_discovery_init)
+
+    return ghcs
+
+
+@pytest.fixture()
+def fixture_ghcs_resource_not_found_error(mocker):
+    ghcs = mocker.patch(path_ghcs)
+    ghcs.side_effect = ResourceNotFoundError("Resource not found")
     mocker.patch(path_iot_hub_service_factory)
     mocker.patch(path_discovery_init)
 
@@ -259,10 +271,7 @@ def fixture_device_messaging_iot_device_show_sas(mocker):
 def build_mock_response(
     mocker=None, status_code=200, payload=None, headers=None, **kwargs
 ):
-    try:
-        from unittest.mock import MagicMock
-    except ImportError:
-        from mock import MagicMock
+    from unittest.mock import MagicMock
 
     response = (
         mocker.MagicMock(name="response") if mocker else MagicMock(name="response")

@@ -66,6 +66,7 @@ class IotHubDiscovery(BaseDiscovery):
             policy.primary_key if key_type == "primary" else policy.secondary_key,
         )
         target["entity"] = resource.properties.host_name
+        target["name"] = resource.name
         target["policy"] = policy.key_name
         target["primarykey"] = policy.primary_key
         target["secondarykey"] = policy.secondary_key

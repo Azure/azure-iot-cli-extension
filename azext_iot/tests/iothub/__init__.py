@@ -52,6 +52,17 @@ MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries or 10
 ROLE_ASSIGNMENT_REFRESH_TIME = 120
 
 
+def set_cmd_auth_type(command: str, auth_type: str, cstring: str) -> str:
+    if auth_type not in DATAPLANE_AUTH_TYPES:
+        raise RuntimeError(f"auth_type of: {auth_type} is unsupported.")
+
+    # cstring takes precedence
+    if auth_type == "cstring":
+        return f"{command} --login {cstring}"
+
+    return f"{command} --auth-type {auth_type}"
+
+
 class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def __init__(self, test_scenario, add_data_contributor=True):
         assert test_scenario
@@ -266,14 +277,9 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         ).get_output_in_json()["connectionString"]
 
     def set_cmd_auth_type(self, command: str, auth_type: str) -> str:
-        if auth_type not in DATAPLANE_AUTH_TYPES:
-            raise RuntimeError(f"auth_type of: {auth_type} is unsupported.")
-
-        # cstring takes precedence
-        if auth_type == "cstring":
-            return f"{command} --login {self.connection_string}"
-
-        return f"{command} --auth-type {auth_type}"
+        return set_cmd_auth_type(
+            command=command, auth_type=auth_type, cstring=self.connection_string
+        )
 
     def get_role_assignments(self, scope, role):
         role_assignments = self.cmd(

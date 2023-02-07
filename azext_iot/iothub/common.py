@@ -46,7 +46,42 @@ class EdgeDevicesConfig(NamedTuple):
     default_edge_agent: Optional[str] = None
 
 
-SYSTEM_ASSIGNED_IDENTITY = '[system]'
+IMMUTABLE_DEVICE_IDENTITY_FIELDS = [
+    "cloudToDeviceMessageCount",
+    "configurations",
+    "deviceEtag",
+    "deviceScope",
+    "lastActivityTime",
+    "parentScopes",
+    "statusUpdateTime",
+    "etag",
+    "version",
+    "deviceId"
+]
+IMMUTABLE_MODULE_IDENTITY_FIELDS = [
+    "generationId",
+    "connectionStateUpdatedTime",
+    "lastActivityTime",
+    "cloudToDeviceMessageCount",
+    "etag",
+    "deviceId",
+    "moduleId",
+]
+IMMUTABLE_AND_DUPLICATE_MODULE_TWIN_FIELDS = [
+    "deviceEtag",
+    "lastActivityTime",
+    "etag",
+    "version",
+    "cloudToDeviceMessageCount",
+    "statusUpdateTime",
+    "authenticationType",
+    "connectionState",
+    "deviceId",
+    "moduleId",
+    "x509Thumbprint"
+]
+
+SYSTEM_ASSIGNED_IDENTITY = "[system]"
 BYTES_PER_MEGABYTE = 1048576
 
 # Message Endpoint Messages
@@ -73,31 +108,44 @@ ABORT_MSG = "Command was aborted."
 NO_CHANGE_MSG = "Current Certificate Root Authority is already {0}. No updates are needed."
 
 
+class EndpointType(Enum):
+    """
+    Type of the message endpoint.
+    """
+    EventHub = "eventhub"
+    ServiceBusQueue = "servicebus-queue"
+    ServiceBusTopic = "servicebus-topic"
+    AzureStorageContainer = "storage-container"
+    CosmosDBContainer = "cosmosdb-container"
+
+
+class HubAspects(Enum):
+    """
+    Hub aspects to import or export.
+    """
+    Configurations = "configurations"
+    Devices = "devices"
+    Arm = "arm"
+
+    @classmethod
+    def list(cls):
+        return list(map(lambda c: c.value, cls))
+
+
 class AuthenticationType(Enum):
     """
     Type of the Authentication for the routing endpoint.
     """
-    KeyBased = 'keyBased'
-    IdentityBased = 'identityBased'
+    KeyBased = "keyBased"
+    IdentityBased = "identityBased"
 
 
 class EncodingFormat(Enum):
     """
     Type of the encoding format for the container.
     """
-    JSON = 'json'
-    AVRO = 'avro'
-
-
-class EndpointType(Enum):
-    """
-    Type of the routing endpoint.
-    """
-    EventHub = 'eventhub'
-    ServiceBusQueue = 'servicebus-queue'
-    ServiceBusTopic = 'servicebus-topic'
-    AzureStorageContainer = 'storage-container'
-    CosmosDBContainer = 'cosmosdb-container'
+    JSON = "json"
+    AVRO = "avro"
 
 
 class IdentityType(Enum):
@@ -114,13 +162,13 @@ class RouteSourceType(Enum):
     """
     Type of the route source.
     """
-    Invalid = 'invalid'
-    DeviceMessages = 'devicemessages'
-    TwinChangeEvents = 'twinchangeevents'
-    DeviceLifecycleEvents = 'devicelifecycleevents'
-    DeviceJobLifecycleEvents = 'devicejoblifecycleevents'
-    DigitalTwinChangeEvents = 'digitaltwinchangeevents'
-    DeviceConnectionStateEvents = 'deviceconnectionstateevents'
+    Invalid = "invalid"
+    DeviceMessages = "devicemessages"
+    TwinChangeEvents = "twinchangeevents"
+    DeviceLifecycleEvents = "devicelifecycleevents"
+    DeviceJobLifecycleEvents = "devicejoblifecycleevents"
+    DigitalTwinChangeEvents = "digitaltwinchangeevents"
+    DeviceConnectionStateEvents = "deviceconnectionstateevents"
 
     @classmethod
     def list(cls):
