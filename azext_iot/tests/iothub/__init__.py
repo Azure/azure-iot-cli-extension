@@ -113,7 +113,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 )
             ).get_output_in_json()
 
-            if(len(role_assignments) == 0):
+            if len(role_assignments) == 0:
                 self._add_data_contributor(target_hub)
 
             # Note down current devices and configs so they can be excluded from tear down when tests are done
