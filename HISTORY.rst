@@ -3,6 +3,21 @@
 Release History
 ===============
 
+unreleased
++++++++++++++++
+
+**IoT Hub updates**
+
+* Addition of the `az iot hub state` command group which introduces commands to save, upload, and copy states between IoT Hubs. This will
+  allow for easier migration of IoT Hubs when changing location, IoT Hub SKU, number of Event Hub partitions and more.
+  For more information, please read the trouble shooting guide [here](https://aka.ms/aziotcli-iot-hub-state).
+
+  The commands are as follows:
+  - `az iot hub state export` to save the current state of an IoT Hub to a JSON file
+  - `az iot hub state import` to upload a state from a JSON file to an IoT Hub
+  - `az iot hub state migrate` to copy a state of an IoT Hub to another IoT Hub
+
+
 0.19.1
 +++++++++++++++
 
@@ -11,15 +26,6 @@ Release History
 * Addition of export modules command for edge device
 
   - az iot edge export-modules
-
-* Addition of `az iot hub state` commands to introduce saving, uploading, and copying states between IoT Hubs. This will
-  allow for easier migration of IoT Hubs when changing location, IoT Hub SKU, number of Event Hub partitions and more.
-  For more information, please read the trouble shooting guide [here](https://github.com/Azure/azure-iot-cli-extension/tree/dev/docs/iot-hub-state-trouble-shooting-guide.md).
-  The commands are as follows:
-  - `az iot hub state export` to save the current state of an IoT Hub to a JSON file
-  - `az iot hub state import` to upload a state from a JSON file to an IoT Hub
-  - `az iot hub state migrate` to copy a state of an IoT Hub to another IoT Hub
-
 
 **Digital Twins updates**
 
