@@ -12,7 +12,7 @@ import json
 from uuid import uuid4
 from random import randint
 from knack.cli import CLIError
-from urllib3.exceptions import MaxRetryError
+from msrest.exceptions import ClientRequestError
 from azext_iot.operations import hub as subject
 from azext_iot.common.utility import read_file_content, evaluate_literal, validate_key_value_pairs
 from azext_iot.tests.conftest import (
@@ -903,12 +903,12 @@ class TestConfigList:
 
     def test_config_list_error(self, fixture_cmd, service_client_generic_errors):
         service_client_generic_errors.assert_all_requests_are_fired = False
-        with pytest.raises((CLIError, MaxRetryError)) as e:
+        with pytest.raises((CLIError, ClientRequestError)) as e:
             subject.iot_hub_configuration_list(
                 cmd=fixture_cmd, hub_name=mock_target["entity"]
             )
         if service_client_generic_errors.calls[0].response.status_code == 500:
-            assert isinstance(e.value, MaxRetryError)
+            assert isinstance(e.value, ClientRequestError)
         else:
             assert isinstance(e.value, CLIError)
 

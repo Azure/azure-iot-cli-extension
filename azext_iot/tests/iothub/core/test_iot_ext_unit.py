@@ -31,7 +31,7 @@ from azext_iot.tests.conftest import (
 )
 from azext_iot.common.shared import DeviceAuthApiType
 from pathlib import Path
-from urllib3.exceptions import MaxRetryError
+from msrest.exceptions import ClientRequestError
 
 CWD = os.path.dirname(os.path.abspath(__file__))
 device_id = "mydevice"
@@ -673,13 +673,13 @@ class TestDeviceShow:
             match_querystring=False,
         )
 
-        with pytest.raises((CLIError, MaxRetryError)) as e:
+        with pytest.raises((CLIError, ClientRequestError)) as e:
             subject.iot_device_show(
                 cmd=fixture_cmd, device_id=device_id, hub_name=mock_target["entity"]
             )
 
         if error_code == 500:
-            assert isinstance(e.value, MaxRetryError)
+            assert isinstance(e.value, ClientRequestError)
         else:
             assert isinstance(e.value, CLIError)
 
