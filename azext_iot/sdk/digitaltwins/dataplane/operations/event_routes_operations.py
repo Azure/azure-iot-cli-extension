@@ -22,7 +22,7 @@ class EventRoutesOperations(object):
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: The requested API version. Constant value: "2022-05-31".
+    :ivar api_version: The requested API version. Constant value: "2023-02-27-preview".
     """
 
     models = models
@@ -32,7 +32,7 @@ class EventRoutesOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2022-05-31"
+        self.api_version = "2023-02-27-preview"
 
         self.config = config
 
@@ -75,7 +75,7 @@ class EventRoutesOperations(object):
 
                 # Construct parameters
                 query_parameters = {}
-                query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+                query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
             else:
                 url = next_link
@@ -160,7 +160,7 @@ class EventRoutesOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
         # Construct headers
         header_parameters = {}
@@ -237,9 +237,7 @@ class EventRoutesOperations(object):
         tracestate = None
         if event_routes_add_options is not None:
             tracestate = event_routes_add_options.tracestate
-        event_route = None
-        if endpoint_name is not None or filter is not None:
-            event_route = models.EventRoute(endpoint_name=endpoint_name, filter=filter)
+        event_route = models.EventRoute(endpoint_name=endpoint_name, filter=filter)
 
         # Construct URL
         url = self.add.metadata['url']
@@ -250,7 +248,7 @@ class EventRoutesOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
         # Construct headers
         header_parameters = {}
@@ -267,10 +265,7 @@ class EventRoutesOperations(object):
             header_parameters['tracestate'] = self._serialize.header("tracestate", tracestate, 'str')
 
         # Construct body
-        if event_route is not None:
-            body_content = self._serialize.body(event_route, 'EventRoute')
-        else:
-            body_content = None
+        body_content = self._serialize.body(event_route, 'EventRoute')
 
         # Construct and send request
         request = self._client.put(url, query_parameters)
@@ -326,7 +321,7 @@ class EventRoutesOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
         # Construct headers
         header_parameters = {}

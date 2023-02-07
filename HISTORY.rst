@@ -3,8 +3,7 @@
 Release History
 ===============
 
-
-unreleased
+0.19.1
 +++++++++++++++
 
 **IoT Hub updates**
@@ -20,6 +19,16 @@ unreleased
   - `az iot hub state export` to save the current state of an IoT Hub to a JSON file
   - `az iot hub state import` to upload a state from a JSON file to an IoT Hub
   - `az iot hub state migrate` to copy a state of an IoT Hub to another IoT Hub
+
+
+**Digital Twins updates**
+
+* Digital Twins dataplane commands now use the newer 2023-02-27-preview API. The following command groups are affected:
+ - `az dt model`
+ - `az dt twin`
+ - `az dt job`
+
+* `az dt job import` now supports newer job statuses, including "cancelling" and "cancelled". Now, to delete a running job, the job must be first cancelled with `az dt job import cancel`.
 
 
 0.19.0

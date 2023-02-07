@@ -237,3 +237,4 @@ def load_digitaltwins_commands(self, _):
         cmd_group.show_command("show", "show_import_job")
         cmd_group.command("list", "list_import_jobs")
         cmd_group.command("delete", "delete_import_job", confirmation=True)
+        cmd_group.command("cancel", "cancel_import_job", confirmation=True)
