@@ -16,6 +16,7 @@ from knack.log import get_logger
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests.settings import DynamoSettings
+from azext_iot.deviceupdate.common import AUTH_RESOURCE_ID
 
 logger = get_logger(__name__)
 
@@ -320,14 +321,11 @@ def _iothub_provisioner(request) -> Optional[dict]:
                     scope_id, "IoT Hub Data Contributor"
                 )
             ).as_json()
-            user = account["user"]
-            if user["name"] is None:
-                raise Exception("User not found")
-            role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
-            if user["name"] not in role_assignment_principal_names:
+            role_assignment_principal_names = [assignment.get("principalName") for assignment in role_assignments]
+            if AUTH_RESOURCE_ID not in role_assignment_principal_names:
                 cli.invoke(
                     '''role assignment create --assignee "{}" --role "{}" --scope "{}"'''.format(
-                        "https://api.adu.microsoft.com/", "IoT Hub Data Contributor", scope_id
+                        AUTH_RESOURCE_ID, "IoT Hub Data Contributor", scope_id
                     )
                 )
             for _ in range(desired_instance_count):
