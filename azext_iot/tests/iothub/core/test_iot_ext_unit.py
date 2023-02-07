@@ -1448,7 +1448,7 @@ class TestQuery:
             assert not headers.get("x-ms-max-item-count")
 
     @pytest.mark.parametrize("top", [-2, 0])
-    def test_query_invalid_args(self, top):
+    def test_query_invalid_args(self, top, fixture_ghcs):
         with pytest.raises(CLIError):
             subject.iot_query(
                 cmd=None, hub_name=mock_target["entity"], query_command=generic_query, top=top

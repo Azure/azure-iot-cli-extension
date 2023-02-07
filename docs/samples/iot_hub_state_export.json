@@ -1,0 +1,554 @@
+{
+    "arm": {
+        "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+        "contentVersion": "1.0.0.0",
+        "parameters": {},
+        "resources": [
+            {
+                "apiVersion": "2022-04-30-preview",
+                "identity": {
+                    "type": "SystemAssigned, UserAssigned",
+                    "userAssignedIdentities": {
+                        "/subscriptions/xxxx/resourcegroups/TESTRG/providers/Microsoft.ManagedIdentity/userAssignedIdentities/test-identity": {}
+                    }
+                },
+                "location": "eastus",
+                "name": "test-hub",
+                "properties": {
+                    "allowedFqdnList": [],
+                    "cloudToDevice": {
+                        "defaultTtlAsIso8601": "PT1H",
+                        "feedback": {
+                            "lockDurationAsIso8601": "PT1M",
+                            "maxDeliveryCount": 10,
+                            "ttlAsIso8601": "PT1H"
+                        },
+                        "maxDeliveryCount": 10
+                    },
+                    "disableDeviceSAS": false,
+                    "disableLocalAuth": false,
+                    "enableDataResidency": false,
+                    "enableFileUploadNotifications": false,
+                    "eventHubEndpoints": {
+                        "events": {
+                            "partitionCount": 4,
+                            "retentionTimeInDays": 1
+                        }
+                    },
+                    "features": "None",
+                    "ipFilterRules": [],
+                    "messagingEndpoints": {
+                        "fileNotifications": {
+                            "lockDurationAsIso8601": "PT1M",
+                            "maxDeliveryCount": 10,
+                            "ttlAsIso8601": "PT1H"
+                        }
+                    },
+                    "routing": {
+                        "endpoints": {
+                            "cosmosDBSqlCollections": [],
+                            "eventHubs": [
+                                {
+                                    "connectionString": "Endpoint=sb://testeventhub.servicebus.windows.net/;SharedAccessKeyName=SHAREDACCESSKEYNAME;SharedAccessKey=SHAREDACCESSKEY;EntityPath=eventhub",
+                                    "id": "0e9b5754-22ce-407f-92f8-f30efc637af5",
+                                    "name": "endpoint1",
+                                    "resourceGroup": "vilit",
+                                    "subscriptionId": "xxxx"
+                                }
+                            ],
+                            "serviceBusQueues": [
+                                {
+                                    "authenticationType": "identityBased",
+                                    "endpointUri": "sb://testservicebus.servicebus.windows.net",
+                                    "entityPath": "queuetest",
+                                    "id": "c98ec7af-b517-445d-9d65-16a91b703dcd",
+                                    "name": "endpoint2",
+                                    "resourceGroup": "vilit",
+                                    "subscriptionId": "xxxx"
+                                }
+                            ],
+                            "serviceBusTopics": [],
+                            "storageContainers": [
+                                {
+                                    "authenticationType": "identityBased",
+                                    "batchFrequencyInSeconds": 100,
+                                    "containerName": "endpoint-container",
+                                    "encoding": "avro",
+                                    "endpointUri": "https://teststore.blob.core.windows.net/",
+                                    "fileNameFormat": "{iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}.avro",
+                                    "id": "517bcf4e-2e66-47b4-9d25-64d0486c0d6f",
+                                    "identity": {
+                                        "userAssignedIdentity": "/subscriptions/xxxx/resourcegroups/TESTRG/providers/Microsoft.ManagedIdentity/userAssignedIdentities/test-identity"
+                                    },
+                                    "maxChunkSizeInBytes": 104857600,
+                                    "name": "endpoint3",
+                                    "resourceGroup": "vilit",
+                                    "subscriptionId": "xxxx"
+                                }
+                            ]
+                        },
+                        "fallbackRoute": {
+                            "condition": "true",
+                            "endpointNames": [
+                                "events"
+                            ],
+                            "isEnabled": true,
+                            "name": "$fallback",
+                            "source": "DeviceMessages"
+                        },
+                        "routes": [
+                            {
+                                "condition": "true",
+                                "endpointNames": [
+                                    "events"
+                                ],
+                                "isEnabled": false,
+                                "name": "route1",
+                                "source": "DeviceMessages"
+                            },
+                            {
+                                "condition": "true",
+                                "endpointNames": [
+                                    "endpoint1"
+                                ],
+                                "isEnabled": false,
+                                "name": "route2",
+                                "source": "DeviceMessages"
+                            }
+                        ]
+                    },
+                    "storageEndpoints": {
+                        "$default": {
+                            "authenticationType": "keyBased",
+                            "connectionString": "DefaultEndpointsProtocol=https;EndpointSuffix=core.windows.net;AccountName=teststore;AccountKey=FAKEKEY;BlobEndpoint=https://teststore.blob.core.windows.net/;FileEndpoint=https://teststore.file.core.windows.net/;QueueEndpoint=https://teststore.queue.core.windows.net/;TableEndpoint=https://teststore.table.core.windows.net/",
+                            "containerName": "test-hub-container",
+                            "sasTtlAsIso8601": "PT1H"
+                        }
+                    }
+                },
+                "sku": {
+                    "capacity": 1,
+                    "name": "S1",
+                    "tier": "Standard"
+                },
+                "tags": {
+                    "environment": "test"
+                },
+                "type": "Microsoft.Devices/IotHubs"
+            },
+            {
+                "apiVersion": "2022-04-30-preview",
+                "dependsOn": [
+                    "[resourceId('Microsoft.Devices/IotHubs', 'test-hub')]"
+                ],
+                "name": "test-hub/certificate1",
+                "properties": {
+                    "certificate": "CERTIFICATEDATA",
+                    "isVerified": false
+                },
+                "type": "Microsoft.Devices/IotHubs/certificates"
+            }
+        ],
+        "variables": {}
+    },
+    "configurations": {
+        "admConfigurations": {
+            "my_config": {
+                "content": {
+                    "deviceContent": {
+                        "properties.desired.awesome": 3
+                    }
+                },
+                "id": "my_config",
+                "labels": null,
+                "metrics": {
+                    "queries": {},
+                    "results": {}
+                },
+                "priority": 10,
+                "systemMetrics": {
+                    "queries": {
+                        "appliedCount": "select deviceId from devices where configurations.[[my_config]].status = 'Applied'",
+                        "targetedCount": "select deviceId from devices where tags.environment='test'"
+                    },
+                    "results": {
+                        "appliedCount": 0,
+                        "targetedCount": 0
+                    }
+                },
+                "targetCondition": "tags.environment='test'"
+            }
+        },
+        "edgeDeployments": {
+            "deployment1": {
+                "content": {
+                    "modulesContent": {
+                        "$edgeAgent": {
+                            "properties.desired": {
+                                "modules": {},
+                                "runtime": {
+                                    "settings": {},
+                                    "type": "docker"
+                                },
+                                "schemaVersion": "1.1",
+                                "systemModules": {
+                                    "edgeAgent": {
+                                        "settings": {
+                                            "image": "mcr.microsoft.com/azureiotedge-agent:1.4"
+                                        },
+                                        "type": "docker"
+                                    },
+                                    "edgeHub": {
+                                        "restartPolicy": "always",
+                                        "settings": {
+                                            "createOptions": "{\"HostConfig\":{\"PortBindings\":{\"443/tcp\":[{\"HostPort\":\"443\"}],\"5671/tcp\":[{\"HostPort\":\"5671\"}],\"8883/tcp\":[{\"HostPort\":\"8883\"}]}}}",
+                                            "image": "mcr.microsoft.com/azureiotedge-hub:1.4"
+                                        },
+                                        "status": "running",
+                                        "type": "docker"
+                                    }
+                                }
+                            }
+                        },
+                        "$edgeHub": {
+                            "properties.desired": {
+                                "routes": {},
+                                "schemaVersion": "1.1",
+                                "storeAndForwardConfiguration": {
+                                    "timeToLiveSecs": 7200
+                                }
+                            }
+                        }
+                    }
+                },
+                "createdTimeUtc": "2022-09-28T22:52:11.0383712Z",
+                "etag": "MQ==",
+                "id": "deployment1",
+                "labels": {},
+                "lastUpdatedTimeUtc": "2022-09-28T22:52:11.0383712Z",
+                "metrics": {
+                    "queries": {},
+                    "results": {}
+                },
+                "priority": 1,
+                "schemaVersion": null,
+                "systemMetrics": {
+                    "queries": {
+                        "appliedCount": "select deviceId from devices.modules where moduleId = '$edgeAgent' and configurations.[[deployment1]].status = 'Applied'",
+                        "reportedFailedCount": "select deviceId from devices.modules where moduleId = '$edgeAgent' and configurations.[[deployment1]].status = 'Applied' and properties.desired.$version = properties.reported.lastDesiredVersion and properties.reported.lastDesiredStatus.code != 200",
+                        "reportedSuccessfulCount": "select deviceId from devices.modules where moduleId = '$edgeAgent' and configurations.[[deployment1]].status = 'Applied' and properties.desired.$version = properties.reported.lastDesiredVersion and properties.reported.lastDesiredStatus.code = 200",
+                        "targetedCount": "select deviceId from devices where capabilities.iotEdge = true"
+                    },
+                    "results": {
+                        "appliedCount": 2,
+                        "reportedFailedCount": 0,
+                        "reportedSuccessfulCount": 0,
+                        "targetedCount": 2
+                    }
+                },
+                "targetCondition": "*"
+            }
+        }
+    },
+    "devices": {
+        "device1": {
+            "identity": {
+                "authentication": {
+                    "type": "selfSigned",
+                    "x509Thumbprint": {
+                        "primaryThumbprint": "THUMBPRINT",
+                        "secondaryThumbprint": "THUMBPRINT"
+                    }
+                },
+                "capabilities": {
+                    "iotEdge": false
+                },
+                "connectionState": "Disconnected",
+                "modelId": "",
+                "status": "enabled"
+            },
+            "modules": {
+                "module1": {
+                    "identity": {
+                        "authentication": {
+                            "symmetricKey": {
+                                "primaryKey": null,
+                                "secondaryKey": null
+                            },
+                            "type": "certificateAuthority",
+                            "x509Thumbprint": {
+                                "primaryThumbprint": null,
+                                "secondaryThumbprint": null
+                            }
+                        },
+                        "connectionState": "Disconnected"
+                    },
+                    "twin": {
+                        "modelId": "",
+                        "properties": {
+                            "desired": {
+                                "test": 3
+                            }
+                        },
+                        "status": "enabled",
+                        "tags": {
+                            "test": "4"
+                        }
+                    }
+                }
+            },
+            "parent": "edge2",
+            "twin": {
+                "properties": {
+                    "desired": {}
+                }
+            }
+        },
+        "edge1": {
+            "identity": {
+                "authentication": {
+                    "symmetricKey": {
+                        "primaryKey": "PRIMARYKEY",
+                        "secondaryKey": "SECONDARYKEY"
+                    },
+                    "type": "sas",
+                    "x509Thumbprint": {
+                        "primaryThumbprint": null,
+                        "secondaryThumbprint": null
+                    }
+                },
+                "capabilities": {
+                    "iotEdge": true
+                },
+                "connectionState": "Disconnected",
+                "modelId": "",
+                "status": "enabled"
+            },
+            "modules": {
+                "$edgeAgent": {
+                    "identity": {
+                        "authentication": {
+                            "symmetricKey": {
+                                "primaryKey": null,
+                                "secondaryKey": null
+                            },
+                            "type": "none",
+                            "x509Thumbprint": {
+                                "primaryThumbprint": null,
+                                "secondaryThumbprint": null
+                            }
+                        },
+                        "connectionState": "Disconnected",
+                        "managedBy": "iotEdge"
+                    },
+                    "twin": {
+                        "modelId": "",
+                        "properties": {
+                            "desired": {
+                                "modules": {
+                                    "SimulatedTemperatureSensor": {
+                                        "restartPolicy": "always",
+                                        "settings": {
+                                            "createOptions": "{}",
+                                            "image": "mcr.microsoft.com/azureiotedge-simulated-temperature-sensor:1.0"
+                                        },
+                                        "status": "running",
+                                        "type": "docker",
+                                        "version": "1.0"
+                                    }
+                                },
+                                "runtime": {
+                                    "settings": {
+                                        "loggingOptions": "",
+                                        "minDockerVersion": "v1.25",
+                                        "registryCredentials": {}
+                                    },
+                                    "type": "docker"
+                                },
+                                "schemaVersion": "1.1",
+                                "systemModules": {
+                                    "edgeAgent": {
+                                        "settings": {
+                                            "createOptions": "{}",
+                                            "image": "mcr.microsoft.com/azureiotedge-agent:1.1"
+                                        },
+                                        "type": "docker"
+                                    },
+                                    "edgeHub": {
+                                        "restartPolicy": "always",
+                                        "settings": {
+                                            "createOptions": "{\"HostConfig\":{\"PortBindings\":{\"5671/tcp\":[{\"HostPort\":\"5671\"}],\"8883/tcp\":[{\"HostPort\":\"8883\"}],\"443/tcp\":[{\"HostPort\":\"443\"}]}}}",
+                                            "image": "mcr.microsoft.com/azureiotedge-hub:1.1"
+                                        },
+                                        "status": "running",
+                                        "type": "docker"
+                                    }
+                                }
+                            }
+                        },
+                        "status": "enabled"
+                    }
+                },
+                "$edgeHub": {
+                    "identity": {
+                        "authentication": {
+                            "symmetricKey": {
+                                "primaryKey": null,
+                                "secondaryKey": null
+                            },
+                            "type": "none",
+                            "x509Thumbprint": {
+                                "primaryThumbprint": null,
+                                "secondaryThumbprint": null
+                            }
+                        },
+                        "connectionState": "Disconnected",
+                        "managedBy": "iotEdge"
+                    },
+                    "twin": {
+                        "modelId": "",
+                        "properties": {
+                            "desired": {
+                                "routes": {
+                                    "upstream": "FROM /messages/* INTO $upstream"
+                                },
+                                "schemaVersion": "1.1",
+                                "storeAndForwardConfiguration": {
+                                    "timeToLiveSecs": 7200
+                                }
+                            }
+                        },
+                        "status": "enabled"
+                    }
+                },
+                "SimulatedTemperatureSensor": {
+                    "identity": {
+                        "authentication": {
+                            "symmetricKey": {
+                                "primaryKey": null,
+                                "secondaryKey": null
+                            },
+                            "type": "none",
+                            "x509Thumbprint": {
+                                "primaryThumbprint": null,
+                                "secondaryThumbprint": null
+                            }
+                        },
+                        "connectionState": "Disconnected",
+                        "managedBy": "iotEdge"
+                    },
+                    "twin": {
+                        "modelId": "",
+                        "properties": {
+                            "desired": {
+                                "SendData": true,
+                                "SendInterval": 5
+                            }
+                        },
+                        "status": "enabled"
+                    }
+                },
+                "module1": {
+                    "identity": {
+                        "authentication": {
+                            "symmetricKey": {
+                                "primaryKey": "PRIMARYKEY",
+                                "secondaryKey": "SECONDARYKEY"
+                            },
+                            "type": "sas",
+                            "x509Thumbprint": {
+                                "primaryThumbprint": null,
+                                "secondaryThumbprint": null
+                            }
+                        },
+                        "connectionState": "Disconnected"
+                    },
+                    "twin": {
+                        "modelId": "",
+                        "properties": {
+                            "desired": {}
+                        },
+                        "status": "enabled"
+                    }
+                }
+            },
+            "twin": {
+                "properties": {
+                    "desired": {}
+                }
+            }
+        },
+        "edge2": {
+            "identity": {
+                "authentication": {
+                    "type": "selfSigned",
+                    "x509Thumbprint": {
+                        "primaryThumbprint": "THUMBPRINT",
+                        "secondaryThumbprint": "THUMBPRINT"
+                    }
+                },
+                "capabilities": {
+                    "iotEdge": true
+                },
+                "connectionState": "Disconnected",
+                "modelId": "",
+                "status": "enabled"
+            },
+            "modules": {
+                "$edgeAgent": {
+                    "identity": {
+                        "authentication": {
+                            "symmetricKey": {
+                                "primaryKey": null,
+                                "secondaryKey": null
+                            },
+                            "type": "none",
+                            "x509Thumbprint": {
+                                "primaryThumbprint": null,
+                                "secondaryThumbprint": null
+                            }
+                        },
+                        "connectionState": "Disconnected",
+                        "managedBy": "iotEdge"
+                    },
+                    "twin": {
+                        "modelId": "",
+                        "properties": {
+                            "desired": {}
+                        },
+                        "status": "enabled"
+                    }
+                },
+                "$edgeHub": {
+                    "identity": {
+                        "authentication": {
+                            "symmetricKey": {
+                                "primaryKey": null,
+                                "secondaryKey": null
+                            },
+                            "type": "none",
+                            "x509Thumbprint": {
+                                "primaryThumbprint": null,
+                                "secondaryThumbprint": null
+                            }
+                        },
+                        "connectionState": "Disconnected",
+                        "managedBy": "iotEdge"
+                    },
+                    "twin": {
+                        "modelId": "",
+                        "properties": {
+                            "desired": {}
+                        },
+                        "status": "enabled"
+                    }
+                }
+            },
+            "twin": {
+                "properties": {
+                    "desired": {}
+                }
+            }
+        }
+    }
+}

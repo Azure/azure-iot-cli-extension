@@ -11,10 +11,15 @@ from inspect import getsourcefile
 from azext_iot.common.utility import ensure_azure_namespace_path
 from azext_iot.common.utility import read_file_content
 from azext_iot.tests.settings import DynamoSettings
+from typing import TypeVar
 
 ensure_azure_namespace_path()
 
 from azure.iot.device import ProvisioningDeviceClient, IoTHubDeviceClient
+
+
+SubRequest = TypeVar('SubRequest')
+Mark = TypeVar('Mark')
 
 GLOBAL_PROVISIONING_HOST = "global.azure-devices-provisioning.net"
 TAG_ENV_VAR = [
@@ -125,6 +130,30 @@ def create_storage_account(
     )
 
     return storage_cstring
+
+
+def tags_to_dict(tags: str) -> dict:
+    result = {}
+    split_tags = tags.split()
+    for tag in split_tags:
+        kvp = tag.split("=")
+        result[kvp[0]] = kvp[1]
+    return result
+
+
+def get_closest_marker(request: SubRequest) -> Mark:
+    for item in request.session.items:
+        if item.get_closest_marker("hub_infrastructure"):
+            return item.get_closest_marker("hub_infrastructure")
+    return request.node.get_closest_marker("hub_infrastructure")
+
+
+def get_agent_public_ip():
+    """
+    Poke the Wikipedia website to get Public IP.
+    """
+    import requests
+    return requests.head("https://www.wikipedia.org").headers["X-Client-IP"]
 
 
 class MockLogger:

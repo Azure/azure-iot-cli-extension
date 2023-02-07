@@ -19,6 +19,7 @@ iothub_message_route_ops = CliCommandType(operations_tmpl="azext_iot.iothub.comm
 device_messaging_ops = CliCommandType(
     operations_tmpl="azext_iot.iothub.commands_device_messaging#{}"
 )
+iothub_state_ops = CliCommandType(operations_tmpl="azext_iot.iothub.commands_state#{}")
 device_identity_ops = CliCommandType(
     operations_tmpl="azext_iot.iothub.commands_device_identity#{}"
 )
@@ -137,6 +138,11 @@ def load_iothub_commands(self, _):
         cmd_group.command("receive", "iot_c2d_message_receive")
         cmd_group.command("send", "iot_c2d_message_send")
         cmd_group.command("purge", "iot_c2d_message_purge")
+
+    with self.command_group("iot hub state", command_type=iothub_state_ops, is_experimental=True) as cmd_group:
+        cmd_group.command("export", "state_export")
+        cmd_group.command("import", "state_import")
+        cmd_group.command("migrate", "state_migrate")
 
     with self.command_group(
         "iot edge devices", command_type=device_identity_ops

@@ -18,9 +18,7 @@ import sys
 import re
 import hmac
 import hashlib
-
 from typing import Any, Optional, List, Dict
-
 from threading import Event, Thread
 from datetime import datetime
 from knack.log import get_logger
