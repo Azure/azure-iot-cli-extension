@@ -19,6 +19,10 @@ jobs:
         python: '3.7'
         toxEnvStr: 'py3.7-azcur-unit'
         desc: 'Python 3.7 tests, current CLI'
+      'python 3.7 tests, dev CLI':
+        python: '3.7'
+        toxEnvStr: 'py3.7-azdev-unit'
+        desc: 'Python 3.7 tests, dev CLI'
       'python 3.8 tests, min CLI':
         python: '3.8'
         toxEnvStr: 'py3.8-azmin-unit'
@@ -27,6 +31,10 @@ jobs:
         python: '3.8'
         toxEnvStr: 'py3.8-azcur-unit'
         desc: 'Python 3.8 tests, current CLI'
+      'python 3.8 tests, dev CLI':
+        python: '3.8'
+        toxEnvStr: 'py3.8-azdev-unit'
+        desc: 'Python 3.8 tests, dev CLI'
       'python 3.9 tests, min CLI':
         python: '3.9'
         toxEnvStr: 'py3.9-azmin-unit'
@@ -35,6 +43,10 @@ jobs:
         python: '3.9'
         toxEnvStr: 'py3.9-azcur-unit'
         desc: 'Python 3.9 tests, current CLI'
+      'python 3.9 tests, dev CLI':
+        python: '3.9'
+        toxEnvStr: 'py3.9-azdev-unit'
+        desc: 'Python 3.9 tests, dev CLI'
       'python 3.10 tests, min CLI':
         python: '3.10'
         toxEnvStr: 'py3.10-azmin-unit'
@@ -43,6 +55,10 @@ jobs:
         python: '3.10'
         toxEnvStr: 'py3.10-azcur-unit'
         desc: 'Python 3.10 tests, current CLI'
+      'python 3.10 tests, dev CLI':
+        python: '3.10'
+        toxEnvStr: 'py3.10-azdev-unit'
+        desc: 'Python 3.10 tests, dev CLI'
   steps:
   - template: templates/clone-cli-repo.yml
   - template: templates/setup-tox.yml
