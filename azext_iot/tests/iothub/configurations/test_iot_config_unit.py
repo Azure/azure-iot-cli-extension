@@ -756,6 +756,70 @@ class TestConfigDelete:
             )
 
 
+class TestConfigClone:
+    @pytest.fixture(params=[200])
+    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        service_client.return_value = build_mock_response(mocker, request.param, {})
+        return service_client
+
+    def test_config_clone(self, fixture_cmd, serviceclient, sample_config_show):
+        new_config = generate_generic_id()
+        subject.iot_hub_configuration_clone(
+            cmd=fixture_cmd,
+            clone_config_id=new_config,
+            hub_name=mock_target["entity"],
+            parameters=sample_config_show,
+        )
+        args = serviceclient.call_args
+        url = args[0][0].url
+        method = args[0][0].method
+        body = args[0][2]
+
+        assert "{}/configurations/{}?".format(mock_target["entity"], new_config) in url
+        assert method == "PUT"
+
+        assert body["id"] == new_config
+        assert body.get("metrics") == sample_config_show.get("metrics")
+        assert body.get("targetCondition") == sample_config_show.get("targetCondition")
+        assert body.get("priority") == sample_config_show.get("priority")
+        assert body.get("labels") == sample_config_show.get("labels")
+
+    def test_config_clone_invalid_args(
+        self, fixture_cmd, serviceclient, sample_config_show
+    ):
+        from copy import deepcopy
+
+        request = deepcopy(sample_config_show)
+        request["labels"] = "not a dictionary"
+
+        with pytest.raises(CLIError) as exc_label:
+            subject.iot_hub_configuration_clone(
+                cmd=fixture_cmd,
+                clone_config_id=config_id,
+                hub_name=mock_target["entity"],
+                parameters=request,
+            )
+
+        type_name = "class" if "class" in str(type) else "type"
+        assert str(exc_label.value) == (
+            "The property \"labels\" must be of <{0} 'dict'> but is <{0} 'str'>. "
+            "Input: not a dictionary. Review inline JSON examples here --> "
+            "https://github.com/Azure/azure-iot-cli-extension/wiki/Tips".format(
+                type_name
+            )
+        )
+
+    def test_config_clone_error(self, fixture_cmd, serviceclient_generic_error):
+        with pytest.raises(CLIError):
+            subject.iot_hub_configuration_clone(
+                cmd=fixture_cmd,
+                clone_config_id=config_id,
+                hub_name=mock_target["entity"],
+                parameters={},
+            )
+
+
 class TestConfigUpdate:
     @pytest.fixture(params=[200])
     def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):

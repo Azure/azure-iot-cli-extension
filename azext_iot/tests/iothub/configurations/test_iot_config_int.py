@@ -133,7 +133,7 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
 
     def test_edge_deployments(self):
         for auth_phase in DATAPLANE_AUTH_TYPES:
-            config_count = 6
+            config_count = 8
             config_ids = self.generate_config_names(config_count)
 
             self.kwargs["generic_metrics"] = read_file_content(generic_metrics_path)
@@ -397,6 +397,51 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
                 ],
             )
 
+            # Clone deployment
+            self.cmd(
+                self.set_cmd_auth_type(
+                    "iot edge deployment clone -d {} --nd {} -n {} -g {}".format(
+                        config_ids[0],
+                        config_ids[6],
+                        self.entity_name,
+                        self.entity_rg,
+                    ),
+                    auth_type=auth_phase
+                ),
+                checks=[
+                    self.check("id", config_ids[6]),
+                    self.check("priority", priority),
+                    self.check("targetCondition", condition),
+                    self.check("labels", json.loads(self.kwargs["labels"])),
+                ],
+            )
+
+            # Clone deployment + change props
+            new_priority = random.randint(1, 10)
+            new_condition = "tags.building=43 and tags.environment='dev'"
+            self.kwargs["new_labels"] = '{"key": "super_value"}'
+            self.cmd(
+                self.set_cmd_auth_type(
+                    "iot edge deployment clone -d {} --nd {} -n {} -g {} --set priority={} "
+                    "targetCondition=\"{}\" labels='{}'".format(
+                        config_ids[0],
+                        config_ids[7],
+                        self.entity_name,
+                        self.entity_rg,
+                        new_priority,
+                        new_condition,
+                        "{new_labels}",
+                    ),
+                    auth_type=auth_phase
+                ),
+                checks=[
+                    self.check("id", config_ids[7]),
+                    self.check("priority", new_priority),
+                    self.check("targetCondition", new_condition),
+                    self.check("labels", json.loads(self.kwargs["new_labels"])),
+                ],
+            )
+
             # Update deployment
             new_priority = random.randint(1, 10)
             new_condition = "tags.building=43 and tags.environment='dev'"
@@ -520,7 +565,7 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
             self.tearDown()
 
     def test_device_configurations(self):
-        config_count = 4
+        config_count = 6
         config_ids = self.generate_config_names(config_count)
         edge_config_ids = self.generate_config_names(1, True)
 
@@ -718,6 +763,51 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
                     self.check("priority", priority),
                     self.check("targetCondition", condition),
                     self.check("labels", json.loads(self.kwargs["labels"])),
+                ],
+            )
+
+            # Clone deployment
+            self.cmd(
+                self.set_cmd_auth_type(
+                    "iot hub configuration clone -c {} --nc {} -n {} -g {}".format(
+                        config_ids[0],
+                        config_ids[4],
+                        self.entity_name,
+                        self.entity_rg,
+                    ),
+                    auth_type=auth_phase,
+                ),
+                checks=[
+                    self.check("id", config_ids[4]),
+                    self.check("priority", priority),
+                    self.check("targetCondition", condition),
+                    self.check("labels", json.loads(self.kwargs["labels"])),
+                ],
+            )
+
+            # Clone deployment + change props
+            new_priority = random.randint(1, 10)
+            new_condition = "tags.building=43 and tags.environment='dev'"
+            self.kwargs["new_labels"] = '{"key": "super_value"}'
+            self.cmd(
+                self.set_cmd_auth_type(
+                    "iot hub configuration clone -c {} --nc {} -n {} -g {} --set priority={} "
+                    "targetCondition=\"{}\" labels='{}'".format(
+                        config_ids[0],
+                        config_ids[5],
+                        self.entity_name,
+                        self.entity_rg,
+                        new_priority,
+                        new_condition,
+                        "{new_labels}",
+                    ),
+                    auth_type=auth_phase,
+                ),
+                checks=[
+                    self.check("id", config_ids[5]),
+                    self.check("priority", new_priority),
+                    self.check("targetCondition", new_condition),
+                    self.check("labels", json.loads(self.kwargs["new_labels"])),
                 ],
             )
 

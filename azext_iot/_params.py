@@ -838,6 +838,18 @@ def load_arguments(self, _):
             help="Maximum number of configurations to return. By default all configurations are returned.",
         )
 
+    with self.argument_context("iot hub configuration clone") as context:
+        context.argument(
+            "config_id",
+            options_list=["--config-id", "-c"],
+            help="Original target device configuration name.",
+        )
+        context.argument(
+            "clone_config_id",
+            options_list=["--new-config-id", "--nc"],
+            help="New target device configuration name.",
+        )
+
     with self.argument_context("iot edge") as context:
         context.argument(
             "config_id",
@@ -898,6 +910,18 @@ def load_arguments(self, _):
             "auth_type_dataplane",
             options_list=["--auth-type"],
             arg_type=hub_auth_type_dataplane_param_type,
+        )
+
+    with self.argument_context("iot edge deployment clone") as context:
+        context.argument(
+            "config_id",
+            options_list=["--deployment-id", "-d"],
+            help="Original deployment name.",
+        )
+        context.argument(
+            "clone_config_id",
+            options_list=["--new-deployment-id", "--nd"],
+            help="New deployment name.",
         )
 
     with self.argument_context("iot dps") as context:

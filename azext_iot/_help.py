@@ -772,6 +772,26 @@ helps[
 """
 
 helps[
+    "iot hub configuration clone"
+] = """
+    type: command
+    short-summary: Clone an IoT automatic device management configuration.
+    long-summary: |
+                  To change the cloned configuration's properties from the original configuration, use --set
+                  followed by property assignments.
+    examples:
+    - name: Clone a device configuration without changing any properties.
+      text: >
+        az iot hub configuration clone -c {configuration_name} --nc {new_configuration_name}
+        -n {iothub_name}
+    - name: Clone a device configuration, while altering the priority and updating the target condition
+            of the cloned device configuration.
+      text: >
+        az iot hub configuration clone -c {configuration_name} --nc {new_configuration_name}
+        --set priority=10 targetCondition="tags.building=43 and tags.environment='dev'"
+"""
+
+helps[
     "iot hub configuration show"
 ] = """
     type: command
@@ -1121,6 +1141,26 @@ helps[
         --custom-labels key0="value0" key1="value1"
         --custom-metric-queries mymetric1="select deviceId from devices where tags.location='US'" mymetric2="select *"
         --layered
+"""
+
+helps[
+    "iot edge deployment clone"
+] = """
+    type: command
+    short-summary: Clone an IoT Edge deployment.
+    long-summary: |
+                  To change the cloned deployment's properties from the original deployment, use --set
+                  followed by property assignments.
+    examples:
+    - name: Clone a device deployment without changing any properties.
+      text: >
+        az iot hub deployment clone -d {deployment_name} --nd {new_deployment_name}
+        -n {iothub_name}
+    - name: Clone a device deployment, while altering the priority and updating the target condition
+            of the cloned device deployment.
+      text: >
+        az iot hub deployment clone -d {deployment_name} --nd {new_deployment_name}
+        --set priority=10 targetCondition="tags.building=43 and tags.environment='dev'"
 """
 
 helps[

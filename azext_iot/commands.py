@@ -117,6 +117,11 @@ def load_command_table(self, _):
     ) as cmd_group:
         cmd_group.command("show-metric", "iot_hub_configuration_metric_show")
         cmd_group.command("create", "iot_hub_configuration_create")
+        cmd_group.generic_update_command(
+            "clone",
+            getter_name="iot_hub_configuration_show",
+            setter_name="iot_hub_configuration_clone",
+        )
         cmd_group.show_command("show", "iot_hub_configuration_show")
         cmd_group.command("list", "iot_hub_configuration_list")
         cmd_group.command("delete", "iot_hub_configuration_delete")
@@ -146,6 +151,11 @@ def load_command_table(self, _):
     ) as cmd_group:
         cmd_group.command("show-metric", "iot_edge_deployment_metric_show")
         cmd_group.command("create", "iot_edge_deployment_create")
+        cmd_group.generic_update_command(
+            "clone",
+            getter_name="iot_hub_configuration_show",
+            setter_name="iot_hub_configuration_clone",
+        )
         cmd_group.show_command("show", "iot_hub_configuration_show")
         cmd_group.command("list", "iot_edge_deployment_list")
         cmd_group.command("delete", "iot_hub_configuration_delete")

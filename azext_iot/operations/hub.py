@@ -1570,6 +1570,51 @@ def _validate_payload_schema(content):
                     )
 
 
+def iot_hub_configuration_clone(
+    cmd,
+    clone_config_id,
+    parameters,
+    hub_name=None,
+    resource_group_name=None,
+    login=None,
+    auth_type_dataplane=None,
+):
+    from azext_iot.sdk.iothub.service.models import Configuration
+    from azext_iot.common.utility import verify_transform
+
+    discovery = IotHubDiscovery(cmd)
+    target = discovery.get_target(
+        resource_name=hub_name,
+        resource_group_name=resource_group_name,
+        login=login,
+        auth_type=auth_type_dataplane,
+    )
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+
+    try:
+        verify = {"metrics": dict, "metrics.queries": dict, "content": dict}
+        if parameters.get("labels"):
+            verify["labels"] = dict
+        verify_transform(parameters, verify)
+        config = Configuration(
+            id=clone_config_id,
+            schema_version=parameters["schemaVersion"],
+            labels=parameters["labels"],
+            content=parameters["content"],
+            metrics=parameters.get("metrics", None),
+            target_condition=parameters["targetCondition"],
+            priority=parameters["priority"],
+        )
+        return service_sdk.configuration.create_or_update(
+            id=clone_config_id, configuration=config
+        )
+    except CloudError as e:
+        handle_service_exception(e)
+    except (AttributeError, TypeError) as err:
+        raise CLIInternalError(err)
+
+
 def iot_hub_configuration_update(
     cmd,
     config_id,
