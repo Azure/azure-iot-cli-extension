@@ -13,9 +13,10 @@ unreleased
   For more information, please read the trouble shooting guide [here](https://aka.ms/aziotcli-iot-hub-state).
 
   The commands are as follows:
-  - `az iot hub state export` to save the current state of an IoT Hub to a JSON file
-  - `az iot hub state import` to upload a state from a JSON file to an IoT Hub
-  - `az iot hub state migrate` to copy a state of an IoT Hub to another IoT Hub
+  
+  - `az iot hub state export` to save the current state of an IoT Hub to a JSON file.
+  - `az iot hub state import` to upload a state from a JSON file to an IoT Hub.
+  - `az iot hub state migrate` to copy a state of an IoT Hub to another IoT Hub.
 
 
 0.19.1
