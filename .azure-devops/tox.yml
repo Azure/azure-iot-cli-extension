@@ -44,7 +44,7 @@ jobs:
         toxEnvStr: 'py3.10-azcur-unit'
         desc: 'Python 3.10 tests, current CLI'
   steps:
-  - template: templates/clone-cli.yml
+  - template: templates/clone-cli-repo.yml
   - template: templates/setup-tox.yml
   - template: templates/set-testenv-sentinel.yml
   - task: UsePythonVersion@0
