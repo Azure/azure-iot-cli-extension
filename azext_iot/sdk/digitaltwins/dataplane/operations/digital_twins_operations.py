@@ -22,7 +22,7 @@ class DigitalTwinsOperations(object):
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: The requested API version. Constant value: "2022-05-31".
+    :ivar api_version: The requested API version. Constant value: "2023-02-27-preview".
     """
 
     models = models
@@ -32,7 +32,7 @@ class DigitalTwinsOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2022-05-31"
+        self.api_version = "2023-02-27-preview"
 
         self.config = config
 
@@ -58,8 +58,8 @@ class DigitalTwinsOperations(object):
          deserialized response
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
-        :return: object or ClientRawResponse if raw=true
-        :rtype: object or ~msrest.pipeline.ClientRawResponse
+        :return: dict or ClientRawResponse if raw=true
+        :rtype: dict[str, object] or ~msrest.pipeline.ClientRawResponse
         :raises:
          :class:`ErrorResponseException<dataplane.models.ErrorResponseException>`
         """
@@ -79,7 +79,7 @@ class DigitalTwinsOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
         # Construct headers
         header_parameters = {}
@@ -106,7 +106,7 @@ class DigitalTwinsOperations(object):
         header_dict = {}
 
         if response.status_code == 200:
-            deserialized = self._deserialize('object', response)
+            deserialized = self._deserialize('{object}', response)
             header_dict = {
                 'ETag': 'str',
             }
@@ -150,8 +150,8 @@ class DigitalTwinsOperations(object):
          deserialized response
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
-        :return: object or ClientRawResponse if raw=true
-        :rtype: object or ~msrest.pipeline.ClientRawResponse
+        :return: dict or ClientRawResponse if raw=true
+        :rtype: dict[str, object] or ~msrest.pipeline.ClientRawResponse
         :raises:
          :class:`ErrorResponseException<dataplane.models.ErrorResponseException>`
         """
@@ -174,7 +174,7 @@ class DigitalTwinsOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
         # Construct headers
         header_parameters = {}
@@ -200,6 +200,7 @@ class DigitalTwinsOperations(object):
         response = self._client.send(
             request, header_parameters, body_content, stream=False, **operation_config)
 
+        # @vilit - added 202
         if response.status_code not in [200, 202]:
             raise models.ErrorResponseException(self._deserialize, response)
 
@@ -207,7 +208,7 @@ class DigitalTwinsOperations(object):
         header_dict = {}
 
         if response.status_code == 200:
-            deserialized = self._deserialize('object', response)
+            deserialized = self._deserialize('{object}', response)
             header_dict = {
                 'ETag': 'str',
             }
@@ -271,7 +272,7 @@ class DigitalTwinsOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
         # Construct headers
         header_parameters = {}
@@ -357,7 +358,7 @@ class DigitalTwinsOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
         # Construct headers
         header_parameters = {}
@@ -383,6 +384,7 @@ class DigitalTwinsOperations(object):
         response = self._client.send(
             request, header_parameters, body_content, stream=False, **operation_config)
 
+        # @vilit - added 202
         if response.status_code not in [202, 204]:
             raise models.ErrorResponseException(self._deserialize, response)
 
@@ -420,8 +422,8 @@ class DigitalTwinsOperations(object):
          deserialized response
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
-        :return: object or ClientRawResponse if raw=true
-        :rtype: object or ~msrest.pipeline.ClientRawResponse
+        :return: dict or ClientRawResponse if raw=true
+        :rtype: dict[str, object] or ~msrest.pipeline.ClientRawResponse
         :raises:
          :class:`ErrorResponseException<dataplane.models.ErrorResponseException>`
         """
@@ -442,7 +444,7 @@ class DigitalTwinsOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
         # Construct headers
         header_parameters = {}
@@ -469,7 +471,7 @@ class DigitalTwinsOperations(object):
         header_dict = {}
 
         if response.status_code == 200:
-            deserialized = self._deserialize('object', response)
+            deserialized = self._deserialize('{object}', response)
             header_dict = {
                 'ETag': 'str',
             }
@@ -519,8 +521,8 @@ class DigitalTwinsOperations(object):
          deserialized response
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
-        :return: object or ClientRawResponse if raw=true
-        :rtype: object or ~msrest.pipeline.ClientRawResponse
+        :return: dict or ClientRawResponse if raw=true
+        :rtype: dict[str, object] or ~msrest.pipeline.ClientRawResponse
         :raises:
          :class:`ErrorResponseException<dataplane.models.ErrorResponseException>`
         """
@@ -544,7 +546,7 @@ class DigitalTwinsOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
         # Construct headers
         header_parameters = {}
@@ -577,7 +579,7 @@ class DigitalTwinsOperations(object):
         header_dict = {}
 
         if response.status_code == 200:
-            deserialized = self._deserialize('object', response)
+            deserialized = self._deserialize('{object}', response)
             header_dict = {
                 'ETag': 'str',
             }
@@ -644,7 +646,7 @@ class DigitalTwinsOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
         # Construct headers
         header_parameters = {}
@@ -736,7 +738,7 @@ class DigitalTwinsOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
         # Construct headers
         header_parameters = {}
@@ -823,7 +825,7 @@ class DigitalTwinsOperations(object):
                 query_parameters = {}
                 if relationship_name is not None:
                     query_parameters['relationshipName'] = self._serialize.query("relationship_name", relationship_name, 'str')
-                query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+                query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
             else:
                 url = next_link
@@ -911,7 +913,7 @@ class DigitalTwinsOperations(object):
 
                 # Construct parameters
                 query_parameters = {}
-                query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+                query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
             else:
                 url = next_link
@@ -1005,7 +1007,7 @@ class DigitalTwinsOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
         # Construct headers
         header_parameters = {}
@@ -1098,7 +1100,7 @@ class DigitalTwinsOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
         # Construct headers
         header_parameters = {}
@@ -1158,8 +1160,8 @@ class DigitalTwinsOperations(object):
          deserialized response
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
-        :return: object or ClientRawResponse if raw=true
-        :rtype: object or ~msrest.pipeline.ClientRawResponse
+        :return: dict or ClientRawResponse if raw=true
+        :rtype: dict[str, object] or ~msrest.pipeline.ClientRawResponse
         :raises:
          :class:`ErrorResponseException<dataplane.models.ErrorResponseException>`
         """
@@ -1180,7 +1182,7 @@ class DigitalTwinsOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
         # Construct headers
         header_parameters = {}
@@ -1207,7 +1209,7 @@ class DigitalTwinsOperations(object):
         header_dict = {}
 
         if response.status_code == 200:
-            deserialized = self._deserialize('object', response)
+            deserialized = self._deserialize('{object}', response)
             header_dict = {
                 'ETag': 'str',
             }
@@ -1280,7 +1282,7 @@ class DigitalTwinsOperations(object):
 
         # Construct parameters
         query_parameters = {}
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
 
         # Construct headers
         header_parameters = {}
@@ -1306,6 +1308,7 @@ class DigitalTwinsOperations(object):
         response = self._client.send(
             request, header_parameters, body_content, stream=False, **operation_config)
 
+        # @vilit - added 202
         if response.status_code not in [202, 204]:
             raise models.ErrorResponseException(self._deserialize, response)
 
