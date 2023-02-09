@@ -1,6 +1,36 @@
 trigger: none
 pr: none
 
+parameters:
+- name: python37
+  displayName: 'Test Python 3.7'
+  type: boolean
+  default: true
+- name: python38
+  displayName: 'Test Python 3.8'
+  type: boolean
+  default: true
+- name: python39
+  displayName: 'Test Python 3.9'
+  type: boolean
+  default: true
+- name: python310
+  displayName: 'Test Python 3.10'
+  type: boolean
+  default: true
+- name: azdev
+  displayName: 'Test development CLI'
+  type: boolean
+  default: true
+- name: azmin
+  displayName: 'Test minimum supported CLI'
+  type: boolean
+  default: true
+- name: azcur
+  displayName: 'Test currently released CLI'
+  type: boolean
+  default: true
+
 pool:
   vmImage: 'ubuntu-latest'
 jobs:
@@ -11,54 +41,70 @@ jobs:
         python: '3.7'
         toxEnvStr: 'lint'
         desc: 'Flake8, Pylint'
-      'python 3.7 tests, min CLI':
-        python: '3.7'
-        toxEnvStr: 'py3.7-azmin-unit'
-        desc: 'python 3.7 tests, min CLI'
-      'python 3.7 tests, current CLI':
-        python: '3.7'
-        toxEnvStr: 'py3.7-azcur-unit'
-        desc: 'Python 3.7 tests, current CLI'
-      'python 3.7 tests, dev CLI':
-        python: '3.7'
-        toxEnvStr: 'py3.7-azdev-unit'
-        desc: 'Python 3.7 tests, dev CLI'
-      'python 3.8 tests, min CLI':
-        python: '3.8'
-        toxEnvStr: 'py3.8-azmin-unit'
-        desc: 'python 3.8 tests, min CLI'
-      'python 3.8 tests, current CLI':
-        python: '3.8'
-        toxEnvStr: 'py3.8-azcur-unit'
-        desc: 'Python 3.8 tests, current CLI'
-      'python 3.8 tests, dev CLI':
-        python: '3.8'
-        toxEnvStr: 'py3.8-azdev-unit'
-        desc: 'Python 3.8 tests, dev CLI'
-      'python 3.9 tests, min CLI':
-        python: '3.9'
-        toxEnvStr: 'py3.9-azmin-unit'
-        desc: 'python 3.9 tests, min CLI'
-      'python 3.9 tests, current CLI':
-        python: '3.9'
-        toxEnvStr: 'py3.9-azcur-unit'
-        desc: 'Python 3.9 tests, current CLI'
-      'python 3.9 tests, dev CLI':
-        python: '3.9'
-        toxEnvStr: 'py3.9-azdev-unit'
-        desc: 'Python 3.9 tests, dev CLI'
-      'python 3.10 tests, min CLI':
-        python: '3.10'
-        toxEnvStr: 'py3.10-azmin-unit'
-        desc: 'Python 3.10 tests, min CLI'
-      'python 3.10 tests, current CLI':
-        python: '3.10'
-        toxEnvStr: 'py3.10-azcur-unit'
-        desc: 'Python 3.10 tests, current CLI'
-      'python 3.10 tests, dev CLI':
-        python: '3.10'
-        toxEnvStr: 'py3.10-azdev-unit'
-        desc: 'Python 3.10 tests, dev CLI'
+      ${{ if parameters.python37 }}:
+        ${{ if parameters.azmin }}:
+          'python 3.7 tests, min CLI':
+            python: '3.7'
+            toxEnvStr: 'py3.7-azmin-unit'
+            desc: 'python 3.7 tests, min CLI'
+        ${{ if parameters.azcur }}:
+          'python 3.7 tests, current CLI':
+            python: '3.7'
+            toxEnvStr: 'py3.7-azcur-unit'
+            desc: 'Python 3.7 tests, current CLI'
+        ${{ if parameters.azdev }}:
+          'python 3.7 tests, dev CLI':
+            python: '3.7'
+            toxEnvStr: 'py3.7-azdev-unit'
+            desc: 'Python 3.7 tests, dev CLI'
+      ${{ if parameters.python38 }}:
+        ${{ if parameters.azmin }}:
+          'python 3.8 tests, min CLI':
+            python: '3.8'
+            toxEnvStr: 'py3.8-azmin-unit'
+            desc: 'python 3.8 tests, min CLI'
+        ${{ if parameters.azcur }}:
+          'python 3.8 tests, current CLI':
+            python: '3.8'
+            toxEnvStr: 'py3.8-azcur-unit'
+            desc: 'Python 3.8 tests, current CLI'
+        ${{ if parameters.azdev }}:
+          'python 3.8 tests, dev CLI':
+            python: '3.8'
+            toxEnvStr: 'py3.8-azdev-unit'
+            desc: 'Python 3.8 tests, dev CLI'
+      ${{ if parameters.python39 }}:
+        ${{ if parameters.azmin }}:
+          'python 3.9 tests, min CLI':
+            python: '3.9'
+            toxEnvStr: 'py3.9-azmin-unit'
+            desc: 'python 3.9 tests, min CLI'
+        ${{ if parameters.azcur }}:
+          'python 3.9 tests, current CLI':
+            python: '3.9'
+            toxEnvStr: 'py3.9-azcur-unit'
+            desc: 'Python 3.9 tests, current CLI'
+        ${{ if parameters.azdev }}:
+          'python 3.9 tests, dev CLI':
+            python: '3.9'
+            toxEnvStr: 'py3.9-azdev-unit'
+            desc: 'Python 3.9 tests, dev CLI'
+      ${{ if parameters.python310 }}:
+        ${{ if parameters.azmin }}:
+          'python 3.10 tests, min CLI':
+            python: '3.10'
+            toxEnvStr: 'py3.10-azmin-unit'
+            desc: 'Python 3.10 tests, min CLI'
+        ${{ if parameters.azcur }}:
+          'python 3.10 tests, current CLI':
+            python: '3.10'
+            toxEnvStr: 'py3.10-azcur-unit'
+            desc: 'Python 3.10 tests, current CLI'
+        ${{ if parameters.azdev }}:
+          'python 3.10 tests, dev CLI':
+            python: '3.10'
+            toxEnvStr: 'py3.10-azdev-unit'
+            desc: 'Python 3.10 tests, dev CLI'
   steps:
   - template: templates/clone-cli-repo.yml
   - template: templates/setup-tox.yml
