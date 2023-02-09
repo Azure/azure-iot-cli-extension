@@ -9,6 +9,8 @@ import responses
 import pytest
 import json
 import os
+from functools import partial
+from urllib3.util.retry import Retry
 
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azure.cli.core.commands import AzCliCommand
@@ -335,6 +337,8 @@ fake_oauth_response = responses.Response(
 @pytest.fixture
 def mocked_response():
     with responses.RequestsMock() as rsps:
+        on_request_with_no_retry = partial(rsps._on_request, retries=Retry(0, read=False))
+        rsps._on_request = on_request_with_no_retry
         yield rsps
 
 
@@ -348,27 +352,27 @@ def service_client_generic_errors(mocked_response, fixture_ghcs, request):
         )
 
     any_endpoint = r"^https:\/\/.+"
-    with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
-        rsps.add_callback(
-            callback=error_callback, method=responses.GET, url=re.compile(any_endpoint)
-        )
-        rsps.add_callback(
-            callback=error_callback, method=responses.PUT, url=re.compile(any_endpoint)
-        )
-        rsps.add_callback(
-            callback=error_callback, method=responses.POST, url=re.compile(any_endpoint)
-        )
-        rsps.add_callback(
-            callback=error_callback,
-            method=responses.DELETE,
-            url=re.compile(any_endpoint),
-        )
-        rsps.add_callback(
-            callback=error_callback,
-            method=responses.PATCH,
-            url=re.compile(any_endpoint),
-        )
-        yield rsps
+    mocked_response.assert_all_requests_are_fired = False
+    mocked_response.add_callback(
+        callback=error_callback, method=responses.GET, url=re.compile(any_endpoint)
+    )
+    mocked_response.add_callback(
+        callback=error_callback, method=responses.PUT, url=re.compile(any_endpoint)
+    )
+    mocked_response.add_callback(
+        callback=error_callback, method=responses.POST, url=re.compile(any_endpoint)
+    )
+    mocked_response.add_callback(
+        callback=error_callback,
+        method=responses.DELETE,
+        url=re.compile(any_endpoint),
+    )
+    mocked_response.add_callback(
+        callback=error_callback,
+        method=responses.PATCH,
+        url=re.compile(any_endpoint),
+    )
+    yield mocked_response
 
 
 @pytest.fixture()
