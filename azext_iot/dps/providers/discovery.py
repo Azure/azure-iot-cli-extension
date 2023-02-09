@@ -9,8 +9,6 @@ from azure.cli.core.commands.client_factory import get_subscription_id
 from azext_iot.common._azure import IOT_SERVICE_CS_TEMPLATE
 from azext_iot.common.base_discovery import BaseDiscovery
 from azext_iot.common.shared import DiscoveryResourceType
-from azext_iot.common.utility import ensure_iotdps_sdk_min_version
-from azext_iot.constants import IOTDPS_TRACK_2_SDK_MIN_VERSION
 from azext_iot.dps.models.dps_target import DPSTarget
 from azext_iot._factory import iot_service_provisioning_factory
 from typing import Any, Dict
@@ -32,8 +30,6 @@ class DPSDiscovery(BaseDiscovery):
 
     def _initialize_client(self):
         if not self.client:
-            # Track 2 could be supported
-            self.track2 = ensure_iotdps_sdk_min_version(IOTDPS_TRACK_2_SDK_MIN_VERSION)
             if getattr(self.cmd, "cli_ctx", None):
                 # The client we want to use is an attribute of the client returned
                 # from the factory. This will have to be revisted if the DPS sdk changes.
