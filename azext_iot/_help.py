@@ -1154,12 +1154,12 @@ helps[
     examples:
     - name: Clone a device deployment without changing any properties.
       text: >
-        az iot hub deployment clone -d {deployment_name} --nd {new_deployment_name}
+        az iot edge deployment clone -d {deployment_name} --nd {new_deployment_name}
         -n {iothub_name}
     - name: Clone a device deployment, while altering the priority and updating the target condition
             of the cloned device deployment.
       text: >
-        az iot hub deployment clone -d {deployment_name} --nd {new_deployment_name}
+        az iot edge deployment clone -d {deployment_name} --nd {new_deployment_name}
         --set priority=10 targetCondition="tags.building=43 and tags.environment='dev'"
 """
 
