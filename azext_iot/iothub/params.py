@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from azext_iot.iothub.providers.state import HubAspects
 from azext_iot.iothub.common import CertificateAuthorityVersions
 from azure.cli.core.commands.parameters import get_enum_type, get_three_state_flag
 from azext_iot.common.shared import DeviceAuthType, SettleType, ProtocolType, AckType
@@ -11,6 +12,7 @@ from azext_iot.assets.user_messages import info_param_properties_device
 from azext_iot._params import hub_auth_type_dataplane_param_type
 from azext_iot.iothub.common import EncodingFormat, EndpointType, RouteSourceType
 from azext_iot.iothub._validators import validate_device_model_id
+from azext_iot._validators import mode2_iot_login_handler
 
 
 def load_iothub_arguments(self, _):
@@ -247,6 +249,78 @@ def load_iothub_arguments(self, _):
             "content_type",
             options_list=["--content-type", "--ct"],
             help="MIME Type of file.",
+        )
+
+    with self.argument_context("iot hub state") as context:
+        context.argument(
+            "state_file",
+            options_list=["--state-file", "-f"],
+            help="The path to the file where the state information will be stored."
+        )
+        context.argument(
+            "replace",
+            options_list=["--replace", "-r"],
+            help="If this flag is set, then the command will delete the current devices, configurations, and certificates "
+                 "of the destination hub."
+        )
+        context.argument(
+            "hub_aspects",
+            options_list=["--aspects"],
+            nargs="+",
+            arg_type=get_enum_type(HubAspects),
+            help="Hub Aspects (space-separated)."
+        )
+
+    with self.argument_context("iot hub state export") as context:
+        context.argument(
+            "replace",
+            options_list=["--replace", "-r"],
+            help="If this flag is set, then the command will overwrite the contents of the output file."
+        )
+
+    with self.argument_context("iot hub state migrate") as context:
+        context.argument(
+            "hub_name",
+            options_list=["--destination-hub", "--dh"],
+            help="Name of IoT Hub to which the origin hub state will be copied to."
+        )
+        context.argument(
+            "resource_group_name",
+            options_list=["--destination-resource-group", "--dg"],
+            help="Name of resource group of the IoT Hub to which the origin hub state will be copied to.",
+            arg_group="IoT Hub Identifier"
+        )
+        context.argument(
+            "login",
+            options_list=["--destination-hub-login", "--dl"],
+            validator=mode2_iot_login_handler,
+            help="This command supports an entity connection string with rights to perform action on the destination hub. "
+            'Use to avoid session login via "az login" for this IoT Hub instance. '
+            "If both an entity connection string and name are provided the connection string takes priority. "
+            "Required if --destination-hub is not provided.",
+            arg_group="IoT Hub Identifier"
+        )
+        context.argument(
+            "orig_hub",
+            options_list=["--origin-hub", "--oh"],
+            help="Name of IoT Hub which will be copied.",
+            arg_group="IoT Hub Identifier"
+        )
+        context.argument(
+            "orig_resource_group_name",
+            options_list=["--origin-resource-group", "--og"],
+            help="Name of resource group of the IoT Hub which will be copied.",
+            arg_group="IoT Hub Identifier"
+        )
+        context.argument(
+            "orig_hub_login",
+            options_list=["--origin-hub-login", "--ol"],
+            validator=mode2_iot_login_handler,
+            help="This command supports an entity connection string with rights to perform action on the origin hub. "
+            'Use to avoid session login via "az login" for this IoT Hub instance. '
+            "If both an entity connection string and name are provided the connection string takes priority. "
+            "Required if --origin-hub is not provided.",
+            arg_group="IoT Hub Identifier"
         )
 
     with self.argument_context("iot edge devices") as context:
