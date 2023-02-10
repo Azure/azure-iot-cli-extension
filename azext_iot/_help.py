@@ -706,8 +706,7 @@ helps[
 ] = """
     type: command
     short-summary: Query an IoT Hub using a powerful SQL-like language.
-    long-summary: Query an IoT Hub using a powerful SQL-like language to retrieve information
-                  regarding device and module twins, jobs and message routing.
+    long-summary: Retrieve information regarding device and module twins, jobs and message routing.
                   See https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language
                   for more information.
     examples:
@@ -789,9 +788,8 @@ helps[
     "iot hub configuration update"
 ] = """
     type: command
-    short-summary: |
-                  Update specified properties of an IoT automatic device management configuration.
-
+    short-summary: Update specified properties of an IoT automatic device management configuration.
+    long-summary: |
                   Use --set followed by property assignments for updating a configuration.
 
                   Note: Configuration content is immutable. Configuration properties that can be
@@ -942,8 +940,8 @@ helps[
     "iot device send-d2c-message"
 ] = """
     type: command
-    short-summary: |
-                   Send an mqtt device-to-cloud message.
+    short-summary: Send an mqtt device-to-cloud message.
+    long-summary: |
                    The command supports sending messages with application and system properties.
 
                    Note: The command only works for symmetric key auth (SAS) based devices
@@ -962,9 +960,8 @@ helps[
     "iot device simulate"
 ] = """
     type: command
-    short-summary: |
-                   Simulate a device in an Azure IoT Hub.
-
+    short-summary: Simulate a device in an Azure IoT Hub.
+    long-summary: |
                    While the device simulation is running, the device will automatically receive
                    and acknowledge cloud-to-device (c2d) messages. For mqtt simulation, all c2d messages will
                    be acknowledged with completion. For http simulation c2d acknowledgement is based on user
@@ -1141,9 +1138,8 @@ helps[
     "iot edge deployment update"
 ] = """
     type: command
-    short-summary: |
-                  Update specified properties of an IoT Edge deployment.
-
+    short-summary: Update specified properties of an IoT Edge deployment.
+    long-summary: |
                   Use --set followed by property assignments for updating a deployment.
 
                   Note: IoT Edge deployment content is immutable. Deployment properties that can be
