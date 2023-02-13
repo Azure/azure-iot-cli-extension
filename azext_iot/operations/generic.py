@@ -4,11 +4,12 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from typing import Optional
 from azure.cli.core.azclierror import InvalidArgumentValueError
 from azext_iot.assets.user_messages import error_param_top_out_of_bounds
 
 
-def _execute_query(query_args, query_method, top=None):
+def _execute_query(query_args, query_method, top: Optional[int] = None):
     payload = []
     headers = {"Cache-Control": "no-cache, must-revalidate"}
 
@@ -35,7 +36,7 @@ def _execute_query(query_args, query_method, top=None):
     return payload[:top] if top else payload
 
 
-def _process_top(top, upper_limit=None):
+def _process_top(top: int, upper_limit: Optional[int] = None):
     # Consider top == 0
     if not top and top != 0:
         return None

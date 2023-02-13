@@ -66,7 +66,7 @@ class CertificateProvider(IoTHubProvider):
             return
 
         command = "resource update -n {} -g {} --api-version {} --resource-type {}".format(
-            self.target["entity"].split(".")[0],
+            self.target["name"],
             self.target["resourcegroup"],
             CA_TRANSITION_API_VERSION,
             HUB_PROVIDER
@@ -86,7 +86,7 @@ class CertificateProvider(IoTHubProvider):
     def _get_target_properties(self) -> Optional[Dict[str, str]]:
         result = self.cli.invoke(
             "resource show -n {} -g {} --api-version {} --resource-type {}".format(
-                self.target["entity"].split(".")[0],
+                self.target["name"],
                 self.target['resourcegroup'],
                 CA_TRANSITION_API_VERSION,
                 HUB_PROVIDER
