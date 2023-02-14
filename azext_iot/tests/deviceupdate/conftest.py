@@ -15,6 +15,7 @@ from knack.log import get_logger
 
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests.helpers import tags_to_dict
 from azext_iot.tests.settings import DynamoSettings
 
 logger = get_logger(__name__)
@@ -52,15 +53,6 @@ def generate_linked_storage_id() -> str:
 
 def generate_useridentity_id() -> str:
     return f"test-adu-dep-{generate_generic_id()}"
-
-
-def tags_to_dict(tags: str) -> dict:
-    result = {}
-    split_tags = tags.split()
-    for tag in split_tags:
-        kvp = tag.split("=")
-        result[kvp[0]] = kvp[1]
-    return result
 
 
 @pytest.fixture(scope="module")

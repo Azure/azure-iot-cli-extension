@@ -19,17 +19,19 @@ class BulkImportJob(Model):
     Variables are only populated by the server, and will be ignored when
     sending a request.
 
+    All required parameters must be populated in order to send to Azure.
+
     :ivar id: The identifier of the bulk import job.
     :vartype id: str
-    :param input_blob_uri: The path to the input Azure storage blob that
-     contains file(s) describing the operations to perform in the job.
+    :param input_blob_uri: Required. The path to the input Azure storage blob
+     that contains file(s) describing the operations to perform in the job.
     :type input_blob_uri: str
-    :param output_blob_uri: The path to the output Azure storage blob that
-     will contain the errors and progress logs of import job.
+    :param output_blob_uri: Required. The path to the output Azure storage
+     blob that will contain the errors and progress logs of import job.
     :type output_blob_uri: str
     :ivar status: Status of the job. Possible values include: 'notstarted',
-     'running', 'failed', 'succeeded'
-    :vartype status: str or ~dataplane.models.enum
+     'running', 'failed', 'succeeded', 'cancelling', 'cancelled'
+    :vartype status: str or ~dataplane.models.Status
     :ivar created_date_time: Start time of the job. The timestamp is in
      RFC3339 format: `yyyy-MM-ddTHH:mm:ssZ`.
     :vartype created_date_time: datetime
@@ -45,11 +47,13 @@ class BulkImportJob(Model):
     :vartype purge_date_time: datetime
     :param error: Details of the error(s) that occurred executing the bulk
      job.
-    :type error: ~dataplane.models.ImportJobError
+    :type error: ~dataplane.models.Error
     """
 
     _validation = {
         'id': {'readonly': True},
+        'input_blob_uri': {'required': True},
+        'output_blob_uri': {'required': True},
         'status': {'readonly': True},
         'created_date_time': {'readonly': True},
         'last_action_date_time': {'readonly': True},
@@ -61,15 +65,15 @@ class BulkImportJob(Model):
         'id': {'key': 'id', 'type': 'str'},
         'input_blob_uri': {'key': 'inputBlobUri', 'type': 'str'},
         'output_blob_uri': {'key': 'outputBlobUri', 'type': 'str'},
-        'status': {'key': 'status', 'type': 'str'},
+        'status': {'key': 'status', 'type': 'Status'},
         'created_date_time': {'key': 'createdDateTime', 'type': 'iso-8601'},
         'last_action_date_time': {'key': 'lastActionDateTime', 'type': 'iso-8601'},
         'finished_date_time': {'key': 'finishedDateTime', 'type': 'iso-8601'},
         'purge_date_time': {'key': 'purgeDateTime', 'type': 'iso-8601'},
-        'error': {'key': 'error', 'type': 'ImportJobError'},
+        'error': {'key': 'error', 'type': 'Error'},
     }
 
-    def __init__(self, *, input_blob_uri: str=None, output_blob_uri: str=None, error=None, **kwargs) -> None:
+    def __init__(self, *, input_blob_uri: str, output_blob_uri: str, error=None, **kwargs) -> None:
         super(BulkImportJob, self).__init__(**kwargs)
         self.id = None
         self.input_blob_uri = input_blob_uri
@@ -80,26 +84,3 @@ class BulkImportJob(Model):
         self.finished_date_time = None
         self.purge_date_time = None
         self.error = error
-
-
-# @vilit - adt service does not return errors properly for import job so added a temporary
-# class. Will need to revist when the API changes.
-class ImportJobError(Model):
-    """Error definition.
-
-    The service populates error like so:
-    "error": {
-        "error": {
-        "code": "ManagedIdentityNotConfigured",
-        "message": "Unable to read input blob because managed identity is not set on Azure Digital Twins instance."
-        }
-    },
-    """
-
-    _validation = {}
-
-    _attribute_map = {}
-
-    def __init__(self, *, innererror=None, **kwargs) -> None:
-        super(ImportJobError, self).__init__(**kwargs)
-

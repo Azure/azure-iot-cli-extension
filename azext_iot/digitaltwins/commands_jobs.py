@@ -33,3 +33,8 @@ def list_import_jobs(cmd, name_or_hostname: str, resource_group_name: str = None
 def delete_import_job(cmd, name_or_hostname: str, job_id: str, resource_group_name: str = None):
     import_job_provider = ImportJobProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     return import_job_provider.delete(job_id=job_id)
+
+
+def cancel_import_job(cmd, name_or_hostname: str, job_id: str, resource_group_name: str = None):
+    import_job_provider = ImportJobProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
+    return import_job_provider.cancel(job_id=job_id)

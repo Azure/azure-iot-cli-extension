@@ -3,8 +3,23 @@
 Release History
 ===============
 
-
 unreleased
++++++++++++++++
+
+**IoT Hub updates**
+
+* Addition of the `az iot hub state` command group which introduces commands to save, upload, and copy states between IoT Hubs. This will
+  allow for easier migration of IoT Hubs when changing location, IoT Hub SKU, number of Event Hub partitions and more.
+  For more information, please read the trouble shooting guide [here](https://aka.ms/aziotcli-iot-hub-state).
+
+  The commands are as follows:
+  
+  - `az iot hub state export` to save the current state of an IoT Hub to a JSON file.
+  - `az iot hub state import` to upload a state from a JSON file to an IoT Hub.
+  - `az iot hub state migrate` to copy a state of an IoT Hub to another IoT Hub.
+
+
+0.19.1
 +++++++++++++++
 
 **IoT Hub updates**
@@ -12,6 +27,15 @@ unreleased
 * Addition of export modules command for edge device
 
   - az iot edge export-modules
+
+**Digital Twins updates**
+
+* Digital Twins dataplane commands now use the newer 2023-02-27-preview API. The following command groups are affected:
+ - `az dt model`
+ - `az dt twin`
+ - `az dt job`
+
+* `az dt job import` now supports newer job statuses, including "cancelling" and "cancelled". Now, to delete a running job, the job must be first cancelled with `az dt job import cancel`.
 
 
 0.19.0
@@ -35,7 +59,7 @@ unreleased
 
 Other notable changes, which are not affected by API versions, include:
 
-* Addition of fallback route management through `az iot hub message-route fallback set` and 
+* Addition of fallback route management through `az iot hub message-route fallback set` and
   `az iot hub message-route fallback show`
 
 * Modification of how route testing works for testing all route sources. If `az iot hub message-route test` is called
@@ -44,14 +68,12 @@ Other notable changes, which are not affected by API versions, include:
 * Addition of new parameters `--custom-labels` and `--custom-metrics` for `az iot hub configuration create` and
   `az iot edge deployment create` to let user input labels and metrics in key=value pair format.
 
-
 **Digital Twins updates**
 
 * Addition of User Assigned Identities for data history connections. The command `az dt data-history connection create adx`
   now can take an extra parameter `--mi-user-assigned` to use an associated User Assigned Identity for the connection
   creation rather than the system assigned identity for the Digital Twin.
 * Some minor improvements to command documentation involving managed identities.
-
 
 **IoT Edge updates**
 
@@ -62,12 +84,10 @@ Other notable changes, which are not affected by API versions, include:
   If an output path is specified, this command will also create tar files containing each device's certificate bundle, an IoT Edge
   `config.toml` config file and an installation script to configure a target Edge device with these settings.
 
-
 **IoT DPS updates**
 
 * Removed file extension restriction for attached certificates in individual enrollments and enrollment groups creation/update commands,
   and added suggested certificate format in `--help` docs.
-
 
 **Device Update**
 
@@ -91,10 +111,10 @@ Other notable changes, which are not affected by API versions, include:
 
   To learn more about this transition, visit http://aka.ms/iot-ca-updates/.
 
-
 **IoT Central updates**
 
 * Fixed an issue with enrollement group certificate encoding
+
 
 
 0.18.2

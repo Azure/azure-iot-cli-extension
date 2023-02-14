@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import os
+from typing import List, Optional
 
 from knack.log import get_logger
 from . import DTLiveScenarioTest
@@ -72,7 +73,7 @@ class TestDTImportJobs(DTLiveScenarioTest):
                 )
             )
 
-    def test_dt_importjobs(self):
+    def test_dt_import_jobs(self):
         self.wait_for_capacity()
 
         storage_account_id = self.cmd(
@@ -118,11 +119,50 @@ class TestDTImportJobs(DTLiveScenarioTest):
         )
         valid_import_job_output_filename = create_valid_import_job_output["outputBlobUri"].split("/")[-1]
 
+        # Run through import job lifecycle
+        # Cancel import job (there could be a race condition)
+        self.cmd(
+            "dt job import cancel -n '{}' -g '{}' -j '{}' -y".format(instance_name, self.rg, valid_import_job_id)
+        )
+
+        # Poll to make sure job is cancelled
+        error = poll_job_status(
+            cmd=self.cmd,
+            rg=self.rg,
+            instance_name=instance_name,
+            job_id=valid_import_job_id,
+            expected_statuses=["cancelled", "cancelling"]
+        )
+        assert error is None
+
+        # Delete import job
+        self.cmd(
+            "dt job import delete -n '{}' -g '{}' -j '{}' -y".format(instance_name, self.rg, valid_import_job_id)
+        )
+
+        # Recreate import job
+        self.cmd(
+            "dt job import create -n '{}' -g '{}' -j '{}' --df '{}' --ibc '{}' --isa '{}'".format(
+                instance_name, self.rg, valid_import_job_id,
+                valid_import_data_filename, self.storage_container, self.storage_account_name
+            )
+        ).get_output_in_json()
+
         # Show import job
         show_import_job_output = self.cmd(
             "dt job import show -n '{}' -g '{}' -j '{}'".format(instance_name, self.rg, valid_import_job_id)
         ).get_output_in_json()
         assert show_import_job_output["id"] == valid_import_job_id
+
+        # Poll to ensure desired status of valid import job before starting new one
+        error = poll_job_status(
+            cmd=self.cmd,
+            rg=self.rg,
+            instance_name=instance_name,
+            job_id=valid_import_job_id,
+            expected_statuses=["succeeded"]
+        )
+        assert error is None
 
         # Create import job for invalid import data
         invalid_import_job_output_filename = "{}_invalid_import_job_output.txt".format(instance_name)
@@ -147,23 +187,15 @@ class TestDTImportJobs(DTLiveScenarioTest):
         assert list_import_jobs_output[0]["id"] in import_job_ids
         assert list_import_jobs_output[1]["id"] in import_job_ids
 
-        # Poll to ensure desired status of import jobs
-        num_tries = 0
-        while num_tries < MAX_TRIES:
-            num_tries += 1
-            show_valid_import_job_output = self.cmd(
-                "dt job import show -n '{}' -g '{}' -j '{}'".format(instance_name, self.rg, valid_import_job_id)
-            ).get_output_in_json()
-            assert show_valid_import_job_output["status"] != "failed"
-            show_invalid_import_job_output = self.cmd(
-                "dt job import show -n '{}' -g '{}' -j '{}'".format(instance_name, self.rg, invalid_import_job_id)
-            ).get_output_in_json()
-            assert show_invalid_import_job_output["status"] != "succeeded"
-            if show_valid_import_job_output["status"] == "succeeded" and show_invalid_import_job_output["status"] == "failed":
-                assert show_invalid_import_job_output["error"]["error"]["code"] == "DTDLParsingError"
-                assert show_valid_import_job_output["error"] is None
-                break
-            sleep(POLL_SLEEP_INTERVAL)
+        # Poll to ensure desired status of invalid import job
+        error = poll_job_status(
+            cmd=self.cmd,
+            rg=self.rg,
+            instance_name=instance_name,
+            job_id=invalid_import_job_id,
+            expected_statuses=["failed"]
+        )
+        assert error["code"] == "DTDLParsingError"
 
         list_models_output = self.cmd(
             "dt model list -n {} -g {} --definition".format(instance_name, self.rg)
@@ -198,12 +230,41 @@ class TestDTImportJobs(DTLiveScenarioTest):
         # Delete import jobs and their output files
         self._cleanup_import_job(instance_name, valid_import_job_id, valid_import_job_output_filename)
         self._cleanup_import_job(instance_name, invalid_import_job_id, invalid_import_job_output_filename)
+        list_import_jobs_output = self.cmd(
+            "dt job import list -n '{}' -g '{}'".format(instance_name, self.rg)
+        ).get_output_in_json()
+        assert len(list_import_jobs_output) == 0
+
+
+def poll_job_status(cmd, rg: str, instance_name: str, job_id: str, expected_statuses: List[str]) -> Optional[dict]:
+    """
+    Helper function to poll job import status until finalized. Returns the error.
+
+    Note that the first status in expected_statuses should be the expected final status. This method will check for running
+    and not started statuses without needing to be specified in expected_statuses.
+    """
+    num_tries = 0
+    final_status = expected_statuses[0]
+    expected_statuses.extend(["running", "notstarted"])
+    while num_tries < MAX_TRIES:
+        num_tries += 1
+        import_job_output = cmd(
+            "dt job import show -n '{}' -g '{}' -j '{}'".format(instance_name, rg, job_id)
+        ).get_output_in_json()
+        assert import_job_output["status"] in expected_statuses
+        if import_job_output["status"] == final_status:
+            return import_job_output["error"]
+        sleep(POLL_SLEEP_INTERVAL)
 
 
 def assert_import_job_creation(
     create_import_job_output: dict, expected_input_blob_name: str, expected_output_blob_name: str, expected_job_id: str = None
 ):
-    assert create_import_job_output is not None
+    assert create_import_job_output
+    assert create_import_job_output["createdDateTime"]
+    assert create_import_job_output["lastActionDateTime"]
+    assert create_import_job_output["purgeDateTime"]
+    assert create_import_job_output["finishedDateTime"] is None
     assert create_import_job_output["error"] is None
     assert create_import_job_output["status"] == "notstarted"
     assert create_import_job_output["inputBlobUri"]
