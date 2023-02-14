@@ -21,6 +21,7 @@ from azext_iot.common.utility import (
     ensure_iothub_sdk_min_version,
     ensure_iotdps_sdk_min_version,
 )
+from azext_iot.operations.generic import _process_top
 from azext_iot.common.deps import ensure_uamqp
 from azext_iot.constants import EVENT_LIB, EXTENSION_NAME
 from azext_iot._validators import mode2_iot_login_handler
@@ -510,3 +511,40 @@ class TestFileHeaders(object):
                 "The following files are missing an encoding and license header, or it is improperly formatted:\n"
                 "{}".format("\n".join(files_missing_header))
             )
+
+
+class TestProcessTop(object):
+    @pytest.mark.parametrize(
+        "top, upper_limit",
+        [
+            (None, None),
+            (-1, None),
+            (5, None),
+            (5, 5),
+            (5, 10),
+        ],
+    )
+    def test_process_top(self, mocker, top, upper_limit):
+        processed_top = _process_top(top=top, upper_limit=upper_limit)
+        if top and top >= 0:
+            assert processed_top == top
+        else:
+            assert processed_top is None
+
+    @pytest.mark.parametrize(
+        "top, upper_limit",
+        [
+            (0, None),
+            (-1, 100),
+            (-3, None),
+            (5, 4),
+            (0, 0),
+        ],
+    )
+    def test_process_top_error(self, mocker, top, upper_limit):
+        with pytest.raises(CLIError) as e:
+            _process_top(top=top, upper_limit=upper_limit)
+
+        assert "top must be > 0" in e.value.error_msg
+        if upper_limit:
+            assert f" and <= {upper_limit}" in e.value.error_msg
