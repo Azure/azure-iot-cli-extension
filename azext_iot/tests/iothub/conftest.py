@@ -15,18 +15,13 @@ from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.tests.helpers import get_closest_marker, get_agent_public_ip
-from azext_iot.tests.settings import DynamoSettings
+from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 
 logger = get_logger(__name__)
 MAX_RBAC_ASSIGNMENT_TRIES = 10
 USER_ROLE = "IoT Hub Data Contributor"
 cli = EmbeddedCLI()
-REQUIRED_TEST_ENV_VARS = [
-    "azext_iot_testrg",
-    "azext_iot_testhub",
-    "azext_iot_teststorageaccount",
-    "azext_iot_teststoragecontainer"]
-settings = DynamoSettings(req_env_set=REQUIRED_TEST_ENV_VARS)
+settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL)
 RG = settings.env.azext_iot_testrg
 HUB_NAME = settings.env.azext_iot_testhub
 STORAGE_ACCOUNT = settings.env.azext_iot_teststorageaccount
