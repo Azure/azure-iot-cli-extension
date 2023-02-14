@@ -47,9 +47,6 @@ class BaseDiscovery(ABC):
     :ivar sub_id: Subscription id
     :vartype sub_id: str
 
-    :ivar track2: Whether the client uses track2.
-    :vartype track2: bool
-
     :ivar resource_type: Type of the resources the client fetches. Used to abstract
                          error messages.
     :vartype resource_type: DiscoveryResourceType
@@ -63,7 +60,6 @@ class BaseDiscovery(ABC):
         self.client = None
         self.sub_id = "unknown"
         self.resource_type = resource_type
-        self.track2 = False
         self.necessary_rights_set = necessary_rights_set
 
     @abstractmethod
@@ -99,15 +95,8 @@ class BaseDiscovery(ABC):
         else:
             resource_pager = self.client.list_by_resource_group(resource_group_name=rg)
 
-        if self.track2:
-            for resources in resource_pager.by_page():
-                resource_list.extend(resources)
-        else:
-            try:
-                while True:
-                    resource_list.extend(resource_pager.advance_page())
-            except StopIteration:
-                pass
+        for resources in resource_pager.by_page():
+            resource_list.extend(resources)
 
         return resource_list
 
@@ -130,15 +119,8 @@ class BaseDiscovery(ABC):
         )
         policy_list = []
 
-        if self.track2:
-            for policies in policy_pager.by_page():
-                policy_list.extend(policies)
-        else:
-            try:
-                while True:
-                    policy_list.extend(policy_pager.advance_page())
-            except StopIteration:
-                pass
+        for policies in policy_pager.by_page():
+            policy_list.extend(policies)
 
         return policy_list
 
