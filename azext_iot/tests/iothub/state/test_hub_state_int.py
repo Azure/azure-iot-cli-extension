@@ -8,7 +8,7 @@ import random
 import pytest
 import json
 import os
-import time
+import timene
 from pathlib import Path
 from azext_iot.common.shared import DeviceAuthApiType
 

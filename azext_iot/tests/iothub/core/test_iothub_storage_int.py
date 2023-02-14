@@ -9,6 +9,7 @@ from time import sleep
 from knack.util import CLIError
 from pathlib import Path
 from knack.log import get_logger
+import pytest
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.settings import UserTypes
@@ -31,6 +32,7 @@ SETUP_SLEEP_INTERVAL = 10
 IDENTITY_SLEEP_INTERVAL = 60
 
 
+@pytest.mark.usefixtures("fixture_provision_existing_hub_storage")
 class TestIoTStorage(IoTLiveScenarioTest):
     def __init__(self, test_case):
         self.storage_cstring = None

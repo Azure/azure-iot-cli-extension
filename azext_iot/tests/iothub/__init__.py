@@ -63,6 +63,7 @@ def set_cmd_auth_type(command: str, auth_type: str, cstring: str) -> str:
     return f"{command} --auth-type {auth_type}"
 
 
+@pytest.mark.usefixtures("fixture_provision_existing_hub_role")
 class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def __init__(self, test_scenario, add_data_contributor=True):
         assert test_scenario
@@ -105,31 +106,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 ).get_output_in_json()
 
                 if add_data_contributor:
-                    account = self.cmd("account show").get_output_in_json()
-                    user = account["user"]
-
-                    if user["name"] is None:
-                        raise Exception("User not found")
-
-                    tries = 0
-                    while tries < MAX_RBAC_ASSIGNMENT_TRIES:
-                        role_assignments = self.get_role_assignments(target_hub["id"], USER_ROLE)
-                        role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
-                        if user["name"] in role_assignment_principal_names:
-                            break
-                        # else assign IoT Hub Data Contributor role to current user and check again
-                        self.cmd(
-                            'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
-                                user["name"], USER_ROLE, target_hub["id"]
-                            )
-                        )
-                        sleep(10)
-
-                    if tries == MAX_RBAC_ASSIGNMENT_TRIES:
-                        raise Exception(
-                            "Reached max ({}) number of tries to assign RBAC role. Please re-run the test later "
-                            "or with more max number of tries.".format(MAX_RBAC_ASSIGNMENT_TRIES)
-                        )
+                    self._add_data_contributor(target_hub)
 
         self.region = self.get_region()
         self.connection_string = self.get_hub_cstring()
@@ -140,6 +117,33 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             rtype=ResourceTypes.hub.value,
             test_tag=test_scenario
         )
+
+    def _add_data_contributor(self, target_hub):
+        account = self.cmd("account show").get_output_in_json()
+        user = account["user"]
+
+        if user["name"] is None:
+            raise Exception("User not found")
+
+        tries = 0
+        while tries < MAX_RBAC_ASSIGNMENT_TRIES:
+            role_assignments = self.get_role_assignments(target_hub["id"], USER_ROLE)
+            role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
+            if user["name"] in role_assignment_principal_names:
+                break
+            # else assign IoT Hub Data Contributor role to current user and check again
+            self.cmd(
+                'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
+                    user["name"], USER_ROLE, target_hub["id"]
+                )
+            )
+            sleep(10)
+
+        if tries == MAX_RBAC_ASSIGNMENT_TRIES:
+            raise Exception(
+                "Reached max ({}) number of tries to assign RBAC role. Please re-run the test later "
+                "or with more max number of tries.".format(MAX_RBAC_ASSIGNMENT_TRIES)
+            )
 
     def clean_up(self, device_ids: List[str] = None, config_ids: List[str] = None):
         if device_ids:

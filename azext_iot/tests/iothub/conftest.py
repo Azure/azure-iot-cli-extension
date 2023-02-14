@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from time import sleep
-from typing import Optional
+from typing import Optional, List
 import os
 
 import pytest
@@ -21,9 +21,16 @@ logger = get_logger(__name__)
 MAX_RBAC_ASSIGNMENT_TRIES = 10
 USER_ROLE = "IoT Hub Data Contributor"
 cli = EmbeddedCLI()
-REQUIRED_TEST_ENV_VARS = ["azext_iot_testrg"]
+REQUIRED_TEST_ENV_VARS = [
+    "azext_iot_testrg",
+    "azext_iot_testhub",
+    "azext_iot_teststorageaccount",
+    "azext_iot_teststoragecontainer"]
 settings = DynamoSettings(req_env_set=REQUIRED_TEST_ENV_VARS)
 RG = settings.env.azext_iot_testrg
+HUB_NAME = settings.env.azext_iot_testhub
+STORAGE_ACCOUNT = settings.env.azext_iot_teststorageaccount
+STORAGE_CONTAINER = settings.env.azext_iot_teststoragecontainer
 
 
 def generate_hub_id() -> str:
@@ -75,6 +82,94 @@ def assign_iot_hub_dataplane_rbac_role(hub_results):
             _assign_rbac_role(
                 assignee=user["name"], scope=target_hub_id, role=USER_ROLE
             )
+
+
+@pytest.fixture()
+def fixture_provision_existing_hub_certificate(request):
+    if HUB_NAME:
+        # Make sure root certificate is Baltimore(Default)
+        authority = cli.invoke(
+            f"iot hub certificate root-authority show -n {HUB_NAME} -g {RG}"
+        ).as_json()
+
+        if authority["enableRootCertificateV2"]:
+            # Transition to Baltimore (initial transition)
+            cli.invoke(
+                f"""iot hub certificate root-authority set -n {HUB_NAME}
+                -g {RG} --cav v1 --yes""",
+            )
+    yield
+
+
+@pytest.fixture()
+def fixture_provision_existing_hub_device_config(request):
+    # Clean up existing devices and configurations
+    if settings.env.azext_iot_testhub:
+        device_list = []
+        device_list.extend(d["deviceId"] for d in cli.invoke(
+            f"iot hub device-twin list -n {HUB_NAME} -g {RG}"
+        ).as_json())
+
+        config_list = []
+        config_list.extend(c["id"] for c in cli.invoke(
+            f"iot edge deployment list -n {HUB_NAME} -g {RG}"
+        ).as_json())
+
+        config_list.extend(c["id"] for c in cli.invoke(
+            f"iot hub configuration list -n {HUB_NAME} -g {RG}"
+        ).as_json())
+
+        _clean_up(device_ids=device_list, config_ids=config_list)
+    yield
+
+
+@pytest.fixture()
+def fixture_provision_existing_hub_role(request):
+    if settings.env.azext_iot_testhub:
+        # Assign Data Contributor role
+        account = cli.invoke("account show").as_json()
+        user = account["user"]
+
+        target_hub = cli.invoke(
+            "iot hub show -n {} -g {}".format(HUB_NAME, RG)
+        ).as_json()
+
+        role_assignments = cli.invoke(
+            'role assignment list --assignee "{}" --scope "{}" --role "{}"'.format(
+                user["name"], target_hub["id"], USER_ROLE
+            )
+        ).as_json()
+
+        if len(role_assignments) == 0:
+            _assign_rbac_role(
+                assignee=user["name"], scope=target_hub, role=USER_ROLE
+            )
+    yield
+
+
+@pytest.fixture()
+def fixture_provision_existing_hub_storage(request):
+    # Add storage account to hub
+    storage_cstring = cli.invoke(
+        "storage account show-connection-string -n {} -g {}".format(
+            STORAGE_ACCOUNT, RG
+        )
+    ).as_json()["connectionString"]
+    if settings.env.azext_iot_testhub:
+        # Check if hub instance has valid storage endpoint
+        hubstate = cli.invoke(
+            "iot hub show -n {}".format(
+                HUB_NAME
+            )).as_json()
+        storage_cs = hubstate["properties"]["storageEndpoints"]["$default"]["connectionString"]
+
+        # Link storage conatiner to the hub instance if hub don't have one
+        if storage_cs is None or storage_cs == "":
+            cli.invoke(
+                "iot hub update -n {} --fc {} --fcs {}".format(
+                    HUB_NAME, STORAGE_CONTAINER, storage_cstring
+                ))
+    yield
 
 
 # IoT Hub fixtures
@@ -652,3 +747,40 @@ def _cosmos_db_removal(account_name: str):
     delete_result = cli.invoke(f"cosmosdb delete -g {RG} -n {account_name} -y")
     if not delete_result.success():
         logger.error(f"Failed to delete Cosmos DB resource {account_name}.")
+
+
+def _clean_up(device_ids: List[str] = None, config_ids: List[str] = None):
+    connection_string = cli.invoke(
+        "iot hub connection-string show -n {} -g {} --policy-name {}".format(
+            HUB_NAME, RG, "iothubowner"
+        )
+    ).as_json()["connectionString"]
+    if device_ids:
+        device = device_ids.pop()
+        cli.invoke(
+            "iot hub device-identity delete -d {} --login {}".format(
+                device, connection_string
+            )
+        )
+
+        for device in device_ids:
+            cli.invoke(
+                "iot hub device-identity delete -d {} -n {} -g {}".format(
+                    device, HUB_NAME, RG
+                )
+            )
+
+    if config_ids:
+        config = config_ids.pop()
+        cli.invoke(
+            "iot hub configuration delete -c {} --login {}".format(
+                config, connection_string
+            )
+        )
+
+        for config in config_ids:
+            cli.invoke(
+                "iot hub configuration delete -c {} -n {} -g {}".format(
+                    config, HUB_NAME, RG
+                )
+            )
