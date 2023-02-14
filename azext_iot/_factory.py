@@ -9,11 +9,9 @@ Factory functions for IoT Hub and Device Provisioning Service.
 """
 
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
-from azext_iot.common.utility import ensure_iotdps_sdk_min_version
 from azext_iot.common.auth import IoTOAuth
 from azext_iot.common.shared import SdkType, AuthenticationTypeDataplane
 from azext_iot.constants import (
-    IOTDPS_TRACK_2_SDK_MIN_VERSION,
     USER_AGENT,
     IOTHUB_RESOURCE_ID,
     IOTDPS_RESOURCE_ID
@@ -58,14 +56,10 @@ def iot_service_provisioning_factory(cli_ctx, *_):
         service_client (IotDpsClient): operational resource for
             working with IoT Hub Device Provisioning Service.
     """
-    if ensure_iotdps_sdk_min_version(IOTDPS_TRACK_2_SDK_MIN_VERSION):
-        from azure.cli.core.commands.client_factory import get_mgmt_service_client
-        from azure.cli.core.profiles import ResourceType
+    from azure.cli.core.commands.client_factory import get_mgmt_service_client
+    from azure.cli.core.profiles import ResourceType
 
-        return get_mgmt_service_client(cli_ctx, ResourceType.MGMT_IOTDPS)
-
-    from azure.cli.command_modules.iot._client_factory import iot_service_provisioning_factory
-    return iot_service_provisioning_factory(cli_ctx=cli_ctx)
+    return get_mgmt_service_client(cli_ctx, ResourceType.MGMT_IOTDPS)
 
 
 class SdkResolver(object):
