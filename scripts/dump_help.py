@@ -20,12 +20,9 @@ Dump everything within `az iot hub message-endpoint create` (will include sub-co
 Dump everything within `az iot hub message-endpoint` (will include sub-group and sub-commands, such as the one above)
     python dump_help.py iot hub message-endpoint
 
-To save to a file, use > as so:
-    python dump_help.py iot hub message-endpoint > help_dump.txt
-
 """
 parser = argparse.ArgumentParser(
-    description='Prints out the help for the method given and any child method.',
+    description='Prints out the help for the method given and any child method. The contents will be saved in help.md.',
     epilog=example_text,
     formatter_class=argparse.RawDescriptionHelpFormatter
 )
@@ -63,30 +60,60 @@ def get_default_cli(**kwargs):
 
 if __name__ == "__main__":
     output_file = StringIO()
-    print(args.commands)
     cli = get_default_cli(invocation_cls=AzCliCommandInvoker)
-    print(cli)
     arguments = args.commands
 
     try:
         with redirect_stdout(output_file):
             cli.invoke(arguments, out_file=None)
     except BaseException:
-        file_name = "help_" + "_".join(args.commands) + ".md"
         file_name = "help.md"
-
+        help_contents = output_file.getvalue()
         # Remove special characters with preview commands
-        help_contents = output_file.getvalue().replace("\x1b[36m", "")
+        help_contents = help_contents.replace("\x1b[36m", "")
         help_contents = help_contents.replace("\x1b[0m", "")
+        help_contents = help_contents.split("\n")
+
+        search_string = "To search AI knowledge base for examples"
+        # Remove Search AI knowledge endings
+        search_lines = [i for i in range(len(help_contents)) if help_contents[i].startswith(search_string)]
+        while search_lines:
+            line = search_lines.pop()
+            # there may be extra spaces before the To search ...
+            start = line - 1
+            if help_contents[line - 2] == "":
+                start -= 1
+            # The command may cut into the next line
+            end = line + 2
+            if help_contents[line + 1] != "":
+                end += 1
+            help_contents = help_contents[:start] + help_contents[end:]
+
+        # Remove extra lines around the ``` and make sure there is one line before the header (#)
+        header_lines = [i for i in range(len(help_contents)) if help_contents[i].startswith("#")]
+        while header_lines:
+            line = header_lines.pop()
+            help_contents = help_contents[:line + 2] + help_contents[line + 3:]
 
         # Remove deprecated
         deprecated_lines = [i for i in range(len(help_contents)) if "deprecated" in help_contents[i].lower()]
         while deprecated_lines:
-            start = deprecated_lines.pop(0)
-            end = deprecated_lines.pop(0) + 1
+            end = deprecated_lines.pop() + 1
+            start = deprecated_lines.pop()
             help_contents = help_contents[:start] + help_contents[end:]
 
-        print(help_contents)
+        # Add disclaimer
+        command = ' '.join(arguments)
+        disclaimer = [
+            "# Disclaimer",
+            "You can use `-h` with any command to view these help prompts.",
+            f"For example, `az {command} -h` will retrieve all the help prompts for `az {command}`.",
+            ""
+        ]
+        help_contents = disclaimer + help_contents
+
+        # Add newlines back in
+        help_contents = "\n".join(help_contents)
         print(f"Writing to {file_name}")
 
         with open(file_name, "w") as f:
