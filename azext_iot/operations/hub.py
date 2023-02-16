@@ -47,7 +47,7 @@ from azext_iot.common.utility import (
     generate_storage_account_sas_token,
 )
 from azext_iot._factory import SdkResolver, CloudError
-from azext_iot.operations.generic import _execute_query, _process_top
+from azext_iot.operations.generic import _execute_query
 from typing import Optional
 import pprint
 
@@ -66,8 +66,6 @@ def iot_query(
     login=None,
     auth_type_dataplane=None,
 ):
-    # TODO: make into validator to remove redundancy
-    top = _process_top(top)
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         resource_name=hub_name,
@@ -79,7 +77,6 @@ def iot_query(
 
 
 def _iot_query(target, query_command, top=None):
-    top = _process_top(top)
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
