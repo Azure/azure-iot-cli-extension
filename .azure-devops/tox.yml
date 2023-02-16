@@ -18,6 +18,10 @@ parameters:
   displayName: 'Test Python 3.10'
   type: boolean
   default: true
+- name: python311
+  displayName: 'Test Python 3.11'
+  type: boolean
+  default: false
 - name: azdev
   displayName: 'Test development CLI'
   type: boolean
@@ -105,16 +109,26 @@ jobs:
             python: '3.10'
             toxEnvStr: 'py3.10-azdev-unit'
             desc: 'Python 3.10 tests, dev CLI'
+      ${{ if parameters.python311 }}:
+        ${{ if parameters.azcur }}:
+          'python 3.11 tests, current CLI':
+            python: '3.11'
+            toxEnvStr: 'py3.11-azcur-unit'
+            desc: 'Python 3.11 tests, current CLI'
+        ${{ if parameters.azdev }}:
+          'python 3.11 tests, dev CLI':
+            python: '3.11'
+            toxEnvStr: 'py3.11-azdev-unit'
+            desc: 'Python 3.11 tests, dev CLI'
   steps:
-  - template: templates/clone-cli-repo.yml
-  - template: templates/setup-tox.yml
-  - template: templates/set-testenv-sentinel.yml
   - task: UsePythonVersion@0
     inputs:
       versionSpec: $(python)
       architecture: 'x64'
-    displayName: 'Use cached Python $(python) for tests.'
-
+    displayName: 'Use Python $(python) for tests.'
+  - template: templates/clone-cli-repo.yml
+  - template: templates/setup-tox.yml
+  - template: templates/set-testenv-sentinel.yml
   - script: python -m tox -e "$(toxEnvStr)" -vv
     displayName: $(desc)
     env:
