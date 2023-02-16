@@ -10,5 +10,5 @@ steps:
       versionSpec: ${{ parameters.pythonVersion }}
       addToPath: false
     name: pyTools
-  - script: $(pyTools.pythonLocation)/bin/pip install --upgrade tox
+  - script: python -m pip install --upgrade tox
     displayName: Install Tox

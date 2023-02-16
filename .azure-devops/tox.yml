@@ -115,7 +115,7 @@ jobs:
       architecture: 'x64'
     displayName: 'Use cached Python $(python) for tests.'
 
-  - script: $(pyTools.pythonLocation)/bin/tox -e "$(toxEnvStr)" -vv
+  - script: python -m tox -e "$(toxEnvStr)" -vv
     displayName: $(desc)
     env:
         AZEXT_IOT_TESTRG: "test"
