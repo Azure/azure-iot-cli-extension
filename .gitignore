@@ -327,3 +327,6 @@ src/build
 
 # .env environment file
 .env
+
+# tox
+.tox/
