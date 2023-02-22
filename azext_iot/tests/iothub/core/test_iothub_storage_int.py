@@ -104,7 +104,9 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
             # ensure role assignment is complete
             while assignee not in role_assignment_principal_ids:
-                role_assignments = self.get_role_assignments(self.live_storage_id, STORAGE_ROLE)
+                role_assignments = get_role_assignment(
+                    scope=self.live_storage_id,
+                    role=STORAGE_ROLE)
                 role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
                 sleep(10)
 

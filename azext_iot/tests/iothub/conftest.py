@@ -134,7 +134,7 @@ def fixture_provision_existing_hub_role(request):
 
         assign_role_assignment(
             assignee=user["name"],
-            scope=target_hub,
+            scope=target_hub["id"],
             role=USER_ROLE,
             max_tries=MAX_RBAC_ASSIGNMENT_TRIES
         )
