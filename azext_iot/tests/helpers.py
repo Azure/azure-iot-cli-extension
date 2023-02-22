@@ -159,7 +159,7 @@ def get_agent_public_ip():
     return requests.head("https://www.wikipedia.org").headers["X-Client-IP"]
 
 
-def get_role_assignment(
+def get_role_assignments(
     scope: str,
     assignee: str = None,
     role: str = None,
@@ -194,7 +194,7 @@ def assign_role_assignment(
     output = None
     tries = 0
     while tries < max_tries:
-        role_assignments = get_role_assignment(scope, assignee, role)
+        role_assignments = get_role_assignments(scope, assignee, role)
         role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
         if assignee in role_assignment_principal_ids:
             break

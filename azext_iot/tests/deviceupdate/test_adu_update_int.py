@@ -620,15 +620,6 @@ def _assign_rbac_if_needed(account_name: str):
         scope=account['id'],
         assignee=principal['user']['name'],
         wait=DEFAULT_ADU_RBAC_SLEEP_SEC)
-    # role_assignments = cli.invoke(f"role assignment list --scope '{account['id']}' --role '{target_role}'").as_json()
-    # flat_assignments = [r['principalName'] for r in role_assignments]
-
-    # if principal not in flat_assignments:
-    #     assert cli.invoke(
-    #         f"role assignment create --role '{target_role}' "
-    #         f"--assignee '{principal['user']['name']}' --scope '{account['id']}'"
-    #     ).success()
-    #     sleep(DEFAULT_ADU_RBAC_SLEEP_SEC)
 
 
 def test_adu_set_config_defaults(provisioned_instances_module: Dict[str, dict]):

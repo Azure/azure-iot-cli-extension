@@ -15,7 +15,7 @@ from knack.log import get_logger
 
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
-from azext_iot.tests.helpers import assign_role_assignment, get_role_assignment, tags_to_dict
+from azext_iot.tests.helpers import assign_role_assignment, get_role_assignments, tags_to_dict
 from azext_iot.tests.settings import DynamoSettings
 from azext_iot.deviceupdate.common import AUTH_RESOURCE_ID
 
@@ -156,8 +156,7 @@ def _account_provisioner(request, provisioned_storage: dict) -> Tuple[dict, List
             assert account["identity"]["tenantId"]
             assert "SystemAssigned" in account["identity"]["type"]
             if desired_scope:
-                assignments: list = get_role_assignment(scope=desired_scope)
-                # cli.invoke(f"role assignment list --scope {desired_scope}").as_json()
+                assignments: list = get_role_assignments(scope=desired_scope)
                 principal_map = {}
                 for assignment in assignments:
                     principal_map[assignment["principalId"]] = assignment["roleDefinitionName"]

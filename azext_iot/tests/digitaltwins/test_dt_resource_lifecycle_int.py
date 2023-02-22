@@ -12,7 +12,7 @@ import pytest
 from azext_iot.common.utility import unpack_msrest_error
 from azext_iot.digitaltwins.common import ADTEndpointAuthType, ADTEndpointType, IdentityType
 from azext_iot.tests.digitaltwins.dt_helpers import assert_system_data_attributes
-from azext_iot.tests.helpers import assign_role_assignment, delete_role_assignment, get_role_assignment
+from azext_iot.tests.helpers import assign_role_assignment, delete_role_assignment, get_role_assignments
 from . import DTLiveScenarioTest
 from . import (
     EP_RG,
@@ -173,11 +173,11 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             assign_identity=True,
         )
 
-        role_assignment_egt_list = get_role_assignment(
+        role_assignment_egt_list = get_role_assignments(
             scope=eventgrid_topic_id, assignee=show_msi_output["identity"]["principalId"])
         assert len(role_assignment_egt_list) == 1
 
-        role_assignment_sbt_list = get_role_assignment(
+        role_assignment_sbt_list = get_role_assignments(
             scope=servicebus_topic_id, assignee=show_msi_output["identity"]["principalId"])
         assert len(role_assignment_sbt_list) == 1
 
@@ -252,7 +252,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         assert (
             len(
-                get_role_assignment(scope=rbac_instance["id"])
+                get_role_assignments(scope=rbac_instance["id"])
             )
             == 0
         )
@@ -281,7 +281,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             rbac_assignee_reader,
         )
 
-        list_assigned_output = get_role_assignment(scope=rbac_instance["id"])
+        list_assigned_output = get_role_assignments(scope=rbac_instance["id"])
 
         assert len(list_assigned_output) == 2
 
@@ -293,7 +293,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             role=self.role_map["reader"]
         )
 
-        list_assigned_output = get_role_assignment(scope=rbac_instance["id"])
+        list_assigned_output = get_role_assignments(scope=rbac_instance["id"])
 
         assert len(list_assigned_output) == 1
 
@@ -303,7 +303,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             assignee=rbac_assignee_owner
         )
 
-        list_assigned_output = get_role_assignment(scope=rbac_instance["id"])
+        list_assigned_output = get_role_assignments(scope=rbac_instance["id"])
 
         assert len(list_assigned_output) == 0
 

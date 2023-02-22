@@ -292,15 +292,6 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         return f"{command} --auth-type {auth_type}"
 
-    def get_role_assignments(self, scope, role):
-        role_assignments = self.cmd(
-            'role assignment list --scope "{}" --role "{}"'.format(
-                scope, role
-            )
-        ).get_output_in_json()
-
-        return role_assignments
-
     def _assign_roles_to_dps(self, target_dps):
         account = self.cmd("account show").get_output_in_json()
         user = account["user"]
@@ -312,27 +303,6 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
             assignee=user["name"],
             max_tries=MAX_RBAC_ASSIGNMENT_TRIES
         )
-
-        # tries = 0
-        # while tries < MAX_RBAC_ASSIGNMENT_TRIES:
-        #     role_assignments = self.get_role_assignments(target_dps["id"], USER_ROLE)
-        #     role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
-        #     if user["name"] in role_assignment_principal_names:
-        #         break
-        #     # else assign DPS Data Contributor role to current user and check again
-        #     self.cmd(
-        #         '''role assignment create --assignee "{}" --role "{}" --scope "{}"'''.format(
-        #             user["name"], USER_ROLE, target_dps["id"]
-        #         )
-        #     )
-        #     sleep(10)
-        #     tries += 1
-
-        # if tries == MAX_RBAC_ASSIGNMENT_TRIES:
-        #     raise Exception(
-        #         "Reached max ({}) number of tries to assign RBAC role. Please re-run the test later "
-        #         "or with more max number of tries.".format(MAX_RBAC_ASSIGNMENT_TRIES)
-        #     )
 
     @pytest.fixture(scope='class', autouse=True)
     def fixture_provision_existing_dps_role(self):

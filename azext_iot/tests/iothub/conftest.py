@@ -36,32 +36,6 @@ def generate_hub_depenency_id() -> str:
     return f"aziotclitest{generate_generic_id()}"[:24]
 
 
-# def _assign_rbac_role(assignee: str, scope: str, role: str, max_tries: int = MAX_RBAC_ASSIGNMENT_TRIES):
-#     tries = 0
-#     while tries < max_tries:
-#         role_assignments = _get_role_assignments(scope, role)
-#         role_assignment_principal_ids = [assignment.get("principalId") for assignment in role_assignments]
-#         role_assignment_principal_names = [assignment.get("principalName") for assignment in role_assignments]
-#         if assignee in role_assignment_principal_ids + role_assignment_principal_names:
-#             break
-#         # else assign role to scope and check again
-#         cli.invoke(
-#             'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
-#                 assignee, role, scope
-#             )
-#         )
-#         sleep(10)
-#         tries += 1
-
-#     if tries == max_tries:
-#         raise Exception(
-#             "Reached max ({}) number of tries to assign role {} to scope {} for assignee {}. Please "
-#             "re-run the test later or with more max number of tries.".format(
-#                 max_tries, role, scope, assignee
-#             )
-#         )
-
-
 def assign_iot_hub_dataplane_rbac_role(hub_results):
     """Add IoT Hub Data Contributor role to current user"""
     for hub in hub_results:
@@ -403,12 +377,6 @@ def _user_identity_provisioner():
     return cli.invoke(
         f"identity create -n {name} -g {RG}"
     ).as_json()
-
-
-# def _get_role_assignments(scope, role):
-#     return cli.invoke(
-#         f'role assignment list --scope "{scope}" --role "{role}"'
-#     ).as_json()
 
 
 def _user_identity_removal(name):

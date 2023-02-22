@@ -10,7 +10,7 @@ import pytest
 from azext_iot.common.utility import unpack_msrest_error
 from azext_iot.digitaltwins.common import IdentityType
 from azext_iot.tests.digitaltwins.dt_helpers import assert_system_data_attributes
-from azext_iot.tests.helpers import get_role_assignment
+from azext_iot.tests.helpers import get_role_assignments
 from . import DTLiveScenarioTest, generate_resource_id
 from . import (
     ADX_RG,
@@ -144,10 +144,10 @@ class TestDTConnections(DTLiveScenarioTest):
 
         # Check role assignments - needed once
         principal_id = create_output.get("identity").get("principalId")
-        assert len(get_role_assignment(
+        assert len(get_role_assignments(
             role="Azure Event Hubs Data Owner", scope=self.eventhub_instance_id, assignee=principal_id
         )) == 1
-        assert len(get_role_assignment(
+        assert len(get_role_assignments(
             role="Contributor", scope=self.adx_database_id, assignee=principal_id
         )) == 1
         assert len(self.get_adx_role(assignee_name=instance_name)) == 1
@@ -440,10 +440,10 @@ class TestDTConnections(DTLiveScenarioTest):
 
         # Check role assignments - needed once
         principal_id = create_output.get("identity").get("principalId")
-        assert len(get_role_assignment(
+        assert len(get_role_assignments(
             role="Azure Event Hubs Data Owner", scope=self.eventhub_instance_id, assignee=principal_id
         )) == 1
-        assert len(get_role_assignment(
+        assert len(get_role_assignments(
             role="Contributor", scope=self.adx_database_id, assignee=principal_id
         )) == 1
         assert len(self.get_adx_role(assignee_name=instance_name)) == 1
