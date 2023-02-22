@@ -272,7 +272,11 @@ class StateProvider(IoTHubProvider):
                 partition_count = current_hub_resource.properties.event_hub_endpoints["events"].partition_count
                 hub_resource["properties"]["eventHubEndpoints"]["events"]["partitionCount"] = partition_count
                 # enable data residency
-                hub_resource["properties"]["enableDataResidency"] = current_hub_resource.properties.enable_data_residency
+                if (
+                    hasattr(current_hub_resource.properties, "enable_data_residency")
+                    and "enableDataResidency" in hub_resource["properties"]
+                ):
+                    hub_resource["properties"]["enableDataResidency"] = current_hub_resource.properties.enable_data_residency
                 # features - hub takes care of this but we will do this just incase
                 hub_resource["properties"]["features"] = current_hub_resource.properties.features
                 # TODO check for other props and add them as they pop up

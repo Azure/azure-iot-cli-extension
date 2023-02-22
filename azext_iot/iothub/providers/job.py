@@ -14,7 +14,7 @@ from azure.cli.core.azclierror import (
 )
 from azext_iot.common.shared import SdkType, JobStatusType, JobType, JobVersionType
 from azext_iot.common.utility import handle_service_exception, process_json_arg
-from azext_iot.operations.generic import _execute_query, _process_top
+from azext_iot.operations.generic import _execute_query
 from azext_iot.iothub.providers.base import IoTHubProvider, CloudError, SerializationError
 
 
@@ -60,7 +60,6 @@ class JobProvider(IoTHubProvider):
             handle_service_exception(e)
 
     def list(self, job_type=None, job_status=None, top=None):
-        top = _process_top(top)
         jobs_collection = []
 
         if (
