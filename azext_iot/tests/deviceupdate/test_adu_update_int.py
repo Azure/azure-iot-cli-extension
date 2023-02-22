@@ -14,7 +14,6 @@ from azext_iot.tests.deviceupdate.conftest import DEFAULT_ADU_RBAC_SLEEP_SEC, AD
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests.helpers import assign_role_assignment
 from azext_iot.tests.settings import DynamoSettings
-from time import sleep
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List
 
