@@ -14,7 +14,7 @@ from knack.log import get_logger
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.certops import create_self_signed_certificate
-from azext_iot.tests.helpers import get_closest_marker, get_agent_public_ip
+from azext_iot.tests.helpers import assign_role_assignment, get_closest_marker, get_agent_public_ip
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 
 logger = get_logger(__name__)
@@ -36,30 +36,30 @@ def generate_hub_depenency_id() -> str:
     return f"aziotclitest{generate_generic_id()}"[:24]
 
 
-def _assign_rbac_role(assignee: str, scope: str, role: str, max_tries: int = MAX_RBAC_ASSIGNMENT_TRIES):
-    tries = 0
-    while tries < max_tries:
-        role_assignments = _get_role_assignments(scope, role)
-        role_assignment_principal_ids = [assignment.get("principalId") for assignment in role_assignments]
-        role_assignment_principal_names = [assignment.get("principalName") for assignment in role_assignments]
-        if assignee in role_assignment_principal_ids + role_assignment_principal_names:
-            break
-        # else assign role to scope and check again
-        cli.invoke(
-            'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
-                assignee, role, scope
-            )
-        )
-        sleep(10)
-        tries += 1
+# def _assign_rbac_role(assignee: str, scope: str, role: str, max_tries: int = MAX_RBAC_ASSIGNMENT_TRIES):
+#     tries = 0
+#     while tries < max_tries:
+#         role_assignments = _get_role_assignments(scope, role)
+#         role_assignment_principal_ids = [assignment.get("principalId") for assignment in role_assignments]
+#         role_assignment_principal_names = [assignment.get("principalName") for assignment in role_assignments]
+#         if assignee in role_assignment_principal_ids + role_assignment_principal_names:
+#             break
+#         # else assign role to scope and check again
+#         cli.invoke(
+#             'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
+#                 assignee, role, scope
+#             )
+#         )
+#         sleep(10)
+#         tries += 1
 
-    if tries == max_tries:
-        raise Exception(
-            "Reached max ({}) number of tries to assign role {} to scope {} for assignee {}. Please "
-            "re-run the test later or with more max number of tries.".format(
-                max_tries, role, scope, assignee
-            )
-        )
+#     if tries == max_tries:
+#         raise Exception(
+#             "Reached max ({}) number of tries to assign role {} to scope {} for assignee {}. Please "
+#             "re-run the test later or with more max number of tries.".format(
+#                 max_tries, role, scope, assignee
+#             )
+#         )
 
 
 def assign_iot_hub_dataplane_rbac_role(hub_results):
@@ -74,8 +74,11 @@ def assign_iot_hub_dataplane_rbac_role(hub_results):
             if user["name"] is None:
                 raise Exception("User not found")
 
-            _assign_rbac_role(
-                assignee=user["name"], scope=target_hub_id, role=USER_ROLE
+            assign_role_assignment(
+                assignee=user["name"],
+                scope=target_hub_id,
+                role=USER_ROLE,
+                max_tries=MAX_RBAC_ASSIGNMENT_TRIES
             )
 
 
@@ -129,16 +132,12 @@ def fixture_provision_existing_hub_role(request):
             "iot hub show -n {} -g {}".format(HUB_NAME, RG)
         ).as_json()
 
-        role_assignments = cli.invoke(
-            'role assignment list --assignee "{}" --scope "{}" --role "{}"'.format(
-                user["name"], target_hub["id"], USER_ROLE
-            )
-        ).as_json()
-
-        if len(role_assignments) == 0:
-            _assign_rbac_role(
-                assignee=user["name"], scope=target_hub, role=USER_ROLE
-            )
+        assign_role_assignment(
+            assignee=user["name"],
+            scope=target_hub,
+            role=USER_ROLE,
+            max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+        )
     yield
 
 
@@ -221,10 +220,20 @@ def setup_hub_controlplane_states(
         provisioned_service_bus_module["topic"]["id"]: "Azure Service Bus Data Sender"
     }
     for scope, role in scope_dict.items():
-        _assign_rbac_role(assignee=user_principal_id, scope=scope, role=role)
+        assign_role_assignment(
+            assignee=user_principal_id,
+            scope=scope,
+            role=role,
+            max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+        )
         if use_system_endpoints:
             for hub_principal_id in hub_principal_ids:
-                _assign_rbac_role(assignee=hub_principal_id, scope=scope, role=role)
+                assign_role_assignment(
+                    assignee=hub_principal_id,
+                    scope=scope,
+                    role=role,
+                    max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+                )
     sleep(30)
 
     suffix = "systemid" if use_system_endpoints else "userid"
@@ -396,10 +405,10 @@ def _user_identity_provisioner():
     ).as_json()
 
 
-def _get_role_assignments(scope, role):
-    return cli.invoke(
-        f'role assignment list --scope "{scope}" --role "{role}"'
-    ).as_json()
+# def _get_role_assignments(scope, role):
+#     return cli.invoke(
+#         f'role assignment list --scope "{scope}" --role "{role}"'
+#     ).as_json()
 
 
 def _user_identity_removal(name):
@@ -418,8 +427,18 @@ def provisioned_storage_with_identity_module(
     hub_principal_id = provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["principalId"]
     user_identities = list(provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["userAssignedIdentities"].values())
     user_id = user_identities[0]["principalId"]
-    _assign_rbac_role(assignee=hub_principal_id, scope=scope, role=role)
-    _assign_rbac_role(assignee=user_id, scope=scope, role=role)
+    assign_role_assignment(
+        assignee=hub_principal_id,
+        scope=scope,
+        role=role,
+        max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+    )
+    assign_role_assignment(
+        assignee=user_id,
+        scope=scope,
+        role=role,
+        max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+    )
     yield provisioned_iot_hubs_with_user_module, provisioned_storage_module
 
 
@@ -500,8 +519,18 @@ def provisioned_event_hub_with_identity_module(
     hub_principal_id = provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["principalId"]
     user_identities = list(provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["userAssignedIdentities"].values())
     user_id = user_identities[0]["principalId"]
-    _assign_rbac_role(assignee=hub_principal_id, scope=scope, role=role)
-    _assign_rbac_role(assignee=user_id, scope=scope, role=role)
+    assign_role_assignment(
+        assignee=hub_principal_id,
+        scope=scope,
+        role=role,
+        max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+    )
+    assign_role_assignment(
+        assignee=user_id,
+        scope=scope,
+        role=role,
+        max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+    )
     yield provisioned_iot_hubs_with_user_module, provisioned_event_hub_module
 
 
@@ -572,10 +601,30 @@ def provisioned_service_bus_with_identity_module(
     hub_principal_id = provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["principalId"]
     user_identities = list(provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["userAssignedIdentities"].values())
     user_id = user_identities[0]["principalId"]
-    _assign_rbac_role(assignee=hub_principal_id, scope=queue_scope, role=role)
-    _assign_rbac_role(assignee=user_id, scope=queue_scope, role=role)
-    _assign_rbac_role(assignee=hub_principal_id, scope=topic_scope, role=role)
-    _assign_rbac_role(assignee=user_id, scope=topic_scope, role=role)
+    assign_role_assignment(
+        assignee=hub_principal_id,
+        scope=queue_scope,
+        role=role,
+        max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+    )
+    assign_role_assignment(
+        assignee=user_id,
+        scope=queue_scope,
+        role=role,
+        max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+    )
+    assign_role_assignment(
+        assignee=hub_principal_id,
+        scope=topic_scope,
+        role=role,
+        max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+    )
+    assign_role_assignment(
+        assignee=user_id,
+        scope=topic_scope,
+        role=role,
+        max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+    )
     yield provisioned_iot_hubs_with_user_module, provisioned_service_bus_module
 
 

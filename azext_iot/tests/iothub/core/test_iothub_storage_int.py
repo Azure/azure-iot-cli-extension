@@ -10,6 +10,7 @@ from knack.util import CLIError
 from pathlib import Path
 from knack.log import get_logger
 import pytest
+from azext_iot.tests.helpers import get_role_assignment
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.settings import UserTypes
@@ -79,7 +80,9 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
     def assign_storage_role_if_needed(self, assignee):
 
-        role_assignments = self.get_role_assignments(self.live_storage_id, STORAGE_ROLE)
+        role_assignments = get_role_assignment(
+            scope=self.live_storage_id,
+            role=STORAGE_ROLE)
         role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
 
         if assignee not in role_assignment_principal_ids:

@@ -8,6 +8,8 @@ import json
 import os
 
 from inspect import getsourcefile
+from time import sleep
+from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.common.utility import ensure_azure_namespace_path
 from azext_iot.common.utility import read_file_content
 from azext_iot.tests.settings import DynamoSettings
@@ -17,6 +19,7 @@ ensure_azure_namespace_path()
 
 from azure.iot.device import ProvisioningDeviceClient, IoTHubDeviceClient
 
+cli = EmbeddedCLI()
 
 SubRequest = TypeVar('SubRequest')
 Mark = TypeVar('Mark')
@@ -154,6 +157,72 @@ def get_agent_public_ip():
     """
     import requests
     return requests.head("https://www.wikipedia.org").headers["X-Client-IP"]
+
+
+def get_role_assignment(
+    scope: str,
+    assignee: str = None,
+    role: str = None,
+):
+    """
+    Get rbac permissions of resource.
+    """
+    role_flag = ""
+    assignee_flag = ""
+
+    if role:
+        role_flag = '--role "{}"'.format(role)
+
+    if assignee:
+        assignee_flag = '--assignee "{}"'.format(assignee)
+
+    return cli.invoke(
+        f'role assignment list --scope "{scope}" {role_flag} {assignee_flag}'
+    ).as_json()
+
+
+def assign_role_assignment(
+    role: str,
+    scope: str,
+    assignee: str,
+    max_tries=10,
+    wait=10
+):
+    """
+    Assign rbac permissions to resource.
+    """
+    output = None
+    tries = 0
+    while tries < max_tries:
+        role_assignments = get_role_assignment(scope, assignee, role)
+        role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
+        if assignee in role_assignment_principal_ids:
+            break
+        # else assign role to scope and check again
+        output = cli.invoke(
+            f'role assignment create --assignee "{assignee}" --role "{role}" --scope "{scope}"'
+        )
+        sleep(wait)
+        tries += 1
+    return output
+
+
+def delete_role_assignment(
+    scope: str,
+    assignee: str,
+    role: str = None,
+):
+    """
+    Delete rbac permissions of resource.
+    """
+    role_flag = ""
+
+    if role:
+        role_flag = "--role '{}'".format(role)
+
+    cli.invoke(
+        f"role assignment delete --scope '{scope}' --assignee '{assignee}' {role_flag}"
+    )
 
 
 class MockLogger:
