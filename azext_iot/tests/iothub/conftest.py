@@ -118,12 +118,12 @@ def fixture_provision_existing_hub_role(request):
 @pytest.fixture()
 def fixture_provision_existing_hub_storage(request):
     # Add storage account to hub
-    storage_cstring = cli.invoke(
-        "storage account show-connection-string -n {} -g {}".format(
-            STORAGE_ACCOUNT, RG
-        )
-    ).as_json()["connectionString"]
-    if settings.env.azext_iot_testhub:
+    if settings.env.azext_iot_testhub and STORAGE_ACCOUNT:
+        storage_cstring = cli.invoke(
+            "storage account show-connection-string -n {} -g {}".format(
+                STORAGE_ACCOUNT, RG
+            )
+        ).as_json()["connectionString"]
         # Check if hub instance has valid storage endpoint
         hubstate = cli.invoke(
             "iot hub show -n {}".format(
