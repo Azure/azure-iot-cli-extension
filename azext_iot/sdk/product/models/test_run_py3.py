@@ -31,6 +31,9 @@ class TestRun(Model):
     :vartype certification_badge_results: list[object]
     """
 
+    # c-ryan-k - disable pytest trying to collect this file
+    __test__ = False
+
     _validation = {
         'certification_badge_results': {'readonly': True},
     }

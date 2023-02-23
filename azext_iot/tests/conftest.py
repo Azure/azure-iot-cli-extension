@@ -9,12 +9,15 @@ import responses
 import pytest
 import json
 import os
+from functools import partial
+from urllib3.util.retry import Retry
 
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azure.cli.core.commands import AzCliCommand
 from azure.cli.core.mock import DummyCli
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.shared import DeviceAuthApiType
+from azure.cli.core.azclierror import ResourceNotFoundError
 
 # Patch paths
 path_get_device = "azext_iot.operations.hub._iot_device_show"
@@ -54,6 +57,7 @@ hostname = "{}.subdomain.domain".format(instance_name)
 # Mock Iot Hub Target
 mock_target = {}
 mock_target["entity"] = hub_entity
+mock_target["name"] = "myhub"
 mock_target["primarykey"] = "rJx/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo="
 mock_target["secondarykey"] = "aCd/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo="
 mock_target["policy"] = "iothubowner"
@@ -151,6 +155,16 @@ def serviceclient_generic_error(mocker, fixture_ghcs, fixture_sas, request):
 def fixture_ghcs(mocker):
     ghcs = mocker.patch(path_ghcs)
     ghcs.return_value = mock_target
+    mocker.patch(path_iot_hub_service_factory)
+    mocker.patch(path_discovery_init)
+
+    return ghcs
+
+
+@pytest.fixture()
+def fixture_ghcs_resource_not_found_error(mocker):
+    ghcs = mocker.patch(path_ghcs)
+    ghcs.side_effect = ResourceNotFoundError("Resource not found")
     mocker.patch(path_iot_hub_service_factory)
     mocker.patch(path_discovery_init)
 
@@ -259,10 +273,7 @@ def fixture_device_messaging_iot_device_show_sas(mocker):
 def build_mock_response(
     mocker=None, status_code=200, payload=None, headers=None, **kwargs
 ):
-    try:
-        from unittest.mock import MagicMock
-    except ImportError:
-        from mock import MagicMock
+    from unittest.mock import MagicMock
 
     response = (
         mocker.MagicMock(name="response") if mocker else MagicMock(name="response")
@@ -326,6 +337,8 @@ fake_oauth_response = responses.Response(
 @pytest.fixture
 def mocked_response():
     with responses.RequestsMock() as rsps:
+        on_request_with_no_retry = partial(rsps._on_request, retries=Retry(0, read=False))
+        rsps._on_request = on_request_with_no_retry
         yield rsps
 
 
@@ -339,27 +352,27 @@ def service_client_generic_errors(mocked_response, fixture_ghcs, request):
         )
 
     any_endpoint = r"^https:\/\/.+"
-    with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
-        rsps.add_callback(
-            callback=error_callback, method=responses.GET, url=re.compile(any_endpoint)
-        )
-        rsps.add_callback(
-            callback=error_callback, method=responses.PUT, url=re.compile(any_endpoint)
-        )
-        rsps.add_callback(
-            callback=error_callback, method=responses.POST, url=re.compile(any_endpoint)
-        )
-        rsps.add_callback(
-            callback=error_callback,
-            method=responses.DELETE,
-            url=re.compile(any_endpoint),
-        )
-        rsps.add_callback(
-            callback=error_callback,
-            method=responses.PATCH,
-            url=re.compile(any_endpoint),
-        )
-        yield rsps
+    mocked_response.assert_all_requests_are_fired = False
+    mocked_response.add_callback(
+        callback=error_callback, method=responses.GET, url=re.compile(any_endpoint)
+    )
+    mocked_response.add_callback(
+        callback=error_callback, method=responses.PUT, url=re.compile(any_endpoint)
+    )
+    mocked_response.add_callback(
+        callback=error_callback, method=responses.POST, url=re.compile(any_endpoint)
+    )
+    mocked_response.add_callback(
+        callback=error_callback,
+        method=responses.DELETE,
+        url=re.compile(any_endpoint),
+    )
+    mocked_response.add_callback(
+        callback=error_callback,
+        method=responses.PATCH,
+        url=re.compile(any_endpoint),
+    )
+    yield mocked_response
 
 
 @pytest.fixture()

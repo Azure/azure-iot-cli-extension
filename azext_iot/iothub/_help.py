@@ -242,10 +242,10 @@ def load_iothub_help():
         "iot device send-d2c-message"
     ] = """
         type: command
-        short-summary: |
-                        Send an mqtt device-to-cloud message.
-                        The command supports sending messages with application and system properties.
-                        Note: If using x509 authentication methods, the certificate and key files (and passphrase if needed) must be provided.
+        short-summary: Send an mqtt device-to-cloud message.
+        long-summary: |
+                      The command supports sending messages with application and system properties.
+                      Note: If using x509 authentication methods, the certificate and key files (and passphrase if needed) must be provided.
         examples:
         - name: Basic usage
           text: az iot device send-d2c-message -n {iothub_name} -d {device_id}
@@ -267,16 +267,16 @@ def load_iothub_help():
         "iot device simulate"
     ] = """
         type: command
-        short-summary: |
-                        Simulate a device in an Azure IoT Hub.
-                        While the device simulation is running, the device will automatically receive
-                        and acknowledge cloud-to-device (c2d) messages. For mqtt simulation, all c2d messages will
-                        be acknowledged with completion. For http simulation c2d acknowledgement is based on user
-                        selection which can be complete, reject or abandon. The mqtt simulation also supports direct
-                        method invocation which can be acknowledged by a response status code and response payload.
-                        Note: The command by default will set content-type to application/json and content-encoding
-                        to utf-8. This can be overriden.
-                        Note: If using x509 authentication methods, the certificate and key files (and passphrase if needed) must be provided.
+        short-summary: Simulate a device in an Azure IoT Hub.
+        long-summary: |
+                      While the device simulation is running, the device will automatically receive
+                      and acknowledge cloud-to-device (c2d) messages. For mqtt simulation, all c2d messages will
+                      be acknowledged with completion. For http simulation c2d acknowledgement is based on user
+                      selection which can be complete, reject or abandon. The mqtt simulation also supports direct
+                      method invocation which can be acknowledged by a response status code and response payload.
+                      Note: The command by default will set content-type to application/json and content-encoding
+                      to utf-8. This can be overriden.
+                      Note: If using x509 authentication methods, the certificate and key files (and passphrase if needed) must be provided.
         examples:
         - name: Basic usage (mqtt)
           text: az iot device simulate -n {iothub_name} -d {device_id}
@@ -361,6 +361,113 @@ def load_iothub_help():
             --root-cert "root_cert.pem" --root-key "root_key.pem" --device-auth x509_thumbprint
             --device id=parent1
             --device id=child1 parent=parent1
+    """
+
+    helps[
+        "iot hub state"
+    ] = """
+        type: group
+        short-summary: Manage the state of an IoT Hub.
+        long-summary: For more information, see aka.ms/aziotcli-iot-hub-state
+    """
+
+    helps[
+        "iot hub state export"
+    ] = """
+        type: command
+        short-summary: Export the state of an IoT Hub to a file.
+        long-summary: |
+                       By default, the exported state will include: arm template for hub, hub configurations (including ADM
+                       configurations and edge deployments), device information (including device identites,
+                       device twins, module identities and module twins).
+
+                       For more information, see aka.ms/aziotcli-iot-hub-state
+        examples:
+        - name: Export the supported state of the specified hub to the specified file.
+          text: >
+            az iot hub state export -n {iothub_name} -f {state_filename}
+        - name: Export the supported state of the specified hub to the specified file, overwriting the file contents.
+          text: >
+            az iot hub state export -n {iothub_name} -f {state_filename} -r
+        - name: Export only the devices and configurations of the specified hub to the specified file.
+          text: >
+            az iot hub state export -n {iothub_name} -f {state_filename} --aspects devices configurations
+    """
+
+    helps[
+        "iot hub state import"
+    ] = """
+        type: command
+        short-summary: Import a Hub state from a file to an IoT Hub.
+        long-summary: |
+                       If the arm aspect is specified, the hub will be created if it does not exist.
+
+                       By default, the imported state will include: arm template for hub, hub configurations (including ADM
+                       configurations and edge deployments), device information (including device identites,
+                       device twins, module identities and module twins).
+
+                       For imported endpoints with system assigned identity authentication, the specified hub must have
+                       the correct permissions. Otherwise the command will fail.
+
+                       Private endpoints will be ignored in the import process.
+
+                       For more information, see aka.ms/aziotcli-iot-hub-state
+        examples:
+        - name: Import the supported state from the specified file to the specified hub.
+          text: >
+            az iot hub state import -n {iothub_name} -f {state_filename}
+        - name: Import the supported state from the specified file to the specified hub, overwriting the previous state of the hub. All
+                certificates, configurations, and devices will be deleted before the new state is uploaded.
+          text: >
+            az iot hub state import -n {iothub_name} -f {state_filename} -r
+        - name: Import only the arm template from the specified file to the specified hub. Note that this will create a new hub if
+                it does not exist. The file may contain the devices and configurations but those will be ignored.
+          text: >
+            az iot hub state import -n {iothub_name} -g {resource_group} -f {state_filename} --aspects arm
+        - name: Import only the devices and configurations from the specified file to the specified hub. Note that this will NOT
+                create a new hub if it does not exist and the command will fail. The file may contain the arm template but that
+                will be ignored.
+          text: >
+            az iot hub state import -n {iothub_name} -f {state_filename} --aspects devices configurations
+    """
+
+    helps[
+        "iot hub state migrate"
+    ] = """
+        type: command
+        short-summary: Migrate the state of one hub to another hub without saving to a file.
+        long-summary: |
+                       If the arm aspect is specified, the hub will be created if it does not exist.
+
+                       By default, the migrated state will include: arm template for hub, hub configurations (including ADM
+                       configurations and edge deployments), device information (including device identites,
+                       device twins, module identities and module twins).
+
+                       For migrated endpoints with system assigned identity authentication, the specified hub must have
+                       the correct permissions. Otherwise the command will fail.
+
+                       Private endpoints will be ignored in the migration process.
+
+                       If you have trouble migrating, please use the export and import commands to have a file as a backup.
+
+                       For more information, see aka.ms/aziotcli-iot-hub-state
+        examples:
+        - name: Migrate the supported state of the origin hub to the destination hub.
+          text: >
+            az iot hub state migrate --destination-hub {dest_hub_name} --origin-hub {orig_hub_name}
+        - name: Migrate the supported state of the origin hub to the destination hub, overwriting the previous state of the hub. All
+                certificates, configurations, and devices in the destination hub will be deleted before the new state is uploaded.
+          text: >
+            az iot hub state migrate --destination-hub {dest_hub_name} --origin-hub {orig_hub_name} -r
+        - name: Migrate only the arm template from the origin hub to the destination hub. Note that this will create a new hub if
+                the destination hub does not exist. The origin hub may contain the devices and configurations but those will be ignored.
+          text: >
+            az iot hub state migrate --destination-hub {dest_hub_name} --destination-resource-group {dest_hub_resource_group} --origin-hub {orig_hub_name} --aspects arm
+        - name: Migrate only the devices and configurations from the origin hub to the destination hub. Note that this will NOT
+                create a new hub if the destination hub does not exist and the command will fail. The arm template for the origin hub
+                will be ignored.
+          text: >
+            az iot hub state migrate --destination-hub {dest_hub_name} --origin-hub {orig_hub_name} --aspects devices configurations
     """
 
     helps[
@@ -506,7 +613,7 @@ def load_iothub_help():
     ] = """
         type: command
         short-summary: Get information on all the endpoints for an IoT Hub.
-        long-summary: Get information on all endpoints in an IoT Hub. You can also specify which endpoint type you want to get information on.
+        long-summary: You can also specify which endpoint type you want to get information on.
         examples:
           - name: Get all the endpoints from an IoT Hub.
             text: >
@@ -532,7 +639,7 @@ def load_iothub_help():
     ] = """
         type: command
         short-summary: Delete all or mentioned endpoint for an IoT Hub.
-        long-summary: Delete an endpoint for an IoT Hub. We recommend that you delete any routes to the endpoint, before deleting the endpoint.
+        long-summary:  We recommend that you delete any routes to the endpoint, before deleting the endpoint.
         examples:
           - name: Delete an endpoint from an IoT Hub.
             text: >

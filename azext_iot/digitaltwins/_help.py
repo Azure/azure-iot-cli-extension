@@ -332,8 +332,9 @@ def load_digitaltwins_help():
     helps["dt endpoint create eventhub"] = """
         type: command
         short-summary: Adds an EventHub endpoint to a Digital Twins instance.
-            Requires pre-created resource.
         long-summary: |
+            Requires pre-created resource.
+
             The instance must have a system-assigned identity to support system-assigned identity based endpoint
             integration. The instance must have the user-assigned identity associated to support user-assigned
             identity based endpoint integration.
@@ -370,8 +371,9 @@ def load_digitaltwins_help():
     helps["dt endpoint create servicebus"] = """
         type: command
         short-summary: Adds a ServiceBus Topic endpoint to a Digital Twins instance.
-            Requires pre-created resource.
         long-summary: |
+            Requires pre-created resource.
+
             The instance must have a system-assigned identity to support system-assigned identity based endpoint
             integration. The instance must have the user-assigned identity associated to support user-assigned
             identity based endpoint integration.
@@ -1108,7 +1110,8 @@ def load_digitaltwins_help():
 
     helps["dt model delete-all"] = """
         type: command
-        short-summary: Delete all models within a Digital Twins instance. Twins configurations are not affected but may be broken without model definitions.
+        short-summary: Delete all models within a Digital Twins instance.
+        long-summary: Twins configurations are not affected but may be broken without model definitions.
 
         examples:
         - name: Delete all models.
