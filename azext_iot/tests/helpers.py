@@ -194,7 +194,7 @@ def assign_role_assignment(
     output = None
     tries = 0
     while tries < max_tries:
-        role_assignments = get_role_assignments(scope, assignee, role)
+        role_assignments = get_role_assignments(scope=scope, role=role)
         role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
         if assignee in role_assignment_principal_ids:
             break
