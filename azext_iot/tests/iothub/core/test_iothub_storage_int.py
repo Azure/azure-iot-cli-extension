@@ -9,7 +9,6 @@ from time import sleep
 from knack.util import CLIError
 from pathlib import Path
 from knack.log import get_logger
-import pytest
 from azext_iot.tests.helpers import delete_role_assignment, get_role_assignments
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
