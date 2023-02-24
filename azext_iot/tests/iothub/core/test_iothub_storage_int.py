@@ -33,7 +33,6 @@ SETUP_SLEEP_INTERVAL = 10
 IDENTITY_SLEEP_INTERVAL = 60
 
 
-@pytest.mark.usefixtures("fixture_provision_existing_hub_storage")
 class TestIoTStorage(IoTLiveScenarioTest):
     def __init__(self, test_case):
         self.storage_cstring = None
