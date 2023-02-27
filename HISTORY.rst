@@ -3,7 +3,7 @@
 Release History
 ===============
 
-unreleased
+0.20.0
 +++++++++++++++
 
 **IoT Hub updates**
