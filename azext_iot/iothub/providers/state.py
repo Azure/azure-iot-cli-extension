@@ -497,7 +497,7 @@ class StateProvider(IoTHubProvider):
         # if incorrect permissions, will fail to retrieve any devices
         devices = {}
         try:
-            twins = _iot_device_twin_list(target=target, top=-1)
+            twins = _iot_device_twin_list(target=target, top=None)
         except AzCLIError:
             logger.warning(usr_msgs.SAVE_DEVICES_RETRIEVE_FAIL_MSG)
             return
@@ -1017,7 +1017,7 @@ class StateProvider(IoTHubProvider):
 
     def delete_all_devices(self):
         """Delete all devices if possible."""
-        identities = _iot_device_twin_list(target=self.target, top=-1)
+        identities = _iot_device_twin_list(target=self.target, top=None)
         for d in tqdm(identities, desc=usr_msgs.DELETE_DEVICES_DESC, ascii=" #"):
             try:
                 _iot_device_delete(target=self.target, device_id=d["deviceId"])
