@@ -182,6 +182,9 @@ class MessageEndpoint(IoTHubProvider):
                 "partitionKeyName": partition_key_name,
                 "partitionKeyTemplate": partition_key_template,
             })
+            # TODO @vilit - why is this None if empty
+            if endpoints.cosmos_db_sql_collections is None:
+                endpoints.cosmos_db_sql_collections = []
             endpoints.cosmos_db_sql_collections.append(new_endpoint)
         elif EndpointType.AzureStorageContainer.value == endpoint_type.lower():
             if fetch_connection_string:
