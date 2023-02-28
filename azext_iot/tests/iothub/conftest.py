@@ -67,8 +67,7 @@ def fixture_provision_existing_hub_certificate(request):
         if authority["enableRootCertificateV2"]:
             # Transition to Baltimore (initial transition)
             cli.invoke(
-                f"""iot hub certificate root-authority set -n {HUB_NAME}
-                -g {RG} --cav v1 --yes""",
+                f"iot hub certificate root-authority set -n {HUB_NAME} -g {RG} --cav v1 --yes",
             )
     yield
 
