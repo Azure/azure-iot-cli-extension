@@ -3,7 +3,7 @@
 Release History
 ===============
 
-unreleased
+0.20.0
 +++++++++++++++
 
 **IoT Hub updates**
@@ -13,10 +13,25 @@ unreleased
   For more information, please read the trouble shooting guide [here](https://aka.ms/aziotcli-iot-hub-state).
 
   The commands are as follows:
-  
+
   - `az iot hub state export` to save the current state of an IoT Hub to a JSON file.
   - `az iot hub state import` to upload a state from a JSON file to an IoT Hub.
   - `az iot hub state migrate` to copy a state of an IoT Hub to another IoT Hub.
+
+**Digital Twins updates**
+
+* The Digital Twin controlplane commands will now use the newest API 2023-01-31. The following command groups are affected:
+ - `az dt create`, `az dt delete`, `az dt list`, `az dt reset`, `az dt show`, `az dt wait`
+ - `az dt data-history`
+ - `az dt endpoint`
+ - `az dt identity`
+ - `az dt network`
+ - `az dt route`
+
+* Added new options for creating a data history connection and deleting one. The create command, `az dt data-history connection create adx`,
+  now supports adding two separate tables for relationship lifecycle events and twin lifecycle events, recording property and item removals,
+  and adding the new default for the generic table name (now known as property event table). The delete command,
+  `az dt data-history connection delete`, now supports a clean parameter which will do a best-effort attempt to clean connection creation artifacts.
 
 
 0.19.1

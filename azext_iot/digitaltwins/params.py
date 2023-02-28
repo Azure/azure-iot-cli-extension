@@ -573,9 +573,36 @@ def load_digitaltwins_arguments(self, _):
         )
         context.argument(
             "adx_table_name",
-            options_list=["--adx-table-name", "--adxt"],
-            help="Name of Azure Data Explorer table to be created. If not provided, will use the format "
-                 "adt_dh_{dt_name}_{dt_location}.",
+            options_list=[
+                "--adx-property-events-table",
+                "--adxpet",
+                context.deprecate(target='--adx-table-name', redirect='--adx-property-events-table'),
+                context.deprecate(target='--adxt', redirect='--adxpet'),
+            ],
+            help="The name of the Azure Data Explorer table used for storing updates to properties of twins and relationships.",
+            arg_group="Azure Data Explorer",
+        )
+        context.argument(
+            "adx_twin_lifecycle_events_table_name",
+            options_list=["--adx-twin-events-table", "--adxtet"],
+            help="The name of the Azure Data Explorer table used for recording twin lifecycle events. The table will not be "
+                 "created if this property is left unspecified.",
+            arg_group="Azure Data Explorer",
+        )
+        context.argument(
+            "adx_relationship_lifecycle_events_table_name",
+            options_list=["--adx-relationship-events-table", "--adxret"],
+            help="The name of the Azure Data Explorer table used for recording relationship lifecycle events. The table will "
+                 "not be created if this property is left unspecified.",
+            arg_group="Azure Data Explorer",
+        )
+        context.argument(
+            "record_property_and_item_removals",
+            options_list=["--adx-record-removals", "--adxrr"],
+            arg_type=get_three_state_flag(),
+            help="Specifies whether or not to record twin / relationship property and item removals, including removals of "
+                 "indexed or keyed values (such as map entries, array elements, etc.). Setting this property to 'true' will "
+                 "generate an additional column in the property events table in ADX.",
             arg_group="Azure Data Explorer",
         )
         context.argument(
@@ -619,6 +646,16 @@ def load_digitaltwins_arguments(self, _):
             options_list=['--mi-user-assigned', '--user'],
             help="Use an user-assigned managed identity for data history connection authentication. "
             "Accepts the identity resource id. If not provided, will use system identity instead."
+        )
+
+    with self.argument_context("dt data-history connection delete") as context:
+        context.argument(
+            "cleanup_connection_artifacts",
+            options_list=["--clean", "-c"],
+            arg_type=get_three_state_flag(),
+            help="Specifies whether or not to attempt to clean up artifacts that were created in order to establish a "
+                 "connection to the time series database. This is a best-effort attempt that will fail if appropriate "
+                 "permissions are not in place. Setting this to 'true' does not delete any recorded data.",
         )
 
     with self.argument_context("dt job import") as context:
