@@ -192,12 +192,12 @@ class TestDTConnections(DTLiveScenarioTest):
         )
 
         # Check role assignments - needed once
-        assert len(self.get_role_assignment(
+        assert len(get_role_assignments(
             role="Azure Event Hubs Data Owner",
             scope=self.eventhub_instance_id,
             assignee=user_identity_principal_id
         )) == 1
-        assert len(self.get_role_assignment(
+        assert len(get_role_assignments(
             role="Contributor",
             scope=self.adx_database_id,
             assignee=user_identity_principal_id
