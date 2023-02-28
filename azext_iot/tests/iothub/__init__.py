@@ -10,6 +10,7 @@ from time import sleep
 from azext_iot.tests.helpers import (
     add_test_tag,
     assign_role_assignment,
+    clean_up_iothub_device_config,
     create_storage_account
 )
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
@@ -197,6 +198,13 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 "storage container delete -n {} --connection-string '{}'".format(
                     self.storage_account_name, self.storage_cstring
                 ),
+            )
+
+    def tearDown(self):
+        if not settings.env.azext_iot_testhub:
+            clean_up_iothub_device_config(
+                hub_name=self.entity_name,
+                rg=self.entity_rg
             )
 
     def get_region(self):

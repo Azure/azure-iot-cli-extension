@@ -163,7 +163,7 @@ def get_role_assignments(
     scope: str,
     assignee: str = None,
     role: str = None,
-):
+) -> json:
     """
     Get rbac permissions of resource.
     """
