@@ -219,7 +219,7 @@ class MessageEndpoint(IoTHubProvider):
             endpoints.storage_containers
         ]
         if self.support_cosmos:
-            endpoint_lists.append(endpoints.cosmos_db_sql_collections)
+            endpoint_lists.append(endpoints.cosmos_db_sql_collections if endpoints.cosmos_db_sql_collections else [])
         for endpoint_list in endpoint_lists:
             for endpoint in endpoint_list:
                 if endpoint.name.lower() == endpoint_name.lower():
@@ -262,8 +262,9 @@ class MessageEndpoint(IoTHubProvider):
             if not endpoint_type or EndpointType.ServiceBusTopic.value == endpoint_type:
                 endpoints.service_bus_topics = [e for e in endpoints.service_bus_topics if e.name.lower() != endpoint_name]
             if self.support_cosmos and not endpoint_type or EndpointType.CosmosDBContainer.value == endpoint_type:
+                cosmos_db_endpoints = endpoints.cosmos_db_sql_collections if endpoints.cosmos_db_sql_collections else []
                 endpoints.cosmos_db_sql_collections = [
-                    e for e in endpoints.cosmos_db_sql_collections if e.name.lower() != endpoint_name
+                    e for e in cosmos_db_endpoints if e.name.lower() != endpoint_name
                 ]
             if not endpoint_type or EndpointType.AzureStorageContainer.value == endpoint_type:
                 endpoints.storage_containers = [e for e in endpoints.storage_containers if e.name.lower() != endpoint_name]

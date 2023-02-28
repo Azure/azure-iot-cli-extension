@@ -634,7 +634,7 @@ class StateProvider(IoTHubProvider):
 
         # Cosmos Db
         cosmos_endpoints = []
-        for ep in endpoints["cosmosDBSqlCollections"]:
+        for ep in endpoints.get("cosmosDBSqlCollections", []):
             account_name = ep["endpointUri"].strip("https://").split(".")[0]
             if ep.get("primaryKey") or ep.get("secondaryKey"):
                 try:
