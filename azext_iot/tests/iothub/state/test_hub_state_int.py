@@ -729,12 +729,12 @@ def compare_hub_controlplane_to_file(filename: str, hub_name: str, rg: str):
     assert file_endpoints == arm_endpoints
 
     # cosmos db endpoint
-    file_endpoints = file_hub_routes["endpoints"]["cosmosDBSqlCollections"]
+    file_endpoints = file_hub_routes["endpoints"].get("cosmosDBSqlCollections", [])
     for endpoint in file_endpoints:
         endpoint.pop("id")
         endpoint.pop("primaryKey")
         endpoint.pop("secondaryKey")
-    arm_endpoints = arm_hub_routes["endpoints"]["cosmosDBSqlCollections"]
+    arm_endpoints = arm_hub_routes["endpoints"].get("cosmosDBSqlCollections", [])
     for endpoint in arm_endpoints:
         endpoint.pop("id")
         endpoint.pop("primaryKey")
@@ -799,11 +799,11 @@ def compare_hubs_controlplane(origin_hub_name: str, dest_hub_name: str, rg: str)
     orig_endpoints = orig_hub["properties"]["routing"].pop("endpoints")
     dest_endpoints = dest_hub["properties"]["routing"].pop("endpoints")
     for endpoint_type in ["cosmosDBSqlCollections", "eventHubs", "serviceBusQueues", "serviceBusTopics", "storageContainers"]:
-        for endpoint in orig_endpoints[endpoint_type]:
+        for endpoint in orig_endpoints.get(endpoint_type, []):
             endpoint.pop("id")
-        for endpoint in dest_endpoints[endpoint_type]:
+        for endpoint in dest_endpoints.get(endpoint_type, []):
             endpoint.pop("id")
-        assert orig_endpoints[endpoint_type] == dest_endpoints[endpoint_type]
+        assert orig_endpoints.get(endpoint_type, []) == dest_endpoints.get(endpoint_type, [])
     for prop in orig_hub["properties"].keys():
         assert orig_hub["properties"][prop] == dest_hub["properties"][prop]
 
