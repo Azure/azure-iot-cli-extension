@@ -225,6 +225,61 @@ def delete_role_assignment(
     )
 
 
+def clean_up_iothub_device_config(
+    hub_name: str,
+    rg: str
+):
+    device_list = []
+    device_list.extend(d["deviceId"] for d in cli.invoke(
+        f"iot hub device-twin list -n {hub_name} -g {rg}"
+    ).as_json())
+
+    config_list = []
+    config_list.extend(c["id"] for c in cli.invoke(
+        f"iot edge deployment list -n {hub_name} -g {rg}"
+    ).as_json())
+
+    config_list.extend(c["id"] for c in cli.invoke(
+        f"iot hub configuration list -n {hub_name} -g {rg}"
+    ).as_json())
+
+    connection_string = cli.invoke(
+        "iot hub connection-string show -n {} -g {} --policy-name {}".format(
+            hub_name, rg, "iothubowner"
+        )
+    ).as_json()["connectionString"]
+
+    if device_list:
+        device = device_list.pop()
+        cli.invoke(
+            "iot hub device-identity delete -d {} --login {}".format(
+                device, connection_string
+            )
+        )
+
+        for device in device_list:
+            cli.invoke(
+                "iot hub device-identity delete -d {} -n {} -g {}".format(
+                    device, hub_name, rg
+                )
+            )
+
+    if config_list:
+        config = config_list.pop()
+        cli.invoke(
+            "iot hub configuration delete -c {} --login {}".format(
+                config, connection_string
+            )
+        )
+
+        for config in config_list:
+            cli.invoke(
+                "iot hub configuration delete -c {} -n {} -g {}".format(
+                    config, hub_name, rg
+                )
+            )
+
+
 class MockLogger:
     def info(self, msg):
         print(msg)

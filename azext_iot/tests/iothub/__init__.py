@@ -7,7 +7,6 @@
 import pytest
 
 from time import sleep
-from typing import List
 from azext_iot.tests.helpers import (
     add_test_tag,
     assign_role_assignment,
@@ -64,7 +63,7 @@ def set_cmd_auth_type(command: str, auth_type: str, cstring: str) -> str:
     return f"{command} --auth-type {auth_type}"
 
 
-@pytest.mark.usefixtures("fixture_provision_existing_hub_role")
+@pytest.mark.usefixtures("fixture_provision_existing_hub_role", "fixture_provision_existing_hub_device_config")
 class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def __init__(self, test_scenario, add_data_contributor=True):
         assert test_scenario
@@ -133,41 +132,6 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             max_tries=MAX_RBAC_ASSIGNMENT_TRIES
         )
 
-    def clean_up(self, device_ids: List[str] = None, config_ids: List[str] = None):
-        if device_ids:
-            device = device_ids.pop()
-            self.cmd(
-                "iot hub device-identity delete -d {} --login {}".format(
-                    device, self.connection_string
-                ),
-                checks=self.is_empty(),
-            )
-
-            for device in device_ids:
-                self.cmd(
-                    "iot hub device-identity delete -d {} -n {} -g {}".format(
-                        device, self.entity_name, self.entity_rg
-                    ),
-                    checks=self.is_empty(),
-                )
-
-        if config_ids:
-            config = config_ids.pop()
-            self.cmd(
-                "iot hub configuration delete -c {} --login {}".format(
-                    config, self.connection_string
-                ),
-                checks=self.is_empty(),
-            )
-
-            for config in config_ids:
-                self.cmd(
-                    "iot hub configuration delete -c {} -n {} -g {}".format(
-                        config, self.entity_name, self.entity_rg
-                    ),
-                    checks=self.is_empty(),
-                )
-
     def generate_device_names(self, count=1, edge=False):
         names = [
             self.create_random_name(
@@ -234,23 +198,6 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     self.storage_account_name, self.storage_cstring
                 ),
             )
-
-    def tearDown(self):
-        device_list = []
-        device_list.extend(d["deviceId"] for d in self.cmd(
-            f"iot hub device-twin list -n {self.entity_name} -g {self.entity_rg}"
-        ).get_output_in_json())
-
-        config_list = []
-        config_list.extend(c["id"] for c in self.cmd(
-            f"iot edge deployment list -n {self.entity_name} -g {self.entity_rg}"
-        ).get_output_in_json())
-
-        config_list.extend(c["id"] for c in self.cmd(
-            f"iot hub configuration list -n {self.entity_name} -g {self.entity_rg}"
-        ).get_output_in_json())
-
-        self.clean_up(device_ids=device_list, config_ids=config_list)
 
     def get_region(self):
         result = self.cmd(

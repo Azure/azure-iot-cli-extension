@@ -14,7 +14,7 @@ from knack.log import get_logger
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.certops import create_self_signed_certificate
-from azext_iot.tests.helpers import assign_role_assignment, get_closest_marker, get_agent_public_ip
+from azext_iot.tests.helpers import assign_role_assignment, clean_up_iothub_device_config, get_closest_marker, get_agent_public_ip
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 
 logger = get_logger(__name__)
@@ -76,22 +76,10 @@ def fixture_provision_existing_hub_certificate(request):
 @pytest.fixture()
 def fixture_provision_existing_hub_device_config(request):
     # Clean up existing devices and configurations
-    if settings.env.azext_iot_testhub:
-        device_list = []
-        device_list.extend(d["deviceId"] for d in cli.invoke(
-            f"iot hub device-twin list -n {HUB_NAME} -g {RG}"
-        ).as_json())
-
-        config_list = []
-        config_list.extend(c["id"] for c in cli.invoke(
-            f"iot edge deployment list -n {HUB_NAME} -g {RG}"
-        ).as_json())
-
-        config_list.extend(c["id"] for c in cli.invoke(
-            f"iot hub configuration list -n {HUB_NAME} -g {RG}"
-        ).as_json())
-
-        _clean_up(device_ids=device_list, config_ids=config_list)
+    clean_up_iothub_device_config(
+        hub_name=HUB_NAME,
+        rg=RG
+    )
     yield
 
 

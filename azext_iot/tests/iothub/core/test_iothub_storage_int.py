@@ -386,8 +386,6 @@ class TestIoTStorage(IoTLiveScenarioTest):
                 )
             )
 
-        self.tearDown()
-
     def wait_till_job_completion(self, job_id):
         tries = 0
 

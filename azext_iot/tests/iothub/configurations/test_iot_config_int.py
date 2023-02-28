@@ -8,6 +8,7 @@ import random
 import json
 
 import pytest
+from azext_iot.tests.helpers import clean_up_iothub_device_config
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.conftest import get_context_path
@@ -520,7 +521,10 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
                 expect_failure=True
             )
 
-            self.tearDown()
+            clean_up_iothub_device_config(
+                hub_name=self.entity_name,
+                rg=self.entity_rg
+            )
 
     def test_device_configurations(self):
         config_count = 4
@@ -854,4 +858,7 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
                 expect_failure=True
             )
 
-            self.tearDown()
+            clean_up_iothub_device_config(
+                hub_name=self.entity_name,
+                rg=self.entity_rg
+            )
