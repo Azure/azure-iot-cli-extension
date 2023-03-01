@@ -24,7 +24,7 @@ class PrivateEndpointConnectionsOperations(object):
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: Version of the DigitalTwinsInstance Management API. Constant value: "2022-10-31".
+    :ivar api_version: Version of the DigitalTwinsInstance Management API. Constant value: "2023-01-31".
     """
 
     models = models
@@ -34,7 +34,7 @@ class PrivateEndpointConnectionsOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2022-10-31"
+        self.api_version = "2023-01-31"
 
         self.config = config
 
