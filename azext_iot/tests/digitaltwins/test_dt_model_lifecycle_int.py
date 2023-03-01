@@ -13,8 +13,11 @@ from azext_iot.common.utility import (
     scantree,
     process_json_arg,
 )
-from . import DTLiveScenarioTest
-from . import generate_resource_id
+from . import (
+    MAX_MODEL_PER_BATCH,
+    DTLiveScenarioTest,
+    generate_resource_id
+)
 
 logger = get_logger(__name__)
 
@@ -159,9 +162,13 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
             # Run the following part of test only if model files exist in the ontology directory
             if os.path.isdir(ontology_directory) and len(os.listdir(ontology_directory)) > 0:
                 # Create Ontology with number of models exceeding API limit
+                model_per_batch_flag = ""
+                if MAX_MODEL_PER_BATCH:
+                    model_per_batch_flag = "--max-models-per-batch '{}'".format(MAX_MODEL_PER_BATCH)
+
                 create_ontology_output = self.cmd(
-                    "dt model create -n {} --from-directory '{}'".format(
-                        instance_name, ontology_directory
+                    "dt model create -n {} --from-directory '{}' {}".format(
+                        instance_name, ontology_directory, model_per_batch_flag
                     )
                 ).get_output_in_json()
 

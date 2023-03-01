@@ -457,6 +457,14 @@ def load_digitaltwins_arguments(self, _):
             arg_group="Models Input",
         )
         context.argument(
+            "max_models_per_batch",
+            options_list=["--max-models-per-batch", "--mmpb"],
+            help="Indicates the maximum model size per batch when create models using directory contains "
+            "more than 250 models. The default batch size will be 30. This value could be useful when encouter "
+            "DTDLParser error. Reduce the number to prevent models pulling disordered from directory. ",
+            arg_group="Models Input"
+        )
+        context.argument(
             "models",
             options_list=["--models"],
             help="Inline model JSON or file path to model JSON. "
