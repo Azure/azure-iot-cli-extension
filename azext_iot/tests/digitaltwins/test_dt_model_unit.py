@@ -23,7 +23,6 @@ from azext_iot.tests.digitaltwins.dt_helpers import (
     url_model_id
 )
 from azext_iot.tests.conftest import hostname
-from azext_iot.digitaltwins.providers.model import MAX_MODELS_PER_BATCH
 from azext_iot.digitaltwins.common import ADTModelCreateFailurePolicy
 
 
@@ -186,7 +185,7 @@ class TestAddModels(object):
                     models=None,
                     from_directory=ontology_directory,
                 )
-                assert len(models_added) == MAX_MODELS_PER_BATCH
+                assert len(models_added) == 30
                 # Since deletion happens in the reverse order, hence we reverse the array before asserting equality
                 models_deleted.reverse()
                 assert models_added == models_deleted
@@ -226,7 +225,7 @@ class TestAddModels(object):
                     from_directory=ontology_directory,
                     failure_policy=ADTModelCreateFailurePolicy.NONE.value,
                 )
-                assert len(models_added) == MAX_MODELS_PER_BATCH
+                assert len(models_added) == 30
 
     def test_add_model_no_models_directory(self, fixture_cmd):
         with pytest.raises(CLIError):
