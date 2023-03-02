@@ -14,7 +14,7 @@ logger = get_logger(__name__)
 def add_models(
     cmd, name_or_hostname, models=None, from_directory=None,
     resource_group_name=None, failure_policy=ADTModelCreateFailurePolicy.ROLLBACK.value,
-    max_models_per_batch=None
+    max_models_per_batch=30
 ):
     model_provider = ModelProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     logger.debug("Received models input: %s", models)

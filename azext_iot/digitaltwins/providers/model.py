@@ -15,8 +15,6 @@ from tqdm import tqdm
 
 logger = get_logger(__name__)
 MAX_MODELS_API_LIMIT = 250
-# avagraw - Max number of models the API's dependency resolution can handle when models are created across multiple API calls.
-MAX_MODELS_PER_BATCH = 30
 
 
 def get_model_dependencies(model, model_id_to_model_map=None):
@@ -80,7 +78,7 @@ class ModelProvider(DigitalTwinsProvider):
 
         # If both arguments are provided. --models wins.
         payload = []
-        models_per_batch = int(max_models_per_batch or MAX_MODELS_PER_BATCH)
+        models_per_batch = int(max_models_per_batch)
         if models:
             models_result = process_json_arg(content=models, argument_name="models")
 
