@@ -139,24 +139,29 @@ class TestAddModels(object):
         models_added = []
         models_deleted = []
 
-        def post_request_callback(request):
+        def post_request_callback_first(request):
             payload = json.loads(request.body)
             headers = {"content_type": "application/json"}
-            # First batch to succeed
-            if payload[0]["@id"] == "dtmi:digitaltwins:rec_3_3:core:Agent;1":
-                assert 1 == 2
-                models_added.extend([model["@id"] for model in payload])
-                resp_body = [{"status": "succeeded"}]
-                return (200, headers, json.dumps(resp_body))
-            # Next batch to fail
-            else:
-                resp_body = [{"status": "failed"}]
-                return (400, headers, json.dumps(resp_body))
+            models_added.extend([model["@id"] for model in payload])
+            resp_body = [{"status": "succeeded"}]
+            return (200, headers, json.dumps(resp_body))
+
+        def post_request_callback_second(request):
+            headers = {"content_type": "application/json"}
+            resp_body = [{"status": "failed"}]
+            return (400, headers, json.dumps(resp_body))
 
         responses.add_callback(
             responses.POST,
             "https://{}/models".format(hostname),
-            callback=post_request_callback,
+            callback=post_request_callback_first,
+            content_type="application/json",
+        )
+
+        responses.add_callback(
+            responses.POST,
+            "https://{}/models".format(hostname),
+            callback=post_request_callback_second,
             content_type="application/json",
         )
 
@@ -189,10 +194,10 @@ class TestAddModels(object):
                     models=None,
                     from_directory=ontology_directory,
                 )
-                assert len(models_added) == MAX_MODEL_PER_BATCH
-                # Since deletion happens in the reverse order, hence we reverse the array before asserting equality
-                models_deleted.reverse()
-                assert models_added == models_deleted
+            assert len(models_added) == MAX_MODEL_PER_BATCH
+            # Since deletion happens in the reverse order, hence we reverse the array before asserting equality
+            models_deleted.reverse()
+            assert models_added == models_deleted
 
     @pytest.mark.usefixtures("set_cwd")
     @responses.activate
