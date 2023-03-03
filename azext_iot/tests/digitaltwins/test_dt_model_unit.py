@@ -24,6 +24,9 @@ from azext_iot.tests.digitaltwins.dt_helpers import (
 )
 from azext_iot.tests.conftest import hostname
 from azext_iot.digitaltwins.common import MAX_MODEL_PER_BATCH, ADTModelCreateFailurePolicy
+from knack.log import get_logger
+
+logger = get_logger(__name__)
 
 
 class TestAddModels(object):
@@ -141,6 +144,7 @@ class TestAddModels(object):
             headers = {"content_type": "application/json"}
             # First batch to succeed
             if payload[0]["@id"] == "dtmi:digitaltwins:rec_3_3:core:Agent;1":
+                assert 1 == 2
                 models_added.extend([model["@id"] for model in payload])
                 resp_body = [{"status": "succeeded"}]
                 return (200, headers, json.dumps(resp_body))
