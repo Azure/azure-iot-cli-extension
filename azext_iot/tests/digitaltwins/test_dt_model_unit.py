@@ -185,10 +185,10 @@ class TestAddModels(object):
                     models=None,
                     from_directory=ontology_directory,
                 )
-            assert len(models_added) == MAX_MODEL_PER_BATCH
-            # Since deletion happens in the reverse order, hence we reverse the array before asserting equality
-            models_deleted.reverse()
-            assert models_added == models_deleted
+                assert len(models_added) == MAX_MODEL_PER_BATCH
+                # Since deletion happens in the reverse order, hence we reverse the array before asserting equality
+                models_deleted.reverse()
+                assert models_added == models_deleted
 
     @pytest.mark.usefixtures("set_cwd")
     @responses.activate
@@ -225,7 +225,7 @@ class TestAddModels(object):
                     from_directory=ontology_directory,
                     failure_policy=ADTModelCreateFailurePolicy.NONE.value,
                 )
-            assert len(models_added) == MAX_MODEL_PER_BATCH
+                assert len(models_added) == MAX_MODEL_PER_BATCH
 
     @pytest.mark.usefixtures("set_cwd")
     @responses.activate
@@ -263,7 +263,7 @@ class TestAddModels(object):
                     max_models_per_batch=20,
                     failure_policy=ADTModelCreateFailurePolicy.NONE.value
                 )
-            assert len(models_added) == 20
+                assert len(models_added) == 20
 
     def test_add_model_no_models_directory(self, fixture_cmd):
         with pytest.raises(CLIError):
