@@ -460,6 +460,7 @@ def load_digitaltwins_arguments(self, _):
             "max_models_per_batch",
             options_list=["--max-models-per-batch", "--mmpb"],
             type=int,
+            deprecate_info=context.deprecate(hide=True),
             help="The maximum model size per batch when creating more than 250 models."
             "Reduce this number to prevent a DTDLParser error. ",
             arg_group="Models Input"
