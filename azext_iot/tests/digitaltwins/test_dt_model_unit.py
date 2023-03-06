@@ -136,8 +136,11 @@ class TestAddModels(object):
     def configure_large_ontology_create_response(self, responses, models_added):
         def post_request_callback_first(request):
             payload = json.loads(request.body)
+            # Check the batch order starts from model with least dependency
+            models = [model["@id"] for model in payload]
+            assert "dtmi:digitaltwins:rec_3_3:core:Agent;1" in models
             headers = {"content_type": "application/json"}
-            models_added.extend([model["@id"] for model in payload])
+            models_added.extend(models)
             resp_body = [{"status": "succeeded"}]
             return (200, headers, json.dumps(resp_body))
 
