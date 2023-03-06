@@ -137,10 +137,10 @@ class TestAddModels(object):
         def post_request_callback_first(request):
             payload = json.loads(request.body)
             # Check the batch order starts from model with least dependency
-            models = [model["@id"] for model in payload]
-            assert "dtmi:digitaltwins:rec_3_3:core:Agent;1" in models
+            model_ids = [model["@id"] for model in payload]
+            assert "dtmi:digitaltwins:rec_3_3:core:Agent;1" in model_ids
             headers = {"content_type": "application/json"}
-            models_added.extend(models)
+            models_added.extend(model_ids)
             resp_body = [{"status": "succeeded"}]
             return (200, headers, json.dumps(resp_body))
 
