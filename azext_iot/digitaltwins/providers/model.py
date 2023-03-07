@@ -69,10 +69,10 @@ class ModelProvider(DigitalTwinsProvider):
         self.model_sdk = self.get_sdk().digital_twin_models
 
     def add(self,
+            max_models_per_batch: int,
             models=None,
             from_directory=None,
-            failure_policy=ADTModelCreateFailurePolicy.ROLLBACK.value,
-            max_models_per_batch: int = None):
+            failure_policy=ADTModelCreateFailurePolicy.ROLLBACK.value):
         if not any([models, from_directory]):
             raise RequiredArgumentMissingError("Provide either --models or --from-directory.")
 
