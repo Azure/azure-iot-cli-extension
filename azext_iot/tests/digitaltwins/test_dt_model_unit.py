@@ -23,7 +23,7 @@ from azext_iot.tests.digitaltwins.dt_helpers import (
     url_model_id
 )
 from azext_iot.tests.conftest import hostname
-from azext_iot.digitaltwins.common import MAX_MODEL_PER_BATCH, ADTModelCreateFailurePolicy
+from azext_iot.digitaltwins.common import MAX_MODELS_PER_BATCH, ADTModelCreateFailurePolicy
 from knack.log import get_logger
 
 logger = get_logger(__name__)
@@ -136,7 +136,7 @@ class TestAddModels(object):
     def configure_large_ontology_create_response(self, responses, models_added):
         def post_request_callback_first(request):
             payload = json.loads(request.body)
-            # Check the batch order starts from model with least dependency
+            # Ensure model with least dependency is in the list of first batch
             model_ids = [model["@id"] for model in payload]
             assert "dtmi:digitaltwins:rec_3_3:core:Agent;1" in model_ids
             headers = {"content_type": "application/json"}
@@ -200,7 +200,7 @@ class TestAddModels(object):
                     models=None,
                     from_directory=ontology_directory,
                 )
-            assert len(models_added) == MAX_MODEL_PER_BATCH
+            assert len(models_added) == MAX_MODELS_PER_BATCH
             # Since deletion happens in the reverse order, hence we reverse the array before asserting equality
             models_deleted.reverse()
             assert models_added == models_deleted
@@ -222,7 +222,7 @@ class TestAddModels(object):
                     from_directory=ontology_directory,
                     failure_policy=ADTModelCreateFailurePolicy.NONE.value,
                 )
-            assert len(models_added) == MAX_MODEL_PER_BATCH
+            assert len(models_added) == MAX_MODELS_PER_BATCH
 
     @pytest.mark.usefixtures("set_cwd")
     @responses.activate
@@ -233,6 +233,7 @@ class TestAddModels(object):
 
         ontology_directory = "./references/opendigitaltwins-building/Ontology"
         if os.path.isdir(ontology_directory) and len(os.listdir(ontology_directory)) > 0:
+            # Raise CLIError after first batch complete, so the models added should be same as custom batch size
             with pytest.raises(CLIError):
                 subject.add_models(
                     cmd=fixture_cmd,

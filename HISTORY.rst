@@ -8,7 +8,7 @@ unreleased
 
 **Digital Twins updates**
 
-* Addition of new parameter `--max-models-per-batch` for `az dt model create` to let user adjust batch size when directory exceeds
+* Addition of new hidden parameter `--max-models-per-batch` for `az dt model create` to let user adjust batch size when directory exceeds
 250 models.
 
 0.20.0

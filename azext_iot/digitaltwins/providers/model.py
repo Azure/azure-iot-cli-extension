@@ -72,13 +72,13 @@ class ModelProvider(DigitalTwinsProvider):
             models=None,
             from_directory=None,
             failure_policy=ADTModelCreateFailurePolicy.ROLLBACK.value,
-            max_models_per_batch=None):
+            max_models_per_batch: int = None):
         if not any([models, from_directory]):
             raise RequiredArgumentMissingError("Provide either --models or --from-directory.")
 
         # If both arguments are provided. --models wins.
         payload = []
-        models_per_batch = int(max_models_per_batch)
+        models_per_batch = max_models_per_batch
         if models:
             models_result = process_json_arg(content=models, argument_name="models")
 

@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from azext_iot.digitaltwins.providers.model import ModelProvider
-from azext_iot.digitaltwins.common import MAX_MODEL_PER_BATCH, ADTModelCreateFailurePolicy
+from azext_iot.digitaltwins.common import MAX_MODELS_PER_BATCH, ADTModelCreateFailurePolicy
 from knack.log import get_logger
 
 logger = get_logger(__name__)
@@ -14,7 +14,7 @@ logger = get_logger(__name__)
 def add_models(
     cmd, name_or_hostname, models=None, from_directory=None,
     resource_group_name=None, failure_policy=ADTModelCreateFailurePolicy.ROLLBACK.value,
-    max_models_per_batch=MAX_MODEL_PER_BATCH
+    max_models_per_batch=MAX_MODELS_PER_BATCH
 ):
     model_provider = ModelProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     logger.debug("Received models input: %s", models)

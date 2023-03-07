@@ -50,7 +50,7 @@ SKIP_ADD_ROLE_MSG = "Skipping addition of the {0}. This may prevent creation of 
 DEFAULT_CONSUMER_GROUP = "$Default"
 
 # Models create
-MAX_MODEL_PER_BATCH = 30
+MAX_MODELS_PER_BATCH = 30
 
 
 # Enums
