@@ -137,7 +137,6 @@ class TestAddModels(object):
         def post_request_callback_first(request):
             payload = json.loads(request.body)
             # Check the batch order starts from model with least dependency
-            model_ids = [model["@id"] for model in payload]
             # Get all model dependencies in the first entry and the length should be 0
             dependencies = []
             if "contents" in payload[0]:
@@ -148,7 +147,7 @@ class TestAddModels(object):
             assert len(dependencies) == 0
 
             headers = {"content_type": "application/json"}
-            models_added.extend(model_ids)
+            models_added.extend([model["@id"] for model in payload])
             resp_body = [{"status": "succeeded"}]
             return (200, headers, json.dumps(resp_body))
 
