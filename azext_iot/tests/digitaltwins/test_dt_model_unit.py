@@ -138,8 +138,15 @@ class TestAddModels(object):
             payload = json.loads(request.body)
             # Check the batch order starts from model with least dependency
             model_ids = [model["@id"] for model in payload]
-            assert model_ids[0] == "dtmi:digitaltwins:rec_3_3:core:Agent;1"\
-                or model_ids[0] == "dtmi:digitaltwins:rec_3_3:business:Role;1"
+            # Get all model dependencies in the first entry and the length should be 0
+            dependencies = []
+            if "contents" in payload[0]:
+                components = [item["schema"] for item in payload[0]["contents"] if item["@type"] == "Component"]
+                dependencies.extend(components)
+            if "extends" in payload[0]:
+                dependencies.append(payload[0]['extends'])
+            assert len(dependencies) == 0
+
             headers = {"content_type": "application/json"}
             models_added.extend(model_ids)
             resp_body = [{"status": "succeeded"}]
