@@ -136,7 +136,7 @@ class TestAddModels(object):
     def configure_large_ontology_create_response(self, responses, models_added):
         def post_request_callback_first(request):
             payload = json.loads(request.body)
-            # Ensure model with least dependency is in the list of first batch
+            # Check the batch order starts from model with least dependency
             model_ids = [model["@id"] for model in payload]
             assert model_ids[0] == "dtmi:digitaltwins:rec_3_3:core:Agent;1"\
                 or model_ids[0] == "dtmi:digitaltwins:rec_3_3:business:Role;1"
