@@ -138,7 +138,7 @@ class TestAddModels(object):
             payload = json.loads(request.body)
             # Ensure model with least dependency is in the list of first batch
             model_ids = [model["@id"] for model in payload]
-            assert "dtmi:digitaltwins:rec_3_3:core:Agent;1" in model_ids
+            assert "dtmi:digitaltwins:rec_3_3:core:Agent;1" == model_ids[0]
             headers = {"content_type": "application/json"}
             models_added.extend(model_ids)
             resp_body = [{"status": "succeeded"}]
