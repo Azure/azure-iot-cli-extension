@@ -94,7 +94,7 @@ class EventGridEndpointBuilder(BaseEndpointBuilder):
 
     def build_key_based(self):
         eg_topic_keys_op = self.cli.invoke(
-            "eventgrid topic key list -n {} -g {}".format(
+            "eventgrid topic key list --name {} -g {}".format(
                 self.endpoint_resource_name, self.endpoint_resource_group
             ),
             subscription=self.endpoint_subscription,
@@ -104,7 +104,7 @@ class EventGridEndpointBuilder(BaseEndpointBuilder):
         eg_topic_keys = eg_topic_keys_op.as_json()
 
         eg_topic_endpoint_op = self.cli.invoke(
-            "eventgrid topic show -n {} -g {}".format(
+            "eventgrid topic show --name {} -g {}".format(
                 self.endpoint_resource_name, self.endpoint_resource_group
             ),
             subscription=self.endpoint_subscription,
@@ -155,7 +155,7 @@ class ServiceBusEndpointBuilder(BaseEndpointBuilder):
 
     def build_key_based(self):
         sb_topic_keys_op = self.cli.invoke(
-            "servicebus topic authorization-rule keys list -n {} "
+            "servicebus topic authorization-rule keys list --name {} "
             "--namespace-name {} -g {} --topic-name {}".format(
                 self.endpoint_resource_policy,
                 self.endpoint_resource_namespace,
@@ -235,7 +235,7 @@ class EventHubEndpointBuilder(BaseEndpointBuilder):
 
     def build_key_based(self):
         eventhub_topic_keys_op = self.cli.invoke(
-            "eventhubs eventhub authorization-rule keys list -n {} "
+            "eventhubs eventhub authorization-rule keys list --name {} "
             "--namespace-name {} -g {} --eventhub-name {}".format(
                 self.endpoint_resource_policy,
                 self.endpoint_resource_namespace,
