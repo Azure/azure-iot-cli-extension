@@ -73,6 +73,7 @@ jobs:
       name: 'azure-digitaltwins'
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
       pythonVersion: $(python)
+      num_reruns: 0
       serviceConnection: $(AzureServiceConnection)
 
 - job: 'testDPS'
