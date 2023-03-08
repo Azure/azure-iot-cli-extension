@@ -8,6 +8,8 @@ import os
 from typing import List, Optional
 
 from knack.log import get_logger
+
+from azext_iot.tests.helpers import assign_role_assignment
 from . import DTLiveScenarioTest
 from . import generate_resource_id
 from time import sleep
@@ -90,13 +92,11 @@ class TestDTImportJobs(DTLiveScenarioTest):
         ).get_output_in_json()
         self.track_instance(create_output)
 
-        self.cmd(
-            "dt role-assignment create -n {} -g {} --assignee {} --role '{}'".format(
-                instance_name, self.rg, self.current_user, self.role_map["owner"]
-            )
-        )
-        # Wait for RBAC to catch-up
-        sleep(RBAC_SLEEP_INTERVAL)
+        assign_role_assignment(
+            role=self.role_map["owner"],
+            scope=create_output["id"],
+            assignee=self.current_user,
+            wait=RBAC_SLEEP_INTERVAL)
 
         # Upload Import Data Files
         valid_import_data_filename = "bulk-models-twins-relationships-valid.ndjson"

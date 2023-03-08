@@ -12,6 +12,7 @@ import pytest
 from azext_iot.common.utility import unpack_msrest_error
 from azext_iot.digitaltwins.common import ADTEndpointAuthType, ADTEndpointType, IdentityType
 from azext_iot.tests.digitaltwins.dt_helpers import assert_system_data_attributes
+from azext_iot.tests.helpers import assign_role_assignment, delete_role_assignment, get_role_assignments
 from . import DTLiveScenarioTest
 from . import (
     EP_RG,
@@ -172,18 +173,12 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             assign_identity=True,
         )
 
-        role_assignment_egt_list = self.cmd(
-            "role assignment list --scope {} --assignee {}".format(
-                eventgrid_topic_id, show_msi_output["identity"]["principalId"]
-            )
-        ).get_output_in_json()
+        role_assignment_egt_list = get_role_assignments(
+            scope=eventgrid_topic_id, assignee=show_msi_output["identity"]["principalId"])
         assert len(role_assignment_egt_list) == 1
 
-        role_assignment_sbt_list = self.cmd(
-            "role assignment list --scope {} --assignee {}".format(
-                servicebus_topic_id, show_msi_output["identity"]["principalId"]
-            )
-        ).get_output_in_json()
+        role_assignment_sbt_list = get_role_assignments(
+            scope=servicebus_topic_id, assignee=show_msi_output["identity"]["principalId"])
         assert len(role_assignment_sbt_list) == 1
 
         # Update tags and disable MSI
@@ -257,18 +252,15 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         assert (
             len(
-                self.cmd(
-                    "dt role-assignment list -n {}".format(rbac_instance_name)
-                ).get_output_in_json()
+                get_role_assignments(scope=rbac_instance["id"])
             )
             == 0
         )
 
-        assign_output = self.cmd(
-            "dt role-assignment create -n {} --assignee {} --role '{}'".format(
-                rbac_instance_name, rbac_assignee_owner, self.role_map["owner"]
-            )
-        ).get_output_in_json()
+        assign_output = assign_role_assignment(
+            role=self.role_map["owner"],
+            scope=rbac_instance["id"],
+            assignee=rbac_assignee_owner).as_json()
 
         assert_common_rbac_attributes(
             assign_output,
@@ -277,14 +269,10 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             rbac_assignee_owner,
         )
 
-        assign_output = self.cmd(
-            "dt role-assignment create -n {} --assignee {} --role '{}' -g {}".format(
-                rbac_instance_name,
-                rbac_assignee_reader,
-                self.role_map["reader"],
-                self.rg,
-            )
-        ).get_output_in_json()
+        assign_output = assign_role_assignment(
+            role=self.role_map["reader"],
+            scope=rbac_instance["id"],
+            assignee=rbac_assignee_reader).as_json()
 
         assert_common_rbac_attributes(
             assign_output,
@@ -293,38 +281,29 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             rbac_assignee_reader,
         )
 
-        list_assigned_output = self.cmd(
-            "dt role-assignment list -n {}".format(rbac_instance_name)
-        ).get_output_in_json()
+        list_assigned_output = get_role_assignments(scope=rbac_instance["id"])
 
         assert len(list_assigned_output) == 2
 
         # Remove specific role assignment (reader) for assignee
         # Role-assignment delete does not currently return output
-        self.cmd(
-            "dt role-assignment delete -n {} --assignee {} --role '{}'".format(
-                rbac_instance_name,
-                rbac_assignee_owner,
-                self.role_map["reader"],
-            )
+        delete_role_assignment(
+            scope=rbac_instance["id"],
+            assignee=rbac_assignee_reader,
+            role=self.role_map["reader"]
         )
 
-        list_assigned_output = self.cmd(
-            "dt role-assignment list -n {} -g {}".format(rbac_instance_name, self.rg)
-        ).get_output_in_json()
+        list_assigned_output = get_role_assignments(scope=rbac_instance["id"])
 
         assert len(list_assigned_output) == 1
 
         # Remove all role assignments for assignee
-        self.cmd(
-            "dt role-assignment delete -n {} --assignee {}".format(
-                rbac_instance_name, rbac_assignee_reader
-            )
+        delete_role_assignment(
+            scope=rbac_instance["id"],
+            assignee=rbac_assignee_owner
         )
 
-        list_assigned_output = self.cmd(
-            "dt role-assignment list -n {} -g {}".format(rbac_instance_name, self.rg)
-        ).get_output_in_json()
+        list_assigned_output = get_role_assignments(scope=rbac_instance["id"])
 
         assert len(list_assigned_output) == 0
 
@@ -361,16 +340,11 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         self.track_instance(endpoint_instance)
 
         # Setup RBAC so we can interact with routes
-        self.cmd(
-            "dt role-assignment create -n {} --assignee {} --role '{}' -g {}".format(
-                endpoints_instance_name,
-                self.current_user,
-                self.role_map["owner"],
-                self.rg,
-            )
-        )
-
-        sleep(30)  # Wait for service to catch-up
+        assign_role_assignment(
+            role=self.role_map["owner"],
+            scope=endpoint_instance["id"],
+            assignee=self.current_user,
+            wait=30)
 
         EndpointTuple = namedtuple(
             "endpoint_tuple", ["endpoint_name", "endpoint_type", "auth_type"]
@@ -545,11 +519,11 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             )
         ).as_json()["id"]
 
-        self.assign_role_assignment(
+        assign_role_assignment(
             scope=sb_topic_resource_id, role=target_scope_role, assignee=user_identity_principal_id
         )
 
-        self.assign_role_assignment(
+        assign_role_assignment(
             scope=eh_resource_id, role=target_scope_role, assignee=user_identity_principal_id
         )
 

@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from time import sleep
-from typing import Optional
+from typing import Optional, List
 import os
 
 import pytest
@@ -14,16 +14,18 @@ from knack.log import get_logger
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.certops import create_self_signed_certificate
-from azext_iot.tests.helpers import get_closest_marker, get_agent_public_ip
-from azext_iot.tests.settings import DynamoSettings
+from azext_iot.tests.helpers import assign_role_assignment, clean_up_iothub_device_config, get_closest_marker, get_agent_public_ip
+from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 
 logger = get_logger(__name__)
 MAX_RBAC_ASSIGNMENT_TRIES = 10
 USER_ROLE = "IoT Hub Data Contributor"
 cli = EmbeddedCLI()
-REQUIRED_TEST_ENV_VARS = ["azext_iot_testrg"]
-settings = DynamoSettings(req_env_set=REQUIRED_TEST_ENV_VARS)
+settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL)
 RG = settings.env.azext_iot_testrg
+HUB_NAME = settings.env.azext_iot_testhub
+STORAGE_ACCOUNT = settings.env.azext_iot_teststorageaccount
+STORAGE_CONTAINER = settings.env.azext_iot_teststoragecontainer
 
 
 def generate_hub_id() -> str:
@@ -32,32 +34,6 @@ def generate_hub_id() -> str:
 
 def generate_hub_depenency_id() -> str:
     return f"aziotclitest{generate_generic_id()}"[:24]
-
-
-def _assign_rbac_role(assignee: str, scope: str, role: str, max_tries: int = MAX_RBAC_ASSIGNMENT_TRIES):
-    tries = 0
-    while tries < max_tries:
-        role_assignments = _get_role_assignments(scope, role)
-        role_assignment_principal_ids = [assignment.get("principalId") for assignment in role_assignments]
-        role_assignment_principal_names = [assignment.get("principalName") for assignment in role_assignments]
-        if assignee in role_assignment_principal_ids + role_assignment_principal_names:
-            break
-        # else assign role to scope and check again
-        cli.invoke(
-            'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
-                assignee, role, scope
-            )
-        )
-        sleep(10)
-        tries += 1
-
-    if tries == max_tries:
-        raise Exception(
-            "Reached max ({}) number of tries to assign role {} to scope {} for assignee {}. Please "
-            "re-run the test later or with more max number of tries.".format(
-                max_tries, role, scope, assignee
-            )
-        )
 
 
 def assign_iot_hub_dataplane_rbac_role(hub_results):
@@ -72,9 +48,59 @@ def assign_iot_hub_dataplane_rbac_role(hub_results):
             if user["name"] is None:
                 raise Exception("User not found")
 
-            _assign_rbac_role(
-                assignee=user["name"], scope=target_hub_id, role=USER_ROLE
+            assign_role_assignment(
+                assignee=user["name"],
+                scope=target_hub_id,
+                role=USER_ROLE,
+                max_tries=MAX_RBAC_ASSIGNMENT_TRIES
             )
+
+
+@pytest.fixture()
+def fixture_provision_existing_hub_certificate(request):
+    if settings.env.azext_iot_testhub:
+        # Make sure root certificate is Baltimore(Default)
+        authority = cli.invoke(
+            f"iot hub certificate root-authority show -n {HUB_NAME} -g {RG}"
+        ).as_json()
+
+        if authority["enableRootCertificateV2"]:
+            # Transition to Baltimore (initial transition)
+            cli.invoke(
+                f"iot hub certificate root-authority set -n {HUB_NAME} -g {RG} --cav v1 --yes",
+            )
+    yield
+
+
+@pytest.fixture()
+def fixture_provision_existing_hub_device_config(request):
+    # Clean up existing devices and configurations
+    if settings.env.azext_iot_testhub:
+        clean_up_iothub_device_config(
+            hub_name=HUB_NAME,
+            rg=RG
+        )
+    yield
+
+
+@pytest.fixture()
+def fixture_provision_existing_hub_role(request):
+    if settings.env.azext_iot_testhub:
+        # Assign Data Contributor role
+        account = cli.invoke("account show").as_json()
+        user = account["user"]
+
+        target_hub = cli.invoke(
+            "iot hub show -n {} -g {}".format(HUB_NAME, RG)
+        ).as_json()
+
+        assign_role_assignment(
+            assignee=user["name"],
+            scope=target_hub["id"],
+            role=USER_ROLE,
+            max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+        )
+    yield
 
 
 # IoT Hub fixtures
@@ -131,10 +157,20 @@ def setup_hub_controlplane_states(
         provisioned_service_bus_module["topic"]["id"]: "Azure Service Bus Data Sender"
     }
     for scope, role in scope_dict.items():
-        _assign_rbac_role(assignee=user_principal_id, scope=scope, role=role)
+        assign_role_assignment(
+            assignee=user_principal_id,
+            scope=scope,
+            role=role,
+            max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+        )
         if use_system_endpoints:
             for hub_principal_id in hub_principal_ids:
-                _assign_rbac_role(assignee=hub_principal_id, scope=scope, role=role)
+                assign_role_assignment(
+                    assignee=hub_principal_id,
+                    scope=scope,
+                    role=role,
+                    max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+                )
     sleep(30)
 
     suffix = "systemid" if use_system_endpoints else "userid"
@@ -306,12 +342,6 @@ def _user_identity_provisioner():
     ).as_json()
 
 
-def _get_role_assignments(scope, role):
-    return cli.invoke(
-        f'role assignment list --scope "{scope}" --role "{role}"'
-    ).as_json()
-
-
 def _user_identity_removal(name):
     delete_result = cli.invoke(f"identity delete -n {name} -g {RG}")
     if not delete_result.success():
@@ -328,8 +358,18 @@ def provisioned_storage_with_identity_module(
     hub_principal_id = provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["principalId"]
     user_identities = list(provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["userAssignedIdentities"].values())
     user_id = user_identities[0]["principalId"]
-    _assign_rbac_role(assignee=hub_principal_id, scope=scope, role=role)
-    _assign_rbac_role(assignee=user_id, scope=scope, role=role)
+    assign_role_assignment(
+        assignee=hub_principal_id,
+        scope=scope,
+        role=role,
+        max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+    )
+    assign_role_assignment(
+        assignee=user_id,
+        scope=scope,
+        role=role,
+        max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+    )
     yield provisioned_iot_hubs_with_user_module, provisioned_storage_module
 
 
@@ -410,8 +450,18 @@ def provisioned_event_hub_with_identity_module(
     hub_principal_id = provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["principalId"]
     user_identities = list(provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["userAssignedIdentities"].values())
     user_id = user_identities[0]["principalId"]
-    _assign_rbac_role(assignee=hub_principal_id, scope=scope, role=role)
-    _assign_rbac_role(assignee=user_id, scope=scope, role=role)
+    assign_role_assignment(
+        assignee=hub_principal_id,
+        scope=scope,
+        role=role,
+        max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+    )
+    assign_role_assignment(
+        assignee=user_id,
+        scope=scope,
+        role=role,
+        max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+    )
     yield provisioned_iot_hubs_with_user_module, provisioned_event_hub_module
 
 
@@ -482,10 +532,30 @@ def provisioned_service_bus_with_identity_module(
     hub_principal_id = provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["principalId"]
     user_identities = list(provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["userAssignedIdentities"].values())
     user_id = user_identities[0]["principalId"]
-    _assign_rbac_role(assignee=hub_principal_id, scope=queue_scope, role=role)
-    _assign_rbac_role(assignee=user_id, scope=queue_scope, role=role)
-    _assign_rbac_role(assignee=hub_principal_id, scope=topic_scope, role=role)
-    _assign_rbac_role(assignee=user_id, scope=topic_scope, role=role)
+    assign_role_assignment(
+        assignee=hub_principal_id,
+        scope=queue_scope,
+        role=role,
+        max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+    )
+    assign_role_assignment(
+        assignee=user_id,
+        scope=queue_scope,
+        role=role,
+        max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+    )
+    assign_role_assignment(
+        assignee=hub_principal_id,
+        scope=topic_scope,
+        role=role,
+        max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+    )
+    assign_role_assignment(
+        assignee=user_id,
+        scope=topic_scope,
+        role=role,
+        max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+    )
     yield provisioned_iot_hubs_with_user_module, provisioned_service_bus_module
 
 
@@ -652,3 +722,40 @@ def _cosmos_db_removal(account_name: str):
     delete_result = cli.invoke(f"cosmosdb delete -g {RG} -n {account_name} -y")
     if not delete_result.success():
         logger.error(f"Failed to delete Cosmos DB resource {account_name}.")
+
+
+def _clean_up(device_ids: List[str] = None, config_ids: List[str] = None):
+    connection_string = cli.invoke(
+        "iot hub connection-string show -n {} -g {} --policy-name {}".format(
+            HUB_NAME, RG, "iothubowner"
+        )
+    ).as_json()["connectionString"]
+    if device_ids:
+        device = device_ids.pop()
+        cli.invoke(
+            "iot hub device-identity delete -d {} --login {}".format(
+                device, connection_string
+            )
+        )
+
+        for device in device_ids:
+            cli.invoke(
+                "iot hub device-identity delete -d {} -n {} -g {}".format(
+                    device, HUB_NAME, RG
+                )
+            )
+
+    if config_ids:
+        config = config_ids.pop()
+        cli.invoke(
+            "iot hub configuration delete -c {} --login {}".format(
+                config, connection_string
+            )
+        )
+
+        for config in config_ids:
+            cli.invoke(
+                "iot hub configuration delete -c {} -n {} -g {}".format(
+                    config, HUB_NAME, RG
+                )
+            )
