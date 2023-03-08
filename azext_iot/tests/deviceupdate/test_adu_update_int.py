@@ -12,8 +12,8 @@ from azext_iot.common.utility import process_json_arg
 from azext_iot.tests.conftest import get_context_path
 from azext_iot.tests.deviceupdate.conftest import DEFAULT_ADU_RBAC_SLEEP_SEC, ADU_CLIENT_DTMI, ACCOUNT_RG
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests.helpers import assign_role_assignment
 from azext_iot.tests.settings import DynamoSettings
-from time import sleep
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List
 
@@ -614,15 +614,11 @@ def _assign_rbac_if_needed(account_name: str):
     target_role = "Device Update Administrator"
     principal = cli.invoke("account show").as_json()
     account = cli.invoke(f"iot du account show -n {account_name}").as_json()
-    role_assignments = cli.invoke(f"role assignment list --scope '{account['id']}' --role '{target_role}'").as_json()
-    flat_assignments = [r['principalName'] for r in role_assignments]
-
-    if principal not in flat_assignments:
-        assert cli.invoke(
-            f"role assignment create --role '{target_role}' "
-            f"--assignee '{principal['user']['name']}' --scope '{account['id']}'"
-        ).success()
-        sleep(DEFAULT_ADU_RBAC_SLEEP_SEC)
+    assign_role_assignment(
+        role=target_role,
+        scope=account['id'],
+        assignee=principal['user']['name'],
+        wait=DEFAULT_ADU_RBAC_SLEEP_SEC)
 
 
 def test_adu_set_config_defaults(provisioned_instances_module: Dict[str, dict]):

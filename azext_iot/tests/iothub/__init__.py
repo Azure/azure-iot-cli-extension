@@ -7,9 +7,10 @@
 import pytest
 
 from time import sleep
-from typing import List
 from azext_iot.tests.helpers import (
     add_test_tag,
+    assign_role_assignment,
+    clean_up_iothub_device_config,
     create_storage_account
 )
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
@@ -63,6 +64,7 @@ def set_cmd_auth_type(command: str, auth_type: str, cstring: str) -> str:
     return f"{command} --auth-type {auth_type}"
 
 
+@pytest.mark.usefixtures("fixture_provision_existing_hub_role", "fixture_provision_existing_hub_device_config")
 class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def __init__(self, test_scenario, add_data_contributor=True):
         assert test_scenario
@@ -105,31 +107,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 ).get_output_in_json()
 
                 if add_data_contributor:
-                    account = self.cmd("account show").get_output_in_json()
-                    user = account["user"]
-
-                    if user["name"] is None:
-                        raise Exception("User not found")
-
-                    tries = 0
-                    while tries < MAX_RBAC_ASSIGNMENT_TRIES:
-                        role_assignments = self.get_role_assignments(target_hub["id"], USER_ROLE)
-                        role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
-                        if user["name"] in role_assignment_principal_names:
-                            break
-                        # else assign IoT Hub Data Contributor role to current user and check again
-                        self.cmd(
-                            'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
-                                user["name"], USER_ROLE, target_hub["id"]
-                            )
-                        )
-                        sleep(10)
-
-                    if tries == MAX_RBAC_ASSIGNMENT_TRIES:
-                        raise Exception(
-                            "Reached max ({}) number of tries to assign RBAC role. Please re-run the test later "
-                            "or with more max number of tries.".format(MAX_RBAC_ASSIGNMENT_TRIES)
-                        )
+                    self._add_data_contributor(target_hub)
 
         self.region = self.get_region()
         self.connection_string = self.get_hub_cstring()
@@ -141,40 +119,19 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             test_tag=test_scenario
         )
 
-    def clean_up(self, device_ids: List[str] = None, config_ids: List[str] = None):
-        if device_ids:
-            device = device_ids.pop()
-            self.cmd(
-                "iot hub device-identity delete -d {} --login {}".format(
-                    device, self.connection_string
-                ),
-                checks=self.is_empty(),
-            )
+    def _add_data_contributor(self, target_hub):
+        account = self.cmd("account show").get_output_in_json()
+        user = account["user"]
 
-            for device in device_ids:
-                self.cmd(
-                    "iot hub device-identity delete -d {} -n {} -g {}".format(
-                        device, self.entity_name, self.entity_rg
-                    ),
-                    checks=self.is_empty(),
-                )
+        if user["name"] is None:
+            raise Exception("User not found")
 
-        if config_ids:
-            config = config_ids.pop()
-            self.cmd(
-                "iot hub configuration delete -c {} --login {}".format(
-                    config, self.connection_string
-                ),
-                checks=self.is_empty(),
-            )
-
-            for config in config_ids:
-                self.cmd(
-                    "iot hub configuration delete -c {} -n {} -g {}".format(
-                        config, self.entity_name, self.entity_rg
-                    ),
-                    checks=self.is_empty(),
-                )
+        assign_role_assignment(
+            role=USER_ROLE,
+            scope=target_hub["id"],
+            assignee=user["name"],
+            max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+        )
 
     def generate_device_names(self, count=1, edge=False):
         names = [
@@ -244,21 +201,11 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             )
 
     def tearDown(self):
-        device_list = []
-        device_list.extend(d["deviceId"] for d in self.cmd(
-            f"iot hub device-twin list -n {self.entity_name} -g {self.entity_rg}"
-        ).get_output_in_json())
-
-        config_list = []
-        config_list.extend(c["id"] for c in self.cmd(
-            f"iot edge deployment list -n {self.entity_name} -g {self.entity_rg}"
-        ).get_output_in_json())
-
-        config_list.extend(c["id"] for c in self.cmd(
-            f"iot hub configuration list -n {self.entity_name} -g {self.entity_rg}"
-        ).get_output_in_json())
-
-        self.clean_up(device_ids=device_list, config_ids=config_list)
+        if not settings.env.azext_iot_testhub:
+            clean_up_iothub_device_config(
+                hub_name=self.entity_name,
+                rg=self.entity_rg
+            )
 
     def get_region(self):
         result = self.cmd(
@@ -280,15 +227,6 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         return set_cmd_auth_type(
             command=command, auth_type=auth_type, cstring=self.connection_string
         )
-
-    def get_role_assignments(self, scope, role):
-        role_assignments = self.cmd(
-            'role assignment list --scope "{}" --role "{}"'.format(
-                scope, role
-            )
-        ).get_output_in_json()
-
-        return role_assignments
 
     @pytest.fixture(scope='class', autouse=True)
     def tearDownSuite(self):
