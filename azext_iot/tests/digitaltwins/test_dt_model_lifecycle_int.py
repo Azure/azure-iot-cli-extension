@@ -7,12 +7,12 @@
 import pytest
 import json
 import os
-from time import sleep
 from knack.log import get_logger
 from azext_iot.common.utility import (
     scantree,
     process_json_arg,
 )
+from azext_iot.tests.helpers import assign_role_assignment
 from . import (
     MAX_MODELS_PER_BATCH,
     DTLiveScenarioTest,
@@ -46,14 +46,11 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
         ).get_output_in_json()
         self.track_instance(create_output)
 
-        self.cmd(
-            "dt role-assignment create -n {} -g {} --assignee {} --role '{}'".format(
-                instance_name, self.rg, self.current_user, self.role_map["owner"]
-            )
-        )
-
-        # Wait for RBAC to catch-up
-        sleep(60)
+        assign_role_assignment(
+            role=self.role_map["owner"],
+            scope=create_output["id"],
+            assignee=self.current_user,
+            wait=60)
 
         create_models_output = self.cmd(
             "dt model create -n {} --from-directory '{}'".format(

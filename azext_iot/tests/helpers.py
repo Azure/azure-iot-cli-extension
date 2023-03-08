@@ -8,6 +8,8 @@ import json
 import os
 
 from inspect import getsourcefile
+from time import sleep
+from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.common.utility import ensure_azure_namespace_path
 from azext_iot.common.utility import read_file_content
 from azext_iot.tests.settings import DynamoSettings
@@ -17,6 +19,7 @@ ensure_azure_namespace_path()
 
 from azure.iot.device import ProvisioningDeviceClient, IoTHubDeviceClient
 
+cli = EmbeddedCLI()
 
 SubRequest = TypeVar('SubRequest')
 Mark = TypeVar('Mark')
@@ -154,6 +157,127 @@ def get_agent_public_ip():
     """
     import requests
     return requests.head("https://www.wikipedia.org").headers["X-Client-IP"]
+
+
+def get_role_assignments(
+    scope: str,
+    assignee: str = None,
+    role: str = None,
+) -> json:
+    """
+    Get rbac permissions of resource.
+    """
+    role_flag = ""
+    assignee_flag = ""
+
+    if role:
+        role_flag = '--role "{}"'.format(role)
+
+    if assignee:
+        assignee_flag = '--assignee "{}"'.format(assignee)
+
+    return cli.invoke(
+        f'role assignment list --scope "{scope}" {role_flag} {assignee_flag}'
+    ).as_json()
+
+
+def assign_role_assignment(
+    role: str,
+    scope: str,
+    assignee: str,
+    max_tries=10,
+    wait=10
+):
+    """
+    Assign rbac permissions to resource.
+    """
+    output = None
+    tries = 0
+    while tries < max_tries:
+        role_assignments = get_role_assignments(scope=scope, role=role)
+        role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
+        if assignee in role_assignment_principal_ids:
+            break
+        # else assign role to scope and check again
+        output = cli.invoke(
+            f'role assignment create --assignee "{assignee}" --role "{role}" --scope "{scope}"'
+        )
+        sleep(wait)
+        tries += 1
+    return output
+
+
+def delete_role_assignment(
+    scope: str,
+    assignee: str,
+    role: str = None,
+):
+    """
+    Delete rbac permissions of resource.
+    """
+    role_flag = ""
+
+    if role:
+        role_flag = "--role '{}'".format(role)
+
+    cli.invoke(
+        f"role assignment delete --scope '{scope}' --assignee '{assignee}' {role_flag}"
+    )
+
+
+def clean_up_iothub_device_config(
+    hub_name: str,
+    rg: str
+):
+    device_list = []
+    device_list.extend(d["deviceId"] for d in cli.invoke(
+        f"iot hub device-twin list -n {hub_name} -g {rg}"
+    ).as_json())
+
+    config_list = []
+    config_list.extend(c["id"] for c in cli.invoke(
+        f"iot edge deployment list -n {hub_name} -g {rg}"
+    ).as_json())
+
+    config_list.extend(c["id"] for c in cli.invoke(
+        f"iot hub configuration list -n {hub_name} -g {rg}"
+    ).as_json())
+
+    connection_string = cli.invoke(
+        "iot hub connection-string show -n {} -g {} --policy-name {}".format(
+            hub_name, rg, "iothubowner"
+        )
+    ).as_json()["connectionString"]
+
+    if device_list:
+        device = device_list.pop()
+        cli.invoke(
+            "iot hub device-identity delete -d {} --login {}".format(
+                device, connection_string
+            )
+        )
+
+        for device in device_list:
+            cli.invoke(
+                "iot hub device-identity delete -d {} -n {} -g {}".format(
+                    device, hub_name, rg
+                )
+            )
+
+    if config_list:
+        config = config_list.pop()
+        cli.invoke(
+            "iot hub configuration delete -c {} --login {}".format(
+                config, connection_string
+            )
+        )
+
+        for config in config_list:
+            cli.invoke(
+                "iot hub configuration delete -c {} -n {} -g {}".format(
+                    config, hub_name, rg
+                )
+            )
 
 
 class MockLogger:
