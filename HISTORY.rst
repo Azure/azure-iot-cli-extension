@@ -3,6 +3,14 @@
 Release History
 ===============
 
+unreleased
++++++++++++++++
+
+**Digital Twins updates**
+
+* Addition of new parameter `--max-models-per-batch` for `az dt model create` to let user adjust batch size when directory exceeds
+  250 models. The parameter will be removed once the DTDLParserError is fixed when models created exceed single page API limit in ubuntu.
+
 0.20.0
 +++++++++++++++
 
