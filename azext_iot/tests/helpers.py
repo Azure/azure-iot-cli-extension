@@ -18,7 +18,11 @@ from typing import TypeVar
 ensure_azure_namespace_path()
 
 from azure.iot.device import ProvisioningDeviceClient, IoTHubDeviceClient
+from azure.cli.core.azclierror import CLIInternalError
+from knack.log import get_logger
 
+
+logger = get_logger(__name__)
 cli = EmbeddedCLI()
 
 SubRequest = TypeVar('SubRequest')
@@ -204,6 +208,9 @@ def assign_role_assignment(
         )
         sleep(wait)
         tries += 1
+    if not output.success():
+        logger.warning(f"Failed to assign '{assignee}' the role of '{role}' against scope '{scope}'.")
+
     return output
 
 
@@ -234,29 +241,17 @@ def clean_up_iothub_device_config(
         f"iot hub device-twin list -n {hub_name} -g {rg}"
     ).as_json())
 
-    config_list = []
-    config_list.extend(c["id"] for c in cli.invoke(
+    deployment_list = []
+    deployment_list.extend(c["id"] for c in cli.invoke(
         f"iot edge deployment list -n {hub_name} -g {rg}"
     ).as_json())
 
+    config_list = []
     config_list.extend(c["id"] for c in cli.invoke(
         f"iot hub configuration list -n {hub_name} -g {rg}"
     ).as_json())
 
-    connection_string = cli.invoke(
-        "iot hub connection-string show -n {} -g {} --policy-name {}".format(
-            hub_name, rg, "iothubowner"
-        )
-    ).as_json()["connectionString"]
-
     if device_list:
-        device = device_list.pop()
-        cli.invoke(
-            "iot hub device-identity delete -d {} --login {}".format(
-                device, connection_string
-            )
-        )
-
         for device in device_list:
             cli.invoke(
                 "iot hub device-identity delete -d {} -n {} -g {}".format(
@@ -264,14 +259,15 @@ def clean_up_iothub_device_config(
                 )
             )
 
-    if config_list:
-        config = config_list.pop()
-        cli.invoke(
-            "iot hub configuration delete -c {} --login {}".format(
-                config, connection_string
+    if deployment_list:
+        for deployment in deployment_list:
+            cli.invoke(
+                "iot edge deployment delete -d {} -n {} -g {}".format(
+                    deployment, hub_name, rg
+                )
             )
-        )
 
+    if config_list:
         for config in config_list:
             cli.invoke(
                 "iot hub configuration delete -c {} -n {} -g {}".format(
