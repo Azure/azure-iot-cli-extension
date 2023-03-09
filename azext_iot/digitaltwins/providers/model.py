@@ -15,8 +15,6 @@ from tqdm import tqdm
 
 logger = get_logger(__name__)
 MAX_MODELS_API_LIMIT = 250
-# avagraw - Max number of models the API's dependency resolution can handle when models are created across multiple API calls.
-MAX_MODELS_PER_BATCH = 35
 
 
 def get_model_dependencies(model, model_id_to_model_map=None):
@@ -70,12 +68,17 @@ class ModelProvider(DigitalTwinsProvider):
         )
         self.model_sdk = self.get_sdk().digital_twin_models
 
-    def add(self, models=None, from_directory=None, failure_policy=ADTModelCreateFailurePolicy.ROLLBACK.value):
+    def add(self,
+            max_models_per_batch: int,
+            models=None,
+            from_directory=None,
+            failure_policy=ADTModelCreateFailurePolicy.ROLLBACK.value):
         if not any([models, from_directory]):
             raise RequiredArgumentMissingError("Provide either --models or --from-directory.")
 
         # If both arguments are provided. --models wins.
         payload = []
+        models_per_batch = max_models_per_batch
         if models:
             models_result = process_json_arg(content=models, argument_name="models")
 
@@ -115,8 +118,8 @@ class ModelProvider(DigitalTwinsProvider):
                 # followed by models with 1 dependency, then 2 dependencies and so on... This ensures that all dependencies
                 # of each model being added were either already added in a previous iteration or are in the current payload.
                 for _, models_list in dep_count_to_models_tuples:
-                    while len(models_batch) + len(models_list) > MAX_MODELS_PER_BATCH:
-                        num_models_to_add = MAX_MODELS_PER_BATCH - len(models_batch)
+                    while len(models_batch) + len(models_list) > models_per_batch:
+                        num_models_to_add = models_per_batch - len(models_batch)
                         models_batch.extend(models_list[0:num_models_to_add])
                         response.extend(self.model_sdk.add(models_batch, raw=True).response.json())
                         models_created.extend([model['@id'] for model in models_batch])

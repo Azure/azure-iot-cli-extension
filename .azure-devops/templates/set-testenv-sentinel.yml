@@ -34,6 +34,7 @@ steps:
             "azext_dt_adx_database": os.environ.get("AZEXT_DT_ADX_DATABASE", sentinel_value),
             "azext_dt_adx_rg": os.environ.get("AZEXT_DT_ADX_RG", sentinel_value),
             "azext_dt_region": os.environ.get("AZEXT_DT_REGION", sentinel_value),
+            "azext_dt_max_models_per_batch": os.environ.get("AZEXT_DT_MAX_MODELS_PER_BATCH", sentinel_value),
             "use_tags": os.environ.get("USE_TAGS", sentinel_value),
             "definition_id": os.environ.get("SYSTEM_DEFINITIONID", sentinel_value),
             "job_display_name": os.environ.get("SYSTEM_JOBDISPLAYNAME", sentinel_value),
@@ -72,4 +73,5 @@ steps:
       AZEXT_DT_EP_EVENTHUB_POLICY: $(azext_dt_ep_eventhub_policy)
       AZEXT_DT_EP_EVENTHUB_TOPIC: $(azext_dt_ep_eventhub_topic)
       AZEXT_DT_EP_RG: $(azext_dt_ep_rg)
+      AZEXT_DT_MAX_MODELS_PER_BATCH: $(azext_dt_max_models_per_batch)
       USE_TAGS: $(use_tags)
