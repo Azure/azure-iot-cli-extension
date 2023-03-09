@@ -260,10 +260,12 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         assign_output = assign_role_assignment(
             role=self.role_map["owner"],
             scope=rbac_instance["id"],
-            assignee=rbac_assignee_owner).as_json()
+            assignee=rbac_assignee_owner)
+
+        assert assign_output
 
         assert_common_rbac_attributes(
-            assign_output,
+            assign_output.as_json(),
             rbac_instance_name,
             "owner",
             rbac_assignee_owner,
@@ -272,10 +274,12 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         assign_output = assign_role_assignment(
             role=self.role_map["reader"],
             scope=rbac_instance["id"],
-            assignee=rbac_assignee_reader).as_json()
+            assignee=rbac_assignee_reader)
+
+        assert assign_output
 
         assert_common_rbac_attributes(
-            assign_output,
+            assign_output.as_json(),
             rbac_instance_name,
             "reader",
             rbac_assignee_reader,

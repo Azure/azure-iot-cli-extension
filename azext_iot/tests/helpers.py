@@ -18,7 +18,6 @@ from typing import TypeVar
 ensure_azure_namespace_path()
 
 from azure.iot.device import ProvisioningDeviceClient, IoTHubDeviceClient
-from azure.cli.core.azclierror import CLIInternalError
 from knack.log import get_logger
 
 
