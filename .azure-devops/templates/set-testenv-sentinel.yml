@@ -52,6 +52,7 @@ steps:
         f.writelines(envvars_sentinel)
         f.write("markers =\n")
         f.write("  adu_infrastructure:\n")
+        f.write("  hub_infrastructure:\n")
         f.close()
 
     env:

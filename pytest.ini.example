@@ -42,3 +42,4 @@ env =
 
 markers =
     adu_infrastructure: desired customizations for ADU integration tests.
+    hub_infrastructure: desired customizations for IoT Hub integration tests.

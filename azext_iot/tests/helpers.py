@@ -13,7 +13,7 @@ from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.common.utility import ensure_azure_namespace_path
 from azext_iot.common.utility import read_file_content
 from azext_iot.tests.settings import DynamoSettings
-from typing import TypeVar
+from typing import TypeVar, Optional
 
 ensure_azure_namespace_path()
 
@@ -189,8 +189,8 @@ def assign_role_assignment(
     scope: str,
     assignee: str,
     max_tries=10,
-    wait=10
-):
+    wait=10,
+) -> Optional[EmbeddedCLI]:
     """
     Assign rbac permissions to resource.
     """
@@ -199,16 +199,18 @@ def assign_role_assignment(
     while tries < max_tries:
         role_assignments = get_role_assignments(scope=scope, role=role)
         role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
-        if assignee in role_assignment_principal_ids:
-            break
+        role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
+        if assignee in role_assignment_principal_ids or assignee in role_assignment_principal_names:
+            return
         # else assign role to scope and check again
         output = cli.invoke(
             f'role assignment create --assignee "{assignee}" --role "{role}" --scope "{scope}"'
         )
+        if not output.success():
+            raise RuntimeError(f"Failed to assign '{assignee}' the role of '{role}' against scope '{scope}'.")
+
         sleep(wait)
         tries += 1
-    if not output.success():
-        logger.warning(f"Failed to assign '{assignee}' the role of '{role}' against scope '{scope}'.")
 
     return output
 
