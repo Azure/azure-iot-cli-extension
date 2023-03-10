@@ -3,13 +3,17 @@
 Release History
 ===============
 
-unreleased
+0.20.1
 +++++++++++++++
 
 **Digital Twins updates**
 
+* Hotfix to ensure policy key retreival during Digital Twin endpoint creation works. Affected commands are:
+  - `az dt endpoint create`
+
 * Addition of new parameter `--max-models-per-batch` for `az dt model create` to let user adjust batch size when directory exceeds
   250 models. The parameter will be removed once the DTDLParserError is fixed when models created exceed single page API limit in ubuntu.
+
 
 0.20.0
 +++++++++++++++
