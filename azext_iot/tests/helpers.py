@@ -202,14 +202,14 @@ def assign_role_assignment(
         role_assignment_principal_ids = [assignment.get("principalId") for assignment in role_assignments]
         role_assignment_principal_names = [assignment.get("principalName") for assignment in role_assignments]
         if assignee in role_assignment_principal_ids or assignee in role_assignment_principal_names:
-            return
+            return output
         # else assign role to scope and check again
         output = cli.invoke(
             f'role assignment create --assignee "{assignee}" --role "{role}" --scope "{scope}"'
         )
         if not output.success():
             logger.warning(f"Failed to assign '{assignee}' the role of '{role}' against scope '{scope}'.")
-            return
+            return output
 
         sleep(wait)
         tries += 1
