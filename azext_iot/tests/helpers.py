@@ -198,6 +198,7 @@ def assign_role_assignment(
     tries = 0
     while tries < max_tries:
         role_assignments = get_role_assignments(scope=scope, role=role)
+        logger.info(f"Role assignments for the role of '{role}' against scope '{scope}': {role_assignments}")
         role_assignment_principal_ids = [assignment.get("principalId") for assignment in role_assignments]
         role_assignment_principal_names = [assignment.get("principalName") for assignment in role_assignments]
         if assignee in role_assignment_principal_ids or assignee in role_assignment_principal_names:
