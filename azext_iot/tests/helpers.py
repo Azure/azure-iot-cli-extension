@@ -196,20 +196,24 @@ def assign_role_assignment(
     """
     output = None
     tries = 0
+    principal_kpis = ["name", "principalId", "principalName"]
+    flat_assignment_kpis = []
     while tries < max_tries:
         role_assignments = get_role_assignments(scope=scope, role=role)
         logger.info(f"Role assignments for the role of '{role}' against scope '{scope}': {role_assignments}")
-        role_assignment_principal_ids = [assignment.get("principalId") for assignment in role_assignments]
-        role_assignment_principal_names = [assignment.get("principalName") for assignment in role_assignments]
-        if assignee in role_assignment_principal_ids or assignee in role_assignment_principal_names:
-            return output
+        for role_assignment in role_assignments:
+            for principal_kpi in principal_kpis:
+                if principal_kpi in role_assignment and role_assignment[principal_kpi]:
+                    flat_assignment_kpis.append(role_assignment[principal_kpi])
+        if assignee in flat_assignment_kpis:
+            break
         # else assign role to scope and check again
         output = cli.invoke(
             f'role assignment create --assignee "{assignee}" --role "{role}" --scope "{scope}"'
         )
         if not output.success():
             logger.warning(f"Failed to assign '{assignee}' the role of '{role}' against scope '{scope}'.")
-            return output
+            break
 
         sleep(wait)
         tries += 1
