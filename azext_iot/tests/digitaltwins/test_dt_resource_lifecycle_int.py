@@ -12,7 +12,7 @@ import pytest
 from azext_iot.common.utility import unpack_msrest_error
 from azext_iot.digitaltwins.common import ADTEndpointAuthType, ADTEndpointType, IdentityType
 from azext_iot.tests.digitaltwins.dt_helpers import assert_system_data_attributes
-from azext_iot.tests.helpers import assign_role_assignment, delete_role_assignment, get_role_assignments
+from azext_iot.tests.helpers import assign_role_assignment, get_role_assignments
 from . import DTLiveScenarioTest
 from . import (
     EP_RG,
