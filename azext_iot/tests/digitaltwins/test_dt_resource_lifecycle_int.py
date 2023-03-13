@@ -12,7 +12,7 @@ import pytest
 from azext_iot.common.utility import unpack_msrest_error
 from azext_iot.digitaltwins.common import ADTEndpointAuthType, ADTEndpointType, IdentityType
 from azext_iot.tests.digitaltwins.dt_helpers import assert_system_data_attributes
-from azext_iot.tests.helpers import assign_role_assignment, delete_role_assignment, get_role_assignments
+from azext_iot.tests.helpers import assign_role_assignment, get_role_assignments
 from . import DTLiveScenarioTest
 from . import (
     EP_RG,
@@ -252,62 +252,74 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         assert (
             len(
-                get_role_assignments(scope=rbac_instance["id"])
+                self.cmd(
+                    "dt role-assignment list -n {}".format(rbac_instance_name)
+                ).get_output_in_json()
             )
             == 0
         )
 
-        assign_output = assign_role_assignment(
-            role=self.role_map["owner"],
-            scope=rbac_instance["id"],
-            assignee=rbac_assignee_owner)
-
-        assert assign_output and assign_output.success()
+        assign_output = self.cmd(
+            "dt role-assignment create -n {} --assignee {} --role '{}'".format(
+                rbac_instance_name, rbac_assignee_owner, self.role_map["owner"]
+            )
+        ).get_output_in_json()
 
         assert_common_rbac_attributes(
-            assign_output.as_json(),
+            assign_output,
             rbac_instance_name,
             "owner",
             rbac_assignee_owner,
         )
 
-        assign_output = assign_role_assignment(
-            role=self.role_map["reader"],
-            scope=rbac_instance["id"],
-            assignee=rbac_assignee_reader)
-
-        assert assign_output and assign_output.success()
+        assign_output = self.cmd(
+            "dt role-assignment create -n {} --assignee {} --role '{}' -g {}".format(
+                rbac_instance_name,
+                rbac_assignee_reader,
+                self.role_map["reader"],
+                self.rg,
+            )
+        ).get_output_in_json()
 
         assert_common_rbac_attributes(
-            assign_output.as_json(),
+            assign_output,
             rbac_instance_name,
             "reader",
             rbac_assignee_reader,
         )
 
-        list_assigned_output = get_role_assignments(scope=rbac_instance["id"])
+        list_assigned_output = self.cmd(
+            "dt role-assignment list -n {}".format(rbac_instance_name)
+        ).get_output_in_json()
 
         assert len(list_assigned_output) == 2
 
         # Remove specific role assignment (reader) for assignee
         # Role-assignment delete does not currently return output
-        delete_role_assignment(
-            scope=rbac_instance["id"],
-            assignee=rbac_assignee_reader,
-            role=self.role_map["reader"]
+        self.cmd(
+            "dt role-assignment delete -n {} --assignee {} --role '{}'".format(
+                rbac_instance_name,
+                rbac_assignee_owner,
+                self.role_map["reader"],
+            )
         )
 
-        list_assigned_output = get_role_assignments(scope=rbac_instance["id"])
+        list_assigned_output = self.cmd(
+            "dt role-assignment list -n {} -g {}".format(rbac_instance_name, self.rg)
+        ).get_output_in_json()
 
         assert len(list_assigned_output) == 1
 
         # Remove all role assignments for assignee
-        delete_role_assignment(
-            scope=rbac_instance["id"],
-            assignee=rbac_assignee_owner
+        self.cmd(
+            "dt role-assignment delete -n {} --assignee {}".format(
+                rbac_instance_name, rbac_assignee_reader
+            )
         )
 
-        list_assigned_output = get_role_assignments(scope=rbac_instance["id"])
+        list_assigned_output = self.cmd(
+            "dt role-assignment list -n {} -g {}".format(rbac_instance_name, self.rg)
+        ).get_output_in_json()
 
         assert len(list_assigned_output) == 0
 

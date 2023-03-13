@@ -330,7 +330,14 @@ def test_instance_update_lifecycle(provisioned_instances_module: Dict[str, dict]
         f"--group-id {device_group_id} --start-time {start_date_time_iso} --update-name {simple_manifest_id['name']} "
         f"--update-provider {simple_manifest_id['provider']} --update-version {simple_manifest_id['version']}").as_json()
     assert basic_create_deployment["deploymentId"] == basic_deployment_id
-    assert basic_create_deployment["update"]["updateId"] == simple_manifest_id
+
+    assert basic_create_deployment["update"]["updateId"]
+    for update_kpi in ["name", "provider", "version"]:
+        assert (
+            update_kpi in basic_create_deployment["update"]["updateId"]
+            and basic_create_deployment["update"]["updateId"][update_kpi] == simple_manifest_id[update_kpi]
+        )
+
     assert device_class_id in basic_create_deployment["deviceClassSubgroups"]
     assert basic_create_deployment["groupId"] == device_group_id
     assert basic_create_deployment["isRetried"] is None
