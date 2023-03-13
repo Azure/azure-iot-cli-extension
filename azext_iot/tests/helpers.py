@@ -219,7 +219,6 @@ def assign_role_assignment(
         tries += 1
 
 
-
 def delete_role_assignment(
     scope: str,
     assignee: str,
