@@ -13,7 +13,7 @@ from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.common.utility import ensure_azure_namespace_path
 from azext_iot.common.utility import read_file_content
 from azext_iot.tests.settings import DynamoSettings
-from typing import TypeVar, Optional, List
+from typing import TypeVar, List
 
 ensure_azure_namespace_path()
 
@@ -190,15 +190,15 @@ def assign_role_assignment(
     assignee: str,
     max_tries=10,
     wait=10,
-) -> Optional[EmbeddedCLI]:
+):
     """
     Assign rbac permissions to resource.
     """
     output = None
     tries = 0
     principal_kpis = ["name", "principalId", "principalName"]
-    flat_assignment_kpis = []
     while tries < max_tries:
+        flat_assignment_kpis = []
         role_assignments = get_role_assignments(scope=scope, role=role)
         logger.info(f"Role assignments for the role of '{role}' against scope '{scope}': {role_assignments}")
         for role_assignment in role_assignments:
@@ -218,7 +218,6 @@ def assign_role_assignment(
         sleep(wait)
         tries += 1
 
-    return output
 
 
 def delete_role_assignment(
