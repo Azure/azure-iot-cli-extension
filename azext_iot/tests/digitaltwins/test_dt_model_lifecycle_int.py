@@ -7,14 +7,17 @@
 import pytest
 import json
 import os
-from time import sleep
 from knack.log import get_logger
 from azext_iot.common.utility import (
     scantree,
     process_json_arg,
 )
-from . import DTLiveScenarioTest
-from . import generate_resource_id
+from azext_iot.tests.helpers import assign_role_assignment
+from . import (
+    MAX_MODELS_PER_BATCH,
+    DTLiveScenarioTest,
+    generate_resource_id
+)
 
 logger = get_logger(__name__)
 
@@ -43,14 +46,11 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
         ).get_output_in_json()
         self.track_instance(create_output)
 
-        self.cmd(
-            "dt role-assignment create -n {} -g {} --assignee {} --role '{}'".format(
-                instance_name, self.rg, self.current_user, self.role_map["owner"]
-            )
-        )
-
-        # Wait for RBAC to catch-up
-        sleep(60)
+        assign_role_assignment(
+            role=self.role_map["owner"],
+            scope=create_output["id"],
+            assignee=self.current_user,
+            wait=60)
 
         create_models_output = self.cmd(
             "dt model create -n {} --from-directory '{}'".format(
@@ -159,9 +159,13 @@ class TestDTModelLifecycle(DTLiveScenarioTest):
             # Run the following part of test only if model files exist in the ontology directory
             if os.path.isdir(ontology_directory) and len(os.listdir(ontology_directory)) > 0:
                 # Create Ontology with number of models exceeding API limit
+                model_per_batch_flag = ""
+                if MAX_MODELS_PER_BATCH:
+                    model_per_batch_flag = "--max-models-per-batch '{}'".format(MAX_MODELS_PER_BATCH)
+
                 create_ontology_output = self.cmd(
-                    "dt model create -n {} --from-directory '{}'".format(
-                        instance_name, ontology_directory
+                    "dt model create -n {} --from-directory '{}' {}".format(
+                        instance_name, ontology_directory, model_per_batch_flag
                     )
                 ).get_output_in_json()
 

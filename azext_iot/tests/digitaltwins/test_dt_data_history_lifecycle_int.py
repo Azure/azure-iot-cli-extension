@@ -10,6 +10,7 @@ import pytest
 from azext_iot.common.utility import unpack_msrest_error
 from azext_iot.digitaltwins.common import IdentityType
 from azext_iot.tests.digitaltwins.dt_helpers import assert_system_data_attributes
+from azext_iot.tests.helpers import get_role_assignments
 from . import DTLiveScenarioTest, generate_resource_id
 from . import (
     ADX_RG,
@@ -83,13 +84,16 @@ class TestDTConnections(DTLiveScenarioTest):
         table_name = f"tb_{generate_generic_id()}"
         consumer_group = f"cg-{generate_generic_id()}"
         self.add_eventhub_consumer_group(consumer_group=consumer_group)
-        user_identity = self.ensure_user_identity()["id"]
+        uai_resource = self.ensure_user_identity()
+        user_identity = uai_resource["id"]
+        user_identity_principal_id = uai_resource["principalId"]
 
         create_output = self.cmd(
-            "dt create -n {} -g {} --mi-system-assigned --mi-user-assigned {}".format(
+            "dt create -n {} -g {} --mi-system-assigned --mi-user-assigned {} -l {}".format(
                 instance_name,
                 self.rg,
-                user_identity
+                user_identity,
+                self.region
             )
         ).get_output_in_json()
         self.track_instance(create_output)
@@ -115,12 +119,12 @@ class TestDTConnections(DTLiveScenarioTest):
             "eventhub_resource_group": EP_RG,
             "consumer_group": "$Default",
             "location": create_output["location"],
-            "table_name": "adt_dh_{}_{}".format(
-                instance_name.replace("-", "_"),
-                create_output["location"]
-            ),
+            "table_name": "AdtPropertyEvents",
             "identity_type": IdentityType.system_assigned.value,
-            "identity_uai": None
+            "identity_uai": None,
+            "rle_table_name": None,
+            "tle_table_name": None,
+            "record_removals": False,
         }
 
         connection_result = self.cmd(
@@ -143,18 +147,21 @@ class TestDTConnections(DTLiveScenarioTest):
 
         # Check role assignments - needed once
         principal_id = create_output.get("identity").get("principalId")
-        assert len(self.get_role_assignment(
+        assert len(get_role_assignments(
             role="Azure Event Hubs Data Owner", scope=self.eventhub_instance_id, assignee=principal_id
         )) == 1
-        assert len(self.get_role_assignment(
+        assert len(get_role_assignments(
             role="Contributor", scope=self.adx_database_id, assignee=principal_id
         )) == 1
         assert len(self.get_adx_role(assignee_name=instance_name)) == 1
 
+        rlet_name = generate_generic_id()
+        tlet_name = generate_generic_id()
+
         # Add custom consumer group and table and use user assigned identity
         connection_result = self.cmd(
-            "dt data-history connection create adx -n {} -g {} --cn {} --adxt {} --adxd {} --adxg {} "
-            "--adxc {} --ehn {} --eh {} --ehg {} --ehc {} --user {} -y".format(
+            "dt data-history connection create adx -n {} -g {} --cn {} --adxpet {} --adxd {} --adxg {} "
+            "--adxc {} --adxrr --adxret {} --adxtet {} --ehn {} --eh {} --ehg {} --ehc {} --user {} -y".format(
                 instance_name,
                 self.rg,
                 connection_name,
@@ -162,6 +169,8 @@ class TestDTConnections(DTLiveScenarioTest):
                 ADX_DATABASE,
                 ADX_RG,
                 ADX_CLUSTER,
+                rlet_name,
+                tlet_name,
                 EP_EVENTHUB_NAMESPACE,
                 EP_EVENTHUB_TOPIC,
                 EP_RG,
@@ -174,9 +183,26 @@ class TestDTConnections(DTLiveScenarioTest):
         expected_attributes["identity_uai"] = user_identity
         expected_attributes["consumer_group"] = consumer_group
         expected_attributes["table_name"] = table_name
+        expected_attributes["rle_table_name"] = rlet_name
+        expected_attributes["tle_table_name"] = tlet_name
+        expected_attributes["record_removals"] = True
+
         assert_common_connection_attributes(
             connection_output=connection_result, expected_attributes=expected_attributes
         )
+
+        # Check role assignments - needed once
+        assert len(get_role_assignments(
+            role="Azure Event Hubs Data Owner",
+            scope=self.eventhub_instance_id,
+            assignee=user_identity_principal_id
+        )) == 1
+        assert len(get_role_assignments(
+            role="Contributor",
+            scope=self.adx_database_id,
+            assignee=user_identity_principal_id
+        )) == 1
+        assert len(self.get_adx_role(assignee_name=instance_name)) == 1
 
         # One connection per dt instance
         self.cmd(
@@ -212,7 +238,7 @@ class TestDTConnections(DTLiveScenarioTest):
         )
 
         self.cmd(
-            "dt data-history connection delete -n {} -g {} --cn {} -y".format(
+            "dt data-history connection delete -n {} -g {} --cn {} --clean -y".format(
                 instance_name, self.rg, connection_name
             )
         )
@@ -230,9 +256,10 @@ class TestDTConnections(DTLiveScenarioTest):
         connection_name = f"cn-{generate_generic_id()}"
 
         create_output = self.cmd(
-            "dt create -n {} -g {} --mi-system-assigned".format(
+            "dt create -n {} -g {} --mi-system-assigned -l {}".format(
                 instance_name,
                 self.rg,
+                self.region
             )
         ).get_output_in_json()
         self.track_instance(create_output)
@@ -365,9 +392,10 @@ class TestDTConnections(DTLiveScenarioTest):
         self.add_eventhub_consumer_group(consumer_group=consumer_group)
 
         create_output = self.cmd(
-            "dt create -n {} -g {} --mi-system-assigned".format(
+            "dt create -n {} -g {} --mi-system-assigned -l {}".format(
                 instance_name,
                 self.rg,
+                self.region
             )
         ).get_output_in_json()
         self.track_instance(create_output)
@@ -393,12 +421,12 @@ class TestDTConnections(DTLiveScenarioTest):
             "eventhub_resource_group": EP_RG,
             "consumer_group": consumer_group,
             "location": create_output["location"],
-            "table_name": "adt_dh_{}_{}".format(
-                instance_name.replace("-", "_"),
-                create_output["location"]
-            ),
+            "table_name": "AdtPropertyEvents",
             "identity_type": IdentityType.system_assigned.value,
-            "identity_uai": None
+            "identity_uai": None,
+            "rle_table_name": None,
+            "tle_table_name": None,
+            "record_removals": False,
         }
 
         self.cmd(
@@ -439,10 +467,10 @@ class TestDTConnections(DTLiveScenarioTest):
 
         # Check role assignments - needed once
         principal_id = create_output.get("identity").get("principalId")
-        assert len(self.get_role_assignment(
+        assert len(get_role_assignments(
             role="Azure Event Hubs Data Owner", scope=self.eventhub_instance_id, assignee=principal_id
         )) == 1
-        assert len(self.get_role_assignment(
+        assert len(get_role_assignments(
             role="Contributor", scope=self.adx_database_id, assignee=principal_id
         )) == 1
         assert len(self.get_adx_role(assignee_name=instance_name)) == 1
@@ -499,6 +527,9 @@ def assert_common_connection_attributes(
     assert expected_attributes["adx_cluster_name"] in properties["adxEndpointUri"]
     assert expected_attributes["adx_cluster_name"] in properties["adxResourceId"]
     assert properties["adxTableName"] == expected_attributes["table_name"]
+    assert properties["adxRelationshipLifecycleEventsTableName"] == expected_attributes["rle_table_name"]
+    assert properties["adxTwinLifecycleEventsTableName"] == expected_attributes["tle_table_name"]
+    assert properties["recordPropertyAndItemRemovals"] == expected_attributes["record_removals"]
     assert properties["connectionType"] == "AzureDataExplorer"
     assert properties["eventHubConsumerGroup"] == expected_attributes["consumer_group"]
     assert properties["eventHubEndpointUri"] == (

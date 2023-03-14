@@ -34,7 +34,7 @@ from azext_iot.common.shared import (
     AuthenticationTypeDataplane,
     RenewKeyType,
 )
-from azext_iot._validators import mode2_iot_login_handler
+from azext_iot._validators import mode2_iot_login_handler, process_top
 from azext_iot.assets.user_messages import info_param_properties_device
 
 
@@ -140,6 +140,7 @@ def load_arguments(self, _):
             "top",
             type=int,
             options_list=["--top"],
+            validator=process_top,
             help="Maximum number of elements to return. Use -1 for unlimited.",
         )
         context.argument(

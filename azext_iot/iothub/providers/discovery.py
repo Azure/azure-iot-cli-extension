@@ -9,10 +9,9 @@ from azure.cli.core.commands.client_factory import get_subscription_id
 from azext_iot.common._azure import IOT_SERVICE_CS_TEMPLATE
 from azext_iot.common.base_discovery import BaseDiscovery
 from azext_iot.common.shared import DiscoveryResourceType
-from azext_iot.common.utility import trim_from_start, ensure_iothub_sdk_min_version
+from azext_iot.common.utility import trim_from_start
 from azext_iot.iothub.models.iothub_target import IotHubTarget
 from azext_iot._factory import iot_hub_service_factory
-from azext_iot.constants import IOTHUB_TRACK_2_SDK_MIN_VERSION
 from typing import Any, Dict
 from enum import Enum, EnumMeta
 
@@ -31,11 +30,8 @@ class IotHubDiscovery(BaseDiscovery):
         )
 
     def _initialize_client(self):
-        """Initialize the client and set the track2 value if not done already."""
+        """Initialize the client."""
         if not self.client:
-            # Track 2 could be supported
-            self.track2 = ensure_iothub_sdk_min_version(IOTHUB_TRACK_2_SDK_MIN_VERSION)
-
             if getattr(self.cmd, "cli_ctx", None):
                 self.client = iot_hub_service_factory(self.cmd.cli_ctx).iot_hub_resource
                 self.sub_id = get_subscription_id(self.cmd.cli_ctx)

@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from azext_iot.assets.user_messages import error_no_hub_or_login_on_input
+from azext_iot.operations.generic import _process_top
 from azure.cli.core.azclierror import RequiredArgumentMissingError
 
 
@@ -36,3 +37,8 @@ def mode2_iot_login_handler(cmd, namespace):
 
             if not any([login_value, entity_value, offline]):
                 raise RequiredArgumentMissingError(error_no_hub_or_login_on_input(iot_cmd_type))
+
+
+def process_top(namespace):
+    if hasattr(namespace, "top"):
+        namespace.top = _process_top(top=namespace.top)

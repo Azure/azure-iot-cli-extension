@@ -6,8 +6,7 @@
 
 import pytest
 import os
-from time import sleep
-from azext_iot.tests.helpers import CERT_ENDING, KEY_ENDING, add_test_tag
+from azext_iot.tests.helpers import CERT_ENDING, KEY_ENDING, add_test_tag, assign_role_assignment
 
 from azext_iot.tests.settings import (
     DynamoSettings,
@@ -66,6 +65,7 @@ MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries if settings.en
 
 
 class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
+
     def __init__(self, test_scenario, cert_only: bool = True):
         assert test_scenario
         self.entity_rg = ENTITY_RG
@@ -149,31 +149,7 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 )
             ).get_output_in_json()
 
-        account = self.cmd("account show").get_output_in_json()
-        user = account["user"]
-        if user["name"] is None:
-            raise Exception("User not found")
-
-        tries = 0
-        while tries < MAX_RBAC_ASSIGNMENT_TRIES:
-            role_assignments = self.get_role_assignments(target_dps["id"], USER_ROLE)
-            role_assignment_principal_names = [assignment["principalName"] for assignment in role_assignments]
-            if user["name"] in role_assignment_principal_names:
-                break
-            # else assign DPS Data Contributor role to current user and check again
-            self.cmd(
-                '''role assignment create --assignee "{}" --role "{}" --scope "{}"'''.format(
-                    user["name"], USER_ROLE, target_dps["id"]
-                )
-            )
-            sleep(10)
-            tries += 1
-
-        if tries == MAX_RBAC_ASSIGNMENT_TRIES:
-            raise Exception(
-                "Reached max ({}) number of tries to assign RBAC role. Please re-run the test later "
-                "or with more max number of tries.".format(MAX_RBAC_ASSIGNMENT_TRIES)
-            )
+        self._assign_roles_to_dps(target_dps)
 
     def create_hub(self):
         """Create an IoT hub for DPS testing purposes."""
@@ -316,14 +292,29 @@ class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
         return f"{command} --auth-type {auth_type}"
 
-    def get_role_assignments(self, scope, role):
-        role_assignments = self.cmd(
-            'role assignment list --scope "{}" --role "{}"'.format(
-                scope, role
-            )
-        ).get_output_in_json()
+    def _assign_roles_to_dps(self, target_dps):
+        account = self.cmd("account show").get_output_in_json()
+        user = account["user"]
+        if user["name"] is None:
+            raise Exception("User not found")
+        assign_role_assignment(
+            role=USER_ROLE,
+            scope=target_dps["id"],
+            assignee=user["name"],
+            max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+        )
 
-        return role_assignments
+    @pytest.fixture(scope='class', autouse=True)
+    def fixture_provision_existing_dps_role(self):
+        if settings.env.azext_iot_testdps:
+            target_dps = self.cmd(
+                "iot dps update --name {} --resource-group {} --tags hubname={}".format(
+                    self.entity_dps_name, self.entity_rg, self.entity_hub_name
+                )
+            ).get_output_in_json()
+
+            self._assign_roles_to_dps(target_dps)
+        yield
 
     @pytest.fixture(scope='class', autouse=True)
     def tearDownSuite(self):

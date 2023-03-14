@@ -23,6 +23,7 @@ LRO_TIMER = 60
 
 
 # Data History strings
+ADX_DEFAULT_TABLE = "AdtPropertyEvents"
 DT_INSTANCE = "Digital Twins instance"
 USER_ASSIGNED_IDENTITY = "User Assigned Identity"
 DT_SYS_IDENTITY_ERROR = "Digital Twins instance does not have System-Assigned Identity enabled. Please enable and try again."
@@ -47,6 +48,9 @@ SKIP_ADD_ROLE_MSG = "Skipping addition of the {0}. This may prevent creation of 
 
 # Default Event Hub Consumer Group
 DEFAULT_CONSUMER_GROUP = "$Default"
+
+# Models create
+MAX_MODELS_PER_BATCH = 30
 
 
 # Enums

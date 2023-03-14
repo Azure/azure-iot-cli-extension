@@ -7,6 +7,9 @@
 import random
 import json
 
+import pytest
+from azext_iot.tests.helpers import clean_up_iothub_device_config
+
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.conftest import get_context_path
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
@@ -27,6 +30,7 @@ adm_content_module_path = get_context_path(__file__, "test_adm_module_content.js
 adm_content_device_path = get_context_path(__file__, "test_adm_device_content.json")
 
 
+@pytest.mark.usefixtures("fixture_provision_existing_hub_device_config")
 class TestIoTConfigurations(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTConfigurations, self).__init__(
@@ -562,7 +566,10 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
                 expect_failure=True
             )
 
-            self.tearDown()
+            clean_up_iothub_device_config(
+                hub_name=self.entity_name,
+                rg=self.entity_rg
+            )
 
     def test_device_configurations(self):
         config_count = 6
@@ -941,4 +948,7 @@ class TestIoTConfigurations(IoTLiveScenarioTest):
                 expect_failure=True
             )
 
-            self.tearDown()
+            clean_up_iothub_device_config(
+                hub_name=self.entity_name,
+                rg=self.entity_rg
+            )

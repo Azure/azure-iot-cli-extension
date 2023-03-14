@@ -262,12 +262,15 @@ def build_adx_connection_properties(
     eh_namespace: str,
     eh_entity_path: str,
     adx_table_name: Optional[str] = None,
+    adx_twin_lifecycle_events_table_name: Optional[str] = None,
+    adx_relationship_lifecycle_events_table_name: Optional[str] = None,
     adx_resource_group: Optional[str] = None,
     adx_subscription: Optional[str] = None,
     eh_resource_group: Optional[str] = None,
     eh_subscription: Optional[str] = None,
     eh_consumer_group: str = DEFAULT_CONSUMER_GROUP,
     identity: str = SYSTEM_IDENTITY,
+    record_property_and_item_removals: bool = False,
     yes: bool = False,
 ):
     validator = AdxConnectionValidator(
@@ -300,9 +303,12 @@ def build_adx_connection_properties(
         adx_endpoint_uri=validator.adx_cluster_uri,
         adx_database_name=adx_database_name,
         adx_table_name=adx_table_name,
+        adx_twin_lifecycle_events_table_name=adx_twin_lifecycle_events_table_name,
+        adx_relationship_lifecycle_events_table_name=adx_relationship_lifecycle_events_table_name,
         event_hub_endpoint_uri=validator.eh_endpoint_uri,
         event_hub_entity_path=eh_entity_path,
         event_hub_consumer_group=eh_consumer_group,
         event_hub_namespace_resource_id=validator.eh_namespace_resource_id,
-        identity=identity
+        identity=identity,
+        record_property_and_item_removals=record_property_and_item_removals
     )
