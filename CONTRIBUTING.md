@@ -216,6 +216,7 @@ For all resources, if the environmental variable is not provided, a new instance
 | `azext_dt_ep_eventhub_topic`	| Digital Twin Data History and Endpoint Tests	| The Event Hub instance in the Event Hub Namespace to use.	|
 | `azext_dt_ep_eventhub_topic_consumer_group`	| Digital Twin Data History Tests	| The Event Hub consumer group name to use. Defaults to "$Default".	|
 | `azext_dt_ep_rg`	| Digital Twin Data History and Endpoint Tests	| The resource group that contains the endpoint (Event Hub, Event Grid, Service Bus) variables. If not provided, `az_iot_testrg` will be used as the resource group.	|
+| `azext_dt_max_models_per_batch`	| Digital Twin Model Tests	| The maximum number of models per batch to submit to the DT Instance if the total set of models exceed the single page API limit. |
 | `use_tags`	| IoT Hub, DPS, and Central Tagging	| Flag to enable resource tagging. Please see "Test Resource Tagging" for more details.	|
 | `definition_id`	| IoT Hub, DPS, and Central Tagging	| Definition Id populated by an internal pipeline run. Can be manually set to customize the pipeline name tag. Please see "Test Resource Tagging" for more details.	|
 | `job_display_name`	| IoT Hub, DPS, and Central Tagging	| Job Display Name populated by an internal pipeline run. Can be manually set to customize the pipeline name tag. Please see "Test Resource Tagging" for more details.	|

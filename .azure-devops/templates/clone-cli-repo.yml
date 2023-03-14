@@ -1,0 +1,12 @@
+parameters:
+- name: install
+  type: boolean
+  default: false
+steps:
+  - script: 'rm -rf ../azure-cli'
+    displayName: 'delete azure cli directory'
+  - script: 'git clone -q -b main --single-branch --depth 1 https://github.com/azure/azure-cli ../azure-cli'
+    displayName: Clone CLI Source
+  - script: bash ../azure-cli/scripts/install_full.sh
+    condition: ${{ parameters.install }}
+    displayName: Install CLI from source

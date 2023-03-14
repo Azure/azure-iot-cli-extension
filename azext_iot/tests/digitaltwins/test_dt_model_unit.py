@@ -23,8 +23,10 @@ from azext_iot.tests.digitaltwins.dt_helpers import (
     url_model_id
 )
 from azext_iot.tests.conftest import hostname
-from azext_iot.digitaltwins.providers.model import MAX_MODELS_PER_BATCH
-from azext_iot.digitaltwins.common import ADTModelCreateFailurePolicy
+from azext_iot.digitaltwins.common import MAX_MODELS_PER_BATCH, ADTModelCreateFailurePolicy
+from knack.log import get_logger
+
+logger = get_logger(__name__)
 
 
 class TestAddModels(object):
@@ -131,31 +133,50 @@ class TestAddModels(object):
         assert request_body == expected_payload
         assert result == json.loads('[' + generic_result + ']')
 
+    def configure_large_ontology_create_response(self, responses, models_added):
+        def post_request_callback_first(request):
+            payload = json.loads(request.body)
+            # Check the batch order starts from model with least dependency
+            # Get all model dependencies in the first entry and the length should be 0
+            dependencies = []
+            if "contents" in payload[0]:
+                components = [item["schema"] for item in payload[0]["contents"] if item["@type"] == "Component"]
+                dependencies.extend(components)
+            if "extends" in payload[0]:
+                dependencies.append(payload[0]['extends'])
+            assert len(dependencies) == 0
+
+            headers = {"content_type": "application/json"}
+            models_added.extend([model["@id"] for model in payload])
+            resp_body = [{"status": "succeeded"}]
+            return (200, headers, json.dumps(resp_body))
+
+        def post_request_callback_second(request):
+            headers = {"content_type": "application/json"}
+            resp_body = [{"status": "failed"}]
+            return (400, headers, json.dumps(resp_body))
+
+        responses.add_callback(
+            responses.POST,
+            "https://{}/models".format(hostname),
+            callback=post_request_callback_first,
+            content_type="application/json",
+        )
+
+        responses.add_callback(
+            responses.POST,
+            "https://{}/models".format(hostname),
+            callback=post_request_callback_second,
+            content_type="application/json",
+        )
+
     @pytest.mark.usefixtures("set_cwd")
     @responses.activate
     def test_large_ontology_error(self, fixture_cmd, fixture_dt_client):
         models_added = []
         models_deleted = []
 
-        def post_request_callback(request):
-            payload = json.loads(request.body)
-            headers = {"content_type": "application/json"}
-            # First batch to succeed
-            if payload[0]["@id"] == "dtmi:digitaltwins:rec_3_3:core:Agent;1":
-                models_added.extend([model["@id"] for model in payload])
-                resp_body = [{"status": "succeeded"}]
-                return (200, headers, json.dumps(resp_body))
-            # Next batch to fail
-            else:
-                resp_body = [{"status": "failed"}]
-                return (400, headers, json.dumps(resp_body))
-
-        responses.add_callback(
-            responses.POST,
-            "https://{}/models".format(hostname),
-            callback=post_request_callback,
-            content_type="application/json",
-        )
+        self.configure_large_ontology_create_response(responses, models_added)
 
         def delete_request_callback(request):
             url = unquote(request.url.split("?")[0])
@@ -186,35 +207,17 @@ class TestAddModels(object):
                     models=None,
                     from_directory=ontology_directory,
                 )
-                assert len(models_added) == MAX_MODELS_PER_BATCH
-                # Since deletion happens in the reverse order, hence we reverse the array before asserting equality
-                models_deleted.reverse()
-                assert models_added == models_deleted
+            assert len(models_added) == MAX_MODELS_PER_BATCH
+            # Since deletion happens in the reverse order, hence we reverse the array before asserting equality
+            models_deleted.reverse()
+            assert models_added == models_deleted
 
     @pytest.mark.usefixtures("set_cwd")
     @responses.activate
     def test_large_ontology_error_failure_policy_none(self, fixture_cmd, fixture_dt_client):
         models_added = []
 
-        def post_request_callback(request):
-            payload = json.loads(request.body)
-            headers = {"content_type": "application/json"}
-            # First batch to succeed
-            if payload[0]["@id"] == "dtmi:digitaltwins:rec_3_3:core:Agent;1":
-                models_added.extend([model["@id"] for model in payload])
-                resp_body = [{"status": "succeeded"}]
-                return (200, headers, json.dumps(resp_body))
-            # Next batch to fail
-            else:
-                resp_body = [{"status": "failed"}]
-                return (400, headers, json.dumps(resp_body))
-
-        responses.add_callback(
-            responses.POST,
-            "https://{}/models".format(hostname),
-            callback=post_request_callback,
-            content_type="application/json",
-        )
+        self.configure_large_ontology_create_response(responses, models_added)
 
         ontology_directory = "./references/opendigitaltwins-building/Ontology"
         if os.path.isdir(ontology_directory) and len(os.listdir(ontology_directory)) > 0:
@@ -226,7 +229,28 @@ class TestAddModels(object):
                     from_directory=ontology_directory,
                     failure_policy=ADTModelCreateFailurePolicy.NONE.value,
                 )
-                assert len(models_added) == MAX_MODELS_PER_BATCH
+            assert len(models_added) == MAX_MODELS_PER_BATCH
+
+    @pytest.mark.usefixtures("set_cwd")
+    @responses.activate
+    def test_large_ontology_error_custom_batch_size(self, fixture_cmd, fixture_dt_client):
+        models_added = []
+
+        self.configure_large_ontology_create_response(responses, models_added)
+
+        ontology_directory = "./references/opendigitaltwins-building/Ontology"
+        if os.path.isdir(ontology_directory) and len(os.listdir(ontology_directory)) > 0:
+            # Raise CLIError after first batch complete, so the models added should be same as custom batch size
+            with pytest.raises(CLIError):
+                subject.add_models(
+                    cmd=fixture_cmd,
+                    name_or_hostname=hostname,
+                    models=None,
+                    from_directory=ontology_directory,
+                    max_models_per_batch=20,
+                    failure_policy=ADTModelCreateFailurePolicy.NONE.value
+                )
+            assert len(models_added) == 20
 
     def test_add_model_no_models_directory(self, fixture_cmd):
         with pytest.raises(CLIError):

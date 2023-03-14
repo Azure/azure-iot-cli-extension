@@ -15,8 +15,9 @@ from knack.log import get_logger
 
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
-from azext_iot.tests.helpers import tags_to_dict
+from azext_iot.tests.helpers import assign_role_assignment, get_role_assignments, tags_to_dict
 from azext_iot.tests.settings import DynamoSettings
+from azext_iot.deviceupdate.common import AUTH_RESOURCE_ID
 
 logger = get_logger(__name__)
 
@@ -29,7 +30,7 @@ settings = DynamoSettings(req_env_set=REQUIRED_TEST_ENV_VARS)
 
 ACCOUNT_RG = settings.env.azext_iot_testrg
 VALID_IDENTITY_MAP = {"system": 1, "user": 1}
-DEFAULT_ADU_RBAC_SLEEP_SEC = 105
+DEFAULT_ADU_RBAC_SLEEP_SEC = 90
 
 # Manifest v4 will work with deviceUpdateModel;[1|2] but v5 only with deviceUpdateModel;2
 ADU_CLIENT_DTMI = "dtmi:azure:iot:deviceUpdateModel;2"
@@ -155,7 +156,7 @@ def _account_provisioner(request, provisioned_storage: dict) -> Tuple[dict, List
             assert account["identity"]["tenantId"]
             assert "SystemAssigned" in account["identity"]["type"]
             if desired_scope:
-                assignments: list = cli.invoke(f"role assignment list --scope {desired_scope}").as_json()
+                assignments: list = get_role_assignments(scope=desired_scope)
                 principal_map = {}
                 for assignment in assignments:
                     principal_map[assignment["principalId"]] = assignment["roleDefinitionName"]
@@ -300,6 +301,18 @@ def _iothub_provisioner(request) -> Optional[dict]:
         if desired_instance_count:
             hub_id_map = {}
             hub_names = []
+
+            # Assign Data Contributor role to resource group if it does not exist
+            account = cli.invoke("account show").as_json()
+            scope_id = "/subscriptions/{}/resourceGroups/{}".format(
+                account["id"],
+                ACCOUNT_RG
+            )
+            assign_role_assignment(
+                role="IoT Hub Data Contributor",
+                scope=scope_id,
+                assignee=AUTH_RESOURCE_ID)
+
             for _ in range(desired_instance_count):
                 target_name = generate_linked_hub_id()
                 create_result = cli.invoke(f"iot hub create -g {ACCOUNT_RG} -n {target_name}")

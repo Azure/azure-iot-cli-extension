@@ -40,9 +40,18 @@ class AzureDataExplorerConnectionProperties(TimeSeriesDatabaseConnectionProperti
     :param adx_database_name: Required. The name of the Azure Data Explorer
      database.
     :type adx_database_name: str
-    :param adx_table_name: The name of the Azure Data Explorer table. Defaults
-     to AdtPropertyEvents. Default value: "AdtPropertyEvents" .
+    :param adx_table_name: The name of the Azure Data Explorer table used for
+     storing updates to properties of twins and relationships. Defaults to
+     AdtPropertyEvents. Default value: "AdtPropertyEvents" .
     :type adx_table_name: str
+    :param adx_twin_lifecycle_events_table_name: The name of the Azure Data
+     Explorer table used for recording twin lifecycle events. The table will
+     not be created if this property is left unspecified.
+    :type adx_twin_lifecycle_events_table_name: str
+    :param adx_relationship_lifecycle_events_table_name: The name of the Azure
+     Data Explorer table used for recording relationship lifecycle events. The
+     table will not be created if this property is left unspecified.
+    :type adx_relationship_lifecycle_events_table_name: str
     :param event_hub_endpoint_uri: Required. The URL of the EventHub namespace
      for identity-based authentication. It must include the protocol sb://
     :type event_hub_endpoint_uri: str
@@ -55,6 +64,13 @@ class AzureDataExplorerConnectionProperties(TimeSeriesDatabaseConnectionProperti
     :param event_hub_consumer_group: The EventHub consumer group to use when
      ADX reads from EventHub. Defaults to $Default. Default value: "$Default" .
     :type event_hub_consumer_group: str
+    :param record_property_and_item_removals: Specifies whether or not to
+     record twin / relationship property and item removals, including removals
+     of indexed or keyed values (such as map entries, array elements, etc.).
+     This feature is de-activated unless explicitly set to 'true'. Setting this
+     property to 'true' will generate an additional column in the property
+     events table in ADX. Default value: False .
+    :type record_property_and_item_removals: bool
     """
 
     _validation = {
@@ -76,20 +92,26 @@ class AzureDataExplorerConnectionProperties(TimeSeriesDatabaseConnectionProperti
         'adx_endpoint_uri': {'key': 'adxEndpointUri', 'type': 'str'},
         'adx_database_name': {'key': 'adxDatabaseName', 'type': 'str'},
         'adx_table_name': {'key': 'adxTableName', 'type': 'str'},
+        'adx_twin_lifecycle_events_table_name': {'key': 'adxTwinLifecycleEventsTableName', 'type': 'str'},
+        'adx_relationship_lifecycle_events_table_name': {'key': 'adxRelationshipLifecycleEventsTableName', 'type': 'str'},
         'event_hub_endpoint_uri': {'key': 'eventHubEndpointUri', 'type': 'str'},
         'event_hub_entity_path': {'key': 'eventHubEntityPath', 'type': 'str'},
         'event_hub_namespace_resource_id': {'key': 'eventHubNamespaceResourceId', 'type': 'str'},
         'event_hub_consumer_group': {'key': 'eventHubConsumerGroup', 'type': 'str'},
+        'record_property_and_item_removals': {'key': 'recordPropertyAndItemRemovals', 'type': 'bool'},
     }
 
-    def __init__(self, *, adx_resource_id: str, adx_endpoint_uri: str, adx_database_name: str, event_hub_endpoint_uri: str, event_hub_entity_path: str, event_hub_namespace_resource_id: str, identity=None, adx_table_name: str="AdtPropertyEvents", event_hub_consumer_group: str="$Default", **kwargs) -> None:
+    def __init__(self, *, adx_resource_id: str, adx_endpoint_uri: str, adx_database_name: str, event_hub_endpoint_uri: str, event_hub_entity_path: str, event_hub_namespace_resource_id: str, identity=None, adx_table_name: str="AdtPropertyEvents", adx_twin_lifecycle_events_table_name: str=None, adx_relationship_lifecycle_events_table_name: str=None, event_hub_consumer_group: str="$Default", record_property_and_item_removals: bool=False, **kwargs) -> None:
         super(AzureDataExplorerConnectionProperties, self).__init__(identity=identity, **kwargs)
         self.adx_resource_id = adx_resource_id
         self.adx_endpoint_uri = adx_endpoint_uri
         self.adx_database_name = adx_database_name
         self.adx_table_name = adx_table_name
+        self.adx_twin_lifecycle_events_table_name = adx_twin_lifecycle_events_table_name
+        self.adx_relationship_lifecycle_events_table_name = adx_relationship_lifecycle_events_table_name
         self.event_hub_endpoint_uri = event_hub_endpoint_uri
         self.event_hub_entity_path = event_hub_entity_path
         self.event_hub_namespace_resource_id = event_hub_namespace_resource_id
         self.event_hub_consumer_group = event_hub_consumer_group
+        self.record_property_and_item_removals = record_property_and_item_removals
         self.connection_type = 'AzureDataExplorer'

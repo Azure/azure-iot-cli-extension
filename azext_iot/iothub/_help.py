@@ -242,10 +242,10 @@ def load_iothub_help():
         "iot device send-d2c-message"
     ] = """
         type: command
-        short-summary: |
-                        Send an mqtt device-to-cloud message.
-                        The command supports sending messages with application and system properties.
-                        Note: If using x509 authentication methods, the certificate and key files (and passphrase if needed) must be provided.
+        short-summary: Send an mqtt device-to-cloud message.
+        long-summary: |
+                      The command supports sending messages with application and system properties.
+                      Note: If using x509 authentication methods, the certificate and key files (and passphrase if needed) must be provided.
         examples:
         - name: Basic usage
           text: az iot device send-d2c-message -n {iothub_name} -d {device_id}
@@ -267,16 +267,16 @@ def load_iothub_help():
         "iot device simulate"
     ] = """
         type: command
-        short-summary: |
-                        Simulate a device in an Azure IoT Hub.
-                        While the device simulation is running, the device will automatically receive
-                        and acknowledge cloud-to-device (c2d) messages. For mqtt simulation, all c2d messages will
-                        be acknowledged with completion. For http simulation c2d acknowledgement is based on user
-                        selection which can be complete, reject or abandon. The mqtt simulation also supports direct
-                        method invocation which can be acknowledged by a response status code and response payload.
-                        Note: The command by default will set content-type to application/json and content-encoding
-                        to utf-8. This can be overriden.
-                        Note: If using x509 authentication methods, the certificate and key files (and passphrase if needed) must be provided.
+        short-summary: Simulate a device in an Azure IoT Hub.
+        long-summary: |
+                      While the device simulation is running, the device will automatically receive
+                      and acknowledge cloud-to-device (c2d) messages. For mqtt simulation, all c2d messages will
+                      be acknowledged with completion. For http simulation c2d acknowledgement is based on user
+                      selection which can be complete, reject or abandon. The mqtt simulation also supports direct
+                      method invocation which can be acknowledged by a response status code and response payload.
+                      Note: The command by default will set content-type to application/json and content-encoding
+                      to utf-8. This can be overriden.
+                      Note: If using x509 authentication methods, the certificate and key files (and passphrase if needed) must be provided.
         examples:
         - name: Basic usage (mqtt)
           text: az iot device simulate -n {iothub_name} -d {device_id}
@@ -613,7 +613,7 @@ def load_iothub_help():
     ] = """
         type: command
         short-summary: Get information on all the endpoints for an IoT Hub.
-        long-summary: Get information on all endpoints in an IoT Hub. You can also specify which endpoint type you want to get information on.
+        long-summary: You can also specify which endpoint type you want to get information on.
         examples:
           - name: Get all the endpoints from an IoT Hub.
             text: >
@@ -639,7 +639,7 @@ def load_iothub_help():
     ] = """
         type: command
         short-summary: Delete all or mentioned endpoint for an IoT Hub.
-        long-summary: Delete an endpoint for an IoT Hub. We recommend that you delete any routes to the endpoint, before deleting the endpoint.
+        long-summary:  We recommend that you delete any routes to the endpoint, before deleting the endpoint.
         examples:
           - name: Delete an endpoint from an IoT Hub.
             text: >

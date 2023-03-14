@@ -40,6 +40,7 @@ resource_test_env_vars = [
     "azext_dt_ep_eventgrid_topic",
     "azext_dt_ep_rg",
     "azext_dt_region",
+    "azext_dt_max_models_per_batch",
     "azext_iot_teststorageaccount",
     "azext_iot_teststoragecontainer"
 ]
@@ -61,6 +62,7 @@ EP_EVENTGRID_TOPIC = settings.env.azext_dt_ep_eventgrid_topic or ("test-egt-" + 
 ADX_CLUSTER = settings.env.azext_dt_adx_cluster or ("testadxc" + generate_generic_id()[:4])
 ADX_DATABASE = settings.env.azext_dt_adx_database or ("testadxd" + generate_generic_id()[:4])
 ADX_RG = settings.env.azext_dt_adx_rg or settings.env.azext_iot_testrg
+MAX_MODELS_PER_BATCH = settings.env.azext_dt_max_models_per_batch
 
 STORAGE_ACCOUNT = settings.env.azext_iot_teststorageaccount or "testadtstore" + generate_generic_id()[:4]
 STORAGE_CONTAINER = settings.env.azext_iot_teststoragecontainer or DEFAULT_CONTAINER
@@ -541,29 +543,6 @@ class DTLiveScenarioTest(LiveScenarioTest):
                     logger.info("The user identites for DT instance {} cannot be deleted.".format(instance))
 
             self.embedded_cli.invoke(f"identity delete -n {self.user_identity_name} -g {self.rg}")
-
-    def get_role_assignment(self, scope, role, assignee):
-        return self.cmd(
-            'role assignment list --scope "{}" --role "{}" --assignee {}'.format(
-                scope, role, assignee
-            )
-        ).get_output_in_json()
-
-    def assign_role_assignment(self, scope, role, assignee, max_tries=10):
-        tries = 0
-        while tries < max_tries:
-            role_assignments = self.get_role_assignment(scope, role, assignee)
-            role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
-            if assignee in role_assignment_principal_ids:
-                break
-            # else assign role to scope and check again
-            self.cmd(
-                'role assignment create --assignee "{}" --role "{}" --scope "{}"'.format(
-                    assignee, role, scope
-                )
-            )
-            sleep(10)
-            tries += 1
 
     def track_instance(self, instance: dict):
         self.tracked_instances.append((instance["name"], instance["resourceGroup"]))

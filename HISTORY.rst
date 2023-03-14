@@ -3,7 +3,27 @@
 Release History
 ===============
 
+
 unreleased
++++++++++++++++
+
+
+0.21.0
++++++++++++++++
+
+**General updates**
+
+* The Azure IoT CLI extension min core CLI version incremented to `2.37.0`.
+
+**Digital Twins updates**
+
+* Fix to ensure policy key retreival during Digital Twin endpoint creation works. Affected commands are:  - `az dt endpoint create *`.
+
+* Addition of new temporary experimental parameter `--max-models-per-batch` for `az dt model create` to let user adjust batch size when directory exceeds
+  250 models.
+
+
+0.20.0
 +++++++++++++++
 
 **IoT Hub updates**
@@ -13,10 +33,25 @@ unreleased
   For more information, please read the trouble shooting guide [here](https://aka.ms/aziotcli-iot-hub-state).
 
   The commands are as follows:
-  
+
   - `az iot hub state export` to save the current state of an IoT Hub to a JSON file.
   - `az iot hub state import` to upload a state from a JSON file to an IoT Hub.
   - `az iot hub state migrate` to copy a state of an IoT Hub to another IoT Hub.
+
+**Digital Twins updates**
+
+* The Digital Twin controlplane commands will now use the newest API 2023-01-31. The following command groups are affected:
+ - `az dt create`, `az dt delete`, `az dt list`, `az dt reset`, `az dt show`, `az dt wait`
+ - `az dt data-history`
+ - `az dt endpoint`
+ - `az dt identity`
+ - `az dt network`
+ - `az dt route`
+
+* Added new options for creating a data history connection and deleting one. The create command, `az dt data-history connection create adx`,
+  now supports adding two separate tables for relationship lifecycle events and twin lifecycle events, recording property and item removals,
+  and adding the new default for the generic table name (now known as property event table). The delete command,
+  `az dt data-history connection delete`, now supports a clean parameter which will do a best-effort attempt to clean connection creation artifacts.
 
 
 0.19.1

@@ -8,15 +8,21 @@ import json
 import os
 
 from inspect import getsourcefile
+from time import sleep
+from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.common.utility import ensure_azure_namespace_path
 from azext_iot.common.utility import read_file_content
 from azext_iot.tests.settings import DynamoSettings
-from typing import TypeVar
+from typing import TypeVar, List
 
 ensure_azure_namespace_path()
 
 from azure.iot.device import ProvisioningDeviceClient, IoTHubDeviceClient
+from knack.log import get_logger
 
+
+logger = get_logger(__name__)
+cli = EmbeddedCLI()
 
 SubRequest = TypeVar('SubRequest')
 Mark = TypeVar('Mark')
@@ -154,6 +160,125 @@ def get_agent_public_ip():
     """
     import requests
     return requests.head("https://www.wikipedia.org").headers["X-Client-IP"]
+
+
+def get_role_assignments(
+    scope: str,
+    assignee: str = None,
+    role: str = None,
+) -> List[dict]:
+    """
+    Get rbac permissions of resource.
+    """
+    role_flag = ""
+    assignee_flag = ""
+
+    if role:
+        role_flag = '--role "{}"'.format(role)
+
+    if assignee:
+        assignee_flag = '--assignee "{}"'.format(assignee)
+
+    return cli.invoke(
+        f'role assignment list --scope "{scope}" {role_flag} {assignee_flag}'
+    ).as_json()
+
+
+def assign_role_assignment(
+    role: str,
+    scope: str,
+    assignee: str,
+    max_tries=10,
+    wait=10,
+):
+    """
+    Assign rbac permissions to resource.
+    """
+    output = None
+    tries = 0
+    principal_kpis = ["name", "principalId", "principalName"]
+    while tries < max_tries:
+        flat_assignment_kpis = []
+        role_assignments = get_role_assignments(scope=scope, role=role)
+        logger.info(f"Role assignments for the role of '{role}' against scope '{scope}': {role_assignments}")
+        for role_assignment in role_assignments:
+            for principal_kpi in principal_kpis:
+                if principal_kpi in role_assignment and role_assignment[principal_kpi]:
+                    flat_assignment_kpis.append(role_assignment[principal_kpi])
+        if assignee in flat_assignment_kpis:
+            break
+        # else assign role to scope and check again
+        output = cli.invoke(
+            f'role assignment create --assignee "{assignee}" --role "{role}" --scope "{scope}"'
+        )
+        if not output.success():
+            logger.warning(f"Failed to assign '{assignee}' the role of '{role}' against scope '{scope}'.")
+            break
+
+        sleep(wait)
+        tries += 1
+
+
+def delete_role_assignment(
+    scope: str,
+    assignee: str,
+    role: str = None,
+):
+    """
+    Delete rbac permissions of resource.
+    """
+    role_flag = ""
+
+    if role:
+        role_flag = "--role '{}'".format(role)
+
+    cli.invoke(
+        f"role assignment delete --scope '{scope}' --assignee '{assignee}' {role_flag}"
+    )
+
+
+def clean_up_iothub_device_config(
+    hub_name: str,
+    rg: str
+):
+    device_list = []
+    device_list.extend(d["deviceId"] for d in cli.invoke(
+        f"iot hub device-twin list -n {hub_name} -g {rg}"
+    ).as_json())
+
+    deployment_list = []
+    deployment_list.extend(c["id"] for c in cli.invoke(
+        f"iot edge deployment list -n {hub_name} -g {rg}"
+    ).as_json())
+
+    config_list = []
+    config_list.extend(c["id"] for c in cli.invoke(
+        f"iot hub configuration list -n {hub_name} -g {rg}"
+    ).as_json())
+
+    if device_list:
+        for device in device_list:
+            cli.invoke(
+                "iot hub device-identity delete -d {} -n {} -g {}".format(
+                    device, hub_name, rg
+                )
+            )
+
+    if deployment_list:
+        for deployment in deployment_list:
+            cli.invoke(
+                "iot edge deployment delete -d {} -n {} -g {}".format(
+                    deployment, hub_name, rg
+                )
+            )
+
+    if config_list:
+        for config in config_list:
+            cli.invoke(
+                "iot hub configuration delete -c {} -n {} -g {}".format(
+                    config, hub_name, rg
+                )
+            )
 
 
 class MockLogger:

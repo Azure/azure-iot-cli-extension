@@ -4,9 +4,11 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import pytest
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 
 
+@pytest.mark.usefixtures("fixture_provision_existing_hub_certificate")
 class TestIotHubCertificateRoot(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIotHubCertificateRoot, self).__init__(test_case, add_data_contributor=False)
