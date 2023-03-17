@@ -9,6 +9,7 @@ from time import sleep
 from knack.util import CLIError
 from pathlib import Path
 from knack.log import get_logger
+from azext_iot.tests.helpers import delete_role_assignment, get_role_assignments
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.settings import UserTypes
@@ -77,7 +78,9 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
     def assign_storage_role_if_needed(self, assignee):
 
-        role_assignments = self.get_role_assignments(self.live_storage_id, STORAGE_ROLE)
+        role_assignments = get_role_assignments(
+            scope=self.live_storage_id,
+            role=STORAGE_ROLE)
         role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
 
         if assignee not in role_assignment_principal_ids:
@@ -99,7 +102,9 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
             # ensure role assignment is complete
             while assignee not in role_assignment_principal_ids:
-                role_assignments = self.get_role_assignments(self.live_storage_id, STORAGE_ROLE)
+                role_assignments = get_role_assignments(
+                    scope=self.live_storage_id,
+                    role=STORAGE_ROLE)
                 role_assignment_principal_ids = [assignment["principalId"] for assignment in role_assignments]
                 sleep(10)
 
@@ -370,18 +375,16 @@ class TestIoTStorage(IoTLiveScenarioTest):
         # if we enabled identity for this hub, undo identity and RBAC
         if identity_enabled:
             # delete role assignment first, disabling identity removes the assignee ID from AAD
-            self.cmd(
-                'role assignment delete --assignee "{}" --role "{}" --scope "{}"'.format(
-                    identity_principal, STORAGE_ROLE, self.live_storage_id
-                )
+            delete_role_assignment(
+                scope=self.live_storage_id,
+                assignee=identity_principal,
+                role=STORAGE_ROLE
             )
             self.cmd(
                 "iot hub identity remove -n {} --user".format(
                     self.entity_name
                 )
             )
-
-        self.tearDown()
 
     def wait_till_job_completion(self, job_id):
         tries = 0

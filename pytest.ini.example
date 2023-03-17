@@ -38,6 +38,8 @@ env =
     azext_dt_ep_eventhub_topic_consumer_group=
     azext_dt_ep_rg=
     azext_dt_region=
+    azext_dt_max_models_per_batch=
 
 markers =
     adu_infrastructure: desired customizations for ADU integration tests.
+    hub_infrastructure: desired customizations for IoT Hub integration tests.

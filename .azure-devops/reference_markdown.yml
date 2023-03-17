@@ -1,0 +1,44 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+
+# Required for schedule only trigger
+trigger: none
+pr: none
+
+
+parameters:
+- name: rootCommand
+  type: string
+  default: 'iot'
+- name: linuxImage
+  type: string
+  default: 'ubuntu-20.04'
+  values:
+  - 'ubuntu-18.04'
+  - 'ubuntu-20.04'
+  - 'ubuntu-22.04'
+  - 'ubuntu-latest'
+
+
+jobs:
+  - job: 'build_and_publish_azure_iot_cli_ext'
+    pool:
+      vmImage: ${{ parameters.linuxImage }}
+
+    steps:
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '3.8'
+        architecture: 'x64'
+
+    - template: templates/setup-ci-machine.yml
+    - template: templates/build-publish-azure-iot-cli-extension.yml
+
+    - template: templates/install-azure-cli-released.yml
+
+    - template: templates/download-install-local-azure-iot-cli-extension.yml
+
+    - template: templates/set-pythonpath.yml
+
+    - template: templates/generate-publish-help-documentation.yml
+      parameters:
+        rootCommand: ${{ parameters.rootCommand }}

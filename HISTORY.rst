@@ -3,6 +3,26 @@
 Release History
 ===============
 
+
+unreleased
++++++++++++++++
+
+
+0.21.0
++++++++++++++++
+
+**General updates**
+
+* The Azure IoT CLI extension min core CLI version incremented to `2.37.0`.
+
+**Digital Twins updates**
+
+* Fix to ensure policy key retreival during Digital Twin endpoint creation works. Affected commands are:  - `az dt endpoint create *`.
+
+* Addition of new temporary experimental parameter `--max-models-per-batch` for `az dt model create` to let user adjust batch size when directory exceeds
+  250 models.
+
+
 0.20.0
 +++++++++++++++
 
