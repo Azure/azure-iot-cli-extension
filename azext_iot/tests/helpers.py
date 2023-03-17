@@ -9,11 +9,13 @@ import os
 
 from inspect import getsourcefile
 from time import sleep
+from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.common.embedded_cli import EmbeddedCLI
+from azext_iot.common.shared import AuthenticationTypeDataplane
 from azext_iot.common.utility import ensure_azure_namespace_path
 from azext_iot.common.utility import read_file_content
 from azext_iot.tests.settings import DynamoSettings
-from typing import TypeVar, List
+from typing import Optional, TypeVar, List
 
 ensure_azure_namespace_path()
 
@@ -37,6 +39,11 @@ TAG_ENV_VAR = [
 
 CERT_ENDING = "-cert.pem"
 KEY_ENDING = "-key.pem"
+DATAPLANE_AUTH_TYPES = [
+    AuthenticationTypeDataplane.key.value,
+    AuthenticationTypeDataplane.login.value,
+    "cstring",
+]
 
 settings = DynamoSettings(opt_env_set=TAG_ENV_VAR)
 # Make sure that TEST_PIPELINE_ID is only populated if correct variables are present
@@ -279,6 +286,43 @@ def clean_up_iothub_device_config(
                     config, hub_name, rg
                 )
             )
+
+
+def create_test_cert(
+    tracked_certs: List[str],
+    subject: str = "aziotcli",
+    cert_only: bool = True,
+    file_prefix: Optional[str] = None
+) -> str:
+    """
+    Creates a test certificate and appends it to the tracked certificates while returning the thumbprint.
+    Will create key certificate if specified.
+    """
+    output_dir = os.getcwd()
+    thumbprint = create_self_signed_certificate(
+        subject=subject,
+        valid_days=1,
+        cert_output_dir=output_dir,
+        cert_only=cert_only,
+        file_prefix=file_prefix,
+        sha_version=256,
+    )["thumbprint"]
+    tracked_certs.append(subject + CERT_ENDING)
+    if not cert_only:
+        tracked_certs.append(subject + KEY_ENDING)
+    return thumbprint
+
+
+def set_cmd_auth_type(command: str, auth_type: str, cstring: str) -> str:
+    """Append the dataplane command auth type."""
+    if auth_type not in DATAPLANE_AUTH_TYPES:
+        raise RuntimeError(f"auth_type of: {auth_type} is unsupported.")
+
+    # cstring takes precedence
+    if auth_type == "cstring":
+        return f"{command} --login {cstring}"
+
+    return f"{command} --auth-type {auth_type}"
 
 
 class MockLogger:
