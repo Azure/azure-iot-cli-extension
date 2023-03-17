@@ -332,4 +332,3 @@ def test_dps_enrollment_symmetrickey_lifecycle(provisioned_iot_dps_module):
                 cstring=dps_cstring
             ),
         )
-
