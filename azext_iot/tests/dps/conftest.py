@@ -13,9 +13,13 @@ from knack.log import get_logger
 
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
-from azext_iot.common.certops import create_self_signed_certificate
-from azext_iot.tests.helpers import assign_role_assignment, clean_up_iothub_device_config, get_closest_marker, get_agent_public_ip
-from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL, ENV_SET_TEST_IOTDPS_OPTIONAL
+from azext_iot.tests.helpers import assign_role_assignment, get_closest_marker
+from azext_iot.tests.settings import (
+    DynamoSettings,
+    ENV_SET_TEST_IOTHUB_REQUIRED,
+    ENV_SET_TEST_IOTHUB_OPTIONAL,
+    ENV_SET_TEST_IOTDPS_OPTIONAL
+)
 
 logger = get_logger(__name__)
 MAX_RBAC_ASSIGNMENT_TRIES = 10
@@ -33,11 +37,9 @@ MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries if settings.en
 def generate_hub_id() -> str:
     return f"aziotclitest-hub-{generate_generic_id()}"[:35]
 
+
 def generate_dps_id() -> str:
     return f"aziotclitest-dps-{generate_generic_id()}"[:35]
-
-def generate_names(count=1):
-    return [generate_generic_id()[:48] for _ in range(count)]
 
 
 def generate_hub_depenency_id() -> str:
@@ -62,6 +64,7 @@ def assign_iot_hub_dataplane_rbac_role(hub_results):
                 role=HUB_USER_ROLE,
                 max_tries=MAX_RBAC_ASSIGNMENT_TRIES
             )
+
 
 def assign_iot_dps_dataplane_rbac_role(target_dps):
     account = cli.invoke("account show").as_json()
@@ -99,13 +102,23 @@ def fixture_provision_existing_hub_role(request):
 # IoT DPS fixtures
 @pytest.fixture(scope="module")
 def provisioned_iot_dps_module(request, provisioned_only_iot_hubs_session) -> dict:
+    print("provisioned_iot_dps_module")
     result = _iot_dps_provisioner(request, provisioned_only_iot_hubs_session)
     yield result
     if result:
         _iot_dps_removal(result)
 
 
-def _iot_dps_provisioner(request, iot_hubs = None):
+@pytest.fixture(scope="module")
+def provisioned_iot_dps_no_hub_module(request) -> dict:
+    print("provisioned_iot_dps_no_hub_module")
+    result = _iot_dps_provisioner(request)
+    yield result
+    if result:
+        _iot_dps_removal(result)
+
+
+def _iot_dps_provisioner(request, iot_hubs: Optional[List] = None) -> dict:
     """Create a device provisioning service for testing purposes."""
     dps_name = settings.env.azext_iot_testdps or generate_dps_id()
     dps_list = cli.invoke(
@@ -129,22 +142,25 @@ def _iot_dps_provisioner(request, iot_hubs = None):
         if iot_hubs:
             base_command += f" --tags hubname={iot_hubs[0]['name']}"
         target_dps = cli.invoke(base_command).as_json()
-        logger.info(f"DPS {dps['name']} created.")
+        print(f"DPS {dps['name']} created.")
 
     assign_iot_dps_dataplane_rbac_role(target_dps)
+    sleep(10)
 
     # Add link between dps and first iot hub
-    target_hub = iot_hubs[0]
-    linked_hubs = cli.invoke(
-        "iot dps linked-hub list --dps-name {} -g {}".format(dps_name, ENTITY_RG)
-    ).as_json()
-    hub_host_name = "{}.azure-devices.net".format(target_hub["name"])
+    hub_host_name = None
+    if iot_hubs:
+        target_hub = iot_hubs[0]
+        linked_hubs = cli.invoke(
+            "iot dps linked-hub list --dps-name {} -g {}".format(dps_name, ENTITY_RG)
+        ).as_json()
+        hub_host_name = "{}.azure-devices.net".format(target_hub["name"])
 
-    if hub_host_name not in [hub["name"] for hub in linked_hubs]:
-        cli.invoke(
-            f"iot dps linked-hub create --dps-name {dps_name} -g {ENTITY_RG} "
-            f"--connection-string {target_hub['connectionString']} --location {target_hub['hub']['location']}"
-        )
+        if hub_host_name not in [hub["name"] for hub in linked_hubs]:
+            cli.invoke(
+                f"iot dps linked-hub create --dps-name {dps_name} -g {ENTITY_RG} "
+                f"--connection-string {target_hub['connectionString']} --location {target_hub['hub']['location']}"
+            )
 
     return {
         "name": dps_name,
@@ -152,16 +168,17 @@ def _iot_dps_provisioner(request, iot_hubs = None):
         "dps": target_dps,
         "connectionString": get_dps_cstring(dps_name, ENTITY_RG),
         "hubHostName": hub_host_name,
+        "hubConnectionString": iot_hubs[0]["connectionString"] if iot_hubs else None,
         "certificates": []
     }
 
 
 def get_dps_cstring(dps_name: str, dps_rg: str, policy: str = "provisioningserviceowner") -> str:
-        return cli.invoke(
-            "iot dps connection-string show -n {} -g {} --policy-name {}".format(
-                dps_name, dps_rg, policy
-            )
-        ).as_json()["connectionString"]
+    return cli.invoke(
+        "iot dps connection-string show -n {} -g {} --policy-name {}".format(
+            dps_name, dps_rg, policy
+        )
+    ).as_json()["connectionString"]
 
 
 def _iot_dps_removal(dps):
@@ -171,13 +188,13 @@ def _iot_dps_removal(dps):
                 os.remove(cert)
             except OSError as e:
                 logger.error(f"Failed to remove {cert}. {e}")
-    if not settings.env.azext_iot_testdps_hub:
+    if not settings.env.azext_iot_testdps:
         cli.invoke(
-            "iot hub delete --name {} --resource-group {}".format(
+            "iot dps delete --name {} --resource-group {}".format(
                 dps["name"], dps["resourceGroup"]
             )
         )
-        logger.info(f"DPS {dps['name']} deleted.")
+        print(f"DPS {dps['name']} deleted.")
 
 
 # IoT Hub fixtures
@@ -224,6 +241,8 @@ def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_s
             base_create_command += f" --fcs {storage_cstring} --fc fileupload"
 
         hub_obj = cli.invoke(base_create_command).as_json()
+
+        print(f"Hub {name} created.")
         hub_results.append({
             "hub": hub_obj,
             "name": name,
@@ -246,5 +265,6 @@ def _iot_hubs_removal(hub_result):
     for hub in hub_result:
         name = hub["name"]
         delete_result = cli.invoke(f"iot hub delete -n {name} -g {ENTITY_RG}")
+        print(f"hub {name} deleted.")
         if not delete_result.success():
             logger.error(f"Failed to delete iot hub resource {name}.")

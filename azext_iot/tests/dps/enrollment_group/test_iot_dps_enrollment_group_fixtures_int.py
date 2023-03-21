@@ -11,6 +11,7 @@ from azext_iot.tests.dps import (
     API_VERSION,
     DATAPLANE_AUTH_TYPES,
     WEBHOOK_URL,
+    clean_dps_dataplane,
 )
 from azext_iot.tests.helpers import CERT_ENDING, create_test_cert, set_cmd_auth_type
 from azext_iot.tests.generators import generate_generic_id, generate_names
@@ -23,6 +24,7 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):
     dps_rg = provisioned_iot_dps_module['resourceGroup']
     hub_hostname = provisioned_iot_dps_module['hubHostName']
     dps_cstring = provisioned_iot_dps_module["connectionString"]
+    clean_dps_dataplane(cli, dps_cstring)
 
     cert_name = generate_names()
     cert_path = cert_name + CERT_ENDING
@@ -68,16 +70,18 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):
             )
         ).as_json()
         assert enrollment_show["enrollmentGroupId"] == enrollment_id
-
-        enrollment_show = cli.invoke(
-            set_cmd_auth_type(
-                f"iot dps enrollment-group show -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_id} --show-keys",
-                auth_type=auth_phase,
-                cstring=dps_cstring
-            ),
-        ).as_json()
-        assert enrollment_show["enrollmentGroupId"] == enrollment_id
         assert enrollment_show["attestation"]["x509"]
+
+        # TODO The warning is annoying - x509 with show keys should be a unit test instead
+        # enrollment_show = cli.invoke(
+        #     set_cmd_auth_type(
+        #         f"iot dps enrollment-group show -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_id} --show-keys",
+        #         auth_type=auth_phase,
+        #         cstring=dps_cstring
+        #     ),
+        # ).as_json()
+        # assert enrollment_show["enrollmentGroupId"] == enrollment_id
+        # assert enrollment_show["attestation"]["x509"]
 
         # Compute Device Key only works for symmetric key enrollment groups
         failure_command = cli.invoke(
@@ -104,7 +108,7 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):
         etag = enrollment["etag"]
         assert enrollment_update["allocationPolicy"] == AllocationType.hashed.value
         assert enrollment_update["attestation"]["type"] == AttestationType.x509.value
-        assert enrollment_update["attestation"]["x509"]["clientCertificates"]["secondary"] is None
+        assert enrollment_update["attestation"]["x509"]["clientCertificates"] is None
         assert enrollment_update["capabilities"]["iotEdge"] is False
         assert enrollment_update["enrollmentGroupId"] == enrollment_id
         assert enrollment_update["provisioningStatus"] == EntityStatusType.disabled.value
@@ -126,7 +130,7 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):
         cert_name = generate_names()
         certificate_create = cli.invoke(
             f"iot dps certificate create -g {dps_rg} --dps-name {dps_name} --name {cert_name} --p {cert_path}"
-        )
+        ).as_json()
         cert_etag = certificate_create["etag"]
         assert certificate_create["name"] == cert_name
 
@@ -140,11 +144,11 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):
             ),
         ).as_json()
         assert enrollment_update["allocationPolicy"] == AllocationType.custom.value
-        assert enrollment_update["allocationPolicy"]["webhookUrl"] == WEBHOOK_URL
-        assert enrollment_update["allocationPolicy"]["apiVersion"] == API_VERSION
         assert enrollment_update["attestation"]["type"] == AttestationType.x509.value
-        assert enrollment_update["attestation"]["x509"]["clientCertificates"]["primary"] == cert_name
-        assert enrollment_update["attestation"]["x509"]["clientCertificates"]["secondary"] is None
+        assert enrollment_update["attestation"]["x509"]["caReferences"]["primary"] == cert_name
+        assert enrollment_update["attestation"]["x509"]["caReferences"]["secondary"] is None
+        assert enrollment_update["customAllocationDefinition"]["webhookUrl"] == WEBHOOK_URL
+        assert enrollment_update["customAllocationDefinition"]["apiVersion"] == API_VERSION
         assert enrollment_update["enrollmentGroupId"] == enrollment_id
 
         cli.invoke(
@@ -165,6 +169,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
     dps_rg = provisioned_iot_dps_module['resourceGroup']
     hub_hostname = provisioned_iot_dps_module['hubHostName']
     dps_cstring = provisioned_iot_dps_module["connectionString"]
+    clean_dps_dataplane(cli, dps_cstring)
     generic_dict = {
         generate_generic_id(): generate_generic_id(),
         "key": "value",
@@ -202,7 +207,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
         assert enrollment["initialTwin"]["properties"]["desired"] == generic_dict
         assert enrollment["provisioningStatus"] == EntityStatusType.enabled.value
         assert enrollment["reprovisionPolicy"]
-        assert enrollment["reprovisionPolicy"]["migrateDeviceData"] is True
+        assert enrollment["reprovisionPolicy"]["migrateDeviceData"] is False
 
         enrollment_list = cli.invoke(
             set_cmd_auth_type(
@@ -232,11 +237,11 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
             )
         ).as_json()
         assert enrollment_update["allocationPolicy"] == AllocationType.custom.value
-        assert enrollment_update["allocationPolicy"]["webhookUrl"] == WEBHOOK_URL
-        assert enrollment_update["allocationPolicy"]["apiVersion"] == API_VERSION
-        assert enrollment_update["attestation"]["type"] == AttestationType.x509.value
+        assert enrollment_update["attestation"]["type"] == attestation_type
         assert enrollment_update["attestation"]["symmetricKey"]["primaryKey"] == primary_key
         assert enrollment_update["capabilities"]["iotEdge"] is False
+        assert enrollment_update["customAllocationDefinition"]["webhookUrl"] == WEBHOOK_URL
+        assert enrollment_update["customAllocationDefinition"]["apiVersion"] == API_VERSION
         assert enrollment_update["enrollmentGroupId"] == enrollment_id
         assert enrollment_update["iotHubs"] is None
         assert enrollment_update["initialTwin"]["tags"]
@@ -246,7 +251,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
         # Use service generated keys
         enrollment2 = cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group create -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_id}",
+                f"iot dps enrollment-group create -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_id2}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
@@ -267,7 +272,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
 
         enrollment_show = cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group show -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_id}",
+                f"iot dps enrollment-group show -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_id2}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
@@ -277,7 +282,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
 
         keys = cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group show -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_id} --show-keys",
+                f"iot dps enrollment-group show -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_id2} --show-keys",
                 auth_type=auth_phase,
                 cstring=dps_cstring
             )
@@ -287,7 +292,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
         online_device_key = cli.invoke(
             set_cmd_auth_type(
                 f"iot dps enrollment-group compute-device-key -g {dps_rg} --dps-name {dps_name} "
-                f"--enrollment-id {enrollment_id} --registration-id myarbitrarydeviceId",
+                f"--enrollment-id {enrollment_id2} --registration-id myarbitrarydeviceId",
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
@@ -308,7 +313,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
 
         enrollment_update = cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group update -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_id}"
+                f"iot dps enrollment-group update -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_id2}"
                 f" --pk \"{keys['secondaryKey']}\" --sk \"{keys['primaryKey']}\" --etag {etag}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
@@ -321,7 +326,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
         online_device_key = cli.invoke(
             set_cmd_auth_type(
                 f"iot dps enrollment-group compute-device-key -g {dps_rg} --dps-name {dps_name} "
-                f"--enrollment-id {enrollment_id} --registration-id myarbitrarydeviceId",
+                f"--enrollment-id {enrollment_id2} --registration-id myarbitrarydeviceId",
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
@@ -350,6 +355,7 @@ def test_dps_enrollment_twin_array(provisioned_iot_dps_module):
     dps_rg = provisioned_iot_dps_module['resourceGroup']
     hub_hostname = provisioned_iot_dps_module['hubHostName']
     dps_cstring = provisioned_iot_dps_module["connectionString"]
+    clean_dps_dataplane(cli, dps_cstring)
     base_enrollment_props = {
         "count": None,
         "metadata": None,

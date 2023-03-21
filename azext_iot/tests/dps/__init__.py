@@ -64,6 +64,26 @@ ENTITY_HUB_NAME = (
 MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries if settings.env.azext_iot_rbac_max_tries else 10
 
 
+def clean_dps_dataplane(cli, dps_cstring):
+    # Individual Enrollments
+    enrollment_list = cli.invoke(
+        f"iot dps enrollment list --login {dps_cstring}"
+    ).as_json()
+    for enrollment in enrollment_list:
+        cli.invoke(
+            f"iot dps enrollment delete --login {dps_cstring} --eid {enrollment['registrationId']}"
+        )
+
+    # Enrollment Groups
+    enrollment_list = cli.invoke(
+        f"iot dps enrollment-group list --login {dps_cstring}"
+    ).as_json()
+    for enrollment in enrollment_list:
+        cli.invoke(
+            f"iot dps enrollment-group delete --login {dps_cstring} --eid {enrollment['enrollmentGroupId']}"
+        )
+
+
 class IoTDPSLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def __init__(self, test_scenario, cert_only: bool = True):
