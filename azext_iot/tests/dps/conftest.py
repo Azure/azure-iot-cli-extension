@@ -102,7 +102,6 @@ def fixture_provision_existing_hub_role(request):
 # IoT DPS fixtures
 @pytest.fixture(scope="module")
 def provisioned_iot_dps_module(request, provisioned_only_iot_hubs_session) -> dict:
-    print("provisioned_iot_dps_module")
     result = _iot_dps_provisioner(request, provisioned_only_iot_hubs_session)
     yield result
     if result:
@@ -111,7 +110,6 @@ def provisioned_iot_dps_module(request, provisioned_only_iot_hubs_session) -> di
 
 @pytest.fixture(scope="module")
 def provisioned_iot_dps_no_hub_module(request) -> dict:
-    print("provisioned_iot_dps_no_hub_module")
     result = _iot_dps_provisioner(request)
     yield result
     if result:
@@ -142,7 +140,6 @@ def _iot_dps_provisioner(request, iot_hubs: Optional[List] = None) -> dict:
         if iot_hubs:
             base_command += f" --tags hubname={iot_hubs[0]['name']}"
         target_dps = cli.invoke(base_command).as_json()
-        print(f"DPS {dps['name']} created.")
 
     assign_iot_dps_dataplane_rbac_role(target_dps)
     sleep(10)
@@ -159,7 +156,7 @@ def _iot_dps_provisioner(request, iot_hubs: Optional[List] = None) -> dict:
         if hub_host_name not in [hub["name"] for hub in linked_hubs]:
             cli.invoke(
                 f"iot dps linked-hub create --dps-name {dps_name} -g {ENTITY_RG} "
-                f"--connection-string {target_hub['connectionString']} --location {target_hub['hub']['location']}"
+                f"--connection-string {target_hub['connectionString']}"
             )
 
     return {
@@ -194,7 +191,6 @@ def _iot_dps_removal(dps):
                 dps["name"], dps["resourceGroup"]
             )
         )
-        print(f"DPS {dps['name']} deleted.")
 
 
 # IoT Hub fixtures
@@ -242,7 +238,6 @@ def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_s
 
         hub_obj = cli.invoke(base_create_command).as_json()
 
-        print(f"Hub {name} created.")
         hub_results.append({
             "hub": hub_obj,
             "name": name,
@@ -265,6 +260,5 @@ def _iot_hubs_removal(hub_result):
     for hub in hub_result:
         name = hub["name"]
         delete_result = cli.invoke(f"iot hub delete -n {name} -g {ENTITY_RG}")
-        print(f"hub {name} deleted.")
         if not delete_result.success():
             logger.error(f"Failed to delete iot hub resource {name}.")

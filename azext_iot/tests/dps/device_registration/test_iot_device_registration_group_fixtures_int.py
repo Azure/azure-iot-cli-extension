@@ -361,7 +361,7 @@ def test_dps_device_registration_unlinked_hub(provisioned_iot_dps_no_hub_module)
             ),
         )
         if not result.success():
-            raise AssertionError(f"Failed to create enrollment with attestation-type {auth_phase}")
+            raise AssertionError(f"Failed to create enrollment group with attestation-type {auth_phase}")
 
         # registration throws error
         registration_result = cli.invoke(
@@ -404,7 +404,7 @@ def test_dps_device_registration_disabled_enrollment(provisioned_iot_dps_module)
             ),
         )
         if not result.success():
-            raise AssertionError(f"Failed to create enrollment with attestation-type {auth_phase}")
+            raise AssertionError(f"Failed to create enrollment group with attestation-type {auth_phase}")
 
         # Registration throws error
         registration_result = cli.invoke(

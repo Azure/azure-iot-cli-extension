@@ -211,10 +211,6 @@ def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module):
     secondary_thumprint = create_test_cert(
         tracked_certs=tracked_certs, subject=cert_name, cert_only=False, file_prefix=second_cert_name
     )
-    print("thumbprints:")
-    print(first_thumbprint)
-    print(secondary_thumprint)
-    print()
 
     attestation_type = AttestationType.x509.value
     for auth_phase in DATAPLANE_AUTH_TYPES:
