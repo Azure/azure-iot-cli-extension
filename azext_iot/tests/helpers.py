@@ -307,9 +307,10 @@ def create_test_cert(
         file_prefix=file_prefix,
         sha_version=256,
     )["thumbprint"]
-    tracked_certs.append(subject + CERT_ENDING)
+    name = file_prefix or subject
+    tracked_certs.append(name + CERT_ENDING)
     if not cert_only:
-        tracked_certs.append(subject + KEY_ENDING)
+        tracked_certs.append(name + KEY_ENDING)
     return thumbprint
 
 

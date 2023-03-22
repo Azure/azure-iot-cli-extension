@@ -4,10 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import pytest
-import os
-from azext_iot.tests.helpers import CERT_ENDING, KEY_ENDING, add_test_tag, assign_role_assignment
-
 from azext_iot.tests.settings import (
     DynamoSettings,
     ENV_SET_TEST_IOTHUB_REQUIRED,
@@ -15,10 +11,7 @@ from azext_iot.tests.settings import (
     ENV_SET_TEST_IOTDPS_OPTIONAL,
 )
 from azext_iot.tests.generators import generate_generic_id
-from azext_iot.tests import CaptureOutputLiveScenarioTest
-from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.common.shared import AuthenticationTypeDataplane
-from azext_iot.tests.test_constants import ResourceTypes
 from knack.log import get_logger
 
 
@@ -37,8 +30,6 @@ PREFIX_DEVICE = "test-device-"
 PREFIX_EDGE_DEVICE = "test-edge-device-"
 PREFIX_INDIVIDUAL_ENROLLMENT = "test-enrollment-"
 PREFIX_GROUP_ENROLLMENT = "test-groupenroll-"
-USER_ROLE = "Device Provisioning Service Data Contributor"
-HUB_USER_ROLE = "IoT Hub Data Contributor"
 MAX_HUB_RETRIES = 3
 
 TEST_ENDORSEMENT_KEY = (

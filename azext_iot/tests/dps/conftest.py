@@ -22,7 +22,6 @@ from azext_iot.tests.settings import (
 )
 
 logger = get_logger(__name__)
-MAX_RBAC_ASSIGNMENT_TRIES = 10
 HUB_USER_ROLE = "IoT Hub Data Contributor"
 DPS_USER_ROLE = "Device Provisioning Service Data Contributor"
 cli = EmbeddedCLI()
@@ -42,30 +41,6 @@ def generate_dps_id() -> str:
     return f"aziotclitest-dps-{generate_generic_id()}"[:35]
 
 
-def generate_hub_depenency_id() -> str:
-    return f"aziotclitest{generate_generic_id()}"[:24]
-
-
-def assign_iot_hub_dataplane_rbac_role(hub_results):
-    """Add IoT Hub Data Contributor role to current user"""
-    for hub in hub_results:
-        # Only add dataplane roles to the hubs that were not created mid test
-        if hub.get("hub"):
-            target_hub_id = hub["hub"]["id"]
-            account = cli.invoke("account show").as_json()
-            user = account["user"]
-
-            if user["name"] is None:
-                raise Exception("User not found")
-
-            assign_role_assignment(
-                assignee=user["name"],
-                scope=target_hub_id,
-                role=HUB_USER_ROLE,
-                max_tries=MAX_RBAC_ASSIGNMENT_TRIES
-            )
-
-
 def assign_iot_dps_dataplane_rbac_role(target_dps):
     account = cli.invoke("account show").as_json()
     user = account["user"]
@@ -77,26 +52,6 @@ def assign_iot_dps_dataplane_rbac_role(target_dps):
         assignee=user["name"],
         max_tries=MAX_RBAC_ASSIGNMENT_TRIES
     )
-
-
-@pytest.fixture()
-def fixture_provision_existing_hub_role(request):
-    if settings.env.azext_iot_testhub:
-        # Assign Data Contributor role
-        account = cli.invoke("account show").as_json()
-        user = account["user"]
-
-        target_hub = cli.invoke(
-            "iot hub show -n {} -g {}".format(settings.env.azext_iot_testhub, ENTITY_RG)
-        ).as_json()
-
-        assign_role_assignment(
-            assignee=user["name"],
-            scope=target_hub["id"],
-            role=HUB_USER_ROLE,
-            max_tries=MAX_RBAC_ASSIGNMENT_TRIES
-        )
-    yield
 
 
 # IoT DPS fixtures
