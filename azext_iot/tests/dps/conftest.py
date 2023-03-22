@@ -18,13 +18,15 @@ from azext_iot.tests.settings import (
     DynamoSettings,
     ENV_SET_TEST_IOTHUB_REQUIRED,
     ENV_SET_TEST_IOTHUB_OPTIONAL,
-    ENV_SET_TEST_IOTDPS_OPTIONAL
+    ENV_SET_TEST_IOTDPS_OPTIONAL,
 )
 
 logger = get_logger(__name__)
 HUB_USER_ROLE = "IoT Hub Data Contributor"
 DPS_USER_ROLE = "Device Provisioning Service Data Contributor"
 cli = EmbeddedCLI()
+
+# Test Environment Variables
 settings = DynamoSettings(
     req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED,
     opt_env_set=list(set(ENV_SET_TEST_IOTHUB_OPTIONAL + ENV_SET_TEST_IOTDPS_OPTIONAL))
@@ -83,7 +85,6 @@ def _iot_dps_provisioner(request, iot_hubs: Optional[List] = None) -> dict:
     for dps in dps_list:
         if dps["name"] == dps_name:
             target_dps = dps
-            logger.info(f"DPS {dps['name']} found.")
             break
 
     # Create the min version dps and assign the correct roles
@@ -112,6 +113,15 @@ def _iot_dps_provisioner(request, iot_hubs: Optional[List] = None) -> dict:
             cli.invoke(
                 f"iot dps linked-hub create --dps-name {dps_name} -g {ENTITY_RG} "
                 f"--connection-string {target_hub['connectionString']}"
+            )
+    elif settings.env.azext_iot_testdps:
+        # Ensure 0 linked hubs
+        linked_hubs = cli.invoke(
+            "iot dps linked-hub list --dps-name {} -g {}".format(dps_name, ENTITY_RG)
+        ).as_json()
+        for hub in linked_hubs:
+            cli.invoke(
+                f"iot dps linked-hub delete --dps-name {dps_name} -g {ENTITY_RG} --linked-hub {hub['name']}"
             )
 
     return {

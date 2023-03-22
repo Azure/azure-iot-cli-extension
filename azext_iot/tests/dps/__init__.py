@@ -4,13 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from azext_iot.tests.settings import (
-    DynamoSettings,
-    ENV_SET_TEST_IOTHUB_REQUIRED,
-    ENV_SET_TEST_IOTHUB_OPTIONAL,
-    ENV_SET_TEST_IOTDPS_OPTIONAL,
-)
-from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.shared import AuthenticationTypeDataplane
 from knack.log import get_logger
 
@@ -41,18 +34,6 @@ TEST_ENDORSEMENT_KEY = (
 )
 TEST_KEY_REGISTRATION_ID = "myarbitrarydeviceId"
 GENERATED_KEY = "cT/EXZvsplPEpT//p98Pc6sKh8mY3kYgSxavHwMkl7w="
-
-# Test Environment Variables
-settings = DynamoSettings(
-    req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED,
-    opt_env_set=list(set(ENV_SET_TEST_IOTHUB_OPTIONAL + ENV_SET_TEST_IOTDPS_OPTIONAL))
-)
-ENTITY_RG = settings.env.azext_iot_testrg
-ENTITY_DPS_NAME = settings.env.azext_iot_testdps if settings.env.azext_iot_testdps else "test-dps-" + generate_generic_id()
-ENTITY_HUB_NAME = (
-    settings.env.azext_iot_testdps_hub if settings.env.azext_iot_testdps_hub else "test-dps-hub-" + generate_generic_id()
-)
-MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries if settings.env.azext_iot_rbac_max_tries else 10
 
 
 def clean_dps_dataplane(cli, dps_cstring):

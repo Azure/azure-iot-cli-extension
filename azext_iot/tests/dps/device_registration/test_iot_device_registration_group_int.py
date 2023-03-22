@@ -7,7 +7,7 @@
 import os
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.common.shared import EntityStatusType
-from azext_iot.tests.dps import DATAPLANE_AUTH_TYPES
+from azext_iot.tests.dps import DATAPLANE_AUTH_TYPES, clean_dps_dataplane
 from azext_iot.tests.dps.device_registration import check_hub_device, compare_registrations
 from azext_iot.tests.generators import generate_generic_id, generate_names
 from azext_iot.tests.helpers import CERT_ENDING, KEY_ENDING, set_cmd_auth_type
@@ -23,6 +23,7 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
     dps_cstring = provisioned_iot_dps_module["connectionString"]
     hub_cstring = provisioned_iot_dps_module["hubConnectionString"]
     id_scope = provisioned_iot_dps_module["dps"]["properties"]["idScope"]
+    clean_dps_dataplane(cli, dps_cstring)
 
     for auth_phase in DATAPLANE_AUTH_TYPES:
         group_id, device_id1, device_id2 = generate_names(count=3)
@@ -225,6 +226,7 @@ def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module):
     dps_cstring = provisioned_iot_dps_module["connectionString"]
     hub_cstring = provisioned_iot_dps_module["hubConnectionString"]
     id_scope = provisioned_iot_dps_module["dps"]["properties"]["idScope"]
+    clean_dps_dataplane(cli, dps_cstring)
 
     fake_pass = "pass1234"
     root_name, devices = _prepare_x509_certificates_for_dps(
@@ -349,6 +351,7 @@ def test_dps_device_registration_unlinked_hub(provisioned_iot_dps_no_hub_module)
     dps_name = provisioned_iot_dps_no_hub_module['name']
     dps_rg = provisioned_iot_dps_no_hub_module['resourceGroup']
     dps_cstring = provisioned_iot_dps_no_hub_module["connectionString"]
+    clean_dps_dataplane(cli, dps_cstring)
 
     for auth_phase in DATAPLANE_AUTH_TYPES:
         group_id, device_id = generate_names(count=2)
@@ -392,6 +395,8 @@ def test_dps_device_registration_disabled_enrollment(provisioned_iot_dps_module)
     dps_name = provisioned_iot_dps_module['name']
     dps_rg = provisioned_iot_dps_module['resourceGroup']
     dps_cstring = provisioned_iot_dps_module["connectionString"]
+    clean_dps_dataplane(cli, dps_cstring)
+
     for auth_phase in DATAPLANE_AUTH_TYPES:
         group_id, device_id = generate_names(count=2)
 
