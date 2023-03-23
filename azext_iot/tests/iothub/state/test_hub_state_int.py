@@ -327,11 +327,13 @@ def test_mirgate_hub_dataplane_error(provisioned_only_iot_hubs_module):
     fake_hub_rg = "fakerg"
     result = cli.invoke(
         f"iot hub state migrate --origin-hub {hub_name} --origin-resource-group {hub_rg} "
-        f"--destination-hub {fake_hub_name} --destination-resource-group {fake_hub_rg} --aspects {DATAPLANE}"
+        f"--destination-hub {fake_hub_name} --destination-resource-group {fake_hub_rg} --aspects {DATAPLANE}",
+        capture_stderr=True
     )
     assert isinstance(result.get_error(), ResourceNotFoundError)
     result = cli.invoke(
-        f"iot hub state migrate --origin-hub {hub_name} --destination-hub {fake_hub_name} --aspects {DATAPLANE}"
+        f"iot hub state migrate --origin-hub {hub_name} --destination-hub {fake_hub_name} --aspects {DATAPLANE}",
+        capture_stderr=True
     )
     assert isinstance(result.get_error(), RequiredArgumentMissingError)
 
@@ -418,6 +420,7 @@ def test_export_import_migrate_missing_hubs_error():
     filename = "./somefile.json"
     hub_name = "fakehub"
     hub_rg = "fakerg"
+    cli.capture_stderr = True
     result = cli.invoke(
         f"iot hub state export -n {hub_name} -f {filename} -g {hub_rg}"
     )
@@ -452,6 +455,7 @@ def test_export_import_migrate_missing_hubs_error():
         f"iot hub state migrate --origin-hub {hub_name} --destination-hub {hub_name}"
     )
     assert isinstance(result.get_error(), RequiredArgumentMissingError)
+    cli.capture_stderr = False
 
 
 # Dataplane main compare commands

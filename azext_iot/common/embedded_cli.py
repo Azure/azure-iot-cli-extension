@@ -16,15 +16,21 @@ logger = get_logger(__name__)
 
 
 class EmbeddedCLI(object):
-    def __init__(self, cli_ctx=None):
+    def __init__(self, cli_ctx=None, capture_stderr: bool = False):
         super(EmbeddedCLI, self).__init__()
         self.output = ""
         self.error_code = 0
         self.az_cli = get_default_cli()
         self.user_subscription = cli_ctx.data.get('subscription_id') if cli_ctx else None
+        self.capture_stderr = capture_stderr
 
-    def invoke(self, command: str, subscription: str = None):
+    def invoke(self, command: str, subscription: Optional[str] = None, capture_stderr: bool = False):
         output_file = StringIO()
+
+        if capture_stderr or self.capture_stderr:
+            # Stop exception from being logged
+            old_exception_handler = self.az_cli.exception_handler
+            self.az_cli.exception_handler = lambda _: None
 
         command = self._ensure_json_output(command=command)
         # prioritize subscription passed into invoke
@@ -37,7 +43,6 @@ class EmbeddedCLI(object):
                 command=command, subscription=self.user_subscription
             )
 
-        # TODO: Capture stderr?
         try:
             self.error_code = (
                 self.az_cli.invoke(shlex.split(command), out_file=output_file) or 0
@@ -52,6 +57,10 @@ class EmbeddedCLI(object):
             self.error_code,
             self.output,
         )
+
+        if capture_stderr or self.capture_stderr:
+            self.az_cli.exception_handler = old_exception_handler
+
         output_file.close()
 
         return self
@@ -60,6 +69,8 @@ class EmbeddedCLI(object):
         try:
             return json.loads(self.output)
         except Exception:
+            if self.get_error():
+                raise self.get_error()
             raise CLIInternalError(
                 "Issue parsing received payload '{}' as json. Please try again or check resource status.".format(
                     self.output
