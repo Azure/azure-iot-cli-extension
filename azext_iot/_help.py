@@ -1071,8 +1071,8 @@ helps[
                   Edge deployments can be created with user defined metrics for on demand evaluation.
                   User metrics are json and in the form of {"queries":{...}} or {"metrics":{"queries":{...}}}.
 
-                  Deployments are classified as layered only if the content has $edgeAgent and within the $edgeAgent, properties.desired.x is defined,
-                  where x can be anything. If you just have properties.desired, it will be treated as a full (non-layered) deployment.
+                  Deployments are classified as layered only if the content has $edgeAgent and within the $edgeAgent object, properties.desired.x is defined,
+                  where x can be anything. If you just have properties.desired, the deployment will be treated as a full (non-layered) deployment.
     examples:
     - name: Create a deployment with labels (bash syntax example) that applies for devices in 'building 9' and
             the environment is 'test'.
