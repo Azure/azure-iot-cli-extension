@@ -4,8 +4,15 @@ Release History
 ===============
 
 
-unreleased
+0.21.1
 +++++++++++++++
+
+**IoT Hub updates**
+
+* Deprecation of parameter `--layered` for `az iot edge deployment create`. The help examples have been improved to describe how to correctly
+  create a layered deployment.
+
+* The command `az iot edge export-modules` is now GA.
 
 
 0.21.0

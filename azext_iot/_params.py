@@ -801,7 +801,7 @@ def load_arguments(self, _):
         context.argument(
             "config_id",
             options_list=["--config-id", "-c"],
-            help="Target device configuration name.",
+            help="Target device configuration name. Lowercase and the following special characters are allowed: [-+%_*!'].",
         )
         context.argument(
             "target_condition",
@@ -843,13 +843,13 @@ def load_arguments(self, _):
         context.argument(
             "config_id",
             options_list=["--deployment-id", "-d"],
-            help="Target deployment name.",
+            help="Target deployment name. Lowercase and the following special characters are allowed: [-+%_*!'].",
         )
         context.argument(
             "target_condition",
             options_list=["--target-condition", "--tc", "-t"],
             help="Target condition in which an edge deployment applies to. Deployments with no target condition "
-            "will target no device.",
+            "will target no device. Use the following format: \"tags.environment='test'\"",
         )
         context.argument(
             "priority",
@@ -888,6 +888,7 @@ def load_arguments(self, _):
             "modules that will layer on top of a base deployment. For example the routes specified in a layered "
             "deployment will merge with routes of the base deployment. Routes with the same name will be "
             "overwritten based on deployment priority.",
+            deprecate_info=context.deprecate(redirect="--no-validation", hide=True),
         )
         context.argument(
             "no_validation",
