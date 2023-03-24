@@ -332,29 +332,16 @@ class TestEmbeddedCli(object):
         azclient.test_meta.error_code = request.param
         return azclient
 
-    @pytest.mark.parametrize(
-        "command, user_subscription, subscription",
-        [
-            ("iot hub device-identity create -n abcd -d dcba", None, None),
-            (
-                "iot hub device-twin show -n 'abcd' -d 'dcba'",
-                "20a300e5-a444-4130-bb5a-1abd08ad930a",
-                None,
-            ),
-            (
-                "iot hub device-identity create -n abcd -d dcba",
-                None,
-                "20a300e5-a444-4130-bb5a-1abd08ad930a",
-            ),
-            (
-                "iot hub device-twin show -n 'abcd' -d 'dcba'",
-                "20a300e5-a444-4130-bb5a-1abd08ad930a",
-                "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-            ),
-        ],
-    )
+    @pytest.mark.parametrize("command", [
+        "iot hub device-identity create -n abcd -d dcba",
+        "iot hub device-twin show -n 'abcd' -d 'dcba'"
+    ])
+    @pytest.mark.parametrize("user_subscription", [None, "20a300e5-a444-4130-bb5a-1abd08ad930a"])
+    @pytest.mark.parametrize("subscription", [None, "40a300e5-4130-a444-bb5a-1abd08ad930a"])
+    @pytest.mark.parametrize("init_capture_stderr", [True, False])
+    @pytest.mark.parametrize("capture_stderr", [None, True, False])
     def test_embedded_cli(
-        self, mocker, mocked_azclient, command, user_subscription, subscription
+        self, mocker, mocked_azclient, command, user_subscription, subscription, init_capture_stderr, capture_stderr
     ):
         import shlex
 
@@ -362,8 +349,10 @@ class TestEmbeddedCli(object):
         cli_ctx.data = {}
         if user_subscription:
             cli_ctx.data["subscription_id"] = user_subscription
-        cli = EmbeddedCLI(cli_ctx)
-        cli.invoke(command=command, subscription=subscription)
+        cli = EmbeddedCLI(cli_ctx, capture_stderr=init_capture_stderr)
+        cli.invoke(command=command, subscription=subscription, capture_stderr=capture_stderr)
+        import pdb; pdb.set_trace()
+        assert mocked_azclient.exception_handler.calls
 
         # Due to forced json output
         command += " -o json"

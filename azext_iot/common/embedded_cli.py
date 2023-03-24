@@ -24,10 +24,12 @@ class EmbeddedCLI(object):
         self.user_subscription = cli_ctx.data.get('subscription_id') if cli_ctx else None
         self.capture_stderr = capture_stderr
 
-    def invoke(self, command: str, subscription: Optional[str] = None, capture_stderr: bool = False):
+    def invoke(self, command: str, subscription: Optional[str] = None, capture_stderr: Optional[bool] = None):
         output_file = StringIO()
+        old_exception_handler = None
 
-        if capture_stderr or self.capture_stderr:
+        # if capture_stderr is defined, use that, otherwise default to capture_stderr
+        if (capture_stderr is None and self.capture_stderr) or capture_stderr:
             # Stop exception from being logged
             old_exception_handler = self.az_cli.exception_handler
             self.az_cli.exception_handler = lambda _: None
@@ -58,7 +60,7 @@ class EmbeddedCLI(object):
             self.output,
         )
 
-        if capture_stderr or self.capture_stderr:
+        if old_exception_handler:
             self.az_cli.exception_handler = old_exception_handler
 
         output_file.close()
