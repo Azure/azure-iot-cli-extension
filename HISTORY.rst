@@ -7,6 +7,10 @@ Release History
 0.21.1
 +++++++++++++++
 
+**General Updates**
+
+* Removal of `az iot product`.
+
 **IoT Hub updates**
 
 * Deprecation of parameter `--layered` for `az iot edge deployment create`. The help examples have been improved to describe how to correctly
