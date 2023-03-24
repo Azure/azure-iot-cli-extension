@@ -11,6 +11,7 @@ import sys
 
 from unittest import mock
 from knack.util import CLIError
+from azure.cli.core.azclierror import CLIInternalError
 from azure.cli.core.extension import get_extension_path
 from azext_iot.common.utility import (
     handle_service_exception,
@@ -321,13 +322,19 @@ class TestVersionComparison(object):
 
 
 class TestEmbeddedCli(object):
-    @pytest.fixture(params=[0, 1])
+    @pytest.fixture(params=[0, 1, 2])
     def mocked_azclient(self, mocker, request):
         azclient = mocker.patch("azext_iot.common.embedded_cli.get_default_cli")
 
         def mock_invoke(args, out_file):
             azclient.return_value.exception_handler("Generic Issue")
-            out_file.write(json.dumps({"generickey": "genericvalue"}))
+            if request.param == 0:
+                out_file.write(json.dumps({"generickey": "genericvalue"}))
+            else:
+                out_file.write("Something not json")
+                returned_error = CLIError("Generic Error") if request.param == 1 else None
+                azclient.return_value.result.error = returned_error
+
             return request.param
 
         azclient.return_value.invoke.side_effect = mock_invoke
@@ -370,13 +377,22 @@ class TestEmbeddedCli(object):
         assert expected_args == actual_args[0]
         success = cli.success()
 
-        if mocked_azclient.test_meta.error_code == 1:
+        if mocked_azclient.test_meta.error_code > 0:
             assert not success
         elif mocked_azclient.test_meta.error_code == 0:
             assert success
 
         assert cli.output
-        assert cli.as_json()
+        if success:
+            assert cli.as_json()
+        elif mocked_azclient.test_meta.error_code == 1:
+            with pytest.raises(CLIError) as e:
+                cli.as_json()
+            assert "Generic Error" in str(e.value)
+        elif mocked_azclient.test_meta.error_code == 2:
+            with pytest.raises(CLIInternalError) as e:
+                cli.as_json()
+            assert "Issue parsing received payload" in str(e.value)
 
 
 class TestCliInit(object):
