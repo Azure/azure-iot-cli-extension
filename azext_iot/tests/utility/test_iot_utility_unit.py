@@ -323,11 +323,13 @@ class TestVersionComparison(object):
 class TestEmbeddedCli(object):
     @pytest.fixture(params=[0, 1])
     def mocked_azclient(self, mocker, request):
+        azclient = mocker.patch("azext_iot.common.embedded_cli.get_default_cli")
+
         def mock_invoke(args, out_file):
+            azclient.return_value.exception_handler("Generic Issue")
             out_file.write(json.dumps({"generickey": "genericvalue"}))
             return request.param
 
-        azclient = mocker.patch("azext_iot.common.embedded_cli.get_default_cli")
         azclient.return_value.invoke.side_effect = mock_invoke
         azclient.test_meta.error_code = request.param
         return azclient
@@ -351,8 +353,8 @@ class TestEmbeddedCli(object):
             cli_ctx.data["subscription_id"] = user_subscription
         cli = EmbeddedCLI(cli_ctx, capture_stderr=init_capture_stderr)
         cli.invoke(command=command, subscription=subscription, capture_stderr=capture_stderr)
-        import pdb; pdb.set_trace()
-        assert mocked_azclient.exception_handler.calls
+        expected_count = 0 if (capture_stderr is None and init_capture_stderr) or capture_stderr else 1
+        assert cli.az_cli.exception_handler.call_count == expected_count
 
         # Due to forced json output
         command += " -o json"
