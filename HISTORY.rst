@@ -7,10 +7,6 @@ Release History
 0.21.1
 +++++++++++++++
 
-**General Updates**
-
-* Removal of `az iot product`.
-
 **IoT Hub updates**
 
 * Improved help examples for `az iot edge deployment create` to describe how to correctly create a layered deployment.

@@ -375,6 +375,15 @@ def service_client_generic_errors(mocked_response, fixture_ghcs, request):
     yield mocked_response
 
 
+@pytest.fixture()
+def fixture_mock_aics_token(mocker):
+    patch = mocker.patch(
+        "azext_iot.product.providers.auth.AICSAuthentication.generate_token"
+    )
+    patch.return_value = "Bearer token"
+    return patch
+
+
 @pytest.fixture
 def fixture_dt_client(mocker, fixture_cmd):
     from azext_iot.sdk.digitaltwins.controlplane import (
