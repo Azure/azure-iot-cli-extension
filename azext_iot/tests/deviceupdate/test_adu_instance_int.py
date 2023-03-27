@@ -86,5 +86,6 @@ def test_instance_custom_storage_update_show_delete(provisioned_instances: Dict[
     # Delete synchronously
     assert cli.invoke(f"iot du instance delete -n {account_name} -i {instance_name} -y").success()
     assert not cli.invoke(
-        f"iot du instance show -n {account_name} -i {instance_name} -g {ACCOUNT_RG}"
+        f"iot du instance show -n {account_name} -i {instance_name} -g {ACCOUNT_RG}",
+        capture_stderr=True
     ).success()

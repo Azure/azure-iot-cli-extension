@@ -30,7 +30,7 @@ def test_account_show_delete(provisioned_accounts: Dict[str, dict]):
     cli.invoke(f"iot du account delete -n {acct_names[1]} -g {ACCOUNT_RG} -y")
     cli.invoke(f"iot du account wait -n {acct_names[0]} --deleted")
     for acct_name in acct_names:
-        assert not cli.invoke(f"iot du account show -n {acct_name} -g {ACCOUNT_RG}").success()
+        assert not cli.invoke(f"iot du account show -n {acct_name} -g {ACCOUNT_RG}", capture_stderr=True).success()
 
 
 @pytest.mark.adu_infrastructure(location="eastus2euap", public_network_access=False, sku="Free")

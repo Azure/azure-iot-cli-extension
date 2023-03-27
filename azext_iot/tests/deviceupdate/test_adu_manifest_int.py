@@ -461,7 +461,7 @@ def test_adu_manifest_init_v5(options, expected):
     ],
 )
 def test_adu_manifest_init_v5_invalid_path_required(options):
-    assert not cli.invoke(f"iot du update init v5 {options}").success()
+    assert not cli.invoke(f"iot du update init v5 {options}", capture_stderr=True).success()
 
 
 @pytest.mark.parametrize(
@@ -536,7 +536,7 @@ def test_adu_manifest_init_v5_validate_errors(options, no_validation):
     if no_validation:
         assert cli.invoke(f"iot du update init v5 {options} --no-validation").success()
     else:
-        assert not cli.invoke(f"iot du update init v5 {options}").success()
+        assert not cli.invoke(f"iot du update init v5 {options}", capture_stderr=True).success()
 
 
 @pytest.mark.parametrize(

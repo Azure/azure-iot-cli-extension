@@ -233,7 +233,10 @@ def test_instance_update_lifecycle(provisioned_instances_module: Dict[str, dict]
 
     for show_flag in device_class_subgroup_show_flags:
         # Error - flags for class requires group (device class subgroup op).
-        assert not cli.invoke(show_device_class_template_cmd.replace("#", show_flag).split("--group-id")[0]).success()
+        assert not cli.invoke(
+            show_device_class_template_cmd.replace("#", show_flag).split("--group-id")[0],
+            capture_stderr=True
+        ).success()
 
     show_device_class_best_update = cli.invoke(
         show_device_class_template_cmd.replace("#", device_class_subgroup_show_flags[0])).as_json()
@@ -647,5 +650,5 @@ def test_adu_set_config_defaults(provisioned_instances_module: Dict[str, dict]):
     assert cli.invoke("config set defaults.adu_account='' defaults.adu_instance='' defaults.adu_group=''").success()
 
     # Expect failure due to missing required param value.
-    assert not cli.invoke("iot du account show").success()
-    assert not cli.invoke("iot du device group list").success()
+    assert not cli.invoke("iot du account show", capture_stderr=True).success()
+    assert not cli.invoke("iot du device group list", capture_stderr=True).success()

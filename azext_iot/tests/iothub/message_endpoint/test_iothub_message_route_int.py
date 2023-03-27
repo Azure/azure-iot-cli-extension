@@ -38,7 +38,8 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     result = cli.invoke(
         "iot hub message-route create -n {} -g {} --rn {} --en {} -t {}".format(
             iot_hub, iot_rg, route_names[0], endpoint_name, RouteSourceType.DeviceMessages.value
-        )
+        ),
+        capture_stderr=True
     )
     assert not result.success()
 
