@@ -807,7 +807,8 @@ def load_arguments(self, _):
             "target_condition",
             options_list=["--target-condition", "--tc", "-t"],
             help="Target condition in which a device or module configuration applies to. "
-            "Configurations with no target condition will target no device or module.",
+            "Configurations with no target condition will target no device or module. "
+            "Use the following format: \"tags.environment='test'\".",
         )
         context.argument(
             "priority",
@@ -849,7 +850,7 @@ def load_arguments(self, _):
             "target_condition",
             options_list=["--target-condition", "--tc", "-t"],
             help="Target condition in which an edge deployment applies to. Deployments with no target condition "
-            "will target no device. Use the following format: \"tags.environment='test'\"",
+            "will target no device. Use the following format: \"tags.environment='test'\".",
         )
         context.argument(
             "priority",
