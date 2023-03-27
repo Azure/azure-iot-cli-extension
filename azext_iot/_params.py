@@ -888,7 +888,6 @@ def load_arguments(self, _):
             "modules that will layer on top of a base deployment. For example the routes specified in a layered "
             "deployment will merge with routes of the base deployment. Routes with the same name will be "
             "overwritten based on deployment priority.",
-            deprecate_info=context.deprecate(redirect="--no-validation", hide=True),
         )
         context.argument(
             "no_validation",
