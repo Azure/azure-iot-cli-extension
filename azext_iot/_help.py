@@ -1073,7 +1073,7 @@ helps[
 
                   Deployments are classified as layered only if the content has $edgeAgent and within the $edgeAgent object, properties.desired.x is defined,
                   where x can be anything. If you just have properties.desired, the deployment will be treated as a full (non-layered) deployment.
-                  We recommend being consistent in the formating $edgeAgent and $edgeHub for layered and full deployments.
+                  We recommend being consistent in formatting $edgeAgent and $edgeHub for layered and full deployments.
     examples:
     - name: Create a deployment with labels (bash syntax example) that applies for devices in 'building 9' and
             the environment is 'test'.
