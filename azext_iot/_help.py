@@ -1070,6 +1070,10 @@ helps[
 
                   Edge deployments can be created with user defined metrics for on demand evaluation.
                   User metrics are json and in the form of {"queries":{...}} or {"metrics":{"queries":{...}}}.
+
+                  Deployments are classified as layered only if the content has $edgeAgent and within the $edgeAgent object, properties.desired.x is defined,
+                  where x can be anything. If you just have properties.desired, the deployment will be treated as a full (non-layered) deployment.
+                  We recommend being consistent in formatting $edgeAgent and $edgeHub for layered and full deployments.
     examples:
     - name: Create a deployment with labels (bash syntax example) that applies for devices in 'building 9' and
             the environment is 'test'.
@@ -1087,37 +1091,35 @@ helps[
         --target-condition "tags.environment='dev'"
     - name: Create a layered deployment that applies for devices tagged with environment 'dev'.
             Both user metrics and modules content defined inline (powershell syntax example).
+            Note that this is a layered deployment because the $edgeAgent object has properties.desired.x defined.
       text: >
         az iot edge deployment create -d {deployment_name} -n {iothub_name}
         --content "{'modulesContent':{'`$edgeAgent':{'properties.desired.modules.mymodule0':{ }},'`$edgeHub':{'properties.desired.routes.myroute0':'FROM /messages/* INTO `$upstream'}}}"
         --target-condition "tags.environment='dev'"
         --priority 10
         --metrics "{'queries':{'mymetrik':'SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200'}}"
-        --layered
     - name: Create a layered deployment that applies for devices in 'building 9' and environment 'test'.
             Both user metrics and modules content defined inline (bash syntax example).
+            Note that this is a layered deployment because the $edgeAgent object has properties.desired.x defined.
       text: >
         az iot edge deployment create -d {deployment_name} -n {iothub_name}
         --content '{"modulesContent":{"$edgeAgent":{"properties.desired.modules.mymodule0":{ }},"$edgeHub":{"properties.desired.routes.myroute0":"FROM /messages/* INTO $upstream"}}}'
         --target-condition "tags.building=9 and tags.environment='test'"
         --metrics '{"queries":{"mymetrik":"SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200"}}'
-        --layered
-    - name: Create a layered deployment that applies for devices in 'building 9' and environment 'test'.
+    - name: Create a deployment that applies for devices in 'building 9' and environment 'test'.
             Both user metrics and modules content defined from file.
       text: >
         az iot edge deployment create -d {deployment_name} -n {iothub_name}
         --content layered_modules_content.json
         --target-condition "tags.building=9 and tags.environment='test'"
         --metrics metrics_content.json
-        --layered
-    - name: Create a layered deployment with an alternative input style of labels and metrics (shell agnostic)
+    - name: Create a deployment with an alternative input style of labels and metrics (shell agnostic)
       text: >
         az iot edge deployment create -d {deployment_name} -n {iothub_name}
         --content layered_modules_content.json
         --target-condition "tags.building=9 and tags.environment='test'"
         --custom-labels key0="value0" key1="value1"
         --custom-metric-queries mymetric1="select deviceId from devices where tags.location='US'" mymetric2="select *"
-        --layered
 """
 
 helps[
