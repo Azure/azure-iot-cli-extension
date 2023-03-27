@@ -78,9 +78,7 @@ class CertificateProvider(IoTHubProvider):
         else:
             command += f" --set properties.rootCertificate.enableRootCertificateV2={not root_ca}"
 
-        result = self.cli.invoke(command)
-        if not result.success():
-            return
+        result = self.cli.invoke(command, capture_stderr=True)
         return result.as_json()["properties"].get("rootCertificate")
 
     def _get_target_properties(self) -> Optional[Dict[str, str]]:
@@ -90,9 +88,7 @@ class CertificateProvider(IoTHubProvider):
                 self.target['resourcegroup'],
                 CA_TRANSITION_API_VERSION,
                 HUB_PROVIDER
-            )
+            ),
+            capture_stderr=True
         )
-        if not result.success():
-            # Error will already be printed out
-            return
         return result.as_json()["properties"]

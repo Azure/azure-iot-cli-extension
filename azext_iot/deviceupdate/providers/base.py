@@ -192,7 +192,7 @@ class DeviceUpdateAccountManager(DeviceUpdateClientHandler):
         self,
         resource_group_name: str,
     ) -> str:
-        resource_group_meta = self.cli.invoke(f"group show --name {resource_group_name}").as_json()
+        resource_group_meta = self.cli.invoke(f"group show --name {resource_group_name}", capture_stderr=True).as_json()
         return resource_group_meta["location"]
 
 

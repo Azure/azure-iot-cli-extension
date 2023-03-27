@@ -492,7 +492,7 @@ def stage_update(
     cli = EmbeddedCLI()
     # If the user is not logged in, 'account show' will fail asking the user to login
     # ensuring we have credentials and a subscription.
-    az_account_info = cli.invoke("account show").as_json()
+    az_account_info = cli.invoke("account show", capture_stderr=True).as_json()
     target_storage_sub = storage_account_subscription or cmd.cli_ctx.data.get("subscription_id") or az_account_info.get("id")
     storage_manager = StorageAccountManager(subscription_id=target_storage_sub)
     blob_service_client = storage_manager.get_sas_blob_service_client(account_name=storage_account_name)

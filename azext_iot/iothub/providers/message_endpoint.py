@@ -307,7 +307,8 @@ def get_eventhub_cstring(
         "eventhubs eventhub authorization-rule keys list --namespace-name {} --resource-group {} "
         "--eventhub-name {} --name {} --subscription {}".format(
             namespace_name, rg, eventhub_name, policy_name, sub
-        )
+        ),
+        capture_stderr=True
     ).as_json()["primaryConnectionString"]
 
 
@@ -318,7 +319,8 @@ def get_servicebus_topic_cstring(
         "servicebus topic authorization-rule keys list --namespace-name {} --resource-group {} "
         "--topic-name {} --name {} --subscription {}".format(
             namespace_name, rg, topic_name, policy_name, sub
-        )
+        ),
+        capture_stderr=True
     ).as_json()["primaryConnectionString"]
 
 
@@ -329,7 +331,8 @@ def get_servicebus_queue_cstring(
         "servicebus queue authorization-rule keys list --namespace-name {} --resource-group {} "
         "--queue-name {} --name {}  --subscription {}".format(
             namespace_name, rg, queue_name, policy_name, sub
-        )
+        ),
+        capture_stderr=True
     ).as_json()["primaryConnectionString"]
 
 
@@ -339,7 +342,8 @@ def get_cosmos_db_cstring(
     output = cmd.invoke(
         'cosmosdb keys list --resource-group {} --name {} --type connection-strings --subscription {}'.format(
             rg, account_name, sub
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     for cs_object in output["connectionStrings"]:
@@ -351,5 +355,6 @@ def get_storage_cstring(cmd, account_name: str, rg: str, sub: str) -> str:
     return cmd.invoke(
         "storage account show-connection-string -n {} -g {}  --subscription {}".format(
             account_name, rg, sub
-        )
+        ),
+        capture_stderr=True
     ).as_json()["connectionString"]

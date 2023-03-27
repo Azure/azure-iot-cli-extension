@@ -67,7 +67,7 @@ class ResourceProvider(DigitalTwinsResourceManager):
             from azext_iot.common.embedded_cli import EmbeddedCLI
             resource_group_meta = (
                 EmbeddedCLI(cli_ctx=self.cmd.cli_ctx)
-                .invoke("group show --name {}".format(resource_group_name))
+                .invoke("group show --name {}".format(resource_group_name), capture_stderr=True)
                 .as_json()
             )
             location = resource_group_meta["location"]

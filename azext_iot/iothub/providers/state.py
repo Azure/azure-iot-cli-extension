@@ -244,7 +244,10 @@ class StateProvider(IoTHubProvider):
             if not hub_rg:
                 hub_rg = control_plane_obj.additional_properties["resourcegroup"]
             hub_resource_id = control_plane_obj.id
-            hub_arm = cli.invoke(f"group export -n {hub_rg} --resource-ids '{hub_resource_id}' --skip-all-params").as_json()
+            hub_arm = cli.invoke(
+                f"group export -n {hub_rg} --resource-ids '{hub_resource_id}' --skip-all-params",
+                capture_stderr=True
+            ).as_json()
             hub_state["arm"] = hub_arm
             hub_resource = hub_state["arm"]["resources"][0]
             self.check_controlplane(hub_resource=hub_resource)
@@ -643,7 +646,8 @@ class StateProvider(IoTHubProvider):
                             account_name,
                             ep["resourceGroup"],
                             ep["subscriptionId"]
-                        )
+                        ),
+                        capture_stderr=True
                     ).as_json()
                 except AzCLIError:
                     logger.warning(
@@ -700,7 +704,8 @@ class StateProvider(IoTHubProvider):
                             endpoint_props["EntityPath"],
                             endpoint_props["SharedAccessKeyName"],
                             ep["subscriptionId"]
-                        )
+                        ),
+                        capture_stderr=True
                     ).as_json()["primaryConnectionString"]
                 except AzCLIError:
                     logger.warning(usr_msgs.SAVE_ENDPOINT_RETRIEVE_FAIL_MSG.format("Event Hub", ep["name"]))
@@ -746,7 +751,8 @@ class StateProvider(IoTHubProvider):
                             endpoint_props["EntityPath"],
                             endpoint_props["SharedAccessKeyName"],
                             ep["subscriptionId"]
-                        )
+                        ),
+                        capture_stderr=True
                     ).as_json()["primaryConnectionString"]
                 except AzCLIError:
                     logger.warning(usr_msgs.SAVE_ENDPOINT_RETRIEVE_FAIL_MSG.format("Service Bus Queue", ep["name"]))
@@ -792,7 +798,8 @@ class StateProvider(IoTHubProvider):
                             endpoint_props["EntityPath"],
                             endpoint_props["SharedAccessKeyName"],
                             ep["subscriptionId"]
-                        )
+                        ),
+                        capture_stderr=True
                     ).as_json()["primaryConnectionString"]
                 except AzCLIError:
                     logger.warning(
@@ -838,7 +845,8 @@ class StateProvider(IoTHubProvider):
                             endpoint_props["AccountName"],
                             ep["resourceGroup"],
                             ep["subscriptionId"]
-                        )
+                        ),
+                        capture_stderr=True
                     ).as_json()["connectionString"]
                 except AzCLIError:
                     logger.warning(
@@ -901,7 +909,8 @@ class StateProvider(IoTHubProvider):
                 file_upload["connectionString"] = cli.invoke(
                     "storage account show-connection-string -n {}".format(
                         endpoint_props["AccountName"]
-                    )
+                    ),
+                    capture_stderr=True
                 ).as_json()["connectionString"]
             except AzCLIError:
                 logger.warning(usr_msgs.SAVE_FILE_UPLOAD_RETRIEVE_FAIL_MSG)
