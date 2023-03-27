@@ -13,7 +13,7 @@ from knack.log import get_logger
 
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
-from azext_iot.tests.helpers import assign_role_assignment, get_closest_marker
+from azext_iot.tests.helpers import assign_role_assignment
 from azext_iot.tests.settings import (
     DynamoSettings,
     ENV_SET_TEST_IOTHUB_REQUIRED,
@@ -58,22 +58,22 @@ def assign_iot_dps_dataplane_rbac_role(target_dps):
 
 # IoT DPS fixtures
 @pytest.fixture(scope="module")
-def provisioned_iot_dps_module(request, provisioned_only_iot_hubs_session) -> dict:
-    result = _iot_dps_provisioner(request, provisioned_only_iot_hubs_session)
+def provisioned_iot_dps_module(provisioned_only_iot_hubs_session) -> dict:
+    result = _iot_dps_provisioner(provisioned_only_iot_hubs_session)
     yield result
     if result:
         _iot_dps_removal(result)
 
 
 @pytest.fixture(scope="module")
-def provisioned_iot_dps_no_hub_module(request) -> dict:
-    result = _iot_dps_provisioner(request)
+def provisioned_iot_dps_no_hub_module() -> dict:
+    result = _iot_dps_provisioner()
     yield result
     if result:
         _iot_dps_removal(result)
 
 
-def _iot_dps_provisioner(request, iot_hubs: Optional[List] = None) -> dict:
+def _iot_dps_provisioner(iot_hub: Optional[List] = None) -> dict:
     """Create a device provisioning service for testing purposes."""
     dps_name = settings.env.azext_iot_testdps or generate_dps_id()
     dps_list = cli.invoke(
@@ -93,8 +93,8 @@ def _iot_dps_provisioner(request, iot_hubs: Optional[List] = None) -> dict:
             logger.error(f"DPS {dps_name} specified in pytest settings not found. DPS will be created")
 
         base_command = f"iot dps create --name {dps_name} --resource-group {ENTITY_RG}"
-        if iot_hubs:
-            base_command += f" --tags hubname={iot_hubs[0]['name']}"
+        if iot_hub:
+            base_command += f" --tags hubname={iot_hub['name']}"
         target_dps = cli.invoke(base_command).as_json()
 
     assign_iot_dps_dataplane_rbac_role(target_dps)
@@ -102,8 +102,8 @@ def _iot_dps_provisioner(request, iot_hubs: Optional[List] = None) -> dict:
 
     # Add link between dps and first iot hub
     hub_host_name = None
-    if iot_hubs:
-        target_hub = iot_hubs[0]
+    if iot_hub:
+        target_hub = iot_hub
         linked_hubs = cli.invoke(
             "iot dps linked-hub list --dps-name {} -g {}".format(dps_name, ENTITY_RG)
         ).as_json()
@@ -130,7 +130,7 @@ def _iot_dps_provisioner(request, iot_hubs: Optional[List] = None) -> dict:
         "dps": target_dps,
         "connectionString": get_dps_cstring(dps_name, ENTITY_RG),
         "hubHostName": hub_host_name,
-        "hubConnectionString": iot_hubs[0]["connectionString"] if iot_hubs else None,
+        "hubConnectionString": iot_hub["connectionString"] if iot_hub else None,
         "certificates": []
     }
 
@@ -158,59 +158,43 @@ def _iot_dps_removal(dps):
         )
 
 
-# IoT Hub fixtures
+# IoT Hub fixtures for DPS
 @pytest.fixture(scope="session")
-def provisioned_only_iot_hubs_session(request) -> dict:
-    result = _iot_hubs_provisioner(request)
+def provisioned_only_iot_hubs_session() -> dict:
+    result = _iot_hubs_provisioner()
     yield result
     if result:
         _iot_hubs_removal(result)
 
 
-def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_storage=None):
-    hub_marker = get_closest_marker(request)
-    desired_location = None
-    desired_tags = None
-    desired_sys_identity = False
-    desired_user_identity = False
-    desired_storage = None
-    desired_count = 1
+def _iot_hubs_provisioner():
+    """Note that this will create min iot hub for a dps test."""
+    name = settings.env.azext_iot_testdps_hub or generate_hub_id()
+    hub_list = cli.invoke(
+        'iot hub list -g "{}"'.format(ENTITY_RG)
+    ).as_json()
 
-    if hub_marker:
-        desired_location = hub_marker.kwargs.get("location")
-        desired_tags = hub_marker.kwargs.get("desired_tags")
-        desired_sys_identity = hub_marker.kwargs.get("sys_identity", False)
-        desired_user_identity = hub_marker.kwargs.get("user_identity", False)
-        desired_storage = hub_marker.kwargs.get("storage")
-        desired_count = hub_marker.kwargs.get("count", 1)
+    # Check if the generated name is already used
+    target_hub = None
+    for hub in hub_list:
+        if hub["name"] == name:
+            target_hub = hub
+            break
 
-    hub_results = []
-    for _ in range(desired_count):
-        name = generate_hub_id()
+    # Create the min version dps and assign the correct roles
+    if not target_hub:
+        if settings.env.azext_iot_testdps_hub:
+            logger.error(f"Hub {name} specified in pytest settings not found. DPS will be created")
+
         base_create_command = f"iot hub create -n {name} -g {ENTITY_RG} --sku S1"
-        if desired_sys_identity:
-            base_create_command += " --mi-system-assigned"
-        if desired_user_identity and provisioned_user_identity:
-            user_identity_id = provisioned_user_identity["id"]
-            base_create_command += f" --mi-user-assigned {user_identity_id}"
-        if desired_tags:
-            base_create_command += f" --tags {desired_tags}"
-        if desired_location:
-            base_create_command += f" -l {desired_location}"
-        if desired_storage and provisioned_storage:
-            storage_cstring = provisioned_storage["connectionString"]
-            base_create_command += f" --fcs {storage_cstring} --fc fileupload"
+        target_hub = cli.invoke(base_create_command).as_json()
 
-        hub_obj = cli.invoke(base_create_command).as_json()
-
-        hub_results.append({
-            "hub": hub_obj,
-            "name": name,
-            "rg": ENTITY_RG,
-            "connectionString": _get_hub_connection_string(name, ENTITY_RG),
-            "storage": provisioned_storage
-        })
-    return hub_results
+    return {
+        "hub": target_hub,
+        "name": name,
+        "rg": ENTITY_RG,
+        "connectionString": _get_hub_connection_string(name, ENTITY_RG),
+    }
 
 
 def _get_hub_connection_string(name, rg, policy="iothubowner"):
@@ -222,8 +206,8 @@ def _get_hub_connection_string(name, rg, policy="iothubowner"):
 
 
 def _iot_hubs_removal(hub_result):
-    for hub in hub_result:
-        name = hub["name"]
+    if not settings.env.azext_iot_testdps_hub:
+        name = hub_result["name"]
         delete_result = cli.invoke(f"iot hub delete -n {name} -g {ENTITY_RG}")
         if not delete_result.success():
             logger.error(f"Failed to delete iot hub resource {name}.")
