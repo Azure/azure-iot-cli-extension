@@ -954,6 +954,8 @@ helps[
       text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props 'key0=value0;key1=value1'
     - name: Send system properties (Message Id and Correlation Id)
       text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props '$.mid=<id>;$.cid=<id>'
+    - name: Send custom data by specifying content-type and content-encoding in system properties
+      text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props '$.ct=<content-type>;$.ce=<content-encoding>' --data {message_body}
 """
 
 helps[
@@ -1066,41 +1068,44 @@ helps[
                   Deployment content is json and in the form of {"modulesContent":{...}} or {"content":{"modulesContent":{...}}}.
 
                   By default properties of system modules $edgeAgent and $edgeHub are validated against schemas installed with the IoT extension.
-                  This can be disabled by using the --no-validation switch.
+                  This validation is intended for base deployments. If the corresponding schema is not available or base deployment format is not detected,
+                  this step will be skipped. Schema validation can be disabled by using the --no-validation switch.
 
-                  Edge deployments can be created with user defined metrics for on demand evaluation.
-                  User metrics are json and in the form of {"queries":{...}} or {"metrics":{"queries":{...}}}.
+                  An edge deployment is classified as layered if a module has properties.desired.* defined.
+                  Any edge device targeted by a layered deployment, first needs a base deployment applied to it.
 
-                  Deployments are classified as layered only if the content has $edgeAgent and within the $edgeAgent object, properties.desired.x is defined,
-                  where x can be anything. If you just have properties.desired, the deployment will be treated as a full (non-layered) deployment.
-                  We recommend being consistent in formatting $edgeAgent and $edgeHub for layered and full deployments.
+                  Any layered deployments targeting a device must have a higher priority than the base deployment for that device.
+
+                  Note: If the properties.desired field of a module twin is set in a layered deployment,
+                  properties.desired will overwrite the desired properties for that module in any lower priority deployments.
     examples:
     - name: Create a deployment with labels (bash syntax example) that applies for devices in 'building 9' and
             the environment is 'test'.
       text: >
         az iot edge deployment create -d {deployment_name} -n {iothub_name}
-        --content modules_content.json
+        --content ./modules_content.json
         --labels '{"key0":"value0", "key1":"value1"}'
         --target-condition "tags.building=9 and tags.environment='test'"
         --priority 3
     - name: Create a deployment with labels (powershell syntax example) that applies for devices tagged with environment 'dev'.
       text: >
         az iot edge deployment create -d {deployment_name} -n {iothub_name}
-        --content modules_content.json
+        --content ./modules_content.json
         --labels "{'key':'value'}"
         --target-condition "tags.environment='dev'"
     - name: Create a layered deployment that applies for devices tagged with environment 'dev'.
             Both user metrics and modules content defined inline (powershell syntax example).
-            Note that this is a layered deployment because the $edgeAgent object has properties.desired.x defined.
+            Note that this is in layered deployment format as properties.desired.* has been defined.
       text: >
         az iot edge deployment create -d {deployment_name} -n {iothub_name}
-        --content "{'modulesContent':{'`$edgeAgent':{'properties.desired.modules.mymodule0':{ }},'`$edgeHub':{'properties.desired.routes.myroute0':'FROM /messages/* INTO `$upstream'}}}"
+        --content "{'modulesContent':{'`$edgeAgent':{
+          'properties.desired.modules.mymodule0':{ }},'`$edgeHub':{'properties.desired.routes.myroute0':'FROM /messages/* INTO `$upstream'}}}"
         --target-condition "tags.environment='dev'"
         --priority 10
         --metrics "{'queries':{'mymetrik':'SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200'}}"
     - name: Create a layered deployment that applies for devices in 'building 9' and environment 'test'.
             Both user metrics and modules content defined inline (bash syntax example).
-            Note that this is a layered deployment because the $edgeAgent object has properties.desired.x defined.
+            Note that this is in layered deployment format as properties.desired.* has been defined.
       text: >
         az iot edge deployment create -d {deployment_name} -n {iothub_name}
         --content '{"modulesContent":{"$edgeAgent":{"properties.desired.modules.mymodule0":{ }},"$edgeHub":{"properties.desired.routes.myroute0":"FROM /messages/* INTO $upstream"}}}'
@@ -1110,15 +1115,15 @@ helps[
             Both user metrics and modules content defined from file.
       text: >
         az iot edge deployment create -d {deployment_name} -n {iothub_name}
-        --content layered_modules_content.json
+        --content ./modules_content.json
         --target-condition "tags.building=9 and tags.environment='test'"
-        --metrics metrics_content.json
-    - name: Create a deployment with an alternative input style of labels and metrics (shell agnostic)
+        --metrics ./metrics_content.json
+    - name: Create a deployment whose definition is from file with shell-agnostic input of labels and metrics.
       text: >
         az iot edge deployment create -d {deployment_name} -n {iothub_name}
-        --content layered_modules_content.json
+        --content ./modules_content.json
         --target-condition "tags.building=9 and tags.environment='test'"
-        --custom-labels key0="value0" key1="value1"
+        --custom-labels key0=value0 key1=value1
         --custom-metric-queries mymetric1="select deviceId from devices where tags.location='US'" mymetric2="select *"
 """
 
