@@ -954,6 +954,8 @@ helps[
       text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props 'key0=value0;key1=value1'
     - name: Send system properties (Message Id and Correlation Id)
       text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props '$.mid=<id>;$.cid=<id>'
+    - name: Send custom data by specifying content-type and content-encoding in system properties
+      text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props '$.ct=<content-type>;$.ce=<content-encoding>'  --data {message_body}
 """
 
 helps[
