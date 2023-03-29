@@ -9,7 +9,7 @@ Release History
 
 **IoT Hub updates**
 
-* Improved help examples for `az iot edge deployment create` to describe how to correctly create a layered deployment.
+* Improved help for `az iot edge deployment create` to better describe layered deployments.
 
 * The command `az iot edge export-modules` is now GA.
 
