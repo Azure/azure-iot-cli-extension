@@ -1066,7 +1066,7 @@ helps[
                   Deployment content is json and in the form of {"modulesContent":{...}} or {"content":{"modulesContent":{...}}}.
 
                   By default properties of system modules $edgeAgent and $edgeHub are validated against schemas installed with the IoT extension.
-                  This validation is intended for base deployments. If the corresponding schema is not available or a base deployment is not detected,
+                  This validation is intended for base deployments. If the corresponding schema is not available or base deployment format is not detected,
                   this step will be skipped. Schema validation can be disabled by using the --no-validation switch.
 
                   An edge deployment is classified as layered if a module has properties.desired.* defined.
@@ -1103,7 +1103,7 @@ helps[
         --metrics "{'queries':{'mymetrik':'SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200'}}"
     - name: Create a layered deployment that applies for devices in 'building 9' and environment 'test'.
             Both user metrics and modules content defined inline (bash syntax example).
-            Note that this is in layered deployment format properties.desired.* has been defined.
+            Note that this is in layered deployment format as properties.desired.* has been defined.
       text: >
         az iot edge deployment create -d {deployment_name} -n {iothub_name}
         --content '{"modulesContent":{"$edgeAgent":{"properties.desired.modules.mymodule0":{ }},"$edgeHub":{"properties.desired.routes.myroute0":"FROM /messages/* INTO $upstream"}}}'
