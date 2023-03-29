@@ -4,8 +4,14 @@ Release History
 ===============
 
 
-unreleased
+0.21.1
 +++++++++++++++
+
+**IoT Hub updates**
+
+* Improved help for `az iot edge deployment create` to better describe layered deployments.
+
+* The command `az iot edge export-modules` is now GA.
 
 
 0.21.0

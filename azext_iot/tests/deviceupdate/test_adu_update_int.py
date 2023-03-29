@@ -284,7 +284,12 @@ def test_instance_update_lifecycle(provisioned_instances_module: Dict[str, dict]
     assert len(show_device_group_best_updates) == 1
     assert show_device_group_best_updates[0]["deviceClassId"] == device_class_id
     assert show_device_group_best_updates[0]["groupId"] == device_group_id
-    assert show_device_group_best_updates[0]["update"]["updateId"] == show_simple_update["updateId"]
+
+    for update_kpi in ["name", "provider", "version"]:
+        assert (
+            update_kpi in show_device_group_best_updates[0]["update"]["updateId"]
+            and show_device_group_best_updates[0]["update"]["updateId"][update_kpi] == simple_manifest_id[update_kpi]
+        )
 
     show_device_group_update_compliance = cli.invoke(
         show_device_group_template_cmd.replace("#", device_group_show_flags[2])).as_json()
