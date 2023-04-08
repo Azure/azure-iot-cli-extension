@@ -46,3 +46,5 @@ DEVICETWIN_MONITOR_TIME_SEC = 15
 # (Lib name, minimum version (including), maximum version (excluding))
 EVENT_LIB = ("uamqp", "1.2", "1.3")
 PNP_DTDLV2_COMPONENT_MARKER = "__t"
+MAX_SUPPORTED_IOTHUB_API_VERSION = "2022-04-30-preview"
+MIN_SUPPORTED_IOTHUB_API_VERSION = "2021-07-02"

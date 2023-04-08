@@ -14,7 +14,9 @@ from azext_iot.common.shared import SdkType, AuthenticationTypeDataplane
 from azext_iot.constants import (
     USER_AGENT,
     IOTHUB_RESOURCE_ID,
-    IOTDPS_RESOURCE_ID
+    IOTDPS_RESOURCE_ID,
+    MAX_SUPPORTED_IOTHUB_API_VERSION,
+    MIN_SUPPORTED_IOTHUB_API_VERSION,
 )
 from msrestazure.azure_exceptions import CloudError
 
@@ -40,8 +42,11 @@ def iot_hub_service_factory(cli_ctx, *_):
     """
     from azure.cli.core.commands.client_factory import get_mgmt_service_client
     from azure.cli.core.profiles import ResourceType
+    from azext_iot.common.utility import test_import_and_version
 
-    return get_mgmt_service_client(cli_ctx, ResourceType.MGMT_IOTHUB)
+    if test_import_and_version("azure-mgmt-iothub", "2.3.0"):
+        return get_mgmt_service_client(cli_ctx, ResourceType.MGMT_IOTHUB, api_version=MAX_SUPPORTED_IOTHUB_API_VERSION)
+    return get_mgmt_service_client(cli_ctx, ResourceType.MGMT_IOTHUB, api_version=MIN_SUPPORTED_IOTHUB_API_VERSION)
 
 
 def iot_service_provisioning_factory(cli_ctx, *_):
@@ -109,10 +114,7 @@ class SdkResolver(object):
         if self.auth_override:
             credentials = self.auth_override
         elif self.target["policy"] == AuthenticationTypeDataplane.login.value:
-            credentials = IoTOAuth(
-                cmd=self.target["cmd"],
-                resource_id=IOTHUB_RESOURCE_ID
-            )
+            credentials = IoTOAuth(cmd=self.target["cmd"], resource_id=IOTHUB_RESOURCE_ID)
         else:
             credentials = SasTokenAuthentication(
                 uri=self.sas_uri,
@@ -130,10 +132,7 @@ class SdkResolver(object):
         if self.auth_override:
             credentials = self.auth_override
         elif self.target["policy"] == AuthenticationTypeDataplane.login.value:
-            credentials = IoTOAuth(
-                cmd=self.target["cmd"],
-                resource_id=IOTDPS_RESOURCE_ID
-            )
+            credentials = IoTOAuth(cmd=self.target["cmd"], resource_id=IOTDPS_RESOURCE_ID)
         else:
             credentials = SasTokenAuthentication(
                 uri=self.sas_uri,
@@ -141,6 +140,4 @@ class SdkResolver(object):
                 shared_access_key=self.target["primarykey"],
             )
 
-        return ProvisioningServiceClient(
-            credentials=credentials, base_url=self.endpoint
-        )
+        return ProvisioningServiceClient(credentials=credentials, base_url=self.endpoint)

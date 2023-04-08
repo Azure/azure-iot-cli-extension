@@ -360,7 +360,7 @@ def url_encode_str(s, plus=False):
     return quote_plus(s) if plus else quote(s)
 
 
-def test_import_and_version(package, expected_version):
+def test_import_and_version(package: str, expected_version: str):
     """
     Used to determine if a package dependency, installed with metadata,
     is at least the expected version. This utility will not work for packages
