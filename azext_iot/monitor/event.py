@@ -73,7 +73,7 @@ def send_c2d_message(
             with open(data, "rb") as f:
                 data = f.read()
         else:
-            with open(data, "r") as f:
+            with open(data, "r", encoding="utf-8") as f:
                 data = f.read()
     else:
         # Ensures valid json when content_type is application/json

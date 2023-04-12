@@ -4,16 +4,13 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import base64
-from genericpath import exists
 import os
 import pprint
 from time import sleep
 from typing import Any, Dict, Optional
 
-from azext_iot.common.utility import ensure_azure_namespace_path, read_file_content
+from azext_iot.common.utility import ensure_azure_namespace_path
 from azure.cli.core.azclierror import RequiredArgumentMissingError
-from win32comext.shell.demos.IFileOperationProgressSink import FileOperationProgressSink
 
 printer = pprint.PrettyPrinter(indent=2)
 
@@ -79,7 +76,7 @@ class MQTTProvider(object):
                 with open(message_content, "rb") as f:
                     data = f.read()
             else:
-                with open(message_content, "r") as f:
+                with open(message_content, "r", encoding="utf-8") as f:
                     data = f.read()
         else:
             data = message_content

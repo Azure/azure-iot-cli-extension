@@ -4,7 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import base64
 from os.path import exists, basename
 from time import time, sleep
 from typing import Dict, Optional
