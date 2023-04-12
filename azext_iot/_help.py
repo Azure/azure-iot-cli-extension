@@ -961,7 +961,7 @@ helps[
     short-summary: Send an mqtt device-to-cloud message.
     long-summary: |
                    The command supports sending messages with application and system properties.
-                   
+
                    The command supports sending messages with custom payload in string or bytes format,
                    the command only takes file path as input when the message is set to sent in bytes format.
                    for example: the payload can be sent in binary when contentType system property is

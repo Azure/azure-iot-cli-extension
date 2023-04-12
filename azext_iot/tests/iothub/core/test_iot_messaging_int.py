@@ -32,6 +32,7 @@ messaging_data_path = get_context_path(__file__, "test_messaging_data.json")
 messaging_unicodable_data_path = get_context_path(__file__, "test_messaging_unicodable_binary_data.bin")
 messaging_non_unicodable_data_path = get_context_path(__file__, "test_messaging_non_unicodable_binary_data.bin")
 
+
 class TestIoTHubMessaging(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTHubMessaging, self).__init__(
@@ -151,7 +152,8 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             )
         ).get_output_in_json()
 
-        assert result["data"].replace("\n", "").replace(" ", "") == self.kwargs["messaging_data"].replace("\r\n", "").replace(" ", "")
+        assert result["data"].replace("\n", "").replace(" ", "") == \
+            self.kwargs["messaging_data"].replace("\r\n", "").replace(" ", "")
 
         system_props = result["properties"]["system"]
         assert system_props["ContentEncoding"] == test_ce
@@ -670,7 +672,8 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         device_events.append((device_ids[0], send_d2c_msg))
 
         self.cmd(
-            "iot device send-d2c-message -d {} -n {} -g {} --da '{}' -p '$.ct=application/json;$.ce=utf-8' --cp {} --kp {}".format(
+            """iot device send-d2c-message -d {} -n {} -g {} --da '{}' -p '$.ct=application/json;$.ce=utf-8'
+            --cp {} --kp {}""".format(
                 device_ids[0], self.entity_name, self.entity_rg, messaging_data_path,
                 f"{device_ids[0]}-cert.pem", f"{device_ids[0]}-key.pem"
             )
@@ -745,7 +748,8 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         device_events.append((device_ids[1], send_d2c_msg))
 
         self.cmd(
-            "iot device send-d2c-message -d {} -n {} -g {} --da '{}' -p '$.ct=application/octet-stream' --cp {} --kp {} --pass {}".format(
+            """iot device send-d2c-message -d {} -n {} -g {} --da '{}' -p '$.ct=application/octet-stream'
+            --cp {} --kp {} --pass {}""".format(
                 device_ids[1], self.entity_name, self.entity_rg, messaging_unicodable_data_path,
                 f"{device_ids[1]}-cert.pem", f"{device_ids[1]}-key.pem", fake_pass
             )
@@ -753,7 +757,8 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         device_events.append((device_ids[1], self.kwargs["messaging_unicodable_data"]))
 
         self.cmd(
-            "iot device send-d2c-message -d {} -n {} -g {} --da '{}' -p '$.ct=application/octet-stream' --cp {} --kp {} --pass {}".format(
+            """iot device send-d2c-message -d {} -n {} -g {} --da '{}' -p '$.ct=application/octet-stream'
+            --cp {} --kp {} --pass {}""".format(
                 device_ids[1], self.entity_name, self.entity_rg, messaging_non_unicodable_data_path,
                 f"{device_ids[1]}-cert.pem", f"{device_ids[1]}-key.pem", fake_pass
             )
