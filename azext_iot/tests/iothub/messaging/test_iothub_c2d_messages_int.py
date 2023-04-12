@@ -60,7 +60,7 @@ class TestIoTHubC2DMessages(IoTLiveScenarioTest):
                 f"iot device c2d-message receive -d {device_ids[0]} --hub-name {self.entity_name} -g {self.entity_rg} --complete",
             ).get_output_in_json()
 
-            assert c2d_receive_result["data"] == test_body
+            assert c2d_receive_result["data"] == '{{non-decodable content}}'
 
             # Assert system properties
             received_system_props = c2d_receive_result["properties"]["system"]

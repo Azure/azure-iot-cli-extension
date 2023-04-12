@@ -152,8 +152,8 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             )
         ).get_output_in_json()
 
-        assert result["data"].replace("\n", "").replace(" ", "") == \
-            self.kwargs["messaging_data"].replace("\r\n", "").replace(" ", "")
+        assert self._remove_json_newlines_spaces(payload=result["data"]) == \
+            self._remove_json_newlines_spaces(payload=self.kwargs["messaging_data"])
 
         system_props = result["properties"]["system"]
         assert system_props["ContentEncoding"] == test_ce
@@ -1489,6 +1489,18 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
     def _parse_monitor_output(self, monitor_output):
         monitor_output = monitor_output.split("...")[1].replace("\n", "")
         return json.loads("[" + monitor_output.replace("}{", "},{") + "]")
+    
+    def _remove_json_newlines_spaces(self, payload):
+        if isinstance(payload, dict):
+            payload = json.dumps(payload)
+
+        # Remove \n and \r characters
+        payload = payload.replace('\n', '')
+        payload = payload.replace('\r', '')
+
+        # Remove spaces
+        payload = payload.replace(' ', '')
+        return payload
 
     def _monitor_checker(self, enqueued_time, device_events):
         # Monitor events for all devices to check that the messages were sent
@@ -1509,9 +1521,8 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 # when the payload is JSON, there will not be a data field
                 # so use the payload directly and do formatting before comparison
                 if payload is None:
-                    payload = json.dumps(monitor_event["payload"])
-                    payload = payload.replace(" ", "")
-                    device_events[i] = (device_events[i][0], device_events[i][1].replace("\r\n", "").replace(" ", ""))
+                    payload = self._remove_json_newlines_spaces(payload=monitor_event["payload"])
+                    device_events[i] = (device_events[i][0], self._remove_json_newlines_spaces(payload=device_events[i][1]))
             event = (monitor_event["origin"], payload)
             assert event == device_events[i]
         device_events.clear()
