@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from typing import List
+from azext_iot.monitor.utility import unicode_decode
 from knack.log import get_logger
 
 from azext_iot.monitor.models.enum import Severity
@@ -18,15 +19,7 @@ class Issue:
         self.details = details
         self.device_id = device_id
         data = next(message.get_data())
-
-        for encoding in ["utf-8", "utf-16", "utf-32"]:
-            try:
-                data = data.decode(encoding)
-                break
-            except (UnicodeError, UnicodeDecodeError):
-                continue
-        else:
-            data = "Failed to represent content in unicode format."
+        data = unicode_decode(data=data, default="Failed to represent content in unicode format.")
 
         if not self.device_id:
             self.device_id = "Unknown"
