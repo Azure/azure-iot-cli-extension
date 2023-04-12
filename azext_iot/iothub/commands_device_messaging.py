@@ -37,7 +37,7 @@ def iot_device_send_message(
         certificate_file=certificate_file,
         key_file=key_file,
         passphrase=passphrase,
-        model_id=model_id,
+        model_id=model_id
     )
 
 

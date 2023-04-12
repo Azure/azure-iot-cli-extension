@@ -4,12 +4,16 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import base64
+from genericpath import exists
+import os
 import pprint
 from time import sleep
 from typing import Any, Dict, Optional
 
-from azext_iot.common.utility import ensure_azure_namespace_path
+from azext_iot.common.utility import ensure_azure_namespace_path, read_file_content
 from azure.cli.core.azclierror import RequiredArgumentMissingError
+from win32comext.shell.demos.IFileOperationProgressSink import FileOperationProgressSink
 
 printer = pprint.PrettyPrinter(indent=2)
 
@@ -61,11 +65,26 @@ class MQTTProvider(object):
         self.init_reported_properties = init_reported_properties
 
     def send_d2c_message(
-        self, message_text: str, properties: Optional[Dict[str, Any]] = None
+        self, message_content: str, properties: Optional[Dict[str, Any]] = None
     ):
         from azure.iot.device import Message
 
-        message = Message(message_text)
+        if os.path.exists(message_content):
+            binary_content = False
+            if properties:
+                binary_content = properties.get("$.ct", None) == 'application/octet-stream'
+
+            # send bytes as message when content type is defined as binary
+            if binary_content:
+                with open(message_content, "rb") as f:
+                    data = f.read()
+            else:
+                with open(message_content, "r") as f:
+                    data = f.read()
+        else:
+            data = message_content
+
+        message = Message(data)
         message.custom_properties = properties
         self.device_client.send_message(message)
 
@@ -159,7 +178,7 @@ class MQTTProvider(object):
                 self.device_client.patch_twin_reported_properties(self.init_reported_properties)
 
             for _ in tqdm(range(0, msg_count), desc='Device simulation in progress', ascii=' #'):
-                self.send_d2c_message(message_text=data.generate(True), properties=properties)
+                self.send_d2c_message(message_content=data.generate(True), properties=properties)
                 sleep(publish_delay)
 
         except Exception as x:

@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import json
+import os
 import uamqp
 import yaml
 
@@ -57,18 +58,32 @@ def send_c2d_message(
     if content_type:
         msg_props.content_type = content_type
 
-        # Ensures valid json when content_type is application/json
-        content_type = content_type.lower()
-        if "application/json" in content_type:
-            data = json.dumps(process_json_arg(data, "data"))
-
     if content_encoding:
         msg_props.content_encoding = content_encoding
 
     if expiry_time_utc:
         msg_props.absolute_expiry_time = int(expiry_time_utc)
 
-    msg_body = data.encode(encoding=content_encoding)
+    content_type = content_type.lower() if content_type else ""
+    if os.path.exists(data):
+        binary_content = 'application/octet-stream' in content_type
+
+        # send bytes as message when content type is defined as binary
+        if binary_content:
+            with open(data, "rb") as f:
+                data = f.read()
+        else:
+            with open(data, "r") as f:
+                data = f.read()
+    else:
+        # Ensures valid json when content_type is application/json
+        if "application/json" in content_type:
+            data = json.dumps(process_json_arg(data, "data"))
+
+    if isinstance(data, str) and content_encoding in ["utf-8", "utf-16", "utf-32"]:
+        msg_body = data.encode(encoding=content_encoding)
+    else:
+        msg_body = data
 
     message = uamqp.Message(
         body=msg_body, properties=msg_props, application_properties=app_props

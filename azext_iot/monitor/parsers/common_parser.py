@@ -191,10 +191,17 @@ class CommonParser(AbstractBaseParser):
 
     def _parse_payload(self, message: Message, content_type):
         payload = ""
-        data = message.get_data()
+        data = next(message.get_data())
 
         if data:
-            payload = str(next(data), "utf8")
+            for encoding in ["utf-8", "utf-16", "utf-32"]:
+                try:
+                    payload = data.decode(encoding)
+                    break
+                except (UnicodeError, UnicodeDecodeError):
+                    continue
+            else:
+                payload = "{{non-unicode decodable payload}}"
 
         if "application/json" in content_type.lower():
             return self._try_parse_json(payload)

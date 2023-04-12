@@ -1,0 +1,14 @@
+{
+    "customJSONProperties": [
+        {
+            "key": "customProperty1",
+            "value": "customValue1"
+        },
+        {
+            "key": "customProperty2",
+            "nestedProperty": {
+                "customProperty3": "customValue3",
+                "customProperty4": "customValue4"}
+        }
+    ]
+}

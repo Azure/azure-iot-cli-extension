@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import base64
 from os.path import exists, basename
 from time import time, sleep
 from typing import Dict, Optional
@@ -83,7 +84,7 @@ class DeviceMessagingProvider(IoTHubProvider):
             model_id=model_id
         )
         for _ in range(msg_count):
-            client_mqtt.send_d2c_message(message_text=data, properties=properties)
+            client_mqtt.send_d2c_message(message_content=data, properties=properties)
         client_mqtt.shutdown()
 
     def device_send_message_http(self, data: str, headers: dict = None):
@@ -214,8 +215,13 @@ class DeviceMessagingProvider(IoTHubProvider):
 
                 if result.content:
                     target_encoding = result.headers.get("ContentEncoding", "utf-8")
-                    logger.info(f"Decoding message data encoded with: {target_encoding}")
-                    payload["data"] = result.content.decode(target_encoding)
+                    payload["data"] = "{{non-decodable content}}"
+                    if target_encoding in ["utf-8", "utf8", "utf-32"]:
+                        logger.info(f"Decoding message data encoded with: {target_encoding}")
+                        try:
+                            payload["data"] = result.content.decode(target_encoding)
+                        except Exception:
+                            pass
 
                 return payload
             return

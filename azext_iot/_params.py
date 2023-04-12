@@ -641,7 +641,11 @@ def load_arguments(self, _):
             options_list=["--auth-type"],
             arg_type=hub_auth_type_dataplane_param_type,
         )
-        context.argument("data", options_list=["--data", "--da"], help="Message body.")
+        context.argument(
+            "data",
+            options_list=["--data", "--da"],
+            help="Message body. Provide file path, text or raw json."
+        )
         context.argument(
             "properties",
             options_list=["--properties", "--props", "-p"],

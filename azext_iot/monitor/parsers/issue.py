@@ -17,7 +17,16 @@ class Issue:
         self.severity = severity
         self.details = details
         self.device_id = device_id
-        self.message = str(message)
+        data = next(message.get_data())
+
+        for encoding in ["utf-8", "utf-16", "utf-32"]:
+            try:
+                data = data.decode(encoding)
+                break
+            except (UnicodeError, UnicodeDecodeError):
+                continue
+        else:
+            data = "Failed to represent content in unicode format."
 
         if not self.device_id:
             self.device_id = "Unknown"
