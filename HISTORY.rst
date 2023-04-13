@@ -13,8 +13,8 @@ unreleased
 
 **IoT device updates**
 
-* `az iot device send-d2c-message` now support inserting file path with `--file-path` argument.
-* `az iot device c2d-message send` now support inserting file path with `--file-path` argument.
+* `az iot device send-d2c-message` now support inserting file path with `--data-file-path` argument.
+* `az iot device c2d-message send` now support inserting file path with `--data-file-path` argument.
 * `az iot device c2d-message receive` now shows non-decodable message payload with rest of the properties.
 
 

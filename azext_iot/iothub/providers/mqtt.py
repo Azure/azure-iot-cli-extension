@@ -70,20 +70,20 @@ class MQTTProvider(object):
         from azure.iot.device import Message
 
         if message_file_path:
-            if os.path.exists(message_file_path):
-                binary_content = False
-                if properties:
-                    binary_content = properties.get("$.ct", None) == 'application/octet-stream'
-
-                # send bytes as message when content type is defined as binary
-                if binary_content:
-                    with open(message_file_path, "rb") as f:
-                        data = f.read()
-                else:
-                    with open(message_file_path, "r", encoding="utf-8") as f:
-                        data = f.read()
-            else:
+            if not os.path.exists(message_file_path):
                 raise FileNotFoundError("File path does not exist: {}".format(message_file_path))
+
+            binary_content = False
+            if properties:
+                binary_content = properties.get("$.ct", None) == 'application/octet-stream'
+
+            # send bytes as message when content type is defined as binary
+            if binary_content:
+                with open(message_file_path, "rb") as f:
+                    data = f.read()
+            else:
+                with open(message_file_path, "r", encoding="utf-8") as f:
+                    data = f.read()
         else:
             data = message_content
 

@@ -38,7 +38,7 @@ helps[
                   https://github.com/Azure/azure-uamqp-python
 
                   Note: The event will be displayed even if the message body is non-unicode decodable, in this case
-                  the event payload portion will be displayed as {{non-unicode decodable content}} with rest of the
+                  the event payload portion will be displayed as {{non-decodable payload}} with rest of the
                   event properties that are available.
     examples:
     - name: Basic usage
@@ -890,8 +890,8 @@ helps[
     type: command
     short-summary: Receive a cloud-to-device message.
     long-summary: |
-      The received message body will only be decoded when its content-encoding set to 'utf-8', 'utf-16' or 'utf-32'.
-      The message payload will be displayed as {{Non-decodable content}} when content-encoding is not set to one of the above,
+      The received message body will only be decoded when its content-encoding is set to 'utf-8', 'utf-16' or 'utf-32'.
+      The message payload will be displayed as {{non-decodable payload}} when content-encoding is not set to one of the above,
       or fails to decode even when content-encoding is set to one of the above.
 
       Note: Only one message ack argument [--complete, --reject, --abandon] will be accepted.
@@ -937,8 +937,8 @@ helps[
                   action when the content-encoding property is either utf-8, utf-16 or utf-32. If the content-encoding value
                   is not one of these, the property will still be sent with no encoding action taken.
 
-                  When sending a message body in bytes, the content-type is required to set to 'application/octet-stream', and
-                  it only takes a file path as input.
+                  When sending a binary message body, the content must be provided from a file (via `--data-file-path`) and
+                  content-type must be set to `application/octet-stream`.
     examples:
     - name: Basic usage with default message body
       text: >
@@ -949,12 +949,12 @@ helps[
     - name: Send a C2D message and wait for device acknowledgement
       text: >
         az iot device c2d-message send -d {device_id} -n {iothub_name} --ack full --wait
-    - name: Send a C2D message with in bytes from a file
+    - name: Send a C2D message in binary format from a file.
       text: >
-        az iot device c2d-message send -d {device_id} -n {iothub_name} --file-path {file_path} --content-type 'application/octet-stream'
-    - name: Send a C2D message with in JSON from a file
+        az iot device c2d-message send -d {device_id} -n {iothub_name} --data-file-path {file_path} --content-type 'application/octet-stream'
+    - name: Send a C2D message in JSON format from a file.
       text: >
-        az iot device c2d-message send -d {device_id} -n {iothub_name} --file-path {file_path} --content-type 'application/json'
+        az iot device c2d-message send -d {device_id} -n {iothub_name} --data-file-path {file_path} --content-type 'application/json'
 """
 
 helps[
@@ -990,9 +990,9 @@ helps[
     - name: Send custom data by specifying content-type and content-encoding in system properties
       text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props '$.ct=<content-type>;$.ce=<content-encoding>' --data {message_body}
     - name: Send custom data in binary format by specifying content-encoding in system properties
-      text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props '$.ct=application/octet-stream' --file-path {file_path}
+      text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props '$.ct=application/octet-stream' --data-file-path {file_path}
     - name: Send custom data in JSON format by specifying content-type and content-encoding in system properties
-      text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props '$.ct=application/json;$.ce=utf-8' --file-path {file_path}
+      text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props '$.ct=application/json;$.ce=utf-8' --data-file-path {file_path}
 """
 
 helps[

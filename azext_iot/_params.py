@@ -647,8 +647,8 @@ def load_arguments(self, _):
             help="Message body for text or raw json."
         )
         context.argument(
-            "file_path",
-            options_list=["--file-path", "--fp"],
+            "data_file_path",
+            options_list=["--data-file-path", "--dfp"],
             is_preview=True,
             help="""Provide path to file for message body payload. Please note when the payload needs
             to be sent as binary format, please use content type as application/octet-stream."""

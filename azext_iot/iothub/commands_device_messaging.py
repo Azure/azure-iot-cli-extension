@@ -15,7 +15,7 @@ def iot_device_send_message(
     cmd,
     device_id: str,
     data: str = "Ping from Az CLI IoT Extension",
-    file_path: Optional[str] = None,
+    data_file_path: Optional[str] = None,
     properties: Optional[str] = None,
     msg_count: int = 1,
     device_symmetric_key: Optional[str] = None,
@@ -32,7 +32,7 @@ def iot_device_send_message(
     )
     return messaging_provider.device_send_message(
         data=data,
-        file_path=file_path,
+        data_file_path=data_file_path,
         properties=properties,
         msg_count=msg_count,
         device_symmetric_key=device_symmetric_key,
@@ -114,7 +114,7 @@ def iot_c2d_message_send(
     cmd,
     device_id: str,
     data: str = "Ping from Az CLI IoT Extension",
-    file_path: Optional[str] = None,
+    data_file_path: Optional[str] = None,
     message_id: Optional[str] = None,
     correlation_id: Optional[str] = None,
     user_id: Optional[str] = None,
@@ -144,7 +144,7 @@ def iot_c2d_message_send(
     )
     return messaging_provider.c2d_message_send(
         data=data,
-        file_path=file_path,
+        data_file_path=data_file_path,
         message_id=message_id,
         correlation_id=correlation_id,
         user_id=user_id,

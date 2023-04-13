@@ -8,6 +8,7 @@ import json
 
 from time import sleep
 from uuid import uuid4
+from azext_iot.iothub.common import NON_DECODABLE_PAYLOAD
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.common.shared import AuthenticationTypeDataplane
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
@@ -61,7 +62,7 @@ class TestIoTHubC2DMessages(IoTLiveScenarioTest):
             ).get_output_in_json()
 
             if auth_phase == AuthenticationTypeDataplane.login.value:
-                assert c2d_receive_result["data"] == '{{non-decodable content}}'
+                assert c2d_receive_result["data"] == NON_DECODABLE_PAYLOAD
             else:
                 assert c2d_receive_result["data"] == test_body
 

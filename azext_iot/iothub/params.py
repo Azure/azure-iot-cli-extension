@@ -65,11 +65,11 @@ def load_iothub_arguments(self, _):
         context.argument(
             "data",
             options_list=["--data", "--da"],
-            help="Message body. Provide file path, text or raw json.")
+            help="Message body. Provide text or raw json.")
         context.argument(
-            "file_path",
+            "data_file_path",
             is_preview=True,
-            options_list=["--file-path", "--fp"],
+            options_list=["--data-file-path", "--dfp"],
             help="""Provide path to file for message body payload. Please note when the payload needs
             to be sent as binary format, please use content type as application/octet-stream."""
         )

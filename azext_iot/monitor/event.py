@@ -27,7 +27,7 @@ def send_c2d_message(
     target,
     device_id,
     data,
-    file_path=None,
+    data_file_path=None,
     message_id=None,
     correlation_id=None,
     ack=None,
@@ -67,25 +67,25 @@ def send_c2d_message(
 
     content_type = content_type.lower() if content_type else ""
 
-    if file_path:
-        if os.path.exists(file_path):
-            binary_content = 'application/octet-stream' in content_type
+    if data_file_path:
+        if not os.path.exists(data_file_path):
+            raise FileNotFoundError("File path {} does not exist.".format(data_file_path))
 
-            # send bytes as message when content type is defined as binary
-            if binary_content:
-                with open(file_path, "rb") as f:
-                    data = f.read()
-            else:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    data = f.read()
+        binary_content = 'application/octet-stream' in content_type
+
+        # send bytes as message when content type is defined as binary
+        if binary_content:
+            with open(data_file_path, "rb") as f:
+                data = f.read()
         else:
-            raise FileNotFoundError("File path {} does not exist.".format(file_path))
+            with open(data_file_path, "r", encoding="utf-8") as f:
+                data = f.read()
     else:
         # Ensures valid json when content_type is application/json
         if "application/json" in content_type:
             data = json.dumps(shell_safe_json_parse(data))
 
-    if isinstance(data, str) and content_encoding in ["utf-8", "utf-16", "utf-32"]:
+    if isinstance(data, str) and content_encoding in ["utf-8", "utf8", "utf-16", "utf16", "utf-32", "utf32"]:
         msg_body = data.encode(encoding=content_encoding)
     else:
         msg_body = data

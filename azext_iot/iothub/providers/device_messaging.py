@@ -7,6 +7,7 @@
 from os.path import exists, basename
 from time import time, sleep
 from typing import Dict, Optional
+from azext_iot.iothub.common import NON_DECODABLE_PAYLOAD
 from knack.log import get_logger
 from azext_iot.common.shared import DeviceAuthApiType, KeyType, ProtocolType, SdkType, SettleType
 from azext_iot.common.utility import (
@@ -55,7 +56,7 @@ class DeviceMessagingProvider(IoTHubProvider):
     def device_send_message(
         self,
         data: str = "Ping from Az CLI IoT Extension",
-        file_path: Optional[str] = None,
+        data_file_path: Optional[str] = None,
         properties: Optional[str] = None,
         msg_count: int = 1,
         device_symmetric_key: Optional[str] = None,
@@ -86,7 +87,7 @@ class DeviceMessagingProvider(IoTHubProvider):
         for _ in range(msg_count):
             client_mqtt.send_d2c_message(
                 message_content=data,
-                message_file_path=file_path,
+                message_file_path=data_file_path,
                 properties=properties
             )
         client_mqtt.shutdown()
@@ -219,8 +220,8 @@ class DeviceMessagingProvider(IoTHubProvider):
 
                 if result.content:
                     target_encoding = result.headers.get("ContentEncoding", "utf-8")
-                    payload["data"] = "{{non-decodable content}}"
-                    if target_encoding in ["utf-8", "utf8", "utf-32"]:
+                    payload["data"] = NON_DECODABLE_PAYLOAD
+                    if target_encoding in ["utf-8", "utf8", "utf-16", "utf16", "utf-32", "utf32"]:
                         logger.info(f"Decoding message data encoded with: {target_encoding}")
                         try:
                             payload["data"] = result.content.decode(target_encoding)
@@ -235,7 +236,7 @@ class DeviceMessagingProvider(IoTHubProvider):
     def c2d_message_send(
         self,
         data: str = "Ping from Az CLI IoT Extension",
-        file_path: Optional[str] = None,
+        data_file_path: Optional[str] = None,
         message_id: Optional[str] = None,
         correlation_id: Optional[str] = None,
         user_id: Optional[str] = None,
@@ -266,7 +267,7 @@ class DeviceMessagingProvider(IoTHubProvider):
             target=self.target,
             device_id=self.device_id,
             data=data,
-            file_path=file_path,
+            data_file_path=data_file_path,
             message_id=message_id,
             correlation_id=correlation_id,
             user_id=user_id,

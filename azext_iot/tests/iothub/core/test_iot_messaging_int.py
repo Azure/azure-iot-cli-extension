@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import os
+from azext_iot.iothub.common import NON_DECODABLE_PAYLOAD
 from azext_iot.tests.conftest import get_context_path
 import pytest
 import json
@@ -128,9 +129,9 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         # Send C2D message with json payload in file
         self.kwargs["messaging_data"] = read_file_content(messaging_data_path)
         self.kwargs["messaging_unicodable_data"] = read_file_content(messaging_unicodable_data_path)
-        self.kwargs["messaging_non_unicodable_data"] = "{{non-decodable content}}"
+        self.kwargs["messaging_non_unicodable_data"] = NON_DECODABLE_PAYLOAD
         self.cmd(
-            """iot device c2d-message send -d {} -n {} -g {} --fp '{}' --cid {} --mid {} --ct {} --expiry {}
+            """iot device c2d-message send -d {} -n {} -g {} --dfp '{}' --cid {} --mid {} --ct {} --expiry {}
             --ce {} --props {} -y""".format(
                 device_ids[0],
                 self.entity_name,
@@ -183,7 +184,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Send C2D message with binary payload in file
         self.cmd(
-            """iot device c2d-message send -d {} -n {} -g {} --fp '{}' --cid {} --mid {} --ct {} --expiry {}
+            """iot device c2d-message send -d {} -n {} -g {} --dfp '{}' --cid {} --mid {} --ct {} --expiry {}
             --ce {} --props {} -y""".format(
                 device_ids[0],
                 self.entity_name,
@@ -233,9 +234,9 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             checks=self.is_empty(),
         )
 
-        # Send C2D message with non-unicode decodable binary payload in file
+        # Send C2D message with non-decodable binary payload in file
         self.cmd(
-            """iot device c2d-message send -d {} -n {} -g {} --fp '{}' --cid {} --mid {} --ct {} --expiry {}
+            """iot device c2d-message send -d {} -n {} -g {} --dfp '{}' --cid {} --mid {} --ct {} --expiry {}
             --ce {} --props {} -y""".format(
                 device_ids[0],
                 self.entity_name,
@@ -287,7 +288,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Send C2D message with non-unicode content encoding
         self.cmd(
-            """iot device c2d-message send -d {} -n {} -g {} --fp '{}' --cid {} --mid {} --ct {} --expiry {}
+            """iot device c2d-message send -d {} -n {} -g {} --dfp '{}' --cid {} --mid {} --ct {} --expiry {}
             --ce {} --props {} -y""".format(
                 device_ids[0],
                 self.entity_name,
@@ -339,7 +340,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Error - Send C2D message with non existed file path
         self.cmd(
-            """iot device c2d-message send -d {} -n {} -g {} --fp '{}' --cid {} --mid {} --ct {} --expiry {}
+            """iot device c2d-message send -d {} -n {} -g {} --dfp '{}' --cid {} --mid {} --ct {} --expiry {}
             --ce {} --props {} -y""".format(
                 device_ids[0],
                 self.entity_name,
@@ -541,7 +542,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         send_d2c_msg = "Key Connection Send-D2C-Message"
         self.kwargs["messaging_data"] = read_file_content(messaging_data_path)
         self.kwargs["messaging_unicodable_data"] = read_file_content(messaging_unicodable_data_path)
-        self.kwargs["messaging_non_unicodable_data"] = "{{non-unicode decodable payload}}"
+        self.kwargs["messaging_non_unicodable_data"] = NON_DECODABLE_PAYLOAD
 
         keys = self.cmd(
             "iot hub device-identity create -d {} -n {} -g {}".format(
@@ -568,7 +569,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         device_events.append((device_id, send_d2c_msg))
 
         self.cmd(
-            "iot device send-d2c-message -d {} -n {} -g {} --fp '{}' -p '$.ct=application/json;$.ce=utf-8' --key {}".format(
+            "iot device send-d2c-message -d {} -n {} -g {} --dfp '{}' -p '$.ct=application/json;$.ce=utf-8' --key {}".format(
                 device_id, self.entity_name, self.entity_rg, messaging_data_path,
                 keys["primaryKey"]
             )
@@ -599,7 +600,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Send-d2c-message with secondary key and binary data
         self.cmd(
-            "iot device send-d2c-message -d {} -n {} -g {} --fp '{}' -p '$.ct=application/octet-stream' --key {}".format(
+            "iot device send-d2c-message -d {} -n {} -g {} --dfp '{}' -p '$.ct=application/octet-stream' --key {}".format(
                 device_id, self.entity_name, self.entity_rg, messaging_unicodable_data_path,
                 keys["secondaryKey"]
             )
@@ -607,7 +608,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         device_events.append((device_id, self.kwargs["messaging_unicodable_data"]))
 
         self.cmd(
-            "iot device send-d2c-message -d {} -n {} -g {} --fp '{}' -p '$.ct=application/octet-stream' --key {}".format(
+            "iot device send-d2c-message -d {} -n {} -g {} --dfp '{}' -p '$.ct=application/octet-stream' --key {}".format(
                 device_id, self.entity_name, self.entity_rg, messaging_non_unicodable_data_path,
                 keys["secondaryKey"]
             )
@@ -637,7 +638,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Error - send-d2c-message with non existed file path.
         self.cmd(
-            "iot device send-d2c-message -d {} -n {} -g {} --fp '{}' -p '$.ct=application/octet-stream' --key {}".format(
+            "iot device send-d2c-message -d {} -n {} -g {} --dfp '{}' -p '$.ct=application/octet-stream' --key {}".format(
                 device_id, self.entity_name, self.entity_rg, '123',
                 keys["secondaryKey"]
             ),
@@ -655,7 +656,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         send_d2c_msg = "Cert Connection Send-D2C-Message"
         self.kwargs["messaging_data"] = read_file_content(messaging_data_path)
         self.kwargs["messaging_unicodable_data"] = read_file_content(messaging_unicodable_data_path)
-        self.kwargs["messaging_non_unicodable_data"] = "{{non-unicode decodable payload}}"
+        self.kwargs["messaging_non_unicodable_data"] = NON_DECODABLE_PAYLOAD
 
         self.cmd(
             "iot hub device-identity create -d {} -n {} -g {} --am x509_thumbprint --valid-days 10 --od '{}'".format(
@@ -699,7 +700,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         device_events.append((device_ids[0], send_d2c_msg))
 
         self.cmd(
-            """iot device send-d2c-message -d {} -n {} -g {} --fp '{}' -p '$.ct=application/json;$.ce=utf-8'
+            """iot device send-d2c-message -d {} -n {} -g {} --dfp '{}' -p '$.ct=application/json;$.ce=utf-8'
             --cp {} --kp {}""".format(
                 device_ids[0], self.entity_name, self.entity_rg, messaging_data_path,
                 f"{device_ids[0]}-cert.pem", f"{device_ids[0]}-key.pem"
@@ -775,7 +776,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         device_events.append((device_ids[1], send_d2c_msg))
 
         self.cmd(
-            """iot device send-d2c-message -d {} -n {} -g {} --fp '{}' -p '$.ct=application/octet-stream'
+            """iot device send-d2c-message -d {} -n {} -g {} --dfp '{}' -p '$.ct=application/octet-stream'
             --cp {} --kp {} --pass {}""".format(
                 device_ids[1], self.entity_name, self.entity_rg, messaging_unicodable_data_path,
                 f"{device_ids[1]}-cert.pem", f"{device_ids[1]}-key.pem", fake_pass
@@ -784,7 +785,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         device_events.append((device_ids[1], self.kwargs["messaging_unicodable_data"]))
 
         self.cmd(
-            """iot device send-d2c-message -d {} -n {} -g {} --fp '{}' -p '$.ct=application/octet-stream'
+            """iot device send-d2c-message -d {} -n {} -g {} --dfp '{}' -p '$.ct=application/octet-stream'
             --cp {} --kp {} --pass {}""".format(
                 device_ids[1], self.entity_name, self.entity_rg, messaging_non_unicodable_data_path,
                 f"{device_ids[1]}-cert.pem", f"{device_ids[1]}-key.pem", fake_pass
@@ -794,7 +795,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Error - send-d2c-message with non existed file path.
         self.cmd(
-            """iot device send-d2c-message -d {} -n {} -g {} --fp '{}' -p '$.ct=application/octet-stream'
+            """iot device send-d2c-message -d {} -n {} -g {} --dfp '{}' -p '$.ct=application/octet-stream'
             --cp {} --kp {} --pass {}""".format(
                 device_ids[1], self.entity_name, self.entity_rg, '123',
                 f"{device_ids[1]}-cert.pem", f"{device_ids[1]}-key.pem", fake_pass
@@ -1306,14 +1307,14 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             ['{\\r\\n\\"payload_data1\\"\\"payload_value1\\"\\r\\n}'],
         )
 
-        self.kwargs["messaging_non_unicodable_data"] = "{{non-unicode decodable payload}}"
+        self.kwargs["messaging_non_unicodable_data"] = NON_DECODABLE_PAYLOAD
 
         # Send messages that contains non-unicode decodable message body
         iot_device_send_message(
             cmd=client,
             device_id=device_ids[i],
             hub_name=self.entity_name,
-            file_path=messaging_non_unicodable_data_path,
+            data_file_path=messaging_non_unicodable_data_path,
             properties="$.ct=application/octet-stream",
             msg_count=1,
             resource_group_name=self.entity_rg,
