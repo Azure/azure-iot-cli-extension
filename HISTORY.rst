@@ -9,13 +9,13 @@ unreleased
 
 **IoT Hub updates**
 
-* `az iot hub c2d-message send` now support inserting file path with `--data` argument.
-* `az iot hub c2d-message receive` now shows non-decodable message payload with rest of the properties.
 * Fix `az iot hub monitor-events` hangs when message payload failed to find representation in unicode.
 
 **IoT device updates**
 
-* `az iot device send-d2c-message` now support inserting file path with `--data` argument.
+* `az iot device send-d2c-message` now support inserting file path with `--file-path` argument.
+* `az iot device c2d-message send` now support inserting file path with `--file-path` argument.
+* `az iot device c2d-message receive` now shows non-decodable message payload with rest of the properties.
 
 
 0.21.1

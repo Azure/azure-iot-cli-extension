@@ -62,22 +62,28 @@ class MQTTProvider(object):
         self.init_reported_properties = init_reported_properties
 
     def send_d2c_message(
-        self, message_content: str, properties: Optional[Dict[str, Any]] = None
+        self,
+        message_content: str,
+        message_file_path: Optional[str] = None,
+        properties: Optional[Dict[str, Any]] = None
     ):
         from azure.iot.device import Message
 
-        if os.path.exists(message_content):
-            binary_content = False
-            if properties:
-                binary_content = properties.get("$.ct", None) == 'application/octet-stream'
+        if message_file_path:
+            if os.path.exists(message_file_path):
+                binary_content = False
+                if properties:
+                    binary_content = properties.get("$.ct", None) == 'application/octet-stream'
 
-            # send bytes as message when content type is defined as binary
-            if binary_content:
-                with open(message_content, "rb") as f:
-                    data = f.read()
+                # send bytes as message when content type is defined as binary
+                if binary_content:
+                    with open(message_file_path, "rb") as f:
+                        data = f.read()
+                else:
+                    with open(message_file_path, "r", encoding="utf-8") as f:
+                        data = f.read()
             else:
-                with open(message_content, "r", encoding="utf-8") as f:
-                    data = f.read()
+                raise FileNotFoundError("File path does not exist: {}".format(message_file_path))
         else:
             data = message_content
 

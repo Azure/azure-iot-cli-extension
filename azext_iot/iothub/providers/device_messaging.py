@@ -55,6 +55,7 @@ class DeviceMessagingProvider(IoTHubProvider):
     def device_send_message(
         self,
         data: str = "Ping from Az CLI IoT Extension",
+        file_path: Optional[str] = None,
         properties: Optional[str] = None,
         msg_count: int = 1,
         device_symmetric_key: Optional[str] = None,
@@ -83,7 +84,11 @@ class DeviceMessagingProvider(IoTHubProvider):
             model_id=model_id
         )
         for _ in range(msg_count):
-            client_mqtt.send_d2c_message(message_content=data, properties=properties)
+            client_mqtt.send_d2c_message(
+                message_content=data,
+                message_file_path=file_path,
+                properties=properties
+            )
         client_mqtt.shutdown()
 
     def device_send_message_http(self, data: str, headers: dict = None):
@@ -230,6 +235,7 @@ class DeviceMessagingProvider(IoTHubProvider):
     def c2d_message_send(
         self,
         data: str = "Ping from Az CLI IoT Extension",
+        file_path: Optional[str] = None,
         message_id: Optional[str] = None,
         correlation_id: Optional[str] = None,
         user_id: Optional[str] = None,
@@ -260,6 +266,7 @@ class DeviceMessagingProvider(IoTHubProvider):
             target=self.target,
             device_id=self.device_id,
             data=data,
+            file_path=file_path,
             message_id=message_id,
             correlation_id=correlation_id,
             user_id=user_id,

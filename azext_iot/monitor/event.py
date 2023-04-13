@@ -14,7 +14,7 @@ from uuid import uuid4
 from knack.log import get_logger
 from azext_iot.constants import USER_AGENT
 from azext_iot.common.shared import AuthenticationTypeDataplane
-from azext_iot.common.utility import process_json_arg
+from azext_iot.common.utility import shell_safe_json_parse
 from azext_iot.monitor.builders.hub_target_builder import AmqpBuilder
 from uamqp.authentication import JWTTokenAuth
 
@@ -27,6 +27,7 @@ def send_c2d_message(
     target,
     device_id,
     data,
+    file_path=None,
     message_id=None,
     correlation_id=None,
     ack=None,
@@ -65,20 +66,24 @@ def send_c2d_message(
         msg_props.absolute_expiry_time = int(expiry_time_utc)
 
     content_type = content_type.lower() if content_type else ""
-    if os.path.exists(data):
-        binary_content = 'application/octet-stream' in content_type
 
-        # send bytes as message when content type is defined as binary
-        if binary_content:
-            with open(data, "rb") as f:
-                data = f.read()
+    if file_path:
+        if os.path.exists(file_path):
+            binary_content = 'application/octet-stream' in content_type
+
+            # send bytes as message when content type is defined as binary
+            if binary_content:
+                with open(file_path, "rb") as f:
+                    data = f.read()
+            else:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    data = f.read()
         else:
-            with open(data, "r", encoding="utf-8") as f:
-                data = f.read()
+            raise FileNotFoundError("File path {} does not exist.".format(file_path))
     else:
         # Ensures valid json when content_type is application/json
         if "application/json" in content_type:
-            data = json.dumps(process_json_arg(data, "data"))
+            data = json.dumps(shell_safe_json_parse(data))
 
     if isinstance(data, str) and content_encoding in ["utf-8", "utf-16", "utf-32"]:
         msg_body = data.encode(encoding=content_encoding)

@@ -951,7 +951,10 @@ helps[
         az iot device c2d-message send -d {device_id} -n {iothub_name} --ack full --wait
     - name: Send a C2D message with in bytes from a file
       text: >
-        az iot device c2d-message send -d {device_id} -n {iothub_name} --data {file_path} --content-type 'application/octet-stream'
+        az iot device c2d-message send -d {device_id} -n {iothub_name} --file-path {file_path} --content-type 'application/octet-stream'
+    - name: Send a C2D message with in JSON from a file
+      text: >
+        az iot device c2d-message send -d {device_id} -n {iothub_name} --file-path {file_path} --content-type 'application/json'
 """
 
 helps[
@@ -986,8 +989,10 @@ helps[
       text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props '$.mid=<id>;$.cid=<id>'
     - name: Send custom data by specifying content-type and content-encoding in system properties
       text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props '$.ct=<content-type>;$.ce=<content-encoding>' --data {message_body}
-    - name: Send custom data in binary format by specifying content-type and content-encoding in system properties
-      text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props '$.ct=application/octet-stream' --data {file_path}
+    - name: Send custom data in binary format by specifying content-encoding in system properties
+      text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props '$.ct=application/octet-stream' --file-path {file_path}
+    - name: Send custom data in JSON format by specifying content-type and content-encoding in system properties
+      text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props '$.ct=application/json;$.ce=utf-8' --file-path {file_path}
 """
 
 helps[
