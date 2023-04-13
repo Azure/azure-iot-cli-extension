@@ -1489,7 +1489,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
     def _parse_monitor_output(self, monitor_output):
         monitor_output = monitor_output.split("...")[1].replace("\n", "")
         return json.loads("[" + monitor_output.replace("}{", "},{") + "]")
-    
+
     def _remove_json_newlines_spaces(self, payload):
         if isinstance(payload, dict):
             payload = json.dumps(payload)
