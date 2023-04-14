@@ -722,11 +722,19 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         for cert_name in ["root", device_ids[1]]:
             self.tracked_certs.append(cert_name + CERT_ENDING)
             self.tracked_certs.append(cert_name + KEY_ENDING)
-        self.cmd(
-            "iot hub certificate create --hub-name {} -g {} -n {} -p {}".format(
-                self.entity_name, self.entity_rg, "root", "root" + CERT_ENDING
+        certificates_result = self.cmd(
+            "iot hub certificate list --hub-name {} -g {}".format(
+                self.entity_name, self.entity_rg
             )
-        )
+        ).get_output_in_json()
+
+        # Create if the certificate name doesn't exist
+        if not any(cert["name"] == "root" for cert in certificates_result["value"]):
+            self.cmd(
+                "iot hub certificate create --hub-name {} -g {} -n {} -p {}".format(
+                    self.entity_name, self.entity_rg, "root", "root" + CERT_ENDING
+                )
+            )
 
         verification_code = self.cmd(
             "iot hub certificate generate-verification-code --hub-name {} -g {} -n {} -e *".format(
@@ -1325,7 +1333,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             "iot hub monitor-events -n {} -g {} --cg {} --et {} -y -p all".format(
                 self.entity_name, self.entity_rg, LIVE_CONSUMER_GROUPS[1], enqueued_time
             ),
-            ['{{non-unicode decodable payload}}'],
+            [NON_DECODABLE_PAYLOAD],
         )
 
         for cg in LIVE_CONSUMER_GROUPS:
