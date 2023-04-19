@@ -38,7 +38,7 @@ helps[
                   https://github.com/Azure/azure-uamqp-python
 
                   Note: The event will be displayed even if the message body is non-unicode decodable, in this case
-                  the event payload portion will be displayed as {{non-decodable payload}} with rest of the
+                  the event payload portion will be displayed as {{non-decodable payload}} with the rest of the
                   event properties that are available.
     examples:
     - name: Basic usage
@@ -965,10 +965,9 @@ helps[
     long-summary: |
                    The command supports sending messages with application and system properties.
 
-                   The command supports sending messages with custom payload in string or bytes format,
-                   the command only takes file path as input when the message is set to sent in bytes format.
-                   for example: the payload can be sent in binary when contentType system property is
-                   set to application/octet-stream.
+                   The command supports sending messages with custom payload in unicode string or binary format.
+                   When intending to send binary, the data should come from a file (via `--data-file-path`) and
+                   content type should be set to `application/octet-stream`.
 
                    Note: The command only works for symmetric key auth (SAS) based devices.
                    To enable querying on a message body in message routing, the contentType

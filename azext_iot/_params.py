@@ -651,7 +651,7 @@ def load_arguments(self, _):
             options_list=["--data-file-path", "--dfp"],
             is_preview=True,
             help="""Provide path to file for message body payload. Please note when the payload needs
-            to be sent as binary format, please use content type as application/octet-stream."""
+            to be sent in binary format, set the content type to application/octet-stream."""
         )
         context.argument(
             "properties",

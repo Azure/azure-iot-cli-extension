@@ -9,7 +9,7 @@ import os
 import uamqp
 import yaml
 
-from typing import Tuple, Union
+from typing import Optional, Tuple, Union
 from uuid import uuid4
 from knack.log import get_logger
 from azext_iot.constants import USER_AGENT
@@ -27,7 +27,7 @@ def send_c2d_message(
     target,
     device_id,
     data,
-    data_file_path=None,
+    data_file_path: Optional[str]=None,
     message_id=None,
     correlation_id=None,
     ack=None,
