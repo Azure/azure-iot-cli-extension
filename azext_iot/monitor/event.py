@@ -27,7 +27,7 @@ def send_c2d_message(
     target,
     device_id,
     data,
-    data_file_path: Optional[str]=None,
+    data_file_path: Optional[str] = None,
     message_id=None,
     correlation_id=None,
     ack=None,
