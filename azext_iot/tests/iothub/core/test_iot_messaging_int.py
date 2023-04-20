@@ -722,37 +722,30 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         for cert_name in ["root", device_ids[1]]:
             self.tracked_certs.append(cert_name + CERT_ENDING)
             self.tracked_certs.append(cert_name + KEY_ENDING)
-        certificates_result = self.cmd(
-            "iot hub certificate list --hub-name {} -g {}".format(
-                self.entity_name, self.entity_rg
-            )
-        ).get_output_in_json()
 
-        # Create if the certificate name doesn't exist
-        if not any(cert["name"] == "root" for cert in certificates_result["value"]):
-            self.cmd(
-                "iot hub certificate create --hub-name {} -g {} -n {} -p {}".format(
-                    self.entity_name, self.entity_rg, "root", "root" + CERT_ENDING
-                )
+        self.cmd(
+            "iot hub certificate create --hub-name {} -g {} -n {} -p {}".format(
+                self.entity_name, self.entity_rg, "root", "root" + CERT_ENDING
             )
+        )
 
-            verification_code = self.cmd(
-                "iot hub certificate generate-verification-code --hub-name {} -g {} -n {} -e *".format(
-                    self.entity_name, self.entity_rg, "root",
-                )
-            ).get_output_in_json()["properties"]["verificationCode"]
-
-            create_certificate(
-                subject=verification_code, valid_days=1, cert_output_dir=output_dir, cert_object=root_cert
+        verification_code = self.cmd(
+            "iot hub certificate generate-verification-code --hub-name {} -g {} -n {} -e *".format(
+                self.entity_name, self.entity_rg, "root",
             )
-            self.tracked_certs.append(verification_code + CERT_ENDING)
-            self.tracked_certs.append(verification_code + KEY_ENDING)
+        ).get_output_in_json()["properties"]["verificationCode"]
 
-            self.cmd(
-                "iot hub certificate verify --hub-name {} -g {} -n {} -p {} -e *".format(
-                    self.entity_name, self.entity_rg, "root", verification_code + CERT_ENDING
-                )
+        create_certificate(
+            subject=verification_code, valid_days=1, cert_output_dir=output_dir, cert_object=root_cert
+        )
+        self.tracked_certs.append(verification_code + CERT_ENDING)
+        self.tracked_certs.append(verification_code + KEY_ENDING)
+
+        self.cmd(
+            "iot hub certificate verify --hub-name {} -g {} -n {} -p {} -e *".format(
+                self.entity_name, self.entity_rg, "root", verification_code + CERT_ENDING
             )
+        )
 
         # create x509 CA device
         self.cmd(
