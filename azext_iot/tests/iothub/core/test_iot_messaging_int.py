@@ -736,23 +736,23 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 )
             )
 
-        verification_code = self.cmd(
-            "iot hub certificate generate-verification-code --hub-name {} -g {} -n {} -e *".format(
-                self.entity_name, self.entity_rg, "root",
-            )
-        ).get_output_in_json()["properties"]["verificationCode"]
+            verification_code = self.cmd(
+                "iot hub certificate generate-verification-code --hub-name {} -g {} -n {} -e *".format(
+                    self.entity_name, self.entity_rg, "root",
+                )
+            ).get_output_in_json()["properties"]["verificationCode"]
 
-        create_certificate(
-            subject=verification_code, valid_days=1, cert_output_dir=output_dir, cert_object=root_cert
-        )
-        self.tracked_certs.append(verification_code + CERT_ENDING)
-        self.tracked_certs.append(verification_code + KEY_ENDING)
-
-        self.cmd(
-            "iot hub certificate verify --hub-name {} -g {} -n {} -p {} -e *".format(
-                self.entity_name, self.entity_rg, "root", verification_code + CERT_ENDING
+            create_certificate(
+                subject=verification_code, valid_days=1, cert_output_dir=output_dir, cert_object=root_cert
             )
-        )
+            self.tracked_certs.append(verification_code + CERT_ENDING)
+            self.tracked_certs.append(verification_code + KEY_ENDING)
+
+            self.cmd(
+                "iot hub certificate verify --hub-name {} -g {} -n {} -p {} -e *".format(
+                    self.entity_name, self.entity_rg, "root", verification_code + CERT_ENDING
+                )
+            )
 
         # create x509 CA device
         self.cmd(
