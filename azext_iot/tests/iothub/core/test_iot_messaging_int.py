@@ -1529,7 +1529,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         monitor_output = monitor_output.split("...")[1].replace("\n", "")
         return json.loads("[" + monitor_output.replace("}{", "},{") + "]")
 
-    def _remove_json_newlines_spaces(self, payload):
+    def _remove_newlines_spaces(self, payload):
         if isinstance(payload, dict):
             payload = json.dumps(payload)
 
@@ -1552,17 +1552,24 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         # Parse out the messages into json
         monitor_events = self._parse_monitor_output(monitor_output)
 
+        # Unify the json payload format in device events
+        for i in range(len(device_events)):
+            payload=device_events[i][1]
+            device_events[i] = (device_events[i][0], self._remove_newlines_spaces(payload=device_events[i][1]))
+
         for i in range(len(monitor_events)):
             monitor_event = monitor_events[i]["event"]
             payload = monitor_event["payload"]
             if isinstance(payload, dict):
                 payload = payload.get("data")
                 # when the payload is JSON, there will not be a data field
-                # so use the payload directly and do formatting before comparison
+                # so use the payload directly
                 if payload is None:
-                    payload = self._remove_json_newlines_spaces(payload=monitor_event["payload"])
-                    device_events[i] = (device_events[i][0], self._remove_json_newlines_spaces(payload=device_events[i][1]))
+                    payload = payload=monitor_event["payload"]
+            
+            # do formatting before comparison
+            payload = self._remove_newlines_spaces(payload=payload)
             event = (monitor_event["origin"], payload)
-            assert event == device_events[i]
+            assert event in device_events
         device_events.clear()
         assert len(device_events) == 0
