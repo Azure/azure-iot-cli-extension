@@ -1568,7 +1568,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # Unify the json payload format in device events
         for i in range(len(device_events)):
-            payload=device_events[i][1]
+            payload = device_events[i][1]
             device_events[i] = (device_events[i][0], self._remove_newlines_spaces(payload=device_events[i][1]))
 
         for i in range(len(monitor_events)):
@@ -1579,8 +1579,8 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 # when the payload is JSON, there will not be a data field
                 # so use the payload directly
                 if payload is None:
-                    payload = payload=monitor_event["payload"]
-            
+                    payload = monitor_event["payload"]
+
             # do formatting before comparison
             payload = self._remove_newlines_spaces(payload=payload)
             event = (monitor_event["origin"], payload)
