@@ -153,8 +153,8 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             )
         ).get_output_in_json()
 
-        assert self._remove_json_newlines_spaces(payload=result["data"]) == \
-            self._remove_json_newlines_spaces(payload=self.kwargs["messaging_data"])
+        assert self._remove_newlines_spaces(payload=result["data"]) == \
+            self._remove_newlines_spaces(payload=self.kwargs["messaging_data"])
 
         system_props = result["properties"]["system"]
         assert system_props["ContentEncoding"] == test_ce
@@ -722,6 +722,20 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         for cert_name in ["root", device_ids[1]]:
             self.tracked_certs.append(cert_name + CERT_ENDING)
             self.tracked_certs.append(cert_name + KEY_ENDING)
+
+        certificates_result = self.cmd(
+            "iot hub certificate list --hub-name {} -g {}".format(
+                self.entity_name, self.entity_rg
+            )
+        ).get_output_in_json()
+
+        # delete the certificate if already exist before creation
+        if any(cert["name"] == "root" for cert in certificates_result["value"]):
+            self.cmd(
+                "iot hub certificate delete --hub-name {} -g {} -n {} -e *".format(
+                    self.entity_name, self.entity_rg, "root"
+                )
+            )
 
         self.cmd(
             "iot hub certificate create --hub-name {} -g {} -n {} -p {}".format(
