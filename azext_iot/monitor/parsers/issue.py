@@ -18,11 +18,8 @@ class Issue:
         self.severity = severity
         self.details = details
         self.device_id = device_id
-        if message:
-            message_body = next(message.get_data())
-            self.message = unicode_decode(data=message_body, default="Failed to represent content in unicode format.")
-        else:
-            self.message = None
+        message_body = next(message.get_data())
+        self.message = unicode_decode(data=message_body, default="Failed to represent content in unicode format.")
 
         if not self.device_id:
             self.device_id = "Unknown"
