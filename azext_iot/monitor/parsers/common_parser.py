@@ -6,6 +6,8 @@
 
 import json
 import re
+from azext_iot.iothub.common import NON_DECODABLE_PAYLOAD
+from azext_iot.monitor.utility import unicode_decode
 
 from uamqp.message import Message
 
@@ -191,10 +193,10 @@ class CommonParser(AbstractBaseParser):
 
     def _parse_payload(self, message: Message, content_type):
         payload = ""
-        data = message.get_data()
+        data = next(message.get_data())
 
         if data:
-            payload = str(next(data), "utf8")
+            payload = unicode_decode(data=data, default=NON_DECODABLE_PAYLOAD)
 
         if "application/json" in content_type.lower():
             return self._try_parse_json(payload)

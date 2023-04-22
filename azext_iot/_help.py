@@ -36,6 +36,10 @@ helps[
     long-summary: |
                   This command relies on and may install dependent Cython package (uamqp) upon first execution.
                   https://github.com/Azure/azure-uamqp-python
+
+                  Note: The event will be displayed even if the message body is non-unicode decodable, in this case
+                  the event payload portion will be displayed as {{non-decodable payload}} with the rest of the
+                  event properties that are available.
     examples:
     - name: Basic usage
       text: >
@@ -886,6 +890,10 @@ helps[
     type: command
     short-summary: Receive a cloud-to-device message.
     long-summary: |
+      The received message body will only be decoded when its content-encoding is set to 'utf-8', 'utf-16' or 'utf-32'.
+      The message payload will be displayed as {{non-decodable payload}} when content-encoding is not set to one of the above,
+      or fails to decode even when content-encoding is set to one of the above.
+
       Note: Only one message ack argument [--complete, --reject, --abandon] will be accepted.
     examples:
     - name: Basic usage
@@ -924,6 +932,13 @@ helps[
     long-summary: |
                   This command relies on and may install dependent Cython package (uamqp) upon first execution.
                   https://github.com/Azure/azure-uamqp-python
+
+                  Note: Content-encoding is defaulted to utf-8. The command will send the message body with encoding
+                  action when the content-encoding property is either utf-8, utf-16 or utf-32. If the content-encoding value
+                  is not one of these, the property will still be sent with no encoding action taken.
+
+                  When sending a binary message body, the content must be provided from a file (via `--data-file-path`) and
+                  content-type must be set to `application/octet-stream`.
     examples:
     - name: Basic usage with default message body
       text: >
@@ -934,6 +949,12 @@ helps[
     - name: Send a C2D message and wait for device acknowledgement
       text: >
         az iot device c2d-message send -d {device_id} -n {iothub_name} --ack full --wait
+    - name: Send a C2D message in binary format from a file.
+      text: >
+        az iot device c2d-message send -d {device_id} -n {iothub_name} --data-file-path {file_path} --content-type 'application/octet-stream'
+    - name: Send a C2D message in JSON format from a file.
+      text: >
+        az iot device c2d-message send -d {device_id} -n {iothub_name} --data-file-path {file_path} --content-type 'application/json'
 """
 
 helps[
@@ -944,7 +965,18 @@ helps[
     long-summary: |
                    The command supports sending messages with application and system properties.
 
-                   Note: The command only works for symmetric key auth (SAS) based devices
+                   The command supports sending messages with custom payload in unicode string or binary format.
+                   When intending to send binary, the data should come from a file (via `--data-file-path`) and
+                   content type should be set to `application/octet-stream`.
+
+                   Note: The command only works for symmetric key auth (SAS) based devices.
+                   To enable querying on a message body in message routing, the contentType
+                   system property must be application/JSON and the contentEncoding system
+                   property must be one of the UTF encoding values supported by that system
+                   property(UTF-8, UTF-16 or UTF-32). If the content encoding isn't set when
+                   Azure Storage is used as routing endpoint, then IoT Hub writes the messages
+                   in base 64 encoded format.
+
     examples:
     - name: Basic usage
       text: az iot device send-d2c-message -n {iothub_name} -d {device_id}
@@ -956,6 +988,10 @@ helps[
       text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props '$.mid=<id>;$.cid=<id>'
     - name: Send custom data by specifying content-type and content-encoding in system properties
       text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props '$.ct=<content-type>;$.ce=<content-encoding>' --data {message_body}
+    - name: Send custom data in binary format by specifying content-encoding in system properties
+      text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props '$.ct=application/octet-stream' --data-file-path {file_path}
+    - name: Send custom data in JSON format by specifying content-type and content-encoding in system properties
+      text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props '$.ct=application/json;$.ce=utf-8' --data-file-path {file_path}
 """
 
 helps[

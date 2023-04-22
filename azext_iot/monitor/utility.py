@@ -28,3 +28,16 @@ def get_loop() -> asyncio.AbstractEventLoop:
         asyncio.set_event_loop(loop)
 
     return loop
+
+
+def unicode_decode(data: bytes, default: str = None):
+    for encoding in ["utf-8", "utf-16", "utf-32"]:
+        try:
+            data = data.decode(encoding)
+            break
+        except (UnicodeError, UnicodeDecodeError):
+            continue
+    else:
+        data = default
+
+    return data
