@@ -122,7 +122,6 @@ def process_json_arg(
     content: str, argument_name: str = "content", preserve_order=False
 ):
     """Primary processor of json input"""
-
     json_from_file = None
 
     if os.path.exists(content):

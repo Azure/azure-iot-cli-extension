@@ -5,15 +5,16 @@
 # --------------------------------------------------------------------------------------------
 
 import json
+import os
 import uamqp
 import yaml
 
-from typing import Tuple, Union
+from typing import Optional, Tuple, Union
 from uuid import uuid4
 from knack.log import get_logger
 from azext_iot.constants import USER_AGENT
 from azext_iot.common.shared import AuthenticationTypeDataplane
-from azext_iot.common.utility import process_json_arg
+from azext_iot.common.utility import shell_safe_json_parse
 from azext_iot.monitor.builders.hub_target_builder import AmqpBuilder
 from uamqp.authentication import JWTTokenAuth
 
@@ -26,6 +27,7 @@ def send_c2d_message(
     target,
     device_id,
     data,
+    data_file_path: Optional[str] = None,
     message_id=None,
     correlation_id=None,
     ack=None,
@@ -57,18 +59,36 @@ def send_c2d_message(
     if content_type:
         msg_props.content_type = content_type
 
-        # Ensures valid json when content_type is application/json
-        content_type = content_type.lower()
-        if "application/json" in content_type:
-            data = json.dumps(process_json_arg(data, "data"))
-
     if content_encoding:
         msg_props.content_encoding = content_encoding
 
     if expiry_time_utc:
         msg_props.absolute_expiry_time = int(expiry_time_utc)
 
-    msg_body = data.encode(encoding=content_encoding)
+    content_type = content_type.lower() if content_type else ""
+
+    if data_file_path:
+        if not os.path.exists(data_file_path):
+            raise FileNotFoundError("File path {} does not exist.".format(data_file_path))
+
+        binary_content = 'application/octet-stream' in content_type
+
+        # send bytes as message when content type is defined as binary
+        if binary_content:
+            with open(data_file_path, "rb") as f:
+                data = f.read()
+        else:
+            with open(data_file_path, "r", encoding="utf-8") as f:
+                data = f.read()
+    else:
+        # Ensures valid json when content_type is application/json
+        if "application/json" in content_type:
+            data = json.dumps(shell_safe_json_parse(data))
+
+    if isinstance(data, str) and content_encoding in ["utf-8", "utf8", "utf-16", "utf16", "utf-32", "utf32"]:
+        msg_body = data.encode(encoding=content_encoding)
+    else:
+        msg_body = data
 
     message = uamqp.Message(
         body=msg_body, properties=msg_props, application_properties=app_props

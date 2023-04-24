@@ -36,6 +36,10 @@ helps[
     long-summary: |
                   This command relies on and may install dependent Cython package (uamqp) upon first execution.
                   https://github.com/Azure/azure-uamqp-python
+
+                  Note: The event will be displayed even if the message body is non-unicode decodable, in this case
+                  the event payload portion will be displayed as {{non-decodable payload}} with the rest of the
+                  event properties that are available.
     examples:
     - name: Basic usage
       text: >
@@ -886,6 +890,10 @@ helps[
     type: command
     short-summary: Receive a cloud-to-device message.
     long-summary: |
+      The received message body will only be decoded when its content-encoding is set to 'utf-8', 'utf-16' or 'utf-32'.
+      The message payload will be displayed as {{non-decodable payload}} when content-encoding is not set to one of the above,
+      or fails to decode even when content-encoding is set to one of the above.
+
       Note: Only one message ack argument [--complete, --reject, --abandon] will be accepted.
     examples:
     - name: Basic usage
@@ -924,6 +932,13 @@ helps[
     long-summary: |
                   This command relies on and may install dependent Cython package (uamqp) upon first execution.
                   https://github.com/Azure/azure-uamqp-python
+
+                  Note: Content-encoding is defaulted to utf-8. The command will send the message body with encoding
+                  action when the content-encoding property is either utf-8, utf-16 or utf-32. If the content-encoding value
+                  is not one of these, the property will still be sent with no encoding action taken.
+
+                  When sending a binary message body, the content must be provided from a file (via `--data-file-path`) and
+                  content-type must be set to `application/octet-stream`.
     examples:
     - name: Basic usage with default message body
       text: >
@@ -934,6 +949,12 @@ helps[
     - name: Send a C2D message and wait for device acknowledgement
       text: >
         az iot device c2d-message send -d {device_id} -n {iothub_name} --ack full --wait
+    - name: Send a C2D message in binary format from a file.
+      text: >
+        az iot device c2d-message send -d {device_id} -n {iothub_name} --data-file-path {file_path} --content-type 'application/octet-stream'
+    - name: Send a C2D message in JSON format from a file.
+      text: >
+        az iot device c2d-message send -d {device_id} -n {iothub_name} --data-file-path {file_path} --content-type 'application/json'
 """
 
 helps[
@@ -944,7 +965,18 @@ helps[
     long-summary: |
                    The command supports sending messages with application and system properties.
 
-                   Note: The command only works for symmetric key auth (SAS) based devices
+                   The command supports sending messages with custom payload in unicode string or binary format.
+                   When intending to send binary, the data should come from a file (via `--data-file-path`) and
+                   content type should be set to `application/octet-stream`.
+
+                   Note: The command only works for symmetric key auth (SAS) based devices.
+                   To enable querying on a message body in message routing, the contentType
+                   system property must be application/JSON and the contentEncoding system
+                   property must be one of the UTF encoding values supported by that system
+                   property(UTF-8, UTF-16 or UTF-32). If the content encoding isn't set when
+                   Azure Storage is used as routing endpoint, then IoT Hub writes the messages
+                   in base 64 encoded format.
+
     examples:
     - name: Basic usage
       text: az iot device send-d2c-message -n {iothub_name} -d {device_id}
@@ -954,6 +986,12 @@ helps[
       text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props 'key0=value0;key1=value1'
     - name: Send system properties (Message Id and Correlation Id)
       text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props '$.mid=<id>;$.cid=<id>'
+    - name: Send custom data by specifying content-type and content-encoding in system properties
+      text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props '$.ct=<content-type>;$.ce=<content-encoding>' --data {message_body}
+    - name: Send custom data in binary format by specifying content-encoding in system properties
+      text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props '$.ct=application/octet-stream' --data-file-path {file_path}
+    - name: Send custom data in JSON format by specifying content-type and content-encoding in system properties
+      text: az iot device send-d2c-message -n {iothub_name} -d {device_id} --props '$.ct=application/json;$.ce=utf-8' --data-file-path {file_path}
 """
 
 helps[
@@ -1066,58 +1104,63 @@ helps[
                   Deployment content is json and in the form of {"modulesContent":{...}} or {"content":{"modulesContent":{...}}}.
 
                   By default properties of system modules $edgeAgent and $edgeHub are validated against schemas installed with the IoT extension.
-                  This can be disabled by using the --no-validation switch.
+                  This validation is intended for base deployments. If the corresponding schema is not available or base deployment format is not detected,
+                  this step will be skipped. Schema validation can be disabled by using the --no-validation switch.
 
-                  Edge deployments can be created with user defined metrics for on demand evaluation.
-                  User metrics are json and in the form of {"queries":{...}} or {"metrics":{"queries":{...}}}.
+                  An edge deployment is classified as layered if a module has properties.desired.* defined.
+                  Any edge device targeted by a layered deployment, first needs a base deployment applied to it.
+
+                  Any layered deployments targeting a device must have a higher priority than the base deployment for that device.
+
+                  Note: If the properties.desired field of a module twin is set in a layered deployment,
+                  properties.desired will overwrite the desired properties for that module in any lower priority deployments.
     examples:
     - name: Create a deployment with labels (bash syntax example) that applies for devices in 'building 9' and
             the environment is 'test'.
       text: >
         az iot edge deployment create -d {deployment_name} -n {iothub_name}
-        --content modules_content.json
+        --content ./modules_content.json
         --labels '{"key0":"value0", "key1":"value1"}'
         --target-condition "tags.building=9 and tags.environment='test'"
         --priority 3
     - name: Create a deployment with labels (powershell syntax example) that applies for devices tagged with environment 'dev'.
       text: >
         az iot edge deployment create -d {deployment_name} -n {iothub_name}
-        --content modules_content.json
+        --content ./modules_content.json
         --labels "{'key':'value'}"
         --target-condition "tags.environment='dev'"
     - name: Create a layered deployment that applies for devices tagged with environment 'dev'.
             Both user metrics and modules content defined inline (powershell syntax example).
+            Note that this is in layered deployment format as properties.desired.* has been defined.
       text: >
         az iot edge deployment create -d {deployment_name} -n {iothub_name}
-        --content "{'modulesContent':{'`$edgeAgent':{'properties.desired.modules.mymodule0':{ }},'`$edgeHub':{'properties.desired.routes.myroute0':'FROM /messages/* INTO `$upstream'}}}"
+        --content "{'modulesContent':{'`$edgeAgent':{
+          'properties.desired.modules.mymodule0':{ }},'`$edgeHub':{'properties.desired.routes.myroute0':'FROM /messages/* INTO `$upstream'}}}"
         --target-condition "tags.environment='dev'"
         --priority 10
         --metrics "{'queries':{'mymetrik':'SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200'}}"
-        --layered
     - name: Create a layered deployment that applies for devices in 'building 9' and environment 'test'.
             Both user metrics and modules content defined inline (bash syntax example).
+            Note that this is in layered deployment format as properties.desired.* has been defined.
       text: >
         az iot edge deployment create -d {deployment_name} -n {iothub_name}
         --content '{"modulesContent":{"$edgeAgent":{"properties.desired.modules.mymodule0":{ }},"$edgeHub":{"properties.desired.routes.myroute0":"FROM /messages/* INTO $upstream"}}}'
         --target-condition "tags.building=9 and tags.environment='test'"
         --metrics '{"queries":{"mymetrik":"SELECT deviceId from devices where properties.reported.lastDesiredStatus.code = 200"}}'
-        --layered
-    - name: Create a layered deployment that applies for devices in 'building 9' and environment 'test'.
+    - name: Create a deployment that applies for devices in 'building 9' and environment 'test'.
             Both user metrics and modules content defined from file.
       text: >
         az iot edge deployment create -d {deployment_name} -n {iothub_name}
-        --content layered_modules_content.json
+        --content ./modules_content.json
         --target-condition "tags.building=9 and tags.environment='test'"
-        --metrics metrics_content.json
-        --layered
-    - name: Create a layered deployment with an alternative input style of labels and metrics (shell agnostic)
+        --metrics ./metrics_content.json
+    - name: Create a deployment whose definition is from file with shell-agnostic input of labels and metrics.
       text: >
         az iot edge deployment create -d {deployment_name} -n {iothub_name}
-        --content layered_modules_content.json
+        --content ./modules_content.json
         --target-condition "tags.building=9 and tags.environment='test'"
-        --custom-labels key0="value0" key1="value1"
+        --custom-labels key0=value0 key1=value1
         --custom-metric-queries mymetric1="select deviceId from devices where tags.location='US'" mymetric2="select *"
-        --layered
 """
 
 helps[

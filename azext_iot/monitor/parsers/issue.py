@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from typing import List
+from azext_iot.monitor.utility import unicode_decode
 from knack.log import get_logger
 
 from azext_iot.monitor.models.enum import Severity
@@ -17,7 +18,10 @@ class Issue:
         self.severity = severity
         self.details = details
         self.device_id = device_id
-        self.message = str(message)
+        self.message = None
+        if message:
+            message_body = next(message.get_data())
+            self.message = unicode_decode(data=message_body, default="Failed to represent content in unicode format.")
 
         if not self.device_id:
             self.device_id = "Unknown"
