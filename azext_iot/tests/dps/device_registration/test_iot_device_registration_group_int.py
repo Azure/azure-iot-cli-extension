@@ -410,7 +410,7 @@ def test_dps_device_registration_disabled_enrollment(provisioned_iot_dps_module)
             ),
         )
         if not result.success():
-            raise AssertionError(f"Failed to create enrollment group with attestation-type {auth_phase}")
+            raise AssertionError(f"Failed to create enrollment group with auth-type {auth_phase}")
 
         # Registration throws error
         registration_result = cli.invoke(
@@ -439,7 +439,7 @@ def test_dps_device_registration_disabled_enrollment(provisioned_iot_dps_module)
             assert registration["registrationId"] == device_id
             assert registration["status"] == "failed"
         except json.decoder.JSONDecodeError:
-            raise AssertionError(f"Failed to create unlinked hub registration with attestation-type {auth_phase}")
+            raise AssertionError(f"Failed to create unlinked hub registration with auth-type {auth_phase}")
 
 
 def _prepare_x509_certificates_for_dps(tracked_certs, dps_name, dps_rg, device_passwords=[None]):

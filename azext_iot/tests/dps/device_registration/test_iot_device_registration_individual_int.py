@@ -384,20 +384,21 @@ def test_dps_device_registration_unlinked_hub(provisioned_iot_dps_no_hub_module)
     dps_cstring = provisioned_iot_dps_no_hub_module["connectionString"]
     clean_dps_dataplane(cli, dps_cstring)
 
+    attestation_type = AttestationType.symmetricKey.value
     for auth_phase in DATAPLANE_AUTH_TYPES:
         enrollment_id = generate_names()
 
         # TODO: seems transient - as in permissions are there but sometimes the login fails
         result = cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment create --enrollment-id {enrollment_id} --attestation-type {auth_phase}"
+                f"iot dps enrollment create --enrollment-id {enrollment_id} --attestation-type {attestation_type}"
                 f" -g {dps_rg} --dps-name {dps_name}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
         )
         if not result.success():
-            raise AssertionError(f"Failed to create enrollment with attestation-type {auth_phase}")
+            raise AssertionError(f"Failed to create enrollment with auth-type {auth_phase}")
 
         # registration throws error
         registration_result = cli.invoke(
@@ -425,7 +426,7 @@ def test_dps_device_registration_unlinked_hub(provisioned_iot_dps_no_hub_module)
             assert registration["registrationId"] == enrollment_id
             assert registration["status"] == "failed"
         except json.decoder.JSONDecodeError:
-            raise AssertionError(f"Failed to create unlinked hub registration with attestation-type {auth_phase}")
+            raise AssertionError(f"Failed to create unlinked hub registration with auth-type {auth_phase}")
 
 
 def test_dps_device_registration_disabled_enrollment(provisioned_iot_dps_module):
