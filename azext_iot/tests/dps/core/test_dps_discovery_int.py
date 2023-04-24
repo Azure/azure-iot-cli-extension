@@ -32,25 +32,25 @@ def test_dps_discovery(provisioned_iot_dps_no_hub_module):
     policies = discovery.get_policies(resource_name=dps_name, rg=dps_rg)
     assert len(policies)
 
-    # Example for leveraging discovery to build cstring for every policy on target IotHub
+    # Example for leveraging discovery to build cstring for every policy on target DPS
     cstrings = [discovery._build_target(resource=resource, policy=p)["cs"] for p in policies]
     assert len(cstrings)
 
-    sub_hubs = discovery.get_resources()
-    assert sub_hubs
+    sub_dps = discovery.get_resources()
+    assert sub_dps
 
-    filtered_sub_hubs = [
-        hub for hub in sub_hubs if hub.as_dict()["name"] == dps_name
+    filtered_sub_dps = [
+        dps for dps in sub_dps if dps.as_dict()["name"] == dps_name
     ]
-    assert filtered_sub_hubs
+    assert filtered_sub_dps
 
-    rg_hubs = discovery.get_resources(rg=dps_rg)
-    assert rg_hubs
+    rg_dpss = discovery.get_resources(rg=dps_rg)
+    assert rg_dpss
 
-    filtered_rg_hubs = [hub for hub in rg_hubs if hub.as_dict()["name"] == dps_name]
-    assert filtered_rg_hubs
+    filtered_rg_dpss = [dps for dps in rg_dpss if dps.as_dict()["name"] == dps_name]
+    assert filtered_rg_dpss
 
-    assert len(rg_hubs) <= len(sub_hubs)
+    assert len(rg_dpss) <= len(sub_dps)
 
 
 def test_dps_targets(provisioned_iot_dps_no_hub_module):
