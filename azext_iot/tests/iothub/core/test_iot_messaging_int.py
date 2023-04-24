@@ -5,6 +5,8 @@
 # --------------------------------------------------------------------------------------------
 
 import os
+from azext_iot.iothub.common import NON_DECODABLE_PAYLOAD
+from azext_iot.tests.conftest import get_context_path
 import pytest
 import json
 
@@ -15,6 +17,7 @@ from azext_iot.tests.iothub import IoTLiveScenarioTest, PREFIX_DEVICE
 from azext_iot.common.utility import (
     execute_onthread,
     calculate_millisec_since_unix_epoch_utc,
+    read_file_content,
     validate_key_value_pairs
 )
 from azext_iot.tests.test_utils import create_certificate
@@ -25,6 +28,10 @@ logger = get_logger(__name__)
 
 LIVE_CONSUMER_GROUPS = ["test1", "test2", "test3"]
 MQTT_PROVIDER_SETUP_TIME = 15
+
+messaging_data_path = get_context_path(__file__, "test_messaging_data.json")
+messaging_unicodable_data_path = get_context_path(__file__, "test_messaging_unicodable_binary_data.bin")
+messaging_non_unicodable_data_path = get_context_path(__file__, "test_messaging_non_unicodable_binary_data.bin")
 
 
 class TestIoTHubMessaging(IoTLiveScenarioTest):
@@ -117,6 +124,236 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 device_ids[0], self.entity_name, self.entity_rg, etag
             ),
             checks=self.is_empty(),
+        )
+
+        # Send C2D message with json payload in file
+        self.kwargs["messaging_data"] = read_file_content(messaging_data_path)
+        self.kwargs["messaging_unicodable_data"] = read_file_content(messaging_unicodable_data_path)
+        self.kwargs["messaging_non_unicodable_data"] = NON_DECODABLE_PAYLOAD
+        self.cmd(
+            """iot device c2d-message send -d {} -n {} -g {} --dfp '{}' --cid {} --mid {} --ct {} --expiry {}
+            --ce {} --props {} -y""".format(
+                device_ids[0],
+                self.entity_name,
+                self.entity_rg,
+                messaging_data_path,
+                test_cid,
+                test_mid,
+                'application/json',
+                test_et,
+                test_ce,
+                test_props,
+            ),
+            checks=self.is_empty(),
+        )
+
+        result = self.cmd(
+            "iot device c2d-message receive -d {} --hub-name {} -g {}".format(
+                device_ids[0], self.entity_name, self.entity_rg
+            )
+        ).get_output_in_json()
+
+        assert self._remove_newlines_spaces(payload=result["data"]) == \
+            self._remove_newlines_spaces(payload=self.kwargs["messaging_data"])
+
+        system_props = result["properties"]["system"]
+        assert system_props["ContentEncoding"] == test_ce
+        assert system_props["ContentType"] == 'application/json'
+        assert system_props["iothub-correlationid"] == test_cid
+        assert system_props["iothub-messageid"] == test_mid
+        assert system_props["iothub-expiry"]
+        assert system_props["iothub-to"] == "/devices/{}/messages/devicebound".format(
+            device_ids[0]
+        )
+
+        # Ack is tested in message feedback tests
+        assert system_props["iothub-ack"] == "none"
+
+        app_props = result["properties"]["app"]
+        assert app_props == validate_key_value_pairs(test_props)
+
+        # Implicit etag assertion
+        etag = result["etag"]
+
+        self.cmd(
+            "iot device c2d-message complete -d {} --hub-name {} -g {} --etag {}".format(
+                device_ids[0], self.entity_name, self.entity_rg, etag
+            ),
+            checks=self.is_empty(),
+        )
+
+        # Send C2D message with binary payload in file
+        self.cmd(
+            """iot device c2d-message send -d {} -n {} -g {} --dfp '{}' --cid {} --mid {} --ct {} --expiry {}
+            --ce {} --props {} -y""".format(
+                device_ids[0],
+                self.entity_name,
+                self.entity_rg,
+                messaging_unicodable_data_path,
+                test_cid,
+                test_mid,
+                'application/octet-stream',
+                test_et,
+                test_ce,
+                test_props,
+            ),
+            checks=self.is_empty(),
+        )
+
+        result = self.cmd(
+            "iot device c2d-message receive -d {} --hub-name {} -g {}".format(
+                device_ids[0], self.entity_name, self.entity_rg
+            )
+        ).get_output_in_json()
+
+        assert result["data"] == self.kwargs["messaging_unicodable_data"]
+
+        system_props = result["properties"]["system"]
+        assert system_props["ContentEncoding"] == test_ce
+        assert system_props["ContentType"] == 'application/octet-stream'
+        assert system_props["iothub-correlationid"] == test_cid
+        assert system_props["iothub-messageid"] == test_mid
+        assert system_props["iothub-expiry"]
+        assert system_props["iothub-to"] == "/devices/{}/messages/devicebound".format(
+            device_ids[0]
+        )
+
+        # Ack is tested in message feedback tests
+        assert system_props["iothub-ack"] == "none"
+
+        app_props = result["properties"]["app"]
+        assert app_props == validate_key_value_pairs(test_props)
+
+        # Implicit etag assertion
+        etag = result["etag"]
+
+        self.cmd(
+            "iot device c2d-message complete -d {} --hub-name {} -g {} --etag {}".format(
+                device_ids[0], self.entity_name, self.entity_rg, etag
+            ),
+            checks=self.is_empty(),
+        )
+
+        # Send C2D message with non-decodable binary payload in file
+        self.cmd(
+            """iot device c2d-message send -d {} -n {} -g {} --dfp '{}' --cid {} --mid {} --ct {} --expiry {}
+            --ce {} --props {} -y""".format(
+                device_ids[0],
+                self.entity_name,
+                self.entity_rg,
+                messaging_non_unicodable_data_path,
+                test_cid,
+                test_mid,
+                'application/octet-stream',
+                test_et,
+                test_ce,
+                test_props,
+            ),
+            checks=self.is_empty(),
+        )
+
+        result = self.cmd(
+            "iot device c2d-message receive -d {} --hub-name {} -g {}".format(
+                device_ids[0], self.entity_name, self.entity_rg
+            )
+        ).get_output_in_json()
+
+        assert result["data"] == self.kwargs["messaging_non_unicodable_data"]
+
+        system_props = result["properties"]["system"]
+        assert system_props["ContentEncoding"] == test_ce
+        assert system_props["ContentType"] == 'application/octet-stream'
+        assert system_props["iothub-correlationid"] == test_cid
+        assert system_props["iothub-messageid"] == test_mid
+        assert system_props["iothub-expiry"]
+        assert system_props["iothub-to"] == "/devices/{}/messages/devicebound".format(
+            device_ids[0]
+        )
+
+        # Ack is tested in message feedback tests
+        assert system_props["iothub-ack"] == "none"
+
+        app_props = result["properties"]["app"]
+        assert app_props == validate_key_value_pairs(test_props)
+
+        # Implicit etag assertion
+        etag = result["etag"]
+
+        self.cmd(
+            "iot device c2d-message complete -d {} --hub-name {} -g {} --etag {}".format(
+                device_ids[0], self.entity_name, self.entity_rg, etag
+            ),
+            checks=self.is_empty(),
+        )
+
+        # Send C2D message with non-unicode content encoding
+        self.cmd(
+            """iot device c2d-message send -d {} -n {} -g {} --dfp '{}' --cid {} --mid {} --ct {} --expiry {}
+            --ce {} --props {} -y""".format(
+                device_ids[0],
+                self.entity_name,
+                self.entity_rg,
+                messaging_non_unicodable_data_path,
+                test_cid,
+                test_mid,
+                'application/octet-stream',
+                test_et,
+                'gzip',
+                test_props,
+            ),
+            checks=self.is_empty(),
+        )
+
+        result = self.cmd(
+            "iot device c2d-message receive -d {} --hub-name {} -g {}".format(
+                device_ids[0], self.entity_name, self.entity_rg
+            )
+        ).get_output_in_json()
+
+        assert result["data"] == self.kwargs["messaging_non_unicodable_data"]
+
+        system_props = result["properties"]["system"]
+        assert system_props["ContentEncoding"] == 'gzip'
+        assert system_props["ContentType"] == 'application/octet-stream'
+        assert system_props["iothub-correlationid"] == test_cid
+        assert system_props["iothub-messageid"] == test_mid
+        assert system_props["iothub-expiry"]
+        assert system_props["iothub-to"] == "/devices/{}/messages/devicebound".format(
+            device_ids[0]
+        )
+
+        # Ack is tested in message feedback tests
+        assert system_props["iothub-ack"] == "none"
+
+        app_props = result["properties"]["app"]
+        assert app_props == validate_key_value_pairs(test_props)
+
+        # Implicit etag assertion
+        etag = result["etag"]
+
+        self.cmd(
+            "iot device c2d-message complete -d {} --hub-name {} -g {} --etag {}".format(
+                device_ids[0], self.entity_name, self.entity_rg, etag
+            ),
+            checks=self.is_empty(),
+        )
+
+        # Error - Send C2D message with non existed file path
+        self.cmd(
+            """iot device c2d-message send -d {} -n {} -g {} --dfp '{}' --cid {} --mid {} --ct {} --expiry {}
+            --ce {} --props {} -y""".format(
+                device_ids[0],
+                self.entity_name,
+                self.entity_rg,
+                '123',
+                test_cid,
+                test_mid,
+                'application/json',
+                test_et,
+                test_ce,
+                test_props,
+            ),
+            expect_failure=True,
         )
 
         # Send C2D message via --login + application/json content ype
@@ -303,6 +540,9 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         enqueued_time = calculate_millisec_since_unix_epoch_utc()
         simulate_msg = "Key Connection Simulate"
         send_d2c_msg = "Key Connection Send-D2C-Message"
+        self.kwargs["messaging_data"] = read_file_content(messaging_data_path)
+        self.kwargs["messaging_unicodable_data"] = read_file_content(messaging_unicodable_data_path)
+        self.kwargs["messaging_non_unicodable_data"] = NON_DECODABLE_PAYLOAD
 
         keys = self.cmd(
             "iot hub device-identity create -d {} -n {} -g {}".format(
@@ -328,6 +568,14 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         )
         device_events.append((device_id, send_d2c_msg))
 
+        self.cmd(
+            "iot device send-d2c-message -d {} -n {} -g {} --dfp '{}' -p '$.ct=application/json;$.ce=utf-8' --key {}".format(
+                device_id, self.entity_name, self.entity_rg, messaging_data_path,
+                keys["primaryKey"]
+            )
+        )
+        device_events.append((device_id, self.kwargs["messaging_data"]))
+
         # Simulate with secondary key and include model Id upon connection
         model_id_simulate_key = "dtmi:com:example:simulatekey;1"
         self.cmd(
@@ -349,6 +597,24 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             )
         )
         device_events.append((device_id, send_d2c_msg))
+
+        # Send-d2c-message with secondary key and binary data
+        self.cmd(
+            "iot device send-d2c-message -d {} -n {} -g {} --dfp '{}' -p '$.ct=application/octet-stream' --key {}".format(
+                device_id, self.entity_name, self.entity_rg, messaging_unicodable_data_path,
+                keys["secondaryKey"]
+            )
+        )
+        device_events.append((device_id, self.kwargs["messaging_unicodable_data"]))
+
+        self.cmd(
+            "iot device send-d2c-message -d {} -n {} -g {} --dfp '{}' -p '$.ct=application/octet-stream' --key {}".format(
+                device_id, self.entity_name, self.entity_rg, messaging_non_unicodable_data_path,
+                keys["secondaryKey"]
+            )
+        )
+        device_events.append((device_id, self.kwargs["messaging_non_unicodable_data"]))
+
         twin_result = self.cmd(
             f"iot hub device-twin show -d {device_id} -n {self.entity_name} -g {self.entity_rg}").get_output_in_json()
         assert twin_result["modelId"] == model_id_d2c_key
@@ -370,6 +636,15 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             expect_failure=True
         )
 
+        # Error - send-d2c-message with non existed file path.
+        self.cmd(
+            "iot device send-d2c-message -d {} -n {} -g {} --dfp '{}' -p '$.ct=application/octet-stream' --key {}".format(
+                device_id, self.entity_name, self.entity_rg, '123',
+                keys["secondaryKey"]
+            ),
+            expect_failure=True
+        )
+
         self._monitor_checker(enqueued_time=enqueued_time, device_events=device_events)
 
     def test_mqtt_device_simulation_x509(self):
@@ -379,6 +654,9 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         enqueued_time = calculate_millisec_since_unix_epoch_utc()
         simulate_msg = "Cert Connection Simulate"
         send_d2c_msg = "Cert Connection Send-D2C-Message"
+        self.kwargs["messaging_data"] = read_file_content(messaging_data_path)
+        self.kwargs["messaging_unicodable_data"] = read_file_content(messaging_unicodable_data_path)
+        self.kwargs["messaging_non_unicodable_data"] = NON_DECODABLE_PAYLOAD
 
         self.cmd(
             "iot hub device-identity create -d {} -n {} -g {} --am x509_thumbprint --valid-days 10 --od '{}'".format(
@@ -421,6 +699,15 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         )
         device_events.append((device_ids[0], send_d2c_msg))
 
+        self.cmd(
+            """iot device send-d2c-message -d {} -n {} -g {} --dfp '{}' -p '$.ct=application/json;$.ce=utf-8'
+            --cp {} --kp {}""".format(
+                device_ids[0], self.entity_name, self.entity_rg, messaging_data_path,
+                f"{device_ids[0]}-cert.pem", f"{device_ids[0]}-key.pem"
+            )
+        )
+        device_events.append((device_ids[0], self.kwargs["messaging_data"]))
+
         # Set up the CA signed cert - need to upload to hub and sign
         root_cert = create_certificate(subject="root", valid_days=1, cert_output_dir=output_dir)
         fake_pass = "pass1234"
@@ -435,6 +722,21 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         for cert_name in ["root", device_ids[1]]:
             self.tracked_certs.append(cert_name + CERT_ENDING)
             self.tracked_certs.append(cert_name + KEY_ENDING)
+
+        certificates_result = self.cmd(
+            "iot hub certificate list --hub-name {} -g {}".format(
+                self.entity_name, self.entity_rg
+            )
+        ).get_output_in_json()
+
+        # delete the certificate if already exist before creation
+        if any(cert["name"] == "root" for cert in certificates_result["value"]):
+            self.cmd(
+                "iot hub certificate delete --hub-name {} -g {} -n {} -e *".format(
+                    self.entity_name, self.entity_rg, "root"
+                )
+            )
+
         self.cmd(
             "iot hub certificate create --hub-name {} -g {} -n {} -p {}".format(
                 self.entity_name, self.entity_rg, "root", "root" + CERT_ENDING
@@ -487,6 +789,34 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             )
         )
         device_events.append((device_ids[1], send_d2c_msg))
+
+        self.cmd(
+            """iot device send-d2c-message -d {} -n {} -g {} --dfp '{}' -p '$.ct=application/octet-stream'
+            --cp {} --kp {} --pass {}""".format(
+                device_ids[1], self.entity_name, self.entity_rg, messaging_unicodable_data_path,
+                f"{device_ids[1]}-cert.pem", f"{device_ids[1]}-key.pem", fake_pass
+            )
+        )
+        device_events.append((device_ids[1], self.kwargs["messaging_unicodable_data"]))
+
+        self.cmd(
+            """iot device send-d2c-message -d {} -n {} -g {} --dfp '{}' -p '$.ct=application/octet-stream'
+            --cp {} --kp {} --pass {}""".format(
+                device_ids[1], self.entity_name, self.entity_rg, messaging_non_unicodable_data_path,
+                f"{device_ids[1]}-cert.pem", f"{device_ids[1]}-key.pem", fake_pass
+            )
+        )
+        device_events.append((device_ids[1], self.kwargs["messaging_non_unicodable_data"]))
+
+        # Error - send-d2c-message with non existed file path.
+        self.cmd(
+            """iot device send-d2c-message -d {} -n {} -g {} --dfp '{}' -p '$.ct=application/octet-stream'
+            --cp {} --kp {} --pass {}""".format(
+                device_ids[1], self.entity_name, self.entity_rg, '123',
+                f"{device_ids[1]}-cert.pem", f"{device_ids[1]}-key.pem", fake_pass
+            ),
+            expect_failure=True
+        )
 
         self._monitor_checker(enqueued_time=enqueued_time, device_events=device_events)
 
@@ -992,6 +1322,27 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             ['{\\r\\n\\"payload_data1\\"\\"payload_value1\\"\\r\\n}'],
         )
 
+        self.kwargs["messaging_non_unicodable_data"] = NON_DECODABLE_PAYLOAD
+
+        # Send messages that contains non-unicode decodable message body
+        iot_device_send_message(
+            cmd=client,
+            device_id=device_ids[i],
+            hub_name=self.entity_name,
+            data_file_path=messaging_non_unicodable_data_path,
+            properties="$.ct=application/octet-stream",
+            msg_count=1,
+            resource_group_name=self.entity_rg,
+        )
+
+        # Monitor events for a single device contains non-unicode decodable message body
+        self.command_execute_assert(
+            "iot hub monitor-events -n {} -g {} --cg {} --et {} -y -p all".format(
+                self.entity_name, self.entity_rg, LIVE_CONSUMER_GROUPS[1], enqueued_time
+            ),
+            [NON_DECODABLE_PAYLOAD],
+        )
+
         for cg in LIVE_CONSUMER_GROUPS:
             self.cmd(
                 "az iot hub consumer-group delete --hub-name {} --resource-group {} --name {}".format(
@@ -1192,6 +1543,18 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         monitor_output = monitor_output.split("...")[1].replace("\n", "")
         return json.loads("[" + monitor_output.replace("}{", "},{") + "]")
 
+    def _remove_newlines_spaces(self, payload):
+        if isinstance(payload, dict):
+            payload = json.dumps(payload)
+
+        # Remove \n and \r characters
+        payload = payload.replace('\n', '')
+        payload = payload.replace('\r', '')
+
+        # Remove spaces
+        payload = payload.replace(' ', '')
+        return payload
+
     def _monitor_checker(self, enqueued_time, device_events):
         # Monitor events for all devices to check that the messages were sent
         monitor_output = self.command_execute_assert(
@@ -1203,12 +1566,24 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         # Parse out the messages into json
         monitor_events = self._parse_monitor_output(monitor_output)
 
+        # Unify the json payload format in device events
+        for i in range(len(device_events)):
+            payload = device_events[i][1]
+            device_events[i] = (device_events[i][0], self._remove_newlines_spaces(payload=device_events[i][1]))
+
         for i in range(len(monitor_events)):
             monitor_event = monitor_events[i]["event"]
             payload = monitor_event["payload"]
             if isinstance(payload, dict):
-                payload = payload["data"]
+                payload = payload.get("data")
+                # when the payload is JSON, there will not be a data field
+                # so use the payload directly
+                if payload is None:
+                    payload = monitor_event["payload"]
+
+            # do formatting before comparison
+            payload = self._remove_newlines_spaces(payload=payload)
             event = (monitor_event["origin"], payload)
             assert event in device_events
-            device_events.remove(event)
+        device_events.clear()
         assert len(device_events) == 0
