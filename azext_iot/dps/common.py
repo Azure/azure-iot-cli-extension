@@ -25,5 +25,5 @@ COMPUTE_KEY_ERROR = "Enrollment group id via --group-id is required if --compute
 CERTIFICATE_FILE_ERROR = "Both certificate and key files are required for registration with x509."
 CERTIFICATE_RETRIEVAL_ERROR = "Please provide the certificate and key files via --certificate-file-path and --key-file-path."
 MISSING_DPS_CREDENTIALS_ERROR = "Cannot retrieve device information with only the DPS Id Scope. Please provide the device "\
-    "credentials, an DPS entity name (via the '['--dps-name']' or '-n' parameter), or DPS connection string via --login."
+    "credentials, a DPS entity name (via the '--dps-name' or '-n' parameters), or DPS connection string via --login."
 TPM_SUPPORT_ERROR = "Device registration with TPM attestation is not supported yet."
