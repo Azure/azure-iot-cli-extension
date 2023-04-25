@@ -38,7 +38,17 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
+        )
+        assert registration_result.success() is False
 
+        # Cannot retrieve device credentials
+        registration_result = cli.invoke(
+            set_cmd_auth_type(
+                f"iot device registration create --id-scope {id_scope} --group-id {group_id} "
+                f"--registration-id {device_id1}",
+                auth_type=auth_phase,
+                cstring=dps_cstring
+            ),
         )
         assert registration_result.success() is False
 

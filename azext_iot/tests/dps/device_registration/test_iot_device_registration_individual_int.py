@@ -41,6 +41,16 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
         )
         assert enrollment_result.success() is False
 
+        # Cannot retrieve device credentials
+        enrollment_result = cli.invoke(
+            set_cmd_auth_type(
+                f"iot device registration create --id-scope {id_scope} --registration-id {enrollment_id}",
+                auth_type=auth_phase,
+                cstring=dps_cstring
+            )
+        )
+        assert enrollment_result.success() is False
+
         # Enrollment with no device id; deviceId becomes enrollmentId
         keys = cli.invoke(
             set_cmd_auth_type(
