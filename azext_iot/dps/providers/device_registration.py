@@ -16,6 +16,7 @@ from azext_iot.dps.common import (
     CERTIFICATE_FILE_ERROR,
     CERTIFICATE_RETRIEVAL_ERROR,
     TPM_SUPPORT_ERROR,
+    MISSING_DPS_CREDENTIALS_ERROR
 )
 from azext_iot.dps.providers.discovery import DPSDiscovery
 from azext_iot.operations.dps import (
@@ -153,6 +154,8 @@ class DeviceRegistrationProvider():
             )
         elif certificate_file or key_file:
             raise RequiredArgumentMissingError(CERTIFICATE_FILE_ERROR)
+        elif not (self.dps_name or self.login):
+            raise RequiredArgumentMissingError(MISSING_DPS_CREDENTIALS_ERROR)
         # Retrieve the attestation if nothing is provided.
         else:
             self._get_attestation_params(enrollment_group_id=enrollment_group_id)
