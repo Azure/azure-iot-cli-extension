@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import json
+from azure.cli.core.azclierror import CLIInternalError
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.common.shared import EntityStatusType, AttestationType
 from azext_iot.tests.dps import (
@@ -435,7 +435,7 @@ def test_dps_device_registration_unlinked_hub(provisioned_iot_dps_no_hub_module)
             assert registration["lastUpdatedDateTimeUtc"]
             assert registration["registrationId"] == enrollment_id
             assert registration["status"] == "failed"
-        except json.decoder.JSONDecodeError:
+        except CLIInternalError:
             raise AssertionError(f"Failed to create unlinked hub registration with auth-type {auth_phase}")
 
 
