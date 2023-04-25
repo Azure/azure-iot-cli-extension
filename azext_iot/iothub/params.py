@@ -573,6 +573,13 @@ def load_iothub_arguments(self, _):
             help="The account name for the endpoint resource."
         )
 
+    with self.argument_context("iot hub message-endpoint delete") as context:
+        context.argument(
+            'force',
+            options_list=['--force', '-f'],
+            help='Force delete the endpoint(s) and any routes and message enrichments associated.',
+        )
+
     with self.argument_context("iot hub message-route") as context:
         context.argument(
             "hub_name",

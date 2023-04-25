@@ -247,12 +247,44 @@ class MessageEndpoint(IoTHubProvider):
         elif EndpointType.AzureStorageContainer.value == endpoint_type:
             return endpoints.storage_containers
 
-    def delete(self, endpoint_name: Optional[str] = None, endpoint_type: Optional[str] = None):
+    def delete(
+        self,
+        endpoint_name: Optional[str] = None,
+        endpoint_type: Optional[str] = None,
+        force: bool = False
+    ):
         endpoints = self.hub_resource.properties.routing.endpoints
         if endpoint_type:
             endpoint_type = endpoint_type.lower()
             if EndpointType.CosmosDBContainer.value == endpoint_type and not self.support_cosmos:
                 raise InvalidArgumentValueError(INVALID_CLI_CORE_FOR_COSMOS)
+
+        if force and (self.hub_resource.properties.routing.enrichments or self.hub_resource.properties.routing.routes):
+            # collect endpoints to remove
+            endpoint_names = []
+            if endpoint_name:
+                endpoint_names.append(endpoint_name)
+            else:
+                if not endpoint_type or endpoint_type == EndpointType.EventHub.value:
+                    endpoint_names.extend([e.name for e in endpoints.event_hubs])
+                if not endpoint_type or endpoint_type == EndpointType.ServiceBusQueue.value:
+                    endpoint_names.extend([e.name for e in endpoints.service_bus_queues])
+                if not endpoint_type or endpoint_type == EndpointType.ServiceBusTopic.value:
+                    endpoint_names.extend([e.name for e in endpoints.service_bus_topics])
+                if self.support_cosmos and not endpoint_type or endpoint_type == EndpointType.CosmosDBContainer.value:
+                    endpoint_names.extend([e.name for e in endpoints.cosmos_db_sql_collections])
+                if not endpoint_type or endpoint_type == EndpointType.AzureStorageContainer.value:
+                    endpoint_names.extend([e.name for e in endpoints.storage_containers])
+            # remove enrichments
+            if self.hub_resource.properties.routing.enrichments:
+                enrichments = self.hub_resource.properties.routing.enrichments
+                enrichments = [e for e in enrichments if e.endpoint_names[0] not in endpoint_names]
+                self.hub_resource.properties.routing.enrichments = enrichments
+            # remove routes
+            if self.hub_resource.properties.routing.routes:
+                routes = self.hub_resource.properties.routing.routes
+                routes = [r for r in routes if r.endpoint_names[0] not in endpoint_names]
+                self.hub_resource.properties.routing.routes = routes
 
         if endpoint_name:
             # Delete endpoint by name
