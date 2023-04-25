@@ -88,7 +88,7 @@ steps:
         ${{ if contains(parameters.path, 'azext_iot/tests/dps') }}:
           inlineScript: |
             export COVERAGE_FILE=.coverage.${{ parameters.name }}
-            pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --durations=0
+            pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --durations=0 -s
 
   - task: PublishBuildArtifacts@1
     inputs:

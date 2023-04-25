@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from time import sleep
-from typing import Optional, List
+from typing import Dict, Optional
 import os
 
 import pytest
@@ -73,9 +73,14 @@ def provisioned_iot_dps_no_hub_module() -> dict:
         _iot_dps_removal(result)
 
 
-def _iot_dps_provisioner(iot_hub: Optional[List] = None) -> dict:
+def _iot_dps_provisioner(iot_hub: Optional[Dict] = None) -> dict:
     """Create a device provisioning service for testing purposes."""
     dps_name = settings.env.azext_iot_testdps or generate_dps_id()
+    # TODO: Remove
+    print()
+    print(f"Creating DPS {dps_name}, # iot hubs: {len(iot_hub)}")
+    print()
+
     dps_list = cli.invoke(
         'iot dps list -g "{}"'.format(ENTITY_RG)
     ).as_json()
