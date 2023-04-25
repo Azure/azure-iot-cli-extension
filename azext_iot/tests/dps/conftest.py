@@ -78,7 +78,7 @@ def _iot_dps_provisioner(iot_hub: Optional[Dict] = None) -> dict:
     dps_name = settings.env.azext_iot_testdps or generate_dps_id()
     # TODO: Remove
     print()
-    print(f"Creating DPS {dps_name}, # iot hubs: {len(iot_hub)}")
+    print(f"Creating DPS {dps_name}, iot hubs: {iot_hub is not None}")
     print()
 
     dps_list = cli.invoke(
