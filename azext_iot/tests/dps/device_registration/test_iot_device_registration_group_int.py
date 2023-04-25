@@ -14,6 +14,7 @@ from azext_iot.tests.generators import generate_generic_id, generate_names
 from azext_iot.tests.helpers import CERT_ENDING, KEY_ENDING, set_cmd_auth_type
 from azext_iot.tests.test_utils import create_certificate
 
+
 cli = EmbeddedCLI()
 
 
@@ -37,6 +38,7 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
+
         )
         assert registration_result.success() is False
 
