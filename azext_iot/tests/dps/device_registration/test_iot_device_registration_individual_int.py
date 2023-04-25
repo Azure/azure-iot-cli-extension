@@ -392,6 +392,7 @@ def test_dps_device_registration_unlinked_hub(provisioned_iot_dps_no_hub_module)
     dps_name = provisioned_iot_dps_no_hub_module['name']
     dps_rg = provisioned_iot_dps_no_hub_module['resourceGroup']
     dps_cstring = provisioned_iot_dps_no_hub_module["connectionString"]
+    id_scope = provisioned_iot_dps_no_hub_module["dps"]["properties"]["idScope"]
     clean_dps_dataplane(cli, dps_cstring)
 
     attestation_type = AttestationType.symmetricKey.value
@@ -409,11 +410,13 @@ def test_dps_device_registration_unlinked_hub(provisioned_iot_dps_no_hub_module)
         )
         if not result.success():
             raise AssertionError(f"Failed to create enrollment with auth-type {auth_phase}")
+        key = result.as_json()["attestation"]["symmetricKey"]["primaryKey"]
 
         # registration throws error
         registration_result = cli.invoke(
             set_cmd_auth_type(
-                f"iot device registration create -g {dps_rg} --dps-name {dps_name} --registration-id {enrollment_id}",
+                f"iot device registration create --id-scope {id_scope} --registration-id {enrollment_id} "
+                f"--key {key}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
             )

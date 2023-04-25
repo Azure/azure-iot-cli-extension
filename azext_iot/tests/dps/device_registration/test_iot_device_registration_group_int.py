@@ -364,6 +364,7 @@ def test_dps_device_registration_unlinked_hub(provisioned_iot_dps_no_hub_module)
     dps_name = provisioned_iot_dps_no_hub_module['name']
     dps_rg = provisioned_iot_dps_no_hub_module['resourceGroup']
     dps_cstring = provisioned_iot_dps_no_hub_module["connectionString"]
+    id_scope = provisioned_iot_dps_no_hub_module["dps"]["properties"]["idScope"]
     clean_dps_dataplane(cli, dps_cstring)
 
     for auth_phase in DATAPLANE_AUTH_TYPES:
@@ -379,11 +380,19 @@ def test_dps_device_registration_unlinked_hub(provisioned_iot_dps_no_hub_module)
         if not result.success():
             raise AssertionError(f"Failed to create enrollment group with attestation-type {auth_phase}")
 
+        device_key = cli.invoke(
+            set_cmd_auth_type(
+                f"iot dps enrollment-group compute-device-key --dps-name {dps_name} -g {dps_rg} --group-id {group_id} "
+                f"--registration-id {device_id}",
+                auth_type=auth_phase,
+                cstring=dps_cstring
+            )
+        ).as_json()
+
         # registration throws error
         registration_result = cli.invoke(
             set_cmd_auth_type(
-                f"iot device registration create --group-id {group_id} -g {dps_rg} --dps-name {dps_name} "
-                f"--registration-id {device_id}",
+                f"iot device registration create --id-scope {id_scope} --registration-id {device_id} --key {device_key}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
             )
