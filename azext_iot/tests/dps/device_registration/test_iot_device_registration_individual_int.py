@@ -37,6 +37,17 @@ class TestDPSDeviceRegistrationsIndividual(IoTDPSLiveScenarioTest):
                 expect_failure=True
             )
 
+            # Cannot retrieve device credentials
+            self.cmd(
+                self.set_cmd_auth_type(
+                    "iot device registration create --id-scope {} --registration-id {}".format(
+                        self.id_scope, enrollment_id
+                    ),
+                    auth_type=auth_phase
+                ),
+                expect_failure=True
+            )
+
             # Enrollment with no device id; deviceId becomes enrollmentId
             keys = self.cmd(
                 self.set_cmd_auth_type(
