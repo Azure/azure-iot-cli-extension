@@ -113,7 +113,7 @@ def _iot_dps_provisioner(iot_hub: Optional[Dict] = None) -> dict:
         target_dps = cli.invoke(base_command).as_json()
 
     assign_iot_dps_dataplane_rbac_role(target_dps)
-    sleep(10)
+    sleep(20)
 
     # Add link between dps and first iot hub
     hub_host_name = None
