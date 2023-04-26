@@ -652,9 +652,11 @@ def load_iothub_help():
               az iot hub message-endpoint delete -n {iothub_name}
           - name: Force delete an endpoint from an IoT Hub. This will delete any routes and message enrichments
                   associated with this endpoint.
+            text: >
               az iot hub message-endpoint delete -n {iothub_name} --endpoint-name {endpoint_name} -f
           - name: Force delete  all the endpoints of type "EventHub" from an IoT Hub. This will delete any routes and
                   message enrichments associated with this endpoint.
+            text: >
               az iot hub message-endpoint delete -n {iothub_name} --endpoint-type eventhub -f
     """
 
