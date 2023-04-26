@@ -113,7 +113,6 @@ def _iot_dps_provisioner(iot_hub: Optional[Dict] = None) -> dict:
         target_dps = cli.invoke(base_command).as_json()
 
     assign_iot_dps_dataplane_rbac_role(target_dps)
-    sleep(20)
 
     # Add link between dps and first iot hub
     hub_host_name = None
@@ -138,6 +137,9 @@ def _iot_dps_provisioner(iot_hub: Optional[Dict] = None) -> dict:
             cli.invoke(
                 f"iot dps linked-hub delete --dps-name {dps_name} -g {ENTITY_RG} --linked-hub {hub['name']}"
             )
+    else:
+        # time passed if hub was not linked
+        sleep(30)
 
     return {
         "name": dps_name,
