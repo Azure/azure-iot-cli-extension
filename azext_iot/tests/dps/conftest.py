@@ -76,20 +76,6 @@ def provisioned_iot_dps_no_hub_module() -> dict:
 def _iot_dps_provisioner(iot_hub: Optional[Dict] = None) -> dict:
     """Create a device provisioning service for testing purposes."""
     dps_name = settings.env.azext_iot_testdps or generate_dps_id()
-    # TODO: Remove
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print()
-    print(f"Creating DPS {dps_name}, iot hubs: {iot_hub is not None}")
-    print()
 
     dps_list = cli.invoke(
         'iot dps list -g "{}"'.format(ENTITY_RG)
