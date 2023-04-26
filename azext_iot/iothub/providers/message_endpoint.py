@@ -14,7 +14,13 @@ from azure.cli.core.azclierror import (
 )
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.iothub.common import (
-    BYTES_PER_MEGABYTE, INVALID_CLI_CORE_FOR_COSMOS, SYSTEM_ASSIGNED_IDENTITY, AuthenticationType, EncodingFormat, EndpointType
+    BYTES_PER_MEGABYTE,
+    FORCE_DELETE_WARNING,
+    INVALID_CLI_CORE_FOR_COSMOS,
+    SYSTEM_ASSIGNED_IDENTITY,
+    AuthenticationType,
+    EncodingFormat,
+    EndpointType
 )
 from azext_iot.iothub.providers.base import IoTHubProvider
 from azext_iot.common._azure import parse_cosmos_db_connection_string
@@ -259,7 +265,7 @@ class MessageEndpoint(IoTHubProvider):
             if EndpointType.CosmosDBContainer.value == endpoint_type and not self.support_cosmos:
                 raise InvalidArgumentValueError(INVALID_CLI_CORE_FOR_COSMOS)
 
-        if force and (self.hub_resource.properties.routing.enrichments or self.hub_resource.properties.routing.routes):
+        if self.hub_resource.properties.routing.enrichments or self.hub_resource.properties.routing.routes:
             # collect endpoints to remove
             endpoint_names = []
             if endpoint_name:
@@ -275,16 +281,35 @@ class MessageEndpoint(IoTHubProvider):
                     endpoint_names.extend([e.name for e in endpoints.cosmos_db_sql_collections])
                 if not endpoint_type or endpoint_type == EndpointType.AzureStorageContainer.value:
                     endpoint_names.extend([e.name for e in endpoints.storage_containers])
-            # remove enrichments
-            if self.hub_resource.properties.routing.enrichments:
-                enrichments = self.hub_resource.properties.routing.enrichments
-                enrichments = [e for e in enrichments if e.endpoint_names[0] not in endpoint_names]
-                self.hub_resource.properties.routing.enrichments = enrichments
-            # remove routes
-            if self.hub_resource.properties.routing.routes:
-                routes = self.hub_resource.properties.routing.routes
-                routes = [r for r in routes if r.endpoint_names[0] not in endpoint_names]
-                self.hub_resource.properties.routing.routes = routes
+            if force:
+                # remove enrichments
+                if self.hub_resource.properties.routing.enrichments:
+                    enrichments = self.hub_resource.properties.routing.enrichments
+                    enrichments = [e for e in enrichments if e.endpoint_names[0] not in endpoint_names]
+                    self.hub_resource.properties.routing.enrichments = enrichments
+                # remove routes
+                if self.hub_resource.properties.routing.routes:
+                    routes = self.hub_resource.properties.routing.routes
+                    routes = [r for r in routes if r.endpoint_names[0] not in endpoint_names]
+                    self.hub_resource.properties.routing.routes = routes
+            else:
+                # warn if needed:
+                conflicts = []
+                if self.hub_resource.properties.routing.enrichments:
+                    enrichments = self.hub_resource.properties.routing.enrichments
+                    num_enrichments = len([e for e in enrichments if e.endpoint_names[0] in endpoint_names])
+                    if num_enrichments > 0:
+                        enrichment_msg = f"{num_enrichments} message enrichment" + ("s" if num_enrichments > 1 else "")
+                        conflicts.append(enrichment_msg)
+
+                if self.hub_resource.properties.routing.routes:
+                    routes = self.hub_resource.properties.routing.routes
+                    num_routes = len([r for r in routes if r.endpoint_names[0] in endpoint_names])
+                    if num_routes > 0:
+                        enrichment_msg = f"{num_routes} routes" + ("s" if num_routes > 1 else "")
+                        conflicts.append(enrichment_msg)
+                if conflicts:
+                    logger.warn(FORCE_DELETE_WARNING.format(" and ".join(conflicts)))
 
         if endpoint_name:
             # Delete endpoint by name
