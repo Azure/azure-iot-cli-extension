@@ -285,7 +285,7 @@ class MessageEndpoint(IoTHubProvider):
                 # remove enrichments
                 if self.hub_resource.properties.routing.enrichments:
                     enrichments = self.hub_resource.properties.routing.enrichments
-                    enrichments = [e for e in enrichments if e.endpoint_names[0] not in endpoint_names]
+                    enrichments = [e for e in enrichments if not any(n for n in e.endpoint_names if n in endpoint_names)]
                     self.hub_resource.properties.routing.enrichments = enrichments
                 # remove routes
                 if self.hub_resource.properties.routing.routes:
@@ -297,7 +297,9 @@ class MessageEndpoint(IoTHubProvider):
                 conflicts = []
                 if self.hub_resource.properties.routing.enrichments:
                     enrichments = self.hub_resource.properties.routing.enrichments
-                    num_enrichments = len([e for e in enrichments if e.endpoint_names[0] in endpoint_names])
+                    num_enrichments = len(
+                        [e for e in enrichments if any(n for n in e.endpoint_names if n in endpoint_names)]
+                    )
                     if num_enrichments > 0:
                         enrichment_msg = f"{num_enrichments} message enrichment" + ("s" if num_enrichments > 1 else "")
                         conflicts.append(enrichment_msg)
@@ -306,7 +308,7 @@ class MessageEndpoint(IoTHubProvider):
                     routes = self.hub_resource.properties.routing.routes
                     num_routes = len([r for r in routes if r.endpoint_names[0] in endpoint_names])
                     if num_routes > 0:
-                        enrichment_msg = f"{num_routes} routes" + ("s" if num_routes > 1 else "")
+                        enrichment_msg = f"{num_routes} route" + ("s" if num_routes > 1 else "")
                         conflicts.append(enrichment_msg)
                 if conflicts:
                     logger.warn(FORCE_DELETE_WARNING.format(" and ".join(conflicts)))
