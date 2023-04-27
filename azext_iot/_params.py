@@ -236,16 +236,16 @@ def load_arguments(self, _):
             nargs="+",
             options_list=["--custom-metric-queries", "--cmq"],
             help="An alternative input style (space separated key=value pairs) for --metrics and intended to replace "
-            "it in the future."
-            'For example: metric1="select deviceId from devices where tags.location=''US''" metric2="select *"',
+            "it in the future. "
+            'Format example: metric1="select deviceId from devices where tags.location=\'US\'" metric2="select *"',
         )
         context.argument(
             "custom_labels",
             nargs="+",
             options_list=["--custom-labels", "--cl"],
             help="An alternative input style (space separated key=value pairs) for --labels and intended to replace "
-            "it in the future."
-            'For example: key1=value1 key2="this is my value"',
+            "it in the future. "
+            'Format example: key1=value1 key2="this is my value"',
         )
 
     with self.argument_context("iot hub") as context:
@@ -641,7 +641,18 @@ def load_arguments(self, _):
             options_list=["--auth-type"],
             arg_type=hub_auth_type_dataplane_param_type,
         )
-        context.argument("data", options_list=["--data", "--da"], help="Message body.")
+        context.argument(
+            "data",
+            options_list=["--data", "--da"],
+            help="Message body for text or raw json."
+        )
+        context.argument(
+            "data_file_path",
+            options_list=["--data-file-path", "--dfp"],
+            is_preview=True,
+            help="""Provide path to file for message body payload. Please note when the payload needs
+            to be sent in binary format, set the content type to application/octet-stream."""
+        )
         context.argument(
             "properties",
             options_list=["--properties", "--props", "-p"],
@@ -801,13 +812,14 @@ def load_arguments(self, _):
         context.argument(
             "config_id",
             options_list=["--config-id", "-c"],
-            help="Target device configuration name.",
+            help="Target device configuration name. Lowercase and the following special characters are allowed: [-+%_*!'].",
         )
         context.argument(
             "target_condition",
             options_list=["--target-condition", "--tc", "-t"],
             help="Target condition in which a device or module configuration applies to. "
-            "Configurations with no target condition will target no device or module.",
+            "Configurations with no target condition will target no device or module. "
+            "Use the following format: \"tags.environment='test'\".",
         )
         context.argument(
             "priority",
@@ -855,13 +867,13 @@ def load_arguments(self, _):
         context.argument(
             "config_id",
             options_list=["--deployment-id", "-d"],
-            help="Target deployment name.",
+            help="Target deployment name. Lowercase and the following special characters are allowed: [-+%_*!'].",
         )
         context.argument(
             "target_condition",
             options_list=["--target-condition", "--tc", "-t"],
             help="Target condition in which an edge deployment applies to. Deployments with no target condition "
-            "will target no device.",
+            "will target no device. Use the following format: \"tags.environment='test'\".",
         )
         context.argument(
             "priority",
@@ -876,15 +888,16 @@ def load_arguments(self, _):
         context.argument(
             "metrics",
             options_list=["--metrics", "-m"],
-            help="IoT Edge deployment metric definitions. Provide file path or raw json."
+            help="IoT Edge deployment user metric definitions. Provide file path or raw json. "
+            'User metrics are in the form of {"queries":{...}} or {"metrics":{"queries":{...}}}. '
             "Using --custom-metric-queries instead of --metrics is recommended.",
         )
         context.argument(
             "labels",
             options_list=["--labels", "--lab"],
             help="Map of labels to be applied to target deployment. "
-            "Using --custom-labels instead of --labels is recommended."
-            'Use the following format: \'{"key0":"value0", "key1":"value1"}\'',
+            'Use the following format: \'{"key0":"value0", "key1":"value1"}\'. '
+            "Using --custom-labels instead of --labels is recommended.",
         )
         context.argument(
             "top",
@@ -897,9 +910,9 @@ def load_arguments(self, _):
             options_list=["--layered"],
             arg_type=get_three_state_flag(),
             help="Layered deployments allow you to define desired properties in $edgeAgent, $edgeHub and user "
-            "modules that will layer on top of a base deployment. For example the routes specified in a layered "
-            "deployment will merge with routes of the base deployment. Routes with the same name will be "
-            "overwritten based on deployment priority.",
+            "modules that will layer on top of a base deployment. The properties specified in a layered "
+            "deployment will merge with properties of the base deployment. Properties with the same path will be "
+            "overwritten based on deployment priority. This option is an alias for --no-validation.",
         )
         context.argument(
             "no_validation",
