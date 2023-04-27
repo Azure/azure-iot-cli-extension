@@ -125,7 +125,7 @@ def _iot_dps_provisioner(iot_hub: Optional[Dict] = None) -> dict:
             )
     else:
         # time passed if hub was not linked
-        sleep(30)
+        sleep(60)
 
     return {
         "name": dps_name,
