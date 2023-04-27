@@ -11,7 +11,8 @@ from azext_iot.tests.helpers import (
     add_test_tag,
     assign_role_assignment,
     clean_up_iothub_device_config,
-    create_storage_account
+    create_storage_account,
+    set_cmd_auth_type
 )
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 from azext_iot.tests.generators import generate_generic_id
@@ -51,17 +52,6 @@ STORAGE_ACCOUNT = settings.env.azext_iot_teststorageaccount or "hubstore" + gene
 STORAGE_CONTAINER = settings.env.azext_iot_teststoragecontainer or DEFAULT_CONTAINER
 MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries or 10
 ROLE_ASSIGNMENT_REFRESH_TIME = 120
-
-
-def set_cmd_auth_type(command: str, auth_type: str, cstring: str) -> str:
-    if auth_type not in DATAPLANE_AUTH_TYPES:
-        raise RuntimeError(f"auth_type of: {auth_type} is unsupported.")
-
-    # cstring takes precedence
-    if auth_type == "cstring":
-        return f"{command} --login {cstring}"
-
-    return f"{command} --auth-type {auth_type}"
 
 
 @pytest.mark.usefixtures("fixture_provision_existing_hub_role", "fixture_provision_existing_hub_device_config")
