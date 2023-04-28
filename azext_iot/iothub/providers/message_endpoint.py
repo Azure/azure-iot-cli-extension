@@ -269,7 +269,12 @@ class MessageEndpoint(IoTHubProvider):
             # collect endpoints to remove
             endpoint_names = []
             if endpoint_name:
-                endpoint_names.append(endpoint_name)
+                # use show to check if this endpoint "exists" in the current extension state
+                try:
+                    self.show(endpoint_name)
+                    endpoint_names.append(endpoint_name)
+                except ResourceNotFoundError:
+                    pass
             else:
                 if not endpoint_type or endpoint_type == EndpointType.EventHub.value:
                     endpoint_names.extend([e.name for e in endpoints.event_hubs])
@@ -281,7 +286,9 @@ class MessageEndpoint(IoTHubProvider):
                     endpoint_names.extend([e.name for e in endpoints.cosmos_db_sql_collections])
                 if not endpoint_type or endpoint_type == EndpointType.AzureStorageContainer.value:
                     endpoint_names.extend([e.name for e in endpoints.storage_containers])
-            if force:
+
+            # only do the routing and enrichment checks if there are endpoints to check.
+            if force and endpoint_names:
                 # remove enrichments
                 if self.hub_resource.properties.routing.enrichments:
                     enrichments = self.hub_resource.properties.routing.enrichments
@@ -292,7 +299,7 @@ class MessageEndpoint(IoTHubProvider):
                     routes = self.hub_resource.properties.routing.routes
                     routes = [r for r in routes if r.endpoint_names[0] not in endpoint_names]
                     self.hub_resource.properties.routing.routes = routes
-            else:
+            elif endpoint_names:
                 # warn if needed:
                 conflicts = []
                 if self.hub_resource.properties.routing.enrichments:
