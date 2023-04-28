@@ -638,7 +638,7 @@ def load_iothub_help():
         "iot hub message-endpoint delete"
     ] = """
         type: command
-        short-summary: Delete all or mentioned endpoint for an IoT Hub.
+        short-summary: Delete all or a specific endpoint for an IoT Hub.
         long-summary:  We recommend that you delete any routes and message enrichments to the endpoint, before deleting the endpoint.
         examples:
           - name: Delete an endpoint from an IoT Hub.
