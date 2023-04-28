@@ -638,8 +638,8 @@ def load_iothub_help():
         "iot hub message-endpoint delete"
     ] = """
         type: command
-        short-summary: Delete all or mentioned endpoint for an IoT Hub.
-        long-summary:  We recommend that you delete any routes to the endpoint, before deleting the endpoint.
+        short-summary: Delete all or a specific endpoint for an IoT Hub.
+        long-summary:  You must delete any routes and message enrichments to the endpoint, before deleting the endpoint.
         examples:
           - name: Delete an endpoint from an IoT Hub.
             text: >
@@ -650,6 +650,14 @@ def load_iothub_help():
           - name: Delete all the endpoints from an IoT Hub.
             text: >
               az iot hub message-endpoint delete -n {iothub_name}
+          - name: Force delete an endpoint from an IoT Hub. This will delete any routes and message enrichments
+                  associated with this endpoint.
+            text: >
+              az iot hub message-endpoint delete -n {iothub_name} --endpoint-name {endpoint_name} -f
+          - name: Force delete  all the endpoints of type "EventHub" from an IoT Hub. This will delete any routes and
+                  message enrichments associated with this endpoint.
+            text: >
+              az iot hub message-endpoint delete -n {iothub_name} --endpoint-type eventhub -f
     """
 
     helps[
