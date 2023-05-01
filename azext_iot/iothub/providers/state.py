@@ -78,8 +78,6 @@ class StateProvider(IoTHubProvider):
 
         if not self.hub_name:
             self.hub_name = self.target["name"]
-        if not self.rg and not self.target:
-            raise RequiredArgumentMissingError(usr_msgs.MISSING_RG_ON_CREATE_ERROR)
         if not self.rg and self.target:
             self.rg = self.target.get("resourcegroup")
 
@@ -120,6 +118,8 @@ class StateProvider(IoTHubProvider):
             raise MutuallyExclusiveArgumentError(usr_msgs.LOGIN_WITH_ARM_ERROR)
         if HubAspects.Arm.value not in hub_aspects and not self.target:
             raise ResourceNotFoundError(usr_msgs.TARGET_HUB_NOT_FOUND_MSG.format(self.hub_name))
+        if not self.rg and not self.target:
+            raise RequiredArgumentMissingError(usr_msgs.MISSING_RG_ON_CREATE_ERROR)
 
         self.delete_aspects(replace, hub_aspects)
 
@@ -155,6 +155,8 @@ class StateProvider(IoTHubProvider):
             raise MutuallyExclusiveArgumentError(usr_msgs.LOGIN_WITH_ARM_ERROR)
         if HubAspects.Arm.value not in hub_aspects and not self.target:
             raise ResourceNotFoundError(usr_msgs.TARGET_HUB_NOT_FOUND_MSG.format(self.hub_name))
+        if not self.rg and not self.target:
+            self.rg = orig_hub_target.get("resourcegroup")
 
         # Command modifies hub_aspect - make copy so we can reuse for upload
         hub_state = self.process_hub_to_dict(orig_hub_target, hub_aspects[:])
