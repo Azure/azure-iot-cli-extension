@@ -37,7 +37,8 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
                 f"iot device registration create --dps-name {dps_name} -g {dps_rg} --registration-id {enrollment_id}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
-            )
+            ),
+            capture_stderr=True
         )
         assert enrollment_result.success() is False
 
@@ -47,7 +48,8 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
                 f"iot device registration create --id-scope {id_scope} --registration-id {enrollment_id}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
-            )
+            ),
+            capture_stderr=True
         )
         assert enrollment_result.success() is False
 
@@ -118,6 +120,7 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
+            capture_stderr=True
         )
         assert bad_registration.success() is False
 
@@ -237,7 +240,8 @@ def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module):
                 f"iot device registration create --dps-name {dps_name} -g {dps_rg} --registration-id {cert_name}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
-            )
+            ),
+            capture_stderr=True
         )
         assert enrollment_result.success() is False
 
@@ -257,7 +261,8 @@ def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module):
                 f"iot device registration create --dps-name {dps_name} -g {dps_rg} --registration-id {cert_name}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
-            )
+            ),
+            capture_stderr=True
         )
         assert enrollment_result.success() is False
 
@@ -419,7 +424,8 @@ def test_dps_device_registration_unlinked_hub(provisioned_iot_dps_no_hub_module)
                 f"--key {key}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
-            )
+            ),
+            capture_stderr=True
         )
         assert registration_result.success() is False
 
@@ -469,7 +475,8 @@ def test_dps_device_registration_disabled_enrollment(provisioned_iot_dps_module)
                 f"iot device registration create -g {dps_rg} --dps-name {dps_name} --registration-id {enrollment_id}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
-            )
+            ),
+            capture_stderr=True
         )
         assert registration_result.success() is False
 

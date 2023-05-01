@@ -28,7 +28,7 @@ class EmbeddedCLI(object):
         output_file = StringIO()
         old_exception_handler = None
 
-        # if capture_stderr is defined, use that, otherwise default to capture_stderr
+        # if capture_stderr is defined, use that, otherwise default to self.capture_stderr
         if (capture_stderr is None and self.capture_stderr) or capture_stderr:
             # Stop exception from being logged
             old_exception_handler = self.az_cli.exception_handler
@@ -73,6 +73,7 @@ class EmbeddedCLI(object):
         except Exception:
             if self.get_error():
                 raise self.get_error()
+            # incase there is no error and no json response
             raise CLIInternalError(
                 "Issue parsing received payload '{}' as json. Please try again or check resource status.".format(
                     self.output

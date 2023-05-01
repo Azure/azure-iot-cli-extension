@@ -840,7 +840,8 @@ def test_iot_endpoint_force_delete(provisioned_service_bus_with_identity_module)
     delete_result = cli.invoke(
         "iot hub message-endpoint delete -n {} -g {} --en {} -y".format(
             iot_hub, iot_rg, endpoint_names[0],
-        )
+        ),
+        capture_stderr=True
     )
     assert delete_result.success() is False
 
@@ -913,7 +914,8 @@ def test_iot_endpoint_force_delete(provisioned_service_bus_with_identity_module)
     delete_result = cli.invoke(
         "iot hub message-endpoint delete -n {} -g {} -t {} -y".format(
             iot_hub, iot_rg, "servicebus-topic",
-        )
+        ),
+        capture_stderr=True
     )
     assert delete_result.success() is False
 
@@ -990,7 +992,8 @@ def test_iot_endpoint_force_delete(provisioned_service_bus_with_identity_module)
     delete_result = cli.invoke(
         "iot hub message-endpoint delete -n {} -g {} -y".format(
             iot_hub, iot_rg,
-        )
+        ),
+        capture_stderr=True
     )
     assert delete_result.success() is False
 

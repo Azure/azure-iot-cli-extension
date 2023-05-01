@@ -90,7 +90,8 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):
                 f"--enrollment-id {enrollment_id} --registration-id myarbitrarydeviceId",
                 auth_type=auth_phase,
                 cstring=dps_cstring
-            )
+            ),
+            capture_stderr=True
         )
         assert failure_command.success() is False
 
