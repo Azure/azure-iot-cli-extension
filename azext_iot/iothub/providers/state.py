@@ -116,10 +116,10 @@ class StateProvider(IoTHubProvider):
             hub_aspects = HubAspects.list()
         if HubAspects.Arm.value in hub_aspects and self.login:
             raise MutuallyExclusiveArgumentError(usr_msgs.LOGIN_WITH_ARM_ERROR)
-        if HubAspects.Arm.value not in hub_aspects and not self.target:
-            raise ResourceNotFoundError(usr_msgs.TARGET_HUB_NOT_FOUND_MSG.format(self.hub_name))
         if not self.rg and not self.target:
             raise RequiredArgumentMissingError(usr_msgs.MISSING_RG_ON_CREATE_ERROR)
+        if HubAspects.Arm.value not in hub_aspects and not self.target:
+            raise ResourceNotFoundError(usr_msgs.TARGET_HUB_NOT_FOUND_MSG.format(self.hub_name))
 
         self.delete_aspects(replace, hub_aspects)
 
