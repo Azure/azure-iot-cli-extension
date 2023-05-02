@@ -273,7 +273,6 @@ def test_migrate_dataplane(setup_hub_states_dataplane):
     origin_rg = setup_hub_states_dataplane[0]["rg"]
     origin_cstring = setup_hub_states_dataplane[0]["connectionString"]
     dest_name = setup_hub_states_dataplane[1]["name"]
-    dest_rg = setup_hub_states_dataplane[1]["rg"]
     dest_cstring = setup_hub_states_dataplane[1]["connectionString"]
     for auth_phase in DATAPLANE_AUTH_TYPES:
         if auth_phase == "cstring":
@@ -285,7 +284,7 @@ def test_migrate_dataplane(setup_hub_states_dataplane):
             cli.invoke(
                 set_cmd_auth_type(
                     f"iot hub state migrate --origin-hub {origin_name} --origin-resource-group {origin_rg} "
-                    f"--destination-hub {dest_name} --destination-resource-group {dest_rg} -r --aspects {DATAPLANE}",
+                    f"--destination-hub {dest_name} -r --aspects {DATAPLANE}",
                     auth_type=auth_phase,
                     cstring=None
                 )
@@ -446,12 +445,6 @@ def test_export_import_migrate_missing_hubs_error():
         f"--destination-hub {hub_name} --destination-resource-group {hub_rg}"
     )
     assert isinstance(result.get_error(), ResourceNotFoundError)
-
-    # RequiredArgumentMissingError because no resource group
-    result = cli.invoke(
-        f"iot hub state migrate --origin-hub {hub_name} --destination-hub {hub_name}"
-    )
-    assert isinstance(result.get_error(), RequiredArgumentMissingError)
 
 
 # Dataplane main compare commands
