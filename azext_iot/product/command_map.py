@@ -20,7 +20,7 @@ requirements_ops = CliCommandType(
 
 def load_product_commands(self, _):
     with self.command_group(
-        "iot product", command_type=requirements_ops, is_preview=True
+        "iot product", command_type=requirements_ops, deprecate_info=self.deprecate()
     ) as g:
         pass
 
