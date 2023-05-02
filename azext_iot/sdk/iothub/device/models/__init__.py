@@ -9,28 +9,17 @@
 # regenerated.
 # --------------------------------------------------------------------------
 
-try:
-    from .symmetric_key_py3 import SymmetricKey
-    from .x509_thumbprint_py3 import X509Thumbprint
-    from .authentication_mechanism_py3 import AuthenticationMechanism
-    from .device_capabilities_py3 import DeviceCapabilities
-    from .device_model_py3 import DeviceModel
-    from .module_py3 import Module
-    from .scope_result_py3 import ScopeResult
-    from .file_upload_request_py3 import FileUploadRequest
-    from .file_upload_response_py3 import FileUploadResponse
-    from .file_upload_completion_status_py3 import FileUploadCompletionStatus
-except (SyntaxError, ImportError):
-    from .symmetric_key import SymmetricKey
-    from .x509_thumbprint import X509Thumbprint
-    from .authentication_mechanism import AuthenticationMechanism
-    from .device_capabilities import DeviceCapabilities
-    from .device_model import DeviceModel
-    from .module import Module
-    from .scope_result import ScopeResult
-    from .file_upload_request import FileUploadRequest
-    from .file_upload_response import FileUploadResponse
-    from .file_upload_completion_status import FileUploadCompletionStatus
+from .symmetric_key_py3 import SymmetricKey
+from .x509_thumbprint_py3 import X509Thumbprint
+from .authentication_mechanism_py3 import AuthenticationMechanism
+from .device_capabilities_py3 import DeviceCapabilities
+from .device_model_py3 import DeviceModel
+from .module_py3 import Module
+from .scope_result_py3 import ScopeResult
+from .file_upload_request_py3 import FileUploadRequest
+from .file_upload_response_py3 import FileUploadResponse
+from .file_upload_completion_status_py3 import FileUploadCompletionStatus
+
 
 __all__ = [
     'SymmetricKey',
