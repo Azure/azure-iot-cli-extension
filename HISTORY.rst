@@ -17,6 +17,10 @@ unreleased
 * `az iot device c2d-message send` now support inserting file path with `--data-file-path` argument.
 * `az iot device c2d-message receive` now shows non-decodable message payload with rest of the properties.
 
+**IoT Product**
+
+* Deprecation of `az iot product`. This command group will be removed in a future release.
+
 
 0.21.1
 +++++++++++++++
