@@ -209,9 +209,12 @@ def message_endpoint_delete(
     hub_name: str,
     endpoint_name: Optional[str] = None,
     endpoint_type: Optional[str] = None,
+    force: bool = False,
     resource_group_name: Optional[str] = None,
 ):
     message_endpoint_provider = MessageEndpoint(
         cmd=cmd, hub_name=hub_name, rg=resource_group_name
     )
-    return message_endpoint_provider.delete(endpoint_name=endpoint_name, endpoint_type=endpoint_type)
+    return message_endpoint_provider.delete(
+        endpoint_name=endpoint_name, endpoint_type=endpoint_type, force=force
+    )

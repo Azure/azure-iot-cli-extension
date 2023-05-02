@@ -65,13 +65,14 @@ def load_iothub_arguments(self, _):
         context.argument(
             "data",
             options_list=["--data", "--da"],
-            help="Message body. Provide text or raw json.")
+            help="Message body. Provide text or raw json.",
+        )
         context.argument(
             "data_file_path",
             is_preview=True,
             options_list=["--data-file-path", "--dfp"],
             help="""Provide path to file for message body payload. Please note when the payload needs
-            to be sent in binary format, set the content type to application/octet-stream."""
+            to be sent in binary format, set the content type to application/octet-stream.""",
         )
         context.argument(
             "properties",
@@ -265,34 +266,34 @@ def load_iothub_arguments(self, _):
         context.argument(
             "state_file",
             options_list=["--state-file", "-f"],
-            help="The path to the file where the state information will be stored."
+            help="The path to the file where the state information will be stored.",
         )
         context.argument(
             "replace",
             options_list=["--replace", "-r"],
             help="If this flag is set, then the command will delete the current devices, configurations, and certificates "
-                 "of the destination hub."
+            "of the destination hub.",
         )
         context.argument(
             "hub_aspects",
             options_list=["--aspects"],
             nargs="+",
             arg_type=get_enum_type(HubAspects),
-            help="Hub Aspects (space-separated)."
+            help="Hub Aspects (space-separated).",
         )
 
     with self.argument_context("iot hub state export") as context:
         context.argument(
             "replace",
             options_list=["--replace", "-r"],
-            help="If this flag is set, then the command will overwrite the contents of the output file."
+            help="If this flag is set, then the command will overwrite the contents of the output file.",
         )
 
     with self.argument_context("iot hub state migrate") as context:
         context.argument(
             "hub_name",
             options_list=["--destination-hub", "--dh"],
-            help="Name of IoT Hub to which the origin hub state will be copied to."
+            help="Name of IoT Hub to which the origin hub state will be copied to.",
         )
         context.argument(
             "resource_group_name",
@@ -309,19 +310,19 @@ def load_iothub_arguments(self, _):
             "Use to avoid session login via \"az login\" for this IoT Hub instance. "
             "If both an entity connection string and name are provided the connection string takes priority. "
             "Required if --destination-hub is not provided.",
-            arg_group="IoT Hub Identifier"
+            arg_group="IoT Hub Identifier",
         )
         context.argument(
             "orig_hub",
             options_list=["--origin-hub", "--oh"],
             help="Name of IoT Hub which will be copied.",
-            arg_group="IoT Hub Identifier"
+            arg_group="IoT Hub Identifier",
         )
         context.argument(
             "orig_resource_group_name",
             options_list=["--origin-resource-group", "--og"],
             help="Name of resource group of the IoT Hub which will be copied.",
-            arg_group="IoT Hub Identifier"
+            arg_group="IoT Hub Identifier",
         )
         context.argument(
             "orig_hub_login",
@@ -331,7 +332,7 @@ def load_iothub_arguments(self, _):
             'Use to avoid session login via "az login" for this IoT Hub instance. '
             "If both an entity connection string and name are provided the connection string takes priority. "
             "Required if --origin-hub is not provided.",
-            arg_group="IoT Hub Identifier"
+            arg_group="IoT Hub Identifier",
         )
 
     with self.argument_context("iot edge devices") as context:
@@ -345,7 +346,7 @@ def load_iothub_arguments(self, _):
             "`parent` (device_id), `edge_agent` (image URL), and `container_auth` (inline json or path to file). "
             "--device can be used 1 or more times. Review help examples for full parameter usage  - these parameters also refer "
             "to their corresponding values in our sample configuration file: "
-            "https://aka.ms/aziotcli-edge-devices-config"
+            "https://aka.ms/aziotcli-edge-devices-config",
         )
         context.argument(
             "clean",
@@ -369,7 +370,10 @@ def load_iothub_arguments(self, _):
         context.argument(
             "device_auth_type",
             arg_type=get_enum_type(
-                [DeviceAuthType.shared_private_key.value, DeviceAuthType.x509_thumbprint.value]
+                [
+                    DeviceAuthType.shared_private_key.value,
+                    DeviceAuthType.x509_thumbprint.value,
+                ]
             ),
             options_list=["--device-auth-type", "--device-auth"],
             help="Device to hub authorization mechanism.",
@@ -400,7 +404,7 @@ def load_iothub_arguments(self, _):
                 "--rc",
             ],
             help="Path to root public key certificate to sign nested edge device certs.",
-            arg_group="Root Certificate"
+            arg_group="Root Certificate",
         )
         context.argument(
             "root_key_path",
@@ -409,7 +413,7 @@ def load_iothub_arguments(self, _):
                 "--rk",
             ],
             help="Path to root private key to sign nested edge device certs.",
-            arg_group="Root Certificate"
+            arg_group="Root Certificate",
         )
         context.argument(
             "root_cert_password",
@@ -418,12 +422,12 @@ def load_iothub_arguments(self, _):
                 "--rp",
             ],
             help="Root key password",
-            arg_group="Root Certificate"
+            arg_group="Root Certificate",
         )
         context.argument(
             "yes",
-            options_list=['--yes', '-y'],
-            help='Do not prompt for confirmation when --clean switch is used to delete existing hub devices.',
+            options_list=["--yes", "-y"],
+            help="Do not prompt for confirmation when --clean switch is used to delete existing hub devices.",
         )
 
     with self.argument_context("iot hub message-endpoint") as context:
@@ -431,147 +435,158 @@ def load_iothub_arguments(self, _):
             "hub_name",
             options_list=["--hub-name", "-n"],
             help="IoT Hub name.",
-            arg_group=None
+            arg_group=None,
         )
         context.argument(
             "endpoint_name",
             options_list=["--endpoint-name", "--endpoint", "--en"],
-            help="Name of the routing endpoint."
+            help="Name of the routing endpoint.",
         )
         context.argument(
             "endpoint_type",
             arg_type=get_enum_type(EndpointType),
             options_list=["--endpoint-type", "--type", "-t"],
-            help="Type of the Routing Endpoint."
+            help="Type of the Routing Endpoint.",
         )
 
     with self.argument_context("iot hub message-endpoint create") as context:
         context.argument(
-            'identity',
-            help='Use a system-assigned or user-assigned managed identity for endpoint '
-                 'authentication. Use "[system]" to refer to the system-assigned identity or a resource ID '
-                 'to refer to a user-assigned identity.',
+            "identity",
+            help="Use a system-assigned or user-assigned managed identity for endpoint "
+            'authentication. Use "[system]" to refer to the system-assigned identity or a resource ID '
+            "to refer to a user-assigned identity.",
         )
         context.argument(
             "endpoint_resource_group",
             options_list=["--endpoint-resource-group", "--erg", "-r"],
-            help="Resource group of the Endpoint resoure. If not provided, the IoT Hub's resource group will be used."
+            help="Resource group of the Endpoint resoure. If not provided, the IoT Hub's resource group will be used.",
         )
         context.argument(
             "endpoint_subscription_id",
             options_list=["--endpoint-subscription-id", "-s"],
-            help="Subscription Id of the Endpoint resource. If not provided, the IoT Hub's subscription will be used."
+            help="Subscription Id of the Endpoint resource. If not provided, the IoT Hub's subscription will be used.",
         )
         context.argument(
             "connection_string",
             options_list=["--connection-string", "-c"],
-            help="Connection string of the Routing Endpoint."
+            help="Connection string of the Routing Endpoint.",
         )
         context.argument(
             "entity_path",
             options_list=["--entity-path"],
-            help="The entity path of the endpoint resource."
+            help="The entity path of the endpoint resource.",
         )
         context.argument(
             "endpoint_policy_name",
             options_list=["--endpoint-policy-name", "--policy"],
-            help="The policy name for connection string retrieval."
+            help="The policy name for connection string retrieval.",
         )
         context.argument(
             "endpoint_uri",
             options_list=["--endpoint-uri"],
-            help="The uri of the endpoint resource."
+            help="The uri of the endpoint resource.",
         )
         context.argument(
             "policy_name",
             options_list=["--policy-name"],
-            help="The policy name for the endpoint resource connection string."
+            help="The policy name for the endpoint resource connection string.",
         )
         context.argument(
             "endpoint_account_name",
             options_list=["--endpoint-namespace-name", "--namespace"],
-            help="The namespace name for the endpoint resource."
+            help="The namespace name for the endpoint resource.",
         )
 
-    with self.argument_context("iot hub message-endpoint create storage-container") as context:
+    with self.argument_context(
+        "iot hub message-endpoint create storage-container"
+    ) as context:
         context.argument(
             "container_name",
             options_list=["--container-name", "--container"],
-            help="Name of the storage container."
+            help="Name of the storage container.",
         )
         context.argument(
             "encoding",
             options_list=["--encoding"],
             arg_type=get_enum_type(EncodingFormat),
-            help="Encoding format for the container."
+            help="Encoding format for the container.",
         )
         context.argument(
-            'batch_frequency',
-            options_list=['--batch-frequency', '-b'],
+            "batch_frequency",
+            options_list=["--batch-frequency", "-b"],
             type=int,
-            help='Request batch frequency in seconds. The maximum amount of time that can elapse before data is'
-                 ' written to a blob, between 60 and 720 seconds.'
+            help="Request batch frequency in seconds. The maximum amount of time that can elapse before data is"
+            " written to a blob, between 60 and 720 seconds.",
         )
         context.argument(
-            'chunk_size_window',
-            options_list=['--chunk-size', '-w'],
+            "chunk_size_window",
+            options_list=["--chunk-size", "-w"],
             type=int,
-            help='Request chunk size in megabytes(MB). The maximum size of blobs, between 10 and 500 MB.'
+            help="Request chunk size in megabytes(MB). The maximum size of blobs, between 10 and 500 MB.",
         )
         context.argument(
-            'file_name_format',
-            options_list=['--file-name-format', '--ff'],
-            help='File name format for the blob. The file name format must contain {iothub},'
-                 ' {partition}, {YYYY}, {MM}, {DD}, {HH} and {mm} fields. All parameters are'
-                 ' mandatory but can be reordered with or without delimiters.'
+            "file_name_format",
+            options_list=["--file-name-format", "--ff"],
+            help="File name format for the blob. The file name format must contain {iothub},"
+            " {partition}, {YYYY}, {MM}, {DD}, {HH} and {mm} fields. All parameters are"
+            " mandatory but can be reordered with or without delimiters.",
         )
         context.argument(
             "endpoint_account_name",
             options_list=["--endpoint-account"],
-            help="The account name for the endpoint resource."
+            help="The account name for the endpoint resource.",
         )
 
-    with self.argument_context("iot hub message-endpoint create cosmosdb-container") as context:
+    with self.argument_context(
+        "iot hub message-endpoint create cosmosdb-container"
+    ) as context:
         context.argument(
-            'database_name',
-            options_list=['--database-name', '--db'],
-            help='The name of the cosmos DB database in the cosmos DB account. Required for Cosmos DB SQL Container Endpoints.',
+            "database_name",
+            options_list=["--database-name", "--db"],
+            help="The name of the cosmos DB database in the cosmos DB account. Required for Cosmos DB SQL Container Endpoints.",
         )
         context.argument(
-            'container_name',
-            options_list=['--container-name', '--container'],
-            help='The name of the Cosmos DB SQL Container in the cosmos DB Database. Required for Cosmos DB SQL Container '
-                 'Endpoints.',
+            "container_name",
+            options_list=["--container-name", "--container"],
+            help="The name of the Cosmos DB SQL Container in the cosmos DB Database. Required for Cosmos DB SQL Container "
+            "Endpoints.",
         )
         context.argument(
-            'primary_key',
-            options_list=['--primary-key', '--pk'],
-            help='The primary key of the cosmos DB account.',
-            arg_group=None
+            "primary_key",
+            options_list=["--primary-key", "--pk"],
+            help="The primary key of the cosmos DB account.",
+            arg_group=None,
         )
         context.argument(
-            'secondary_key',
-            options_list=['--secondary-key', '--sk'],
-            help='The secondary key of the cosmos DB account.',
-            arg_group=None
+            "secondary_key",
+            options_list=["--secondary-key", "--sk"],
+            help="The secondary key of the cosmos DB account.",
+            arg_group=None,
         )
         context.argument(
-            'partition_key_name',
-            options_list=['--partition-key-name', '--pkn'],
-            help='The name of the partition key associated with this Cosmos DB SQL Container if one exists.',
+            "partition_key_name",
+            options_list=["--partition-key-name", "--pkn"],
+            help="The name of the partition key associated with this Cosmos DB SQL Container if one exists.",
         )
         context.argument(
-            'partition_key_template',
-            options_list=['--partition-key-template', '--pkt'],
-            help='The template for generating a synthetic partition key value for use with this Cosmos DB SQL Container. '
-                 'The template must include at least one of the following placeholders: {iothub}, {deviceid}, {DD}, {MM}, and '
-                 '{YYYY}. Any one placeholder may be specified at most once, but order and non-placeholder components are '
-                 'arbitrary. If partition key name is provided, partition key template defaults to {deviceid}-{YYYY}-{MM}',
+            "partition_key_template",
+            options_list=["--partition-key-template", "--pkt"],
+            help="The template for generating a synthetic partition key value for use with this Cosmos DB SQL Container. "
+            "The template must include at least one of the following placeholders: {iothub}, {deviceid}, {DD}, {MM}, and "
+            "{YYYY}. Any one placeholder may be specified at most once, but order and non-placeholder components are "
+            "arbitrary. If partition key name is provided, partition key template defaults to {deviceid}-{YYYY}-{MM}",
         )
         context.argument(
             "endpoint_account_name",
             options_list=["--endpoint-account"],
-            help="The account name for the endpoint resource."
+            help="The account name for the endpoint resource.",
+        )
+
+    with self.argument_context("iot hub message-endpoint delete") as context:
+        context.argument(
+            "force",
+            options_list=["--force", "-f"],
+            help="Force delete the endpoint(s) and any routes and message enrichments associated.",
         )
 
     with self.argument_context("iot hub message-route") as context:
@@ -579,34 +594,34 @@ def load_iothub_arguments(self, _):
             "hub_name",
             options_list=["--hub-name", "-n"],
             help="IoT Hub name.",
-            arg_group=None
+            arg_group=None,
         )
         context.argument(
             "route_name",
             options_list=["--route-name", "--route", "--rn"],
-            help="Name of the route."
+            help="Name of the route.",
         )
         context.argument(
             "endpoint_name",
             options_list=["--endpoint-name", "--endpoint", "--en"],
-            help="Name of the routing endpoint. For the built-in endpoint, use endpoint name 'events'."
+            help="Name of the routing endpoint. For the built-in endpoint, use endpoint name 'events'.",
         )
         context.argument(
             "condition",
             options_list=["--condition", "-c"],
-            help="Condition that is evaluated to apply the routing rule."
+            help="Condition that is evaluated to apply the routing rule.",
         )
         context.argument(
             "enabled",
             options_list=["--enabled", "-e"],
             arg_type=get_three_state_flag(),
-            help="A boolean indicating whether to enable route to the IoT Hub."
+            help="A boolean indicating whether to enable route to the IoT Hub.",
         )
         context.argument(
             "source_type",
             arg_type=get_enum_type(RouteSourceType),
             options_list=["--source-type", "--type", "-t"],
-            help="Source of the route."
+            help="Source of the route.",
         )
 
     with self.argument_context("iot hub message-route test") as context:
