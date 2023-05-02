@@ -19,3 +19,26 @@ def compare_registrations(device_side: Dict[str, str], service_side: Dict[str, s
     # The device sdk always returns a substatus of initialAssignment, when that should not be the case if a
     # device is reregistered. The service side has the correct substatus.
     # assert device_side["substatus"] == service_side["substatus"]
+
+
+def check_hub_device(
+    cli,
+    device: str,
+    auth_type: str,
+    hub_cstring: str,
+    key: str = None,
+    thumbprint: str = None
+):
+    """Helper method to check whether a device exists in a hub."""
+
+    device_auth = cli.invoke(
+        "iot hub device-identity show -l {} -d {}".format(
+            hub_cstring,
+            device,
+        )
+    ).as_json()["authentication"]
+    assert auth_type == device_auth["type"]
+    if key:
+        assert key == device_auth["symmetricKey"]["primaryKey"]
+    if thumbprint:
+        assert thumbprint == device_auth["x509Thumbprint"]["primaryThumbprint"]

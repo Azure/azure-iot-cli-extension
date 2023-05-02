@@ -8,7 +8,7 @@
 from typing import Optional
 import pytest
 from azext_iot.common.utility import ensure_iothub_sdk_min_version
-from azext_iot.iothub.common import AuthenticationType
+from azext_iot.iothub.common import AuthenticationType, RouteSourceType
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common._azure import _parse_connection_string, parse_cosmos_db_connection_string
@@ -782,6 +782,244 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
     ).as_json()
 
     assert endpoint_list == []
+
+
+def test_iot_endpoint_force_delete(provisioned_service_bus_with_identity_module):
+    # this test covers two endpoint types
+    iot_hub_objs, servicebus_obj = provisioned_service_bus_with_identity_module
+    iot_hub_obj = iot_hub_objs[0]["hub"]
+
+    iot_hub = iot_hub_obj["name"]
+    iot_rg = iot_hub_obj["resourcegroup"]
+    queue_cs = servicebus_obj["queueConnectionString"]
+    topic_cs = servicebus_obj["topicConnectionString"]
+    built_in_endpoint = "events"
+
+    # Create 2 topic, 2 queue endpoints
+    endpoint_names = generate_ep_names(3)
+
+    # Route names, one for each endpoint + built in
+    route_names = generate_ep_names(4)
+
+    # Enrichment keys, one for each endpoint + built in
+    enrichment_keys = generate_ep_names(4)
+
+    # Create route and message enrichment for builtin endpoint
+    cli.invoke(
+        "iot hub message-route create -n {} -g {} --rn {} --en {} -t {}".format(
+            iot_hub, iot_rg, route_names[-1], built_in_endpoint, RouteSourceType.DeviceMessages.value
+        )
+    )
+
+    cli.invoke(
+        "iot hub message-enrichment create -n {} -g {} -e {} -k {} -v {}".format(
+            iot_hub, iot_rg, built_in_endpoint, enrichment_keys[-1], generate_generic_id()
+        )
+    )
+
+    # create topic endpoint first - connection string, add route and message enrichment
+    cli.invoke(
+        "iot hub message-endpoint create servicebus-topic -n {} -g {} --en {} --erg {} -c {}".format(
+            iot_hub, iot_rg, endpoint_names[0], iot_rg, topic_cs
+        )
+    )
+
+    cli.invoke(
+        "iot hub message-route create -n {} -g {} --rn {} --en {} -t {}".format(
+            iot_hub, iot_rg, route_names[0], endpoint_names[0], RouteSourceType.DeviceMessages.value
+        )
+    )
+
+    cli.invoke(
+        "iot hub message-enrichment create -n {} -g {} -e {} -k {} -v {}".format(
+            iot_hub, iot_rg, endpoint_names[0], enrichment_keys[0], generate_generic_id()
+        )
+    )
+
+    # try delete with name without force
+    delete_result = cli.invoke(
+        "iot hub message-endpoint delete -n {} -g {} --en {} -y".format(
+            iot_hub, iot_rg, endpoint_names[0],
+        )
+    )
+    assert delete_result.success() is False
+
+    # delete with name force
+    delete_result = cli.invoke(
+        "iot hub message-endpoint delete -n {} -g {} --en {} -y -f".format(
+            iot_hub, iot_rg, endpoint_names[0],
+        )
+    )
+    assert delete_result.success()
+
+    # ensure built in is not deleted
+    route_list = cli.invoke(
+        "iot hub message-route list -n {} -g {}".format(
+            iot_hub, iot_rg,
+        )
+    ).as_json()
+
+    assert len(route_list) == 1
+    assert route_list[0]["name"] == route_names[-1]
+
+    enrichment_list = cli.invoke(
+        "iot hub message-enrichment list -n {} -g {}".format(
+            iot_hub, iot_rg,
+        )
+    ).as_json()
+
+    assert len(enrichment_list) == 1
+    assert enrichment_list[0]["key"] == enrichment_keys[-1]
+
+    # Recreate topic endpoint
+    cli.invoke(
+        "iot hub message-endpoint create servicebus-topic -n {} -g {} --en {} --erg {} -c {}".format(
+            iot_hub, iot_rg, endpoint_names[0], iot_rg, topic_cs
+        )
+    )
+
+    cli.invoke(
+        "iot hub message-route create -n {} -g {} --rn {} --en {} -t {}".format(
+            iot_hub, iot_rg, route_names[0], endpoint_names[0], RouteSourceType.DeviceMessages.value
+        )
+    )
+
+    cli.invoke(
+        "iot hub message-enrichment create -n {} -g {} -e {} -k {} -v {}".format(
+            iot_hub, iot_rg, endpoint_names[0], enrichment_keys[0], generate_generic_id()
+        )
+    )
+
+    # Create queue endpoint
+    cli.invoke(
+        "iot hub message-endpoint create servicebus-queue -n {} -g {} --en {} --erg {} -c {}".format(
+            iot_hub, iot_rg, endpoint_names[1], iot_rg, queue_cs
+        )
+    )
+
+    cli.invoke(
+        "iot hub message-route create -n {} -g {} --rn {} --en {} -t {}".format(
+            iot_hub, iot_rg, route_names[1], endpoint_names[1], RouteSourceType.DeviceMessages.value
+        )
+    )
+
+    cli.invoke(
+        "iot hub message-enrichment create -n {} -g {} -e {} -k {} -v {}".format(
+            iot_hub, iot_rg, endpoint_names[1], enrichment_keys[1], generate_generic_id()
+        )
+    )
+
+    # delete by endpoint type without force
+    delete_result = cli.invoke(
+        "iot hub message-endpoint delete -n {} -g {} -t {} -y".format(
+            iot_hub, iot_rg, "servicebus-topic",
+        )
+    )
+    assert delete_result.success() is False
+
+    # delete by endpoint type with force
+    delete_result = cli.invoke(
+        "iot hub message-endpoint delete -n {} -g {} -t {} -y -f".format(
+            iot_hub, iot_rg, "servicebus-topic",
+        )
+    )
+    assert delete_result.success()
+
+    # ensure only servicebus topic route and message enrichment are deleted
+    route_list = cli.invoke(
+        "iot hub message-route list -n {} -g {}".format(
+            iot_hub, iot_rg,
+        )
+    ).as_json()
+
+    assert len(route_list) == 2
+    route_list_names = [r["name"] for r in route_list]
+    assert route_names[-1] in route_list_names
+    assert route_names[1] in route_list_names
+
+    enrichment_list = cli.invoke(
+        "iot hub message-enrichment list -n {} -g {}".format(
+            iot_hub, iot_rg,
+        )
+    ).as_json()
+
+    assert len(enrichment_list) == 2
+    enrichment_list_names = [r["key"] for r in enrichment_list]
+    assert enrichment_keys[-1] in enrichment_list_names
+    assert enrichment_keys[1] in enrichment_list_names
+
+    # Recreate topic endpoint
+    cli.invoke(
+        "iot hub message-endpoint create servicebus-topic -n {} -g {} --en {} --erg {} -c {}".format(
+            iot_hub, iot_rg, endpoint_names[0], iot_rg, topic_cs
+        )
+    )
+
+    cli.invoke(
+        "iot hub message-route create -n {} -g {} --rn {} --en {} -t {}".format(
+            iot_hub, iot_rg, route_names[0], endpoint_names[0], RouteSourceType.DeviceMessages.value
+        )
+    )
+
+    cli.invoke(
+        "iot hub message-enrichment create -n {} -g {} -e {} -k {} -v {}".format(
+            iot_hub, iot_rg, endpoint_names[0], enrichment_keys[0], generate_generic_id()
+        )
+    )
+
+    # Create secondary queue endpoint
+    cli.invoke(
+        "iot hub message-endpoint create servicebus-queue -n {} -g {} --en {} --erg {} -c {}".format(
+            iot_hub, iot_rg, endpoint_names[2], iot_rg, queue_cs
+        )
+    )
+
+    cli.invoke(
+        "iot hub message-route create -n {} -g {} --rn {} --en {} -t {}".format(
+            iot_hub, iot_rg, route_names[2], endpoint_names[2], RouteSourceType.DeviceMessages.value
+        )
+    )
+
+    cli.invoke(
+        "iot hub message-enrichment create -n {} -g {} -e {} -k {} -v {}".format(
+            iot_hub, iot_rg, endpoint_names[2], enrichment_keys[2], generate_generic_id()
+        )
+    )
+
+    # delete all endpoints without force
+    delete_result = cli.invoke(
+        "iot hub message-endpoint delete -n {} -g {} -y".format(
+            iot_hub, iot_rg,
+        )
+    )
+    assert delete_result.success() is False
+
+    # delete all endpoints with force
+    delete_result = cli.invoke(
+        "iot hub message-endpoint delete -n {} -g {} -y -f".format(
+            iot_hub, iot_rg,
+        )
+    )
+    assert delete_result.success()
+
+    # ensure built in is not deleted
+    route_list = cli.invoke(
+        "iot hub message-route list -n {} -g {}".format(
+            iot_hub, iot_rg,
+        )
+    ).as_json()
+
+    assert len(route_list) == 1
+    assert route_list[0]["name"] == route_names[-1]
+
+    enrichment_list = cli.invoke(
+        "iot hub message-enrichment list -n {} -g {}".format(
+            iot_hub, iot_rg,
+        )
+    ).as_json()
+
+    assert len(enrichment_list) == 1
+    assert enrichment_list[0]["key"] == enrichment_keys[-1]
 
 
 def build_expected_endpoint(
