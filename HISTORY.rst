@@ -10,6 +10,7 @@ unreleased
 **IoT Hub updates**
 
 * Fix `az iot hub monitor-events` hangs when message payload failed to find representation in unicode.
+* `az iot hub state migrate` will now use the origin IoT Hub's resource group when the destination IoT Hub's resource group is not given.
 
 **IoT device updates**
 
