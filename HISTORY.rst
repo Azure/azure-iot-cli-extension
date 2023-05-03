@@ -7,6 +7,9 @@ Release History
 unreleased
 +++++++++++++++
 
+0.22.0
++++++++++++++++
+
 **IoT Hub updates**
 
 * Fix `az iot hub monitor-events` hangs when message payload failed to find representation in unicode.
