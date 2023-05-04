@@ -7,16 +7,18 @@ Release History
 unreleased
 +++++++++++++++
 
+0.21.2
++++++++++++++++
+
 **IoT Hub updates**
 
-* Fix `az iot hub monitor-events` hangs when message payload failed to find representation in unicode.
+* Fixed issue where `az iot hub monitor-events` would hang when message payload cannot be decoded as unicode.
 * `az iot hub state migrate` will now use the origin IoT Hub's resource group when the destination IoT Hub's resource group is not given.
 
 **IoT device updates**
 
-* `az iot device send-d2c-message` now support inserting file path with `--data-file-path` argument.
-* `az iot device c2d-message send` now support inserting file path with `--data-file-path` argument.
-* `az iot device c2d-message receive` now shows non-decodable message payload with rest of the properties.
+* `az iot device send-d2c-message` and `az iot device c2d-message send` now support providing message data from a file using the `--data-file-path` argument.
+* `az iot device c2d-message receive` will now show a warning, along with other event properties, if the message payload cannot be decoded.
 
 **IoT Product**
 
