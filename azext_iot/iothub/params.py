@@ -71,8 +71,9 @@ def load_iothub_arguments(self, _):
             "data_file_path",
             is_preview=True,
             options_list=["--data-file-path", "--dfp"],
-            help="""Provide path to file for message body payload. Please note when the payload needs
-            to be sent in binary format, set the content type to application/octet-stream.""",
+            help="Provide path to file for message body payload. Please "
+            "note when the payload needs to be sent in binary format, "
+            "set the content type to application/octet-stream.",
         )
         context.argument(
             "properties",
