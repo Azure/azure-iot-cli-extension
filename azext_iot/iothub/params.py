@@ -71,8 +71,9 @@ def load_iothub_arguments(self, _):
             "data_file_path",
             is_preview=True,
             options_list=["--data-file-path", "--dfp"],
-            help="""Provide path to file for message body payload. Please note when the payload needs
-            to be sent in binary format, set the content type to application/octet-stream.""",
+            help="Provide path to file for message body payload. Please "
+            "note when the payload needs to be sent in binary format, "
+            "set the content type to application/octet-stream.",
         )
         context.argument(
             "properties",
@@ -298,7 +299,7 @@ def load_iothub_arguments(self, _):
         context.argument(
             "resource_group_name",
             options_list=["--destination-resource-group", "--dg"],
-            help="Name of resource group of the IoT Hub to which the origin hub state will be copied to."
+            help="Name of resource group of the IoT Hub to which the origin hub state will be copied to. "
             "If not provided, will use the origin IoT Hub's resource group.",
             arg_group="IoT Hub Identifier"
         )
