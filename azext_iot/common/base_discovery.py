@@ -292,7 +292,7 @@ class BaseDiscovery(ABC):
             )
 
         policy_name = kwargs.get("policy_name", "auto")
-        rg = resource.additional_properties.get("resourcegroup")
+        rg = resource.resourcegroup if hasattr(resource, "resourcegroup") else resource.additional_properties.get("resourcegroup")
 
         resource_policy = self.find_policy(
             resource_name=resource.name, rg=rg, policy_name=policy_name,
@@ -321,11 +321,16 @@ class BaseDiscovery(ABC):
         resources = self.get_resources(rg=resource_group_name)
         if resources:
             for resource in resources:
+                rg = (
+                    resource.resourcegroup
+                    if hasattr(resource, "resourcegroup")
+                    else resource.additional_properties.get("resourcegroup")
+                )
                 try:
                     targets.append(
                         self.get_target(
                             resource_name=resource.name,
-                            resource_group_name=resource.additional_properties.get("resourcegroup"),
+                            resource_group_name=rg,
                             **kwargs
                         )
                     )

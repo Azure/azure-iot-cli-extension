@@ -739,6 +739,7 @@ def iot_dps_connection_string_show(
 
         connection_strings = []
         for dps in dps:
+            dps_rg = dps.resourcegroup if hasattr(dps, "resourcegroup") else dps.additional_properties.get("resourcegroup")
             if dps.properties.state == IoTDPSStateType.Active.value:
                 try:
                     connection_strings.append(
@@ -752,13 +753,13 @@ def iot_dps_connection_string_show(
                 except Exception:
                     logger.warning(
                         f"Warning: The DPS {dps.name} in resource group "
-                        + f"{dps.additional_properties['resourcegroup']} does "
+                        + f"{dps_rg} does "
                         + f"not have the target policy {policy_name}."
                     )
             else:
                 logger.warning(
                     f"Warning: The DPS {dps.name} in resource group "
-                    + f"{dps.additional_properties['resourcegroup']} is skipped "
+                    + f"{dps_rg} is skipped "
                     + "because the DPS is not active."
                 )
         return connection_strings
@@ -775,14 +776,15 @@ def _get_dps_connection_string(
     discovery, dps, policy_name, key_type, show_all
 ):
     policies = []
+    dps_rg = dps.resourcegroup if hasattr(dps, "resourcegroup") else dps.additional_properties.get("resourcegroup")
     if show_all:
         policies.extend(
-            discovery.get_policies(dps.name, dps.additional_properties["resourcegroup"])
+            discovery.get_policies(dps.name, dps_rg)
         )
     else:
         policies.append(
             discovery.find_policy(
-                dps.name, dps.additional_properties["resourcegroup"], policy_name
+                dps.name, dps_rg, policy_name
             )
         )
 
