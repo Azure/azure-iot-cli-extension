@@ -22,7 +22,7 @@ class ImportJobsOperations(object):
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: The requested API version. Constant value: "2023-02-27-preview".
+    :ivar api_version: The requested API version. Constant value: "2023-06-30".
     """
 
     models = models
@@ -32,13 +32,13 @@ class ImportJobsOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2023-02-27-preview"
+        self.api_version = "2023-06-30"
 
         self.config = config
 
     def list(
             self, import_jobs_list_options=None, custom_headers=None, raw=False, **operation_config):
-        """Retrieves all bulk import jobs.
+        """Retrieves all import jobs.
         Status codes:
         * 200 OK.
 
@@ -51,9 +51,9 @@ class ImportJobsOperations(object):
          deserialized response
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
-        :return: An iterator like instance of BulkImportJob
+        :return: An iterator like instance of ImportJob
         :rtype:
-         ~dataplane.models.BulkImportJobPaged[~dataplane.models.BulkImportJob]
+         ~dataplane.models.ImportJobPaged[~dataplane.models.ImportJob]
         :raises:
          :class:`ErrorResponseException<dataplane.models.ErrorResponseException>`
         """
@@ -108,11 +108,11 @@ class ImportJobsOperations(object):
             return response
 
         # Deserialize response
-        deserialized = models.BulkImportJobPaged(internal_paging, self._deserialize.dependencies)
+        deserialized = models.ImportJobPaged(internal_paging, self._deserialize.dependencies)
 
         if raw:
             header_dict = {}
-            client_raw_response = models.BulkImportJobPaged(internal_paging, self._deserialize.dependencies, header_dict)
+            client_raw_response = models.ImportJobPaged(internal_paging, self._deserialize.dependencies, header_dict)
             return client_raw_response
 
         return deserialized
@@ -120,29 +120,30 @@ class ImportJobsOperations(object):
 
     def add(
             self, id, import_job, import_jobs_add_options=None, custom_headers=None, raw=False, **operation_config):
-        """Creates a bulk import job.
+        """Creates an import job.
         Status codes:
         * 201 Created
         * 400 Bad Request
-        * JobLimitReached - The maximum number of bulk import jobs allowed has
-        been reached.
-        * ValidationFailed - The bulk job request is not valid.
+        * JobLimitReached - The maximum number of import jobs allowed has been
+        reached.
+        * ValidationFailed - The import job request is not valid.
 
-        :param id: The id for the bulk import job. The id is unique within the
+        :param id: The id for the import job. The id is unique within the
          service and case sensitive.
         :type id: str
-        :param import_job: The bulk import job being added.
-        :type import_job: ~dataplane.models.BulkImportJob
+        :param import_job: The import job being added.
+        :type import_job: ~dataplane.models.ImportJob
         :param import_jobs_add_options: Additional parameters for the
          operation
-        :type import_jobs_add_options: ~dataplane.models.ImportJobsAddOptions
+        :type import_jobs_add_options:
+         ~dataplane.models.ImportJobsAddOptions
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
-        :return: BulkImportJob or ClientRawResponse if raw=true
-        :rtype: ~dataplane.models.BulkImportJob or
+        :return: ImportJob or ClientRawResponse if raw=true
+        :rtype: ~dataplane.models.ImportJob or
          ~msrest.pipeline.ClientRawResponse
         :raises:
          :class:`ErrorResponseException<dataplane.models.ErrorResponseException>`
@@ -180,7 +181,7 @@ class ImportJobsOperations(object):
             header_parameters['tracestate'] = self._serialize.header("tracestate", tracestate, 'str')
 
         # Construct body
-        body_content = self._serialize.body(import_job, 'BulkImportJob')
+        body_content = self._serialize.body(import_job, 'ImportJob')
 
         # Construct and send request
         request = self._client.put(url, query_parameters)
@@ -193,7 +194,7 @@ class ImportJobsOperations(object):
         deserialized = None
 
         if response.status_code == 201:
-            deserialized = self._deserialize('BulkImportJob', response)
+            deserialized = self._deserialize('ImportJob', response)
 
         if raw:
             client_raw_response = ClientRawResponse(deserialized, response)
@@ -204,13 +205,13 @@ class ImportJobsOperations(object):
 
     def get_by_id(
             self, id, import_jobs_get_by_id_options=None, custom_headers=None, raw=False, **operation_config):
-        """Retrieves a bulk job.
+        """Retrieves an import job.
         Status codes:
         * 200 OK
         * 404 Not Found
-        * BulkJobNotFound - The bulk job was not found.
+        * ImportJobNotFound - The import job was not found.
 
-        :param id: The id for the bulk import job. The id is unique within the
+        :param id: The id for the import job. The id is unique within the
          service and case sensitive.
         :type id: str
         :param import_jobs_get_by_id_options: Additional parameters for the
@@ -222,8 +223,8 @@ class ImportJobsOperations(object):
          deserialized response
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
-        :return: BulkImportJob or ClientRawResponse if raw=true
-        :rtype: ~dataplane.models.BulkImportJob or
+        :return: ImportJob or ClientRawResponse if raw=true
+        :rtype: ~dataplane.models.ImportJob or
          ~msrest.pipeline.ClientRawResponse
         :raises:
          :class:`ErrorResponseException<dataplane.models.ErrorResponseException>`
@@ -270,7 +271,7 @@ class ImportJobsOperations(object):
         deserialized = None
 
         if response.status_code == 200:
-            deserialized = self._deserialize('BulkImportJob', response)
+            deserialized = self._deserialize('ImportJob', response)
 
         if raw:
             client_raw_response = ClientRawResponse(deserialized, response)
@@ -281,13 +282,13 @@ class ImportJobsOperations(object):
 
     def delete(
             self, id, import_jobs_delete_options=None, custom_headers=None, raw=False, **operation_config):
-        """Deletes a bulk import job.
+        """Deletes an import job.
         Status codes:
         * 204 No Content
         * 400 Bad Request
-        * ValidationFailed - The bulk job request is not valid.
+        * ValidationFailed - The import job request is not valid.
 
-        :param id: The id for the bulk import job. The id is unique within the
+        :param id: The id for the import job. The id is unique within the
          service and case sensitive.
         :type id: str
         :param import_jobs_delete_options: Additional parameters for the
@@ -350,13 +351,13 @@ class ImportJobsOperations(object):
 
     def cancel(
             self, id, import_jobs_cancel_options=None, custom_headers=None, raw=False, **operation_config):
-        """Cancels a bulk import job.
+        """Cancels an import job.
         Status codes:
         * 200 Request Accepted
         * 400 Bad Request
-        * ValidationFailed - The bulk job request is not valid.
+        * ValidationFailed - The import job request is not valid.
 
-        :param id: The id for the bulk import job. The id is unique within the
+        :param id: The id for the import job. The id is unique within the
          service and case sensitive.
         :type id: str
         :param import_jobs_cancel_options: Additional parameters for the
@@ -368,8 +369,8 @@ class ImportJobsOperations(object):
          deserialized response
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
-        :return: BulkImportJob or ClientRawResponse if raw=true
-        :rtype: ~dataplane.models.BulkImportJob or
+        :return: ImportJob or ClientRawResponse if raw=true
+        :rtype: ~dataplane.models.ImportJob or
          ~msrest.pipeline.ClientRawResponse
         :raises:
          :class:`ErrorResponseException<dataplane.models.ErrorResponseException>`
@@ -416,7 +417,7 @@ class ImportJobsOperations(object):
         deserialized = None
 
         if response.status_code == 200:
-            deserialized = self._deserialize('BulkImportJob', response)
+            deserialized = self._deserialize('ImportJob', response)
 
         if raw:
             client_raw_response = ClientRawResponse(deserialized, response)
