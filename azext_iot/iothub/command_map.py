@@ -61,6 +61,7 @@ def load_iothub_commands(self, _):
         "iot hub message-endpoint", command_type=iothub_message_endpoint_ops, is_preview=True
     ) as cmd_group:
         cmd_group.show_command("show", "message_endpoint_show")
+        cmd_group.show_command("update", "message_endpoint_update")
         cmd_group.command("list", "message_endpoint_list")
         cmd_group.command(
             "delete",

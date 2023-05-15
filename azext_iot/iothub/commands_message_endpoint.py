@@ -179,6 +179,35 @@ def message_endpoint_create_storage_container(
         identity=identity
     )
 
+def message_endpoint_update(
+    cmd,
+    hub_name: str,
+    endpoint_name: str,
+    endpoint_account_name: Optional[str] = None,
+    endpoint_resource_group: Optional[str] = None,
+    endpoint_subscription_id: Optional[str] = None,
+    endpoint_policy_name: Optional[str] = None,
+    connection_string: Optional[str] = None,
+    endpoint_uri: Optional[str] = None,
+    entity_path: Optional[str] = None,
+    identity: Optional[str] = None,
+    resource_group_name: Optional[str] = None,
+):
+    message_endpoint_provider = MessageEndpoint(
+        cmd=cmd, hub_name=hub_name, rg=resource_group_name
+    )
+    return message_endpoint_provider.update(
+        endpoint_name=endpoint_name,
+        endpoint_account_name=endpoint_account_name,
+        endpoint_resource_group=endpoint_resource_group,
+        endpoint_subscription_id=endpoint_subscription_id,
+        endpoint_policy_name=endpoint_policy_name,
+        connection_string=connection_string,
+        endpoint_uri=endpoint_uri,
+        entity_path=entity_path,
+        identity=identity
+    )
+
 
 def message_endpoint_show(
     cmd,
