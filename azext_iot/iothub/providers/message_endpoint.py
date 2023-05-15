@@ -219,6 +219,67 @@ class MessageEndpoint(IoTHubProvider):
             if_match=self.hub_resource.etag
         )
 
+    def update(
+        self,
+        endpoint_name: str,
+        endpoint_account_name: Optional[str] = None,
+        endpoint_resource_group: Optional[str] = None,
+        endpoint_subscription_id: Optional[str] = None,
+        endpoint_policy_name: Optional[str] = None,
+        connection_string: Optional[str] = None,
+        container_name: Optional[str] = None,
+        encoding: Optional[str] = None,
+        batch_frequency: int = 300,
+        chunk_size_window: int = 300,
+        file_name_format: str = '{iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}',
+        endpoint_uri: Optional[str] = None,
+        entity_path: Optional[str] = None,
+        database_name: Optional[str] = None,
+        primary_key: Optional[str] = None,
+        secondary_key: Optional[str] = None,
+        partition_key_name: Optional[str] = None,
+        partition_key_template: Optional[str] = None,
+        identity: Optional[str] = None
+    ):
+        # Find the endpoint - if we need type too, then we will need to manually search.
+        # will need type if we check for connection strings
+        original_endpoint = self.show(endpoint_name=endpoint_name)
+        import pdb; pdb.set_trace()
+        if connection_string:
+            # Note that cosmos db uses a decomposed connection string
+            if hasattr(original_endpoint, "connection_string") and original_endpoint.connection_string:
+                original_endpoint.connection_string = connection_string
+            elif hasattr(original_endpoint, "primaryKey") and original_endpoint.primary_key or original_endpoint.secondary_key:
+                # lazy - decompose connection string and stick it in
+                original_endpoint.primary_key = ""
+
+            else:
+                raise Exception("Cannot change authentication types.")
+        # if endpoint_account_name:
+        #     original_endpoint.account_name = endpoint_account_name
+        # if endpoint_resource_group:
+        #     original_endpoint.account_name = endpoint_resource_group
+        # if endpoint_subscription_id:
+        #     original_endpoint.account_name = endpoint_subscription_id
+        # if endpoint_account_name:
+        #     original_endpoint.account_name = endpoint_account_name
+        # if endpoint_account_name:
+        #     original_endpoint.account_name = endpoint_account_name
+        # if endpoint_account_name:
+        #     original_endpoint.account_name = endpoint_account_name
+        # if endpoint_account_name:
+        #     original_endpoint.account_name = endpoint_account_name
+        # if endpoint_account_name:
+        #     original_endpoint.account_name = endpoint_account_name
+
+        return self.discovery.client.begin_create_or_update(
+            self.hub_resource.additional_properties["resourcegroup"],
+            self.hub_resource.name,
+            self.hub_resource,
+            if_match=self.hub_resource.etag
+        )
+
+
     def show(self, endpoint_name: str):
         endpoints = self.hub_resource.properties.routing.endpoints
         endpoint_lists = [
