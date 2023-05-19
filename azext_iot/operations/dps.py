@@ -61,7 +61,7 @@ def iot_dps_device_enrollment_list(
     login=None,
     auth_type_dataplane=None,
 ):
-    from azext_iot.sdk.dps.service.models.query_specification import QuerySpecification
+    from azext_iot.sdk.dps.service.models import QuerySpecification
 
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
@@ -358,7 +358,7 @@ def iot_dps_device_enrollment_delete(
 def iot_dps_device_enrollment_group_list(
     cmd, dps_name=None, resource_group_name=None, top=None, login=None, auth_type_dataplane=None,
 ):
-    from azext_iot.sdk.dps.service.models.query_specification import QuerySpecification
+    from azext_iot.sdk.dps.service.models import QuerySpecification
 
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(

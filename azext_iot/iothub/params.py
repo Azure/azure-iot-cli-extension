@@ -71,8 +71,9 @@ def load_iothub_arguments(self, _):
             "data_file_path",
             is_preview=True,
             options_list=["--data-file-path", "--dfp"],
-            help="""Provide path to file for message body payload. Please note when the payload needs
-            to be sent in binary format, set the content type to application/octet-stream.""",
+            help="Provide path to file for message body payload. Please "
+            "note when the payload needs to be sent in binary format, "
+            "set the content type to application/octet-stream.",
         )
         context.argument(
             "properties",
@@ -298,15 +299,16 @@ def load_iothub_arguments(self, _):
         context.argument(
             "resource_group_name",
             options_list=["--destination-resource-group", "--dg"],
-            help="Name of resource group of the IoT Hub to which the origin hub state will be copied to.",
-            arg_group="IoT Hub Identifier",
+            help="Name of resource group of the IoT Hub to which the origin hub state will be copied to. "
+            "If not provided, will use the origin IoT Hub's resource group.",
+            arg_group="IoT Hub Identifier"
         )
         context.argument(
             "login",
             options_list=["--destination-hub-login", "--dl"],
             validator=mode2_iot_login_handler,
             help="This command supports an entity connection string with rights to perform action on the destination hub. "
-            'Use to avoid session login via "az login" for this IoT Hub instance. '
+            "Use to avoid session login via `az login` for this IoT Hub instance. "
             "If both an entity connection string and name are provided the connection string takes priority. "
             "Required if --destination-hub is not provided.",
             arg_group="IoT Hub Identifier",
@@ -328,7 +330,7 @@ def load_iothub_arguments(self, _):
             options_list=["--origin-hub-login", "--ol"],
             validator=mode2_iot_login_handler,
             help="This command supports an entity connection string with rights to perform action on the origin hub. "
-            'Use to avoid session login via "az login" for this IoT Hub instance. '
+            "Use to avoid session login via `az login` for this IoT Hub instance. "
             "If both an entity connection string and name are provided the connection string takes priority. "
             "Required if --origin-hub is not provided.",
             arg_group="IoT Hub Identifier",

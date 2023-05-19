@@ -273,7 +273,6 @@ def test_migrate_dataplane(setup_hub_states_dataplane):
     origin_rg = setup_hub_states_dataplane[0]["rg"]
     origin_cstring = setup_hub_states_dataplane[0]["connectionString"]
     dest_name = setup_hub_states_dataplane[1]["name"]
-    dest_rg = setup_hub_states_dataplane[1]["rg"]
     dest_cstring = setup_hub_states_dataplane[1]["connectionString"]
     for auth_phase in DATAPLANE_AUTH_TYPES:
         if auth_phase == "cstring":
@@ -285,7 +284,7 @@ def test_migrate_dataplane(setup_hub_states_dataplane):
             cli.invoke(
                 set_cmd_auth_type(
                     f"iot hub state migrate --origin-hub {origin_name} --origin-resource-group {origin_rg} "
-                    f"--destination-hub {dest_name} --destination-resource-group {dest_rg} -r --aspects {DATAPLANE}",
+                    f"--destination-hub {dest_name} -r --aspects {DATAPLANE}",
                     auth_type=auth_phase,
                     cstring=None
                 )
@@ -300,6 +299,9 @@ def test_migrate_dataplane(setup_hub_states_dataplane):
     count=1, sys_identity=True, user_identity=True, storage=True, desired_tags="abc=def", system_endpoints=False
 )
 def test_migrate_controlplane_with_create(setup_hub_states_controlplane):
+    """
+    Try using migrate to create new hubs. One hub is needed, two new hubs will be created.
+    """
     origin_name = setup_hub_states_controlplane[0]["name"]
     origin_rg = setup_hub_states_controlplane[0]["rg"]
     dest_name = generate_hub_id()
@@ -310,6 +312,15 @@ def test_migrate_controlplane_with_create(setup_hub_states_controlplane):
     cli.invoke(
         f"iot hub state migrate --origin-hub {origin_name} --origin-resource-group {origin_rg} "
         f"--destination-hub {dest_name} --destination-resource-group {origin_rg} -r --aspects {CONTROLPLANE}"
+    )
+
+    # default the destination rg
+    dest_name2 = generate_hub_id()
+    setup_hub_states_controlplane.append({"name": dest_name2})
+
+    cli.invoke(
+        f"iot hub state migrate --origin-hub {origin_name} --origin-resource-group {origin_rg} "
+        f"--destination-hub {dest_name} -r --aspects {CONTROLPLANE}"
     )
 
     time.sleep(1)  # gives the hub time to update before the checks
@@ -331,11 +342,6 @@ def test_mirgate_hub_dataplane_error(provisioned_only_iot_hubs_module):
         capture_stderr=True
     )
     assert isinstance(result.get_error(), ResourceNotFoundError)
-    result = cli.invoke(
-        f"iot hub state migrate --origin-hub {hub_name} --destination-hub {fake_hub_name} --aspects {DATAPLANE}",
-        capture_stderr=True
-    )
-    assert isinstance(result.get_error(), RequiredArgumentMissingError)
 
 
 @pytest.mark.hub_infrastructure(count=1, sys_identity=True, user_identity=True, storage=True, desired_tags="abc=def")
@@ -362,6 +368,9 @@ def test_export_import_controlplane(setup_hub_states_controlplane):
     count=1, sys_identity=True, user_identity=True, storage=True, desired_tags="abc=def", system_endpoints=False
 )
 def test_export_import_controlplane_with_create(setup_hub_states_controlplane):
+    """
+    Try using export/import to create new hubs. One hub is needed, one new hub will be created.
+    """
     filename = setup_hub_states_controlplane[0]["filename"]
     hub_name = setup_hub_states_controlplane[0]["name"]
     hub_rg = setup_hub_states_controlplane[0]["rg"]
@@ -449,13 +458,6 @@ def test_export_import_migrate_missing_hubs_error():
         f"--destination-hub {hub_name} --destination-resource-group {hub_rg}"
     )
     assert isinstance(result.get_error(), ResourceNotFoundError)
-
-    # RequiredArgumentMissingError because no resource group
-    result = cli.invoke(
-        f"iot hub state migrate --origin-hub {hub_name} --destination-hub {hub_name}"
-    )
-    assert isinstance(result.get_error(), RequiredArgumentMissingError)
-    cli.capture_stderr = False
 
 
 # Dataplane main compare commands
