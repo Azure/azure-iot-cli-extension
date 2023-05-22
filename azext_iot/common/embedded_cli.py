@@ -16,6 +16,25 @@ logger = get_logger(__name__)
 
 
 class EmbeddedCLI(object):
+    """
+    An embedded CLI wrapper for easily invoking commands.
+
+    ...
+
+    Attributes
+    ----------
+    output : str
+        The output of the last invoked cli command. If the last command failed or there were no runs,
+        will return ""
+    error_code : int
+        Error code of the last invoked cli command. If no runs, will be 0.
+    az_cli : AzCli
+        The cli that will be used for invoking commands. Should be the default CLI
+    user_subscription : Optional[str]
+        The invoker's subscription.
+    capture_stderr : bool
+        Flag for capturing the stderr during the invocation of the command.
+    """
     def __init__(self, cli_ctx=None, capture_stderr: bool = False):
         super(EmbeddedCLI, self).__init__()
         self.output = ""
@@ -24,7 +43,29 @@ class EmbeddedCLI(object):
         self.user_subscription = cli_ctx.data.get('subscription_id') if cli_ctx else None
         self.capture_stderr = capture_stderr
 
-    def invoke(self, command: str, subscription: Optional[str] = None, capture_stderr: Optional[bool] = None):
+    def invoke(
+        self, command: str, subscription: Optional[str] = None, capture_stderr: Optional[bool] = None
+    ):
+        """
+        Run a given command.
+
+        Note that if capture_stderr is False, any error will print out to console and the error will
+        propogate again when running the command self.as_json. Please ensure that the error
+        is printed once in the console by setting capture_stderr to True if as_json will be called
+        and False if as_json will not be called. Best practice for the future would be to set
+        capture_stderr to True and handle the error from as_json.
+
+        Parameters
+        ----------
+        command : str
+            The command to invoke. Note that the command should omit the `az` from the command.
+        subscription : Optional[str]
+            Subscription for when it needs to be different from the self.user_subscription. Takes
+            precedence over self.user_subscription.
+        capture_stderr : Optional[bool]
+            Flag for capturing the stderr during the invocation of the command. Takes
+            precedence over self.capture_stderr.
+        """
         output_file = StringIO()
         old_exception_handler = None
 
@@ -68,6 +109,12 @@ class EmbeddedCLI(object):
         return self
 
     def as_json(self):
+        """
+        Try to parse the result of the last invoked cli command as a json.
+
+        If the json cannot be parsed, the last invoked cli command must have failed. This will raise the error
+        for easier handling.
+        """
         try:
             return json.loads(self.output)
         except Exception:
@@ -81,14 +128,18 @@ class EmbeddedCLI(object):
             )
 
     def success(self) -> bool:
+        """Return if last invoked cli command was a success."""
         logger.debug("Operation error code: %s", self.error_code)
         return self.error_code == 0
 
     def get_error(self) -> Optional[Exception]:
+        """Return error from last invoked cli command."""
         return self.az_cli.result.error
 
     def _ensure_json_output(self, command: str) -> str:
+        """Force invoked cli command to return a json."""
         return "{} -o json".format(command)
 
     def _ensure_subscription(self, command: str, subscription: str) -> str:
+        """Add subscription to invoked cli command."""
         return "{} --subscription '{}'".format(command, subscription)

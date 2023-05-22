@@ -2378,7 +2378,7 @@ def _generate_blob_container_uri(
             "Storage account and Blob container names are required to generate blob container uri"
         )
 
-    cli = EmbeddedCLI(cli_ctx=cmd.cli_ctx)
+    cli = EmbeddedCLI(cli_ctx=cmd.cli_ctx, capture_stderr=True)
     storage_endpoint = cli.invoke(
         "storage account show -n '{}'".format(
             storage_account_name
