@@ -23,13 +23,15 @@ cli = EmbeddedCLI()
 def test_instance_list_show_delete(provisioned_instances: Dict[str, dict]):
     for account_record in provisioned_instances.keys():
         instance_names = list(provisioned_instances[account_record].keys())
-        instance_list_result: list = cli.invoke(f"iot du instance list -n {account_record}").as_json()
+        instance_list_result: list = cli.invoke(
+            f"iot du instance list -n {account_record}", capture_stderr=True
+        ).as_json()
         assert len(instance_names) == len(instance_list_result)
         for instance in instance_list_result:
             assert instance["name"] in instance_names
             assert cli.invoke(f"iot du instance show -n {account_record} -i {instance['name']}").success()
         instance_list_by_group_result: list = cli.invoke(
-            f"iot du instance list -n {account_record} -g {ACCOUNT_RG}"
+            f"iot du instance list -n {account_record} -g {ACCOUNT_RG}", capture_stderr=True
         ).as_json()
         assert instance_list_result == instance_list_by_group_result
         for instance_name in instance_names:
@@ -56,13 +58,16 @@ def test_instance_custom_storage_update_show_delete(provisioned_instances: Dict[
     random_tag1 = generate_generic_id()
     random_tag2 = generate_generic_id()
     # Fetch backing storage account
-    storage_resource_id = cli.invoke(f"iot du instance show -n {account_name} -i {instance_name}").as_json()[
+    storage_resource_id = cli.invoke(
+        f"iot du instance show -n {account_name} -i {instance_name}", capture_stderr=True
+    ).as_json()[
         "diagnosticStorageProperties"
     ]["resourceId"]
     # Set tag, disable diagnostics and remove existing diagnostic storage account.
     updated_instance: dict = cli.invoke(
         f"iot du instance update -n {account_name} -i {instance_name} --set tags.env1={random_tag1} "
-        "diagnosticStorageProperties=null enableDiagnostics=false"
+        "diagnosticStorageProperties=null enableDiagnostics=false",
+        capture_stderr=True
     ).as_json()
     assert updated_instance["provisioningState"] == "Succeeded"
     assert updated_instance["tags"]["env1"] == random_tag1
@@ -75,7 +80,9 @@ def test_instance_custom_storage_update_show_delete(provisioned_instances: Dict[
         f"diagnosticStorageProperties.resourceId={storage_resource_id} --no-wait"
     )
     cli.invoke(f"iot du instance wait -n {account_name} -i {instance_name} --updated")
-    shown_instance: dict = cli.invoke(f"iot du instance show -n {account_name} -i {instance_name}").as_json()
+    shown_instance: dict = cli.invoke(
+        f"iot du instance show -n {account_name} -i {instance_name}", capture_stderr=True
+    ).as_json()
     assert shown_instance["provisioningState"] == "Succeeded"
     assert shown_instance["tags"]["env1"] == random_tag1
     assert shown_instance["tags"]["env2"] == random_tag2

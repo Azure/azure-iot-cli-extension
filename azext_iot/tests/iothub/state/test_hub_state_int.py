@@ -217,11 +217,13 @@ def clean_up_hub_controlplane(hub_name, hub_rg, hub_location):
 
 def clean_up_hub_dataplane(cstring):
     dest_hub_configs = cli.invoke(
-        f"iot hub configuration list -l {cstring}"
+        f"iot hub configuration list -l {cstring}",
+        capture_stderr=True
     ).as_json()
 
     dest_hub_deploys = cli.invoke(
-        f"iot edge deployment list -l {cstring}"
+        f"iot edge deployment list -l {cstring}",
+        capture_stderr=True
     ).as_json()
 
     for config in dest_hub_configs + dest_hub_deploys:
@@ -230,7 +232,8 @@ def clean_up_hub_dataplane(cstring):
         )
 
     dest_hub_identities = cli.invoke(
-        f"iot hub device-identity list -l {cstring}"
+        f"iot hub device-identity list -l {cstring}",
+        capture_stderr=True
     ).as_json()
 
     for device in dest_hub_identities:
@@ -467,10 +470,12 @@ def compare_hubs_dataplane(origin_cstring: str, dest_cstring: str):
     while tries < MAX_RETRIES:
         try:
             orig_hub_configs = cli.invoke(
-                f"iot hub configuration list -l {origin_cstring}"
+                f"iot hub configuration list -l {origin_cstring}",
+                capture_stderr=True
             ).as_json()
             dest_hub_configs = cli.invoke(
-                f"iot hub configuration list -l {dest_cstring}"
+                f"iot hub configuration list -l {dest_cstring}",
+                capture_stderr=True
             ).as_json()
             compare_configs(orig_hub_configs, dest_hub_configs)
             break
@@ -483,10 +488,12 @@ def compare_hubs_dataplane(origin_cstring: str, dest_cstring: str):
     while tries < MAX_RETRIES:
         try:
             orig_hub_deploys = cli.invoke(
-                f"iot edge deployment list -l {origin_cstring}"
+                f"iot edge deployment list -l {origin_cstring}",
+                capture_stderr=True
             ).as_json()
             dest_hub_deploys = cli.invoke(
-                f"iot edge deployment list -l {dest_cstring}"
+                f"iot edge deployment list -l {dest_cstring}",
+                capture_stderr=True
             ).as_json()
             compare_configs(orig_hub_deploys, dest_hub_deploys)
             break
@@ -498,10 +505,12 @@ def compare_hubs_dataplane(origin_cstring: str, dest_cstring: str):
     tries = 0
     while tries < MAX_RETRIES:
         orig_hub_identities = cli.invoke(
-            f"iot hub device-identity list -l {origin_cstring}"
+            f"iot hub device-identity list -l {origin_cstring}",
+            capture_stderr=True
         ).as_json()
         dest_hub_identities = cli.invoke(
-            f"iot hub device-identity list -l {dest_cstring}"
+            f"iot hub device-identity list -l {dest_cstring}",
+            capture_stderr=True
         ).as_json()
         if len(orig_hub_identities) == len(dest_hub_identities):
             break
@@ -518,10 +527,12 @@ def compare_hubs_dataplane(origin_cstring: str, dest_cstring: str):
 
         if device["authenticationType"] == DeviceAuthApiType.sas.value:
             id1 = cli.invoke(
-                "iot hub device-identity show -l {} -d {}".format(origin_cstring, device['deviceId'])
+                "iot hub device-identity show -l {} -d {}".format(origin_cstring, device['deviceId']),
+                capture_stderr=True
             ).as_json()
             id2 = cli.invoke(
-                "iot hub device-identity show -l {} -d {}".format(dest_cstring, device['deviceId'])
+                "iot hub device-identity show -l {} -d {}".format(dest_cstring, device['deviceId']),
+                capture_stderr=True
             ).as_json()
 
             device["symmetricKey"] = id1["authentication"]["symmetricKey"]
@@ -532,10 +543,12 @@ def compare_hubs_dataplane(origin_cstring: str, dest_cstring: str):
         # compare modules
 
         orig_modules = cli.invoke(
-            "iot hub module-identity list -d {} -l {}".format(device['deviceId'], origin_cstring)
+            "iot hub module-identity list -d {} -l {}".format(device['deviceId'], origin_cstring),
+            capture_stderr=True
         ).as_json()
         dest_modules = cli.invoke(
-            "iot hub module-identity list -d {} -l {}".format(device['deviceId'], dest_cstring)
+            "iot hub module-identity list -d {} -l {}".format(device['deviceId'], dest_cstring),
+            capture_stderr=True
         ).as_json()
 
         if device["capabilities"]["iotEdge"]:
@@ -555,10 +568,12 @@ def compare_hubs_dataplane(origin_cstring: str, dest_cstring: str):
             assert module["authentication"] == target_module["authentication"]
 
             module_twin = cli.invoke(
-                f"iot hub module-twin show -m {module['moduleId']} -d {device['deviceId']} -l {origin_cstring}"
+                f"iot hub module-twin show -m {module['moduleId']} -d {device['deviceId']} -l {origin_cstring}",
+                capture_stderr=True
             ).as_json()
             target_module_twin = cli.invoke(
-                f"iot hub module-twin show -m {module['moduleId']} -d {device['deviceId']} -l {dest_cstring}"
+                f"iot hub module-twin show -m {module['moduleId']} -d {device['deviceId']} -l {dest_cstring}",
+                capture_stderr=True
             ).as_json()
 
             compare_module_twins(module_twin, target_module_twin)
@@ -566,10 +581,12 @@ def compare_hubs_dataplane(origin_cstring: str, dest_cstring: str):
         # compare children
         if device["capabilities"]["iotEdge"]:
             orig_children = cli.invoke(
-                f"iot hub device-identity children list -d {device['deviceId']} -l {origin_cstring}"
+                f"iot hub device-identity children list -d {device['deviceId']} -l {origin_cstring}",
+                capture_stderr=True
             ).as_json()
             dest_children = cli.invoke(
-                f"iot hub device-identity children list -d {device['deviceId']} -l {dest_cstring}"
+                f"iot hub device-identity children list -d {device['deviceId']} -l {dest_cstring}",
+                capture_stderr=True
             ).as_json()
 
             assert orig_children == dest_children
@@ -585,7 +602,8 @@ def compare_hub_dataplane_to_file(filename: str, cstring: str):
     while tries < MAX_RETRIES:
         try:
             hub_configs = cli.invoke(
-                f"iot hub configuration list -l {cstring}"
+                f"iot hub configuration list -l {cstring}",
+                capture_stderr=True
             ).as_json()
             compare_configs(file_configs, hub_configs)
             break
@@ -599,7 +617,8 @@ def compare_hub_dataplane_to_file(filename: str, cstring: str):
     while tries < MAX_RETRIES:
         try:
             hub_deploys = cli.invoke(
-                f"iot edge deployment list -l {cstring}"
+                f"iot edge deployment list -l {cstring}",
+                capture_stderr=True
             ).as_json()
             compare_configs(file_deploys, hub_deploys)
             break
@@ -610,13 +629,15 @@ def compare_hub_dataplane_to_file(filename: str, cstring: str):
     # compare devices
     file_devices = hub_info["devices"]
     hub_devices = cli.invoke(
-        f"iot hub device-identity list -l {cstring}"
+        f"iot hub device-identity list -l {cstring}",
+        capture_stderr=True
     ).as_json()
 
     tries = 0
     while tries < MAX_RETRIES:
         hub_devices = cli.invoke(
-            f"iot hub device-identity list -l {cstring}"
+            f"iot hub device-identity list -l {cstring}",
+            capture_stderr=True
         ).as_json()
         if len(file_devices) == len(hub_devices):
             break
@@ -627,7 +648,8 @@ def compare_hub_dataplane_to_file(filename: str, cstring: str):
 
     for device in hub_devices:
         id = cli.invoke(
-            f"iot hub device-identity show -l {cstring} -d {device['deviceId']}"
+            f"iot hub device-identity show -l {cstring} -d {device['deviceId']}",
+            capture_stderr=True
         ).as_json()
         device["symmetricKey"] = id["authentication"]["symmetricKey"]
 
@@ -649,7 +671,8 @@ def compare_hub_dataplane_to_file(filename: str, cstring: str):
 
         file_modules = file_device.get("modules", {})
         hub_modules = cli.invoke(
-            "iot hub module-identity list -d {} -l {}".format(device["deviceId"], cstring)
+            "iot hub module-identity list -d {} -l {}".format(device["deviceId"], cstring),
+            capture_stderr=True
         ).as_json()
 
         assert len(file_modules) == len(hub_modules)
@@ -657,7 +680,8 @@ def compare_hub_dataplane_to_file(filename: str, cstring: str):
         for module in hub_modules:
 
             module_twin = cli.invoke(
-                f"iot hub module-twin show -m {module['moduleId']} -d {device['deviceId']} -l {cstring}"
+                f"iot hub module-twin show -m {module['moduleId']} -d {device['deviceId']} -l {cstring}",
+                capture_stderr=True
             ).as_json()
 
             target_module = file_modules[module["moduleId"]]["identity"]
@@ -685,7 +709,8 @@ def compare_hub_controlplane_to_file(filename: str, hub_name: str, rg: str):
     # get the hub info
     hub_resource_id = cli.invoke(f"iot hub show -n {hub_name} -g {rg}").as_json()["id"]
     arm_hub_info = cli.invoke(
-        f"group export -n {rg} --resource-ids {hub_resource_id} --skip-all-params"
+        f"group export -n {rg} --resource-ids {hub_resource_id} --skip-all-params",
+        capture_stderr=True
     ).as_json()["resources"]
     arm_hub = arm_hub_info[0]
 
@@ -783,13 +808,15 @@ def compare_hub_controlplane_to_file(filename: str, hub_name: str, rg: str):
 def compare_hubs_controlplane(origin_hub_name: str, dest_hub_name: str, rg: str):
     orig_hub_resource_id = cli.invoke(f"iot hub show -n {origin_hub_name} -g {rg}").as_json()["id"]
     orig_hub_info = cli.invoke(
-        f"group export -n {rg} --resource-ids {orig_hub_resource_id} --skip-all-params"
+        f"group export -n {rg} --resource-ids {orig_hub_resource_id} --skip-all-params",
+        capture_stderr=True
     ).as_json()["resources"]
     orig_hub = orig_hub_info[0]
 
     dest_hub_resource_id = cli.invoke(f"iot hub show -n {dest_hub_name} -g {rg}").as_json()["id"]
     dest_hub_info = cli.invoke(
-        f"group export -n {rg} --resource-ids {dest_hub_resource_id} --skip-all-params"
+        f"group export -n {rg} --resource-ids {dest_hub_resource_id} --skip-all-params",
+        capture_stderr=True
     ).as_json()["resources"]
     dest_hub = dest_hub_info[0]
 

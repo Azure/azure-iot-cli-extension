@@ -35,7 +35,7 @@ def check_hub_device(
         "iot hub device-identity show -l {} -d {}".format(
             hub_cstring,
             device,
-        )
+        ), capture_stderr=True
     ).as_json()["authentication"]
     assert auth_type == device_auth["type"]
     if key:

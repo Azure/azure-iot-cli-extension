@@ -17,7 +17,7 @@ from azext_iot.tests.dps import (
 from azext_iot.tests.helpers import CERT_ENDING, create_test_cert, set_cmd_auth_type
 from azext_iot.tests.generators import generate_generic_id, generate_names
 
-cli = EmbeddedCLI()
+cli = EmbeddedCLI(capture_stderr=True)
 
 
 def test_dps_enrollment_tpm_lifecycle(provisioned_iot_dps_module):
@@ -113,6 +113,7 @@ def test_dps_enrollment_tpm_lifecycle(provisioned_iot_dps_module):
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
+            capture_stderr=False
         )
 
 
@@ -209,6 +210,7 @@ def test_dps_enrollment_x509_lifecycle(provisioned_iot_dps_module):
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
+            capture_stderr=False
         )
 
 
@@ -328,6 +330,7 @@ def test_dps_enrollment_symmetrickey_lifecycle(provisioned_iot_dps_module):
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
+            capture_stderr=False
         )
         cli.invoke(
             set_cmd_auth_type(
@@ -335,4 +338,5 @@ def test_dps_enrollment_symmetrickey_lifecycle(provisioned_iot_dps_module):
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
+            capture_stderr=False
         )

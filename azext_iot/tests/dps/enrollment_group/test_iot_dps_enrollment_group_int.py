@@ -16,7 +16,7 @@ from azext_iot.tests.dps import (
 from azext_iot.tests.helpers import CERT_ENDING, create_test_cert, set_cmd_auth_type
 from azext_iot.tests.generators import generate_generic_id, generate_names
 
-cli = EmbeddedCLI()
+cli = EmbeddedCLI(capture_stderr=True)
 
 
 def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):
@@ -90,8 +90,7 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):
                 f"--enrollment-id {enrollment_id} --registration-id myarbitrarydeviceId",
                 auth_type=auth_phase,
                 cstring=dps_cstring
-            ),
-            capture_stderr=True
+            )
         )
         assert failure_command.success() is False
 
@@ -158,10 +157,12 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
+            capture_stderr=False
         )
 
         cli.invoke(
-            f"iot dps certificate delete -g {dps_rg} --dps-name {dps_name} --name {cert_name} --etag {cert_etag}"
+            f"iot dps certificate delete -g {dps_rg} --dps-name {dps_name} --name {cert_name} --etag {cert_etag}",
+            capture_stderr=False
         )
 
 
@@ -297,18 +298,21 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
+            capture_stderr=False
         ).output
 
         offline_device_key = cli.invoke(
             f"iot dps enrollment-group compute-device-key --key \"{keys['primaryKey']}\" "
-            "--registration-id myarbitrarydeviceId".format()
+            "--registration-id myarbitrarydeviceId",
+            capture_stderr=False
         ).output
         assert offline_device_key == online_device_key
 
         # Compute Device Key uses primary key
         offline_device_key = cli.invoke(
             f"iot dps enrollment-group compute-device-key --key \"{keys['secondaryKey']}\" "
-            "--registration-id myarbitrarydeviceId"
+            "--registration-id myarbitrarydeviceId",
+            capture_stderr=False
         ).output
         assert offline_device_key != online_device_key
 
@@ -331,6 +335,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
+            capture_stderr=False
         ).output
         assert offline_device_key == online_device_key
 
@@ -340,6 +345,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
+            capture_stderr=False
         )
 
         cli.invoke(
@@ -348,6 +354,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
+            capture_stderr=False
         )
 
 
@@ -412,6 +419,7 @@ def test_dps_enrollment_twin_array(provisioned_iot_dps_module):
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
+            capture_stderr=False
         )
 
         # test twin array in enrollment group
@@ -444,4 +452,5 @@ def test_dps_enrollment_twin_array(provisioned_iot_dps_module):
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
+            capture_stderr=False
         )

@@ -137,7 +137,7 @@ def _account_provisioner(request, provisioned_storage: dict) -> Tuple[dict, List
         if desired_location:
             assert account["location"] == desired_location
         else:
-            group = cli.invoke(f"group show -n {ACCOUNT_RG}").as_json()
+            group = cli.invoke(f"group show -n {ACCOUNT_RG}", capture_stderr=True).as_json()
             assert account["location"] == group["location"]
         if desired_tags:
             assert account["tags"] == tags_to_dict(desired_tags)
@@ -207,7 +207,11 @@ def _process_identity(base_command: str, identity_request: str) -> Tuple[str, Li
     for id in split_identities:
         if id in split_identities:
             if id == "user":
-                user_id_result.append(cli.invoke(f"identity create -n {generate_useridentity_id()} -g {ACCOUNT_RG}").as_json())
+                user_id_result.append(
+                    cli.invoke(
+                        f"identity create -n {generate_useridentity_id()} -g {ACCOUNT_RG}",
+                        capture_stderr=True
+                    ).as_json())
             elif id == "system" and not system_processed:
                 system_processed = True
 
@@ -254,7 +258,7 @@ def _instance_provisioner(request, provisioned_accounts: dict, provisioned_iothu
         for hub_id in provisioned_iothubs:
             target_instance_name = generate_instance_id()
             create_command = f"{base_create_command} -n {acct_name} -i {target_instance_name} --iothub-ids {hub_id}"
-            instance_create_result = cli.invoke(create_command)
+            instance_create_result = cli.invoke(create_command, capture_stderr=True)
             if not instance_create_result.success():
                 raise RuntimeError(f"Failed to provision instance resource {target_instance_name}.")
             target_instance = instance_create_result.as_json()
@@ -303,7 +307,7 @@ def _iothub_provisioner(request) -> Optional[dict]:
             hub_names = []
 
             # Assign Data Contributor role to resource group if it does not exist
-            account = cli.invoke("account show").as_json()
+            account = cli.invoke("account show", capture_stderr=True).as_json()
             scope_id = "/subscriptions/{}/resourceGroups/{}".format(
                 account["id"],
                 ACCOUNT_RG
@@ -315,7 +319,9 @@ def _iothub_provisioner(request) -> Optional[dict]:
 
             for _ in range(desired_instance_count):
                 target_name = generate_linked_hub_id()
-                create_result = cli.invoke(f"iot hub create -g {ACCOUNT_RG} -n {target_name}")
+                create_result = cli.invoke(
+                    f"iot hub create -g {ACCOUNT_RG} -n {target_name}", capture_stderr=True
+                )
                 if not create_result.success():
                     raise RuntimeError(f"Failed to provision iot hub resource {target_name}.")
                 create_result = create_result.as_json()
@@ -355,7 +361,9 @@ def _storage_provisioner(request):
         desired_instance_diagnostics_user_storage = acct_marker.kwargs.get("instance_diagnostics_user_storage", False)
         if desired_scope == "storage" or desired_instance_diagnostics_user_storage:
             target_name = generate_linked_storage_id()
-            create_result = cli.invoke(f"storage account create -g {ACCOUNT_RG} -n {target_name}")
+            create_result = cli.invoke(
+                f"storage account create -g {ACCOUNT_RG} -n {target_name}", capture_stderr=True
+            )
             if not create_result.success():
                 raise RuntimeError(f"Failed to provision storage account resource {target_name}.")
             return create_result.as_json()

@@ -42,7 +42,7 @@ def assign_iot_hub_dataplane_rbac_role(hub_results):
         # Only add dataplane roles to the hubs that were not created mid test
         if hub.get("hub"):
             target_hub_id = hub["hub"]["id"]
-            account = cli.invoke("account show").as_json()
+            account = cli.invoke("account show", capture_stderr=True).as_json()
             user = account["user"]
 
             if user["name"] is None:
@@ -61,7 +61,7 @@ def fixture_provision_existing_hub_certificate(request):
     if settings.env.azext_iot_testhub:
         # Make sure root certificate is Baltimore(Default)
         authority = cli.invoke(
-            f"iot hub certificate root-authority show -n {HUB_NAME} -g {RG}"
+            f"iot hub certificate root-authority show -n {HUB_NAME} -g {RG}", capture_stderr=True
         ).as_json()
 
         if authority["enableRootCertificateV2"]:
@@ -91,7 +91,7 @@ def fixture_provision_existing_hub_role(request):
         user = account["user"]
 
         target_hub = cli.invoke(
-            "iot hub show -n {} -g {}".format(HUB_NAME, RG)
+            "iot hub show -n {} -g {}".format(HUB_NAME, RG), capture_stderr=True
         ).as_json()
 
         assign_role_assignment(
@@ -299,7 +299,7 @@ def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_s
             storage_cstring = provisioned_storage["connectionString"]
             base_create_command += f" --fcs {storage_cstring} --fc fileupload"
 
-        hub_obj = cli.invoke(base_create_command).as_json()
+        hub_obj = cli.invoke(base_create_command, capture_stderr=True).as_json()
         hub_results.append({
             "hub": hub_obj,
             "name": name,
@@ -314,7 +314,8 @@ def _get_hub_connection_string(name, rg, policy="iothubowner"):
     return cli.invoke(
         "iot hub connection-string show -n {} -g {} --policy-name {}".format(
             name, rg, policy
-        )
+        ),
+        capture_stderr=True
     ).as_json()["connectionString"]
 
 
@@ -338,7 +339,7 @@ def provisioned_user_identity_module() -> dict:
 def _user_identity_provisioner():
     name = generate_hub_depenency_id()
     return cli.invoke(
-        f"identity create -n {name} -g {RG}"
+        f"identity create -n {name} -g {RG}", capture_stderr=True
     ).as_json()
 
 
@@ -385,7 +386,8 @@ def _storage_get_cstring(account_name):
     return cli.invoke(
         "storage account show-connection-string -n {} -g {}".format(
             account_name, RG
-        )
+        ),
+        capture_stderr=True
     ).as_json()["connectionString"]
 
 
@@ -397,7 +399,7 @@ def _storage_provisioner():
     container_name = generate_hub_depenency_id()
 
     storage_list = cli.invoke(
-        'storage account list -g "{}"'.format(RG)
+        'storage account list -g "{}"'.format(RG), capture_stderr=True
     ).as_json()
 
     target_storage = None
@@ -410,7 +412,8 @@ def _storage_provisioner():
         target_storage = cli.invoke(
             "storage account create -n {} -g {}".format(
                 account_name, RG
-            )
+            ),
+            capture_stderr=True
         ).as_json()
 
     storage_cstring = _storage_get_cstring(account_name)
@@ -425,6 +428,7 @@ def _storage_provisioner():
         "storage container show -n {} --connection-string '{}'".format(
             container_name, storage_cstring
         ),
+        capture_stderr=True
     ).as_json()
 
     return {
@@ -478,7 +482,8 @@ def _event_hub_get_cstring(namespace_name, eventhub_name, policy_name):
         "eventhubs eventhub authorization-rule keys list --namespace-name {} --resource-group {} "
         "--eventhub-name {} --name {}".format(
             namespace_name, RG, eventhub_name, policy_name
-        )
+        ),
+        capture_stderr=True
     ).as_json()["primaryConnectionString"]
 
 
@@ -492,20 +497,23 @@ def _event_hub_provisioner():
     namespace_obj = cli.invoke(
         "eventhubs namespace create --name {} --resource-group {}".format(
             namespace_name, RG
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     eventhub_obj = cli.invoke(
         "eventhubs eventhub create --namespace-name {} --resource-group {} --name {}".format(
             namespace_name, RG, eventhub_name
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     policy_obj = cli.invoke(
         "eventhubs eventhub authorization-rule create --namespace-name {} --resource-group {} "
         "--eventhub-name {} --name {} --rights Send".format(
             namespace_name, RG, eventhub_name, policy_name
-        )
+        ),
+        capture_stderr=True
     ).as_json()
     return {
         "namespace": namespace_obj,
@@ -572,7 +580,8 @@ def _service_bus_topic_get_cstring(namespace_name, topic_name, policy_name):
         "servicebus topic authorization-rule keys list --namespace-name {} --resource-group {} "
         "--topic-name {} --name {}".format(
             namespace_name, RG, topic_name, policy_name
-        )
+        ),
+        capture_stderr=True
     ).as_json()["primaryConnectionString"]
 
 
@@ -581,7 +590,8 @@ def _service_bus_queue_get_cstring(namespace_name, queue_name, policy_name):
         "servicebus queue authorization-rule keys list --namespace-name {} --resource-group {} "
         "--queue-name {} --name {}".format(
             namespace_name, RG, queue_name, policy_name
-        )
+        ),
+        capture_stderr=True
     ).as_json()["primaryConnectionString"]
 
 
@@ -596,33 +606,38 @@ def _service_bus_provisioner():
     namespace_obj = cli.invoke(
         "servicebus namespace create --name {} --resource-group {}".format(
             namespace_name, RG
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     queue_obj = cli.invoke(
         "servicebus queue create --namespace-name {} --resource-group {} --name {}".format(
             namespace_name, RG, queue_name
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     queue_policy = cli.invoke(
         "servicebus queue authorization-rule create --namespace-name {} --resource-group {} "
         "--queue-name {} --name {} --rights Send".format(
             namespace_name, RG, queue_name, policy_name
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     topic_obj = cli.invoke(
         "servicebus topic create --namespace-name {} --resource-group {} --name {}".format(
             namespace_name, RG, topic_name
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     topic_policy = cli.invoke(
         "servicebus topic authorization-rule create --namespace-name {} --resource-group {} "
         "--topic-name {} --name {} --rights Send".format(
             namespace_name, RG, topic_name, policy_name
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     return {
@@ -676,7 +691,8 @@ def provisioned_cosmos_db_module() -> Optional[list]:
 
 def _cosmos_db_get_cstring(account_name):
     output = cli.invoke(
-        'cosmosdb keys list --resource-group {} --name {} --type connection-strings'.format(RG, account_name)
+        'cosmosdb keys list --resource-group {} --name {} --type connection-strings'.format(RG, account_name),
+        capture_stderr=True
     ).as_json()
 
     for cs_object in output["connectionStrings"]:
@@ -696,19 +712,22 @@ def _cosmos_db_provisioner():
     cosmos_obj = cli.invoke(
         "cosmosdb create --name {} --resource-group {} --locations regionName={} failoverPriority=0".format(
             account_name, RG, location
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     database_obj = cli.invoke(
         "cosmosdb sql database create --account-name {} --resource-group {} --name {}".format(
             account_name, RG, database_name
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     container_obj = cli.invoke(
         "cosmosdb sql container create --account-name {} --resource-group {} --database-name {} --name {} -p {}".format(
             account_name, RG, database_name, collection_name, partition_key_path
-        )
+        ),
+        capture_stderr=True
     ).as_json()
     return {
         "cosmosdb": cosmos_obj,
@@ -728,7 +747,8 @@ def _clean_up(device_ids: List[str] = None, config_ids: List[str] = None):
     connection_string = cli.invoke(
         "iot hub connection-string show -n {} -g {} --policy-name {}".format(
             HUB_NAME, RG, "iothubowner"
-        )
+        ),
+        capture_stderr=True
     ).as_json()["connectionString"]
     if device_ids:
         device = device_ids.pop()

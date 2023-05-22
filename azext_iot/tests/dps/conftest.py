@@ -24,7 +24,7 @@ from azext_iot.tests.settings import (
 logger = get_logger(__name__)
 HUB_USER_ROLE = "IoT Hub Data Contributor"
 DPS_USER_ROLE = "Device Provisioning Service Data Contributor"
-cli = EmbeddedCLI()
+cli = EmbeddedCLI(capture_stderr=True)
 
 # Test Environment Variables
 settings = DynamoSettings(
@@ -112,7 +112,8 @@ def _iot_dps_provisioner(iot_hub: Optional[Dict] = None) -> dict:
         if hub_host_name not in [hub["name"] for hub in linked_hubs]:
             cli.invoke(
                 f"iot dps linked-hub create --dps-name {dps_name} -g {ENTITY_RG} "
-                f"--connection-string {target_hub['connectionString']}"
+                f"--connection-string {target_hub['connectionString']}",
+                capture_stderr=False
             )
     elif settings.env.azext_iot_testdps:
         # Ensure 0 linked hubs
@@ -121,7 +122,8 @@ def _iot_dps_provisioner(iot_hub: Optional[Dict] = None) -> dict:
         ).as_json()
         for hub in linked_hubs:
             cli.invoke(
-                f"iot dps linked-hub delete --dps-name {dps_name} -g {ENTITY_RG} --linked-hub {hub['name']}"
+                f"iot dps linked-hub delete --dps-name {dps_name} -g {ENTITY_RG} --linked-hub {hub['name']}",
+                capture_stderr=False
             )
     else:
         # time passed if hub was not linked
@@ -157,7 +159,8 @@ def _iot_dps_removal(dps):
         cli.invoke(
             "iot dps delete --name {} --resource-group {}".format(
                 dps["name"], dps["resourceGroup"]
-            )
+            ),
+            capture_stderr=False
         )
 
 
@@ -211,6 +214,6 @@ def _get_hub_connection_string(name, rg, policy="iothubowner"):
 def _iot_hubs_removal(hub_result):
     if not settings.env.azext_iot_testdps_hub:
         name = hub_result["name"]
-        delete_result = cli.invoke(f"iot hub delete -n {name} -g {ENTITY_RG}")
+        delete_result = cli.invoke(f"iot hub delete -n {name} -g {ENTITY_RG}", capture_stderr=False)
         if not delete_result.success():
             logger.error(f"Failed to delete iot hub resource {name}.")

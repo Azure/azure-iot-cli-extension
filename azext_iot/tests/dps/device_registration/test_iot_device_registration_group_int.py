@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 
 import os
-from azure.cli.core.azclierror import CLIInternalError
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.common.shared import EntityStatusType
 from azext_iot.tests.dps import DATAPLANE_AUTH_TYPES, clean_dps_dataplane
@@ -15,7 +14,7 @@ from azext_iot.tests.helpers import CERT_ENDING, KEY_ENDING, set_cmd_auth_type
 from azext_iot.tests.test_utils import create_certificate
 
 
-cli = EmbeddedCLI()
+cli = EmbeddedCLI(capture_stderr=True)
 
 
 def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_module):
@@ -37,8 +36,7 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
                 f"--registration-id {device_id1}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
-            ),
-            capture_stderr=True
+            )
         )
         assert registration_result.success() is False
 
@@ -49,8 +47,7 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
                 f"--registration-id {device_id1}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
-            ),
-            capture_stderr=True
+            )
         )
         assert registration_result.success() is False
 
@@ -209,8 +206,7 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
                 f"--key {keys['primaryKey']}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
-            ),
-            capture_stderr=True
+            )
         )
         assert registration_result.success() is False
 
@@ -262,8 +258,7 @@ def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module):
                 f"--cp {devices[0][0] + CERT_ENDING} --kp {devices[0][0] + KEY_ENDING}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
-            ),
-            capture_stderr=True
+            )
         )
         assert registration_result.success() is False
 
@@ -275,6 +270,7 @@ def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module):
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
+            capture_stderr=False
         )
 
         # Need to specify file - cannot retrieve need info from service
@@ -283,8 +279,7 @@ def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module):
                 f"iot device registration create --dps-name {dps_name} -g {dps_rg} --registration-id {devices[0][0]}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
-            ),
-            capture_stderr=True
+            )
         )
         assert registration_result.success() is False
 
@@ -362,6 +357,7 @@ def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module):
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
+            capture_stderr=False
         )
 
 
@@ -381,6 +377,7 @@ def test_dps_device_registration_unlinked_hub(provisioned_iot_dps_no_hub_module)
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
+            capture_stderr=False
         )
         if not result.success():
             raise AssertionError(f"Failed to create enrollment group with attestation-type {auth_phase}")
@@ -400,8 +397,7 @@ def test_dps_device_registration_unlinked_hub(provisioned_iot_dps_no_hub_module)
                 f"iot device registration create --id-scope {id_scope} --registration-id {device_id} --key {device_key}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
-            ),
-            capture_stderr=True
+            )
         )
         assert registration_result.success() is False
 
@@ -413,14 +409,11 @@ def test_dps_device_registration_unlinked_hub(provisioned_iot_dps_no_hub_module)
                 cstring=dps_cstring
             ),
         )
-        try:
-            registration = show_registration_result.as_json()
-            assert registration["etag"]
-            assert registration["lastUpdatedDateTimeUtc"]
-            assert registration["registrationId"] == device_id
-            assert registration["status"] == "failed"
-        except CLIInternalError:
-            raise AssertionError(f"Failed to create unlinked hub registration with auth-type {auth_phase}")
+        registration = show_registration_result.as_json()
+        assert registration["etag"]
+        assert registration["lastUpdatedDateTimeUtc"]
+        assert registration["registrationId"] == device_id
+        assert registration["status"] == "failed"
 
 
 def test_dps_device_registration_disabled_enrollment(provisioned_iot_dps_module):
@@ -439,6 +432,7 @@ def test_dps_device_registration_disabled_enrollment(provisioned_iot_dps_module)
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
+            capture_stderr=False
         )
         if not result.success():
             raise AssertionError(f"Failed to create enrollment group with attestation-type {auth_phase}")
@@ -450,8 +444,7 @@ def test_dps_device_registration_disabled_enrollment(provisioned_iot_dps_module)
                 f"--registration-id {device_id}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
-            ),
-            capture_stderr=True
+            )
         )
         assert registration_result.success() is False
 
@@ -495,7 +488,8 @@ def _prepare_x509_certificates_for_dps(tracked_certs, dps_name, dps_rg, device_p
 
     # Upload root certifcate and get verification code
     cli.invoke(
-        f"iot dps certificate create --dps-name {dps_name} -g {dps_rg} -n {root_name} -p {root_name + CERT_ENDING}"
+        f"iot dps certificate create --dps-name {dps_name} -g {dps_rg} -n {root_name} -p {root_name + CERT_ENDING}",
+        capture_stderr=False
     )
 
     verification_code = cli.invoke(
@@ -513,6 +507,7 @@ def _prepare_x509_certificates_for_dps(tracked_certs, dps_name, dps_rg, device_p
     tracked_certs.append(verification_code + KEY_ENDING)
 
     cli.invoke(
-        f"iot dps certificate verify --dps-name {dps_name} -g {dps_rg} -n {root_name} -p {verification_code + CERT_ENDING} -e *"
+        f"iot dps certificate verify --dps-name {dps_name} -g {dps_rg} -n {root_name} -p {verification_code + CERT_ENDING} -e *",
+        capture_stderr=False
     )
     return (root_name, devices)

@@ -54,7 +54,8 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     routes = cli.invoke(
         "iot hub message-route create -n {} -g {} --rn {} --en {} -t {}".format(
             iot_hub, iot_rg, route_names[0], built_in_endpoint, RouteSourceType.DeviceMessages.value
-        )
+        ),
+        capture_stderr=True
     ).as_json()
     assert len(routes) == 1
 
@@ -62,14 +63,16 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     route = cli.invoke(
         "iot hub message-route show -n {} -g {} --rn {}".format(
             iot_hub, iot_rg, route_names[0]
-        )
+        ),
+        capture_stderr=True
     ).as_json()
     assert_route_properties(route, expected_route)
 
     test_result = cli.invoke(
         "iot hub message-route test -n {} -g {} --rn {}".format(
             iot_hub, iot_rg, route_names[0]
-        )
+        ),
+        capture_stderr=True
     ).as_json()["result"]
     assert test_result == "true"
 
@@ -77,7 +80,8 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     routes = cli.invoke(
         "iot hub message-route create -n {} -g {} --rn {} --en {} -t {} -e false".format(
             iot_hub, iot_rg, route_names[1], built_in_endpoint, RouteSourceType.TwinChangeEvents.value
-        )
+        ),
+        capture_stderr=True
     ).as_json()
     assert len(routes) == 2
 
@@ -87,14 +91,16 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     route = cli.invoke(
         "iot hub message-route show -n {} -g {} --rn {}".format(
             iot_hub, iot_rg, route_names[1]
-        )
+        ),
+        capture_stderr=True
     ).as_json()
     assert_route_properties(route, expected_route)
 
     test_result = cli.invoke(
         "iot hub message-route test -n {} -g {} --rn {}".format(
             iot_hub, iot_rg, route_names[1]
-        )
+        ),
+        capture_stderr=True
     ).as_json()["result"]
     assert test_result == "true"
 
@@ -102,7 +108,8 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     routes = cli.invoke(
         "iot hub message-route create -n {} -g {} --rn {} --en {} -t {}".format(
             iot_hub, iot_rg, route_names[2], endpoint_name, RouteSourceType.DeviceLifecycleEvents.value
-        )
+        ),
+        capture_stderr=True
     ).as_json()
     assert len(routes) == 3
 
@@ -112,14 +119,16 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     route = cli.invoke(
         "iot hub message-route show -n {} -g {} --rn {}".format(
             iot_hub, iot_rg, route_names[2]
-        )
+        ),
+        capture_stderr=True
     ).as_json()
     assert_route_properties(route, expected_route)
 
     test_result = cli.invoke(
         "iot hub message-route test -n {} -g {} --rn {}".format(
             iot_hub, iot_rg, route_names[2]
-        )
+        ),
+        capture_stderr=True
     ).as_json()["result"]
     assert test_result == "true"
 
@@ -127,7 +136,8 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     routes = cli.invoke(
         "iot hub message-route create -n {} -g {} --rn {} --en {} -t {} -c false".format(
             iot_hub, iot_rg, route_names[3], built_in_endpoint, RouteSourceType.DeviceJobLifecycleEvents.value
-        )
+        ),
+        capture_stderr=True
     ).as_json()
     assert len(routes) == 4
 
@@ -137,14 +147,16 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     route = cli.invoke(
         "iot hub message-route show -n {} -g {} --rn {}".format(
             iot_hub, iot_rg, route_names[3]
-        )
+        ),
+        capture_stderr=True
     ).as_json()
     assert_route_properties(route, expected_route)
 
     test_result = cli.invoke(
         "iot hub message-route test -n {} -g {} --rn {}".format(
             iot_hub, iot_rg, route_names[3]
-        )
+        ),
+        capture_stderr=True
     ).as_json()["result"]
     assert test_result == "false"
 
@@ -152,7 +164,8 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     routes = cli.invoke(
         "iot hub message-route create -n {} -g {} --rn {} --en {} -t {} -e true".format(
             iot_hub, iot_rg, route_names[4], built_in_endpoint, RouteSourceType.DigitalTwinChangeEvents.value
-        )
+        ),
+        capture_stderr=True
     ).as_json()
     assert len(routes) == 5
 
@@ -160,14 +173,16 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     route = cli.invoke(
         "iot hub message-route show -n {} -g {} --rn {}".format(
             iot_hub, iot_rg, route_names[4]
-        )
+        ),
+        capture_stderr=True
     ).as_json()
     assert_route_properties(route, expected_route)
 
     test_result = cli.invoke(
         "iot hub message-route test -n {} -g {} --rn {}".format(
             iot_hub, iot_rg, route_names[0]
-        )
+        ),
+        capture_stderr=True
     ).as_json()["result"]
     assert test_result == "true"
 
@@ -175,7 +190,8 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     routes = cli.invoke(
         "iot hub message-route create -n {} -g {} --rn {} --en {} -t {} -e true -c true".format(
             iot_hub, iot_rg, route_names[5], built_in_endpoint, RouteSourceType.DeviceConnectionStateEvents.value
-        )
+        ),
+        capture_stderr=True
     ).as_json()
     assert len(routes) == 6
 
@@ -185,7 +201,8 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     route = cli.invoke(
         "iot hub message-route show -n {} -g {} --rn {}".format(
             iot_hub, iot_rg, route_names[5]
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert_route_properties(route, expected_route)
@@ -193,7 +210,8 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     test_result = cli.invoke(
         "iot hub message-route test -n {} -g {} --rn {}".format(
             iot_hub, iot_rg, route_names[0]
-        )
+        ),
+        capture_stderr=True
     ).as_json()["result"]
     assert test_result == "true"
 
@@ -201,7 +219,8 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     routes = cli.invoke(
         "iot hub message-route list -n {} -g {}".format(
             iot_hub, iot_rg,
-        )
+        ),
+        capture_stderr=True
     ).as_json()
     assert len(routes) == 6
 
@@ -209,7 +228,8 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
         routes = cli.invoke(
             "iot hub message-route list -n {} -g {} -t {}".format(
                 iot_hub, iot_rg, source_type
-            )
+            ),
+            capture_stderr=True
         ).as_json()
         assert len(routes) == 1
 
@@ -217,7 +237,8 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     test_result = cli.invoke(
         "iot hub message-route test -n {} -g {}".format(
             iot_hub, iot_rg
-        )
+        ),
+        capture_stderr=True
     ).as_json()["routes"]
     test_result = remove_fallback_route(test_result)
     assert len(test_result) == 4
@@ -234,7 +255,8 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     test_result = cli.invoke(
         "iot hub message-route test -n {} -g {} -t {}".format(
             iot_hub, iot_rg, RouteSourceType.DeviceMessages.value
-        )
+        ),
+        capture_stderr=True
     ).as_json()["routes"]
     test_result = remove_fallback_route(test_result)
     assert len(test_result) == 1
@@ -246,7 +268,8 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     test_result = cli.invoke(
         "iot hub message-route test -n {} -g {} -t {}".format(
             iot_hub, iot_rg, RouteSourceType.DeviceJobLifecycleEvents.value
-        )
+        ),
+        capture_stderr=True
     ).as_json()["routes"]
     test_result = remove_fallback_route(test_result)
     assert len(test_result) == 0
@@ -269,7 +292,8 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     route = cli.invoke(
         "iot hub message-route show -n {} -g {} --rn {}".format(
             iot_hub, iot_rg, route_names[4]
-        )
+        ),
+        capture_stderr=True
     ).as_json()
     assert_route_properties(route, expected_route)
 
@@ -285,7 +309,8 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     test_result = cli.invoke(
         "iot hub message-route test -n {} -g {} --rn {} -b '{}' --ap '{}' --sp '{}'".format(
             iot_hub, iot_rg, route_names[4], msg_body, app_properties, system_properties
-        )
+        ),
+        capture_stderr=True
     ).as_json()["result"]
     assert test_result == "true"
 
@@ -293,7 +318,8 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     test_result = cli.invoke(
         "iot hub message-route test -n {} -g {} -b '{}' --ap '{}' --sp '{}'".format(
             iot_hub, iot_rg, msg_body, app_properties, system_properties
-        )
+        ),
+        capture_stderr=True
     ).as_json()["routes"]
     test_result = remove_fallback_route(test_result)
     assert len(test_result) == 3
@@ -308,7 +334,8 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     routes = cli.invoke(
         "iot hub message-route list -n {} -g {}".format(
             iot_hub, iot_rg,
-        )
+        ),
+        capture_stderr=True
     ).as_json()
     assert len(routes) == 5
 
@@ -321,7 +348,8 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     routes = cli.invoke(
         "iot hub message-route list -n {} -g {}".format(
             iot_hub, iot_rg,
-        )
+        ),
+        capture_stderr=True
     ).as_json()
     assert len(routes) == 3
 
@@ -330,7 +358,8 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     test_result = cli.invoke(
         "iot hub message-route test -n {} -g {}".format(
             iot_hub, iot_rg,
-        )
+        ),
+        capture_stderr=True
     ).as_json()["routes"]
     test_result = remove_fallback_route(test_result)
     assert len(test_result) == 2
@@ -338,7 +367,8 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     test_result = cli.invoke(
         "iot hub message-route test -n {} -g {} -t {}".format(
             iot_hub, iot_rg, RouteSourceType.DeviceMessages.value
-        )
+        ),
+        capture_stderr=True
     ).as_json()["routes"]
     test_result = remove_fallback_route(test_result)
     assert len(test_result) == 0
@@ -352,7 +382,8 @@ def test_route_lifecycle(provisioned_only_iot_hubs_module, provisioned_event_hub
     routes = cli.invoke(
         "iot hub message-route list -n {} -g {}".format(
             iot_hub, iot_rg,
-        )
+        ),
+        capture_stderr=True
     ).as_json()
     assert len(routes) == 0
 
@@ -368,7 +399,8 @@ def test_route_fallback_lifecycle(provisioned_only_iot_hubs_module):
         source_type=RouteSourceType.DeviceMessages.value,
     )
     fallback_route = cli.invoke(
-        f"iot hub message-route fallback show -n {iot_hub} -g {iot_rg}"
+        f"iot hub message-route fallback show -n {iot_hub} -g {iot_rg}",
+        capture_stderr=True
     ).as_json()
 
     assert_route_properties(fallback_route, expected_fallback_route)
@@ -377,7 +409,8 @@ def test_route_fallback_lifecycle(provisioned_only_iot_hubs_module):
     test_result = cli.invoke(
         "iot hub message-route test -n {} -g {} -t {}".format(
             iot_hub, iot_rg, RouteSourceType.TwinChangeEvents.value
-        )
+        ),
+        capture_stderr=True
     ).as_json()["routes"]
     assert len(test_result) == 1
     assert test_result[0]["properties"]["name"] == fallback_name
@@ -396,7 +429,8 @@ def test_route_fallback_lifecycle(provisioned_only_iot_hubs_module):
     )
 
     fallback_route = cli.invoke(
-        f"iot hub message-route fallback set -n {iot_hub} -g {iot_rg} -e false"
+        f"iot hub message-route fallback set -n {iot_hub} -g {iot_rg} -e false",
+        capture_stderr=True
     ).as_json()
     assert_route_properties(fallback_route, expected_fallback_route)
     wait_till_hub_state_is_active(iot_hub, iot_rg)
@@ -405,12 +439,14 @@ def test_route_fallback_lifecycle(provisioned_only_iot_hubs_module):
     test_result = cli.invoke(
         "iot hub message-route test -n {} -g {} -t {}".format(
             iot_hub, iot_rg, RouteSourceType.TwinChangeEvents.value
-        )
+        ),
+        capture_stderr=True
     ).as_json()["routes"]
     assert len(test_result) == 0
 
     test_result = cli.invoke(
-        f"iot hub message-route test -n {iot_hub} -g {iot_rg}"
+        f"iot hub message-route test -n {iot_hub} -g {iot_rg}",
+        capture_stderr=True
     ).as_json()["routes"]
     assert len(test_result) == 0
 
@@ -420,7 +456,8 @@ def test_route_fallback_lifecycle(provisioned_only_iot_hubs_module):
         source_type=RouteSourceType.DeviceMessages.value
     )
     fallback_route = cli.invoke(
-        f"iot hub message-route fallback set -n {iot_hub} -g {iot_rg} -e true"
+        f"iot hub message-route fallback set -n {iot_hub} -g {iot_rg} -e true",
+        capture_stderr=True
     ).as_json()
 
     assert_route_properties(fallback_route, expected_fallback_route)
@@ -434,7 +471,8 @@ def wait_till_hub_state_is_active(iot_hub: str, iot_rg: str):
         sleep(1)
         retries += 1
         state = cli.invoke(
-            f"iot hub show -n {iot_hub} -g {iot_rg}"
+            f"iot hub show -n {iot_hub} -g {iot_rg}",
+            capture_stderr=True
         ).as_json()["properties"]["state"].lower()
 
 

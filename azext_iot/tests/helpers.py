@@ -187,7 +187,8 @@ def get_role_assignments(
         assignee_flag = '--assignee "{}"'.format(assignee)
 
     return cli.invoke(
-        f'role assignment list --scope "{scope}" {role_flag} {assignee_flag}'
+        f'role assignment list --scope "{scope}" {role_flag} {assignee_flag}',
+        capture_stderr=True
     ).as_json()
 
 
@@ -250,17 +251,20 @@ def clean_up_iothub_device_config(
 ):
     device_list = []
     device_list.extend(d["deviceId"] for d in cli.invoke(
-        f"iot hub device-twin list -n {hub_name} -g {rg}"
+        f"iot hub device-twin list -n {hub_name} -g {rg}",
+        capture_stderr=True
     ).as_json())
 
     deployment_list = []
     deployment_list.extend(c["id"] for c in cli.invoke(
-        f"iot edge deployment list -n {hub_name} -g {rg}"
+        f"iot edge deployment list -n {hub_name} -g {rg}",
+        capture_stderr=True
     ).as_json())
 
     config_list = []
     config_list.extend(c["id"] for c in cli.invoke(
-        f"iot hub configuration list -n {hub_name} -g {rg}"
+        f"iot hub configuration list -n {hub_name} -g {rg}",
+        capture_stderr=True
     ).as_json())
 
     if device_list:

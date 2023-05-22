@@ -123,13 +123,15 @@ def test_iot_eventhub_endpoint_lifecycle(provisioned_event_hub_with_identity_mod
     endpoint_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {}".format(
             iot_hub, iot_rg
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     eventhub_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
             iot_hub, iot_rg, "eventhub"
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert len(eventhub_list) == 3
@@ -146,7 +148,8 @@ def test_iot_eventhub_endpoint_lifecycle(provisioned_event_hub_with_identity_mod
     eventhub_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
             iot_hub, iot_rg, "eventhub"
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert len(eventhub_list) == 2
@@ -161,7 +164,8 @@ def test_iot_eventhub_endpoint_lifecycle(provisioned_event_hub_with_identity_mod
     endpoint_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
             iot_hub, iot_rg, "eventhub"
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert endpoint_list == []
@@ -199,7 +203,8 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     endpoint_output = cli.invoke(
         "iot hub message-endpoint show -n {} -g {} --en {}".format(
             iot_hub, iot_rg, endpoint_names[0]
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert_endpoint_properties(endpoint_output, expected_cs_endpoint)
@@ -223,7 +228,8 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     endpoint_output = cli.invoke(
         "iot hub message-endpoint show -n {} -g {} --en {}".format(
             iot_hub, iot_rg, endpoint_names[1]
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert_endpoint_properties(endpoint_output, expected_sys_endpoint)
@@ -255,7 +261,8 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     endpoint_output = cli.invoke(
         "iot hub message-endpoint show -n {} -g {} --en {}".format(
             iot_hub, iot_rg, endpoint_names[2]
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert_endpoint_properties(endpoint_output, expected_user_endpoint)
@@ -274,7 +281,8 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     endpoint_output = cli.invoke(
         "iot hub message-endpoint show -n {} -g {} --en {}".format(
             iot_hub, iot_rg, endpoint_names[3]
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert_endpoint_properties(endpoint_output, expected_cs_endpoint)
@@ -299,7 +307,8 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     endpoint_output = cli.invoke(
         "iot hub message-endpoint show -n {} -g {} --en {}".format(
             iot_hub, iot_rg, endpoint_names[4]
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert_endpoint_properties(endpoint_output, expected_sys_endpoint)
@@ -331,7 +340,8 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     endpoint_output = cli.invoke(
         "iot hub message-endpoint show -n {} -g {} --en {}".format(
             iot_hub, iot_rg, endpoint_names[5]
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert_endpoint_properties(endpoint_output, expected_user_endpoint)
@@ -346,7 +356,8 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     topic_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
             iot_hub, iot_rg, "servicebus-topic"
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert len(topic_list) == 3
@@ -355,7 +366,8 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     queue_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
             iot_hub, iot_rg, "servicebus-queue"
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert len(queue_list) == 3
@@ -372,7 +384,8 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     eventhub_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
             iot_hub, iot_rg, "servicebus-topic"
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert len(eventhub_list) == 3
@@ -380,7 +393,8 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     queue_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
             iot_hub, iot_rg, "servicebus-queue"
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert len(queue_list) == 3
@@ -396,7 +410,8 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     eventhub_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
             iot_hub, iot_rg, "servicebus-topic"
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert len(eventhub_list) == 2
@@ -404,7 +419,8 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     queue_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
             iot_hub, iot_rg, "servicebus-queue"
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert len(queue_list) == 3
@@ -419,7 +435,8 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     endpoint_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
             iot_hub, iot_rg, "servicebus-queue"
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert endpoint_list == []
@@ -427,7 +444,8 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     endpoint_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
             iot_hub, iot_rg, "servicebus-topic"
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert len(endpoint_list) == 2
@@ -442,7 +460,8 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     endpoint_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
             iot_hub, iot_rg, "servicebus-topic"
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert endpoint_list == []
@@ -486,7 +505,8 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     endpoint_output = cli.invoke(
         "iot hub message-endpoint show -n {} -g {} --en {}".format(
             iot_hub, iot_rg, endpoint_names[0]
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert_endpoint_properties(endpoint_output, expected_cs_endpoint)
@@ -524,7 +544,8 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     endpoint_output = cli.invoke(
         "iot hub message-endpoint show -n {} -g {} --en {}".format(
             iot_hub, iot_rg, endpoint_names[1]
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert_endpoint_properties(endpoint_output, expected_sys_endpoint)
@@ -562,7 +583,8 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     endpoint_output = cli.invoke(
         "iot hub message-endpoint show -n {} -g {} --en {}".format(
             iot_hub, iot_rg, endpoint_names[2]
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert_endpoint_properties(endpoint_output, expected_user_endpoint)
@@ -570,13 +592,15 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     endpoint_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {}".format(
             iot_hub, iot_rg
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     storage_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
             iot_hub, iot_rg, "storage-container"
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert len(storage_list) == 3
@@ -593,7 +617,8 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     storage_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
             iot_hub, iot_rg, "storage-container"
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert len(storage_list) == 2
@@ -608,7 +633,8 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     endpoint_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
             iot_hub, iot_rg, "storage-container"
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert endpoint_list == []
@@ -661,7 +687,8 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
     endpoint_output = cli.invoke(
         "iot hub message-endpoint show -n {} -g {} --en {}".format(
             iot_hub, iot_rg, endpoint_names[0]
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert_endpoint_properties(endpoint_output, expected_cs_endpoint)
@@ -696,7 +723,8 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
     endpoint_output = cli.invoke(
         "iot hub message-endpoint show -n {} -g {} --en {}".format(
             iot_hub, iot_rg, endpoint_names[1]
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert_endpoint_properties(endpoint_output, expected_sys_endpoint)
@@ -734,7 +762,8 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
     endpoint_output = cli.invoke(
         "iot hub message-endpoint show -n {} -g {} --en {}".format(
             iot_hub, iot_rg, endpoint_names[2]
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert_endpoint_properties(endpoint_output, expected_user_endpoint)
@@ -742,13 +771,15 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
     endpoint_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {}".format(
             iot_hub, iot_rg
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     cosmos_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
             iot_hub, iot_rg, "cosmosdb-container"
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert len(cosmos_list) == 3
@@ -763,7 +794,8 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
     cosmos_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
             iot_hub, iot_rg, "cosmosdb-container"
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert len(cosmos_list) == 2
@@ -778,7 +810,8 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
     endpoint_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {} -t {}".format(
             iot_hub, iot_rg, "cosmosdb-container"
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert endpoint_list == []
@@ -857,7 +890,8 @@ def test_iot_endpoint_force_delete(provisioned_service_bus_with_identity_module)
     route_list = cli.invoke(
         "iot hub message-route list -n {} -g {}".format(
             iot_hub, iot_rg,
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert len(route_list) == 1
@@ -866,7 +900,8 @@ def test_iot_endpoint_force_delete(provisioned_service_bus_with_identity_module)
     enrichment_list = cli.invoke(
         "iot hub message-enrichment list -n {} -g {}".format(
             iot_hub, iot_rg,
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert len(enrichment_list) == 1
@@ -931,7 +966,8 @@ def test_iot_endpoint_force_delete(provisioned_service_bus_with_identity_module)
     route_list = cli.invoke(
         "iot hub message-route list -n {} -g {}".format(
             iot_hub, iot_rg,
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert len(route_list) == 2
@@ -1009,7 +1045,8 @@ def test_iot_endpoint_force_delete(provisioned_service_bus_with_identity_module)
     route_list = cli.invoke(
         "iot hub message-route list -n {} -g {}".format(
             iot_hub, iot_rg,
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert len(route_list) == 1
@@ -1018,7 +1055,8 @@ def test_iot_endpoint_force_delete(provisioned_service_bus_with_identity_module)
     enrichment_list = cli.invoke(
         "iot hub message-enrichment list -n {} -g {}".format(
             iot_hub, iot_rg,
-        )
+        ),
+        capture_stderr=True
     ).as_json()
 
     assert len(enrichment_list) == 1
