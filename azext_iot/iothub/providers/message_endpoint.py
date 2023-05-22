@@ -79,22 +79,12 @@ class MessageEndpoint(IoTHubProvider):
                 )
         elif not connection_string:
             # check for args to get the connection string
-            error_msg = "Please provide a connection string '--connection-string/-c'"
-            if not (
-                endpoint_account_name and entity_path and endpoint_policy_name
-            ) and endpoint_type.lower() in [
-                EndpointType.EventHub.value, EndpointType.ServiceBusQueue.value, EndpointType.ServiceBusTopic.value
-            ]:
-                raise ArgumentUsageError(
-                    error_msg + " or endpoint namespace '--endpoint-namespace', endpoint "
-                    "entity path '--entity-path', and policy name '--policy-name'."
-                )
-            elif not endpoint_account_name and endpoint_type.lower() in [
-                EndpointType.AzureStorageContainer.value, EndpointType.CosmosDBContainer.value
-            ]:
-                raise ArgumentUsageError(
-                    error_msg + " or endpoint account '--endpoint-account'."
-                )
+            self._connection_string_check(
+                endpoint_type=endpoint_type,
+                endpoint_account_name=endpoint_account_name,
+                entity_path=entity_path,
+                endpoint_policy_name=endpoint_policy_name
+            )
 
         # Base props shared among all endpoints
         new_endpoint = {
@@ -241,36 +231,157 @@ class MessageEndpoint(IoTHubProvider):
         partition_key_template: Optional[str] = None,
         identity: Optional[str] = None
     ):
-        # Find the endpoint - if we need type too, then we will need to manually search.
-        # will need type if we check for connection strings
-        original_endpoint = self.show(endpoint_name=endpoint_name)
-        import pdb; pdb.set_trace()
-        if connection_string:
-            # Note that cosmos db uses a decomposed connection string
-            if hasattr(original_endpoint, "connection_string") and original_endpoint.connection_string:
-                original_endpoint.connection_string = connection_string
-            elif hasattr(original_endpoint, "primaryKey") and original_endpoint.primary_key or original_endpoint.secondary_key:
-                # lazy - decompose connection string and stick it in
-                original_endpoint.primary_key = ""
+        original_endpoint, endpoint_type = self._show_with_type(endpoint_name=endpoint_name)
 
+        # All props
+        if endpoint_resource_group:
+            original_endpoint.resource_group = endpoint_resource_group
+        if endpoint_subscription_id:
+            original_endpoint.subscription_id = endpoint_subscription_id
+        if endpoint_uri:
+            original_endpoint.endpoint_uri = endpoint_uri
+
+        # Eventhub, Eventgrid, Servicebus Queue + Topic
+        if entity_path:
+            if hasattr(original_endpoint, "entity_path"):
+                original_endpoint.entity_path = entity_path
             else:
-                raise Exception("Cannot change authentication types.")
-        # if endpoint_account_name:
-        #     original_endpoint.account_name = endpoint_account_name
-        # if endpoint_resource_group:
-        #     original_endpoint.account_name = endpoint_resource_group
-        # if endpoint_subscription_id:
-        #     original_endpoint.account_name = endpoint_subscription_id
-        # if endpoint_account_name:
-        #     original_endpoint.account_name = endpoint_account_name
-        # if endpoint_account_name:
-        #     original_endpoint.account_name = endpoint_account_name
-        # if endpoint_account_name:
-        #     original_endpoint.account_name = endpoint_account_name
-        # if endpoint_account_name:
-        #     original_endpoint.account_name = endpoint_account_name
-        # if endpoint_account_name:
-        #     original_endpoint.account_name = endpoint_account_name
+                raise Exception(
+                    f"{endpoint_name} is not an EventHub, Eventgrid, ServiceBus Topic or Queue endpoint."
+                )
+
+        # Storage only props
+        if container_name:
+            if hasattr(original_endpoint, "container_name"):
+                original_endpoint.container_name = container_name
+            else:
+                raise Exception(f"{endpoint_name} is not a storage container endpoint.")
+        if encoding:
+            if hasattr(original_endpoint, "encoding"):
+                original_endpoint.encoding = encoding.lower() if encoding else EncodingFormat.AVRO.value
+            else:
+                raise Exception(f"{endpoint_name} is not a storage container endpoint.")
+        if file_name_format:
+            if hasattr(original_endpoint, "file_name_format"):
+                original_endpoint.file_name_format = file_name_format
+            else:
+                raise Exception(f"{endpoint_name} is not a storage container endpoint.")
+        if batch_frequency:
+            if hasattr(original_endpoint, "batch_frequency"):
+                original_endpoint.batch_frequency = batch_frequency
+            else:
+                raise Exception(f"{endpoint_name} is not a storage container endpoint.")
+        if chunk_size_window:
+            if hasattr(original_endpoint, "chunk_size_window"):
+                original_endpoint.chunk_size_window = (chunk_size_window * BYTES_PER_MEGABYTE)
+            else:
+                raise Exception(f"{endpoint_name} is not a storage container endpoint.")
+
+        # Cosmos DB only props
+        if database_name:
+            if hasattr(original_endpoint, "database_name"):
+                original_endpoint.database_name = database_name
+            else:
+                raise Exception(f"{endpoint_name} is not a Cosmos DB Container endpoint.")
+        if container_name:
+            if hasattr(original_endpoint, "container_name"):
+                original_endpoint.container_name = container_name
+            else:
+                raise Exception(f"{endpoint_name} is not a Cosmos DB Container endpoint.")
+        if partition_key_name:
+            if hasattr(original_endpoint, "partition_key_name"):
+                original_endpoint.partition_key_name = partition_key_name
+            else:
+                raise Exception(f"{endpoint_name} is not a Cosmos DB Container endpoint.")
+        if partition_key_template:
+            if hasattr(original_endpoint, "partition_key_template"):
+                original_endpoint.partition_key_template = partition_key_template
+            else:
+                raise Exception(f"{endpoint_name} is not a Cosmos DB Container endpoint.")
+
+        # Identity/Connection String schenanigans
+        if identity:
+            original_endpoint.connection_string = None
+            original_endpoint.authentication_type = AuthenticationType.IdentityBased.value
+            if identity == SYSTEM_ASSIGNED_IDENTITY:
+                original_endpoint.identity = None
+            else:
+                original_endpoint.identity = ManagedIdentity(
+                    user_assigned_identity=identity
+                )
+        if connection_string:
+            original_endpoint.identity = None
+            original_endpoint.authentication_type = AuthenticationType.KeyBased.value
+            if EndpointType.CosmosDBContainer.value != endpoint_type.lower():
+                original_endpoint.endpoint_uri = None
+            if hasattr(original_endpoint, "entity_path"):
+                original_endpoint.entity_path = None
+            if isinstance(connection_string, str):
+                original_endpoint.connection_string = connection_string
+            else:
+                # check for args to get the connection string
+                self._connection_string_check(
+                    endpoint_type=endpoint_type,
+                    endpoint_account_name=endpoint_account_name,
+                    entity_path=entity_path,
+                    endpoint_policy_name=endpoint_policy_name
+                )
+                if EndpointType.EventHub.value == endpoint_type.lower():
+                    original_endpoint.connection_string = get_eventhub_cstring(
+                        cmd=self.cli,
+                        namespace_name=endpoint_account_name,
+                        eventhub_name=entity_path,
+                        policy_name=endpoint_policy_name,
+                        rg=endpoint_resource_group,
+                        sub=endpoint_subscription_id
+                    )
+                elif EndpointType.ServiceBusQueue.value == endpoint_type.lower():
+                    original_endpoint.connection_string = get_servicebus_queue_cstring(
+                        cmd=self.cli,
+                        namespace_name=endpoint_account_name,
+                        queue_name=entity_path,
+                        policy_name=endpoint_policy_name,
+                        rg=endpoint_resource_group,
+                        sub=endpoint_subscription_id
+                    )
+                elif EndpointType.ServiceBusTopic.value == endpoint_type.lower():
+                    original_endpoint.connection_string = get_servicebus_topic_cstring(
+                        cmd=self.cli,
+                        namespace_name=endpoint_account_name,
+                        topic_name=entity_path,
+                        policy_name=endpoint_policy_name,
+                        rg=endpoint_resource_group,
+                        sub=endpoint_subscription_id
+                    )
+                elif EndpointType.CosmosDBContainer.value == endpoint_type.lower():
+                    # try to get connection string - this will be used to get keys + uri
+                    if not primary_key and not secondary_key:
+                        connection_string = get_cosmos_db_cstring(
+                            cmd=self.cli,
+                            account_name=endpoint_account_name,
+                            rg=endpoint_resource_group,
+                            sub=endpoint_subscription_id
+                        )
+                    if connection_string:
+                        # parse out key from connection string
+                        if not primary_key and not secondary_key:
+                            parsed_cs = parse_cosmos_db_connection_string(connection_string)
+                            primary_key = parsed_cs["AccountKey"]
+                            secondary_key = parsed_cs["AccountKey"]
+                        # parse out endpoint uri from connection string
+                        if not endpoint_uri:
+                            endpoint_uri = parsed_cs["AccountEndpoint"]
+                    if primary_key:
+                        original_endpoint.primary_key = primary_key
+                    if secondary_key:
+                        original_endpoint.secondary_key = secondary_key
+                elif EndpointType.AzureStorageContainer.value == endpoint_type.lower():
+                    original_endpoint.connection_string = get_storage_cstring(
+                        cmd=self.cli,
+                        account_name=endpoint_account_name,
+                        rg=endpoint_resource_group,
+                        sub=endpoint_subscription_id
+                    )
 
         return self.discovery.client.begin_create_or_update(
             self.hub_resource.additional_properties["resourcegroup"],
@@ -279,6 +390,48 @@ class MessageEndpoint(IoTHubProvider):
             if_match=self.hub_resource.etag
         )
 
+    def _connection_string_check(
+        endpoint_type: str,
+        endpoint_account_name: Optional[str] = None,
+        entity_path: Optional[str] = None,
+        endpoint_policy_name: Optional[str] = None,
+    ):
+        error_msg = "Please provide a connection string '--connection-string/-c'"
+        if not (
+            endpoint_account_name and entity_path and endpoint_policy_name
+        ) and endpoint_type.lower() in [
+            EndpointType.EventHub.value, EndpointType.ServiceBusQueue.value, EndpointType.ServiceBusTopic.value
+        ]:
+            raise ArgumentUsageError(
+                error_msg + " or endpoint namespace '--endpoint-namespace', endpoint "
+                "entity path '--entity-path', and policy name '--policy-name'."
+            )
+        elif not endpoint_account_name and endpoint_type.lower() in [
+            EndpointType.AzureStorageContainer.value, EndpointType.CosmosDBContainer.value
+        ]:
+            raise ArgumentUsageError(
+                error_msg + " or endpoint account '--endpoint-account'."
+            )
+
+    def _show_with_type(self, endpoint_name: str):
+        endpoints = self.hub_resource.properties.routing.endpoints
+        endpoint_lists = [
+            (endpoints.event_hubs, EndpointType.EventHub.value),
+            (endpoints.service_bus_queues, EndpointType.ServiceBusQueue.value),
+            (endpoints.service_bus_topics, EndpointType.ServiceBusTopic.value),
+            (endpoints.storage_containers, EndpointType.AzureStorageContainer.value)
+        ]
+        if self.support_cosmos:
+            endpoint_lists.append(
+                (endpoints.cosmos_db_sql_collections, EndpointType.CosmosDBContainer.value)
+                if endpoints.cosmos_db_sql_collections
+                else []
+            )
+        for endpoint_list, endpoint_type in endpoint_lists:
+            for endpoint in endpoint_list:
+                if endpoint.name.lower() == endpoint_name.lower():
+                    return endpoint, endpoint_type
+        raise ResourceNotFoundError(f"Endpoint {endpoint_name} not found in IoT Hub {self.hub_resource.name}.")
 
     def show(self, endpoint_name: str):
         endpoints = self.hub_resource.properties.routing.endpoints
