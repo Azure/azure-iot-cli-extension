@@ -24,6 +24,9 @@ unreleased
 
 * Deprecation of `az iot product`. This command group will be removed in a future release.
 
+**IoT Edge Deployment**
+
+* Fixed the documentation issue where the `--layered` parameter's description incorrectly mentioned `This option is an alias for --no-validation.`.
 
 0.21.1
 +++++++++++++++
