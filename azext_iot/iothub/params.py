@@ -449,8 +449,7 @@ def load_iothub_arguments(self, _):
             options_list=["--endpoint-type", "--type", "-t"],
             help="Type of the Routing Endpoint.",
         )
-
-    with self.argument_context("iot hub message-endpoint create") as context:
+        # Create and Update All types
         context.argument(
             "identity",
             help="Use a system-assigned or user-assigned managed identity for endpoint "
@@ -498,9 +497,7 @@ def load_iothub_arguments(self, _):
             help="The namespace name for the endpoint resource.",
         )
 
-    with self.argument_context(
-        "iot hub message-endpoint create storage-container"
-    ) as context:
+        # Create and Update Storage
         context.argument(
             "container_name",
             options_list=["--container-name", "--container"],
@@ -537,10 +534,7 @@ def load_iothub_arguments(self, _):
             options_list=["--endpoint-account"],
             help="The account name for the endpoint resource.",
         )
-
-    with self.argument_context(
-        "iot hub message-endpoint create cosmosdb-container"
-    ) as context:
+        # create and update Cosmos db
         context.argument(
             "database_name",
             options_list=["--database-name", "--db"],

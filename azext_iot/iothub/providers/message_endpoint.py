@@ -209,7 +209,7 @@ class MessageEndpoint(IoTHubProvider):
             if_match=self.hub_resource.etag
         )
 
-    def update(
+    def update_alt(
         self,
         endpoint_name: str,
         endpoint_account_name: Optional[str] = None,
@@ -391,7 +391,7 @@ class MessageEndpoint(IoTHubProvider):
             if_match=self.hub_resource.etag
         )
 
-    def update2(
+    def update(
         self,
         endpoint_name: str,
         endpoint_type: str,

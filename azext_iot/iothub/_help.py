@@ -646,6 +646,146 @@ def load_iothub_help():
     """
 
     helps[
+        "iot hub message-endpoint update"
+    ] = """
+        type: group
+        short-summary: Update the properties of an existing endpoint for an IoT Hub.
+    """
+
+    helps[
+        "iot hub message-endpoint update cosmosdb-container"
+    ] = """
+        type: command
+        short-summary: Update the properties of an existing Cosmos DB Container endpoint for an IoT Hub.
+        long-summary: |
+                      If updating the authentication type from a key-based to identity-based Cosmos DB Container endpoint, you must provide the endpoint account (via --endpoint-account). The old primary key and secondary key will be nulled out.
+
+                      If updating the authentication type from an identity-based to key-based Cosmos DB Container endpoint, you must provide the connection string (via --connection-string) or the primary key (via --primary-key) or the secondary key (via --secondary-key) or the endpoint account (via --endpoint-account).
+        examples:
+          - name: Update a key-based Cosmos DB Container endpoint for an IoT Hub to use a new specified connection string.
+            text: >
+              az iot hub message-endpoint update cosmosdb-container -n {iothub_name} --en {endpoint_name} --connection-string {connection_string}
+          - name: Update the connection-string for a key-based Cosmos DB Container endpoint for an IoT Hub by retrieving the connection string from the specified Cosmos DB Container.
+            text: >
+              az iot hub message-endpoint update cosmosdb-container -n {iothub_name} --en {endpoint_name} --connection-string --container {container}
+              --db {database} --endpoint-account {account_name}
+          - name: Update a Cosmos DB Container endpoint for an IoT Hub to use a specified primary key and secondary key.
+            text: >
+              az iot hub message-endpoint update cosmosdb-container -n {iothub_name} --en {endpoint_name} --pk {primary_key} --sk {secondary_key}
+          - name: Update a Cosmos DB Container endpoint for an IoT Hub to use system assigned identity and a partition key name.
+                  The partition key template will be the default.
+            text: >
+              az iot hub message-endpoint update cosmosdb-container -n {iothub_name} --en {endpoint_name} --pkn {partition_key_name} --identity [system]
+          - name: Update a Cosmos DB Container endpoint for an IoT Hub to use user assigned identity
+            text: >
+              az iot hub message-endpoint update cosmosdb-container -n {iothub_name} --en {endpoint_name}
+              --identity {user_identity_resource_id}
+    """
+
+    helps[
+        "iot hub message-endpoint update eventhub"
+    ] = """
+        type: command
+        short-summary: Update the properties of an existing Event Hub endpoint for an IoT Hub.
+        long-summary: |
+                      If updating the authentication type from a key-based to identity-based Event Hub endpoint, you must provide the endpoint uri (via --endpoint-uri) and the entity path (via --entity-path). The old connection string will be nulled out.
+
+                      If updating the authentication type from an identity-based to key-based Event Hub endpoint, you must provide the connection string (via --connection-string) or endpoint uri (via --endpoint-uri) and the entity path (via --entity-path). The old endpoint uri and entity path will be nulled out.
+        examples:
+          - name: Update the connection-string for a key-based Event Hub endpoint for an IoT Hub by retrieving the connection string from the specified Event Hub.
+            text: >
+              az iot hub message-endpoint update eventhub -n {iothub_name} --en {endpoint_name} --namespace {namespace_name}
+              --entity-path {entity_path} --policy {policy_name} --connection-string
+          - name: Update an Event Hub endpoint for an IoT Hub to use a new specified connection string.
+            text: >
+              az iot hub message-endpoint update eventhub -n {iothub_name} --en {endpoint_name} -c {connection_string}
+          - name: Update an Event Hub endpoint for an IoT Hub to use system assigned identity and a different entity path.
+            text: >
+              az iot hub message-endpoint update eventhub -n {iothub_name} --en {endpoint_name}
+              --entity-path {entity_path} --identity [system]
+          - name: Update an Event Hub endpoint for an IoT Hub to use user assigned identity.
+            text: >
+              az iot hub message-endpoint update eventhub -n {iothub_name} --en {endpoint_name} --identity {user_identity_resource_id}
+    """
+
+    helps[
+        "iot hub message-endpoint update servicebus-queue"
+    ] = """
+        type: command
+        short-summary: Update the properties of an existing Service Bus Queue endpoint for an IoT Hub.
+        long-summary: |
+                      If updating the authentication type from a key-based to identity-based Service Bus Queue endpoint, you must provide the endpoint uri (via --endpoint-uri) and the entity path (via --entity-path). The old connection string will be nulled out.
+
+                      If updating the authentication type from an identity-based to key-based Service Bus Queue endpoint, you must provide the connection string (via --connection-string) or endpoint uri (via --endpoint-uri) and the entity path (via --entity-path). The old endpoint uri and entity path will be nulled out.
+        examples:
+          - name: Update the connection-string for a key-based Service Bus Queue endpoint for an IoT Hub by retrieving the connection string from the specified Service Bus Queue.
+            text: >
+              az iot hub message-endpoint update servicebus-queue -n {iothub_name} --en {endpoint_name} --namespace {namespace_name}
+              --entity-path {entity_path} --policy {policy_name} --connection-string
+          - name: Update a Service Bus Queue endpoint for an IoT Hub to use a new specified connection string.
+            text: >
+              az iot hub message-endpoint update servicebus-queue -n {iothub_name} --en {endpoint_name} -c {connection_string}
+          - name: Update a Service Bus Queue endpoint for an IoT Hub to use system assigned identity and a different entity path.
+            text: >
+              az iot hub message-endpoint update servicebus-queue -n {iothub_name} --en {endpoint_name}
+              --entity-path {entity_path} --identity [system]
+          - name: Update a Service Bus Queue endpoint for an IoT Hub to use user assigned identity.
+            text: >
+              az iot hub message-endpoint update servicebus-queue -n {iothub_name} --en {endpoint_name} --identity {user_identity_resource_id}
+    """
+
+    helps[
+        "iot hub message-endpoint update servicebus-topic"
+    ] = """
+        type: command
+        short-summary: Update the properties of an existing Service Bus Topic endpoint for an IoT Hub.
+        long-summary: |
+                      If updating the authentication type from a key-based to identity-based Service Bus Topic endpoint, you must provide the endpoint uri (via --endpoint-uri) and the entity path (via --entity-path). The old connection string will be nulled out.
+
+                      If updating the authentication type from an identity-based to key-based Service Bus Topic endpoint, you must provide the connection string (via --connection-string) or endpoint uri (via --endpoint-uri) and the entity path (via --entity-path). The old endpoint uri and entity path will be nulled out.
+        examples:
+          - name: Update the connection-string for a key-based Service Bus Topic endpoint for an IoT Hub by retrieving the connection string from the specified Service Bus Topic.
+            text: >
+              az iot hub message-endpoint update servicebus-topic -n {iothub_name} --en {endpoint_name} --namespace {namespace_name}
+              --entity-path {entity_path} --policy {policy_name} --connection-string
+          - name: Update a Service Bus Topic endpoint for an IoT Hub to use a new specified connection string.
+            text: >
+              az iot hub message-endpoint update servicebus-topic -n {iothub_name} --en {endpoint_name} -c {connection_string}
+          - name: Update a Service Bus Topic endpoint for an IoT Hub to use system assigned identity and a different entity path.
+            text: >
+              az iot hub message-endpoint update servicebus-topic -n {iothub_name} --en {endpoint_name}
+              --entity-path {entity_path} --identity [system]
+          - name: Update a Service Bus Topic endpoint for an IoT Hub to use user assigned identity.
+            text: >
+              az iot hub message-endpoint update servicebus-topic -n {iothub_name} --en {endpoint_name}  --identity {user_identity_resource_id}
+    """
+
+    helps[
+        "iot hub message-endpoint update storage-container"
+    ] = """
+        type: command
+        short-summary: Update the properties of an existing Storage Container endpoint for an IoT Hub.
+        long-summary: |
+                      If updating the authentication type from a key-based to identity-based Storage Container endpoint, you must provide the endpoint account (via --endpoint-account). The old connection string will be nulled out.
+
+                      If updating the authentication type from an identity-based to key-based Storage Container endpoint, you must provide the connection string (via --connection-string) or the endpoint account (via --endpoint-account).
+        examples:
+          - name: Update the connection-string for a key-based Storage Container endpoint for an IoT Hub by retrieving the connection string from the specified Storage Container.
+            text: >
+              az iot hub message-endpoint update storage-container -n {iothub_name} --en {endpoint_name} --container {container_name}
+              --endpoint-account {account_name} --connection-string
+          - name: Update a Storage Container endpoint for an IoT Hub to use a new specified connection string.
+            text: >
+              az iot hub message-endpoint update storage-container -n {iothub_name} --en {endpoint_name} -c {connection_string}
+          - name: Update a Storage Container endpoint for an IoT Hub to use system assigned identity with the given batch frequency, chunk size, and file name format.
+            text: >
+              az iot hub message-endpoint update storage-container -n {iothub_name} --en {endpoint_name}  -b {batch_frequency} -w {chunk_size} --ff {file_format} --identity [system]
+          - name: Update a Storage Container endpoint for an IoT Hub to use user assigned identity with json encoding.
+            text: >
+              az iot hub message-endpoint update storage-container -n {iothub_name} --en {endpoint_name}  --encoding json --identity {user_identity_resource_id}
+    """
+
+    helps[
         "iot hub message-endpoint list"
     ] = """
         type: command
