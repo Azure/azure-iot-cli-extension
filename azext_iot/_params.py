@@ -900,7 +900,7 @@ def load_arguments(self, _):
             help="Layered deployments allow you to define desired properties in $edgeAgent, $edgeHub and user "
             "modules that will layer on top of a base deployment. The properties specified in a layered "
             "deployment will merge with properties of the base deployment. Properties with the same path will be "
-            "overwritten based on deployment priority. This option is an alias for --no-validation.",
+            "overwritten based on deployment priority.",
         )
         context.argument(
             "no_validation",
