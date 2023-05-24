@@ -135,6 +135,83 @@ def test_iot_eventhub_endpoint_lifecycle(provisioned_event_hub_with_identity_mod
     assert len(eventhub_list) == 3
     assert endpoint_list["eventHubs"] == eventhub_list
 
+    # Update
+    # Keybased -> System
+    cli.invoke(
+        "iot hub message-endpoint create eventhub -n {} -g {} --en {} --erg {} --endpoint-uri {} --entity-path {} "
+        "--identity [system]".format(
+            iot_hub, iot_rg, endpoint_names[0], iot_rg, endpoint_uri, eventhub_instance
+        )
+    )
+
+    expected_sys_endpoint = build_expected_endpoint(
+        endpoint_names[0],
+        iot_rg,
+        iot_sub,
+        entity_path=eventhub_instance,
+        authentication_type=AuthenticationType.IdentityBased.value,
+        endpoint_uri=endpoint_uri
+    )
+
+    endpoint_output = cli.invoke(
+        "iot hub message-endpoint show -n {} -g {} --en {}".format(
+            iot_hub, iot_rg, endpoint_names[0]
+        )
+    ).as_json()
+
+    assert_endpoint_properties(endpoint_output, expected_cs_endpoint)
+
+    # System -> User
+    cli.invoke(
+        "iot hub message-endpoint create eventhub -n {} -g {} --en {} --erg {} --endpoint-uri {} --entity-path {} "
+        "--identity {}".format(
+            iot_hub,
+            iot_rg,
+            endpoint_names[2],
+            iot_rg,
+            endpoint_uri,
+            eventhub_instance,
+            user_id
+        )
+    )
+
+    expected_user_endpoint = build_expected_endpoint(
+        endpoint_names[2],
+        iot_rg,
+        iot_sub,
+        entity_path=eventhub_instance,
+        authentication_type=AuthenticationType.IdentityBased.value,
+        endpoint_uri=endpoint_uri,
+        identity=user_id
+    )
+
+    endpoint_output = cli.invoke(
+        "iot hub message-endpoint show -n {} -g {} --en {}".format(
+            iot_hub, iot_rg, endpoint_names[1]
+        )
+    )
+
+    assert_endpoint_properties(endpoint_output.as_json(), expected_sys_endpoint)
+
+    # User -> Keybased
+    cli.invoke(
+        "iot hub message-endpoint update eventhub -n {} -g {} --en {} --erg {} -c {}".format(
+            iot_hub, iot_rg, endpoint_names[2], iot_rg, eventhub_cs
+        )
+    )
+
+    expected_cs_endpoint = build_expected_endpoint(
+        endpoint_names[2], iot_rg, iot_sub, connection_string=eventhub_cs
+    )
+
+    endpoint_output = cli.invoke(
+        "iot hub message-endpoint show -n {} -g {} --en {}".format(
+            iot_hub, iot_rg, endpoint_names[2]
+        )
+    )
+
+    assert_endpoint_properties(endpoint_output.as_json(), expected_user_endpoint)
+
     # Delete one event hub endpoint
     cli.invoke(
         "iot hub message-endpoint delete -n {} -g {} --en {} -y".format(
@@ -361,6 +438,82 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     assert len(queue_list) == 3
     assert endpoint_list["serviceBusQueues"] == queue_list
 
+    # Update
+    # Keybased -> User Queue
+    cli.invoke(
+        "iot hub message-endpoint create servicebus-queue -n {} -g {} --en {} --erg {} --endpoint-uri {} "
+        "--entity-path {} --identity {}".format(
+            iot_hub,
+            iot_rg,
+            endpoint_names[3],
+            iot_rg,
+            endpoint_uri,
+            queue_instance,
+            user_id
+        )
+    )
+
+    expected_user_endpoint = build_expected_endpoint(
+        endpoint_names[3],
+        iot_rg,
+        iot_sub,
+        entity_path=queue_instance,
+        authentication_type=AuthenticationType.IdentityBased.value,
+        endpoint_uri=endpoint_uri,
+        identity=user_id
+    )
+
+    endpoint_output = cli.invoke(
+        "iot hub message-endpoint show -n {} -g {} --en {}".format(
+            iot_hub, iot_rg, endpoint_names[3]
+        )
+    ).as_json()
+
+    assert_endpoint_properties(endpoint_output, expected_user_endpoint)
+
+    # User -> System Topic
+    cli.invoke(
+        "iot hub message-endpoint create servicebus-topic -n {} -g {} --en {} --erg {} --endpoint-uri {} "
+        "--entity-path {} --identity [system]".format(
+            iot_hub, iot_rg, endpoint_names[2], iot_rg, endpoint_uri, topic_instance
+        )
+    )
+
+    expected_sys_endpoint = build_expected_endpoint(
+        endpoint_names[2],
+        iot_rg, iot_sub,
+        entity_path=topic_instance,
+        authentication_type=AuthenticationType.IdentityBased.value,
+        endpoint_uri=endpoint_uri
+    )
+
+    endpoint_output = cli.invoke(
+        "iot hub message-endpoint show -n {} -g {} --en {}".format(
+            iot_hub, iot_rg, endpoint_names[2]
+        )
+    ).as_json()
+
+    assert_endpoint_properties(endpoint_output, expected_sys_endpoint)
+
+    # System -> Keybased Topic
+    cli.invoke(
+        "iot hub message-endpoint create servicebus-topic -n {} -g {} --en {} --erg {} -c {}".format(
+            iot_hub, iot_rg, endpoint_names[1], iot_rg, topic_cs
+        )
+    )
+
+    expected_cs_endpoint = build_expected_endpoint(
+        endpoint_names[1], iot_rg, iot_sub, connection_string=topic_cs
+    )
+
+    endpoint_output = cli.invoke(
+        "iot hub message-endpoint show -n {} -g {} --en {}".format(
+            iot_hub, iot_rg, endpoint_names[1]
+        )
+    ).as_json()
+
+    assert_endpoint_properties(endpoint_output, expected_cs_endpoint)
+
     # Delete mismatch name and type
     cli.invoke(
         "iot hub message-endpoint delete -n {} -g {} --en {} -t {} -y".format(
@@ -567,6 +720,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
 
     assert_endpoint_properties(endpoint_output, expected_user_endpoint)
 
+    # List
     endpoint_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {}".format(
             iot_hub, iot_rg
@@ -581,6 +735,119 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
 
     assert len(storage_list) == 3
     assert endpoint_list["storageContainers"] == storage_list
+
+    # Update
+    # Keybased -> System, change all optional props
+    cli.invoke(
+        "iot hub message-endpoint create storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {}"
+        "--identity [system] -b {} -w {} --encoding {} --ff {}".format(
+            iot_hub,
+            iot_rg,
+            endpoint_names[0],
+            iot_rg,
+            endpoint_uri,
+            container_name,
+            100,
+            50,
+            "json",
+            custom_file_format
+        )
+    )
+
+    # use defaults
+    expected_cs_endpoint = build_expected_endpoint(
+        endpoint_names[0],
+        iot_rg,
+        iot_sub,
+        authentication_type=AuthenticationType.IdentityBased.value,
+        endpoint_uri=endpoint_uri,
+        container_name=container_name,
+        batch_frequency_in_seconds=100,
+        encoding="json",
+        file_name_format=custom_file_format,
+        max_chunk_size_in_bytes=50
+    )
+
+    endpoint_output = cli.invoke(
+        "iot hub message-endpoint show -n {} -g {} --en {}".format(
+            iot_hub, iot_rg, endpoint_names[0]
+        )
+    ).as_json()
+
+    assert_endpoint_properties(endpoint_output, expected_cs_endpoint)
+
+    # System -> User, change some optional props
+    custom_file_format = default_file_format.replace("/", "_")
+    cli.invoke(
+        "iot hub message-endpoint create storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {} "
+        "--identity {} -b {}".format(
+            iot_hub,
+            iot_rg,
+            endpoint_names[1],
+            iot_rg, endpoint_uri,
+            container_name,
+            user_id,
+            70,
+        )
+    )
+
+    expected_sys_endpoint = build_expected_endpoint(
+        endpoint_names[1],
+        iot_rg,
+        iot_sub,
+        container_name=container_name,
+        authentication_type=AuthenticationType.IdentityBased.value,
+        endpoint_uri=endpoint_uri,
+        identity=user_id,
+        batch_frequency_in_seconds=70,
+        encoding="json",
+        file_name_format=custom_file_format,
+        max_chunk_size_in_bytes=10
+    )
+
+    endpoint_output = cli.invoke(
+        "iot hub message-endpoint show -n {} -g {} --en {}".format(
+            iot_hub, iot_rg, endpoint_names[1]
+        )
+    ).as_json()
+
+    assert_endpoint_properties(endpoint_output, expected_sys_endpoint)
+
+    # User -> Keybased, change no optional props
+    cli.invoke(
+        "iot hub message-endpoint create storage-container -n {} -g {} --en {} --erg {} --container {} "
+        "-c {}".format(
+            iot_hub,
+            iot_rg,
+            endpoint_names[2],
+            iot_rg,
+            container_name,
+            storage_cs,
+        )
+    )
+
+    expected_user_endpoint = build_expected_endpoint(
+        endpoint_names[2],
+        iot_rg,
+        iot_sub,
+        connection_string=storage_cs,
+        container_name=container_name,
+        authentication_type=AuthenticationType.KeyBased.value,
+        endpoint_uri=endpoint_uri,
+        identity=user_id,
+        batch_frequency_in_seconds=720,
+        encoding="avro",
+        file_name_format=default_file_format,
+        max_chunk_size_in_bytes=500
+    )
+
+    endpoint_output = cli.invoke(
+        "iot hub message-endpoint show -n {} -g {} --en {}".format(
+            iot_hub, iot_rg, endpoint_names[2]
+        )
+    ).as_json()
+
+    assert_endpoint_properties(endpoint_output, expected_user_endpoint)
 
     # Delete one event hub endpoint
     cli.invoke(
@@ -739,6 +1006,7 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
 
     assert_endpoint_properties(endpoint_output, expected_user_endpoint)
 
+    # List
     endpoint_list = cli.invoke(
         "iot hub message-endpoint list -n {} -g {}".format(
             iot_hub, iot_rg
@@ -753,6 +1021,13 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
 
     assert len(cosmos_list) == 3
     assert endpoint_list["cosmosDbSqlCollections"] == cosmos_list
+
+    # Update
+    # Keybased -> User, add pkn + pkt
+
+    # System -> Keybased, keep
+
+    # User -> System, remove pkn, pkt
 
     # Delete one cosmos endpoint
     cli.invoke(

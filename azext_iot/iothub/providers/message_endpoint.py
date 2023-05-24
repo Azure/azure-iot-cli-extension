@@ -417,7 +417,22 @@ class MessageEndpoint(IoTHubProvider):
         # have the user say the type. Will make args easier (as in we do not need to check for unneeded args)
         original_endpoint = self._show_by_type(endpoint_name=endpoint_name, endpoint_type=endpoint_type)
 
+        # should we have a way to parse out connection string props?
+        # from azext_iot.common._azure import _parse_connection_string
+        # if not connection_string and original_endpoint.connection_string:
+        #     parsed_cs = _parse_connection_string(original_endpoint.connection_string)
+        #     if parsed_cs.get("EntityPath") and entity_path is None:
+        #         entity_path = parsed_cs.get("EntityPath")
+        #     if parsed_cs.get("SharedAccessKeyName") and endpoint_policy_name is None:
+        #         endpoint_policy_name = parsed_cs.get("SharedAccessKeyName")
+        #     if parsed_cs.get("Endpoint"):
+        #         if isinstance(connection_string, bool) and endpoint_account_name is None:
+        #             endpoint_account_name = parsed_cs.get("Endpoint")
+        #         if isinstance(connection_string, bool) and endpoint_uri is None:
+        #             endpoint_uri = parsed_cs.get("Endpoint")
+
         # Identity/Connection String schenanigans
+        fetch_connection_string = False
         if identity:
             original_endpoint.connection_string = None
             original_endpoint.authentication_type = AuthenticationType.IdentityBased.value
@@ -427,8 +442,7 @@ class MessageEndpoint(IoTHubProvider):
                 original_endpoint.identity = ManagedIdentity(
                     user_assigned_identity=identity
                 )
-        fetch_connection_string = False
-        if connection_string:
+        elif connection_string:
             original_endpoint.identity = None
             original_endpoint.authentication_type = AuthenticationType.KeyBased.value
             if EndpointType.CosmosDBContainer.value != endpoint_type.lower():
