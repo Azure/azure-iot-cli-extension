@@ -552,9 +552,9 @@ class MessageEndpoint(IoTHubProvider):
             if container_name:
                 original_endpoint.container_name = container_name
             if partition_key_name:
-                original_endpoint.partition_key_name = partition_key_name
+                original_endpoint.partition_key_name = None if partition_key_name == "" else partition_key_name
             if partition_key_template:
-                original_endpoint.partition_key_template = partition_key_template
+                original_endpoint.partition_key_template = None if partition_key_template == "" else partition_key_template
 
         return self.discovery.client.begin_create_or_update(
             self.hub_resource.additional_properties["resourcegroup"],

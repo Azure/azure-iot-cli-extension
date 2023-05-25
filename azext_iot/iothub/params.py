@@ -577,6 +577,23 @@ def load_iothub_arguments(self, _):
             help="The account name for the endpoint resource.",
         )
 
+    with self.argument_context("iot hub message-endpoint update cosmosdb-container") as context:
+        context.argument(
+            "partition_key_name",
+            options_list=["--partition-key-name", "--pkn"],
+            help="The name of the partition key associated with this Cosmos DB SQL Container if one exists. To clear "
+            "this property, set this to \"\"",
+        )
+        context.argument(
+            "partition_key_template",
+            options_list=["--partition-key-template", "--pkt"],
+            help="The template for generating a synthetic partition key value for use with this Cosmos DB SQL Container. "
+            "The template must include at least one of the following placeholders: {iothub}, {deviceid}, {DD}, {MM}, and "
+            "{YYYY}. Any one placeholder may be specified at most once, but order and non-placeholder components are "
+            "arbitrary. If partition key name is provided, partition key template defaults to {deviceid}-{YYYY}-{MM}. To "
+            "clear this property, set this to \"\""
+        )
+
     with self.argument_context("iot hub message-endpoint delete") as context:
         context.argument(
             "force",
