@@ -123,6 +123,7 @@ class QueryOperations(object):
             deserialized = self._deserialize('QueryResult', response)
             header_dict = {
                 'query-charge': 'float',
+                'x-ms-error-code': 'str',
             }
 
         if raw:

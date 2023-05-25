@@ -17,7 +17,7 @@ class DigitalTwinsAddRelationshipOptions(Model):
 
     :param if_none_match: Only perform the operation if the entity does not
      already exist. Possible values include: '*'
-    :type if_none_match: str or ~dataplane.models.enum
+    :type if_none_match: str or ~controlplane.models.enum
     :param traceparent: Identifies the request in a distributed tracing
      system.
     :type traceparent: str

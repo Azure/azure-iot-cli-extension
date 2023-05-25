@@ -192,12 +192,17 @@ class ImportJobsOperations(object):
             raise models.ErrorResponseException(self._deserialize, response)
 
         deserialized = None
+        header_dict = {}
 
         if response.status_code == 201:
             deserialized = self._deserialize('ImportJob', response)
+            header_dict = {
+                'x-ms-error-code': 'str',
+            }
 
         if raw:
             client_raw_response = ClientRawResponse(deserialized, response)
+            client_raw_response.add_headers(header_dict)
             return client_raw_response
 
         return deserialized
@@ -269,12 +274,17 @@ class ImportJobsOperations(object):
             raise models.ErrorResponseException(self._deserialize, response)
 
         deserialized = None
+        header_dict = {}
 
         if response.status_code == 200:
             deserialized = self._deserialize('ImportJob', response)
+            header_dict = {
+                'x-ms-error-code': 'str',
+            }
 
         if raw:
             client_raw_response = ClientRawResponse(deserialized, response)
+            client_raw_response.add_headers(header_dict)
             return client_raw_response
 
         return deserialized
@@ -346,6 +356,9 @@ class ImportJobsOperations(object):
 
         if raw:
             client_raw_response = ClientRawResponse(None, response)
+            client_raw_response.add_headers({
+                'x-ms-error-code': 'str',
+            })
             return client_raw_response
     delete.metadata = {'url': '/jobs/imports/{id}'}
 
@@ -415,12 +428,17 @@ class ImportJobsOperations(object):
             raise models.ErrorResponseException(self._deserialize, response)
 
         deserialized = None
+        header_dict = {}
 
         if response.status_code == 200:
             deserialized = self._deserialize('ImportJob', response)
+            header_dict = {
+                'x-ms-error-code': 'str',
+            }
 
         if raw:
             client_raw_response = ClientRawResponse(deserialized, response)
+            client_raw_response.add_headers(header_dict)
             return client_raw_response
 
         return deserialized

@@ -14,7 +14,7 @@ from msrest.paging import Paged
 
 class ImportJobPaged(Paged):
     """
-    A paging container for iterating over a list of :class:`ImportJob <dataplane.models.ImportJob>` object
+    A paging container for iterating over a list of :class:`ImportJob <controlplane.models.ImportJob>` object
     """
 
     _attribute_map = {

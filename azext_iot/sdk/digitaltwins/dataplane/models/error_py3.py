@@ -24,10 +24,10 @@ class Error(Model):
     :ivar message: A human-readable representation of the error.
     :vartype message: str
     :ivar details: Internal error details.
-    :vartype details: list[~dataplane.models.Error]
+    :vartype details: list[~controlplane.models.Error]
     :param innererror: An object containing more specific information than the
      current object about the error.
-    :type innererror: ~dataplane.models.InnerError
+    :type innererror: ~controlplane.models.InnerError
     """
 
     _validation = {
