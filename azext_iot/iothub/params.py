@@ -447,7 +447,7 @@ def load_iothub_arguments(self, _):
             "endpoint_type",
             arg_type=get_enum_type(EndpointType),
             options_list=["--endpoint-type", "--type", "-t"],
-            help="Type of the Routing Endpoint.",
+            help="Type of the routing endpoint.",
         )
         # Create and Update All types
         context.argument(
@@ -469,7 +469,7 @@ def load_iothub_arguments(self, _):
         context.argument(
             "connection_string",
             options_list=["--connection-string", "-c"],
-            help="Connection string of the Routing Endpoint.",
+            help="Connection string of the routing endpoint.",
         )
         context.argument(
             "entity_path",
@@ -575,6 +575,14 @@ def load_iothub_arguments(self, _):
             "endpoint_account_name",
             options_list=["--endpoint-account"],
             help="The account name for the endpoint resource.",
+        )
+
+    with self.argument_context("iot hub message-endpoint update") as context:
+        context.argument(
+            "connection_string",
+            options_list=["--connection-string", "-c"],
+            help="Connection string of the routing endpoint. Use `update` if you want the connection string to "
+            "be fetched from the service instead of providing it in the argument.",
         )
 
     with self.argument_context("iot hub message-endpoint update cosmosdb-container") as context:

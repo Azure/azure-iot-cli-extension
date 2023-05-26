@@ -10,7 +10,8 @@ from azure.cli.core.azclierror import (
     ArgumentUsageError,
     RequiredArgumentMissingError,
     ResourceNotFoundError,
-    InvalidArgumentValueError
+    InvalidArgumentValueError,
+    MutuallyExclusiveArgumentError
 )
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.iothub.common import (
@@ -68,6 +69,9 @@ class MessageEndpoint(IoTHubProvider):
             endpoint_resource_group = self.hub_resource.additional_properties["resourcegroup"]
         if not endpoint_subscription_id:
             endpoint_subscription_id = self.hub_resource.additional_properties['subscriptionid']
+
+        if connection_string and identity:
+            raise MutuallyExclusiveArgumentError("Please use either --connection-string or --identity, both were provided.")
 
         authentication_type = AuthenticationType.KeyBased.value
         endpoint_identity = None
@@ -209,188 +213,6 @@ class MessageEndpoint(IoTHubProvider):
             if_match=self.hub_resource.etag
         )
 
-    def update_alt(
-        self,
-        endpoint_name: str,
-        endpoint_account_name: Optional[str] = None,
-        endpoint_resource_group: Optional[str] = None,
-        endpoint_subscription_id: Optional[str] = None,
-        endpoint_policy_name: Optional[str] = None,
-        connection_string: Optional[str] = None,
-        container_name: Optional[str] = None,
-        encoding: Optional[str] = None,
-        batch_frequency: int = 300,
-        chunk_size_window: int = 300,
-        file_name_format: str = '{iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}',
-        endpoint_uri: Optional[str] = None,
-        entity_path: Optional[str] = None,
-        database_name: Optional[str] = None,
-        primary_key: Optional[str] = None,
-        secondary_key: Optional[str] = None,
-        partition_key_name: Optional[str] = None,
-        partition_key_template: Optional[str] = None,
-        identity: Optional[str] = None
-    ):
-        # This update is if we want to put everything into one update command... which is sorta ugly af
-        original_endpoint, endpoint_type = self._show_with_type(endpoint_name=endpoint_name)
-
-        # All props
-        if endpoint_resource_group:
-            original_endpoint.resource_group = endpoint_resource_group
-        if endpoint_subscription_id:
-            original_endpoint.subscription_id = endpoint_subscription_id
-        if endpoint_uri:
-            original_endpoint.endpoint_uri = endpoint_uri
-
-        # Eventhub, Eventgrid, Servicebus Queue + Topic
-        if entity_path:
-            if hasattr(original_endpoint, "entity_path"):
-                original_endpoint.entity_path = entity_path
-            else:
-                raise Exception(
-                    f"{endpoint_name} is not an EventHub, Eventgrid, ServiceBus Topic or Queue endpoint."
-                )
-
-        # Storage only props
-        if container_name:
-            if hasattr(original_endpoint, "container_name"):
-                original_endpoint.container_name = container_name
-            else:
-                raise Exception(f"{endpoint_name} is not a storage container endpoint.")
-        if encoding:
-            if hasattr(original_endpoint, "encoding"):
-                original_endpoint.encoding = encoding.lower() if encoding else EncodingFormat.AVRO.value
-            else:
-                raise Exception(f"{endpoint_name} is not a storage container endpoint.")
-        if file_name_format:
-            if hasattr(original_endpoint, "file_name_format"):
-                original_endpoint.file_name_format = file_name_format
-            else:
-                raise Exception(f"{endpoint_name} is not a storage container endpoint.")
-        if batch_frequency:
-            if hasattr(original_endpoint, "batch_frequency"):
-                original_endpoint.batch_frequency = batch_frequency
-            else:
-                raise Exception(f"{endpoint_name} is not a storage container endpoint.")
-        if chunk_size_window:
-            if hasattr(original_endpoint, "chunk_size_window"):
-                original_endpoint.chunk_size_window = (chunk_size_window * BYTES_PER_MEGABYTE)
-            else:
-                raise Exception(f"{endpoint_name} is not a storage container endpoint.")
-
-        # Cosmos DB only props
-        if database_name:
-            if hasattr(original_endpoint, "database_name"):
-                original_endpoint.database_name = database_name
-            else:
-                raise Exception(f"{endpoint_name} is not a Cosmos DB Container endpoint.")
-        if container_name:
-            if hasattr(original_endpoint, "container_name"):
-                original_endpoint.container_name = container_name
-            else:
-                raise Exception(f"{endpoint_name} is not a Cosmos DB Container endpoint.")
-        if partition_key_name:
-            if hasattr(original_endpoint, "partition_key_name"):
-                original_endpoint.partition_key_name = partition_key_name
-            else:
-                raise Exception(f"{endpoint_name} is not a Cosmos DB Container endpoint.")
-        if partition_key_template:
-            if hasattr(original_endpoint, "partition_key_template"):
-                original_endpoint.partition_key_template = partition_key_template
-            else:
-                raise Exception(f"{endpoint_name} is not a Cosmos DB Container endpoint.")
-
-        # Identity/Connection String schenanigans
-        if identity:
-            original_endpoint.connection_string = None
-            original_endpoint.authentication_type = AuthenticationType.IdentityBased.value
-            if identity == SYSTEM_ASSIGNED_IDENTITY:
-                original_endpoint.identity = None
-            else:
-                original_endpoint.identity = ManagedIdentity(
-                    user_assigned_identity=identity
-                )
-        if connection_string:
-            original_endpoint.identity = None
-            original_endpoint.authentication_type = AuthenticationType.KeyBased.value
-            if EndpointType.CosmosDBContainer.value != endpoint_type.lower():
-                original_endpoint.endpoint_uri = None
-            if hasattr(original_endpoint, "entity_path"):
-                original_endpoint.entity_path = None
-            if isinstance(connection_string, str):
-                original_endpoint.connection_string = connection_string
-            else:
-                # check for args to get the connection string
-                self._connection_string_retrieval_args_check(
-                    endpoint_type=endpoint_type,
-                    endpoint_account_name=endpoint_account_name,
-                    entity_path=entity_path,
-                    endpoint_policy_name=endpoint_policy_name
-                )
-                if EndpointType.EventHub.value == endpoint_type.lower():
-                    original_endpoint.connection_string = get_eventhub_cstring(
-                        cmd=self.cli,
-                        namespace_name=endpoint_account_name,
-                        eventhub_name=entity_path,
-                        policy_name=endpoint_policy_name,
-                        rg=endpoint_resource_group,
-                        sub=endpoint_subscription_id
-                    )
-                elif EndpointType.ServiceBusQueue.value == endpoint_type.lower():
-                    original_endpoint.connection_string = get_servicebus_queue_cstring(
-                        cmd=self.cli,
-                        namespace_name=endpoint_account_name,
-                        queue_name=entity_path,
-                        policy_name=endpoint_policy_name,
-                        rg=endpoint_resource_group,
-                        sub=endpoint_subscription_id
-                    )
-                elif EndpointType.ServiceBusTopic.value == endpoint_type.lower():
-                    original_endpoint.connection_string = get_servicebus_topic_cstring(
-                        cmd=self.cli,
-                        namespace_name=endpoint_account_name,
-                        topic_name=entity_path,
-                        policy_name=endpoint_policy_name,
-                        rg=endpoint_resource_group,
-                        sub=endpoint_subscription_id
-                    )
-                elif EndpointType.CosmosDBContainer.value == endpoint_type.lower():
-                    # try to get connection string - this will be used to get keys + uri
-                    if not primary_key and not secondary_key:
-                        connection_string = get_cosmos_db_cstring(
-                            cmd=self.cli,
-                            account_name=endpoint_account_name,
-                            rg=endpoint_resource_group,
-                            sub=endpoint_subscription_id
-                        )
-                    if connection_string:
-                        # parse out key from connection string
-                        if not primary_key and not secondary_key:
-                            parsed_cs = parse_cosmos_db_connection_string(connection_string)
-                            primary_key = parsed_cs["AccountKey"]
-                            secondary_key = parsed_cs["AccountKey"]
-                        # parse out endpoint uri from connection string
-                        if not endpoint_uri:
-                            endpoint_uri = parsed_cs["AccountEndpoint"]
-                    if primary_key:
-                        original_endpoint.primary_key = primary_key
-                    if secondary_key:
-                        original_endpoint.secondary_key = secondary_key
-                elif EndpointType.AzureStorageContainer.value == endpoint_type.lower():
-                    original_endpoint.connection_string = get_storage_cstring(
-                        cmd=self.cli,
-                        account_name=endpoint_account_name,
-                        rg=endpoint_resource_group,
-                        sub=endpoint_subscription_id
-                    )
-
-        return self.discovery.client.begin_create_or_update(
-            self.hub_resource.additional_properties["resourcegroup"],
-            self.hub_resource.name,
-            self.hub_resource,
-            if_match=self.hub_resource.etag
-        )
-
     def update(
         self,
         endpoint_name: str,
@@ -402,9 +224,9 @@ class MessageEndpoint(IoTHubProvider):
         connection_string: Optional[str] = None,
         container_name: Optional[str] = None,
         encoding: Optional[str] = None,
-        batch_frequency: int = 300,
-        chunk_size_window: int = 300,
-        file_name_format: str = '{iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}',
+        batch_frequency: Optional[int] = None,
+        chunk_size_window: Optional[int] = None,
+        file_name_format: Optional[str] = None,
         endpoint_uri: Optional[str] = None,
         entity_path: Optional[str] = None,
         database_name: Optional[str] = None,
@@ -414,24 +236,15 @@ class MessageEndpoint(IoTHubProvider):
         partition_key_template: Optional[str] = None,
         identity: Optional[str] = None
     ):
+        # if nothing is provided -> should we block?
         # have the user say the type. Will make args easier (as in we do not need to check for unneeded args)
         original_endpoint = self._show_by_type(endpoint_name=endpoint_name, endpoint_type=endpoint_type)
 
-        # should we have a way to parse out connection string props?
-        # from azext_iot.common._azure import _parse_connection_string
-        # if not connection_string and original_endpoint.connection_string:
-        #     parsed_cs = _parse_connection_string(original_endpoint.connection_string)
-        #     if parsed_cs.get("EntityPath") and entity_path is None:
-        #         entity_path = parsed_cs.get("EntityPath")
-        #     if parsed_cs.get("SharedAccessKeyName") and endpoint_policy_name is None:
-        #         endpoint_policy_name = parsed_cs.get("SharedAccessKeyName")
-        #     if parsed_cs.get("Endpoint"):
-        #         if isinstance(connection_string, bool) and endpoint_account_name is None:
-        #             endpoint_account_name = parsed_cs.get("Endpoint")
-        #         if isinstance(connection_string, bool) and endpoint_uri is None:
-        #             endpoint_uri = parsed_cs.get("Endpoint")
+        if connection_string and identity:
+            raise MutuallyExclusiveArgumentError("Please use either --connection-string or --identity, both were provided.")
 
         # Identity/Connection String schenanigans
+        # If Identity and Connection String args are provided, Identity wins
         fetch_connection_string = False
         if identity:
             original_endpoint.connection_string = None
@@ -449,9 +262,8 @@ class MessageEndpoint(IoTHubProvider):
                 original_endpoint.endpoint_uri = None
             if hasattr(original_endpoint, "entity_path"):
                 original_endpoint.entity_path = None
-            if isinstance(connection_string, str):
-                original_endpoint.connection_string = connection_string
-            else:
+
+            if connection_string.lower() == "update":
                 # check for args to get the connection string
                 self._connection_string_retrieval_args_check(
                     endpoint_type=endpoint_type,
@@ -464,6 +276,8 @@ class MessageEndpoint(IoTHubProvider):
                     endpoint_resource_group = self.hub_resource.additional_properties["resourcegroup"]
                 if not endpoint_subscription_id:
                     endpoint_subscription_id = self.hub_resource.additional_properties['subscriptionid']
+            else:
+                original_endpoint.connection_string = connection_string
 
         # Properties for all endpoint types
         if endpoint_resource_group:
@@ -476,6 +290,7 @@ class MessageEndpoint(IoTHubProvider):
         # Properties + connection string by specific types
         if fetch_connection_string:
             if EndpointType.EventHub.value == endpoint_type.lower():
+                print("fetching")
                 original_endpoint.connection_string = get_eventhub_cstring(
                     cmd=self.cli,
                     namespace_name=endpoint_account_name,
@@ -502,9 +317,10 @@ class MessageEndpoint(IoTHubProvider):
                     rg=endpoint_resource_group,
                     sub=endpoint_subscription_id
                 )
-        if endpoint_type in [
+        elif endpoint_type in [
             EndpointType.EventHub.value, EndpointType.ServiceBusQueue.value, EndpointType.ServiceBusTopic.value
         ] and entity_path:
+            # only set entity_path if no connection string
             original_endpoint.entity_path = entity_path
         elif endpoint_type == EndpointType.AzureStorageContainer.value:
             if fetch_connection_string:

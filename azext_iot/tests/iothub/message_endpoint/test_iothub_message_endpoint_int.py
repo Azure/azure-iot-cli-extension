@@ -1024,10 +1024,113 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
 
     # Update
     # Keybased -> User, add pkn + pkt
+    cli.invoke(
+        "iot hub message-endpoint create cosmosdb-container -n {} -g {} --en {} --erg {} --endpoint-uri {} "
+        "--identity {} --container {} --db {} --pkn {} --pkt {}".format(
+            iot_hub,
+            iot_rg,
+            endpoint_names[0],
+            iot_rg,
+            endpoint_uri,
+            user_id,
+            container,
+            database,
+            partition_path,
+            partition_template
+        )
+    )
+
+    expected_user_endpoint = build_expected_endpoint(
+        endpoint_names[0],
+        iot_rg,
+        iot_sub,
+        endpoint_uri=endpoint_uri,
+        container_name=container,
+        database_name=database,
+        partition_key_name=partition_path,
+        authentication_type=AuthenticationType.IdentityBased.value,
+        partition_key_template=partition_template,
+        identity=user_id
+    )
+
+    endpoint_output = cli.invoke(
+        "iot hub message-endpoint show -n {} -g {} --en {}".format(
+            iot_hub, iot_rg, endpoint_names[0]
+        )
+    ).as_json()
+
+    assert_endpoint_properties(endpoint_output, expected_user_endpoint)
 
     # System -> Keybased, keep
+    cli.invoke(
+        "iot hub message-endpoint create cosmosdb-container -n {} -g {} --en {} --erg {} -c {} --container {} "
+        "--db {}".format(
+            iot_hub,
+            iot_rg,
+            endpoint_names[1],
+            iot_rg,
+            cosmos_cstring,
+            container,
+            database
+        )
+    )
+
+    expected_cs_endpoint = build_expected_endpoint(
+        endpoint_names[1],
+        iot_rg,
+        iot_sub,
+        primary_key=parsed_cs["AccountKey"],
+        secondary_key=parsed_cs["AccountKey"],
+        endpoint_uri=endpoint_uri,
+        container_name=container,
+        database_name=database,
+        partition_key_name=partition_path,
+        partition_key_template=partition_template_default
+    )
+
+    endpoint_output = cli.invoke(
+        "iot hub message-endpoint show -n {} -g {} --en {}".format(
+            iot_hub, iot_rg, endpoint_names[1]
+        )
+    ).as_json()
+
+    assert_endpoint_properties(endpoint_output, expected_cs_endpoint)
 
     # User -> System, remove pkn, pkt
+    cli.invoke(
+        "iot hub message-endpoint update cosmosdb-container -n {} -g {} --en {} --erg {} --endpoint-uri {} "
+        "--identity [system] --container {} --db {} --pkn {} --pkt {}".format(
+            iot_hub,
+            iot_rg,
+            endpoint_names[2],
+            iot_rg,
+            endpoint_uri,
+            container,
+            database,
+            partition_path,
+            partition_template
+        )
+    )
+
+    expected_user_endpoint = build_expected_endpoint(
+        endpoint_names[2],
+        iot_rg,
+        iot_sub,
+        endpoint_uri=endpoint_uri,
+        container_name=container,
+        database_name=database,
+        partition_key_name=None,
+        authentication_type=AuthenticationType.IdentityBased.value,
+        partition_key_template=None,
+    )
+
+    endpoint_output = cli.invoke(
+        "iot hub message-endpoint show -n {} -g {} --en {}".format(
+            iot_hub, iot_rg, endpoint_names[2]
+        )
+    ).as_json()
+
+    assert_endpoint_properties(endpoint_output, expected_user_endpoint)
 
     # Delete one cosmos endpoint
     cli.invoke(
