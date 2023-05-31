@@ -240,14 +240,29 @@ class MessageEndpoint(IoTHubProvider):
         # have the user say the type. Will make args easier (as in we do not need to check for unneeded args)
         original_endpoint = self._show_by_type(endpoint_name=endpoint_name, endpoint_type=endpoint_type)
 
-        if connection_string and identity:
-            raise MutuallyExclusiveArgumentError("Please use either --connection-string or --identity, both were provided.")
+        if any([connection_string, primary_key, secondary_key]) and identity:
+            optional_msg = ", --primary-key and/or --secondary-key," if primary_key or secondary_key else ""
+            error_msg = "Please use either --connection-string" + optional_msg + " or --identity."
+            raise MutuallyExclusiveArgumentError(error_msg)
+
+        # Properties for all endpoint types
+        if endpoint_resource_group:
+            original_endpoint.resource_group = endpoint_resource_group
+        if endpoint_subscription_id:
+            original_endpoint.subscription_id = endpoint_subscription_id
+        if endpoint_uri:
+            # Handle this later with cosmos db connection string parsing
+            original_endpoint.endpoint_uri = endpoint_uri
 
         # Identity/Connection String schenanigans
         # If Identity and Connection String args are provided, Identity wins
         fetch_connection_string = False
         if identity:
-            original_endpoint.connection_string = None
+            if EndpointType.CosmosDBContainer.value == endpoint_type.lower():
+                original_endpoint.primary_key = None
+                original_endpoint.secondary_key = None
+            else:
+                original_endpoint.connection_string = None
             original_endpoint.authentication_type = AuthenticationType.IdentityBased.value
             if identity == SYSTEM_ASSIGNED_IDENTITY:
                 original_endpoint.identity = None
@@ -255,7 +270,7 @@ class MessageEndpoint(IoTHubProvider):
                 original_endpoint.identity = ManagedIdentity(
                     user_assigned_identity=identity
                 )
-        elif connection_string:
+        elif any([connection_string, primary_key, secondary_key]):
             original_endpoint.identity = None
             original_endpoint.authentication_type = AuthenticationType.KeyBased.value
             if EndpointType.CosmosDBContainer.value != endpoint_type.lower():
@@ -265,6 +280,7 @@ class MessageEndpoint(IoTHubProvider):
 
             if connection_string.lower() == "update":
                 # check for args to get the connection string
+                # handle the primary/secondary key parsing for cosmos db later
                 self._connection_string_retrieval_args_check(
                     endpoint_type=endpoint_type,
                     endpoint_account_name=endpoint_account_name,
@@ -276,16 +292,13 @@ class MessageEndpoint(IoTHubProvider):
                     endpoint_resource_group = self.hub_resource.additional_properties["resourcegroup"]
                 if not endpoint_subscription_id:
                     endpoint_subscription_id = self.hub_resource.additional_properties['subscriptionid']
-            else:
+            elif EndpointType.CosmosDBContainer.value != endpoint_type.lower():
                 original_endpoint.connection_string = connection_string
-
-        # Properties for all endpoint types
-        if endpoint_resource_group:
-            original_endpoint.resource_group = endpoint_resource_group
-        if endpoint_subscription_id:
-            original_endpoint.subscription_id = endpoint_subscription_id
-        if endpoint_uri:
-            original_endpoint.endpoint_uri = endpoint_uri
+            else:
+                if primary_key:
+                    original_endpoint.primary_key = primary_key
+                if secondary_key:
+                    original_endpoint.secondary_key = secondary_key
 
         # Properties + connection string by specific types
         if fetch_connection_string:
@@ -321,7 +334,8 @@ class MessageEndpoint(IoTHubProvider):
         ] and entity_path and not connection_string:
             # only set entity_path if no connection string
             original_endpoint.entity_path = entity_path
-        elif endpoint_type == EndpointType.AzureStorageContainer.value:
+
+        if endpoint_type == EndpointType.AzureStorageContainer.value:
             if fetch_connection_string:
                 original_endpoint.connection_string = get_storage_cstring(
                     cmd=self.cli,
@@ -349,19 +363,15 @@ class MessageEndpoint(IoTHubProvider):
                         rg=endpoint_resource_group,
                         sub=endpoint_subscription_id
                     )
-                if connection_string:
-                    # parse out key from connection string
-                    if not primary_key and not secondary_key:
-                        parsed_cs = parse_cosmos_db_connection_string(connection_string)
-                        primary_key = parsed_cs["AccountKey"]
-                        secondary_key = parsed_cs["AccountKey"]
-                    # parse out endpoint uri from connection string
-                    if not endpoint_uri:
-                        endpoint_uri = parsed_cs["AccountEndpoint"]
-                if primary_key:
-                    original_endpoint.primary_key = primary_key
-                if secondary_key:
-                    original_endpoint.secondary_key = secondary_key
+            if connection_string:
+                # parse out key from connection string
+                parsed_cs = parse_cosmos_db_connection_string(connection_string)
+                if not primary_key and not secondary_key:
+                    original_endpoint.primary_key = parsed_cs["AccountKey"]
+                    original_endpoint.secondary_key = parsed_cs["AccountKey"]
+                # parse out endpoint uri from connection string
+                if not endpoint_uri:
+                    original_endpoint.endpoint_uri = parsed_cs["AccountEndpoint"]
             if database_name:
                 original_endpoint.database_name = database_name
             if container_name:
@@ -421,27 +431,6 @@ class MessageEndpoint(IoTHubProvider):
                 return endpoint
 
         raise ResourceNotFoundError(f"{endpoint_type} endpoint {endpoint_name} not found in IoT Hub {self.hub_resource.name}.")
-
-    def _show_with_type(self, endpoint_name: str):
-        # checks all and returns type too
-        endpoints = self.hub_resource.properties.routing.endpoints
-        endpoint_lists = [
-            (endpoints.event_hubs, EndpointType.EventHub.value),
-            (endpoints.service_bus_queues, EndpointType.ServiceBusQueue.value),
-            (endpoints.service_bus_topics, EndpointType.ServiceBusTopic.value),
-            (endpoints.storage_containers, EndpointType.AzureStorageContainer.value)
-        ]
-        if self.support_cosmos:
-            endpoint_lists.append(
-                (endpoints.cosmos_db_sql_collections, EndpointType.CosmosDBContainer.value)
-                if endpoints.cosmos_db_sql_collections
-                else []
-            )
-        for endpoint_list, endpoint_type in endpoint_lists:
-            for endpoint in endpoint_list:
-                if endpoint.name.lower() == endpoint_name.lower():
-                    return endpoint, endpoint_type
-        raise ResourceNotFoundError(f"Endpoint {endpoint_name} not found in IoT Hub {self.hub_resource.name}.")
 
     def show(self, endpoint_name: str):
         endpoints = self.hub_resource.properties.routing.endpoints

@@ -4,24 +4,16 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import json
-import os
 import pytest
-import responses
-import re
 import azext_iot.iothub.commands_message_endpoint as subject
 from azure.cli.core.azclierror import (
-    FileOperationError,
-    BadRequestError,
     MutuallyExclusiveArgumentError,
     ResourceNotFoundError
 )
-from azext_iot.iothub.common import EndpointType, AuthenticationType
-import azext_iot.iothub.providers.helpers.state_strings as constants
+from azext_iot.iothub.common import BYTES_PER_MEGABYTE, AuthenticationType
 from azext_iot.tests.generators import generate_names
 
 from azure.mgmt.iothub.models import ManagedIdentity
-from azext_iot.tests.conftest import generate_cs
 
 hub_name = "hubname"
 hub_rg = "hubrg"
@@ -36,7 +28,9 @@ get_eventhub_cstring_path = "azext_iot.iothub.providers.message_endpoint.get_eve
 get_servicebus_topic_cstring_path = "azext_iot.iothub.providers.message_endpoint.get_servicebus_topic_cstring"
 get_servicebus_queue_cstring_path = "azext_iot.iothub.providers.message_endpoint.get_servicebus_queue_cstring"
 get_cosmos_db_cstring_path = "azext_iot.iothub.providers.message_endpoint.get_cosmos_db_cstring"
+parse_cosmos_db_cstring_path = "azext_iot.iothub.providers.message_endpoint.parse_cosmos_db_connection_string"
 get_storage_cstring_path = "azext_iot.iothub.providers.message_endpoint.get_storage_cstring"
+
 
 @pytest.fixture()
 def fixture_update_endpoint_ops(mocker):
@@ -45,8 +39,12 @@ def fixture_update_endpoint_ops(mocker):
     mocker.patch(get_eventhub_cstring_path, return_value="get_eventhub_cstring")
     mocker.patch(get_servicebus_topic_cstring_path, return_value="get_servicebus_topic_cstring")
     mocker.patch(get_servicebus_queue_cstring_path, return_value="get_servicebus_queue_cstring")
-    mocker.patch(get_cosmos_db_cstring_path, return_value="get_cosmos_db_cstring")
     mocker.patch(get_storage_cstring_path, return_value="get_storage_cstring")
+    mocker.patch(get_cosmos_db_cstring_path, return_value="get_cosmos_db_cstring")
+    mocker.patch(parse_cosmos_db_cstring_path, return_value={
+        "AccountKey": "get_cosmos_db_account_key",
+        "AccountEndpoint": "get_cosmos_db_account_endpoint"
+    })
 
     # Hub Resource
     find_resource = mocker.patch(path_find_resource, autospec=True)
@@ -80,17 +78,7 @@ class TestMessageEndpointUpdate:
     @pytest.mark.parametrize(
         "req",
         [
-            {
-                "endpoint_account_name": None,
-                "endpoint_resource_group": None,
-                "endpoint_subscription_id": None,
-                "endpoint_policy_name": None,
-                "connection_string": None,
-                "endpoint_uri": None,
-                "entity_path": None,
-                "identity": None,
-                "resource_group_name": None,
-            },
+            {},
             {
                 "endpoint_account_name": None,
                 "endpoint_resource_group": generate_names(),
@@ -161,64 +149,64 @@ class TestMessageEndpointUpdate:
         resource_group = fixture_find_resource.call_args[0][2]
         assert req.get("resource_group_name") == resource_group
         hub_resource = fixture_find_resource.call_args[0][0].client.begin_create_or_update.call_args[0][2]
-        eventhubs = hub_resource.properties.routing.endpoints.event_hubs
-        assert len(eventhubs) == 1
-        eventhub = eventhubs[0]
+        endpoints = hub_resource.properties.routing.endpoints.event_hubs
+        assert len(endpoints) == 1
+        endpoint = endpoints[0]
 
-        assert eventhub.name == endpoint_name
-        assert eventhub.type == "event_hubs"
+        assert endpoint.name == endpoint_name
+        assert endpoint.type == "event_hubs"
         mock = mocker.Mock
 
         # if a prop is not set, it will be a Mock object
         # Props that will always be set
         if req.get("endpoint_resource_group"):
-            assert eventhub.resource_group == req.get("endpoint_resource_group")
+            assert endpoint.resource_group == req.get("endpoint_resource_group")
         else:
-            assert isinstance(eventhub.resource_group, mock)
+            assert isinstance(endpoint.resource_group, mock)
 
         if req.get("endpoint_subscription_id"):
-            assert eventhub.subscription_id == req.get("endpoint_subscription_id")
+            assert endpoint.subscription_id == req.get("endpoint_subscription_id")
         else:
-            assert isinstance(eventhub.subscription_id, mock)
+            assert isinstance(endpoint.subscription_id, mock)
 
         # Authentication props
         if req.get("identity"):
-            assert eventhub.authentication_type == AuthenticationType.IdentityBased.value
-            assert eventhub.connection_string is None
+            assert endpoint.authentication_type == AuthenticationType.IdentityBased.value
+            assert endpoint.connection_string is None
             identity = req.get("identity")
             if identity == "[system]":
-                assert eventhub.identity is None
+                assert endpoint.identity is None
             else:
-                assert isinstance(eventhub.identity, ManagedIdentity)
-                assert eventhub.identity.user_assigned_identity == identity
-                assert fixture_arg_check.call_count == 0
+                assert isinstance(endpoint.identity, ManagedIdentity)
+                assert endpoint.identity.user_assigned_identity == identity
+            assert fixture_arg_check.call_count == 0
         elif req.get("connection_string"):
-            assert eventhub.authentication_type == AuthenticationType.KeyBased.value
-            assert eventhub.identity is None
-            assert eventhub.entity_path is None
+            assert endpoint.authentication_type == AuthenticationType.KeyBased.value
+            assert endpoint.identity is None
+            assert endpoint.entity_path is None
             connection_string = req.get("connection_string")
             if connection_string == "update":
-                eventhub.connection_string = "get_eventhub_cstring"
+                assert endpoint.connection_string == "get_eventhub_cstring"
                 args_check = fixture_arg_check.call_args[1]
                 assert args_check["endpoint_account_name"] == req.get("endpoint_account_name")
                 assert args_check["entity_path"] == req.get("entity_path")
                 assert args_check["endpoint_policy_name"] == req.get("endpoint_policy_name")
             else:
-                eventhub.connection_string = connection_string
+                endpoint.connection_string = connection_string
         else:
-            assert isinstance(eventhub.authentication_type, mock)
+            assert isinstance(endpoint.authentication_type, mock)
 
         # props that are conditional
         if not req.get("connection_string"):
             if req.get("entity_path"):
-                assert eventhub.entity_path == req.get("entity_path")
+                assert endpoint.entity_path == req.get("entity_path")
             else:
-                assert isinstance(eventhub.entity_path, mock)
+                assert isinstance(endpoint.entity_path, mock)
 
             if req.get("endpoint_uri"):
-                assert eventhub.endpoint_uri == req.get("endpoint_uri")
+                assert endpoint.endpoint_uri == req.get("endpoint_uri")
             else:
-                assert isinstance(eventhub.endpoint_uri, mock)
+                assert isinstance(endpoint.endpoint_uri, mock)
 
     def test_message_endpoint_update_event_hub_error(self, fixture_cmd, fixture_update_endpoint_ops):
         # Cannot do both types of Authentication
@@ -242,17 +230,7 @@ class TestMessageEndpointUpdate:
     @pytest.mark.parametrize(
         "req",
         [
-            {
-                "endpoint_account_name": None,
-                "endpoint_resource_group": None,
-                "endpoint_subscription_id": None,
-                "endpoint_policy_name": None,
-                "connection_string": None,
-                "endpoint_uri": None,
-                "entity_path": None,
-                "identity": None,
-                "resource_group_name": None,
-            },
+            {},
             {
                 "endpoint_account_name": None,
                 "endpoint_resource_group": generate_names(),
@@ -323,64 +301,64 @@ class TestMessageEndpointUpdate:
         resource_group = fixture_find_resource.call_args[0][2]
         assert req.get("resource_group_name") == resource_group
         hub_resource = fixture_find_resource.call_args[0][0].client.begin_create_or_update.call_args[0][2]
-        eventhubs = hub_resource.properties.routing.endpoints.service_bus_queues
-        assert len(eventhubs) == 1
-        eventhub = eventhubs[0]
+        endpoints = hub_resource.properties.routing.endpoints.service_bus_queues
+        assert len(endpoints) == 1
+        endpoint = endpoints[0]
 
-        assert eventhub.name == endpoint_name
-        assert eventhub.type == "service_bus_queues"
+        assert endpoint.name == endpoint_name
+        assert endpoint.type == "service_bus_queues"
         mock = mocker.Mock
 
         # if a prop is not set, it will be a Mock object
         # Props that will always be set
         if req.get("endpoint_resource_group"):
-            assert eventhub.resource_group == req.get("endpoint_resource_group")
+            assert endpoint.resource_group == req.get("endpoint_resource_group")
         else:
-            assert isinstance(eventhub.resource_group, mock)
+            assert isinstance(endpoint.resource_group, mock)
 
         if req.get("endpoint_subscription_id"):
-            assert eventhub.subscription_id == req.get("endpoint_subscription_id")
+            assert endpoint.subscription_id == req.get("endpoint_subscription_id")
         else:
-            assert isinstance(eventhub.subscription_id, mock)
+            assert isinstance(endpoint.subscription_id, mock)
 
         # Authentication props
         if req.get("identity"):
-            assert eventhub.authentication_type == AuthenticationType.IdentityBased.value
-            assert eventhub.connection_string is None
+            assert endpoint.authentication_type == AuthenticationType.IdentityBased.value
+            assert endpoint.connection_string is None
             identity = req.get("identity")
             if identity == "[system]":
-                assert eventhub.identity is None
+                assert endpoint.identity is None
             else:
-                assert isinstance(eventhub.identity, ManagedIdentity)
-                assert eventhub.identity.user_assigned_identity == identity
-                assert fixture_arg_check.call_count == 0
+                assert isinstance(endpoint.identity, ManagedIdentity)
+                assert endpoint.identity.user_assigned_identity == identity
+            assert fixture_arg_check.call_count == 0
         elif req.get("connection_string"):
-            assert eventhub.authentication_type == AuthenticationType.KeyBased.value
-            assert eventhub.identity is None
-            assert eventhub.entity_path is None
+            assert endpoint.authentication_type == AuthenticationType.KeyBased.value
+            assert endpoint.identity is None
+            assert endpoint.entity_path is None
             connection_string = req.get("connection_string")
             if connection_string == "update":
-                eventhub.connection_string = "get_eventhub_cstring"
+                assert endpoint.connection_string == "get_servicebus_queue_cstring"
                 args_check = fixture_arg_check.call_args[1]
                 assert args_check["endpoint_account_name"] == req.get("endpoint_account_name")
                 assert args_check["entity_path"] == req.get("entity_path")
                 assert args_check["endpoint_policy_name"] == req.get("endpoint_policy_name")
             else:
-                eventhub.connection_string = connection_string
+                endpoint.connection_string = connection_string
         else:
-            assert isinstance(eventhub.authentication_type, mock)
+            assert isinstance(endpoint.authentication_type, mock)
 
         # props that are conditional
         if not req.get("connection_string"):
             if req.get("entity_path"):
-                assert eventhub.entity_path == req.get("entity_path")
+                assert endpoint.entity_path == req.get("entity_path")
             else:
-                assert isinstance(eventhub.entity_path, mock)
+                assert isinstance(endpoint.entity_path, mock)
 
             if req.get("endpoint_uri"):
-                assert eventhub.endpoint_uri == req.get("endpoint_uri")
+                assert endpoint.endpoint_uri == req.get("endpoint_uri")
             else:
-                assert isinstance(eventhub.endpoint_uri, mock)
+                assert isinstance(endpoint.endpoint_uri, mock)
 
     def test_message_endpoint_update_service_bus_queue_error(self, fixture_cmd, fixture_update_endpoint_ops):
         # Cannot do both types of Authentication
@@ -404,17 +382,7 @@ class TestMessageEndpointUpdate:
     @pytest.mark.parametrize(
         "req",
         [
-            {
-                "endpoint_account_name": None,
-                "endpoint_resource_group": None,
-                "endpoint_subscription_id": None,
-                "endpoint_policy_name": None,
-                "connection_string": None,
-                "endpoint_uri": None,
-                "entity_path": None,
-                "identity": None,
-                "resource_group_name": None,
-            },
+            {},
             {
                 "endpoint_account_name": None,
                 "endpoint_resource_group": generate_names(),
@@ -485,64 +453,64 @@ class TestMessageEndpointUpdate:
         resource_group = fixture_find_resource.call_args[0][2]
         assert req.get("resource_group_name") == resource_group
         hub_resource = fixture_find_resource.call_args[0][0].client.begin_create_or_update.call_args[0][2]
-        eventhubs = hub_resource.properties.routing.endpoints.service_bus_topics
-        assert len(eventhubs) == 1
-        eventhub = eventhubs[0]
+        endpoints = hub_resource.properties.routing.endpoints.service_bus_topics
+        assert len(endpoints) == 1
+        endpoint = endpoints[0]
 
-        assert eventhub.name == endpoint_name
-        assert eventhub.type == "service_bus_topics"
+        assert endpoint.name == endpoint_name
+        assert endpoint.type == "service_bus_topics"
         mock = mocker.Mock
 
         # if a prop is not set, it will be a Mock object
         # Props that will always be set
         if req.get("endpoint_resource_group"):
-            assert eventhub.resource_group == req.get("endpoint_resource_group")
+            assert endpoint.resource_group == req.get("endpoint_resource_group")
         else:
-            assert isinstance(eventhub.resource_group, mock)
+            assert isinstance(endpoint.resource_group, mock)
 
         if req.get("endpoint_subscription_id"):
-            assert eventhub.subscription_id == req.get("endpoint_subscription_id")
+            assert endpoint.subscription_id == req.get("endpoint_subscription_id")
         else:
-            assert isinstance(eventhub.subscription_id, mock)
+            assert isinstance(endpoint.subscription_id, mock)
 
         # Authentication props
         if req.get("identity"):
-            assert eventhub.authentication_type == AuthenticationType.IdentityBased.value
-            assert eventhub.connection_string is None
+            assert endpoint.authentication_type == AuthenticationType.IdentityBased.value
+            assert endpoint.connection_string is None
             identity = req.get("identity")
             if identity == "[system]":
-                assert eventhub.identity is None
+                assert endpoint.identity is None
             else:
-                assert isinstance(eventhub.identity, ManagedIdentity)
-                assert eventhub.identity.user_assigned_identity == identity
-                assert fixture_arg_check.call_count == 0
+                assert isinstance(endpoint.identity, ManagedIdentity)
+                assert endpoint.identity.user_assigned_identity == identity
+            assert fixture_arg_check.call_count == 0
         elif req.get("connection_string"):
-            assert eventhub.authentication_type == AuthenticationType.KeyBased.value
-            assert eventhub.identity is None
-            assert eventhub.entity_path is None
+            assert endpoint.authentication_type == AuthenticationType.KeyBased.value
+            assert endpoint.identity is None
+            assert endpoint.entity_path is None
             connection_string = req.get("connection_string")
             if connection_string == "update":
-                eventhub.connection_string = "get_eventhub_cstring"
+                assert endpoint.connection_string == "get_servicebus_topic_cstring"
                 args_check = fixture_arg_check.call_args[1]
                 assert args_check["endpoint_account_name"] == req.get("endpoint_account_name")
                 assert args_check["entity_path"] == req.get("entity_path")
                 assert args_check["endpoint_policy_name"] == req.get("endpoint_policy_name")
             else:
-                eventhub.connection_string = connection_string
+                endpoint.connection_string = connection_string
         else:
-            assert isinstance(eventhub.authentication_type, mock)
+            assert isinstance(endpoint.authentication_type, mock)
 
         # props that are conditional
         if not req.get("connection_string"):
             if req.get("entity_path"):
-                assert eventhub.entity_path == req.get("entity_path")
+                assert endpoint.entity_path == req.get("entity_path")
             else:
-                assert isinstance(eventhub.entity_path, mock)
+                assert isinstance(endpoint.entity_path, mock)
 
             if req.get("endpoint_uri"):
-                assert eventhub.endpoint_uri == req.get("endpoint_uri")
+                assert endpoint.endpoint_uri == req.get("endpoint_uri")
             else:
-                assert isinstance(eventhub.endpoint_uri, mock)
+                assert isinstance(endpoint.endpoint_uri, mock)
 
     def test_message_endpoint_update_service_bus_topic_error(self, fixture_cmd, fixture_update_endpoint_ops):
         # Cannot do both types of Authentication
@@ -566,14 +534,55 @@ class TestMessageEndpointUpdate:
     @pytest.mark.parametrize(
         "req",
         [
+            {},
             {
-                "endpoint_account_name": None,
+                "endpoint_account_name": generate_names(),
+                "endpoint_resource_group": generate_names(),
+                "endpoint_subscription_id": generate_names(),
+                "connection_string": None,
+                "endpoint_uri": generate_names(),
+                "container_name": generate_names(),
+                "encoding": "JSON",
+                "batch_frequency": 1,
+                "chunk_size_window": 100,
+                "file_name_format": generate_names(),
+                "identity": "[system]",
+                "resource_group_name": generate_names(),
+            },
+            {
+                "endpoint_account_name": generate_names(),
+                "endpoint_resource_group": generate_names(),
+                "endpoint_subscription_id": generate_names(),
+                "connection_string": None,
+                "endpoint_uri": generate_names(),
+                "container_name": generate_names(),
+                "encoding": "JSON",
+                "batch_frequency": None,
+                "chunk_size_window": 30,
+                "file_name_format": generate_names(),
+                "identity": generate_names(),
+                "resource_group_name": None,
+            },
+            {
+                "endpoint_account_name": generate_names(),
                 "endpoint_resource_group": None,
                 "endpoint_subscription_id": None,
-                "endpoint_policy_name": None,
-                "connection_string": None,
+                "connection_string": "update",
                 "endpoint_uri": None,
-                "entity_path": None,
+                "container_name": None,
+                "encoding": "arvo",
+                "batch_frequency": None,
+                "chunk_size_window": None,
+                "file_name_format": None,
+                "identity": None,
+                "resource_group_name": None,
+            },
+            {
+                "endpoint_account_name": None,
+                "endpoint_resource_group": generate_names(),
+                "endpoint_subscription_id": None,
+                "connection_string": generate_names(),
+                "endpoint_uri": generate_names(),
                 "container_name": None,
                 "encoding": None,
                 "batch_frequency": None,
@@ -620,27 +629,27 @@ class TestMessageEndpointUpdate:
         if req.get("container_name"):
             assert endpoint.container_name == req.get("container_name")
         else:
-            assert isinstance(endpoint.subscription_id, mock)
+            assert isinstance(endpoint.container_name, mock)
 
         if req.get("encoding"):
             assert endpoint.encoding == req.get("encoding").lower()
         else:
-            assert isinstance(endpoint.subscription_id, mock)
+            assert isinstance(endpoint.encoding, mock)
 
         if req.get("file_name_format"):
             assert endpoint.file_name_format == req.get("file_name_format")
         else:
-            assert isinstance(endpoint.subscription_id, mock)
+            assert isinstance(endpoint.file_name_format, mock)
 
         if req.get("batch_frequency"):
             assert endpoint.batch_frequency == req.get("batch_frequency")
         else:
-            assert isinstance(endpoint.subscription_id, mock)
+            assert isinstance(endpoint.batch_frequency, mock)
 
         if req.get("chunk_size_window"):
-            assert endpoint.chunk_size_window == req.get("chunk_size_window")
+            assert endpoint.chunk_size_window == (req.get("chunk_size_window") * BYTES_PER_MEGABYTE)
         else:
-            assert isinstance(endpoint.subscription_id, mock)
+            assert isinstance(endpoint.chunk_size_window, mock)
 
         # Authentication props
         if req.get("identity"):
@@ -652,14 +661,14 @@ class TestMessageEndpointUpdate:
             else:
                 assert isinstance(endpoint.identity, ManagedIdentity)
                 assert endpoint.identity.user_assigned_identity == identity
-                assert fixture_arg_check.call_count == 0
+            assert fixture_arg_check.call_count == 0
         elif req.get("connection_string"):
             assert endpoint.authentication_type == AuthenticationType.KeyBased.value
             assert endpoint.identity is None
             assert endpoint.entity_path is None
             connection_string = req.get("connection_string")
             if connection_string == "update":
-                endpoint.connection_string = "get_storage_cstring"
+                assert endpoint.connection_string == "get_storage_cstring"
                 args_check = fixture_arg_check.call_args[1]
                 assert args_check["endpoint_account_name"] == req.get("endpoint_account_name")
                 assert args_check["entity_path"] == req.get("entity_path")
@@ -695,6 +704,242 @@ class TestMessageEndpointUpdate:
         # not found
         with pytest.raises(ResourceNotFoundError):
             subject.message_endpoint_update_storage_container(
+                cmd=fixture_cmd,
+                hub_name=hub_name,
+                endpoint_name=generate_names(),
+            )
+
+    @pytest.mark.parametrize(
+        "req",
+        [
+            {},
+            {
+                "endpoint_account_name": generate_names(),
+                "endpoint_resource_group": generate_names(),
+                "endpoint_subscription_id": generate_names(),
+                "container_name": generate_names(),
+                "database_name": generate_names(),
+                "connection_string": generate_names(),
+                "primary_key": None,
+                "secondary_key": None,
+                "endpoint_uri": generate_names(),
+                "partition_key_name": None,
+                "partition_key_template": None,
+                "identity": None,
+                "resource_group_name": None,
+            },
+            {
+                "endpoint_account_name": None,
+                "endpoint_resource_group": None,
+                "endpoint_subscription_id": None,
+                "container_name": None,
+                "database_name": None,
+                "connection_string": None,
+                "primary_key": None,
+                "secondary_key": None,
+                "endpoint_uri": generate_names(),
+                "partition_key_name": generate_names(),
+                "partition_key_template": generate_names(),
+                "identity": generate_names(),
+                "resource_group_name": generate_names(),
+            },
+            {
+                "endpoint_account_name": None,
+                "endpoint_resource_group": None,
+                "endpoint_subscription_id": None,
+                "container_name": None,
+                "database_name": None,
+                "connection_string": None,
+                "primary_key": None,
+                "secondary_key": None,
+                "endpoint_uri": None,
+                "partition_key_name": None,
+                "partition_key_template": None,
+                "identity": "[system]",
+                "resource_group_name": None,
+            },
+            {
+                "endpoint_account_name": None,
+                "endpoint_resource_group": None,
+                "endpoint_subscription_id": None,
+                "container_name": None,
+                "database_name": None,
+                "connection_string": generate_names(),
+                "primary_key": None,
+                "secondary_key": generate_names(),
+                "endpoint_uri": None,
+                "partition_key_name": None,
+                "partition_key_template": generate_names(),
+                "identity": None,
+                "resource_group_name": None,
+            },
+            {
+                "endpoint_account_name": None,
+                "endpoint_resource_group": generate_names(),
+                "endpoint_subscription_id": None,
+                "container_name": None,
+                "database_name": None,
+                "connection_string": generate_names(),
+                "primary_key": generate_names(),
+                "secondary_key": generate_names(),
+                "endpoint_uri": None,
+                "partition_key_name": generate_names(),
+                "partition_key_template": None,
+                "identity": None,
+                "resource_group_name": None,
+            },
+            {
+                "endpoint_account_name": None,
+                "endpoint_resource_group": None,
+                "endpoint_subscription_id": None,
+                "container_name": generate_names(),
+                "database_name": generate_names(),
+                "connection_string": "update",
+                "primary_key": None,
+                "secondary_key": None,
+                "endpoint_uri": None,
+                "partition_key_name": None,
+                "partition_key_template": None,
+                "identity": None,
+                "resource_group_name": None,
+            },
+        ]
+    )
+    def test_message_endpoint_update_cosmos_db_sql_container(self, mocker, fixture_cmd, fixture_update_endpoint_ops, req):
+        result = subject.message_endpoint_update_cosmos_db_container(
+            cmd=fixture_cmd,
+            hub_name=hub_name,
+            endpoint_name=endpoint_name,
+            **req
+        )
+        fixture_find_resource, fixture_arg_check = fixture_update_endpoint_ops
+
+        assert result == generic_response
+        resource_group = fixture_find_resource.call_args[0][2]
+        assert req.get("resource_group_name") == resource_group
+        hub_resource = fixture_find_resource.call_args[0][0].client.begin_create_or_update.call_args[0][2]
+        # TODO: @vilit fix once service fixes their naming
+        endpoints = hub_resource.properties.routing.endpoints.cosmos_db_sql_collections
+        assert len(endpoints) == 1
+        endpoint = endpoints[0]
+
+        assert endpoint.name == endpoint_name
+        assert endpoint.type == "cosmos_db_sql_collections"
+        mock = mocker.Mock
+
+        # if a prop is not set, it will be a Mock object
+        # Props that will always be set if present
+        if req.get("endpoint_resource_group"):
+            assert endpoint.resource_group == req.get("endpoint_resource_group")
+        else:
+            assert isinstance(endpoint.resource_group, mock)
+
+        if req.get("endpoint_subscription_id"):
+            assert endpoint.subscription_id == req.get("endpoint_subscription_id")
+        else:
+            assert isinstance(endpoint.subscription_id, mock)
+
+        if req.get("container_name"):
+            assert endpoint.container_name == req.get("container_name")
+        else:
+            assert isinstance(endpoint.container_name, mock)
+
+        if req.get("database_name"):
+            assert endpoint.database_name == req.get("database_name").lower()
+        else:
+            assert isinstance(endpoint.database_name, mock)
+
+        if req.get("partition_key_name"):
+            partition_key_name = req.get("partition_key_name")
+            if partition_key_name == "":
+                assert endpoint.partition_key_name is None
+            else:
+                endpoint.partition_key_name == partition_key_name
+        else:
+            assert isinstance(endpoint.partition_key_name, mock)
+
+        if req.get("partition_key_template"):
+            partition_key_template = req.get("partition_key_template")
+            if partition_key_template == "":
+                assert endpoint.partition_key_template is None
+            else:
+                endpoint.partition_key_template == partition_key_template
+        else:
+            assert isinstance(endpoint.partition_key_template, mock)
+
+        # Connection strings dont exist
+        assert isinstance(endpoint.connection_string, mock)
+
+        # Authentication props
+        if req.get("identity"):
+            assert endpoint.authentication_type == AuthenticationType.IdentityBased.value
+            assert endpoint.primary_key is None
+            assert endpoint.secondary_key is None
+            identity = req.get("identity")
+            if identity == "[system]":
+                assert endpoint.identity is None
+            else:
+                assert isinstance(endpoint.identity, ManagedIdentity)
+                assert endpoint.identity.user_assigned_identity == identity
+            assert fixture_arg_check.call_count == 0
+        elif any([req.get("connection_string"), req.get("primary_key"), req.get("secondary_key")]):
+            assert endpoint.authentication_type == AuthenticationType.KeyBased.value
+            assert endpoint.identity is None
+            assert endpoint.entity_path is None
+            connection_string = req.get("connection_string")
+            primary_key = req.get("primary_key")
+            secondary_key = req.get("secondary_key")
+            endpoint_uri = req.get("endpoint_uri")
+            if connection_string == "update":
+                args_check = fixture_arg_check.call_args[1]
+                assert args_check["endpoint_account_name"] == req.get("endpoint_account_name")
+                assert args_check["entity_path"] == req.get("entity_path")
+                assert args_check["endpoint_policy_name"] == req.get("endpoint_policy_name")
+
+            if primary_key:
+                assert endpoint.primary_key == primary_key
+            if secondary_key:
+                assert endpoint.secondary_key == secondary_key
+            if not primary_key and not secondary_key and connection_string:
+                assert endpoint.primary_key == endpoint.secondary_key == "get_cosmos_db_account_key"
+
+            if endpoint_uri:
+                assert endpoint.endpoint_uri == endpoint_uri
+            elif connection_string:
+                assert endpoint.endpoint_uri == "get_cosmos_db_account_endpoint"
+        else:
+            assert isinstance(endpoint.authentication_type, mock)
+
+    def test_message_endpoint_update_cosmos_db_sql_collections_error(self, fixture_cmd, fixture_update_endpoint_ops):
+        # Cannot do both types of Authentication
+        with pytest.raises(MutuallyExclusiveArgumentError):
+            subject.message_endpoint_update_cosmos_db_container(
+                cmd=fixture_cmd,
+                hub_name=hub_name,
+                endpoint_name=endpoint_name,
+                connection_string="fake_cstring",
+                identity="[system]"
+            )
+        with pytest.raises(MutuallyExclusiveArgumentError):
+            subject.message_endpoint_update_cosmos_db_container(
+                cmd=fixture_cmd,
+                hub_name=hub_name,
+                endpoint_name=endpoint_name,
+                primary_key="fake_cstring",
+                identity="[system]"
+            )
+        with pytest.raises(MutuallyExclusiveArgumentError):
+            subject.message_endpoint_update_cosmos_db_container(
+                cmd=fixture_cmd,
+                hub_name=hub_name,
+                endpoint_name=endpoint_name,
+                secondary_key="fake_cstring",
+                identity="[system]"
+            )
+
+        # not found
+        with pytest.raises(ResourceNotFoundError):
+            subject.message_endpoint_update_cosmos_db_container(
                 cmd=fixture_cmd,
                 hub_name=hub_name,
                 endpoint_name=generate_names(),
