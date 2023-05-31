@@ -65,7 +65,7 @@ class ImportJobProvider(DigitalTwinsProvider):
         self, input_blob_name: str, input_blob_container: str, input_storage_account: str, output_blob_name: str = None,
         output_blob_container: str = None, output_storage_account: str = None, job_id: str = None,
     ):
-        from azext_iot.sdk.digitaltwins.dataplane.models import BulkImportJob
+        from azext_iot.sdk.digitaltwins.dataplane.models import ImportJob
 
         job_id = job_id if job_id else DEFAULT_IMPORT_JOB_ID_PREFIX + str(uuid4()).replace("-", "")
         output_blob_name = output_blob_name if output_blob_name else "{}_output.txt".format(job_id)
@@ -76,7 +76,7 @@ class ImportJobProvider(DigitalTwinsProvider):
         output_blob_url = self._get_blob_url(output_blob_name, output_blob_container, output_storage_account)
 
         try:
-            import_job = BulkImportJob(input_blob_uri=input_blob_url, output_blob_uri=output_blob_url)
+            import_job = ImportJob(input_blob_uri=input_blob_url, output_blob_uri=output_blob_url)
             return self.sdk.add(id=job_id, import_job=import_job)
         except ErrorResponseException as e:
             handle_service_exception(e)
