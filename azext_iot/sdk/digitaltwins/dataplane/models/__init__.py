@@ -16,7 +16,7 @@ from .query_specification_py3 import QuerySpecification
 from .query_result_py3 import QueryResult
 from .inner_error_py3 import InnerError
 from .error_py3 import Error
-from .bulk_import_job_py3 import BulkImportJob
+from .import_job_py3 import ImportJob
 from .error_response_py3 import ErrorResponse, ErrorResponseException
 from .digital_twin_models_add_options_py3 import DigitalTwinModelsAddOptions
 from .digital_twin_models_list_options_py3 import DigitalTwinModelsListOptions
@@ -51,7 +51,7 @@ from .digital_twins_model_data_paged import DigitalTwinsModelDataPaged
 from .object_paged import ObjectPaged
 from .incoming_relationship_paged import IncomingRelationshipPaged
 from .event_route_paged import EventRoutePaged
-from .bulk_import_job_paged import BulkImportJobPaged
+from .import_job_paged import ImportJobPaged
 from .azure_digital_twins_api_enums import (
     Status,
 )
@@ -64,7 +64,7 @@ __all__ = [
     'QueryResult',
     'InnerError',
     'Error',
-    'BulkImportJob',
+    'ImportJob',
     'ErrorResponse', 'ErrorResponseException',
     'DigitalTwinModelsAddOptions',
     'DigitalTwinModelsListOptions',
@@ -99,6 +99,6 @@ __all__ = [
     'ObjectPaged',
     'IncomingRelationshipPaged',
     'EventRoutePaged',
-    'BulkImportJobPaged',
+    'ImportJobPaged',
     'Status',
 ]

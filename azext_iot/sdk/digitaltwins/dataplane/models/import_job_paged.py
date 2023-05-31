@@ -12,16 +12,16 @@
 from msrest.paging import Paged
 
 
-class BulkImportJobPaged(Paged):
+class ImportJobPaged(Paged):
     """
-    A paging container for iterating over a list of :class:`BulkImportJob <dataplane.models.BulkImportJob>` object
+    A paging container for iterating over a list of :class:`ImportJob <dataplane.models.ImportJob>` object
     """
 
     _attribute_map = {
         'next_link': {'key': 'nextLink', 'type': 'str'},
-        'current_page': {'key': 'value', 'type': '[BulkImportJob]'}
+        'current_page': {'key': 'value', 'type': '[ImportJob]'}
     }
 
     def __init__(self, *args, **kwargs):
 
-        super(BulkImportJobPaged, self).__init__(*args, **kwargs)
+        super(ImportJobPaged, self).__init__(*args, **kwargs)
