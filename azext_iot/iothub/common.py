@@ -121,6 +121,10 @@ class EndpointType(Enum):
     AzureStorageContainer = "storage-container"
     CosmosDBContainer = "cosmosdb-container"
 
+    @classmethod
+    def list(cls):
+        return list(map(lambda c: c.value, cls))
+
 
 class HubAspects(Enum):
     """

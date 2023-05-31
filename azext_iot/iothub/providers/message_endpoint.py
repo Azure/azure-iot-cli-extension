@@ -290,7 +290,6 @@ class MessageEndpoint(IoTHubProvider):
         # Properties + connection string by specific types
         if fetch_connection_string:
             if EndpointType.EventHub.value == endpoint_type.lower():
-                print("fetching")
                 original_endpoint.connection_string = get_eventhub_cstring(
                     cmd=self.cli,
                     namespace_name=endpoint_account_name,
@@ -319,7 +318,7 @@ class MessageEndpoint(IoTHubProvider):
                 )
         elif endpoint_type in [
             EndpointType.EventHub.value, EndpointType.ServiceBusQueue.value, EndpointType.ServiceBusTopic.value
-        ] and entity_path:
+        ] and entity_path and not connection_string:
             # only set entity_path if no connection string
             original_endpoint.entity_path = entity_path
         elif endpoint_type == EndpointType.AzureStorageContainer.value:
