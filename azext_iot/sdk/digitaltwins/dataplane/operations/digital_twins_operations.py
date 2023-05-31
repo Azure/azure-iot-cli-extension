@@ -22,7 +22,7 @@ class DigitalTwinsOperations(object):
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: The requested API version. Constant value: "2023-02-27-preview".
+    :ivar api_version: The requested API version. Constant value: "2023-06-30".
     """
 
     models = models
@@ -32,7 +32,7 @@ class DigitalTwinsOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2023-02-27-preview"
+        self.api_version = "2023-06-30"
 
         self.config = config
 
@@ -109,6 +109,7 @@ class DigitalTwinsOperations(object):
             deserialized = self._deserialize('{object}', response)
             header_dict = {
                 'ETag': 'str',
+                'x-ms-error-code': 'str',
             }
 
         if raw:
@@ -211,6 +212,7 @@ class DigitalTwinsOperations(object):
             deserialized = self._deserialize('{object}', response)
             header_dict = {
                 'ETag': 'str',
+                'x-ms-error-code': 'str',
             }
 
         if raw:
@@ -299,6 +301,9 @@ class DigitalTwinsOperations(object):
 
         if raw:
             client_raw_response = ClientRawResponse(None, response)
+            client_raw_response.add_headers({
+                'x-ms-error-code': 'str',
+            })
             return client_raw_response
     delete.metadata = {'url': '/digitaltwins/{id}'}
 
@@ -392,6 +397,7 @@ class DigitalTwinsOperations(object):
             client_raw_response = ClientRawResponse(None, response)
             client_raw_response.add_headers({
                 'ETag': 'str',
+                'x-ms-error-code': 'str',
             })
             return client_raw_response
     update.metadata = {'url': '/digitaltwins/{id}'}
@@ -474,6 +480,7 @@ class DigitalTwinsOperations(object):
             deserialized = self._deserialize('{object}', response)
             header_dict = {
                 'ETag': 'str',
+                'x-ms-error-code': 'str',
             }
 
         if raw:
@@ -582,6 +589,7 @@ class DigitalTwinsOperations(object):
             deserialized = self._deserialize('{object}', response)
             header_dict = {
                 'ETag': 'str',
+                'x-ms-error-code': 'str',
             }
 
         if raw:
@@ -673,6 +681,9 @@ class DigitalTwinsOperations(object):
 
         if raw:
             client_raw_response = ClientRawResponse(None, response)
+            client_raw_response.add_headers({
+                'x-ms-error-code': 'str',
+            })
             return client_raw_response
     delete_relationship.metadata = {'url': '/digitaltwins/{id}/relationships/{relationshipId}'}
 
@@ -771,6 +782,7 @@ class DigitalTwinsOperations(object):
             client_raw_response = ClientRawResponse(None, response)
             client_raw_response.add_headers({
                 'ETag': 'str',
+                'x-ms-error-code': 'str',
             })
             return client_raw_response
     update_relationship.metadata = {'url': '/digitaltwins/{id}/relationships/{relationshipId}'}
@@ -1039,6 +1051,9 @@ class DigitalTwinsOperations(object):
 
         if raw:
             client_raw_response = ClientRawResponse(None, response)
+            client_raw_response.add_headers({
+                'x-ms-error-code': 'str',
+            })
             return client_raw_response
     send_telemetry.metadata = {'url': '/digitaltwins/{id}/telemetry'}
 
@@ -1132,6 +1147,9 @@ class DigitalTwinsOperations(object):
 
         if raw:
             client_raw_response = ClientRawResponse(None, response)
+            client_raw_response.add_headers({
+                'x-ms-error-code': 'str',
+            })
             return client_raw_response
     send_component_telemetry.metadata = {'url': '/digitaltwins/{id}/components/{componentPath}/telemetry'}
 
@@ -1212,6 +1230,7 @@ class DigitalTwinsOperations(object):
             deserialized = self._deserialize('{object}', response)
             header_dict = {
                 'ETag': 'str',
+                'x-ms-error-code': 'str',
             }
 
         if raw:
@@ -1316,6 +1335,7 @@ class DigitalTwinsOperations(object):
             client_raw_response = ClientRawResponse(None, response)
             client_raw_response.add_headers({
                 'ETag': 'str',
+                'x-ms-error-code': 'str',
             })
             return client_raw_response
     update_component.metadata = {'url': '/digitaltwins/{id}/components/{componentPath}'}

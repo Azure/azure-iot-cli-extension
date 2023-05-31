@@ -22,7 +22,7 @@ class DigitalTwinModelsOperations(object):
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: The requested API version. Constant value: "2023-02-27-preview".
+    :ivar api_version: The requested API version. Constant value: "2023-06-30".
     """
 
     models = models
@@ -32,7 +32,7 @@ class DigitalTwinModelsOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2023-02-27-preview"
+        self.api_version = "2023-06-30"
 
         self.config = config
 
@@ -114,12 +114,17 @@ class DigitalTwinModelsOperations(object):
             raise models.ErrorResponseException(self._deserialize, response)
 
         deserialized = None
+        header_dict = {}
 
         if response.status_code in [200, 201]:
             deserialized = self._deserialize('[DigitalTwinsModelData]', response)
+            header_dict = {
+                'x-ms-error-code': 'str',
+            }
 
         if raw:
             client_raw_response = ClientRawResponse(deserialized, response)
+            client_raw_response.add_headers(header_dict)
             return client_raw_response
 
         return deserialized
@@ -299,12 +304,17 @@ class DigitalTwinModelsOperations(object):
             raise models.ErrorResponseException(self._deserialize, response)
 
         deserialized = None
+        header_dict = {}
 
         if response.status_code == 200:
             deserialized = self._deserialize('DigitalTwinsModelData', response)
+            header_dict = {
+                'x-ms-error-code': 'str',
+            }
 
         if raw:
             client_raw_response = ClientRawResponse(deserialized, response)
+            client_raw_response.add_headers(header_dict)
             return client_raw_response
 
         return deserialized
@@ -390,6 +400,9 @@ class DigitalTwinModelsOperations(object):
 
         if raw:
             client_raw_response = ClientRawResponse(None, response)
+            client_raw_response.add_headers({
+                'x-ms-error-code': 'str',
+            })
             return client_raw_response
     update.metadata = {'url': '/models/{id}'}
 
@@ -466,5 +479,8 @@ class DigitalTwinModelsOperations(object):
 
         if raw:
             client_raw_response = ClientRawResponse(None, response)
+            client_raw_response.add_headers({
+                'x-ms-error-code': 'str',
+            })
             return client_raw_response
     delete.metadata = {'url': '/models/{id}'}
