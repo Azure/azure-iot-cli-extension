@@ -49,20 +49,17 @@ def fixture_update_endpoint_ops(mocker):
     # Hub Resource
     find_resource = mocker.patch(path_find_resource, autospec=True)
 
-    def create_mock_endpoint(endpoint_type):
+    def create_mock_endpoint():
         endpoint = mocker.Mock()
         endpoint.name = endpoint_name
-        endpoint.type = endpoint_type
         return endpoint
 
     hub_mock = mocker.MagicMock()
-    hub_mock.properties.routing.endpoints.event_hubs = [create_mock_endpoint(endpoint_type="event_hubs")]
-    hub_mock.properties.routing.endpoints.service_bus_queues = [create_mock_endpoint(endpoint_type="service_bus_queues")]
-    hub_mock.properties.routing.endpoints.service_bus_topics = [create_mock_endpoint(endpoint_type="service_bus_topics")]
-    hub_mock.properties.routing.endpoints.storage_containers = [create_mock_endpoint(endpoint_type="storage_containers")]
-    hub_mock.properties.routing.endpoints.cosmos_db_sql_collections = [
-        create_mock_endpoint(endpoint_type="cosmos_db_sql_collections")
-    ]
+    hub_mock.properties.routing.endpoints.event_hubs = [create_mock_endpoint()]
+    hub_mock.properties.routing.endpoints.service_bus_queues = [create_mock_endpoint()]
+    hub_mock.properties.routing.endpoints.service_bus_topics = [create_mock_endpoint()]
+    hub_mock.properties.routing.endpoints.storage_containers = [create_mock_endpoint()]
+    hub_mock.properties.routing.endpoints.cosmos_db_sql_collections = [create_mock_endpoint()]
 
     def initialize_mock_client(self, *args):
         self.client = mocker.MagicMock()
