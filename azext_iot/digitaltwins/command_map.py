@@ -230,8 +230,7 @@ def load_digitaltwins_commands(self, _):
 
     with self.command_group(
         "dt job import",
-        command_type=digitaltwins_job_ops,
-        is_preview=True,
+        command_type=digitaltwins_job_ops
     ) as cmd_group:
         cmd_group.command("create", "create_import_job")
         cmd_group.show_command("show", "show_import_job")
