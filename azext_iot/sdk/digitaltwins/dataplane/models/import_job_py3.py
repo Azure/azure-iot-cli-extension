@@ -12,7 +12,7 @@
 from msrest.serialization import Model
 
 
-class BulkImportJob(Model):
+class ImportJob(Model):
     """A job which contains a reference to the operations to perform, results, and
     execution metadata.
 
@@ -21,7 +21,7 @@ class BulkImportJob(Model):
 
     All required parameters must be populated in order to send to Azure.
 
-    :ivar id: The identifier of the bulk import job.
+    :ivar id: The identifier of the import job.
     :vartype id: str
     :param input_blob_uri: Required. The path to the input Azure storage blob
      that contains file(s) describing the operations to perform in the job.
@@ -45,7 +45,7 @@ class BulkImportJob(Model):
      from the system. The timestamp is in RFC3339 format:
      `yyyy-MM-ddTHH:mm:ssZ`.
     :vartype purge_date_time: datetime
-    :param error: Details of the error(s) that occurred executing the bulk
+    :param error: Details of the error(s) that occurred executing the import
      job.
     :type error: ~dataplane.models.Error
     """
@@ -74,7 +74,7 @@ class BulkImportJob(Model):
     }
 
     def __init__(self, *, input_blob_uri: str, output_blob_uri: str, error=None, **kwargs) -> None:
-        super(BulkImportJob, self).__init__(**kwargs)
+        super(ImportJob, self).__init__(**kwargs)
         self.id = None
         self.input_blob_uri = input_blob_uri
         self.output_blob_uri = output_blob_uri
