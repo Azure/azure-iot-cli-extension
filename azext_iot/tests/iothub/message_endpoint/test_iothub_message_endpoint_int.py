@@ -42,6 +42,13 @@ def test_iot_eventhub_endpoint_lifecycle(provisioned_event_hub_with_identity_mod
     endpoint_uri = "sb:" + event_hub_obj["namespace"]["serviceBusEndpoint"].split(":")[1]
     eventhub_cs = event_hub_obj["connectionString"]
     endpoint_names = generate_ep_names(3)
+    # Ensure there are no endpoints
+    cli.invoke(
+        "iot hub message-endpoint delete -n {} -g {} -y -f".format(
+            iot_hub, iot_rg
+        )
+    )
+
     # use connection string - note how the connection string needs to have entity path and the
     # endpoint uri and path are left blank
     cli.invoke(
@@ -177,6 +184,12 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     iot_rg = iot_hub_obj["resourcegroup"]
     iot_sub = iot_hub_obj["subscriptionid"]
     user_id = list(iot_hub_obj["identity"]["userAssignedIdentities"].keys())[0]
+    # Ensure there are no endpoints
+    cli.invoke(
+        "iot hub message-endpoint delete -n {} -g {} -y -f".format(
+            iot_hub, iot_rg
+        )
+    )
 
     queue_instance = servicebus_obj["queue"]["name"]
     topic_instance = servicebus_obj["topic"]["name"]
@@ -457,6 +470,12 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     iot_rg = iot_hub_obj["resourcegroup"]
     iot_sub = iot_hub_obj["subscriptionid"]
     user_id = list(iot_hub_obj["identity"]["userAssignedIdentities"].keys())[0]
+    # Ensure there are no endpoints
+    cli.invoke(
+        "iot hub message-endpoint delete -n {} -g {} -y -f".format(
+            iot_hub, iot_rg
+        )
+    )
 
     endpoint_names = generate_ep_names(3)
     storage_cs = storage_obj["connectionString"]
@@ -624,6 +643,12 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
     iot_rg = iot_hub_obj["resourcegroup"]
     iot_sub = iot_hub_obj["subscriptionid"]
     user_id = list(iot_hub_obj["identity"]["userAssignedIdentities"].keys())[0]
+    # Ensure there are no endpoints
+    cli.invoke(
+        "iot hub message-endpoint delete -n {} -g {} -y -f".format(
+            iot_hub, iot_rg
+        )
+    )
 
     cosmos_cstring = cosmosdb_obj["connectionString"]
     database = cosmosdb_obj["database"]["name"]
