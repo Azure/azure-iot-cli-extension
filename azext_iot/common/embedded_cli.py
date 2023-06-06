@@ -29,11 +29,12 @@ class EmbeddedCLI(object):
     error_code : int
         Error code of the last invoked cli command. If no runs, will be 0.
     az_cli : AzCli
-        The cli that will be used for invoking commands. Should be the default CLI
+        The cli that will be used for invoking commands. Should be the default CLI.
     user_subscription : Optional[str]
         The invoker's subscription.
     capture_stderr : bool
-        Flag for capturing the stderr during the invocation of the command.
+        Flag to determine whether we capture (don't print) output from invoked commands, but raise errors
+        when they occur.
     """
     def __init__(self, cli_ctx=None, capture_stderr: bool = False):
         super(EmbeddedCLI, self).__init__()
@@ -59,8 +60,8 @@ class EmbeddedCLI(object):
             Subscription for when it needs to be different from the self.user_subscription. Takes
             precedence over self.user_subscription.
         capture_stderr : Optional[bool]
-            Flag for capturing the stderr during the invocation of the command. Takes
-            precedence over self.capture_stderr.
+            Flag to determine whether we capture (don't print) output from invoked commands, but raise errors
+            when they occur. Takes precedence over self.capture_stderr.
         """
         output_file = StringIO()
         old_exception_handler = None
