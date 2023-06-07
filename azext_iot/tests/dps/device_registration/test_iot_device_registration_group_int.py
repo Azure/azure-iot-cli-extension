@@ -5,7 +5,15 @@
 # --------------------------------------------------------------------------------------------
 
 import os
-from azure.cli.core.azclierror import CLIInternalError
+from azure.cli.core.azclierror import (
+    AzureResponseError,
+    RequiredArgumentMissingError,
+    ResourceNotFoundError,
+    CLIInternalError,
+    UnauthorizedError,
+    InvalidArgumentValueError,
+)
+import pytest
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.common.shared import EntityStatusType
 from azext_iot.tests.dps import DATAPLANE_AUTH_TYPES, clean_dps_dataplane
@@ -31,26 +39,40 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
         group_id, device_id1, device_id2 = generate_names(count=3)
 
         # Enrollment needs to be created
-        registration_result = cli.invoke(
-            set_cmd_auth_type(
-                f"iot device registration create --dps-name {dps_name} -g {dps_rg} --group-id {group_id} "
-                f"--registration-id {device_id1}",
-                auth_type=auth_phase,
-                cstring=dps_cstring
-            ),
-        )
-        assert registration_result.success() is False
+        with pytest.raises(ResourceNotFoundError):
+            cli.invoke(
+                set_cmd_auth_type(
+                    f"iot device registration create --dps-name {dps_name} -g {dps_rg} --group-id {group_id} "
+                    f"--registration-id {device_id1}",
+                    auth_type=auth_phase,
+                    cstring=dps_cstring
+                ),
+                capture_stderr=True
+            )
 
         # Cannot retrieve device credentials
-        registration_result = cli.invoke(
-            set_cmd_auth_type(
-                f"iot device registration create --id-scope {id_scope} --group-id {group_id} "
-                f"--registration-id {device_id1}",
-                auth_type=auth_phase,
-                cstring=dps_cstring
-            ),
-        )
-        assert registration_result.success() is False
+        if auth_phase == "cstring":
+            with pytest.raises(ResourceNotFoundError):
+                cli.invoke(
+                    set_cmd_auth_type(
+                        f"iot device registration create --id-scope {id_scope} --group-id {group_id} "
+                        f"--registration-id {device_id1}",
+                        auth_type=auth_phase,
+                        cstring=dps_cstring
+                    ),
+                    capture_stderr=True
+                )
+        else:
+            with pytest.raises(RequiredArgumentMissingError):
+                cli.invoke(
+                    set_cmd_auth_type(
+                        f"iot device registration create --id-scope {id_scope} --group-id {group_id} "
+                        f"--registration-id {device_id1}",
+                        auth_type=auth_phase,
+                        cstring=dps_cstring
+                    ),
+                    capture_stderr=True
+                )
 
         # Regular enrollment group
         keys = cli.invoke(
@@ -201,15 +223,16 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
         compare_registrations(device2_registration, service_side)
 
         # Cannot use group key as device key
-        registration_result = cli.invoke(
-            set_cmd_auth_type(
-                f"iot device registration create --dps-name {dps_name} -g {dps_rg} --registration-id {device_id1} "
-                f"--key {keys['primaryKey']}",
-                auth_type=auth_phase,
-                cstring=dps_cstring
-            ),
-        )
-        assert registration_result.success() is False
+        with pytest.raises(UnauthorizedError):
+            cli.invoke(
+                set_cmd_auth_type(
+                    f"iot device registration create --dps-name {dps_name} -g {dps_rg} --registration-id {device_id1} "
+                    f"--key {keys['primaryKey']}",
+                    auth_type=auth_phase,
+                    cstring=dps_cstring
+                ),
+                capture_stderr=True
+            )
 
         # Try with payload
         payload = {"Thermostat": {"$metadata": {}}}
@@ -253,15 +276,16 @@ def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module):
         group_id = generate_names()
 
         # Enrollment needs to be created
-        registration_result = cli.invoke(
-            set_cmd_auth_type(
-                f"iot device registration create --dps-name {dps_name} -g {dps_rg} --registration-id {devices[0][0]} "
-                f"--cp {devices[0][0] + CERT_ENDING} --kp {devices[0][0] + KEY_ENDING}",
-                auth_type=auth_phase,
-                cstring=dps_cstring
+        with pytest.raises(UnauthorizedError):
+            cli.invoke(
+                set_cmd_auth_type(
+                    f"iot device registration create --dps-name {dps_name} -g {dps_rg} --registration-id "
+                    f"{devices[0][0]} --group-id {group_id} --cp {devices[0][0] + CERT_ENDING} --kp {devices[0][0] + KEY_ENDING}",
+                    auth_type=auth_phase,
+                    cstring=dps_cstring
+                ),
+                capture_stderr=True
             )
-        )
-        assert registration_result.success() is False
 
         # Create enrollment group
         cli.invoke(
@@ -274,14 +298,16 @@ def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module):
         )
 
         # Need to specify file - cannot retrieve need info from service
-        registration_result = cli.invoke(
-            set_cmd_auth_type(
-                f"iot device registration create --dps-name {dps_name} -g {dps_rg} --registration-id {devices[0][0]}",
-                auth_type=auth_phase,
-                cstring=dps_cstring
-            ),
-        )
-        assert registration_result.success() is False
+        with pytest.raises(InvalidArgumentValueError):
+            cli.invoke(
+                set_cmd_auth_type(
+                    f"iot device registration create --dps-name {dps_name} -g {dps_rg} --registration-id {devices[0][0]} "
+                    f"--group-id {group_id}",
+                    auth_type=auth_phase,
+                    cstring=dps_cstring
+                ),
+                capture_stderr=True
+            )
 
         # Normal registration
         registration_states = []
@@ -390,14 +416,15 @@ def test_dps_device_registration_unlinked_hub(provisioned_iot_dps_no_hub_module)
         ).as_json()
 
         # registration throws error
-        registration_result = cli.invoke(
-            set_cmd_auth_type(
-                f"iot device registration create --id-scope {id_scope} --registration-id {device_id} --key {device_key}",
-                auth_type=auth_phase,
-                cstring=dps_cstring
+        with pytest.raises(AzureResponseError):
+            cli.invoke(
+                set_cmd_auth_type(
+                    f"iot device registration create --id-scope {id_scope} --registration-id {device_id} --key {device_key}",
+                    auth_type=auth_phase,
+                    cstring=dps_cstring
+                ),
+                capture_stderr=True
             )
-        )
-        assert registration_result.success() is False
 
         # Can see registration
         show_registration_result = cli.invoke(
@@ -438,15 +465,16 @@ def test_dps_device_registration_disabled_enrollment(provisioned_iot_dps_module)
             raise AssertionError(f"Failed to create enrollment group with attestation-type {auth_phase}")
 
         # Registration throws error
-        registration_result = cli.invoke(
-            set_cmd_auth_type(
-                f"iot device registration create --group-id {group_id} -g {dps_rg} --dps-name {dps_name} "
-                f"--registration-id {device_id}",
-                auth_type=auth_phase,
-                cstring=dps_cstring
-            ),
-        )
-        assert registration_result.success() is False
+        with pytest.raises(AzureResponseError):
+            cli.invoke(
+                set_cmd_auth_type(
+                    f"iot device registration create --group-id {group_id} -g {dps_rg} --dps-name {dps_name} "
+                    f"--registration-id {device_id}",
+                    auth_type=auth_phase,
+                    cstring=dps_cstring
+                ),
+                capture_stderr=True
+            )
 
         # Can see registration
         registration = cli.invoke(

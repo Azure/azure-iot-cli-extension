@@ -16,15 +16,61 @@ logger = get_logger(__name__)
 
 
 class EmbeddedCLI(object):
-    def __init__(self, cli_ctx=None):
+    """
+    An embedded CLI wrapper for easily invoking commands.
+
+    ...
+
+    Attributes
+    ----------
+    output : str
+        The output of the last invoked cli command. If the last command failed or there were no runs,
+        will return ""
+    error_code : int
+        Error code of the last invoked cli command. If no runs, will be 0.
+    az_cli : AzCli
+        The cli that will be used for invoking commands. Should be the default CLI.
+    user_subscription : Optional[str]
+        The invoker's subscription.
+    capture_stderr : bool
+        Flag to determine whether we capture (don't print) output from invoked commands, but raise errors
+        when they occur.
+    """
+    def __init__(self, cli_ctx=None, capture_stderr: bool = False):
         super(EmbeddedCLI, self).__init__()
         self.output = ""
         self.error_code = 0
         self.az_cli = get_default_cli()
         self.user_subscription = cli_ctx.data.get('subscription_id') if cli_ctx else None
+        self.capture_stderr = capture_stderr
 
-    def invoke(self, command: str, subscription: str = None):
+    def invoke(
+        self, command: str, subscription: str = None, capture_stderr: Optional[bool] = None
+    ):
+        """
+        Run a given command.
+
+        Note that if capture_stderr is True, any error during invocation will be raised.
+
+        Parameters
+        ----------
+        command : str
+            The command to invoke. Note that the command should omit the `az` from the command.
+        subscription : Optional[str]
+            Subscription for when it needs to be different from the self.user_subscription. Takes
+            precedence over self.user_subscription.
+        capture_stderr : Optional[bool]
+            Flag to determine whether we capture (don't print) output from invoked commands, but raise errors
+            when they occur. Takes precedence over self.capture_stderr.
+        """
         output_file = StringIO()
+        old_exception_handler = None
+
+        # if capture_stderr is defined, use that, otherwise default to self.capture_stderr
+        if (capture_stderr is None and self.capture_stderr) or capture_stderr:
+            # Stop exception from being logged
+            old_exception_handler = self.az_cli.exception_handler
+            self.az_cli.exception_handler = lambda _: None
 
         command = self._ensure_json_output(command=command)
         # prioritize subscription passed into invoke
@@ -37,7 +83,6 @@ class EmbeddedCLI(object):
                 command=command, subscription=self.user_subscription
             )
 
-        # TODO: Capture stderr?
         try:
             self.error_code = (
                 self.az_cli.invoke(shlex.split(command), out_file=output_file) or 0
@@ -52,11 +97,23 @@ class EmbeddedCLI(object):
             self.error_code,
             self.output,
         )
+
+        if old_exception_handler:
+            self.az_cli.exception_handler = old_exception_handler
+            if self.get_error():
+                raise self.get_error()
+
         output_file.close()
 
         return self
 
     def as_json(self):
+        """
+        Try to parse the result of the last invoked cli command as a json.
+
+        If the json cannot be parsed, the last invoked cli command must have failed. This will raise a
+        CLIInternalError.
+        """
         try:
             return json.loads(self.output)
         except Exception:
@@ -67,14 +124,18 @@ class EmbeddedCLI(object):
             )
 
     def success(self) -> bool:
+        """Return if last invoked cli command was a success."""
         logger.debug("Operation error code: %s", self.error_code)
         return self.error_code == 0
 
     def get_error(self) -> Optional[Exception]:
+        """Return error from last invoked cli command."""
         return self.az_cli.result.error
 
     def _ensure_json_output(self, command: str) -> str:
+        """Force invoked cli command to return a json."""
         return "{} -o json".format(command)
 
     def _ensure_subscription(self, command: str, subscription: str) -> str:
+        """Add subscription to invoked cli command."""
         return "{} --subscription '{}'".format(command, subscription)
