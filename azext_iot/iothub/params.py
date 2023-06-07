@@ -569,7 +569,7 @@ def load_iothub_arguments(self, _):
 
     for endpoint_type in ["cosmosdb-container", "storage-container"]:
         for endpoint_op in ["create", "update"]:
-            with self.argument_context(f"iot hub message-endpoint {endpoint_type} {endpoint_op}") as context:
+            with self.argument_context(f"iot hub message-endpoint {endpoint_op} {endpoint_type}") as context:
                 context.argument(
                     "endpoint_account_name",
                     options_list=["--endpoint-account"],
