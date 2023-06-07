@@ -7,9 +7,10 @@
 from typing import Optional
 from knack.log import get_logger
 from azure.cli.core.azclierror import ResourceNotFoundError
-from azext_iot.common.utility import process_json_arg
+from azext_iot.common.utility import handle_service_exception, process_json_arg
 from azext_iot.iothub.common import RouteSourceType
 from azext_iot.iothub.providers.base import IoTHubProvider
+from azure.core.exceptions import HttpResponseError
 
 
 logger = get_logger(__name__)
@@ -42,12 +43,15 @@ class MessageRoute(IoTHubProvider):
             }
         )
 
-        return self.discovery.client.begin_create_or_update(
-            resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
-            resource_name=self.hub_resource.name,
-            iot_hub_description=self.hub_resource,
-            if_match=self.hub_resource.etag
-        )
+        try:
+            return self.discovery.client.begin_create_or_update(
+                resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
+                resource_name=self.hub_resource.name,
+                iot_hub_description=self.hub_resource,
+                if_match=self.hub_resource.etag
+            )
+        except HttpResponseError as e:
+            handle_service_exception(e)
 
     def update(
         self,
@@ -63,12 +67,15 @@ class MessageRoute(IoTHubProvider):
         route.condition = route.condition if condition is None else condition
         route.is_enabled = route.is_enabled if enabled is None else enabled
 
-        return self.discovery.client.begin_create_or_update(
-            resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
-            resource_name=self.hub_resource.name,
-            iot_hub_description=self.hub_resource,
-            if_match=self.hub_resource.etag
-        )
+        try:
+            return self.discovery.client.begin_create_or_update(
+                resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
+                resource_name=self.hub_resource.name,
+                iot_hub_description=self.hub_resource,
+                if_match=self.hub_resource.etag
+            )
+        except HttpResponseError as e:
+            handle_service_exception(e)
 
     def show(self, route_name: str):
         routes = self.hub_resource.properties.routing.routes
@@ -92,12 +99,15 @@ class MessageRoute(IoTHubProvider):
         else:
             routing.routes = [route for route in routing.routes if route.source.lower() != source_type.lower()]
 
-        return self.discovery.client.begin_create_or_update(
-            resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
-            resource_name=self.hub_resource.name,
-            iot_hub_description=self.hub_resource,
-            if_match=self.hub_resource.etag
-        )
+        try:
+            return self.discovery.client.begin_create_or_update(
+                resource_group_name=self.hub_resource.additional_properties['resourcegroup'],
+                resource_name=self.hub_resource.name,
+                iot_hub_description=self.hub_resource,
+                if_match=self.hub_resource.etag
+            )
+        except HttpResponseError as e:
+            handle_service_exception(e)
 
     def test(
         self,

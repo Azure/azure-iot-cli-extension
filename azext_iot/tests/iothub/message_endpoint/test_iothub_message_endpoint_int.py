@@ -7,6 +7,7 @@
 
 from typing import Optional
 import pytest
+from azure.cli.core.azclierror import BadRequestError
 from azext_iot.common.utility import ensure_iothub_sdk_min_version
 from azext_iot.iothub.common import AuthenticationType, RouteSourceType
 from azext_iot.common.embedded_cli import EmbeddedCLI
@@ -41,6 +42,13 @@ def test_iot_eventhub_endpoint_lifecycle(provisioned_event_hub_with_identity_mod
     endpoint_uri = "sb:" + event_hub_obj["namespace"]["serviceBusEndpoint"].split(":")[1]
     eventhub_cs = event_hub_obj["connectionString"]
     endpoint_names = generate_ep_names(3)
+    # Ensure there are no endpoints
+    cli.invoke(
+        "iot hub message-endpoint delete -n {} -g {} -y -f".format(
+            iot_hub, iot_rg
+        )
+    )
+
     # use connection string - note how the connection string needs to have entity path and the
     # endpoint uri and path are left blank
     cli.invoke(
@@ -253,6 +261,12 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     iot_rg = iot_hub_obj["resourcegroup"]
     iot_sub = iot_hub_obj["subscriptionid"]
     user_id = list(iot_hub_obj["identity"]["userAssignedIdentities"].keys())[0]
+    # Ensure there are no endpoints
+    cli.invoke(
+        "iot hub message-endpoint delete -n {} -g {} -y -f".format(
+            iot_hub, iot_rg
+        )
+    )
 
     queue_instance = servicebus_obj["queue"]["name"]
     topic_instance = servicebus_obj["topic"]["name"]
@@ -609,6 +623,12 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     iot_rg = iot_hub_obj["resourcegroup"]
     iot_sub = iot_hub_obj["subscriptionid"]
     user_id = list(iot_hub_obj["identity"]["userAssignedIdentities"].keys())[0]
+    # Ensure there are no endpoints
+    cli.invoke(
+        "iot hub message-endpoint delete -n {} -g {} -y -f".format(
+            iot_hub, iot_rg
+        )
+    )
 
     endpoint_names = generate_ep_names(3)
     storage_cs = storage_obj["connectionString"]
@@ -890,6 +910,12 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
     iot_rg = iot_hub_obj["resourcegroup"]
     iot_sub = iot_hub_obj["subscriptionid"]
     user_id = list(iot_hub_obj["identity"]["userAssignedIdentities"].keys())[0]
+    # Ensure there are no endpoints
+    cli.invoke(
+        "iot hub message-endpoint delete -n {} -g {} -y -f".format(
+            iot_hub, iot_rg
+        )
+    )
 
     cosmos_cstring = cosmosdb_obj["connectionString"]
     database = cosmosdb_obj["database"]["name"]
@@ -1215,12 +1241,13 @@ def test_iot_endpoint_force_delete(provisioned_service_bus_with_identity_module)
     )
 
     # try delete with name without force
-    delete_result = cli.invoke(
-        "iot hub message-endpoint delete -n {} -g {} --en {} -y".format(
-            iot_hub, iot_rg, endpoint_names[0],
+    with pytest.raises(BadRequestError):
+        cli.invoke(
+            "iot hub message-endpoint delete -n {} -g {} --en {} -y".format(
+                iot_hub, iot_rg, endpoint_names[0],
+            ),
+            capture_stderr=True
         )
-    )
-    assert delete_result.success() is False
 
     # delete with name force
     delete_result = cli.invoke(
@@ -1288,12 +1315,13 @@ def test_iot_endpoint_force_delete(provisioned_service_bus_with_identity_module)
     )
 
     # delete by endpoint type without force
-    delete_result = cli.invoke(
-        "iot hub message-endpoint delete -n {} -g {} -t {} -y".format(
-            iot_hub, iot_rg, "servicebus-topic",
+    with pytest.raises(BadRequestError):
+        cli.invoke(
+            "iot hub message-endpoint delete -n {} -g {} -t {} -y".format(
+                iot_hub, iot_rg, "servicebus-topic",
+            ),
+            capture_stderr=True
         )
-    )
-    assert delete_result.success() is False
 
     # delete by endpoint type with force
     delete_result = cli.invoke(
@@ -1365,12 +1393,14 @@ def test_iot_endpoint_force_delete(provisioned_service_bus_with_identity_module)
     )
 
     # delete all endpoints without force
-    delete_result = cli.invoke(
-        "iot hub message-endpoint delete -n {} -g {} -y".format(
-            iot_hub, iot_rg,
+
+    with pytest.raises(BadRequestError):
+        cli.invoke(
+            "iot hub message-endpoint delete -n {} -g {} -y".format(
+                iot_hub, iot_rg,
+            ),
+            capture_stderr=True
         )
-    )
-    assert delete_result.success() is False
 
     # delete all endpoints with force
     delete_result = cli.invoke(
