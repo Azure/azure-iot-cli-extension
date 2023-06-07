@@ -667,7 +667,7 @@ def load_iothub_help():
               az iot hub message-endpoint update cosmosdb-container -n {iothub_name} --en {endpoint_name} --connection-string {connection_string}
           - name: Update the connection-string for a key-based Cosmos DB Container endpoint for an IoT Hub by retrieving the connection string from the specified Cosmos DB Container.
             text: >
-              az iot hub message-endpoint update cosmosdb-container -n {iothub_name} --en {endpoint_name} --connection-string --container {container}
+              az iot hub message-endpoint update cosmosdb-container -n {iothub_name} --en {endpoint_name} --connection-string "update" --container {container}
               --db {database} --endpoint-account {account_name}
           - name: Update a Cosmos DB Container endpoint for an IoT Hub to use a specified primary key and secondary key.
             text: >
@@ -695,7 +695,7 @@ def load_iothub_help():
           - name: Update the connection-string for a key-based Event Hub endpoint for an IoT Hub by retrieving the connection string from the specified Event Hub.
             text: >
               az iot hub message-endpoint update eventhub -n {iothub_name} --en {endpoint_name} --namespace {namespace_name}
-              --entity-path {entity_path} --policy {policy_name} --connection-string
+              --entity-path {entity_path} --policy {policy_name} --connection-string "update"
           - name: Update an Event Hub endpoint for an IoT Hub to use a new specified connection string.
             text: >
               az iot hub message-endpoint update eventhub -n {iothub_name} --en {endpoint_name} -c {connection_string}
@@ -721,7 +721,7 @@ def load_iothub_help():
           - name: Update the connection-string for a key-based Service Bus Queue endpoint for an IoT Hub by retrieving the connection string from the specified Service Bus Queue.
             text: >
               az iot hub message-endpoint update servicebus-queue -n {iothub_name} --en {endpoint_name} --namespace {namespace_name}
-              --entity-path {entity_path} --policy {policy_name} --connection-string
+              --entity-path {entity_path} --policy {policy_name} --connection-string "update"
           - name: Update a Service Bus Queue endpoint for an IoT Hub to use a new specified connection string.
             text: >
               az iot hub message-endpoint update servicebus-queue -n {iothub_name} --en {endpoint_name} -c {connection_string}
@@ -747,7 +747,7 @@ def load_iothub_help():
           - name: Update the connection-string for a key-based Service Bus Topic endpoint for an IoT Hub by retrieving the connection string from the specified Service Bus Topic.
             text: >
               az iot hub message-endpoint update servicebus-topic -n {iothub_name} --en {endpoint_name} --namespace {namespace_name}
-              --entity-path {entity_path} --policy {policy_name} --connection-string
+              --entity-path {entity_path} --policy {policy_name} --connection-string "update"
           - name: Update a Service Bus Topic endpoint for an IoT Hub to use a new specified connection string.
             text: >
               az iot hub message-endpoint update servicebus-topic -n {iothub_name} --en {endpoint_name} -c {connection_string}
@@ -773,7 +773,7 @@ def load_iothub_help():
           - name: Update the connection-string for a key-based Storage Container endpoint for an IoT Hub by retrieving the connection string from the specified Storage Container.
             text: >
               az iot hub message-endpoint update storage-container -n {iothub_name} --en {endpoint_name} --container {container_name}
-              --endpoint-account {account_name} --connection-string
+              --endpoint-account {account_name} --connection-string "update"
           - name: Update a Storage Container endpoint for an IoT Hub to use a new specified connection string.
             text: >
               az iot hub message-endpoint update storage-container -n {iothub_name} --en {endpoint_name} -c {connection_string}

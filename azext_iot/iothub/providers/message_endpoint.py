@@ -389,6 +389,7 @@ class MessageEndpoint(IoTHubProvider):
         )
 
     def _connection_string_retrieval_args_check(
+        self,
         endpoint_type: str,
         endpoint_account_name: Optional[str] = None,
         entity_path: Optional[str] = None,

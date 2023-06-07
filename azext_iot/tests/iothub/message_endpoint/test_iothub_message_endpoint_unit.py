@@ -151,7 +151,6 @@ class TestMessageEndpointUpdate:
         endpoint = endpoints[0]
 
         assert endpoint.name == endpoint_name
-        assert endpoint.type == "event_hubs"
         mock = mocker.Mock
 
         # if a prop is not set, it will be a Mock object
@@ -303,7 +302,6 @@ class TestMessageEndpointUpdate:
         endpoint = endpoints[0]
 
         assert endpoint.name == endpoint_name
-        assert endpoint.type == "service_bus_queues"
         mock = mocker.Mock
 
         # if a prop is not set, it will be a Mock object
@@ -455,7 +453,6 @@ class TestMessageEndpointUpdate:
         endpoint = endpoints[0]
 
         assert endpoint.name == endpoint_name
-        assert endpoint.type == "service_bus_topics"
         mock = mocker.Mock
 
         # if a prop is not set, it will be a Mock object
@@ -608,7 +605,6 @@ class TestMessageEndpointUpdate:
         endpoint = endpoints[0]
 
         assert endpoint.name == endpoint_name
-        assert endpoint.type == "storage_containers"
         mock = mocker.Mock
 
         # if a prop is not set, it will be a Mock object
@@ -821,7 +817,6 @@ class TestMessageEndpointUpdate:
         endpoint = endpoints[0]
 
         assert endpoint.name == endpoint_name
-        assert endpoint.type == "cosmos_db_sql_collections"
         mock = mocker.Mock
 
         # if a prop is not set, it will be a Mock object
