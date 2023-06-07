@@ -4,6 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import pytest
+from azure.cli.core.azclierror import BadRequestError
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.common.shared import EntityStatusType, AttestationType, AllocationType, ReprovisionType
 from azext_iot.common.utility import generate_key
@@ -84,15 +86,16 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):
         # assert enrollment_show["attestation"]["x509"]
 
         # Compute Device Key only works for symmetric key enrollment groups
-        failure_command = cli.invoke(
-            set_cmd_auth_type(
-                f"iot dps enrollment-group compute-device-key -g {dps_rg} --dps-name {dps_name} "
-                f"--enrollment-id {enrollment_id} --registration-id myarbitrarydeviceId",
-                auth_type=auth_phase,
-                cstring=dps_cstring
+        with pytest.raises(BadRequestError):
+            cli.invoke(
+                set_cmd_auth_type(
+                    f"iot dps enrollment-group compute-device-key -g {dps_rg} --dps-name {dps_name} "
+                    f"--enrollment-id {enrollment_id} --registration-id myarbitrarydeviceId",
+                    auth_type=auth_phase,
+                    cstring=dps_cstring
+                ),
+                capture_stderr=True
             )
-        )
-        assert failure_command.success() is False
 
         enrollment_update = cli.invoke(
             set_cmd_auth_type(

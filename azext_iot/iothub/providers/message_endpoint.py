@@ -14,6 +14,7 @@ from azure.cli.core.azclierror import (
     MutuallyExclusiveArgumentError
 )
 from azext_iot.common.embedded_cli import EmbeddedCLI
+from azext_iot.common.utility import handle_service_exception
 from azext_iot.iothub.common import (
     BYTES_PER_MEGABYTE,
     FORCE_DELETE_WARNING,
@@ -26,6 +27,7 @@ from azext_iot.iothub.common import (
 from azext_iot.iothub.providers.base import IoTHubProvider
 from azext_iot.common._azure import parse_cosmos_db_connection_string
 from azure.mgmt.iothub.models import ManagedIdentity
+from azure.core.exceptions import HttpResponseError
 
 
 logger = get_logger(__name__)
@@ -206,12 +208,15 @@ class MessageEndpoint(IoTHubProvider):
             })
             endpoints.storage_containers.append(new_endpoint)
 
-        return self.discovery.client.begin_create_or_update(
-            self.hub_resource.additional_properties["resourcegroup"],
-            self.hub_resource.name,
-            self.hub_resource,
-            if_match=self.hub_resource.etag
-        )
+        try:
+            return self.discovery.client.begin_create_or_update(
+                self.hub_resource.additional_properties["resourcegroup"],
+                self.hub_resource.name,
+                self.hub_resource,
+                if_match=self.hub_resource.etag
+            )
+        except HttpResponseError as e:
+            handle_service_exception(e)
 
     def update(
         self,
@@ -571,12 +576,15 @@ class MessageEndpoint(IoTHubProvider):
                 endpoints.cosmos_db_sql_collections = []
             endpoints.storage_containers = []
 
-        return self.discovery.client.begin_create_or_update(
-            self.hub_resource.additional_properties["resourcegroup"],
-            self.hub_resource.name,
-            self.hub_resource,
-            if_match=self.hub_resource.etag
-        )
+        try:
+            return self.discovery.client.begin_create_or_update(
+                self.hub_resource.additional_properties["resourcegroup"],
+                self.hub_resource.name,
+                self.hub_resource,
+                if_match=self.hub_resource.etag
+            )
+        except HttpResponseError as e:
+            handle_service_exception(e)
 
 
 def get_eventhub_cstring(
