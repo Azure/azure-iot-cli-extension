@@ -529,11 +529,6 @@ def load_iothub_arguments(self, _):
             " {partition}, {YYYY}, {MM}, {DD}, {HH} and {mm} fields. All parameters are"
             " mandatory but can be reordered with or without delimiters.",
         )
-        context.argument(
-            "endpoint_account_name",
-            options_list=["--endpoint-account"],
-            help="The account name for the endpoint resource.",
-        )
         # create and update Cosmos db
         context.argument(
             "database_name",
@@ -576,6 +571,14 @@ def load_iothub_arguments(self, _):
             options_list=["--endpoint-account"],
             help="The account name for the endpoint resource.",
         )
+    for endpoint_type in ["cosmosdb-container", "storage-container"]:
+        for endpoint_op in ["create", "update"]:
+            with self.argument_context(f"iot hub message-endpoint {endpoint_type} {endpoint_op}") as context:
+                context.argument(
+                    "endpoint_account_name",
+                    options_list=["--endpoint-account"],
+                    help="The account name for the endpoint resource.",
+                )
 
     with self.argument_context("iot hub message-endpoint update") as context:
         context.argument(
