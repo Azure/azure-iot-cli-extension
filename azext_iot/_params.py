@@ -94,7 +94,7 @@ def load_arguments(self, _):
         context.argument("resource_group_name", arg_type=resource_group_name_type)
         context.argument(
             "hub_name", options_list=["--hub-name", "-n"], arg_type=hub_name_type,
-            help="IoT Hub name. Required if --login is not provided.",
+            help="IoT Hub name or host name. Required if --login is not provided.",
             arg_group="IoT Hub Identifier"
         )
         context.argument(
@@ -928,7 +928,7 @@ def load_arguments(self, _):
         context.argument(
             "dps_name",
             options_list=["--dps-name", "-n"],
-            help="Name of the Azure IoT Hub Device Provisioning Service. Required if --login is not provided.",
+            help="Name or host name of the Azure IoT Hub Device Provisioning Service. Required if --login is not provided.",
             arg_group="Device Provisioning Service Identifier"
         )
         context.argument(
