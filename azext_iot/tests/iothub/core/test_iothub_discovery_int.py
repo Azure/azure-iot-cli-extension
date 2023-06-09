@@ -25,6 +25,10 @@ class TestIoTHubDiscovery(IoTLiveScenarioTest):
         iothub = discovery.find_resource(resource_name=self.entity_name)
         assert iothub.name == self.entity_name
 
+        iothub_hostname = iothub.properties.host_name
+        iothub = discovery.find_resource(resource_name=iothub_hostname)
+        assert iothub.name == self.entity_name
+
         auto_policy = discovery.find_policy(resource_name=self.entity_name, rg=self.entity_rg).as_dict()
         rights_set = set(auto_policy["rights"].split(", "))
         assert rights_set == PRIVILEDGED_ACCESS_RIGHTS_SET

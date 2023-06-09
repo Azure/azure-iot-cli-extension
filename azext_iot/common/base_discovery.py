@@ -134,7 +134,7 @@ class BaseDiscovery(ABC):
 
         Raises ResourceNotFoundError if no resource is found.
 
-        :param resource_name: Resource Name
+        :param resource_name: Resource Name or Resource Host Name
         :type resource_name: str
         :param rg: Resource Group
         :type rg: str
@@ -144,6 +144,7 @@ class BaseDiscovery(ABC):
         """
         self._initialize_client()
 
+        resource_name = resource_name.split(".")[0]
         if rg:
             try:
                 return self.client.get(

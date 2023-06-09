@@ -12,12 +12,16 @@ from azext_iot.tests.settings import Setting
 def test_dps_discovery(provisioned_iot_dps_no_hub_module):
     dps_name = provisioned_iot_dps_no_hub_module["name"]
     dps_rg = provisioned_iot_dps_no_hub_module["resourceGroup"]
+    dps_hostname = provisioned_iot_dps_no_hub_module["dps"]["properties"]["serviceOperationsHostName"]
     cmd_shell = Setting()
     setattr(cmd_shell, "cli_ctx", get_dummy_cli())
     desired_policy_name = "provisioningserviceowner"
     discovery = DPSDiscovery(cmd_shell)
 
     resource = discovery.find_resource(resource_name=dps_name)
+    assert resource.name == dps_name
+
+    resource = discovery.find_resource(resource_name=dps_hostname)
     assert resource.name == dps_name
 
     auto_policy = discovery.find_policy(resource_name=dps_name, rg=dps_rg).as_dict()
