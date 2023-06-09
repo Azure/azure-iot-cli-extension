@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from azext_iot.iothub.providers.state import HubAspects
-from azext_iot.iothub.common import CertificateAuthorityVersions
+from azext_iot.iothub.common import CertificateAuthorityVersions, PublicNetworkAccessType
 from azure.cli.core.commands.parameters import get_enum_type, get_three_state_flag
 from azext_iot.common.shared import DeviceAuthType, SettleType, ProtocolType, AckType
 from azext_iot.assets.user_messages import info_param_properties_device
@@ -640,6 +640,34 @@ def load_iothub_arguments(self, _):
             "system_properties",
             options_list=["--system-properties", "--sp"],
             help="System properties of the route message.",
+        )
+
+    with self.argument_context("iot hub network-rule-set update") as context:
+        context.argument(
+            "public_network_access",
+            options_list=["--public-network-access", "--pna"],
+            arg_type=get_enum_type(PublicNetworkAccessType),
+            help="Option for public network access.",
+        )
+        context.argument(
+            "add_ip_rules",
+            options_list=["--ip-rule", "--ir"],
+            nargs="+",
+            action="append",
+            help="Space-separated key=value pairs corresponding to properties of the IP Rule to add. The following key values "
+            "are required: `name` and `address_range`. --ip-rule can be used 1 or more times.",
+        )
+        context.argument(
+            "remove_all",
+            options_list=["--remove-all", "-r"],
+            arg_type=get_three_state_flag(),
+            help="Force all IP Rules to be removed.",
+        )
+        context.argument(
+            "apply_built_in",
+            options_list=["--apply-to-built-in", "--atbi"],
+            arg_type=get_three_state_flag(),
+            help="Apply the IP Rules to the built-in Event Hub.",
         )
 
     with self.argument_context("iot hub certificate root-authority set") as context:

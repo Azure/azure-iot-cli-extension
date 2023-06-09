@@ -188,3 +188,12 @@ class CertificateAuthorityVersions(Enum):
     """
     v2 = "v2"
     v1 = "v1"
+
+
+class PublicNetworkAccessType(Enum):
+    """
+    Public Network Access options
+    """
+    IPRules = "IPRules"
+    Enabled = "Enabled"
+    Disabled = "Disabled"

@@ -861,3 +861,38 @@ def load_iothub_help():
           text: >
             az iot hub certificate root-authority show --hub-name {iothub_name}
     """
+
+    helps["iot hub network-rule-set"] = """
+        type: group
+        short-summary: Manage the public network rule set for an IoT Hub instance.
+    """
+
+    helps["iot hub network-rule-set update"] = """
+        type: command
+        short-summary: Update the public network rule set for an IoT Hub instance.
+        examples:
+        - name: Update the public network rule set to deny all public access. This will not change the IP Rules.
+          text: >
+            az iot hub network-rule-set update --hub-name {iothub_name} --public-network-access Disabled
+        - name: Update the public network rule set to allow all public access. This will not change the IP Rules.
+          text: >
+            az iot hub network-rule-set update --hub-name {iothub_name} --public-network-access Enabled
+        - name: Update the public network rule set to allow two selected IP ranges.
+          text: >
+            az iot hub network-rule-set update --hub-name {iothub_name} --public-network-access IPRules --ip-rule name=myiprule address_range=192.0.0.0 --ip-rule name=myiprule2 address_range=0.0.0.0
+        - name: Remove all IP rules. This will not change the Public Network Access status.
+          text: >
+            az iot hub network-rule-set update --hub-name {iothub_name} --remove-all
+        - name: Overwrite the IP rules with the specified selected IP range. This will not change the Public Network Access status.
+          text: >
+            az iot hub network-rule-set update --hub-name {iothub_name} --remove-all --ip-rule name=myiprule address_range=192.0.0.0
+    """
+
+    helps["iot hub network-rule-set show"] = """
+        type: command
+        short-summary: Show the current public network rule set for an IoT Hub instance.
+        examples:
+        - name: Show the target IoT Hub public network rule set.
+          text: >
+            az iot hub network-rule-set show --hub-name {iothub_name}
+    """
