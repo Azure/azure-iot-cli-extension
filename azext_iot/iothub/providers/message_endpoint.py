@@ -105,7 +105,7 @@ class MessageEndpoint(IoTHubProvider):
         fetch_connection_string = identity is None and not connection_string
 
         endpoints = self.hub_resource.properties.routing.endpoints
-        if EndpointType.EventHub.value == endpoint_type.lower():
+        if endpoint_type.lower() == EndpointType.EventHub.value:
             if fetch_connection_string:
                 new_endpoint["connectionString"] = get_eventhub_cstring(
                     cmd=self.cli,
@@ -117,7 +117,7 @@ class MessageEndpoint(IoTHubProvider):
                 )
             new_endpoint["entityPath"] = entity_path
             endpoints.event_hubs.append(new_endpoint)
-        elif EndpointType.ServiceBusQueue.value == endpoint_type.lower():
+        elif endpoint_type.lower() == EndpointType.ServiceBusQueue.value:
             if fetch_connection_string:
                 new_endpoint["connectionString"] = get_servicebus_queue_cstring(
                     cmd=self.cli,
@@ -129,7 +129,7 @@ class MessageEndpoint(IoTHubProvider):
                 )
             new_endpoint["entityPath"] = entity_path
             endpoints.service_bus_queues.append(new_endpoint)
-        elif EndpointType.ServiceBusTopic.value == endpoint_type.lower():
+        elif endpoint_type.lower() == EndpointType.ServiceBusTopic.value:
             if fetch_connection_string:
                 new_endpoint["connectionString"] = get_servicebus_topic_cstring(
                     cmd=self.cli,
@@ -141,7 +141,7 @@ class MessageEndpoint(IoTHubProvider):
                 )
             new_endpoint["entityPath"] = entity_path
             endpoints.service_bus_topics.append(new_endpoint)
-        elif EndpointType.CosmosDBContainer.value == endpoint_type.lower():
+        elif endpoint_type.lower() == EndpointType.CosmosDBContainer.value:
             if fetch_connection_string:
                 # try to get connection string - this will be used to get keys + uri
                 connection_string = get_cosmos_db_cstring(
@@ -188,7 +188,7 @@ class MessageEndpoint(IoTHubProvider):
             if endpoints.cosmos_db_sql_collections is None:
                 endpoints.cosmos_db_sql_collections = []
             endpoints.cosmos_db_sql_collections.append(new_endpoint)
-        elif EndpointType.AzureStorageContainer.value == endpoint_type.lower():
+        elif endpoint_type.lower() == EndpointType.AzureStorageContainer.value:
             if fetch_connection_string:
                 # try to get connection string
                 new_endpoint["connectionString"] = get_storage_cstring(
@@ -222,10 +222,8 @@ class MessageEndpoint(IoTHubProvider):
         self,
         endpoint_name: str,
         endpoint_type: str,
-        endpoint_account_name: Optional[str] = None,
         endpoint_resource_group: Optional[str] = None,
         endpoint_subscription_id: Optional[str] = None,
-        endpoint_policy_name: Optional[str] = None,
         connection_string: Optional[str] = None,
         container_name: Optional[str] = None,
         encoding: Optional[str] = None,
@@ -261,9 +259,8 @@ class MessageEndpoint(IoTHubProvider):
 
         # Identity/Connection String schenanigans
         # If Identity and Connection String args are provided, Identity wins
-        fetch_connection_string = False
         if identity:
-            if EndpointType.CosmosDBContainer.value == endpoint_type.lower():
+            if endpoint_type.lower() == EndpointType.CosmosDBContainer.value:
                 original_endpoint.primary_key = None
                 original_endpoint.secondary_key = None
             else:
@@ -278,26 +275,12 @@ class MessageEndpoint(IoTHubProvider):
         elif any([connection_string, primary_key, secondary_key]):
             original_endpoint.identity = None
             original_endpoint.authentication_type = AuthenticationType.KeyBased.value
-            if EndpointType.CosmosDBContainer.value != endpoint_type.lower():
+            if endpoint_type.lower() != EndpointType.CosmosDBContainer.value:
                 original_endpoint.endpoint_uri = None
             if hasattr(original_endpoint, "entity_path"):
                 original_endpoint.entity_path = None
 
-            if connection_string.lower() == "update":
-                # check for args to get the connection string
-                # handle the primary/secondary key parsing for cosmos db later
-                self._connection_string_retrieval_args_check(
-                    endpoint_type=endpoint_type,
-                    endpoint_account_name=endpoint_account_name,
-                    entity_path=entity_path,
-                    endpoint_policy_name=endpoint_policy_name
-                )
-                fetch_connection_string = True
-                if not endpoint_resource_group:
-                    endpoint_resource_group = self.hub_resource.additional_properties["resourcegroup"]
-                if not endpoint_subscription_id:
-                    endpoint_subscription_id = self.hub_resource.additional_properties['subscriptionid']
-            elif EndpointType.CosmosDBContainer.value != endpoint_type.lower():
+            if endpoint_type.lower() != EndpointType.CosmosDBContainer.value:
                 original_endpoint.connection_string = connection_string
             else:
                 if primary_key:
@@ -305,49 +288,14 @@ class MessageEndpoint(IoTHubProvider):
                 if secondary_key:
                     original_endpoint.secondary_key = secondary_key
 
-        # Properties + connection string by specific types
-        if fetch_connection_string:
-            if EndpointType.EventHub.value == endpoint_type.lower():
-                original_endpoint.connection_string = get_eventhub_cstring(
-                    cmd=self.cli,
-                    namespace_name=endpoint_account_name,
-                    eventhub_name=entity_path,
-                    policy_name=endpoint_policy_name,
-                    rg=endpoint_resource_group,
-                    sub=endpoint_subscription_id
-                )
-            elif EndpointType.ServiceBusQueue.value == endpoint_type.lower():
-                original_endpoint.connection_string = get_servicebus_queue_cstring(
-                    cmd=self.cli,
-                    namespace_name=endpoint_account_name,
-                    queue_name=entity_path,
-                    policy_name=endpoint_policy_name,
-                    rg=endpoint_resource_group,
-                    sub=endpoint_subscription_id
-                )
-            elif EndpointType.ServiceBusTopic.value == endpoint_type.lower():
-                original_endpoint.connection_string = get_servicebus_topic_cstring(
-                    cmd=self.cli,
-                    namespace_name=endpoint_account_name,
-                    topic_name=entity_path,
-                    policy_name=endpoint_policy_name,
-                    rg=endpoint_resource_group,
-                    sub=endpoint_subscription_id
-                )
-        elif endpoint_type in [
+        # Properties by specific types
+        if endpoint_type in [
             EndpointType.EventHub.value, EndpointType.ServiceBusQueue.value, EndpointType.ServiceBusTopic.value
         ] and entity_path and not connection_string:
             # only set entity_path if no connection string
             original_endpoint.entity_path = entity_path
 
         if endpoint_type == EndpointType.AzureStorageContainer.value:
-            if fetch_connection_string:
-                original_endpoint.connection_string = get_storage_cstring(
-                    cmd=self.cli,
-                    account_name=endpoint_account_name,
-                    rg=endpoint_resource_group,
-                    sub=endpoint_subscription_id
-                )
             if container_name:
                 original_endpoint.container_name = container_name
             if encoding:
@@ -359,15 +307,6 @@ class MessageEndpoint(IoTHubProvider):
             if chunk_size_window:
                 original_endpoint.chunk_size_window = (chunk_size_window * BYTES_PER_MEGABYTE)
         elif endpoint_type == EndpointType.CosmosDBContainer.value:
-            if fetch_connection_string:
-                # try to get connection string - this will be used to get keys + uri
-                if not primary_key and not secondary_key:
-                    connection_string = get_cosmos_db_cstring(
-                        cmd=self.cli,
-                        account_name=endpoint_account_name,
-                        rg=endpoint_resource_group,
-                        sub=endpoint_subscription_id
-                    )
             if connection_string:
                 # parse out key from connection string
                 parsed_cs = parse_cosmos_db_connection_string(connection_string)
@@ -420,16 +359,16 @@ class MessageEndpoint(IoTHubProvider):
     def _show_by_type(self, endpoint_name: str, endpoint_type: str):
         endpoints = self.hub_resource.properties.routing.endpoints
         endpoint_list = None
-        if EndpointType.EventHub.value == endpoint_type.lower():
+        if endpoint_type.lower() == EndpointType.EventHub.value:
             endpoint_list = endpoints.event_hubs
-        if EndpointType.ServiceBusQueue.value == endpoint_type.lower():
+        if endpoint_type.lower() == EndpointType.ServiceBusQueue.value:
             endpoint_list = endpoints.service_bus_queues
-        if EndpointType.ServiceBusTopic.value == endpoint_type.lower():
+        if endpoint_type.lower() == EndpointType.ServiceBusTopic.value:
             endpoint_list = endpoints.service_bus_topics
-        if EndpointType.AzureStorageContainer.value == endpoint_type.lower():
+        if endpoint_type.lower() == EndpointType.AzureStorageContainer.value:
             endpoint_list = endpoints.storage_containers
         # note that cosmos db support will be determined by if the user can call the command.
-        if EndpointType.CosmosDBContainer.value == endpoint_type.lower():
+        if endpoint_type.lower() == EndpointType.CosmosDBContainer.value:
             endpoint_list = endpoints.cosmos_db_sql_collections
 
         for endpoint in endpoint_list:

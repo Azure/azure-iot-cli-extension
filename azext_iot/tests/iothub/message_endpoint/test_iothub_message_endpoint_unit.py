@@ -22,25 +22,15 @@ resource_not_found_error = "Resource not found."
 generic_response = {generate_names(): generate_names()}
 
 
-path_find_resource = "azext_iot.iothub.providers.discovery.IotHubDiscovery.find_resource"
-arg_check_path = "azext_iot.iothub.providers.message_endpoint.MessageEndpoint._connection_string_retrieval_args_check"
-get_eventhub_cstring_path = "azext_iot.iothub.providers.message_endpoint.get_eventhub_cstring"
-get_servicebus_topic_cstring_path = "azext_iot.iothub.providers.message_endpoint.get_servicebus_topic_cstring"
-get_servicebus_queue_cstring_path = "azext_iot.iothub.providers.message_endpoint.get_servicebus_queue_cstring"
-get_cosmos_db_cstring_path = "azext_iot.iothub.providers.message_endpoint.get_cosmos_db_cstring"
-parse_cosmos_db_cstring_path = "azext_iot.iothub.providers.message_endpoint.parse_cosmos_db_connection_string"
-get_storage_cstring_path = "azext_iot.iothub.providers.message_endpoint.get_storage_cstring"
+iot_hub_providers_path = "azext_iot.iothub.providers"
+path_find_resource = f"{iot_hub_providers_path}.discovery.IotHubDiscovery.find_resource"
+parse_cosmos_db_cstring_path = f"{iot_hub_providers_path}.message_endpoint.parse_cosmos_db_connection_string"
+get_storage_cstring_path = f"{iot_hub_providers_path}.message_endpoint.get_storage_cstring"
 
 
 @pytest.fixture()
 def fixture_update_endpoint_ops(mocker):
-    # Fetch connection string
-    arg_check = mocker.patch(arg_check_path)
-    mocker.patch(get_eventhub_cstring_path, return_value="get_eventhub_cstring")
-    mocker.patch(get_servicebus_topic_cstring_path, return_value="get_servicebus_topic_cstring")
-    mocker.patch(get_servicebus_queue_cstring_path, return_value="get_servicebus_queue_cstring")
-    mocker.patch(get_storage_cstring_path, return_value="get_storage_cstring")
-    mocker.patch(get_cosmos_db_cstring_path, return_value="get_cosmos_db_cstring")
+    # Parse connection string
     mocker.patch(parse_cosmos_db_cstring_path, return_value={
         "AccountKey": "get_cosmos_db_account_key",
         "AccountEndpoint": "get_cosmos_db_account_endpoint"
@@ -68,7 +58,7 @@ def fixture_update_endpoint_ops(mocker):
 
     find_resource.side_effect = initialize_mock_client
 
-    yield find_resource, arg_check
+    yield find_resource
 
 
 class TestMessageEndpointUpdate:
@@ -77,10 +67,8 @@ class TestMessageEndpointUpdate:
         [
             {},
             {
-                "endpoint_account_name": None,
                 "endpoint_resource_group": generate_names(),
                 "endpoint_subscription_id": generate_names(),
-                "endpoint_policy_name": None,
                 "connection_string": generate_names(),
                 "endpoint_uri": None,
                 "entity_path": None,
@@ -88,10 +76,8 @@ class TestMessageEndpointUpdate:
                 "resource_group_name": generate_names(),
             },
             {
-                "endpoint_account_name": None,
                 "endpoint_resource_group": None,
                 "endpoint_subscription_id": None,
-                "endpoint_policy_name": None,
                 "connection_string": None,
                 "endpoint_uri": generate_names(),
                 "entity_path": generate_names(),
@@ -99,32 +85,26 @@ class TestMessageEndpointUpdate:
                 "resource_group_name": None,
             },
             {
-                "endpoint_account_name": generate_names(),
                 "endpoint_resource_group": None,
                 "endpoint_subscription_id": None,
-                "endpoint_policy_name": generate_names(),
-                "connection_string": "update",
+                "connection_string": generate_names(),
                 "endpoint_uri": generate_names(),
                 "entity_path": generate_names(),
                 "identity": None,
                 "resource_group_name": generate_names(),
             },
             {
-                "endpoint_account_name": None,
                 "endpoint_resource_group": generate_names(),
                 "endpoint_subscription_id": None,
-                "endpoint_policy_name": generate_names(),
                 "connection_string": None,
                 "endpoint_uri": generate_names(),
                 "entity_path": None,
-                "identity": generate_names(),
+                "identity": "[system]",
                 "resource_group_name": None,
             },
             {
-                "endpoint_account_name": generate_names(),
                 "endpoint_resource_group": generate_names(),
                 "endpoint_subscription_id": generate_names(),
-                "endpoint_policy_name": generate_names(),
                 "connection_string": generate_names(),
                 "endpoint_uri": generate_names(),
                 "entity_path": generate_names(),
@@ -140,7 +120,7 @@ class TestMessageEndpointUpdate:
             endpoint_name=endpoint_name,
             **req
         )
-        fixture_find_resource, fixture_arg_check = fixture_update_endpoint_ops
+        fixture_find_resource = fixture_update_endpoint_ops
 
         assert result == generic_response
         resource_group = fixture_find_resource.call_args[0][2]
@@ -175,20 +155,11 @@ class TestMessageEndpointUpdate:
             else:
                 assert isinstance(endpoint.identity, ManagedIdentity)
                 assert endpoint.identity.user_assigned_identity == identity
-            assert fixture_arg_check.call_count == 0
         elif req.get("connection_string"):
             assert endpoint.authentication_type == AuthenticationType.KeyBased.value
             assert endpoint.identity is None
             assert endpoint.entity_path is None
-            connection_string = req.get("connection_string")
-            if connection_string == "update":
-                assert endpoint.connection_string == "get_eventhub_cstring"
-                args_check = fixture_arg_check.call_args[1]
-                assert args_check["endpoint_account_name"] == req.get("endpoint_account_name")
-                assert args_check["entity_path"] == req.get("entity_path")
-                assert args_check["endpoint_policy_name"] == req.get("endpoint_policy_name")
-            else:
-                endpoint.connection_string = connection_string
+            assert endpoint.connection_string == req.get("connection_string")
         else:
             assert isinstance(endpoint.authentication_type, mock)
 
@@ -228,10 +199,8 @@ class TestMessageEndpointUpdate:
         [
             {},
             {
-                "endpoint_account_name": None,
                 "endpoint_resource_group": generate_names(),
                 "endpoint_subscription_id": generate_names(),
-                "endpoint_policy_name": None,
                 "connection_string": generate_names(),
                 "endpoint_uri": None,
                 "entity_path": None,
@@ -239,10 +208,8 @@ class TestMessageEndpointUpdate:
                 "resource_group_name": generate_names(),
             },
             {
-                "endpoint_account_name": None,
                 "endpoint_resource_group": None,
                 "endpoint_subscription_id": None,
-                "endpoint_policy_name": None,
                 "connection_string": None,
                 "endpoint_uri": generate_names(),
                 "entity_path": generate_names(),
@@ -250,32 +217,26 @@ class TestMessageEndpointUpdate:
                 "resource_group_name": None,
             },
             {
-                "endpoint_account_name": generate_names(),
                 "endpoint_resource_group": None,
                 "endpoint_subscription_id": None,
-                "endpoint_policy_name": generate_names(),
-                "connection_string": "update",
+                "connection_string": generate_names(),
                 "endpoint_uri": generate_names(),
                 "entity_path": generate_names(),
                 "identity": None,
                 "resource_group_name": generate_names(),
             },
             {
-                "endpoint_account_name": None,
                 "endpoint_resource_group": generate_names(),
                 "endpoint_subscription_id": None,
-                "endpoint_policy_name": generate_names(),
                 "connection_string": None,
                 "endpoint_uri": generate_names(),
                 "entity_path": None,
-                "identity": generate_names(),
+                "identity": "[system]",
                 "resource_group_name": None,
             },
             {
-                "endpoint_account_name": generate_names(),
                 "endpoint_resource_group": generate_names(),
                 "endpoint_subscription_id": generate_names(),
-                "endpoint_policy_name": generate_names(),
                 "connection_string": generate_names(),
                 "endpoint_uri": generate_names(),
                 "entity_path": generate_names(),
@@ -291,7 +252,7 @@ class TestMessageEndpointUpdate:
             endpoint_name=endpoint_name,
             **req
         )
-        fixture_find_resource, fixture_arg_check = fixture_update_endpoint_ops
+        fixture_find_resource = fixture_update_endpoint_ops
 
         assert result == generic_response
         resource_group = fixture_find_resource.call_args[0][2]
@@ -326,20 +287,11 @@ class TestMessageEndpointUpdate:
             else:
                 assert isinstance(endpoint.identity, ManagedIdentity)
                 assert endpoint.identity.user_assigned_identity == identity
-            assert fixture_arg_check.call_count == 0
         elif req.get("connection_string"):
             assert endpoint.authentication_type == AuthenticationType.KeyBased.value
             assert endpoint.identity is None
             assert endpoint.entity_path is None
-            connection_string = req.get("connection_string")
-            if connection_string == "update":
-                assert endpoint.connection_string == "get_servicebus_queue_cstring"
-                args_check = fixture_arg_check.call_args[1]
-                assert args_check["endpoint_account_name"] == req.get("endpoint_account_name")
-                assert args_check["entity_path"] == req.get("entity_path")
-                assert args_check["endpoint_policy_name"] == req.get("endpoint_policy_name")
-            else:
-                endpoint.connection_string = connection_string
+            assert endpoint.connection_string == req.get("connection_string")
         else:
             assert isinstance(endpoint.authentication_type, mock)
 
@@ -379,10 +331,8 @@ class TestMessageEndpointUpdate:
         [
             {},
             {
-                "endpoint_account_name": None,
                 "endpoint_resource_group": generate_names(),
                 "endpoint_subscription_id": generate_names(),
-                "endpoint_policy_name": None,
                 "connection_string": generate_names(),
                 "endpoint_uri": None,
                 "entity_path": None,
@@ -390,10 +340,8 @@ class TestMessageEndpointUpdate:
                 "resource_group_name": generate_names(),
             },
             {
-                "endpoint_account_name": None,
                 "endpoint_resource_group": None,
                 "endpoint_subscription_id": None,
-                "endpoint_policy_name": None,
                 "connection_string": None,
                 "endpoint_uri": generate_names(),
                 "entity_path": generate_names(),
@@ -401,32 +349,26 @@ class TestMessageEndpointUpdate:
                 "resource_group_name": None,
             },
             {
-                "endpoint_account_name": generate_names(),
                 "endpoint_resource_group": None,
                 "endpoint_subscription_id": None,
-                "endpoint_policy_name": generate_names(),
-                "connection_string": "update",
+                "connection_string": generate_names(),
                 "endpoint_uri": generate_names(),
                 "entity_path": generate_names(),
                 "identity": None,
                 "resource_group_name": generate_names(),
             },
             {
-                "endpoint_account_name": None,
                 "endpoint_resource_group": generate_names(),
                 "endpoint_subscription_id": None,
-                "endpoint_policy_name": generate_names(),
                 "connection_string": None,
                 "endpoint_uri": generate_names(),
                 "entity_path": None,
-                "identity": generate_names(),
+                "identity": "[system]",
                 "resource_group_name": None,
             },
             {
-                "endpoint_account_name": generate_names(),
                 "endpoint_resource_group": generate_names(),
                 "endpoint_subscription_id": generate_names(),
-                "endpoint_policy_name": generate_names(),
                 "connection_string": generate_names(),
                 "endpoint_uri": generate_names(),
                 "entity_path": generate_names(),
@@ -442,7 +384,7 @@ class TestMessageEndpointUpdate:
             endpoint_name=endpoint_name,
             **req
         )
-        fixture_find_resource, fixture_arg_check = fixture_update_endpoint_ops
+        fixture_find_resource = fixture_update_endpoint_ops
 
         assert result == generic_response
         resource_group = fixture_find_resource.call_args[0][2]
@@ -477,20 +419,11 @@ class TestMessageEndpointUpdate:
             else:
                 assert isinstance(endpoint.identity, ManagedIdentity)
                 assert endpoint.identity.user_assigned_identity == identity
-            assert fixture_arg_check.call_count == 0
         elif req.get("connection_string"):
             assert endpoint.authentication_type == AuthenticationType.KeyBased.value
             assert endpoint.identity is None
             assert endpoint.entity_path is None
-            connection_string = req.get("connection_string")
-            if connection_string == "update":
-                assert endpoint.connection_string == "get_servicebus_topic_cstring"
-                args_check = fixture_arg_check.call_args[1]
-                assert args_check["endpoint_account_name"] == req.get("endpoint_account_name")
-                assert args_check["entity_path"] == req.get("entity_path")
-                assert args_check["endpoint_policy_name"] == req.get("endpoint_policy_name")
-            else:
-                endpoint.connection_string = connection_string
+            assert endpoint.connection_string == req.get("connection_string")
         else:
             assert isinstance(endpoint.authentication_type, mock)
 
@@ -530,7 +463,6 @@ class TestMessageEndpointUpdate:
         [
             {},
             {
-                "endpoint_account_name": generate_names(),
                 "endpoint_resource_group": generate_names(),
                 "endpoint_subscription_id": generate_names(),
                 "connection_string": None,
@@ -544,7 +476,6 @@ class TestMessageEndpointUpdate:
                 "resource_group_name": generate_names(),
             },
             {
-                "endpoint_account_name": generate_names(),
                 "endpoint_resource_group": generate_names(),
                 "endpoint_subscription_id": generate_names(),
                 "connection_string": None,
@@ -558,10 +489,9 @@ class TestMessageEndpointUpdate:
                 "resource_group_name": None,
             },
             {
-                "endpoint_account_name": generate_names(),
                 "endpoint_resource_group": None,
                 "endpoint_subscription_id": None,
-                "connection_string": "update",
+                "connection_string": None,
                 "endpoint_uri": None,
                 "container_name": None,
                 "encoding": "arvo",
@@ -572,7 +502,6 @@ class TestMessageEndpointUpdate:
                 "resource_group_name": None,
             },
             {
-                "endpoint_account_name": None,
                 "endpoint_resource_group": generate_names(),
                 "endpoint_subscription_id": None,
                 "connection_string": generate_names(),
@@ -594,7 +523,7 @@ class TestMessageEndpointUpdate:
             endpoint_name=endpoint_name,
             **req
         )
-        fixture_find_resource, fixture_arg_check = fixture_update_endpoint_ops
+        fixture_find_resource = fixture_update_endpoint_ops
 
         assert result == generic_response
         resource_group = fixture_find_resource.call_args[0][2]
@@ -654,20 +583,11 @@ class TestMessageEndpointUpdate:
             else:
                 assert isinstance(endpoint.identity, ManagedIdentity)
                 assert endpoint.identity.user_assigned_identity == identity
-            assert fixture_arg_check.call_count == 0
         elif req.get("connection_string"):
             assert endpoint.authentication_type == AuthenticationType.KeyBased.value
             assert endpoint.identity is None
             assert endpoint.entity_path is None
-            connection_string = req.get("connection_string")
-            if connection_string == "update":
-                assert endpoint.connection_string == "get_storage_cstring"
-                args_check = fixture_arg_check.call_args[1]
-                assert args_check["endpoint_account_name"] == req.get("endpoint_account_name")
-                assert args_check["entity_path"] == req.get("entity_path")
-                assert args_check["endpoint_policy_name"] == req.get("endpoint_policy_name")
-            else:
-                endpoint.connection_string = connection_string
+            assert endpoint.connection_string == req.get("connection_string")
         else:
             assert isinstance(endpoint.authentication_type, mock)
 
@@ -707,7 +627,6 @@ class TestMessageEndpointUpdate:
         [
             {},
             {
-                "endpoint_account_name": generate_names(),
                 "endpoint_resource_group": generate_names(),
                 "endpoint_subscription_id": generate_names(),
                 "container_name": generate_names(),
@@ -722,7 +641,6 @@ class TestMessageEndpointUpdate:
                 "resource_group_name": None,
             },
             {
-                "endpoint_account_name": None,
                 "endpoint_resource_group": None,
                 "endpoint_subscription_id": None,
                 "container_name": None,
@@ -737,7 +655,6 @@ class TestMessageEndpointUpdate:
                 "resource_group_name": generate_names(),
             },
             {
-                "endpoint_account_name": None,
                 "endpoint_resource_group": None,
                 "endpoint_subscription_id": None,
                 "container_name": None,
@@ -752,7 +669,6 @@ class TestMessageEndpointUpdate:
                 "resource_group_name": None,
             },
             {
-                "endpoint_account_name": None,
                 "endpoint_resource_group": None,
                 "endpoint_subscription_id": None,
                 "container_name": None,
@@ -767,7 +683,6 @@ class TestMessageEndpointUpdate:
                 "resource_group_name": None,
             },
             {
-                "endpoint_account_name": None,
                 "endpoint_resource_group": generate_names(),
                 "endpoint_subscription_id": None,
                 "container_name": None,
@@ -782,12 +697,11 @@ class TestMessageEndpointUpdate:
                 "resource_group_name": None,
             },
             {
-                "endpoint_account_name": None,
                 "endpoint_resource_group": None,
                 "endpoint_subscription_id": None,
                 "container_name": generate_names(),
                 "database_name": generate_names(),
-                "connection_string": "update",
+                "connection_string": None,
                 "primary_key": None,
                 "secondary_key": None,
                 "endpoint_uri": None,
@@ -805,7 +719,7 @@ class TestMessageEndpointUpdate:
             endpoint_name=endpoint_name,
             **req
         )
-        fixture_find_resource, fixture_arg_check = fixture_update_endpoint_ops
+        fixture_find_resource = fixture_update_endpoint_ops
 
         assert result == generic_response
         resource_group = fixture_find_resource.call_args[0][2]
@@ -873,7 +787,6 @@ class TestMessageEndpointUpdate:
             else:
                 assert isinstance(endpoint.identity, ManagedIdentity)
                 assert endpoint.identity.user_assigned_identity == identity
-            assert fixture_arg_check.call_count == 0
         elif any([req.get("connection_string"), req.get("primary_key"), req.get("secondary_key")]):
             assert endpoint.authentication_type == AuthenticationType.KeyBased.value
             assert endpoint.identity is None
@@ -882,11 +795,6 @@ class TestMessageEndpointUpdate:
             primary_key = req.get("primary_key")
             secondary_key = req.get("secondary_key")
             endpoint_uri = req.get("endpoint_uri")
-            if connection_string == "update":
-                args_check = fixture_arg_check.call_args[1]
-                assert args_check["endpoint_account_name"] == req.get("endpoint_account_name")
-                assert args_check["entity_path"] == req.get("entity_path")
-                assert args_check["endpoint_policy_name"] == req.get("endpoint_policy_name")
 
             if primary_key:
                 assert endpoint.primary_key == primary_key
