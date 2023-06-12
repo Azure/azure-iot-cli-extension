@@ -19,6 +19,7 @@ from azext_iot.iothub.common import (
     BYTES_PER_MEGABYTE,
     FORCE_DELETE_WARNING,
     INVALID_CLI_CORE_FOR_COSMOS,
+    NULL_WARNING,
     SYSTEM_ASSIGNED_IDENTITY,
     AuthenticationType,
     EncodingFormat,
@@ -244,7 +245,8 @@ class MessageEndpoint(IoTHubProvider):
         original_endpoint = self._show_by_type(endpoint_name=endpoint_name, endpoint_type=endpoint_type)
 
         if any([connection_string, primary_key, secondary_key]) and identity:
-            optional_msg = ", --primary-key and/or --secondary-key," if primary_key or secondary_key else ""
+            cosmos_db = endpoint_type.lower() == EndpointType.CosmosDBContainer.value
+            optional_msg = ", --primary-key and/or --secondary-key," if cosmos_db else ""
             error_msg = "Please use either --connection-string" + optional_msg + " or --identity."
             raise MutuallyExclusiveArgumentError(error_msg)
 
@@ -261,9 +263,13 @@ class MessageEndpoint(IoTHubProvider):
         # If Identity and Connection String args are provided, Identity wins
         if identity:
             if endpoint_type.lower() == EndpointType.CosmosDBContainer.value:
+                if original_endpoint.primary_key or original_endpoint.secondary_key:
+                    logger.warning(NULL_WARNING.format("Primary and secondary keys"))
                 original_endpoint.primary_key = None
                 original_endpoint.secondary_key = None
             else:
+                if original_endpoint.connection_string:
+                    logger.warning(NULL_WARNING.format("The connection string"))
                 original_endpoint.connection_string = None
             original_endpoint.authentication_type = AuthenticationType.IdentityBased.value
             if identity == SYSTEM_ASSIGNED_IDENTITY:
@@ -273,11 +279,15 @@ class MessageEndpoint(IoTHubProvider):
                     user_assigned_identity=identity
                 )
         elif any([connection_string, primary_key, secondary_key]):
+            if original_endpoint.identity:
+                logger.warning(NULL_WARNING.format("The managed identity argument"))
             original_endpoint.identity = None
             original_endpoint.authentication_type = AuthenticationType.KeyBased.value
             if endpoint_type.lower() != EndpointType.CosmosDBContainer.value:
                 original_endpoint.endpoint_uri = None
             if hasattr(original_endpoint, "entity_path"):
+                if original_endpoint.entity_path:
+                    logger.warning(NULL_WARNING.format("The entity path"))
                 original_endpoint.entity_path = None
 
             if endpoint_type.lower() != EndpointType.CosmosDBContainer.value:

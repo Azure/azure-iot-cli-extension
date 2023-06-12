@@ -89,6 +89,7 @@ NON_DECODABLE_PAYLOAD = "{{non-decodable payload}}"
 INVALID_CLI_CORE_FOR_COSMOS = "This version of the azure cli core does not support Cosmos Db Endpoints for IoT Hub."
 FORCE_DELETE_WARNING = "This delete command may fail because {0} depend on the selected endpoint(s). Use --force to force delete"\
     " the endpoint(s) and the dependent {0}."
+NULL_WARNING = "{0} will be nulled out for the endpoint."
 
 CA_TRANSITION_API_VERSION = "2022-04-30-preview"
 HUB_PROVIDER = "Microsoft.Devices/IotHubs"

@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
+import logging
 import azext_iot.iothub.commands_message_endpoint as subject
 from azure.cli.core.azclierror import (
     MutuallyExclusiveArgumentError,
@@ -14,6 +15,8 @@ from azext_iot.iothub.common import BYTES_PER_MEGABYTE, AuthenticationType
 from azext_iot.tests.generators import generate_names
 
 from azure.mgmt.iothub.models import ManagedIdentity
+
+logging.disable(logging.CRITICAL)
 
 hub_name = "hubname"
 hub_rg = "hubrg"
@@ -177,7 +180,7 @@ class TestMessageEndpointUpdate:
 
     def test_message_endpoint_update_event_hub_error(self, fixture_cmd, fixture_update_endpoint_ops):
         # Cannot do both types of Authentication
-        with pytest.raises(MutuallyExclusiveArgumentError):
+        with pytest.raises(MutuallyExclusiveArgumentError) as e:
             subject.message_endpoint_update_event_hub(
                 cmd=fixture_cmd,
                 hub_name=hub_name,
@@ -185,6 +188,10 @@ class TestMessageEndpointUpdate:
                 connection_string="fake_cstring",
                 identity="[system]"
             )
+        error_msg = e.value.error_msg
+        assert "--connection-string" in error_msg
+        assert "--identity" in error_msg
+        assert "--primary-key and/or --secondary-key" not in error_msg
 
         # not found
         with pytest.raises(ResourceNotFoundError):
@@ -309,7 +316,7 @@ class TestMessageEndpointUpdate:
 
     def test_message_endpoint_update_service_bus_queue_error(self, fixture_cmd, fixture_update_endpoint_ops):
         # Cannot do both types of Authentication
-        with pytest.raises(MutuallyExclusiveArgumentError):
+        with pytest.raises(MutuallyExclusiveArgumentError) as e:
             subject.message_endpoint_update_service_bus_queue(
                 cmd=fixture_cmd,
                 hub_name=hub_name,
@@ -317,6 +324,10 @@ class TestMessageEndpointUpdate:
                 connection_string="fake_cstring",
                 identity="[system]"
             )
+        error_msg = e.value.error_msg
+        assert "--connection-string" in error_msg
+        assert "--identity" in error_msg
+        assert "--primary-key and/or --secondary-key" not in error_msg
 
         # not found
         with pytest.raises(ResourceNotFoundError):
@@ -441,7 +452,7 @@ class TestMessageEndpointUpdate:
 
     def test_message_endpoint_update_service_bus_topic_error(self, fixture_cmd, fixture_update_endpoint_ops):
         # Cannot do both types of Authentication
-        with pytest.raises(MutuallyExclusiveArgumentError):
+        with pytest.raises(MutuallyExclusiveArgumentError) as e:
             subject.message_endpoint_update_service_bus_topic(
                 cmd=fixture_cmd,
                 hub_name=hub_name,
@@ -449,6 +460,10 @@ class TestMessageEndpointUpdate:
                 connection_string="fake_cstring",
                 identity="[system]"
             )
+        error_msg = e.value.error_msg
+        assert "--connection-string" in error_msg
+        assert "--identity" in error_msg
+        assert "--primary-key and/or --secondary-key" not in error_msg
 
         # not found
         with pytest.raises(ResourceNotFoundError):
@@ -605,7 +620,7 @@ class TestMessageEndpointUpdate:
 
     def test_message_endpoint_update_storage_container_error(self, fixture_cmd, fixture_update_endpoint_ops):
         # Cannot do both types of Authentication
-        with pytest.raises(MutuallyExclusiveArgumentError):
+        with pytest.raises(MutuallyExclusiveArgumentError) as e:
             subject.message_endpoint_update_storage_container(
                 cmd=fixture_cmd,
                 hub_name=hub_name,
@@ -613,6 +628,10 @@ class TestMessageEndpointUpdate:
                 connection_string="fake_cstring",
                 identity="[system]"
             )
+        error_msg = e.value.error_msg
+        assert "--connection-string" in error_msg
+        assert "--identity" in error_msg
+        assert "--primary-key and/or --secondary-key" not in error_msg
 
         # not found
         with pytest.raises(ResourceNotFoundError):
@@ -812,7 +831,7 @@ class TestMessageEndpointUpdate:
 
     def test_message_endpoint_update_cosmos_db_sql_collections_error(self, fixture_cmd, fixture_update_endpoint_ops):
         # Cannot do both types of Authentication
-        with pytest.raises(MutuallyExclusiveArgumentError):
+        with pytest.raises(MutuallyExclusiveArgumentError) as e:
             subject.message_endpoint_update_cosmos_db_container(
                 cmd=fixture_cmd,
                 hub_name=hub_name,
@@ -820,7 +839,12 @@ class TestMessageEndpointUpdate:
                 connection_string="fake_cstring",
                 identity="[system]"
             )
-        with pytest.raises(MutuallyExclusiveArgumentError):
+        error_msg = e.value.error_msg
+        assert "--connection-string" in error_msg
+        assert "--identity" in error_msg
+        assert "--primary-key and/or --secondary-key" in error_msg
+
+        with pytest.raises(MutuallyExclusiveArgumentError) as e:
             subject.message_endpoint_update_cosmos_db_container(
                 cmd=fixture_cmd,
                 hub_name=hub_name,
@@ -828,7 +852,12 @@ class TestMessageEndpointUpdate:
                 primary_key="fake_cstring",
                 identity="[system]"
             )
-        with pytest.raises(MutuallyExclusiveArgumentError):
+        error_msg = e.value.error_msg
+        assert "--connection-string" in error_msg
+        assert "--identity" in error_msg
+        assert "--primary-key and/or --secondary-key" in error_msg
+
+        with pytest.raises(MutuallyExclusiveArgumentError) as e:
             subject.message_endpoint_update_cosmos_db_container(
                 cmd=fixture_cmd,
                 hub_name=hub_name,
@@ -836,6 +865,10 @@ class TestMessageEndpointUpdate:
                 secondary_key="fake_cstring",
                 identity="[system]"
             )
+        error_msg = e.value.error_msg
+        assert "--connection-string" in error_msg
+        assert "--identity" in error_msg
+        assert "--primary-key and/or --secondary-key" in error_msg
 
         # not found
         with pytest.raises(ResourceNotFoundError):
