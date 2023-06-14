@@ -753,6 +753,8 @@ def load_iothub_help():
                       If updating the authentication type from a key-based to identity-based Storage Container endpoint, you must provide the endpoint account (via --endpoint-account). The old connection string will be nulled out.
 
                       If updating the authentication type from an identity-based to key-based Storage Container endpoint, you must provide the connection string (via --connection-string).
+
+                      Encoding for the endpoint cannot be changed.
         examples:
           - name: Update a Storage Container endpoint for an IoT Hub to use a new specified connection string.
             text: >
@@ -760,9 +762,9 @@ def load_iothub_help():
           - name: Update a Storage Container endpoint for an IoT Hub to use system assigned identity with the given batch frequency, chunk size, and file name format.
             text: >
               az iot hub message-endpoint update storage-container -n {iothub_name} --en {endpoint_name}  -b {batch_frequency} -w {chunk_size} --ff {file_format} --identity [system]
-          - name: Update a Storage Container endpoint for an IoT Hub to use user assigned identity with json encoding.
+          - name: Update a Storage Container endpoint for an IoT Hub to use user assigned identity.
             text: >
-              az iot hub message-endpoint update storage-container -n {iothub_name} --en {endpoint_name}  --encoding json --identity {user_identity_resource_id}
+              az iot hub message-endpoint update storage-container -n {iothub_name} --en {endpoint_name}  --identity {user_identity_resource_id}
     """
 
     helps[

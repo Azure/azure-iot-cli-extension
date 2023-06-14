@@ -483,7 +483,6 @@ class TestMessageEndpointUpdate:
                 "connection_string": None,
                 "endpoint_uri": generate_names(),
                 "container_name": generate_names(),
-                "encoding": "JSON",
                 "batch_frequency": 1,
                 "chunk_size_window": 100,
                 "file_name_format": generate_names(),
@@ -496,7 +495,6 @@ class TestMessageEndpointUpdate:
                 "connection_string": None,
                 "endpoint_uri": generate_names(),
                 "container_name": generate_names(),
-                "encoding": "JSON",
                 "batch_frequency": None,
                 "chunk_size_window": 30,
                 "file_name_format": generate_names(),
@@ -509,7 +507,6 @@ class TestMessageEndpointUpdate:
                 "connection_string": None,
                 "endpoint_uri": None,
                 "container_name": None,
-                "encoding": "arvo",
                 "batch_frequency": None,
                 "chunk_size_window": None,
                 "file_name_format": None,
@@ -522,7 +519,6 @@ class TestMessageEndpointUpdate:
                 "connection_string": generate_names(),
                 "endpoint_uri": generate_names(),
                 "container_name": None,
-                "encoding": None,
                 "batch_frequency": None,
                 "chunk_size_window": None,
                 "file_name_format": None,
@@ -567,11 +563,6 @@ class TestMessageEndpointUpdate:
             assert endpoint.container_name == req.get("container_name")
         else:
             assert isinstance(endpoint.container_name, mock)
-
-        if req.get("encoding"):
-            assert endpoint.encoding == req.get("encoding").lower()
-        else:
-            assert isinstance(endpoint.encoding, mock)
 
         if req.get("file_name_format"):
             assert endpoint.file_name_format == req.get("file_name_format")

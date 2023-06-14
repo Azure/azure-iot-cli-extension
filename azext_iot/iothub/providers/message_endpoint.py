@@ -227,7 +227,6 @@ class MessageEndpoint(IoTHubProvider):
         endpoint_subscription_id: Optional[str] = None,
         connection_string: Optional[str] = None,
         container_name: Optional[str] = None,
-        encoding: Optional[str] = None,
         batch_frequency: Optional[int] = None,
         chunk_size_window: Optional[int] = None,
         file_name_format: Optional[str] = None,
@@ -308,8 +307,6 @@ class MessageEndpoint(IoTHubProvider):
         if endpoint_type == EndpointType.AzureStorageContainer.value:
             if container_name:
                 original_endpoint.container_name = container_name
-            if encoding:
-                original_endpoint.encoding = encoding.lower()
             if file_name_format:
                 original_endpoint.file_name_format = file_name_format
             if batch_frequency:

@@ -10,7 +10,7 @@ from azure.cli.core.commands.parameters import get_enum_type, get_three_state_fl
 from azext_iot.common.shared import DeviceAuthType, SettleType, ProtocolType, AckType
 from azext_iot.assets.user_messages import info_param_properties_device
 from azext_iot._params import hub_auth_type_dataplane_param_type
-from azext_iot.iothub.common import EncodingFormat, EndpointType, RouteSourceType
+from azext_iot.iothub.common import EndpointType, RouteSourceType
 from azext_iot.iothub._validators import validate_device_model_id
 from azext_iot._validators import mode2_iot_login_handler
 
@@ -494,12 +494,6 @@ def load_iothub_arguments(self, _):
                 "container_name",
                 options_list=["--container-name", "--container"],
                 help="Name of the storage container.",
-            )
-            context.argument(
-                "encoding",
-                options_list=["--encoding"],
-                arg_type=get_enum_type(EncodingFormat),
-                help="Encoding format for the container.",
             )
             context.argument(
                 "batch_frequency",
