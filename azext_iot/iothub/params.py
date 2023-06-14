@@ -10,7 +10,7 @@ from azure.cli.core.commands.parameters import get_enum_type, get_three_state_fl
 from azext_iot.common.shared import DeviceAuthType, SettleType, ProtocolType, AckType
 from azext_iot.assets.user_messages import info_param_properties_device
 from azext_iot._params import hub_auth_type_dataplane_param_type
-from azext_iot.iothub.common import EndpointType, RouteSourceType
+from azext_iot.iothub.common import EncodingFormat, EndpointType, RouteSourceType
 from azext_iot.iothub._validators import validate_device_model_id
 from azext_iot._validators import mode2_iot_login_handler
 
@@ -571,6 +571,14 @@ def load_iothub_arguments(self, _):
             "policy_name",
             options_list=["--policy-name"],
             help="The policy name for the endpoint resource connection string.",
+        )
+
+    with self.argument_context("iot hub message-endpoint create storage-container") as context:
+        context.argument(
+            "encoding",
+            options_list=["--encoding"],
+            arg_type=get_enum_type(EncodingFormat),
+            help="Encoding format for the container.",
         )
 
     with self.argument_context("iot hub message-endpoint update cosmosdb-container") as context:
