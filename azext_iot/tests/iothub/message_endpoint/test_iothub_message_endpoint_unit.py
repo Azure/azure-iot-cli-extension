@@ -579,14 +579,14 @@ class TestMessageEndpointUpdate:
             assert isinstance(endpoint.file_name_format, mock)
 
         if req.get("batch_frequency"):
-            assert endpoint.batch_frequency == req.get("batch_frequency")
+            assert endpoint.batch_frequency_in_seconds == req.get("batch_frequency")
         else:
-            assert isinstance(endpoint.batch_frequency, mock)
+            assert isinstance(endpoint.batch_frequency_in_seconds, mock)
 
         if req.get("chunk_size_window"):
-            assert endpoint.chunk_size_window == (req.get("chunk_size_window") * BYTES_PER_MEGABYTE)
+            assert endpoint.max_chunk_size_in_bytes == (req.get("chunk_size_window") * BYTES_PER_MEGABYTE)
         else:
-            assert isinstance(endpoint.chunk_size_window, mock)
+            assert isinstance(endpoint.max_chunk_size_in_bytes, mock)
 
         # Authentication props
         if req.get("identity"):

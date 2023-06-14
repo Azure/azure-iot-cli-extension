@@ -4,7 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-
 from typing import Optional
 import pytest
 from azure.cli.core.azclierror import BadRequestError
@@ -146,7 +145,7 @@ def test_iot_eventhub_endpoint_lifecycle(provisioned_event_hub_with_identity_mod
     # Update
     # Keybased -> System
     cli.invoke(
-        "iot hub message-endpoint create eventhub -n {} -g {} --en {} --erg {} --endpoint-uri {} --entity-path {} "
+        "iot hub message-endpoint update eventhub -n {} -g {} --en {} --erg {} --endpoint-uri {} --entity-path {} "
         "--identity [system]".format(
             iot_hub, iot_rg, endpoint_names[0], iot_rg, endpoint_uri, eventhub_instance
         )
@@ -167,15 +166,15 @@ def test_iot_eventhub_endpoint_lifecycle(provisioned_event_hub_with_identity_mod
         )
     ).as_json()
 
-    assert_endpoint_properties(endpoint_output, expected_cs_endpoint)
+    assert_endpoint_properties(endpoint_output, expected_sys_endpoint)
 
     # System -> User
     cli.invoke(
-        "iot hub message-endpoint create eventhub -n {} -g {} --en {} --erg {} --endpoint-uri {} --entity-path {} "
+        "iot hub message-endpoint update eventhub -n {} -g {} --en {} --erg {} --endpoint-uri {} --entity-path {} "
         "--identity {}".format(
             iot_hub,
             iot_rg,
-            endpoint_names[2],
+            endpoint_names[1],
             iot_rg,
             endpoint_uri,
             eventhub_instance,
@@ -184,7 +183,7 @@ def test_iot_eventhub_endpoint_lifecycle(provisioned_event_hub_with_identity_mod
     )
 
     expected_user_endpoint = build_expected_endpoint(
-        endpoint_names[2],
+        endpoint_names[1],
         iot_rg,
         iot_sub,
         entity_path=eventhub_instance,
@@ -199,7 +198,7 @@ def test_iot_eventhub_endpoint_lifecycle(provisioned_event_hub_with_identity_mod
         )
     )
 
-    assert_endpoint_properties(endpoint_output.as_json(), expected_sys_endpoint)
+    assert_endpoint_properties(endpoint_output.as_json(), expected_user_endpoint)
 
     # User -> Keybased
     cli.invoke(
@@ -218,7 +217,7 @@ def test_iot_eventhub_endpoint_lifecycle(provisioned_event_hub_with_identity_mod
         )
     )
 
-    assert_endpoint_properties(endpoint_output.as_json(), expected_user_endpoint)
+    assert_endpoint_properties(endpoint_output.as_json(), expected_cs_endpoint)
 
     # Delete one event hub endpoint
     cli.invoke(
@@ -455,7 +454,7 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
     # Update
     # Keybased -> User Queue
     cli.invoke(
-        "iot hub message-endpoint create servicebus-queue -n {} -g {} --en {} --erg {} --endpoint-uri {} "
+        "iot hub message-endpoint update servicebus-queue -n {} -g {} --en {} --erg {} --endpoint-uri {} "
         "--entity-path {} --identity {}".format(
             iot_hub,
             iot_rg,
@@ -487,7 +486,7 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
 
     # User -> System Topic
     cli.invoke(
-        "iot hub message-endpoint create servicebus-topic -n {} -g {} --en {} --erg {} --endpoint-uri {} "
+        "iot hub message-endpoint update servicebus-topic -n {} -g {} --en {} --erg {} --endpoint-uri {} "
         "--entity-path {} --identity [system]".format(
             iot_hub, iot_rg, endpoint_names[2], iot_rg, endpoint_uri, topic_instance
         )
@@ -511,7 +510,7 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
 
     # System -> Keybased Topic
     cli.invoke(
-        "iot hub message-endpoint create servicebus-topic -n {} -g {} --en {} --erg {} -c {}".format(
+        "iot hub message-endpoint update servicebus-topic -n {} -g {} --en {} --erg {} -c {}".format(
             iot_hub, iot_rg, endpoint_names[1], iot_rg, topic_cs
         )
     )
@@ -759,8 +758,8 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     # Update
     # Keybased -> System, change all optional props
     cli.invoke(
-        "iot hub message-endpoint create storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {}"
-        "--identity [system] -b {} -w {} --encoding {} --ff {}".format(
+        "iot hub message-endpoint update storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {} "
+        "--identity [system] -b {} -w {} --ff {}".format(
             iot_hub,
             iot_rg,
             endpoint_names[0],
@@ -769,7 +768,6 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
             container_name,
             100,
             50,
-            "json",
             custom_file_format
         )
     )
@@ -783,7 +781,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
         endpoint_uri=endpoint_uri,
         container_name=container_name,
         batch_frequency_in_seconds=100,
-        encoding="json",
+        encoding="avro",
         file_name_format=custom_file_format,
         max_chunk_size_in_bytes=50
     )
@@ -799,7 +797,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     # System -> User, change some optional props
     custom_file_format = default_file_format.replace("/", "_")
     cli.invoke(
-        "iot hub message-endpoint create storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {} "
+        "iot hub message-endpoint update storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {} "
         "--identity {} -b {}".format(
             iot_hub,
             iot_rg,
@@ -835,7 +833,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
 
     # User -> Keybased, change no optional props
     cli.invoke(
-        "iot hub message-endpoint create storage-container -n {} -g {} --en {} --erg {} --container {} "
+        "iot hub message-endpoint update storage-container -n {} -g {} --en {} --erg {} --container {} "
         "-c {}".format(
             iot_hub,
             iot_rg,
@@ -853,8 +851,7 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
         connection_string=storage_cs,
         container_name=container_name,
         authentication_type=AuthenticationType.KeyBased.value,
-        endpoint_uri=endpoint_uri,
-        identity=user_id,
+        endpoint_uri=None,
         batch_frequency_in_seconds=720,
         encoding="avro",
         file_name_format=default_file_format,
@@ -1051,7 +1048,7 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
     # Update
     # Keybased -> User, add pkn + pkt
     cli.invoke(
-        "iot hub message-endpoint create cosmosdb-container -n {} -g {} --en {} --erg {} --endpoint-uri {} "
+        "iot hub message-endpoint update cosmosdb-container -n {} -g {} --en {} --erg {} --endpoint-uri {} "
         "--identity {} --container {} --db {} --pkn {} --pkt {}".format(
             iot_hub,
             iot_rg,
@@ -1089,7 +1086,7 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
 
     # System -> Keybased, keep
     cli.invoke(
-        "iot hub message-endpoint create cosmosdb-container -n {} -g {} --en {} --erg {} -c {} --container {} "
+        "iot hub message-endpoint update cosmosdb-container -n {} -g {} --en {} --erg {} -c {} --container {} "
         "--db {}".format(
             iot_hub,
             iot_rg,

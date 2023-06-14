@@ -280,7 +280,7 @@ class MessageEndpoint(IoTHubProvider):
                 )
         elif any([connection_string, primary_key, secondary_key]):
             if original_endpoint.identity:
-                logger.warning(NULL_WARNING.format("The managed identity argument"))
+                logger.warning(NULL_WARNING.format("The managed identity property"))
             original_endpoint.identity = None
             original_endpoint.authentication_type = AuthenticationType.KeyBased.value
             if endpoint_type.lower() != EndpointType.CosmosDBContainer.value:
@@ -313,9 +313,9 @@ class MessageEndpoint(IoTHubProvider):
             if file_name_format:
                 original_endpoint.file_name_format = file_name_format
             if batch_frequency:
-                original_endpoint.batch_frequency = batch_frequency
+                original_endpoint.batch_frequency_in_seconds = batch_frequency
             if chunk_size_window:
-                original_endpoint.chunk_size_window = (chunk_size_window * BYTES_PER_MEGABYTE)
+                original_endpoint.max_chunk_size_in_bytes = (chunk_size_window * BYTES_PER_MEGABYTE)
         elif endpoint_type == EndpointType.CosmosDBContainer.value:
             if connection_string:
                 # parse out key from connection string
@@ -366,42 +366,33 @@ class MessageEndpoint(IoTHubProvider):
                 error_msg + " or endpoint account '--endpoint-account'."
             )
 
-    def _show_by_type(self, endpoint_name: str, endpoint_type: str):
+    def _show_by_type(self, endpoint_name: str, endpoint_type: Optional[str] = None):
         endpoints = self.hub_resource.properties.routing.endpoints
-        endpoint_list = None
-        if endpoint_type.lower() == EndpointType.EventHub.value:
-            endpoint_list = endpoints.event_hubs
-        if endpoint_type.lower() == EndpointType.ServiceBusQueue.value:
-            endpoint_list = endpoints.service_bus_queues
-        if endpoint_type.lower() == EndpointType.ServiceBusTopic.value:
-            endpoint_list = endpoints.service_bus_topics
-        if endpoint_type.lower() == EndpointType.AzureStorageContainer.value:
-            endpoint_list = endpoints.storage_containers
-        # note that cosmos db support will be determined by if the user can call the command.
-        if endpoint_type.lower() == EndpointType.CosmosDBContainer.value:
-            endpoint_list = endpoints.cosmos_db_sql_collections
+        endpoint_list = []
+        if endpoint_type is None or endpoint_type.lower() == EndpointType.EventHub.value:
+            endpoint_list.extend(endpoints.event_hubs)
+        if endpoint_type is None or endpoint_type.lower() == EndpointType.ServiceBusQueue.value:
+            endpoint_list.extend(endpoints.service_bus_queues)
+        if endpoint_type is None or endpoint_type.lower() == EndpointType.ServiceBusTopic.value:
+            endpoint_list.extend(endpoints.service_bus_topics)
+        if endpoint_type is None or endpoint_type.lower() == EndpointType.AzureStorageContainer.value:
+            endpoint_list.extend(endpoints.storage_containers)
+        if self.support_cosmos and (endpoint_type is None or endpoint_type.lower() == EndpointType.CosmosDBContainer.value):
+            endpoint_list.extend(endpoints.cosmos_db_sql_collections)
 
         for endpoint in endpoint_list:
             if endpoint.name.lower() == endpoint_name.lower():
                 return endpoint
 
-        raise ResourceNotFoundError(f"{endpoint_type} endpoint {endpoint_name} not found in IoT Hub {self.hub_resource.name}.")
+        if endpoint_type:
+            raise ResourceNotFoundError(
+                f"{endpoint_type} endpoint {endpoint_name} not found in IoT Hub {self.hub_resource.name}."
+            )
+
+        raise ResourceNotFoundError(f"Endpoint {endpoint_name} not found in IoT Hub {self.hub_resource.name}.")
 
     def show(self, endpoint_name: str):
-        endpoints = self.hub_resource.properties.routing.endpoints
-        endpoint_lists = [
-            endpoints.event_hubs,
-            endpoints.service_bus_queues,
-            endpoints.service_bus_topics,
-            endpoints.storage_containers
-        ]
-        if self.support_cosmos:
-            endpoint_lists.append(endpoints.cosmos_db_sql_collections if endpoints.cosmos_db_sql_collections else [])
-        for endpoint_list in endpoint_lists:
-            for endpoint in endpoint_list:
-                if endpoint.name.lower() == endpoint_name.lower():
-                    return endpoint
-        raise ResourceNotFoundError(f"Endpoint {endpoint_name} not found in IoT Hub {self.hub_resource.name}.")
+        return self._show_by_type(endpoint_name=endpoint_name)
 
     def list(self, endpoint_type: Optional[str] = None):
         endpoints = self.hub_resource.properties.routing.endpoints
