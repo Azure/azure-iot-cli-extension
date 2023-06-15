@@ -2608,6 +2608,7 @@ def iot_hub_distributed_tracing_show(
         resource_name=hub_name,
         resource_group_name=resource_group_name,
         auth_type=auth_type_dataplane,
+        # force_find_resource=True
     )
 
     device_twin = _iot_hub_distributed_tracing_show(target=target, device_id=device_id)
@@ -2710,6 +2711,7 @@ def iot_hub_distributed_tracing_update(
         resource_group_name=resource_group_name,
         include_events=True,
         auth_type=auth_type_dataplane,
+        # force_find_resource=True
     )
 
     if int(sampling_rate) not in range(0, 101):
@@ -2854,13 +2856,14 @@ def _iot_hub_distributed_tracing_show(target, device_id):
 
 
 def _validate_device_tracing(target, device_twin):
-    if target["location"].lower() not in TRACING_ALLOWED_FOR_LOCATION:
+    # Question: we can either force the hub to be found or skip checks
+    if target.get("location") and target["location"].lower() not in TRACING_ALLOWED_FOR_LOCATION:
         raise ClientRequestError(
             'Distributed tracing isn\'t supported for the hub located at "{}" location.'.format(
                 target["location"]
             )
         )
-    if target["sku_tier"].lower() != TRACING_ALLOWED_FOR_SKU:
+    if target.get("sku_tier") and target["sku_tier"].lower() != TRACING_ALLOWED_FOR_SKU:
         raise ClientRequestError(
             'Distributed tracing isn\'t supported for the hub belongs to "{}" sku tier.'.format(
                 target["sku_tier"]

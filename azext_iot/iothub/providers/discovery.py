@@ -42,8 +42,12 @@ class IotHubDiscovery(BaseDiscovery):
         return kwargs
 
     @classmethod
-    def get_target_by_cstring(cls, connection_string: str) -> IotHubTarget:
+    def get_target_by_cstring(cls, connection_string: str) -> Dict[str, str]:
         return IotHubTarget.from_connection_string(cstring=connection_string).as_dict()
+
+    @classmethod
+    def get_target_by_host_name(self, resource_host_name: str) -> Dict[str, str]:
+        return IotHubTarget.from_host_name(hostname=resource_host_name).as_dict()
 
     def _build_target(
         self, resource, policy, key_type: str = None, **kwargs

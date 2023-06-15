@@ -49,8 +49,32 @@ class DPSDiscovery(BaseDiscovery):
         return kwargs
 
     @classmethod
-    def get_target_by_cstring(cls, connection_string: str) -> DPSTarget:
+    def get_target_by_cstring(cls, connection_string: str) -> Dict[str, str]:
         return DPSTarget.from_connection_string(cstring=connection_string).as_dict()
+
+    @classmethod
+    def get_target_by_host_name(cls, resource_host_name: str) -> Dict[str, str]:
+        return DPSTarget.from_connection_string(resource_host_name=resource_host_name).as_dict()
+
+    def _build_target_from_name(
+        self, resource_host_name: str, policy, resource_group_name: str
+    ) -> Dict[str, str]:
+        target = {}
+        target["cs"] = IOT_SERVICE_CS_TEMPLATE.format(
+            resource_host_name,
+            policy.key_name,
+            policy.primary_key,
+        )
+        target["entity"] = resource_host_name
+        target["name"] = resource_host_name.split(".")[0]
+        target["policy"] = policy.key_name
+        target["primarykey"] = policy.primary_key
+        target["secondarykey"] = policy.secondary_key
+        target["subscription"] = self.sub_id
+        target["resourcegroup"] = resource_group_name
+
+        target["cmd"] = self.cmd
+        return target
 
     def _build_target(
         self, resource, policy, key_type: str = None, **kwargs

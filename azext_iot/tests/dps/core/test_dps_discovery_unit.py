@@ -7,6 +7,7 @@
 import pytest
 from azext_iot.dps.providers.discovery import DPSDiscovery
 from azext_iot.common._azure import parse_iot_dps_connection_string
+from azext_iot.common.shared import AuthenticationTypeDataplane
 
 
 @pytest.fixture
@@ -57,3 +58,44 @@ class TestDPSDiscovery:
         assert target["entity"] == parsed_fake_login["HostName"]
         assert target["policy"] == parsed_fake_login["SharedAccessKeyName"]
         assert target["primarykey"] == parsed_fake_login["SharedAccessKey"]
+
+    def test_get_target_by_host_name(self, fixture_cmd, get_mgmt_client):
+        discovery = DPSDiscovery(cmd=fixture_cmd)
+
+        fake_name = "COOLDPS"
+        fake_host_name = f"{fake_name}.azure-devices-provisioning.net"
+        fake_rg = "COOLRG"
+
+        target = discovery.get_target(
+            resource_name=fake_host_name, resource_group_name=fake_rg
+        )
+
+        # Ensure no ARM calls are made
+        assert get_mgmt_client.call_count == 0
+
+        assert target["cs"] == AuthenticationTypeDataplane.login.value
+        assert target["entity"] == fake_host_name
+        assert target["policy"] == AuthenticationTypeDataplane.login.value
+        assert target["primarykey"] == AuthenticationTypeDataplane.login.value
+
+        target = discovery.get_target(
+            resource_name=fake_host_name, resource_group_name=None
+        )
+
+        # Ensure no ARM calls are made
+        assert get_mgmt_client.call_count == 0
+
+        assert target["cs"] == AuthenticationTypeDataplane.login.value
+        assert target["entity"] == fake_host_name
+        assert target["policy"] == AuthenticationTypeDataplane.login.value
+        assert target["primarykey"] == AuthenticationTypeDataplane.login.value
+
+        target = discovery.get_target_by_host_name(fake_host_name)
+
+        # Ensure no ARM calls are made
+        assert get_mgmt_client.call_count == 0
+
+        assert target["cs"] == AuthenticationTypeDataplane.login.value
+        assert target["entity"] == fake_host_name
+        assert target["policy"] == AuthenticationTypeDataplane.login.value
+        assert target["primarykey"] == AuthenticationTypeDataplane.login.value
