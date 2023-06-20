@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 
 from azext_iot.common._azure import parse_iot_dps_connection_string
-from azext_iot.common.shared import AuthenticationTypeDataplane
 
 
 # TODO: Align with vNext for DPS
@@ -13,11 +12,10 @@ class DPSTarget:
     def __init__(self, decomposed: dict):
         # Revisit
         decomposed_lower = dict((k.lower(), v) for k, v in decomposed.items())
-        login = AuthenticationTypeDataplane.login.value
 
-        self.cs = decomposed_lower.get("cs", login)
-        self.policy = decomposed_lower.get("sharedaccesskeyname", login)
-        self.shared_access_key = decomposed_lower.get("sharedaccesskey", login)
+        self.cs = decomposed_lower.get("cs")
+        self.policy = decomposed_lower.get("sharedaccesskeyname")
+        self.shared_access_key = decomposed_lower.get("sharedaccesskey")
         self.entity = decomposed_lower.get("hostname")
 
     @classmethod
@@ -25,10 +23,6 @@ class DPSTarget:
         decomposed = parse_iot_dps_connection_string(cs=cstring)
         decomposed["cs"] = cstring
         return cls(decomposed)
-
-    @classmethod
-    def from_host_name(cls, hostname):
-        return cls({"hostname": hostname})
 
     def as_dict(self):
         return {

@@ -26,7 +26,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             for edge_device_id in edge_device_ids:
                 self.cmd(
                     self.set_cmd_auth_type(
-                        f"iot hub device-identity create -d {edge_device_id} -n {self.entity_name} -g {self.entity_rg} --ee",
+                        f"iot hub device-identity create -d {edge_device_id} -n {self.host_name} -g {self.entity_rg} --ee",
                         auth_type=auth_phase,
                     ),
                     checks=[
@@ -38,7 +38,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             for device_id in device_ids:
                 self.cmd(
                     self.set_cmd_auth_type(
-                        f"iot hub device-identity create -d {device_id} -n {self.entity_name} -g {self.entity_rg}",
+                        f"iot hub device-identity create -d {device_id} -n {self.host_name} -g {self.entity_rg}",
                         auth_type=auth_phase,
                     ),
                     checks=[
@@ -50,7 +50,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             # Error - Get parent of edge device with no initial parent
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub device-identity parent show -d {edge_device_ids[0]} -n {self.entity_name} -g {self.entity_rg}",
+                    f"iot hub device-identity parent show -d {edge_device_ids[0]} -n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 ),
                 expect_failure=True,
@@ -59,7 +59,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             # Error - Get parent of device which does not have any parent set
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub device-identity parent show -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg}",
+                    f"iot hub device-identity parent show -d {device_ids[0]} -n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 ),
                 expect_failure=True,
@@ -69,7 +69,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub device-identity parent set "
-                    f"-d {device_ids[0]} --pd {device_ids[1]} -n {self.entity_name} -g {self.entity_rg}",
+                    f"-d {device_ids[0]} --pd {device_ids[1]} -n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 ),
                 expect_failure=True,
@@ -79,7 +79,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub device-identity parent set -d {edge_device_ids[0]} --pd {edge_device_ids[1]} "
-                    f"-n {self.entity_name} -g {self.entity_rg}",
+                    f"-n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 ),
                 checks=self.is_empty(),
@@ -89,7 +89,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub device-identity children add -d {device_ids[0]} --child-list {device_ids[1]} "
-                    f"-n {self.entity_name} -g {self.entity_rg}",
+                    f"-n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 ),
                 expect_failure=True,
@@ -99,7 +99,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub device-identity children add -d {edge_device_ids[0]} --child-list {' '.join(device_ids)} "
-                    f"-n {self.entity_name} -g {self.entity_rg}",
+                    f"-n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 ),
                 checks=self.is_empty(),
@@ -109,7 +109,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub device-identity parent set "
-                    f"-d {device_ids[2]} --pd {edge_device_ids[1]} -n {self.entity_name} -g {self.entity_rg}",
+                    f"-d {device_ids[2]} --pd {edge_device_ids[1]} -n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 ),
                 expect_failure=True,
@@ -119,7 +119,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub device-identity parent set -d {device_ids[2]} --pd {edge_device_ids[1]} "
-                    f"-n {self.entity_name} -g {self.entity_rg} --force",
+                    f"-n {self.host_name} -g {self.entity_rg} --force",
                     auth_type=auth_phase,
                 ),
                 checks=self.is_empty(),
@@ -128,7 +128,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             # Get parent of device
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub device-identity parent show -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg}",
+                    f"iot hub device-identity parent show -d {device_ids[0]} -n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 ),
                 checks=[
@@ -141,7 +141,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub device-identity children add -d {edge_device_ids[0]} --child-list {device_ids[0]} "
-                    f"-n {self.entity_name} -g {self.entity_rg}",
+                    f"-n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 ),
                 expect_failure=True,
@@ -151,7 +151,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub device-identity children add -d {edge_device_ids[1]} --child-list {device_ids[0]} "
-                    f"-n {self.entity_name} -g {self.entity_rg}",
+                    f"-n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 ),
                 expect_failure=True,
@@ -161,7 +161,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub device-identity children add -d {edge_device_ids[1]} --child-list {device_ids[0]} "
-                    f"-n {self.entity_name} -g {self.entity_rg} --force",
+                    f"-n {self.host_name} -g {self.entity_rg} --force",
                     auth_type=auth_phase,
                 ),
                 checks=self.is_empty(),
@@ -173,7 +173,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             # List child devices of edge device
             output = self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub device-identity children list -d {edge_device_ids[0]} -n {self.entity_name} -g {self.entity_rg}",
+                    f"iot hub device-identity children list -d {edge_device_ids[0]} -n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 )
             )
@@ -183,7 +183,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub device-identity children remove "
-                    f"-d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg} --remove-all",
+                    f"-d {device_ids[0]} -n {self.host_name} -g {self.entity_rg} --remove-all",
                     auth_type=auth_phase,
                 ),
                 expect_failure=True,
@@ -193,7 +193,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub device-identity children remove "
-                    f"-d {edge_device_ids[1]} -n {self.entity_name} -g {self.entity_rg} --remove-all",
+                    f"-d {edge_device_ids[1]} -n {self.host_name} -g {self.entity_rg} --remove-all",
                     auth_type=auth_phase,
                 ),
                 checks=self.is_empty(),
@@ -206,7 +206,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub device-identity children remove "
-                    f"-d {edge_device_ids[1]} -n {self.entity_name} -g {self.entity_rg} --remove-all",
+                    f"-d {edge_device_ids[1]} -n {self.host_name} -g {self.entity_rg} --remove-all",
                     auth_type=auth_phase,
                 ),
                 expect_failure=True,
@@ -215,7 +215,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             # Error - remove child device of edge device neither passing child devices list nor remove-all parameter
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub device-identity children remove -d {edge_device_ids[1]} -n {self.entity_name} -g {self.entity_rg}",
+                    f"iot hub device-identity children remove -d {edge_device_ids[1]} -n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 ),
                 expect_failure=True,
@@ -225,7 +225,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub device-identity children remove -d {edge_device_ids[1]} --child-list {edge_device_ids[0]} "
-                    f"-n {self.entity_name} -g {self.entity_rg}",
+                    f"-n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 ),
                 expect_failure=True,
@@ -235,7 +235,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub device-identity children remove -d {edge_device_ids[1]} --child-list {device_ids[1]} "
-                    f"-n {self.entity_name} -g {self.entity_rg}",
+                    f"-n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 ),
                 expect_failure=True,
@@ -245,7 +245,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub device-identity children remove -d {edge_device_ids[0]} --child-list {device_ids[1]} "
-                    f"-n {self.entity_name} -g {self.entity_rg}",
+                    f"-n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 ),
                 checks=self.is_empty(),
@@ -255,7 +255,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub device-identity children remove -d {edge_device_ids[0]} --child-list {device_ids[0]} "
-                    f"-n {self.entity_name} -g {self.entity_rg}",
+                    f"-n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 ),
                 expect_failure=True,
@@ -264,7 +264,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
             # List child devices of edge device which doesn't have any children
             output = self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub device-identity children list -d {edge_device_ids[1]} -n {self.entity_name} -g {self.entity_rg}",
+                    f"iot hub device-identity children list -d {edge_device_ids[1]} -n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 )
             )
@@ -279,7 +279,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
 
             edge_device = self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub device-identity create -d {edge_device_ids[0]} -n {self.entity_name} -g {self.entity_rg} --ee",
+                    f"iot hub device-identity create -d {edge_device_ids[0]} -n {self.host_name} -g {self.entity_rg} --ee",
                     auth_type=auth_phase,
                 ),
                 checks=[
@@ -291,7 +291,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
 
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub device-identity create -d {device_ids[0]} -n {self.entity_name} "
+                    f"iot hub device-identity create -d {device_ids[0]} -n {self.host_name} "
                     f"-g {self.entity_rg} --device-scope {edge_device['deviceScope']}",
                     auth_type=auth_phase,
                 ),
@@ -307,7 +307,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
 
             edge_device = self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub device-identity create -d {edge_device_ids[0]} -n {self.entity_name} -g {self.entity_rg} --ee",
+                    f"iot hub device-identity create -d {edge_device_ids[0]} -n {self.host_name} -g {self.entity_rg} --ee",
                     auth_type=auth_phase,
                 ),
                 checks=[
@@ -319,7 +319,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
 
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub device-identity create -d {edge_device_ids[1]} -n {self.entity_name} --ee "
+                    f"iot hub device-identity create -d {edge_device_ids[1]} -n {self.host_name} --ee "
                     f"-g {self.entity_rg} --device-scope {edge_device['deviceScope']}",
                     auth_type=auth_phase,
                 ),

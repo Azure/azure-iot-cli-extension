@@ -99,6 +99,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 if add_data_contributor:
                     self._add_data_contributor(target_hub)
 
+        self.host_name = target_hub["properties"]["hostName"]
         self.region = self.get_region()
         self.connection_string = self.get_hub_cstring()
         add_test_tag(

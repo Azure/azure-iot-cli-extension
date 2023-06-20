@@ -71,9 +71,6 @@ def test_dps_targets(provisioned_iot_dps_no_hub_module):
     cs_target2 = discovery.get_target(resource_name=None, login=connection_string)
     assert_target(cs_target2, True)
 
-    cs_target1 = discovery.get_target_by_host_name(dps_host_name)
-    assert_target(cs_target1, True)
-
     cs_target2 = discovery.get_target(resource_name=dps_host_name)
     assert_target(cs_target2, True)
 

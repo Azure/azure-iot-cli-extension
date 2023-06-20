@@ -75,8 +75,11 @@ class TestDPSDiscovery:
 
         assert target["cs"] == AuthenticationTypeDataplane.login.value
         assert target["entity"] == fake_host_name
+        assert target["name"] == fake_name
         assert target["policy"] == AuthenticationTypeDataplane.login.value
         assert target["primarykey"] == AuthenticationTypeDataplane.login.value
+        assert target["secondarykey"] == AuthenticationTypeDataplane.login.value
+        assert target["resourcegroup"] == fake_rg
 
         target = discovery.get_target(
             resource_name=fake_host_name, resource_group_name=None
@@ -87,15 +90,8 @@ class TestDPSDiscovery:
 
         assert target["cs"] == AuthenticationTypeDataplane.login.value
         assert target["entity"] == fake_host_name
+        assert target["name"] == fake_name
         assert target["policy"] == AuthenticationTypeDataplane.login.value
         assert target["primarykey"] == AuthenticationTypeDataplane.login.value
-
-        target = discovery.get_target_by_host_name(fake_host_name)
-
-        # Ensure no ARM calls are made
-        assert get_mgmt_client.call_count == 0
-
-        assert target["cs"] == AuthenticationTypeDataplane.login.value
-        assert target["entity"] == fake_host_name
-        assert target["policy"] == AuthenticationTypeDataplane.login.value
-        assert target["primarykey"] == AuthenticationTypeDataplane.login.value
+        assert target["secondarykey"] == AuthenticationTypeDataplane.login.value
+        assert target["resourcegroup"] is None

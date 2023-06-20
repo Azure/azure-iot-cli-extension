@@ -8,7 +8,7 @@ from knack.log import get_logger
 from azure.cli.core.commands.client_factory import get_subscription_id
 from azext_iot.common._azure import IOT_SERVICE_CS_TEMPLATE
 from azext_iot.common.base_discovery import BaseDiscovery
-from azext_iot.common.shared import DiscoveryResourceType
+from azext_iot.common.shared import DiscoveryResourceType, AuthenticationTypeDataplane
 from azext_iot.common.utility import trim_from_start
 from azext_iot.iothub.models.iothub_target import IotHubTarget
 from azext_iot._factory import iot_hub_service_factory
@@ -45,9 +45,26 @@ class IotHubDiscovery(BaseDiscovery):
     def get_target_by_cstring(cls, connection_string: str) -> Dict[str, str]:
         return IotHubTarget.from_connection_string(cstring=connection_string).as_dict()
 
-    @classmethod
-    def get_target_by_host_name(self, resource_host_name: str) -> Dict[str, str]:
-        return IotHubTarget.from_host_name(hostname=resource_host_name).as_dict()
+    def _build_target_from_name(
+        self, resource_host_name: str, resource_group_name: str
+    ) -> Dict[str, str]:
+        login = AuthenticationTypeDataplane.login.value
+        target = {}
+        target["cs"] = IOT_SERVICE_CS_TEMPLATE.format(
+            resource_host_name,
+            login,
+            login,
+        )
+        target["entity"] = resource_host_name
+        target["name"] = resource_host_name.split(".")[0]
+        target["policy"] = login
+        target["primarykey"] = login
+        target["secondarykey"] = login
+        target["subscription"] = self.sub_id
+        target["resourcegroup"] = resource_group_name
+
+        target["cmd"] = self.cmd
+        return target
 
     def _build_target(
         self, resource, policy, key_type: str = None, **kwargs

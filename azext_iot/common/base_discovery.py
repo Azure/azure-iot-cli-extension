@@ -232,12 +232,6 @@ class BaseDiscovery(ABC):
         """Returns target inforation needed from a connection string."""
         pass
 
-    @classmethod
-    @abstractmethod
-    def get_target_by_host_name(cls, hostname):
-        """Returns target inforation needed from a hostname."""
-        pass
-
     def get_target(
         self, resource_name: str, resource_group_name: str = None, **kwargs
     ) -> Dict[str, str]:
@@ -293,7 +287,10 @@ class BaseDiscovery(ABC):
         if auth_type == AuthenticationTypeDataplane.login.value:
             logger.info("Using AAD access token for %s interaction.", self.resource_type)
             if all([not kwargs.get("force_find_resource"), valid_hostname(resource_name), "." in resource_name]):
-                return self.get_target_by_host_name(resource_host_name=resource_name)
+                return self._build_target_from_name(
+                    resource_host_name=resource_name,
+                    resource_group_name=resource_group_name
+                )
 
             resource = self.find_resource(resource_name=resource_name, rg=resource_group_name)
 
@@ -360,4 +357,9 @@ class BaseDiscovery(ABC):
     def _build_target(self, resource, policy, key_type=None, **kwargs):
         """Returns a dictionary representing the resource connection string parts to
         be used by the IoT extension."""
+        pass
+
+    @abstractmethod
+    def _build_target_from_name(cls, hostname, resource_group_name):
+        """Returns target inforation needed from a hostname."""
         pass
