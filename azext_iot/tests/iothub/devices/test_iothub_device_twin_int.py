@@ -39,7 +39,7 @@ class TestIoTHubDeviceTwin(IoTLiveScenarioTest):
 
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub device-identity create -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg}",
+                    f"iot hub device-identity create -d {device_ids[0]} -n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 )
             )
@@ -47,7 +47,7 @@ class TestIoTHubDeviceTwin(IoTLiveScenarioTest):
             # Initial twin state
             d0_twin = self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub device-twin show -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg}",
+                    f"iot hub device-twin show -d {device_ids[0]} -n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 ),
                 checks=[
@@ -63,7 +63,7 @@ class TestIoTHubDeviceTwin(IoTLiveScenarioTest):
             # Patch based twin update of desired props
             d0_twin = self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub device-twin update -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg} "
+                    f"iot hub device-twin update -d {device_ids[0]} -n {self.host_name} -g {self.entity_rg} "
                     "--desired '{patch_desired}'",  # Not f-string due to CLI TestFramework self.kwargs application :(
                     auth_type=auth_phase,
                 )
@@ -77,7 +77,7 @@ class TestIoTHubDeviceTwin(IoTLiveScenarioTest):
             # Patch based twin update of tag props
             d0_twin = self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub device-twin update -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg} "
+                    f"iot hub device-twin update -d {device_ids[0]} -n {self.host_name} -g {self.entity_rg} "
                     "--tags '{patch_tags}'",  # Not f-string due to CLI TestFramework self.kwargs application :(
                     auth_type=auth_phase,
                 )
@@ -94,7 +94,7 @@ class TestIoTHubDeviceTwin(IoTLiveScenarioTest):
             # Patch based twin update of tag and desired props
             d0_twin = self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub device-twin update -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg} "
+                    f"iot hub device-twin update -d {device_ids[0]} -n {self.host_name} -g {self.entity_rg} "
                     "--tags '{patch_tags}' --desired '{patch_desired}'",
                     auth_type=auth_phase,
                 )
@@ -115,7 +115,7 @@ class TestIoTHubDeviceTwin(IoTLiveScenarioTest):
             # Remove all twin tag properties
             d0_twin = self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub device-twin update -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg} "
+                    f"iot hub device-twin update -d {device_ids[0]} -n {self.host_name} -g {self.entity_rg} "
                     "--tags '{patch_tags}'",
                     auth_type=auth_phase,
                 )
@@ -130,7 +130,7 @@ class TestIoTHubDeviceTwin(IoTLiveScenarioTest):
             # Remove single desired property
             d0_twin = self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub device-twin update -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg} "
+                    f"iot hub device-twin update -d {device_ids[0]} -n {self.host_name} -g {self.entity_rg} "
                     "--desired '{patch_desired}'",
                     auth_type=auth_phase,
                 )
@@ -142,7 +142,7 @@ class TestIoTHubDeviceTwin(IoTLiveScenarioTest):
             # Validation error --desired is not an object
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub device-twin update -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg} "
+                    f"iot hub device-twin update -d {device_ids[0]} -n {self.host_name} -g {self.entity_rg} "
                     "--desired 'badinput'",
                     auth_type=auth_phase,
                 ),
@@ -156,7 +156,7 @@ class TestIoTHubDeviceTwin(IoTLiveScenarioTest):
 
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub device-identity create -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg}",
+                    f"iot hub device-identity create -d {device_ids[0]} -n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 )
             )
@@ -167,7 +167,7 @@ class TestIoTHubDeviceTwin(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub device-twin replace "
-                    f"-d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg} -j '{replace_twin_content_path}'",
+                    f"-d {device_ids[0]} -n {self.host_name} -g {self.entity_rg} -j '{replace_twin_content_path}'",
                     auth_type=auth_phase,
                 ),
                 checks=[
@@ -188,7 +188,7 @@ class TestIoTHubDeviceTwin(IoTLiveScenarioTest):
             )
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub device-twin replace -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg} "
+                    f"iot hub device-twin replace -d {device_ids[0]} -n {self.host_name} -g {self.entity_rg} "
                     "-j '{inline_replace_content}'",
                     auth_type=auth_phase,
                 ),
