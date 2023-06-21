@@ -67,31 +67,37 @@ class TestDPSDiscovery:
         fake_rg = "COOLRG"
 
         target = discovery.get_target(
-            resource_name=fake_host_name, resource_group_name=fake_rg
+            resource_name=fake_host_name,
+            resource_group_name=fake_rg,
+            auth_type=AuthenticationTypeDataplane.login.value
         )
 
         # Ensure no ARM calls are made
         assert get_mgmt_client.call_count == 0
 
-        assert target["cs"] == AuthenticationTypeDataplane.login.value
+        assert AuthenticationTypeDataplane.login.value in target["cs"]
         assert target["entity"] == fake_host_name
         assert target["name"] == fake_name
         assert target["policy"] == AuthenticationTypeDataplane.login.value
         assert target["primarykey"] == AuthenticationTypeDataplane.login.value
         assert target["secondarykey"] == AuthenticationTypeDataplane.login.value
         assert target["resourcegroup"] == fake_rg
+        assert target["cmd"] == fixture_cmd
 
         target = discovery.get_target(
-            resource_name=fake_host_name, resource_group_name=None
+            resource_name=fake_host_name,
+            resource_group_name=None,
+            auth_type=AuthenticationTypeDataplane.login.value
         )
 
         # Ensure no ARM calls are made
         assert get_mgmt_client.call_count == 0
 
-        assert target["cs"] == AuthenticationTypeDataplane.login.value
+        assert AuthenticationTypeDataplane.login.value in target["cs"]
         assert target["entity"] == fake_host_name
         assert target["name"] == fake_name
         assert target["policy"] == AuthenticationTypeDataplane.login.value
         assert target["primarykey"] == AuthenticationTypeDataplane.login.value
         assert target["secondarykey"] == AuthenticationTypeDataplane.login.value
         assert target["resourcegroup"] is None
+        assert target["cmd"] == fixture_cmd
