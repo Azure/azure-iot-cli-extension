@@ -35,9 +35,12 @@ class CertificateProvider(IoTHubProvider):
         rg: Optional[str] = None,
     ):
         super(CertificateProvider, self).__init__(
-            cmd=cmd, hub_name=hub_name, rg=rg,
+            cmd=cmd, hub_name=hub_name, rg=rg
         )
         self.cli = EmbeddedCLI()
+        if self.target.get("resourcegroup") is None:
+            resource = self.discovery.find_resource(hub_name)
+            self.target["resourcegroup"] = resource.additional_properties.get("resourcegroup")
 
     def iot_hub_certificate_root_authority_show(self) -> Optional[Dict[str, str]]:
         # Since a newly created IoT Hub has empty rootCertificate property

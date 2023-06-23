@@ -2718,7 +2718,7 @@ def iot_hub_distributed_tracing_update(
         raise InvalidArgumentValueError(
             "Sampling rate is a percentage, So only values from 0 to 100(inclusive) are permitted."
         )
-    device_twin = _iot_hub_distributed_tracing_show(target=target, device_id=device_id)
+    device_twin = _iot_hub_distributed_tracing_show(discovery=discovery, target=target, device_id=device_id)
     if TRACING_PROPERTY not in device_twin["properties"]["desired"]:
         device_twin["properties"]["desired"][TRACING_PROPERTY] = {}
     device_twin["properties"]["desired"][TRACING_PROPERTY]["sampling_rate"] = int(
@@ -2849,21 +2849,25 @@ def _iot_hub_monitor_feedback(target, device_id, wait_on_id):
     )
 
 
-def _iot_hub_distributed_tracing_show(target, device_id):
+def _iot_hub_distributed_tracing_show(discovery, target, device_id):
     device_twin = _iot_device_twin_show(target=target, device_id=device_id)
-    _validate_device_tracing(target, device_twin)
+    _validate_device_tracing(discovery, target, device_twin)
     return device_twin
 
 
-def _validate_device_tracing(target, device_twin):
+def _validate_device_tracing(discovery, target, device_twin):
     # Question: we can either force the hub to be found or skip checks
-    if target.get("location") and target["location"].lower() not in TRACING_ALLOWED_FOR_LOCATION:
+    if not all(target.get("location"), target.get("sku_tier")):
+        resource = discovery.find_resource(target["name"])
+        target["location"] = resource.location
+        target["sku_tier"] = resource.sku.tier.value if isinstance(resource.sku.tier, (Enum, EnumMeta)) else resource.sku.tier
+    if target["location"].lower() not in TRACING_ALLOWED_FOR_LOCATION:
         raise ClientRequestError(
             'Distributed tracing isn\'t supported for the hub located at "{}" location.'.format(
                 target["location"]
             )
         )
-    if target.get("sku_tier") and target["sku_tier"].lower() != TRACING_ALLOWED_FOR_SKU:
+    if target["sku_tier"].lower() != TRACING_ALLOWED_FOR_SKU:
         raise ClientRequestError(
             'Distributed tracing isn\'t supported for the hub belongs to "{}" sku tier.'.format(
                 target["sku_tier"]

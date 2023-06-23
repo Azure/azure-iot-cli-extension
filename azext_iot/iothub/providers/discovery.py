@@ -45,18 +45,18 @@ class IotHubDiscovery(BaseDiscovery):
     def get_target_by_cstring(cls, connection_string: str) -> Dict[str, str]:
         return IotHubTarget.from_connection_string(cstring=connection_string).as_dict()
 
-    def _build_target_from_name(
-        self, resource_host_name: str, resource_group_name: str
+    def _build_target_from_hostname(
+        self, resource_hostname: str, resource_group_name: str
     ) -> Dict[str, str]:
         login = AuthenticationTypeDataplane.login.value
         target = {}
         target["cs"] = IOT_SERVICE_CS_TEMPLATE.format(
-            resource_host_name,
+            resource_hostname,
             login,
             login,
         )
-        target["entity"] = resource_host_name
-        target["name"] = resource_host_name.split(".")[0]
+        target["entity"] = resource_hostname
+        target["name"] = resource_hostname.split(".")[0]
         target["policy"] = login
         target["primarykey"] = login
         target["secondarykey"] = login
