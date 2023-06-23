@@ -354,7 +354,7 @@ class BaseDiscovery(ABC):
         return targets
 
     @abstractmethod
-    def _build_target_from_hostname(cls, resource_hostname, resource_group_name):
+    def _build_target_from_hostname(self, resource_hostname, resource_group_name):
         """Returns target inforation needed from a hostname."""
         pass
 

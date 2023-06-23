@@ -2611,7 +2611,7 @@ def iot_hub_distributed_tracing_show(
         # force_find_resource=True
     )
 
-    device_twin = _iot_hub_distributed_tracing_show(target=target, device_id=device_id)
+    device_twin = _iot_hub_distributed_tracing_show(discovery=discovery, target=target, device_id=device_id)
     return _customize_device_tracing_output(
         device_twin["deviceId"],
         device_twin["properties"]["desired"],
@@ -2857,7 +2857,7 @@ def _iot_hub_distributed_tracing_show(discovery, target, device_id):
 
 def _validate_device_tracing(discovery, target, device_twin):
     # Question: we can either force the hub to be found or skip checks
-    if not all(target.get("location"), target.get("sku_tier")):
+    if not all([target.get("location"), target.get("sku_tier")]):
         resource = discovery.find_resource(target["name"])
         target["location"] = resource.location
         target["sku_tier"] = resource.sku.tier.value if isinstance(resource.sku.tier, (Enum, EnumMeta)) else resource.sku.tier
