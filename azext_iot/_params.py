@@ -928,7 +928,7 @@ def load_arguments(self, _):
             arg_group="Device Provisioning Service Identifier"
         )
         context.argument(
-            "dps_name_or_hostname",
+            "dps_name",
             options_list=["--dps-name", "-n"],
             help="Name or hostname of the Azure IoT Hub Device Provisioning Service. Required if --login is not provided.",
             arg_group="Device Provisioning Service Identifier"

@@ -27,7 +27,7 @@ def generate_enrollment_create_req(attestation_type=None, endorsement_key=None,
     return {'client': None,
             'enrollment_id': enrollment_id,
             'rg': resource_group,
-            'dps_name_or_hostname': mock_dps_target['entity'],
+            'dps_name': mock_dps_target['entity'],
             'attestation_type': attestation_type,
             'endorsement_key': endorsement_key,
             'certificate_path': certificate_path,
@@ -154,7 +154,7 @@ class TestEnrollmentCreate():
             cmd=fixture_cmd,
             enrollment_id=req['enrollment_id'],
             attestation_type=req['attestation_type'],
-            dps_name_or_hostname=req['dps_name_or_hostname'],
+            dps_name=req['dps_name'],
             resource_group_name=req['rg'],
             endorsement_key=req['endorsement_key'],
             certificate_path=req['certificate_path'],
@@ -251,7 +251,7 @@ class TestEnrollmentCreate():
                 cmd=fixture_cmd,
                 enrollment_id=req['enrollment_id'],
                 attestation_type=req['attestation_type'],
-                dps_name_or_hostname=req['dps_name_or_hostname'],
+                dps_name=req['dps_name'],
                 resource_group_name=req['rg'],
                 endorsement_key=req['endorsement_key'],
                 certificate_path=req['certificate_path'],
@@ -274,7 +274,7 @@ class TestEnrollmentCreate():
                 cmd=fixture_cmd,
                 enrollment_id=req['enrollment_id'],
                 attestation_type=req['attestation_type'],
-                dps_name_or_hostname=req['dps_name_or_hostname'],
+                dps_name=req['dps_name'],
                 resource_group_name=req['rg'],
                 endorsement_key=req['endorsement_key'],
                 device_id=req['device_id'],
@@ -319,7 +319,7 @@ def generate_enrollment_update_req(certificate_path=None, iot_hub_host_name=None
     return {'client': None,
             'enrollment_id': enrollment_id,
             'rg': resource_group,
-            'dps_name_or_hostname': mock_dps_target['entity'],
+            'dps_name': mock_dps_target['entity'],
             'certificate_path': certificate_path,
             'secondary_certificate_path': secondary_certificate_path,
             'remove_certificate_path': remove_certificate_path,
@@ -387,7 +387,7 @@ class TestEnrollmentUpdate():
         subject.iot_dps_device_enrollment_update(
             cmd=fixture_cmd,
             enrollment_id=req['enrollment_id'],
-            dps_name_or_hostname=req['dps_name_or_hostname'],
+            dps_name=req['dps_name'],
             resource_group_name=req['rg'],
             etag=req['etag'],
             endorsement_key=None,
@@ -501,7 +501,7 @@ class TestEnrollmentShow():
         result = subject.iot_dps_device_enrollment_get(
             cmd=fixture_cmd,
             enrollment_id=enrollment_id,
-            dps_name_or_hostname=mock_dps_target['entity'],
+            dps_name=mock_dps_target['entity'],
             resource_group_name=resource_group,
         )
 
@@ -518,7 +518,7 @@ class TestEnrollmentShow():
         result = subject.iot_dps_device_enrollment_get(
             cmd=fixture_cmd,
             enrollment_id=enrollment_id,
-            dps_name_or_hostname=mock_dps_target['entity'],
+            dps_name=mock_dps_target['entity'],
             resource_group_name=resource_group,
             show_keys=True
         )
@@ -545,7 +545,7 @@ class TestEnrollmentShow():
             subject.iot_dps_device_enrollment_get(
                 cmd=fixture_cmd,
                 enrollment_id=enrollment_id,
-                dps_name_or_hostname=mock_dps_target['entity'],
+                dps_name=mock_dps_target['entity'],
                 resource_group_name=resource_group,
             )
 
@@ -567,7 +567,7 @@ class TestEnrollmentList():
     def test_enrollment_list(self, serviceclient, fixture_cmd, top):
         result = subject.iot_dps_device_enrollment_list(
             cmd=fixture_cmd,
-            dps_name_or_hostname=mock_dps_target['entity'],
+            dps_name=mock_dps_target['entity'],
             resource_group_name=resource_group,
             top=top
         )
@@ -585,7 +585,7 @@ class TestEnrollmentList():
         with pytest.raises(CLIError):
             subject.iot_dps_device_enrollment_list(
                 cmd=fixture_cmd,
-                dps_name_or_hostname=mock_dps_target['entity'],
+                dps_name=mock_dps_target['entity'],
                 resource_group_name=resource_group,
             )
 
@@ -611,7 +611,7 @@ class TestEnrollmentDelete():
         subject.iot_dps_device_enrollment_delete(
             cmd=fixture_cmd,
             enrollment_id=enrollment_id,
-            dps_name_or_hostname=mock_dps_target['entity'],
+            dps_name=mock_dps_target['entity'],
             resource_group_name=resource_group,
             etag=etag
         )
@@ -627,7 +627,7 @@ class TestEnrollmentDelete():
             subject.iot_dps_device_enrollment_delete(
                 cmd=fixture_cmd,
                 enrollment_id=enrollment_id,
-                dps_name_or_hostname=mock_dps_target['entity'],
+                dps_name=mock_dps_target['entity'],
                 resource_group_name=resource_group,
             )
 
@@ -654,7 +654,7 @@ class TestRegistrationShow():
     def test_registration_show(self, fixture_cmd, serviceclient):
         result = subject.iot_dps_registration_get(
             cmd=fixture_cmd,
-            dps_name_or_hostname=mock_dps_target['entity'],
+            dps_name=mock_dps_target['entity'],
             registration_id=enrollment_id,
             resource_group_name=resource_group,
         )
@@ -669,7 +669,7 @@ class TestRegistrationShow():
         with pytest.raises(CLIError):
             subject.iot_dps_registration_get(
                 cmd=fixture_cmd,
-                dps_name_or_hostname=mock_dps_target['entity'],
+                dps_name=mock_dps_target['entity'],
                 registration_id=enrollment_id,
                 resource_group_name=resource_group,
             )
@@ -695,7 +695,7 @@ class TestRegistrationDelete():
     def test_registration_delete(self, serviceclient, fixture_cmd, etag):
         subject.iot_dps_registration_delete(
             cmd=fixture_cmd,
-            dps_name_or_hostname=mock_dps_target['entity'],
+            dps_name=mock_dps_target['entity'],
             registration_id=enrollment_id,
             resource_group_name=resource_group,
             etag=etag
@@ -711,7 +711,7 @@ class TestRegistrationDelete():
         with pytest.raises(CLIError):
             subject.iot_dps_registration_delete(
                 cmd=fixture_cmd,
-                dps_name_or_hostname=mock_dps_target['entity'],
+                dps_name=mock_dps_target['entity'],
                 registration_id=enrollment_id,
                 resource_group_name=resource_group,
             )

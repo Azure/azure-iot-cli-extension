@@ -55,7 +55,7 @@ logger = get_logger(__name__)
 
 def iot_dps_device_enrollment_list(
     cmd,
-    dps_name_or_hostname=None,
+    dps_name=None,
     resource_group_name=None,
     top=None,
     login=None,
@@ -65,7 +65,7 @@ def iot_dps_device_enrollment_list(
 
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
-        dps_name_or_hostname,
+        dps_name,
         resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -85,7 +85,7 @@ def iot_dps_device_enrollment_list(
 def iot_dps_device_enrollment_get(
     cmd,
     enrollment_id,
-    dps_name_or_hostname=None,
+    dps_name=None,
     resource_group_name=None,
     show_keys=None,
     login=None,
@@ -93,7 +93,7 @@ def iot_dps_device_enrollment_get(
 ):
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
-        dps_name_or_hostname,
+        dps_name,
         resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -128,7 +128,7 @@ def iot_dps_device_enrollment_create(
     cmd,
     enrollment_id,
     attestation_type,
-    dps_name_or_hostname=None,
+    dps_name=None,
     resource_group_name=None,
     endorsement_key=None,
     certificate_path=None,
@@ -152,7 +152,7 @@ def iot_dps_device_enrollment_create(
 ):
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
-        dps_name_or_hostname,
+        dps_name,
         resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -216,7 +216,7 @@ def iot_dps_device_enrollment_create(
 def iot_dps_device_enrollment_update(
     cmd,
     enrollment_id,
-    dps_name_or_hostname=None,
+    dps_name=None,
     resource_group_name=None,
     etag=None,
     endorsement_key=None,
@@ -243,7 +243,7 @@ def iot_dps_device_enrollment_update(
 ):
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
-        dps_name_or_hostname,
+        dps_name,
         resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -330,7 +330,7 @@ def iot_dps_device_enrollment_update(
 def iot_dps_device_enrollment_delete(
     cmd,
     enrollment_id,
-    dps_name_or_hostname=None,
+    dps_name=None,
     resource_group_name=None,
     etag=None,
     login=None,
@@ -338,7 +338,7 @@ def iot_dps_device_enrollment_delete(
 ):
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
-        dps_name_or_hostname,
+        dps_name,
         resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -356,13 +356,13 @@ def iot_dps_device_enrollment_delete(
 
 
 def iot_dps_device_enrollment_group_list(
-    cmd, dps_name_or_hostname=None, resource_group_name=None, top=None, login=None, auth_type_dataplane=None,
+    cmd, dps_name=None, resource_group_name=None, top=None, login=None, auth_type_dataplane=None,
 ):
     from azext_iot.sdk.dps.service.models import QuerySpecification
 
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
-        dps_name_or_hostname,
+        dps_name,
         resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -381,7 +381,7 @@ def iot_dps_device_enrollment_group_list(
 def iot_dps_device_enrollment_group_get(
     cmd,
     enrollment_id,
-    dps_name_or_hostname=None,
+    dps_name=None,
     resource_group_name=None,
     show_keys=None,
     login=None,
@@ -389,7 +389,7 @@ def iot_dps_device_enrollment_group_get(
 ):
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
-        dps_name_or_hostname,
+        dps_name,
         resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -423,7 +423,7 @@ def iot_dps_device_enrollment_group_get(
 def iot_dps_device_enrollment_group_create(
     cmd,
     enrollment_id,
-    dps_name_or_hostname=None,
+    dps_name=None,
     resource_group_name=None,
     certificate_path=None,
     secondary_certificate_path=None,
@@ -446,7 +446,7 @@ def iot_dps_device_enrollment_group_create(
 ):
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
-        dps_name_or_hostname,
+        dps_name,
         resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -515,7 +515,7 @@ def iot_dps_device_enrollment_group_create(
 def iot_dps_device_enrollment_group_update(
     cmd,
     enrollment_id,
-    dps_name_or_hostname=None,
+    dps_name=None,
     resource_group_name=None,
     etag=None,
     certificate_path=None,
@@ -541,7 +541,7 @@ def iot_dps_device_enrollment_group_update(
 ):
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
-        dps_name_or_hostname,
+        dps_name,
         resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -645,7 +645,7 @@ def iot_dps_device_enrollment_group_update(
 def iot_dps_device_enrollment_group_delete(
     cmd,
     enrollment_id,
-    dps_name_or_hostname=None,
+    dps_name=None,
     resource_group_name=None,
     etag=None,
     login=None,
@@ -653,7 +653,7 @@ def iot_dps_device_enrollment_group_delete(
 ):
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
-        dps_name_or_hostname,
+        dps_name,
         resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -671,14 +671,14 @@ def iot_dps_compute_device_key(
     cmd,
     registration_id,
     enrollment_id=None,
-    dps_name_or_hostname=None,
+    dps_name=None,
     resource_group_name=None,
     symmetric_key=None,
     login=None,
     auth_type_dataplane=None,
 ):
     if symmetric_key is None:
-        if not all([dps_name_or_hostname, enrollment_id]):
+        if not all([dps_name, enrollment_id]):
             raise RequiredArgumentMissingError(
                 "Please provide DPS enrollment group identifiers (Device Provisioning Service name via "
                 "--dps-name and Enrollment ID via --enrollment-id) or the enrollment group symmetric key "
@@ -687,7 +687,7 @@ def iot_dps_compute_device_key(
 
         discovery = DPSDiscovery(cmd)
         target = discovery.get_target(
-            dps_name_or_hostname,
+            dps_name,
             resource_group_name,
             login=login,
             auth_type=auth_type_dataplane,
@@ -719,7 +719,7 @@ def iot_dps_compute_device_key(
 
 def iot_dps_connection_string_show(
     cmd,
-    dps_name_or_hostname=None,
+    dps_name=None,
     resource_group_name=None,
     policy_name="provisioningserviceowner",
     key_type=KeyType.primary.value,
@@ -727,7 +727,7 @@ def iot_dps_connection_string_show(
 ):
     discovery = DPSDiscovery(cmd)
 
-    if dps_name_or_hostname is None:
+    if dps_name is None:
         dps = discovery.get_resources(resource_group_name)
         if dps is None:
             raise ResourceNotFoundError("No Device Provisioning Service found.")
@@ -763,7 +763,7 @@ def iot_dps_connection_string_show(
                 )
         return connection_strings
 
-    dps = discovery.find_resource(dps_name_or_hostname, resource_group_name)
+    dps = discovery.find_resource(dps_name, resource_group_name)
     if dps:
         conn_str = _get_dps_connection_string(
             discovery, dps, policy_name, key_type, show_all
@@ -801,11 +801,11 @@ def _get_dps_connection_string(
 
 
 def iot_dps_registration_list(
-    cmd, enrollment_id, dps_name_or_hostname=None, resource_group_name=None, login=None, auth_type_dataplane=None,
+    cmd, enrollment_id, dps_name=None, resource_group_name=None, login=None, auth_type_dataplane=None,
 ):
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
-        dps_name_or_hostname,
+        dps_name,
         resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -822,11 +822,11 @@ def iot_dps_registration_list(
 
 
 def iot_dps_registration_get(
-    cmd, registration_id, dps_name_or_hostname=None, resource_group_name=None, login=None, auth_type_dataplane=None,
+    cmd, registration_id, dps_name=None, resource_group_name=None, login=None, auth_type_dataplane=None,
 ):
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
-        dps_name_or_hostname,
+        dps_name,
         resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -845,7 +845,7 @@ def iot_dps_registration_get(
 def iot_dps_registration_delete(
     cmd,
     registration_id,
-    dps_name_or_hostname=None,
+    dps_name=None,
     resource_group_name=None,
     etag=None,
     login=None,
@@ -853,7 +853,7 @@ def iot_dps_registration_delete(
 ):
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
-        dps_name_or_hostname,
+        dps_name,
         resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
