@@ -102,6 +102,38 @@ def load_iothub_commands(self, _):
         )
 
     with self.command_group(
+        "iot hub message-endpoint update",
+        command_type=iothub_message_endpoint_ops,
+    ) as cmd_group:
+        cmd_group.command(
+            "eventhub",
+            "message_endpoint_update_event_hub",
+            transform=EndpointUpdateResultTransform(self.cli_ctx)
+        )
+        cmd_group.command(
+            "servicebus-queue",
+            "message_endpoint_update_service_bus_queue",
+            transform=EndpointUpdateResultTransform(self.cli_ctx)
+        )
+        cmd_group.command(
+            "servicebus-topic",
+            "message_endpoint_update_service_bus_topic",
+            transform=EndpointUpdateResultTransform(self.cli_ctx)
+        )
+        cmd_group.command(
+            "cosmosdb-container",
+            "message_endpoint_update_cosmos_db_container",
+            transform=EndpointUpdateResultTransform(self.cli_ctx),
+            resource_type=ResourceType.MGMT_IOTHUB,
+            min_api="2022-04-30-preview"
+        )
+        cmd_group.command(
+            "storage-container",
+            "message_endpoint_update_storage_container",
+            transform=EndpointUpdateResultTransform(self.cli_ctx)
+        )
+
+    with self.command_group(
         'iot hub message-route', command_type=iothub_message_route_ops, is_preview=True
     ) as cmd_group:
         cmd_group.command(
