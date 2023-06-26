@@ -18,12 +18,12 @@ def invoke_device_command(
     payload="{}",
     connect_timeout=None,
     response_timeout=None,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
 ):
     runtime_provider = PnPRuntimeProvider(
-        cmd=cmd, hub_name=hub_name, rg=resource_group_name, login=login
+        cmd=cmd, hub_name=hub_name_or_hostname, rg=resource_group_name, login=login
     )
     return runtime_provider.invoke_device_command(
         device_id=device_id,
@@ -38,12 +38,12 @@ def invoke_device_command(
 def get_digital_twin(
     cmd,
     device_id,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
 ):
     runtime_provider = PnPRuntimeProvider(
-        cmd=cmd, hub_name=hub_name, rg=resource_group_name, login=login
+        cmd=cmd, hub_name=hub_name_or_hostname, rg=resource_group_name, login=login
     )
     return runtime_provider.get_digital_twin(
         device_id=device_id,
@@ -54,13 +54,13 @@ def patch_digital_twin(
     cmd,
     device_id,
     json_patch,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     etag=None
 ):
     runtime_provider = PnPRuntimeProvider(
-        cmd=cmd, hub_name=hub_name, rg=resource_group_name, login=login
+        cmd=cmd, hub_name=hub_name_or_hostname, rg=resource_group_name, login=login
     )
     return runtime_provider.patch_digital_twin(
         device_id=device_id, json_patch=json_patch, etag=etag
