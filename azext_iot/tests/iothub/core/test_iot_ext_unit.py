@@ -181,7 +181,7 @@ class TestDeviceCreate:
             subject.iot_device_create(
                 cmd=None,
                 device_id=req["device_id"],
-                hub_name=req["hub_name"],
+                hub_name_or_hostname=req["hub_name"],
                 edge_enabled=req["ee"],
                 auth_method=req["auth"],
                 primary_key=req["pk"],
@@ -197,7 +197,7 @@ class TestDeviceCreate:
             subject.iot_device_create(
                 cmd=None,
                 device_id=req["device_id"],
-                hub_name=req["hub_name"],
+                hub_name_or_hostname=req["hub_name"],
                 edge_enabled=req["ee"],
                 auth_method=req["auth"],
                 primary_key=req["pk"],
@@ -292,7 +292,7 @@ class TestDeviceUpdate:
         subject.iot_device_update(
             cmd=fixture_cmd,
             device_id=req["deviceId"],
-            hub_name=mock_target["entity"],
+            hub_name_or_hostname=mock_target["entity"],
             parameters=req,
             etag=req.get("etag"),
         )
@@ -508,7 +508,7 @@ class TestDeviceUpdate:
             subject.iot_device_update(
                 cmd=fixture_cmd,
                 device_id=req["deviceId"],
-                hub_name=mock_target["entity"],
+                hub_name_or_hostname=mock_target["entity"],
                 parameters=req,
             )
 
@@ -518,7 +518,7 @@ class TestDeviceUpdate:
             subject.iot_device_update(
                 cmd=fixture_cmd,
                 device_id=req["deviceId"],
-                hub_name=mock_target["entity"],
+                hub_name_or_hostname=mock_target["entity"],
                 parameters=req,
             )
 
@@ -549,7 +549,7 @@ class TestDeviceRegenerateKey:
     def test_device_key_regenerate(self, fixture_cmd, serviceclient, req, etag):
         subject.iot_device_key_regenerate(
             cmd=fixture_cmd,
-            hub_name=mock_target["entity"],
+            hub_name_or_hostname=mock_target["entity"],
             device_id=device_id,
             renew_key_type=req,
             etag=etag
@@ -592,7 +592,7 @@ class TestDeviceRegenerateKey:
         with pytest.raises(exp):
             subject.iot_device_key_regenerate(
                 cmd=fixture_cmd,
-                hub_name=mock_target["entity"],
+                hub_name_or_hostname=mock_target["entity"],
                 device_id=device_id,
                 renew_key_type=req,
             )
@@ -602,7 +602,7 @@ class TestDeviceRegenerateKey:
         with pytest.raises(CLIError):
             subject.iot_device_key_regenerate(
                 cmd=fixture_cmd,
-                hub_name=mock_target["entity"],
+                hub_name_or_hostname=mock_target["entity"],
                 device_id=device_id,
                 renew_key_type=req,
             )
@@ -623,7 +623,7 @@ class TestDeviceDelete:
         subject.iot_device_delete(
             cmd=fixture_cmd,
             device_id=device_id,
-            hub_name=mock_target["entity"],
+            hub_name_or_hostname=mock_target["entity"],
             etag=target_etag,
         )
         args = serviceclient.call_args
@@ -654,14 +654,14 @@ class TestDeviceShow:
         )
 
         result = subject.iot_device_show(
-            cmd=fixture_cmd, device_id=device_id, hub_name=mock_target["entity"]
+            cmd=fixture_cmd, device_id=device_id, hub_name_or_hostname=mock_target["entity"]
         )
         assert result["deviceId"] == device_id
 
     def test_device_show_error(self, fixture_cmd, service_client_generic_errors):
         with pytest.raises(CLIError):
             subject.iot_device_show(
-                cmd=fixture_cmd, device_id=device_id, hub_name=mock_target["entity"]
+                cmd=fixture_cmd, device_id=device_id, hub_name_or_hostname=mock_target["entity"]
             )
 
 
@@ -689,7 +689,7 @@ class TestDeviceTwinList:
     @pytest.mark.parametrize("top, edge", [(10, True), (1000, False)])
     def test_device_list(self, fixture_cmd, service_client, top, edge):
         result = subject.iot_device_twin_list(
-            cmd=fixture_cmd, hub_name=mock_target["entity"], top=top, edge_enabled=edge
+            cmd=fixture_cmd, hub_name_or_hostname=mock_target["entity"], top=top, edge_enabled=edge
         )
         list_request = service_client.calls[0].request
 
@@ -712,14 +712,14 @@ class TestDeviceTwinList:
     def test_device_list_invalid_args(self, fixture_cmd, top):
         with pytest.raises(CLIError):
             subject.iot_device_twin_list(
-                cmd=fixture_cmd, hub_name=mock_target["entity"], top=top
+                cmd=fixture_cmd, hub_name_or_hostname=mock_target["entity"], top=top
             )
 
     def test_device_list_error(self, fixture_cmd, service_client_generic_errors):
         service_client_generic_errors.assert_all_requests_are_fired = False
         with pytest.raises(CLIError):
             subject.iot_device_twin_list(
-                cmd=fixture_cmd, hub_name=mock_target["entity"],
+                cmd=fixture_cmd, hub_name_or_hostname=mock_target["entity"],
             )
 
 
@@ -757,7 +757,7 @@ class TestDeviceModuleCreate:
         subject.iot_device_module_create(
             cmd=fixture_cmd,
             device_id=req["device_id"],
-            hub_name=req["hub_name"],
+            hub_name_or_hostname=req["hub_name"],
             module_id=req["module_id"],
             auth_method=req["auth"],
             primary_key=req["pk"],
@@ -822,7 +822,7 @@ class TestDeviceModuleCreate:
                 cmd=fixture_cmd,
                 device_id=req["device_id"],
                 module_id=req["module_id"],
-                hub_name=req["hub_name"],
+                hub_name_or_hostname=req["hub_name"],
                 auth_method=req["auth"],
                 primary_key=req["pk"],
                 secondary_key=req["sk"],
@@ -835,7 +835,7 @@ class TestDeviceModuleCreate:
             subject.iot_device_module_create(
                 cmd=fixture_cmd,
                 device_id=req["device_id"],
-                hub_name=req["hub_name"],
+                hub_name_or_hostname=req["hub_name"],
                 module_id=req["module_id"],
             )
 
@@ -889,7 +889,7 @@ class TestDeviceModuleUpdate:
             cmd=fixture_cmd,
             device_id=req["deviceId"],
             module_id=req["moduleId"],
-            hub_name=mock_target["entity"],
+            hub_name_or_hostname=mock_target["entity"],
             parameters=req,
         )
         args = serviceclient.call_args
@@ -946,7 +946,7 @@ class TestDeviceModuleUpdate:
                 cmd=fixture_cmd,
                 device_id=req["deviceId"],
                 module_id=req["moduleId"],
-                hub_name=mock_target["entity"],
+                hub_name_or_hostname=mock_target["entity"],
                 parameters=req,
             )
 
@@ -956,7 +956,7 @@ class TestDeviceModuleUpdate:
             subject.iot_device_module_update(
                 cmd=fixture_cmd,
                 device_id=req["deviceId"],
-                hub_name=mock_target["entity"],
+                hub_name_or_hostname=mock_target["entity"],
                 module_id=req["moduleId"],
                 parameters=req,
             )
@@ -978,7 +978,7 @@ class TestDeviceModuleDelete:
             cmd=fixture_cmd,
             device_id=device_id,
             module_id=module_id,
-            hub_name=mock_target["entity"],
+            hub_name_or_hostname=mock_target["entity"],
             etag=target_etag,
         )
         args = serviceclient.call_args
@@ -996,7 +996,7 @@ class TestDeviceModuleDelete:
                 cmd=fixture_cmd,
                 device_id=device_id,
                 module_id=module_id,
-                hub_name=mock_target["entity"],
+                hub_name_or_hostname=mock_target["entity"],
             )
 
 
@@ -1009,7 +1009,7 @@ class TestDeviceModuleShow:
 
     def test_device_module_show(self, serviceclient):
         result = subject.iot_device_module_show(
-            cmd=fixture_cmd, device_id=device_id, module_id=module_id, hub_name=mock_target["entity"]
+            cmd=fixture_cmd, device_id=device_id, module_id=module_id, hub_name_or_hostname=mock_target["entity"]
         )
         assert json.dumps(result)
         args = serviceclient.call_args
@@ -1025,7 +1025,7 @@ class TestDeviceModuleShow:
                 cmd=fixture_cmd,
                 device_id=device_id,
                 module_id=module_id,
-                hub_name=mock_target["entity"],
+                hub_name_or_hostname=mock_target["entity"],
             )
 
 
@@ -1046,7 +1046,7 @@ class TestDeviceModuleList:
     @pytest.mark.parametrize("top", [10, 1000])
     def test_device_module_list(self, serviceclient, top):
         result = subject.iot_device_module_list(
-            cmd=fixture_cmd, device_id=device_id, hub_name=mock_target["entity"], top=top
+            cmd=fixture_cmd, device_id=device_id, hub_name_or_hostname=mock_target["entity"], top=top
         )
         args = serviceclient.call_args
         url = args[0][0].url
@@ -1058,7 +1058,7 @@ class TestDeviceModuleList:
     def test_device_module_list_error(self, serviceclient_generic_error):
         with pytest.raises(CLIError):
             subject.iot_device_module_list(
-                cmd=fixture_cmd, device_id=device_id, hub_name=mock_target["entity"]
+                cmd=fixture_cmd, device_id=device_id, hub_name_or_hostname=mock_target["entity"]
             )
 
 
@@ -1091,7 +1091,7 @@ class TestDeviceTwinShow:
 
     def test_device_twin_show(self, serviceclient):
         result = subject.iot_device_twin_show(
-            cmd=fixture_cmd, device_id=device_id, hub_name=mock_target["entity"]
+            cmd=fixture_cmd, device_id=device_id, hub_name_or_hostname=mock_target["entity"]
         )
         args = serviceclient.call_args
         url = args[0][0].url
@@ -1104,7 +1104,7 @@ class TestDeviceTwinShow:
     def test_device_twin_show_error(self, serviceclient_generic_error):
         with pytest.raises(CLIError):
             subject.iot_device_twin_show(
-                cmd=None, device_id=device_id, hub_name=mock_target["entity"]
+                cmd=None, device_id=device_id, hub_name_or_hostname=mock_target["entity"]
             )
 
 
@@ -1131,7 +1131,7 @@ class TestDeviceTwinUpdate:
         subject.iot_device_twin_update(
             cmd=fixture_cmd,
             device_id=req["deviceId"],
-            hub_name=mock_target["entity"],
+            hub_name_or_hostname=mock_target["entity"],
             parameters=req,
             etag=req.get("etag"),
         )
@@ -1150,7 +1150,7 @@ class TestDeviceTwinUpdate:
             subject.iot_device_twin_update(
                 cmd=fixture_cmd,
                 device_id=req["deviceId"],
-                hub_name=mock_target["entity"],
+                hub_name_or_hostname=mock_target["entity"],
                 parameters=req,
             )
 
@@ -1189,7 +1189,7 @@ class TestDeviceTwinReplace:
         subject.iot_device_twin_replace(
             cmd=fixture_cmd,
             device_id=device_id,
-            hub_name=mock_target["entity"],
+            hub_name_or_hostname=mock_target["entity"],
             target_json=req,
             etag=etag,
         )
@@ -1212,7 +1212,7 @@ class TestDeviceTwinReplace:
             subject.iot_device_twin_replace(
                 cmd=fixture_cmd,
                 device_id=device_id,
-                hub_name=mock_target["entity"],
+                hub_name_or_hostname=mock_target["entity"],
                 target_json=json.dumps(req),
             )
 
@@ -1228,7 +1228,7 @@ class TestDeviceModuleTwinShow:
 
     def test_device_module_twin_show(self, serviceclient):
         result = subject.iot_device_module_twin_show(
-            cmd=fixture_cmd, device_id=device_id, hub_name=mock_target["entity"], module_id=module_id
+            cmd=fixture_cmd, device_id=device_id, hub_name_or_hostname=mock_target["entity"], module_id=module_id
         )
         args = serviceclient.call_args
         assert "twins/{}".format(device_id) in args[0][0].url
@@ -1240,7 +1240,7 @@ class TestDeviceModuleTwinShow:
             subject.iot_device_module_twin_show(
                 cmd=fixture_cmd,
                 device_id=device_id,
-                hub_name=mock_target["entity"],
+                hub_name_or_hostname=mock_target["entity"],
                 module_id=module_id,
             )
 
@@ -1276,7 +1276,7 @@ class TestDeviceModuleTwinUpdate:
         subject.iot_device_module_twin_update(
             cmd=fixture_cmd,
             device_id=req["deviceId"],
-            hub_name=mock_target["entity"],
+            hub_name_or_hostname=mock_target["entity"],
             module_id=module_id,
             parameters=req,
             etag=req.get("etag"),
@@ -1298,7 +1298,7 @@ class TestDeviceModuleTwinUpdate:
             subject.iot_device_module_twin_update(
                 cmd=fixture_cmd,
                 device_id=req["deviceId"],
-                hub_name=mock_target["entity"],
+                hub_name_or_hostname=mock_target["entity"],
                 module_id=module_id,
                 parameters=req,
             )
@@ -1338,7 +1338,7 @@ class TestDeviceModuleTwinReplace:
         subject.iot_device_module_twin_replace(
             cmd=fixture_cmd,
             device_id=device_id,
-            hub_name=mock_target["entity"],
+            hub_name_or_hostname=mock_target["entity"],
             module_id=module_id,
             target_json=req,
             etag=etag,
@@ -1362,7 +1362,7 @@ class TestDeviceModuleTwinReplace:
             subject.iot_device_module_twin_replace(
                 cmd=fixture_cmd,
                 device_id=device_id,
-                hub_name=mock_target["entity"],
+                hub_name_or_hostname=mock_target["entity"],
                 module_id=module_id,
                 target_json=json.dumps(req),
             )
@@ -1412,7 +1412,7 @@ class TestQuery:
         )
 
         result = subject.iot_query(
-            cmd=None, hub_name=mock_target["entity"], query_command=query, top=top
+            cmd=None, hub_name_or_hostname=mock_target["entity"], query_command=query, top=top
         )
 
         if top and top < servtotal:
@@ -1451,13 +1451,13 @@ class TestQuery:
     def test_query_invalid_args(self, top, fixture_ghcs):
         with pytest.raises(CLIError):
             subject.iot_query(
-                cmd=None, hub_name=mock_target["entity"], query_command=generic_query, top=top
+                cmd=None, hub_name_or_hostname=mock_target["entity"], query_command=generic_query, top=top
             )
 
     def test_query_error(self, serviceclient_generic_error):
         with pytest.raises(CLIError):
             subject.iot_query(
-                cmd=None, hub_name=mock_target["entity"], query_command=generic_query
+                cmd=None, hub_name_or_hostname=mock_target["entity"], query_command=generic_query
             )
 
 
@@ -1478,7 +1478,7 @@ class TestDeviceMethodInvoke:
         subject.iot_device_method(
             cmd=fixture_cmd,
             device_id=device_id,
-            hub_name=mock_target["entity"],
+            hub_name_or_hostname=mock_target["entity"],
             method_name=device_method,
             method_payload=payload,
             timeout=timeout,
@@ -1516,7 +1516,7 @@ class TestDeviceMethodInvoke:
                 subject.iot_device_method(
                     fixture_cmd,
                     device_id=device_id,
-                    hub_name=mock_target["entity"],
+                    hub_name_or_hostname=mock_target["entity"],
                     method_name="mymethod",
                     method_payload=req,
                 )
@@ -1524,7 +1524,7 @@ class TestDeviceMethodInvoke:
                 subject.iot_device_method(
                     fixture_cmd,
                     device_id=device_id,
-                    hub_name=mock_target["entity"],
+                    hub_name_or_hostname=mock_target["entity"],
                     method_name="mymethod",
                     method_payload='{"key":"value"}',
                     timeout=req,
@@ -1535,7 +1535,7 @@ class TestDeviceMethodInvoke:
             subject.iot_device_method(
                 cmd=fixture_cmd,
                 device_id=device_id,
-                hub_name=mock_target["entity"],
+                hub_name_or_hostname=mock_target["entity"],
                 method_name="mymethod",
                 method_payload='{"key":"value"}',
             )
@@ -1560,7 +1560,7 @@ class TestDeviceModuleMethodInvoke:
             device_id=device_id,
             module_id=module_id,
             method_name=module_method,
-            hub_name=mock_target["entity"],
+            hub_name_or_hostname=mock_target["entity"],
             method_payload=payload,
             timeout=timeout,
         )
@@ -1604,7 +1604,7 @@ class TestDeviceModuleMethodInvoke:
                     device_id=device_id,
                     module_id=module_id,
                     method_name="mymethod",
-                    hub_name=mock_target["entity"],
+                    hub_name_or_hostname=mock_target["entity"],
                     method_payload=req,
                 )
             if etype == "timeout":
@@ -1613,7 +1613,7 @@ class TestDeviceModuleMethodInvoke:
                     device_id=device_id,
                     module_id=module_id,
                     method_name="mymethod",
-                    hub_name=mock_target["entity"],
+                    hub_name_or_hostname=mock_target["entity"],
                     method_payload='{"key":"value"}',
                     timeout=req,
                 )
@@ -1625,7 +1625,7 @@ class TestDeviceModuleMethodInvoke:
                 device_id=device_id,
                 module_id=module_id,
                 method_name="mymethod",
-                hub_name=mock_target["entity"],
+                hub_name_or_hostname=mock_target["entity"],
                 method_payload='{"key":"value"}',
             )
 
@@ -1705,7 +1705,7 @@ class TestMonitorEvents:
                     content_type="application/json",
                     enqueued_time="54321",
                     timeout="30",
-                    hub_name="myhub",
+                    hub_name_or_hostname="myhub",
                     resource_group_name="myrg",
                     yes=True,
                     properties="sys anno app",
@@ -1726,7 +1726,7 @@ class TestMonitorEvents:
             content_type=req["content_type"],
             enqueued_time=req["enqueued_time"],
             timeout=req["timeout"],
-            hub_name=req["hub_name"],
+            hub_name_or_hostname=req["hub_name_or_hostname"],
             resource_group_name=req["resource_group_name"],
             yes=req["yes"],
             properties=req["properties"],
@@ -1744,7 +1744,7 @@ class TestMonitorEvents:
             "content_type",
             "timeout",
             "login",
-            "hub_name",
+            "hub_name_or_hostname",
             "resource_group_name",
             "yes",
             "properties",

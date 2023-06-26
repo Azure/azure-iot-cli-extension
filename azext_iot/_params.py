@@ -95,8 +95,13 @@ def load_arguments(self, _):
     with self.argument_context("iot") as context:
         context.argument("resource_group_name", arg_type=resource_group_name_type)
         context.argument(
-            "hub_name", options_list=["--hub-name", "-n"], arg_type=hub_name_type,
+            "hub_name_or_hostname", options_list=["--hub-name", "-n"], arg_type=hub_name_type,
             help="IoT Hub name or hostname. Required if --login is not provided.",
+            arg_group="IoT Hub Identifier"
+        )
+        context.argument(
+            "hub_name", options_list=["--hub-name", "-n"], arg_type=hub_name_type,
+            help="IoT Hub name. Required if --login is not provided.",
             arg_group="IoT Hub Identifier"
         )
         context.argument(

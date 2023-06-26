@@ -60,7 +60,7 @@ printer = pprint.PrettyPrinter(indent=2)
 def iot_query(
     cmd,
     query_command,
-    hub_name=None,
+    hub_name_or_hostname=None,
     top=None,
     resource_group_name=None,
     login=None,
@@ -68,7 +68,7 @@ def iot_query(
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -95,14 +95,14 @@ def _iot_query(target, query_command, top=None):
 def iot_device_show(
     cmd,
     device_id,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -127,7 +127,7 @@ def _iot_device_show(target, device_id):
 def iot_device_create(
     cmd,
     device_id,
-    hub_name=None,
+    hub_name_or_hostname=None,
     edge_enabled=False,
     auth_method=DeviceAuthType.shared_private_key.value,
     primary_key=None,
@@ -145,7 +145,7 @@ def iot_device_create(
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -401,7 +401,7 @@ def iot_device_update(
     cmd,
     device_id,
     parameters,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     etag=None,
@@ -409,7 +409,7 @@ def iot_device_update(
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -448,7 +448,7 @@ def _iot_device_update(target, device_id, device):
 def iot_device_delete(
     cmd,
     device_id,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     etag=None,
@@ -456,7 +456,7 @@ def iot_device_delete(
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -497,7 +497,7 @@ def _update_device_key(target, device, auth_method, pk, sk, etag=None):
 
 def iot_device_key_regenerate(
     cmd,
-    hub_name,
+    hub_name_or_hostname,
     device_id,
     renew_key_type,
     resource_group_name=None,
@@ -507,7 +507,7 @@ def iot_device_key_regenerate(
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -536,14 +536,14 @@ def iot_device_key_regenerate(
 def iot_device_get_parent(
     cmd,
     device_id,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -562,14 +562,14 @@ def iot_device_set_parent(
     device_id,
     parent_id,
     force=False,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -596,14 +596,14 @@ def iot_device_children_add(
     device_id,
     child_list,
     force=False,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -640,14 +640,14 @@ def iot_device_children_remove(
     device_id,
     child_list=None,
     remove_all=False,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -691,14 +691,14 @@ def iot_device_children_remove(
 def iot_device_children_list(
     cmd,
     device_id,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -791,7 +791,7 @@ def iot_device_module_create(
     cmd,
     device_id,
     module_id,
-    hub_name=None,
+    hub_name_or_hostname=None,
     auth_method=DeviceAuthType.shared_private_key.value,
     primary_key=None,
     secondary_key=None,
@@ -817,7 +817,7 @@ def iot_device_module_create(
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -877,7 +877,7 @@ def iot_device_module_update(
     device_id,
     module_id,
     parameters,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     etag=None,
@@ -885,7 +885,7 @@ def iot_device_module_update(
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -943,7 +943,7 @@ def _parse_auth(parameters):
 
 def iot_device_module_key_regenerate(
     cmd,
-    hub_name,
+    hub_name_or_hostname,
     device_id,
     module_id,
     renew_key_type,
@@ -954,7 +954,7 @@ def iot_device_module_key_regenerate(
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -1002,7 +1002,7 @@ def iot_device_module_key_regenerate(
 def iot_device_module_list(
     cmd,
     device_id,
-    hub_name=None,
+    hub_name_or_hostname=None,
     top=1000,
     resource_group_name=None,
     login=None,
@@ -1010,7 +1010,7 @@ def iot_device_module_list(
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -1032,14 +1032,14 @@ def iot_device_module_show(
     cmd,
     device_id,
     module_id,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -1065,7 +1065,7 @@ def iot_device_module_delete(
     cmd,
     device_id,
     module_id,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     etag=None,
@@ -1073,7 +1073,7 @@ def iot_device_module_delete(
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -1096,14 +1096,14 @@ def iot_device_module_twin_show(
     cmd,
     device_id,
     module_id,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -1130,7 +1130,7 @@ def iot_device_module_twin_update(
     device_id,
     module_id,
     parameters,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     etag=None,
@@ -1138,7 +1138,7 @@ def iot_device_module_twin_update(
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -1178,7 +1178,7 @@ def iot_device_module_twin_replace(
     device_id,
     module_id,
     target_json,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     etag=None,
@@ -1186,7 +1186,7 @@ def iot_device_module_twin_replace(
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -1216,7 +1216,7 @@ def iot_edge_set_modules(
     cmd,
     device_id,
     content,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
@@ -1224,7 +1224,7 @@ def iot_edge_set_modules(
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -1253,14 +1253,14 @@ def _iot_edge_set_modules(target, device_id, content):
 def iot_edge_export_modules(
     cmd,
     device_id,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -1269,7 +1269,7 @@ def iot_edge_export_modules(
 
     try:
         # Get all modules in the device
-        module_list = iot_device_module_list(cmd, device_id, hub_name=hub_name, login=login)
+        module_list = iot_device_module_list(cmd, device_id, hub_name_or_hostname=hub_name_or_hostname, login=login)
         for module in module_list:
             # Get module twins using module ids
             module_twin = _iot_device_module_twin_show(
@@ -1302,7 +1302,7 @@ def iot_edge_deployment_create(
     content,
     custom_labels=None,
     custom_metric_queries=None,
-    hub_name=None,
+    hub_name_or_hostname=None,
     target_condition="",
     priority=0,
     labels=None,
@@ -1317,7 +1317,7 @@ def iot_edge_deployment_create(
     config_type = ConfigType.layered if layered or no_validation else ConfigType.edge
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -1342,7 +1342,7 @@ def iot_hub_configuration_create(
     content,
     custom_labels=None,
     custom_metric_queries=None,
-    hub_name=None,
+    hub_name_or_hostname=None,
     target_condition="",
     priority=0,
     labels=None,
@@ -1353,7 +1353,7 @@ def iot_hub_configuration_create(
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -1571,7 +1571,7 @@ def iot_hub_configuration_update(
     cmd,
     config_id,
     parameters,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     etag=None,
@@ -1582,7 +1582,7 @@ def iot_hub_configuration_update(
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -1618,14 +1618,14 @@ def iot_hub_configuration_update(
 def iot_hub_configuration_show(
     cmd,
     config_id,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -1645,7 +1645,7 @@ def _iot_hub_configuration_show(target, config_id):
 
 def iot_hub_configuration_list(
     cmd,
-    hub_name=None,
+    hub_name_or_hostname=None,
     top=None,
     resource_group_name=None,
     login=None,
@@ -1653,7 +1653,7 @@ def iot_hub_configuration_list(
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -1673,7 +1673,7 @@ def iot_hub_configuration_list(
 
 def iot_edge_deployment_list(
     cmd,
-    hub_name=None,
+    hub_name_or_hostname=None,
     top=None,
     resource_group_name=None,
     login=None,
@@ -1681,7 +1681,7 @@ def iot_edge_deployment_list(
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -1699,8 +1699,8 @@ def _iot_hub_configuration_list(target):
     try:
         result = service_sdk.configuration.get_configurations(raw=True).response.json()
         if not result:
-            hub_name = target["name"]
-            logger.info('No configurations found on hub "%s".', hub_name)
+            hub_name_or_hostname = target["name"]
+            logger.info('No configurations found on hub "%s".', hub_name_or_hostname)
         return result
     except CloudError as e:
         handle_service_exception(e)
@@ -1709,7 +1709,7 @@ def _iot_hub_configuration_list(target):
 def iot_hub_configuration_delete(
     cmd,
     config_id,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     etag=None,
@@ -1717,7 +1717,7 @@ def iot_hub_configuration_delete(
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -1742,7 +1742,7 @@ def iot_edge_deployment_metric_show(
     config_id,
     metric_id,
     metric_type="user",
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
@@ -1752,7 +1752,7 @@ def iot_edge_deployment_metric_show(
         config_id=config_id,
         metric_id=metric_id,
         metric_type=metric_type,
-        hub_name=hub_name,
+        hub_name_or_hostname=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type_dataplane=auth_type_dataplane,
@@ -1764,14 +1764,14 @@ def iot_hub_configuration_metric_show(
     config_id,
     metric_id,
     metric_type="user",
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -1818,14 +1818,14 @@ def iot_hub_configuration_metric_show(
 def iot_device_twin_show(
     cmd,
     device_id,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -1845,7 +1845,7 @@ def _iot_device_twin_show(target, device_id):
 
 def iot_device_twin_list(
     cmd,
-    hub_name=None,
+    hub_name_or_hostname=None,
     top=1000,
     edge_enabled=False,
     resource_group_name=None,
@@ -1854,7 +1854,7 @@ def iot_device_twin_list(
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -1871,8 +1871,8 @@ def _iot_device_twin_list(target, edge_enabled=False, top=1000):
     result = _iot_query(target=target, query_command=query, top=top)
 
     if not result:
-        hub_name = target["name"]
-        logger.info('No registered devices found on hub "%s".', hub_name)
+        hub_name_or_hostname = target["name"]
+        logger.info('No registered devices found on hub "%s".', hub_name_or_hostname)
     return result
 
 
@@ -1894,7 +1894,7 @@ def iot_device_twin_update(
     cmd,
     device_id,
     parameters,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     etag=None,
@@ -1902,7 +1902,7 @@ def iot_device_twin_update(
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -1944,7 +1944,7 @@ def iot_device_twin_replace(
     cmd,
     device_id,
     target_json,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     etag=None,
@@ -1952,7 +1952,7 @@ def iot_device_twin_replace(
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -1979,7 +1979,7 @@ def iot_device_method(
     cmd,
     device_id,
     method_name,
-    hub_name=None,
+    hub_name_or_hostname=None,
     method_payload="{}",
     timeout=30,
     resource_group_name=None,
@@ -2002,7 +2002,7 @@ def iot_device_method(
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -2042,7 +2042,7 @@ def iot_device_module_method(
     device_id,
     module_id,
     method_name,
-    hub_name=None,
+    hub_name_or_hostname=None,
     method_payload="{}",
     timeout=30,
     resource_group_name=None,
@@ -2065,7 +2065,7 @@ def iot_device_module_method(
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -2103,7 +2103,7 @@ def iot_device_module_method(
 
 def iot_get_sas_token(
     cmd,
-    hub_name=None,
+    hub_name_or_hostname=None,
     device_id=None,
     policy_name="iothubowner",
     key_type="primary",
@@ -2141,7 +2141,7 @@ def iot_get_sas_token(
     return {
         DeviceAuthApiType.sas.value: _iot_build_sas_token(
             cmd,
-            hub_name,
+            hub_name_or_hostname,
             device_id,
             module_id,
             policy_name,
@@ -2194,7 +2194,7 @@ def _iot_build_sas_token_from_cs(connection_string, duration=3600):
 
 def _iot_build_sas_token(
     cmd,
-    hub_name=None,
+    hub_name_or_hostname=None,
     device_id=None,
     module_id=None,
     policy_name="iothubowner",
@@ -2215,7 +2215,7 @@ def _iot_build_sas_token(
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         policy_name=policy_name,
         login=login,
@@ -2301,7 +2301,7 @@ def _build_device_or_module_connection_string(entity, key_type="primary"):
 def iot_get_device_connection_string(
     cmd,
     device_id,
-    hub_name=None,
+    hub_name_or_hostname=None,
     key_type="primary",
     resource_group_name=None,
     login=None,
@@ -2311,7 +2311,7 @@ def iot_get_device_connection_string(
     device = iot_device_show(
         cmd,
         device_id,
-        hub_name=hub_name,
+        hub_name_or_hostname=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type_dataplane=auth_type_dataplane,
@@ -2326,7 +2326,7 @@ def iot_get_module_connection_string(
     cmd,
     device_id,
     module_id,
-    hub_name=None,
+    hub_name_or_hostname=None,
     key_type="primary",
     resource_group_name=None,
     login=None,
@@ -2338,7 +2338,7 @@ def iot_get_module_connection_string(
         device_id,
         module_id,
         resource_group_name=resource_group_name,
-        hub_name=hub_name,
+        hub_name_or_hostname=hub_name_or_hostname,
         login=login,
         auth_type_dataplane=auth_type_dataplane,
     )
@@ -2350,14 +2350,14 @@ def iot_get_module_connection_string(
 
 def _get_service_sdk(
     cmd,
-    hub_name: str,
+    hub_name_or_hostname: str,
     resource_group_name: str = None,
     login=None,
     auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -2440,7 +2440,7 @@ def _create_export_import_job_properties(
 
 def iot_device_export(
     cmd,
-    hub_name: str = None,
+    hub_name_or_hostname: str = None,
     blob_container_uri: str = None,
     blob_container_name: str = None,
     storage_account_name: str = None,
@@ -2464,7 +2464,7 @@ def iot_device_export(
         )
 
     service_sdk = _get_service_sdk(
-        cmd, hub_name, resource_group_name, login, auth_type_dataplane
+        cmd, hub_name_or_hostname, resource_group_name, login, auth_type_dataplane
     )
     export_job_properties = _create_export_import_job_properties(
         job_type=JobType.exportDevices.value,
@@ -2481,7 +2481,7 @@ def iot_device_export(
 
 def iot_device_import(
     cmd,
-    hub_name: str = None,
+    hub_name_or_hostname: str = None,
     input_blob_container_uri: str = None,
     input_blob_container_name: str = None,
     input_storage_account_name: str = None,
@@ -2511,7 +2511,7 @@ def iot_device_import(
         )
 
     service_sdk = _get_service_sdk(
-        cmd, hub_name, resource_group_name, login, auth_type_dataplane
+        cmd, hub_name_or_hostname, resource_group_name, login, auth_type_dataplane
     )
     import_job_properties = _create_export_import_job_properties(
         job_type=JobType.importDevices.value,
@@ -2528,7 +2528,7 @@ def iot_device_import(
 
 def iot_hub_monitor_events(
     cmd,
-    hub_name=None,
+    hub_name_or_hostname=None,
     device_id=None,
     interface=None,
     module_id=None,
@@ -2547,7 +2547,7 @@ def iot_hub_monitor_events(
     try:
         _iot_hub_monitor_events(
             cmd,
-            hub_name=hub_name,
+            hub_name_or_hostname=hub_name_or_hostname,
             device_id=device_id,
             interface_name=interface,
             module_id=module_id,
@@ -2569,7 +2569,7 @@ def iot_hub_monitor_events(
 
 def iot_hub_monitor_feedback(
     cmd,
-    hub_name=None,
+    hub_name_or_hostname=None,
     device_id=None,
     yes=False,
     wait_on_id=None,
@@ -2585,7 +2585,7 @@ def iot_hub_monitor_feedback(
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         login=login,
         auth_type=auth_type_dataplane,
@@ -2598,14 +2598,14 @@ def iot_hub_monitor_feedback(
 
 def iot_hub_distributed_tracing_show(
     cmd,
-    hub_name,
+    hub_name_or_hostname,
     device_id,
     resource_group_name=None,
     auth_type_dataplane=None,
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         auth_type=auth_type_dataplane,
         # force_find_resource=True
@@ -2623,7 +2623,7 @@ def _iot_hub_monitor_events(
     cmd,
     interface_name=None,
     module_id=None,
-    hub_name=None,
+    hub_name_or_hostname=None,
     device_id=None,
     consumer_group="$Default",
     timeout=300,
@@ -2644,7 +2644,7 @@ def _iot_hub_monitor_events(
     device_ids = {}
     if device_query:
         devices_result = iot_query(
-            cmd, device_query, hub_name, None, resource_group_name, login=login
+            cmd, device_query, hub_name_or_hostname, None, resource_group_name, login=login
         )
         if devices_result:
             for device_result in devices_result:
@@ -2652,7 +2652,7 @@ def _iot_hub_monitor_events(
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         include_events=True,
         login=login,
@@ -2698,7 +2698,7 @@ def _iot_hub_monitor_events(
 
 def iot_hub_distributed_tracing_update(
     cmd,
-    hub_name,
+    hub_name_or_hostname,
     device_id,
     sampling_mode,
     sampling_rate,
@@ -2707,7 +2707,7 @@ def iot_hub_distributed_tracing_update(
 ):
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
-        resource_name=hub_name,
+        resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
         include_events=True,
         auth_type=auth_type_dataplane,
@@ -2728,7 +2728,7 @@ def iot_hub_distributed_tracing_update(
         1 if sampling_mode.lower() == "on" else 2
     )
     result = iot_device_twin_update(
-        cmd, device_id, device_twin, hub_name, resource_group_name
+        cmd, device_id, device_twin, hub_name_or_hostname, resource_group_name
     )
     return _customize_device_tracing_output(
         result.device_id, result.properties.desired, result.properties.reported
@@ -2737,7 +2737,7 @@ def iot_hub_distributed_tracing_update(
 
 def iot_hub_connection_string_show(
     cmd,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     policy_name="iothubowner",
     key_type=KeyType.primary.value,
@@ -2746,7 +2746,7 @@ def iot_hub_connection_string_show(
 ):
     discovery = IotHubDiscovery(cmd)
 
-    if hub_name is None:
+    if hub_name_or_hostname is None:
         hubs = discovery.get_resources(resource_group_name)
         if hubs is None:
             raise ResourceNotFoundError("No IoT Hub found.")
@@ -2782,7 +2782,7 @@ def iot_hub_connection_string_show(
                 )
         return connection_strings
 
-    hub = discovery.find_resource(hub_name, resource_group_name)
+    hub = discovery.find_resource(hub_name_or_hostname, resource_group_name)
     if hub:
         conn_str = _get_hub_connection_string(
             discovery, hub, policy_name, key_type, show_all, default_eventhub
