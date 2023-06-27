@@ -76,8 +76,8 @@ class StateProvider(IoTHubProvider):
         self.auth_type = auth_type_dataplane
         self.login = login
 
-        # Make sure hub_name is not a hostname
-        self.hub_name = self.target["name"]
+        if self.target:
+            self.hub_name = self.target["name"]
         if not self.rg and self.target:
             self.rg = self.target.get("resourcegroup")
 
