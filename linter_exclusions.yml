@@ -75,7 +75,7 @@ iot hub state migrate:
     resource_group_name:
       rule exclusions:
       - parameter_should_not_end_in_resource_group
-iot hub message-endpoint create cosmosdb-collection:
+iot hub message-endpoint create cosmosdb-container:
   parameters:
     endpoint_resource_group:
       rule_exclusions:
@@ -96,6 +96,31 @@ iot hub message-endpoint create servicebus-topic:
       rule_exclusions:
       - parameter_should_not_end_in_resource_group
 iot hub message-endpoint create storage-container:
+  parameters:
+    endpoint_resource_group:
+      rule_exclusions:
+      - parameter_should_not_end_in_resource_group
+iot hub message-endpoint update cosmosdb-container:
+  parameters:
+    endpoint_resource_group:
+      rule_exclusions:
+      - parameter_should_not_end_in_resource_group
+iot hub message-endpoint update eventhub:
+  parameters:
+    endpoint_resource_group:
+      rule_exclusions:
+      - parameter_should_not_end_in_resource_group
+iot hub message-endpoint update servicebus-queue:
+  parameters:
+    endpoint_resource_group:
+      rule_exclusions:
+      - parameter_should_not_end_in_resource_group
+iot hub message-endpoint update servicebus-topic:
+  parameters:
+    endpoint_resource_group:
+      rule_exclusions:
+      - parameter_should_not_end_in_resource_group
+iot hub message-endpoint update storage-container:
   parameters:
     endpoint_resource_group:
       rule_exclusions:
