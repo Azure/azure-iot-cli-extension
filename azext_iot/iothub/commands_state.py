@@ -55,7 +55,7 @@ def state_migrate(
     resource_group_name: Optional[str] = None,
     hub_aspects: Optional[List[str]] = None,
     login: Optional[str] = None,
-    orig_hub: Optional[str] = None,
+    orig_hub_or_hostname: Optional[str] = None,
     orig_resource_group_name: Optional[str] = None,
     orig_hub_login: Optional[str] = None,
     auth_type_dataplane: Optional[str] = None,
@@ -68,4 +68,4 @@ def state_migrate(
         login=login,
         auth_type_dataplane=auth_type_dataplane
     )
-    sp.migrate_state(orig_hub, orig_resource_group_name, orig_hub_login, replace, hub_aspects)
+    sp.migrate_state(orig_hub_or_hostname, orig_resource_group_name, orig_hub_login, replace, hub_aspects)
