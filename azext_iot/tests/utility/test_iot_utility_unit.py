@@ -11,6 +11,7 @@ import sys
 
 from unittest import mock
 from knack.util import CLIError
+from azure.cli.core.azclierror import CLIInternalError
 from azure.cli.core.extension import get_extension_path
 from azext_iot.common.utility import (
     handle_service_exception,
@@ -321,40 +322,36 @@ class TestVersionComparison(object):
 
 
 class TestEmbeddedCli(object):
-    @pytest.fixture(params=[0, 1])
+    @pytest.fixture(params=[0, 1, 2])
     def mocked_azclient(self, mocker, request):
+        azclient = mocker.patch("azext_iot.common.embedded_cli.get_default_cli")
+
         def mock_invoke(args, out_file):
-            out_file.write(json.dumps({"generickey": "genericvalue"}))
+            azclient.return_value.exception_handler("Generic Issue")
+            azclient.return_value.result.error = None
+            if request.param == 0:
+                out_file.write(json.dumps({"generickey": "genericvalue"}))
+            else:
+                out_file.write("Something not json")
+                if request.param == 1:
+                    azclient.return_value.result.error = CLIError("Generic Error")
+
             return request.param
 
-        azclient = mocker.patch("azext_iot.common.embedded_cli.get_default_cli")
         azclient.return_value.invoke.side_effect = mock_invoke
         azclient.test_meta.error_code = request.param
         return azclient
 
-    @pytest.mark.parametrize(
-        "command, user_subscription, subscription",
-        [
-            ("iot hub device-identity create -n abcd -d dcba", None, None),
-            (
-                "iot hub device-twin show -n 'abcd' -d 'dcba'",
-                "20a300e5-a444-4130-bb5a-1abd08ad930a",
-                None,
-            ),
-            (
-                "iot hub device-identity create -n abcd -d dcba",
-                None,
-                "20a300e5-a444-4130-bb5a-1abd08ad930a",
-            ),
-            (
-                "iot hub device-twin show -n 'abcd' -d 'dcba'",
-                "20a300e5-a444-4130-bb5a-1abd08ad930a",
-                "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-            ),
-        ],
-    )
+    @pytest.mark.parametrize("command", [
+        "iot hub device-identity create -n abcd -d dcba",
+        "iot hub device-twin show -n 'abcd' -d 'dcba'"
+    ])
+    @pytest.mark.parametrize("user_subscription", [None, "20a300e5-a444-4130-bb5a-1abd08ad930a"])
+    @pytest.mark.parametrize("subscription", [None, "40a300e5-4130-a444-bb5a-1abd08ad930a"])
+    @pytest.mark.parametrize("init_capture_stderr", [True, False])
+    @pytest.mark.parametrize("capture_stderr", [None, True, False])
     def test_embedded_cli(
-        self, mocker, mocked_azclient, command, user_subscription, subscription
+        self, mocker, mocked_azclient, command, user_subscription, subscription, init_capture_stderr, capture_stderr
     ):
         import shlex
 
@@ -362,8 +359,18 @@ class TestEmbeddedCli(object):
         cli_ctx.data = {}
         if user_subscription:
             cli_ctx.data["subscription_id"] = user_subscription
-        cli = EmbeddedCLI(cli_ctx)
-        cli.invoke(command=command, subscription=subscription)
+
+        expected_count = 0 if (capture_stderr is None and init_capture_stderr) or capture_stderr else 1
+        cli = EmbeddedCLI(cli_ctx, capture_stderr=init_capture_stderr)
+
+        if mocked_azclient.test_meta.error_code != 1 or expected_count == 1:
+            cli.invoke(command=command, subscription=subscription, capture_stderr=capture_stderr)
+        else:
+            with pytest.raises(CLIError) as e:
+                cli.invoke(command=command, subscription=subscription, capture_stderr=capture_stderr)
+            assert "Generic Error" in str(e.value)
+
+        assert cli.az_cli.exception_handler.call_count == expected_count
 
         # Due to forced json output
         command += " -o json"
@@ -377,15 +384,17 @@ class TestEmbeddedCli(object):
         call = mocked_azclient().invoke.call_args_list[0]
         actual_args, _ = call
         assert expected_args == actual_args[0]
+        assert cli.output
         success = cli.success()
-
-        if mocked_azclient.test_meta.error_code == 1:
+        if mocked_azclient.test_meta.error_code > 0:
             assert not success
+            if mocked_azclient.test_meta.error_code == 2:
+                with pytest.raises(CLIInternalError) as e:
+                    cli.as_json()
+                assert "Issue parsing received payload" in str(e.value)
         elif mocked_azclient.test_meta.error_code == 0:
             assert success
-
-        assert cli.output
-        assert cli.as_json()
+            assert cli.as_json()
 
 
 class TestCliInit(object):

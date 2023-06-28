@@ -7,6 +7,16 @@ Release History
 unreleased
 +++++++++++++++
 
+0.21.3
++++++++++++++++
+
+**Digital Twins updates**
+
+* Updated Digital Twin dataplane API to use 2023-06-30. Affected commands:
+  * `az dt job import` is now GA.
+  * `az dt model` and `az dt twin` now use the newer API but functionality remains the same.
+
+
 0.21.2
 +++++++++++++++
 
