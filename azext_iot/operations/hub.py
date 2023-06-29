@@ -2607,8 +2607,7 @@ def iot_hub_distributed_tracing_show(
     target = discovery.get_target(
         resource_name=hub_name_or_hostname,
         resource_group_name=resource_group_name,
-        auth_type=auth_type_dataplane,
-        # force_find_resource=True
+        auth_type=auth_type_dataplane
     )
 
     device_twin = _iot_hub_distributed_tracing_show(discovery=discovery, target=target, device_id=device_id)
@@ -2711,7 +2710,6 @@ def iot_hub_distributed_tracing_update(
         resource_group_name=resource_group_name,
         include_events=True,
         auth_type=auth_type_dataplane,
-        # force_find_resource=True
     )
 
     if int(sampling_rate) not in range(0, 101):
@@ -2856,7 +2854,6 @@ def _iot_hub_distributed_tracing_show(discovery, target, device_id):
 
 
 def _validate_device_tracing(discovery, target, device_twin):
-    # Question: we can either force the hub to be found or skip checks
     if not all([target.get("location"), target.get("sku_tier")]):
         resource = discovery.find_resource(target["name"])
         target["location"] = resource.location

@@ -264,7 +264,6 @@ class BaseDiscovery(ABC):
         :keyword auth_type: Authentication Type for the Dataplane
         :paramtype auth_type: AuthenticationTypeDataplane
         :keyword str policy_name: Policy name to use
-        :keyword bool force_find_resource: Flag to force find resource even if there is no need.
 
         :return: Resource
         :rtype: dict representing self.resource_type
@@ -354,7 +353,7 @@ class BaseDiscovery(ABC):
         return targets
 
     @abstractmethod
-    def _build_target_from_hostname(self, resource_hostname, resource_group_name):
+    def _build_target_from_hostname(self, resource_hostname):
         """Returns target inforation needed from a hostname."""
         pass
 

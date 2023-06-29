@@ -79,7 +79,6 @@ class TestIoTHubDiscovery:
         assert target["policy"] == AuthenticationTypeDataplane.login.value
         assert target["primarykey"] == AuthenticationTypeDataplane.login.value
         assert target["secondarykey"] == AuthenticationTypeDataplane.login.value
-        assert target["resourcegroup"] == fake_rg
         assert target["cmd"] == fixture_cmd
 
         target = discovery.get_target(
@@ -97,5 +96,4 @@ class TestIoTHubDiscovery:
         assert target["policy"] == AuthenticationTypeDataplane.login.value
         assert target["primarykey"] == AuthenticationTypeDataplane.login.value
         assert target["secondarykey"] == AuthenticationTypeDataplane.login.value
-        assert target["resourcegroup"] is None
         assert target["cmd"] == fixture_cmd
