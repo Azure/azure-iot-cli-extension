@@ -287,8 +287,7 @@ class BaseDiscovery(ABC):
             logger.info("Using AAD access token for %s interaction.", self.resource_type)
             if all([not kwargs.get("force_find_resource"), valid_hostname(resource_name), "." in resource_name]):
                 return self._build_target_from_hostname(
-                    resource_hostname=resource_name,
-                    resource_group_name=resource_group_name
+                    resource_hostname=resource_name
                 )
 
             resource = self.find_resource(resource_name=resource_name, rg=resource_group_name)
