@@ -9,7 +9,7 @@ Release History
 
 **IoT Hub updates**
 
-* Add command group `az iot hub message-endpointendpoint update`, which will allow you to update your message endpoint without deleting it.
+* Add command group `az iot hub message-endpoint update`, which will allow you to update your message endpoint without deleting it.
 
 * The IoT Hub name (`--hub-name`) can now be the IoT Hub name or hostname. This allows for RBAC authentication method (`--auth-type login`) to skip resource lookup if a hostname is provided. If properties beyond those that can be determined from the hostname are needed, resource lookup will still occur. Commands that do not support authentication methods will require the IoT Hub name.
 
