@@ -30,7 +30,7 @@ class SasTokenAuthentication(Authentication):
         shared_access_key (str): Shared access key.
         expiry (int): Future expiry (in seconds) of the token to be generated.
     """
-    def __init__(self, uri, shared_access_policy_name, shared_access_key, expiry=3600):
+    def __init__(self, uri, shared_access_policy_name, shared_access_key, expiry=600):
         self.uri = uri
         self.policy = shared_access_policy_name
         self.key = shared_access_key

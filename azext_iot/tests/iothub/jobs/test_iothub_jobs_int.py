@@ -27,7 +27,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             for device_id in device_ids_twin_tags + device_ids_twin_props:
                 self.cmd(
                     self.set_cmd_auth_type(
-                        f"iot hub device-identity create -d {device_id} -n {self.entity_name} -g {self.entity_rg}",
+                        f"iot hub device-identity create -d {device_id} -n {self.host_name} -g {self.entity_rg}",
                         auth_type=auth_phase
                     )
                 )
@@ -43,7 +43,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub job create --job-id {self.job_ids[0]} --job-type scheduleUpdateTwin -q \"{query_condition}\" "
-                    f"-n {self.entity_name} -g {self.entity_rg} "
+                    f"-n {self.host_name} -g {self.entity_rg} "
                     "--twin-patch '{twin_patch_tags}' --ttl 300 --wait",
                     auth_type=auth_phase
                 ),
@@ -63,7 +63,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             for device_id in device_ids_twin_tags:
                 self.cmd(
                     self.set_cmd_auth_type(
-                        f"iot hub device-twin show -d {device_id} -n {self.entity_name} -g {self.entity_rg}",
+                        f"iot hub device-twin show -d {device_id} -n {self.host_name} -g {self.entity_rg}",
                         auth_type=auth_phase
                     ),
                     checks=[
@@ -82,7 +82,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub job create --job-id {self.job_ids[1]} --job-type scheduleUpdateTwin -q \"{query_condition}\" "
-                    f"-n {self.entity_name} -g {self.entity_rg} "
+                    f"-n {self.host_name} -g {self.entity_rg} "
                     "--twin-patch '{twin_patch_props}' --ttl 300 --wait",
                     auth_type=auth_phase,
                 ),
@@ -103,7 +103,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot hub job create --job-id {} --job-type {} --twin-patch '{}' -n {}".format(
-                        self.job_ids[1], "scheduleUpdateTwin", "{twin_patch_props}", self.entity_name
+                        self.job_ids[1], "scheduleUpdateTwin", "{twin_patch_props}", self.host_name
                     ),
                     auth_type=auth_phase,
                 ),
@@ -113,7 +113,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot hub job create --job-id {} --job-type {} --twin-patch '{}' -n {}".format(
-                        self.job_ids[1], "scheduleDeviceMethod", "{twin_patch_props}", self.entity_name
+                        self.job_ids[1], "scheduleDeviceMethod", "{twin_patch_props}", self.host_name
                     ),
                     auth_type=auth_phase
                 ),
@@ -124,7 +124,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot hub job create --job-id {} --job-type {} -q '*' -n {}".format(
-                        self.job_ids[1], "scheduleUpdateTwin", self.entity_name
+                        self.job_ids[1], "scheduleUpdateTwin", self.host_name
                     ),
                     auth_type=auth_phase
                 ),
@@ -135,7 +135,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot hub job create --job-id {} --job-type {} -q '*' -n {}".format(
-                        self.job_ids[1], "scheduleDeviceMethod", self.entity_name
+                        self.job_ids[1], "scheduleDeviceMethod", self.host_name
                     ),
                     auth_type=auth_phase
                 ),
@@ -147,7 +147,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot hub job show --job-id {} -n {} -g {}".format(
-                        self.job_ids[0], self.entity_name, self.entity_rg
+                        self.job_ids[0], self.host_name, self.entity_rg
                     ),
                     auth_type=auth_phase
                 ),
@@ -161,7 +161,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot hub job show --job-id notarealjobid -n {} -g {}".format(
-                        self.entity_name, self.entity_rg
+                        self.host_name, self.entity_rg
                     ),
                     auth_type=auth_phase
                 ),
@@ -180,7 +180,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
                         query_condition,
                         "{twin_patch_tags}",
                         scheduled_time_iso,
-                        self.entity_name,
+                        self.host_name,
                         self.entity_rg,
                     ),
                     auth_type=auth_phase
@@ -195,7 +195,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot hub job show --job-id {} -n {} -g {}".format(
-                        self.job_ids[2], self.entity_name, self.entity_rg
+                        self.job_ids[2], self.host_name, self.entity_rg
                     ),
                     auth_type=auth_phase
                 ),
@@ -209,7 +209,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot hub job cancel --job-id {} -n {} -g {}".format(
-                        self.job_ids[2], self.entity_name, self.entity_rg
+                        self.job_ids[2], self.host_name, self.entity_rg
                     ),
                     auth_type=auth_phase,
                 ),
@@ -223,7 +223,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot hub job cancel --job-id notarealjobid -n {} -g {}".format(
-                        self.entity_name, self.entity_rg
+                        self.host_name, self.entity_rg
                     ),
                     auth_type=auth_phase
                 ),

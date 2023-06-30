@@ -25,14 +25,14 @@ def iot_edge_devices_create(
     root_key_path: Optional[str] = None,
     root_cert_password: Optional[str] = None,
     bundle_output_path: Optional[str] = None,
-    hub_name: Optional[str] = None,
+    hub_name_or_hostname: Optional[str] = None,
     resource_group_name: Optional[str] = None,
     login: Optional[str] = None,
     auth_type_dataplane: Optional[str] = None,
 ):
     device_identity_provider = DeviceIdentityProvider(
         cmd=cmd,
-        hub_name=hub_name,
+        hub_name=hub_name_or_hostname,
         rg=resource_group_name,
         login=login,
         auth_type_dataplane=auth_type_dataplane,
@@ -56,14 +56,14 @@ def iot_edge_devices_create(
 def iot_delete_devices(
     cmd,
     device_ids: List[str],
-    hub_name: Optional[str] = None,
+    hub_name_or_hostname: Optional[str] = None,
     resource_group_name: Optional[str] = None,
     login: Optional[str] = None,
     auth_type_dataplane: Optional[str] = None,
 ):
     device_identity_provider = DeviceIdentityProvider(
         cmd=cmd,
-        hub_name=hub_name,
+        hub_name=hub_name_or_hostname,
         rg=resource_group_name,
         login=login,
         auth_type_dataplane=auth_type_dataplane,

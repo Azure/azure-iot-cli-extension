@@ -115,7 +115,7 @@ class TestIoTHubDeviceIdentityExport(object):
     def test_device_identity_export(self, fixture_cmd, service_client, req):
         result = subject.iot_device_export(
             cmd=fixture_cmd,
-            hub_name=hub_name,
+            hub_name_or_hostname=hub_name,
             blob_container_uri=blob_container_uri,
             include_keys=req["include_keys"],
             identity=req["identity"],
@@ -147,7 +147,7 @@ class TestIoTHubDeviceIdentityExport(object):
         with pytest.raises(CLIError):
             subject.iot_device_export(
                 cmd=fixture_cmd,
-                hub_name=hub_name,
+                hub_name_or_hostname=hub_name,
                 blob_container_uri=blob_container_uri,
                 include_keys=req["include_keys"],
                 identity=req["identity"],
@@ -158,7 +158,7 @@ class TestIoTHubDeviceIdentityExport(object):
         with pytest.raises(CLIError) as e:
             subject.iot_device_export(
                 cmd=fixture_cmd,
-                hub_name=hub_name,
+                hub_name_or_hostname=hub_name,
                 blob_container_uri=blob_container_uri,
                 resource_group_name="myresourcegroup",
             )
@@ -195,7 +195,7 @@ class TestIoTHubDeviceIdentityImport(object):
     def test_device_identity_import(self, fixture_cmd, service_client, req):
         result = subject.iot_device_import(
             cmd=fixture_cmd,
-            hub_name=hub_name,
+            hub_name_or_hostname=hub_name,
             input_blob_container_uri=blob_container_uri,
             output_blob_container_uri=blob_container_uri + "2",
             identity=req["identity"],
@@ -227,7 +227,7 @@ class TestIoTHubDeviceIdentityImport(object):
         with pytest.raises(CLIError):
             subject.iot_device_import(
                 cmd=fixture_cmd,
-                hub_name=hub_name,
+                hub_name_or_hostname=hub_name,
                 input_blob_container_uri=blob_container_uri,
                 output_blob_container_uri=blob_container_uri + "2",
                 identity=req["identity"],
@@ -238,7 +238,7 @@ class TestIoTHubDeviceIdentityImport(object):
         with pytest.raises(CLIError) as e:
             subject.iot_device_import(
                 cmd=fixture_cmd,
-                hub_name=hub_name,
+                hub_name_or_hostname=hub_name,
                 input_blob_container_uri=blob_container_uri,
                 output_blob_container_uri=blob_container_uri + "2",
                 resource_group_name="myresourcegroup",

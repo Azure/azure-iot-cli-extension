@@ -292,7 +292,7 @@ def load_iothub_arguments(self, _):
 
     with self.argument_context("iot hub state migrate") as context:
         context.argument(
-            "hub_name",
+            "hub_name_or_hostname",
             options_list=["--destination-hub", "--dh"],
             help="Name of IoT Hub to which the origin hub state will be copied to.",
         )
@@ -314,7 +314,7 @@ def load_iothub_arguments(self, _):
             arg_group="IoT Hub Identifier",
         )
         context.argument(
-            "orig_hub",
+            "orig_hub_or_hostname",
             options_list=["--origin-hub", "--oh"],
             help="Name of IoT Hub which will be copied.",
             arg_group="IoT Hub Identifier",

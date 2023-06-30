@@ -422,7 +422,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             args={
                 "cmd": client,
                 "device_id": device_ids[0],
-                "hub_name": self.entity_name,
+                "hub_name_or_hostname": self.entity_name,
                 "receive_settle": "complete",
                 "data": "Testing mqtt c2d and direct method invocations",
                 "msg_count": 4,
@@ -460,7 +460,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             args={
                 "cmd": client,
                 "device_id": device_ids[0],
-                "hub_name": self.entity_name,
+                "hub_name_or_hostname": self.entity_name,
                 "receive_settle": "complete",
                 "data": "Ping from c2d ack wait test",
                 "msg_count": 2,
@@ -844,7 +844,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             args={
                 "cmd": client,
                 "device_id": device_ids[0],
-                "hub_name": self.entity_name,
+                "hub_name_or_hostname": self.entity_name,
                 "receive_settle": "complete",
                 "data": "Testing direct method invocations when simulator is run with custom method response status and payload",
                 "msg_count": 4,
@@ -907,7 +907,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 "msg_count": 4,
                 "msg_interval": 5,
                 "protocol_type": "mqtt",
-                "hub_name": self.entity_name,
+                "hub_name_or_hostname": self.entity_name,
             },
             max_runs=4,
             return_handle=True,
@@ -1143,7 +1143,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                     "data": send_message_data,
                     "properties": "$.mid=12345;key0=value0;key1=1",
                     "msg_count": 1,
-                    "hub_name": self.entity_name,
+                    "hub_name_or_hostname": self.entity_name,
                     "resource_group_name": self.entity_rg,
                 },
                 max_runs=1,
@@ -1252,7 +1252,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             data=send_message_data,
             properties="",
             msg_count=1,
-            hub_name=self.entity_name,
+            hub_name_or_hostname=self.entity_name,
             resource_group_name=self.entity_rg,
         )
 
@@ -1281,7 +1281,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             data=send_message_data,
             properties="$.ct=application/json",
             msg_count=1,
-            hub_name=self.entity_name,
+            hub_name_or_hostname=self.entity_name,
             resource_group_name=self.entity_rg,
         )
 
@@ -1307,7 +1307,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         iot_device_send_message(
             cmd=client,
             device_id=device_ids[i],
-            hub_name=self.entity_name,
+            hub_name_or_hostname=self.entity_name,
             data='{\r\n"payload_data1""payload_value1"\r\n}',
             properties="$.ct=application/json",
             msg_count=1,
@@ -1328,7 +1328,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         iot_device_send_message(
             cmd=client,
             device_id=device_ids[i],
-            hub_name=self.entity_name,
+            hub_name_or_hostname=self.entity_name,
             data_file_path=messaging_non_unicodable_data_path,
             properties="$.ct=application/octet-stream",
             msg_count=1,
