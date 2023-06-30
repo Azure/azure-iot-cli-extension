@@ -7,6 +7,7 @@
 import pytest
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common._azure import parse_iot_hub_connection_string
+from azext_iot.common.shared import AuthenticationTypeDataplane
 
 
 @pytest.fixture
@@ -56,3 +57,43 @@ class TestIoTHubDiscovery:
         assert target["entity"] == parsed_fake_login["HostName"]
         assert target["policy"] == parsed_fake_login["SharedAccessKeyName"]
         assert target["primarykey"] == parsed_fake_login["SharedAccessKey"]
+
+    def test_get_target_by_hostname(self, fixture_cmd, get_mgmt_client):
+        discovery = IotHubDiscovery(cmd=fixture_cmd)
+
+        fake_name = "COOLIoTHub"
+        fake_hostname = f"{fake_name}.azure-devices-provisioning.net"
+        fake_rg = "COOLRG"
+
+        target = discovery.get_target(
+            resource_name=fake_hostname,
+            resource_group_name=fake_rg,
+            auth_type=AuthenticationTypeDataplane.login.value
+        )
+
+        # Ensure no ARM calls are made
+        assert get_mgmt_client.call_count == 0
+
+        assert target["entity"] == fake_hostname
+        assert target["name"] == fake_name
+        assert target["policy"] == AuthenticationTypeDataplane.login.value
+        assert target["primarykey"] == AuthenticationTypeDataplane.login.value
+        assert target["secondarykey"] == AuthenticationTypeDataplane.login.value
+        assert target["cmd"] == fixture_cmd
+
+        target = discovery.get_target(
+            resource_name=fake_hostname,
+            resource_group_name=None,
+            auth_type=AuthenticationTypeDataplane.login.value
+        )
+
+        # Ensure no ARM calls are made
+        assert get_mgmt_client.call_count == 0
+
+        assert AuthenticationTypeDataplane.login.value in target["cs"]
+        assert target["entity"] == fake_hostname
+        assert target["name"] == fake_name
+        assert target["policy"] == AuthenticationTypeDataplane.login.value
+        assert target["primarykey"] == AuthenticationTypeDataplane.login.value
+        assert target["secondarykey"] == AuthenticationTypeDataplane.login.value
+        assert target["cmd"] == fixture_cmd

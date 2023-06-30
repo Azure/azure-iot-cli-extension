@@ -12,6 +12,8 @@ from azext_iot.common.shared import AuthenticationTypeDataplane
 from typing import Any, Dict, List
 from types import SimpleNamespace
 
+from azext_iot.common.utility import valid_hostname
+
 logger = get_logger(__name__)
 POLICY_ERROR_TEMPLATE = (
     "Unable to discover a priviledged policy for {0}: {1}, in subscription {2}. "
@@ -271,14 +273,25 @@ class BaseDiscovery(ABC):
             return self.get_target_by_cstring(connection_string=cstring)
 
         resource_group_name = resource_group_name or kwargs.get("rg")
-        resource = self.find_resource(resource_name=resource_name, rg=resource_group_name)
 
-        key_type = kwargs.get("key_type", "primary")
+        https_prefix = "https://"
+        http_prefix = "http://"
 
-        # Azure AD auth path
+        if resource_name.lower().startswith(https_prefix):
+            resource_name = resource_name[len(https_prefix) :]
+        elif resource_name.lower().startswith(http_prefix):
+            resource_name = resource_name[len(http_prefix) :]
+
         auth_type = kwargs.get("auth_type", AuthenticationTypeDataplane.key.value)
         if auth_type == AuthenticationTypeDataplane.login.value:
             logger.info("Using AAD access token for %s interaction.", self.resource_type)
+            if all([not kwargs.get("force_find_resource"), valid_hostname(resource_name), "." in resource_name]):
+                return self._build_target_from_hostname(
+                    resource_hostname=resource_name
+                )
+
+            resource = self.find_resource(resource_name=resource_name, rg=resource_group_name)
+
             policy = SimpleNamespace()
             policy.key_name = AuthenticationTypeDataplane.login.value
             policy.primary_key = AuthenticationTypeDataplane.login.value
@@ -291,6 +304,10 @@ class BaseDiscovery(ABC):
                 **kwargs
             )
 
+        if "." in resource_name:
+            resource_name = resource_name.split(".")[0]
+        resource = self.find_resource(resource_name=resource_name, rg=resource_group_name)
+        key_type = kwargs.get("key_type", "primary")
         policy_name = kwargs.get("policy_name", "auto")
         rg = resource.resourcegroup if hasattr(resource, "resourcegroup") else resource.additional_properties.get("resourcegroup")
 
@@ -338,6 +355,11 @@ class BaseDiscovery(ABC):
                     logger.warning("Could not access %s. %s", resource.name, e)
 
         return targets
+
+    @abstractmethod
+    def _build_target_from_hostname(self, resource_hostname):
+        """Returns target inforation needed from a hostname."""
+        pass
 
     @abstractmethod
     def _build_target(self, resource, policy, key_type=None, **kwargs):

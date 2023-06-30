@@ -22,7 +22,7 @@ class IoTHubProvider(object):
         rg: str,
         login: Optional[str] = None,
         auth_type_dataplane: Optional[str] = None,
-        dataplane: bool = True
+        dataplane: bool = True,
     ):
         self.cmd = cmd
         self.hub_name = hub_name

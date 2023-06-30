@@ -45,6 +45,7 @@ dps_auth_type_dataplane_param_type = CLIArgumentType(
     ),
     arg_group="Access Control",
     help="Indicates whether the operation should auto-derive a policy key or use the current Azure AD session. "
+    "If the authentication type is login and the resource hostname is provided, resource lookup will be skipped unless needed."
     "You can configure the default using `az configure --defaults iotdps-data-auth-type=<auth-type-value>`",
     configured_default="iotdps-data-auth-type",
 )
@@ -56,6 +57,7 @@ hub_auth_type_dataplane_param_type = CLIArgumentType(
     ),
     arg_group="Access Control",
     help="Indicates whether the operation should auto-derive a policy key or use the current Azure AD session. "
+    "If the authentication type is login and the resource hostname is provided, resource lookup will be skipped unless needed."
     "You can configure the default using `az configure --defaults iothub-data-auth-type=<auth-type-value>`",
     configured_default="iothub-data-auth-type",
 )
@@ -92,6 +94,11 @@ def load_arguments(self, _):
     """
     with self.argument_context("iot") as context:
         context.argument("resource_group_name", arg_type=resource_group_name_type)
+        context.argument(
+            "hub_name_or_hostname", options_list=["--hub-name", "-n"], arg_type=hub_name_type,
+            help="IoT Hub name or hostname. Required if --login is not provided.",
+            arg_group="IoT Hub Identifier"
+        )
         context.argument(
             "hub_name", options_list=["--hub-name", "-n"], arg_type=hub_name_type,
             help="IoT Hub name. Required if --login is not provided.",
@@ -928,7 +935,7 @@ def load_arguments(self, _):
         context.argument(
             "dps_name",
             options_list=["--dps-name", "-n"],
-            help="Name of the Azure IoT Hub Device Provisioning Service. Required if --login is not provided.",
+            help="Name or hostname of the Azure IoT Hub Device Provisioning Service. Required if --login is not provided.",
             arg_group="Device Provisioning Service Identifier"
         )
         context.argument(

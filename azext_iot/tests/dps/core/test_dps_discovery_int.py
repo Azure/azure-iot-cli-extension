@@ -56,6 +56,7 @@ def test_dps_discovery(provisioned_iot_dps_no_hub_module):
 def test_dps_targets(provisioned_iot_dps_no_hub_module):
     dps_name = provisioned_iot_dps_no_hub_module["name"]
     dps_rg = provisioned_iot_dps_no_hub_module["resourceGroup"]
+    dps_host_name = provisioned_iot_dps_no_hub_module['dps']['properties']['serviceOperationsHostName']
     cmd_shell = Setting()
     setattr(cmd_shell, "cli_ctx", get_dummy_cli())
     discovery = DPSDiscovery(cmd_shell)
@@ -68,6 +69,9 @@ def test_dps_targets(provisioned_iot_dps_no_hub_module):
     assert_target(cs_target1, True)
 
     cs_target2 = discovery.get_target(resource_name=None, login=connection_string)
+    assert_target(cs_target2, True)
+
+    cs_target2 = discovery.get_target(resource_name=dps_host_name)
     assert_target(cs_target2, True)
 
     auto_target = discovery.get_target(resource_name=dps_name, resource_group_name=dps_rg)
