@@ -154,7 +154,7 @@ class TestCloudToDeviceMessaging:
 
         timeout = 120
         result = subject.iot_c2d_message_receive(
-            cmd=fixture_cmd, device_id=device_id, hub_name=mock_target["entity"], lock_timeout=timeout
+            cmd=fixture_cmd, device_id=device_id, hub_name_or_hostname=mock_target["entity"], lock_timeout=timeout
         )
         request = service_client.calls[0].request
         url = request.url
@@ -219,7 +219,7 @@ class TestCloudToDeviceMessaging:
             result = subject.iot_c2d_message_receive(
                 cmd=fixture_cmd,
                 device_id=device_id,
-                hub_name=mock_target["entity"],
+                hub_name_or_hostname=mock_target["entity"],
                 lock_timeout=timeout,
                 complete=(ack == "complete"),
                 reject=(ack == "reject"),
@@ -312,14 +312,14 @@ class TestCloudToDeviceMessaging:
             subject.iot_c2d_message_receive(
                 cmd=fixture_cmd,
                 device_id=device_id,
-                hub_name=mock_target["entity"],
+                hub_name_or_hostname=mock_target["entity"],
                 abandon=True,
                 complete=True,
             )
             subject.iot_c2d_message_receive(
                 cmd=fixture_cmd,
                 device_id=device_id,
-                hub_name=mock_target["entity"],
+                hub_name_or_hostname=mock_target["entity"],
                 abandon=False,
                 complete=True,
                 reject=True,
@@ -327,7 +327,7 @@ class TestCloudToDeviceMessaging:
             subject.iot_c2d_message_receive(
                 cmd=fixture_cmd,
                 device_id=device_id,
-                hub_name=mock_target["entity"],
+                hub_name_or_hostname=mock_target["entity"],
                 complete=True,
                 reject=True,
             )
@@ -335,7 +335,7 @@ class TestCloudToDeviceMessaging:
     def test_c2d_complete(self, c2d_ack_complete_scenario):
         service_client = c2d_ack_complete_scenario
         result = subject.iot_c2d_message_complete(
-            fixture_cmd, device_id, message_etag, hub_name=mock_target["entity"]
+            fixture_cmd, device_id, message_etag, hub_name_or_hostname=mock_target["entity"]
         )
 
         request = service_client.calls[0].request
@@ -355,7 +355,7 @@ class TestCloudToDeviceMessaging:
         service_client = c2d_ack_reject_scenario
 
         result = subject.iot_c2d_message_reject(
-            fixture_cmd, device_id, message_etag, hub_name=mock_target["entity"]
+            fixture_cmd, device_id, message_etag, hub_name_or_hostname=mock_target["entity"]
         )
 
         request = service_client.calls[0].request
@@ -376,7 +376,7 @@ class TestCloudToDeviceMessaging:
         service_client = c2d_ack_abandon_scenario
 
         result = subject.iot_c2d_message_abandon(
-            fixture_cmd, device_id, message_etag, hub_name=mock_target["entity"]
+            fixture_cmd, device_id, message_etag, hub_name_or_hostname=mock_target["entity"]
         )
 
         request = service_client.calls[0].request
@@ -395,16 +395,16 @@ class TestCloudToDeviceMessaging:
     def test_c2d_receive_and_ack_errors(self, serviceclient_generic_error):
         with pytest.raises(CLIError):
             subject.iot_c2d_message_receive(
-                fixture_cmd, device_id, hub_name=mock_target["entity"]
+                fixture_cmd, device_id, hub_name_or_hostname=mock_target["entity"]
             )
             subject.iot_c2d_message_abandon(
-                fixture_cmd, device_id, hub_name=mock_target["entity"], etag=""
+                fixture_cmd, device_id, hub_name_or_hostname=mock_target["entity"], etag=""
             )
             subject.iot_c2d_message_complete(
-                fixture_cmd, device_id, hub_name=mock_target["entity"], etag=""
+                fixture_cmd, device_id, hub_name_or_hostname=mock_target["entity"], etag=""
             )
             subject.iot_c2d_message_reject(
-                fixture_cmd, device_id, hub_name=mock_target["entity"], etag=""
+                fixture_cmd, device_id, hub_name_or_hostname=mock_target["entity"], etag=""
             )
 
     def test_c2d_message_purge(self, c2d_purge_scenario):
@@ -457,7 +457,7 @@ class TestDeviceSimulate:
         subject.iot_simulate_device(
             cmd=fixture_cmd,
             device_id=device_id,
-            hub_name=mock_target["entity"],
+            hub_name_or_hostname=mock_target["entity"],
             receive_settle=rs,
             msg_count=mc,
             msg_interval=mi,
@@ -528,7 +528,7 @@ class TestDeviceSimulate:
             subject.iot_simulate_device(
                 cmd=fixture_cmd,
                 device_id=device_id,
-                hub_name=mock_target["entity"],
+                hub_name_or_hostname=mock_target["entity"],
                 receive_settle=rs,
                 msg_count=mc,
                 msg_interval=mi,
@@ -543,14 +543,14 @@ class TestDeviceSimulate:
             subject.iot_simulate_device(
                 cmd=fixture_cmd,
                 device_id=device_id,
-                hub_name=mock_target["entity"],
+                hub_name_or_hostname=mock_target["entity"],
                 protocol_type="http",
             )
 
     def test_device_simulate_mqtt_error(self, mqttclient_generic_error):
         with pytest.raises(CLIError):
             subject.iot_simulate_device(
-                cmd=fixture_cmd, device_id=device_id, hub_name=mock_target["entity"]
+                cmd=fixture_cmd, device_id=device_id, hub_name_or_hostname=mock_target["entity"]
             )
 
 

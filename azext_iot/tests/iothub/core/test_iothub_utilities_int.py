@@ -16,7 +16,7 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
         for auth_phase in DATAPLANE_AUTH_TYPES:
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub generate-sas-token -n {self.entity_name} -g {self.entity_rg}",
+                    f"iot hub generate-sas-token -n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 ),
                 checks=[self.exists("sas")],
@@ -25,7 +25,7 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
             # Custom duration
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub generate-sas-token -n {self.entity_name} --du 1000",
+                    f"iot hub generate-sas-token -n {self.host_name} --du 1000",
                     auth_type=auth_phase,
                 ),
                 checks=[self.exists("sas")],
@@ -35,7 +35,7 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
                 # Custom policy
                 self.cmd(
                     self.set_cmd_auth_type(
-                        f"iot hub generate-sas-token -n {self.entity_name} -g {self.entity_rg} --pn service",
+                        f"iot hub generate-sas-token -n {self.host_name} -g {self.entity_rg} --pn service",
                         auth_type=auth_phase,
                     ),
                     checks=[self.exists("sas")],
@@ -44,7 +44,7 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
             # Error - non-existent custom policy
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub generate-sas-token --pn somepolicy -n {self.entity_name} -g {self.entity_rg}",
+                    f"iot hub generate-sas-token --pn somepolicy -n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 ),
                 expect_failure=True,
@@ -139,7 +139,7 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
         for auth_phase in DATAPLANE_AUTH_TYPES:
             self.cmd(
                 self.set_cmd_auth_type(
-                    f'iot hub query --hub-name {self.entity_name} -q "select * from devices"',
+                    f'iot hub query --hub-name {self.host_name} -q "select * from devices"',
                     auth_type=auth_phase,
                 ),
                 checks=[self.check("length([*])", 0)],

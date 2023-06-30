@@ -75,7 +75,7 @@ class TestPnPRuntimeInvokeCommand(object):
             connect_timeout=arbitrary_timeout,
             response_timeout=arbitrary_timeout,
             payload=request_payload,
-            hub_name=mock_target["entity"],
+            hub_name_or_hostname=mock_target["entity"],
         )
 
         self._assert_common_attributes(
@@ -103,7 +103,7 @@ class TestPnPRuntimeInvokeCommand(object):
             connect_timeout=arbitrary_timeout,
             response_timeout=arbitrary_timeout,
             payload=request_payload,
-            hub_name=mock_target["entity"],
+            hub_name_or_hostname=mock_target["entity"],
             component_path=component_id,
         )
 
@@ -126,7 +126,7 @@ class TestPnPRuntimeInvokeCommand(object):
                 device_id=device_id,
                 command_name=command_id,
                 payload=json.dumps({}),
-                hub_name=mock_target["entity"],
+                hub_name_or_hostname=mock_target["entity"],
             )
 
         with pytest.raises(CLIError):
@@ -135,7 +135,7 @@ class TestPnPRuntimeInvokeCommand(object):
                 device_id=device_id,
                 command_name=command_id,
                 payload=json.dumps({}),
-                hub_name=mock_target["entity"],
+                hub_name_or_hostname=mock_target["entity"],
                 component_path=component_id,
             )
 
@@ -190,7 +190,7 @@ class TestPnPRuntimeShowDigitalTwin(object):
         result = subject.get_digital_twin(
             cmd=fixture_cmd,
             device_id=device_id,
-            hub_name=mock_target["entity"],
+            hub_name_or_hostname=mock_target["entity"],
         )
 
         # Validates simple endpoint behavior.
@@ -259,7 +259,7 @@ class TestPnPRuntimeUpdateDigitalTwin(object):
         result = subject.patch_digital_twin(
             cmd=fixture_cmd,
             device_id=device_id,
-            hub_name=mock_target["entity"],
+            hub_name_or_hostname=mock_target["entity"],
             json_patch=request_json_patch,
             etag=etag,
         )

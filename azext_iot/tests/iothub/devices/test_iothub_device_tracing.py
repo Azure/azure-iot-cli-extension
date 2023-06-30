@@ -35,14 +35,14 @@ class TestIoTHubDistributedTracing(IoTLiveScenarioTest):
 
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub device-identity create -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg}",
+                    f"iot hub device-identity create -d {device_ids[0]} -n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 )
             )
 
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub distributed-tracing show -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg}",
+                    f"iot hub distributed-tracing show -d {device_ids[0]} -n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 ),
                 checks=self.is_empty(),
@@ -51,7 +51,7 @@ class TestIoTHubDistributedTracing(IoTLiveScenarioTest):
             result = self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub distributed-tracing update "
-                    f"-d {device_ids[0]} -n {self.entity_name} -g { self.entity_rg} --sm on --sr 50",
+                    f"-d {device_ids[0]} -n {self.host_name} -g { self.entity_rg} --sm on --sr 50",
                     auth_type=auth_phase,
                 )
             ).get_output_in_json()

@@ -35,7 +35,7 @@ class TestHubStateExport:
             subject.state_export(
                 cmd=fixture_cmd,
                 state_file=fake_file,
-                hub_name="someHub",
+                hub_name_or_hostname="someHub",
                 resource_group_name="somerg"
             )
         assert constants.FILE_NOT_EMPTY_ERROR == str(error.value)
@@ -61,7 +61,7 @@ class TestHubStateImport:
             subject.state_import(
                 cmd=fixture_cmd,
                 state_file="./file.json",
-                hub_name="someHub",
+                hub_name_or_hostname="someHub",
                 resource_group_name="somerg"
             )
         assert constants.FILE_NOT_FOUND_ERROR.format(file_name) == str(error.value)
@@ -86,7 +86,7 @@ class TestHubStateImport:
             subject.state_import(
                 cmd=fixture_cmd,
                 state_file=fake_file,
-                hub_name=hub_name,
+                hub_name_or_hostname=hub_name,
                 resource_group_name="somerg"
             )
         assert constants.HUB_NOT_CREATED_MSG.format(hub_name) == str(error.value)

@@ -67,6 +67,9 @@ class TestIoTHubDiscovery(IoTLiveScenarioTest):
         cs_target2 = discovery.get_target(resource_name=None, login=self.connection_string)
         assert_target(cs_target2, True)
 
+        cs_target2 = discovery.get_target(resource_name=self.host_name)
+        assert_target(cs_target2, True)
+
         auto_target = discovery.get_target(resource_name=self.entity_name)
         assert_target(auto_target, rg=self.entity_rg)
 

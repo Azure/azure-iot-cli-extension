@@ -26,14 +26,14 @@ def job_create(
     wait=False,
     poll_interval=10,
     poll_duration=600,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
 ):
     jobs = JobProvider(
         cmd=cmd,
-        hub_name=hub_name,
+        hub_name=hub_name_or_hostname,
         rg=resource_group_name,
         login=login,
         auth_type_dataplane=auth_type_dataplane,
@@ -58,14 +58,14 @@ def job_create(
 def job_show(
     cmd,
     job_id,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
 ):
     jobs = JobProvider(
         cmd=cmd,
-        hub_name=hub_name,
+        hub_name=hub_name_or_hostname,
         rg=resource_group_name,
         login=login,
         auth_type_dataplane=auth_type_dataplane,
@@ -78,14 +78,14 @@ def job_list(
     job_type=None,
     job_status=None,
     top=None,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
 ):
     jobs = JobProvider(
         cmd=cmd,
-        hub_name=hub_name,
+        hub_name=hub_name_or_hostname,
         rg=resource_group_name,
         login=login,
         auth_type_dataplane=auth_type_dataplane,
@@ -96,14 +96,14 @@ def job_list(
 def job_cancel(
     cmd,
     job_id,
-    hub_name=None,
+    hub_name_or_hostname=None,
     resource_group_name=None,
     login=None,
     auth_type_dataplane=None,
 ):
     jobs = JobProvider(
         cmd=cmd,
-        hub_name=hub_name,
+        hub_name=hub_name_or_hostname,
         rg=resource_group_name,
         login=login,
         auth_type_dataplane=auth_type_dataplane,

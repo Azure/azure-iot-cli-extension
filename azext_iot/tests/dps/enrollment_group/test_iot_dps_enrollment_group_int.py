@@ -24,6 +24,7 @@ cli = EmbeddedCLI()
 def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):
     dps_name = provisioned_iot_dps_module['name']
     dps_rg = provisioned_iot_dps_module['resourceGroup']
+    dps_host_name = provisioned_iot_dps_module['dps']['properties']['serviceOperationsHostName']
     hub_hostname = provisioned_iot_dps_module['hubHostName']
     dps_cstring = provisioned_iot_dps_module["connectionString"]
     clean_dps_dataplane(cli, dps_cstring)
@@ -36,7 +37,7 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):
 
         enrollment = cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group create --enrollment-id {enrollment_id} -g {dps_rg} --dps-name {dps_name} "
+                f"iot dps enrollment-group create --enrollment-id {enrollment_id} -g {dps_rg} --dps-name {dps_host_name} "
                 f"--cp {cert_path} --scp {cert_path} --provisioning-status {EntityStatusType.enabled.value} "
                 f"--allocation-policy {AllocationType.geolatency.value} --iot-hubs {hub_hostname} --edge-enabled",
                 auth_type=auth_phase,
@@ -57,7 +58,7 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):
 
         enrollment_list = cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group list -g {dps_rg} --dps-name {dps_name}",
+                f"iot dps enrollment-group list -g {dps_rg} --dps-name {dps_host_name}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
             )
@@ -66,7 +67,7 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):
 
         enrollment_show = cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group show -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_id}",
+                f"iot dps enrollment-group show -g {dps_rg} --dps-name {dps_host_name} --enrollment-id {enrollment_id}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
             )
@@ -89,7 +90,7 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):
         with pytest.raises(BadRequestError):
             cli.invoke(
                 set_cmd_auth_type(
-                    f"iot dps enrollment-group compute-device-key -g {dps_rg} --dps-name {dps_name} "
+                    f"iot dps enrollment-group compute-device-key -g {dps_rg} --dps-name {dps_host_name} "
                     f"--enrollment-id {enrollment_id} --registration-id myarbitrarydeviceId",
                     auth_type=auth_phase,
                     cstring=dps_cstring
@@ -99,7 +100,7 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):
 
         enrollment_update = cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group update -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_id} "
+                f"iot dps enrollment-group update -g {dps_rg} --dps-name {dps_host_name} --enrollment-id {enrollment_id} "
                 f"--provisioning-status {EntityStatusType.disabled.value} --rsc --etag {etag} "
                 f"--rp {ReprovisionType.never.value} --allocation-policy {AllocationType.hashed.value} --edge-enabled False "
                 f"--scp {cert_path}",
@@ -123,7 +124,8 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):
 
         enrollment_list = cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group registration list -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_id}",
+                f"iot dps enrollment-group registration list -g {dps_rg} --dps-name {dps_host_name} --enrollment-id "
+                f"{enrollment_id}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
@@ -139,7 +141,7 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):
 
         enrollment_update = cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group update -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_id} "
+                f"iot dps enrollment-group update -g {dps_rg} --dps-name {dps_host_name} --enrollment-id {enrollment_id} "
                 f"--cn {cert_name} --etag {etag} --allocation-policy {AllocationType.custom.value} "
                 f"--webhook-url {WEBHOOK_URL} --api-version {API_VERSION}",
                 auth_type=auth_phase,
@@ -156,7 +158,7 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):
 
         cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group delete -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_id}",
+                f"iot dps enrollment-group delete -g {dps_rg} --dps-name {dps_host_name} --enrollment-id {enrollment_id}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
@@ -168,8 +170,8 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):
 
 
 def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module):
-    dps_name = provisioned_iot_dps_module['name']
     dps_rg = provisioned_iot_dps_module['resourceGroup']
+    dps_host_name = provisioned_iot_dps_module['dps']['properties']['serviceOperationsHostName']
     hub_hostname = provisioned_iot_dps_module['hubHostName']
     dps_cstring = provisioned_iot_dps_module["connectionString"]
     clean_dps_dataplane(cli, dps_cstring)
@@ -189,7 +191,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
 
         enrollment = cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group create --enrollment-id {enrollment_id} -g {dps_rg} --dps-name {dps_name} "
+                f"iot dps enrollment-group create --enrollment-id {enrollment_id} -g {dps_rg} --dps-name {dps_host_name} "
                 f"--pk {primary_key} --sk {secondary_key} --provisioning-status {EntityStatusType.enabled.value}"
                 f" --initial-twin-tags \"{generic_dict}\" --initial-twin-properties \"{generic_dict}\" "
                 f"--allocation-policy {AllocationType.geolatency.value} --rp {ReprovisionType.reprovisionandresetdata.value} "
@@ -214,7 +216,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
 
         enrollment_list = cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group list -g {dps_rg} --dps-name {dps_name}",
+                f"iot dps enrollment-group list -g {dps_rg} --dps-name {dps_host_name}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
@@ -223,7 +225,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
 
         enrollment_show = cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group show -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_id}",
+                f"iot dps enrollment-group show -g {dps_rg} --dps-name {dps_host_name} --enrollment-id {enrollment_id}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
@@ -232,7 +234,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
 
         enrollment_update = cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group update -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_id}"
+                f"iot dps enrollment-group update -g {dps_rg} --dps-name {dps_host_name} --enrollment-id {enrollment_id}"
                 f" --provisioning-status {EntityStatusType.disabled.value} --etag {etag} --edge-enabled False"
                 f" --allocation-policy {AllocationType.custom.value} --webhook-url {WEBHOOK_URL} --api-version {API_VERSION}",
                 auth_type=auth_phase,
@@ -254,7 +256,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
         # Use service generated keys
         enrollment2 = cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group create -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_id2}",
+                f"iot dps enrollment-group create -g {dps_rg} --dps-name {dps_host_name} --enrollment-id {enrollment_id2}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
@@ -265,7 +267,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
 
         enrollment_list2 = cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group list -g {dps_rg} --dps-name {dps_name}",
+                f"iot dps enrollment-group list -g {dps_rg} --dps-name {dps_host_name}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
             )
@@ -275,7 +277,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
 
         enrollment_show = cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group show -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_id2}",
+                f"iot dps enrollment-group show -g {dps_rg} --dps-name {dps_host_name} --enrollment-id {enrollment_id2}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
@@ -285,7 +287,8 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
 
         keys = cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group show -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_id2} --show-keys",
+                f"iot dps enrollment-group show -g {dps_rg} --dps-name {dps_host_name} --enrollment-id {enrollment_id2} "
+                "--show-keys",
                 auth_type=auth_phase,
                 cstring=dps_cstring
             )
@@ -294,7 +297,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
         # Compute Device Key tests
         online_device_key = cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group compute-device-key -g {dps_rg} --dps-name {dps_name} "
+                f"iot dps enrollment-group compute-device-key -g {dps_rg} --dps-name {dps_host_name} "
                 f"--enrollment-id {enrollment_id2} --registration-id myarbitrarydeviceId",
                 auth_type=auth_phase,
                 cstring=dps_cstring
@@ -316,7 +319,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
 
         enrollment_update = cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group update -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_id2}"
+                f"iot dps enrollment-group update -g {dps_rg} --dps-name {dps_host_name} --enrollment-id {enrollment_id2}"
                 f" --pk \"{keys['secondaryKey']}\" --sk \"{keys['primaryKey']}\" --etag {etag}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
@@ -328,7 +331,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
 
         online_device_key = cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group compute-device-key -g {dps_rg} --dps-name {dps_name} "
+                f"iot dps enrollment-group compute-device-key -g {dps_rg} --dps-name {dps_host_name} "
                 f"--enrollment-id {enrollment_id2} --registration-id myarbitrarydeviceId",
                 auth_type=auth_phase,
                 cstring=dps_cstring
@@ -338,7 +341,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
 
         cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group delete -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_id2}",
+                f"iot dps enrollment-group delete -g {dps_rg} --dps-name {dps_host_name} --enrollment-id {enrollment_id2}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
@@ -346,7 +349,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
 
         cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group delete -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_id}",
+                f"iot dps enrollment-group delete -g {dps_rg} --dps-name {dps_host_name} --enrollment-id {enrollment_id}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
@@ -354,8 +357,8 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
 
 
 def test_dps_enrollment_twin_array(provisioned_iot_dps_module):
-    dps_name = provisioned_iot_dps_module['name']
     dps_rg = provisioned_iot_dps_module['resourceGroup']
+    dps_host_name = provisioned_iot_dps_module['dps']['properties']['serviceOperationsHostName']
     hub_hostname = provisioned_iot_dps_module['hubHostName']
     dps_cstring = provisioned_iot_dps_module["connectionString"]
     clean_dps_dataplane(cli, dps_cstring)
@@ -386,7 +389,7 @@ def test_dps_enrollment_twin_array(provisioned_iot_dps_module):
         enrollment = cli.invoke(
             set_cmd_auth_type(
                 f"iot dps enrollment create --enrollment-id {enrollment_id} --attestation-type {attestation_type}"
-                f" -g {dps_rg} --dps-name {dps_name} --cp {cert_path} --scp {cert_path}"
+                f" -g {dps_rg} --dps-name {dps_host_name} --cp {cert_path} --scp {cert_path}"
                 f" --provisioning-status {EntityStatusType.enabled.value} --device-id {device_id}"
                 f" --initial-twin-tags \"{generic_dict}\" --initial-twin-properties \"{twin_array_dict}\" "
                 f"--device-information \"{generic_dict}\" --allocation-policy {AllocationType.hashed.value} "
@@ -410,7 +413,7 @@ def test_dps_enrollment_twin_array(provisioned_iot_dps_module):
 
         cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment delete -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_id}",
+                f"iot dps enrollment delete -g {dps_rg} --dps-name {dps_host_name} --enrollment-id {enrollment_id}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
@@ -421,7 +424,7 @@ def test_dps_enrollment_twin_array(provisioned_iot_dps_module):
 
         enrollment = cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group create -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_group_id}"
+                f"iot dps enrollment-group create -g {dps_rg} --dps-name {dps_host_name} --enrollment-id {enrollment_group_id}"
                 f" --cp {cert_path} --scp {cert_path} --provisioning-status {EntityStatusType.enabled.value} "
                 f"--allocation-policy {AllocationType.geolatency.value} --iot-hubs {hub_hostname} --edge-enabled "
                 f"--props \"{twin_array_dict}\"",
@@ -442,7 +445,7 @@ def test_dps_enrollment_twin_array(provisioned_iot_dps_module):
 
         cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group delete -g {dps_rg} --dps-name {dps_name} --enrollment-id {enrollment_group_id}",
+                f"iot dps enrollment-group delete -g {dps_rg} --dps-name {dps_host_name} --enrollment-id {enrollment_group_id}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),

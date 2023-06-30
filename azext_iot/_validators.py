@@ -22,6 +22,9 @@ def mode2_iot_login_handler(cmd, namespace):
             if 'hub_name' in args:
                 iot_cmd_type = 'IoT Hub'
                 entity_value = args['hub_name']
+            if 'hub_name_or_hostname' in args:
+                iot_cmd_type = 'IoT Hub'
+                entity_value = args['hub_name_or_hostname']
             elif 'dps_name' in args:
                 iot_cmd_type = 'DPS'
                 entity_value = args['dps_name']

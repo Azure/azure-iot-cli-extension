@@ -22,13 +22,13 @@ def iot_device_send_message(
     certificate_file: Optional[str] = None,
     key_file: Optional[str] = None,
     passphrase: Optional[str] = None,
-    hub_name: Optional[str] = None,
+    hub_name_or_hostname: Optional[str] = None,
     resource_group_name: Optional[str] = None,
     login: Optional[str] = None,
     model_id: Optional[str] = None,
 ):
     messaging_provider = DeviceMessagingProvider(
-        cmd=cmd, device_id=device_id, hub_name=hub_name, rg=resource_group_name, login=login
+        cmd=cmd, device_id=device_id, hub_name=hub_name_or_hostname, rg=resource_group_name, login=login
     )
     return messaging_provider.device_send_message(
         data=data,
@@ -47,12 +47,12 @@ def iot_c2d_message_complete(
     cmd,
     device_id: str,
     etag: Optional[str] = None,
-    hub_name: Optional[str] = None,
+    hub_name_or_hostname: Optional[str] = None,
     resource_group_name: Optional[str] = None,
     login: Optional[str] = None,
 ):
     messaging_provider = DeviceMessagingProvider(
-        cmd=cmd, device_id=device_id, hub_name=hub_name, rg=resource_group_name, login=login
+        cmd=cmd, device_id=device_id, hub_name=hub_name_or_hostname, rg=resource_group_name, login=login
     )
     return messaging_provider.c2d_message_complete(
         etag=etag
@@ -63,12 +63,12 @@ def iot_c2d_message_reject(
     cmd,
     device_id: str,
     etag: Optional[str] = None,
-    hub_name: Optional[str] = None,
+    hub_name_or_hostname: Optional[str] = None,
     resource_group_name: Optional[str] = None,
     login: Optional[str] = None,
 ):
     messaging_provider = DeviceMessagingProvider(
-        cmd=cmd, device_id=device_id, hub_name=hub_name, rg=resource_group_name, login=login
+        cmd=cmd, device_id=device_id, hub_name=hub_name_or_hostname, rg=resource_group_name, login=login
     )
     return messaging_provider.c2d_message_reject(
         etag=etag
@@ -79,12 +79,12 @@ def iot_c2d_message_abandon(
     cmd,
     device_id: str,
     etag: Optional[str] = None,
-    hub_name: Optional[str] = None,
+    hub_name_or_hostname: Optional[str] = None,
     resource_group_name: Optional[str] = None,
     login: Optional[str] = None,
 ):
     messaging_provider = DeviceMessagingProvider(
-        cmd=cmd, device_id=device_id, hub_name=hub_name, rg=resource_group_name, login=login
+        cmd=cmd, device_id=device_id, hub_name=hub_name_or_hostname, rg=resource_group_name, login=login
     )
     return messaging_provider.c2d_message_abandon(
         etag=etag
@@ -98,12 +98,12 @@ def iot_c2d_message_receive(
     abandon: bool = False,
     complete: bool = False,
     reject: bool = False,
-    hub_name: Optional[str] = None,
+    hub_name_or_hostname: Optional[str] = None,
     resource_group_name: Optional[str] = None,
     login: Optional[str] = None,
 ):
     messaging_provider = DeviceMessagingProvider(
-        cmd=cmd, device_id=device_id, hub_name=hub_name, rg=resource_group_name, login=login
+        cmd=cmd, device_id=device_id, hub_name=hub_name_or_hostname, rg=resource_group_name, login=login
     )
     return messaging_provider.c2d_message_receive(
         lock_timeout=lock_timeout, abandon=abandon, complete=complete, reject=reject
@@ -126,7 +126,7 @@ def iot_c2d_message_send(
     wait_on_feedback: bool = False,
     yes: bool = False,
     repair: bool = False,
-    hub_name: Optional[str] = None,
+    hub_name_or_hostname: Optional[str] = None,
     resource_group_name: Optional[str] = None,
     login: Optional[str] = None,
     auth_type_dataplane: Optional[str] = None
@@ -137,7 +137,7 @@ def iot_c2d_message_send(
     messaging_provider = DeviceMessagingProvider(
         cmd=cmd,
         device_id=device_id,
-        hub_name=hub_name,
+        hub_name=hub_name_or_hostname,
         rg=resource_group_name,
         login=login,
         auth_type_dataplane=auth_type_dataplane
@@ -160,12 +160,12 @@ def iot_c2d_message_send(
 def iot_c2d_message_purge(
     cmd,
     device_id: str,
-    hub_name: Optional[str] = None,
+    hub_name_or_hostname: Optional[str] = None,
     resource_group_name: Optional[str] = None,
     login: Optional[str] = None,
 ):
     messaging_provider = DeviceMessagingProvider(
-        cmd=cmd, device_id=device_id, hub_name=hub_name, rg=resource_group_name, login=login
+        cmd=cmd, device_id=device_id, hub_name=hub_name_or_hostname, rg=resource_group_name, login=login
     )
     return messaging_provider.c2d_message_purge()
 
@@ -186,13 +186,13 @@ def iot_simulate_device(
     method_response_code: Optional[str] = None,
     method_response_payload: Optional[str] = None,
     init_reported_properties: Optional[str] = None,
-    hub_name: Optional[str] = None,
+    hub_name_or_hostname: Optional[str] = None,
     resource_group_name: Optional[str] = None,
     login: Optional[str] = None,
     model_id: Optional[str] = None,
 ):
     messaging_provider = DeviceMessagingProvider(
-        cmd=cmd, device_id=device_id, hub_name=hub_name, rg=resource_group_name, login=login
+        cmd=cmd, device_id=device_id, hub_name=hub_name_or_hostname, rg=resource_group_name, login=login
     )
     return messaging_provider.simulate_device(
         receive_settle=receive_settle,
@@ -217,12 +217,12 @@ def iot_device_upload_file(
     device_id: str,
     file_path: str,
     content_type: str,
-    hub_name: Optional[str] = None,
+    hub_name_or_hostname: Optional[str] = None,
     resource_group_name: Optional[str] = None,
     login: Optional[str] = None,
 ):
     messaging_provider = DeviceMessagingProvider(
-        cmd=cmd, device_id=device_id, hub_name=hub_name, rg=resource_group_name, login=login
+        cmd=cmd, device_id=device_id, hub_name=hub_name_or_hostname, rg=resource_group_name, login=login
     )
     return messaging_provider.device_upload_file(
         file_path=file_path,

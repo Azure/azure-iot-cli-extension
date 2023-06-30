@@ -34,7 +34,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                 self.cmd(
                     self.set_cmd_auth_type(
                         f"iot hub device-identity create "
-                        f"-d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg} {edge_enabled}",
+                        f"-d {device_ids[0]} -n {self.host_name} -g {self.entity_rg} {edge_enabled}",
                         auth_type=auth_phase,
                     ),
                 )
@@ -52,7 +52,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                 self.cmd(
                     self.set_cmd_auth_type(
                         f"iot hub module-identity create --module-id {module_ids[0]} --device-id {device_ids[0]} "
-                        f"--hub-name {self.entity_name} --resource-group {self.entity_rg} --primary-key {custom_primary_key} "
+                        f"--hub-name {self.host_name} --resource-group {self.entity_rg} --primary-key {custom_primary_key} "
                         f"--secondary-key {custom_secondary_key}",
                         auth_type=auth_phase,
                     ),
@@ -72,7 +72,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                 self.cmd(
                     self.set_cmd_auth_type(
                         f"iot hub module-identity delete -m {module_ids[0]} -d {device_ids[0]} "
-                        f"-n {self.entity_name} -g {self.entity_rg}",
+                        f"-n {self.host_name} -g {self.entity_rg}",
                         auth_type=auth_phase,
                     ),
                     checks=self.is_empty(),
@@ -82,7 +82,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                 self.cmd(
                     self.set_cmd_auth_type(
                         f"iot hub module-identity create --module-id {module_ids[0]} --device-id {device_ids[0]} "
-                        f"--hub-name {self.entity_name} --resource-group {self.entity_rg}",
+                        f"--hub-name {self.host_name} --resource-group {self.entity_rg}",
                         auth_type=auth_phase,
                     ),
                     checks=m0_d0_checks,
@@ -92,7 +92,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                 self.cmd(
                     self.set_cmd_auth_type(
                         f"iot hub module-identity create -m {module_ids[1]} -d {device_ids[0]} "
-                        f"-n {self.entity_name} -g {self.entity_rg} --auth-method x509_thumbprint "
+                        f"-n {self.host_name} -g {self.entity_rg} --auth-method x509_thumbprint "
                         f"--primary-thumbprint {PRIMARY_THUMBPRINT} --secondary-thumbprint {SECONDARY_THUMBPRINT}",
                         auth_type=auth_phase,
                     ),
@@ -117,7 +117,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                 self.cmd(
                     self.set_cmd_auth_type(
                         f"iot hub module-identity create -m {module_ids[2]} -d {device_ids[0]} "
-                        f"-n {self.entity_name} -g {self.entity_rg} --am x509_thumbprint --valid-days 1",
+                        f"-n {self.host_name} -g {self.entity_rg} --am x509_thumbprint --valid-days 1",
                         auth_type=auth_phase,
                     ),
                     checks=[
@@ -137,7 +137,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                 self.cmd(
                     self.set_cmd_auth_type(
                         f"iot hub module-identity create -m {module_ids[3]} -d {device_ids[0]} "
-                        f"-n {self.entity_name} -g {self.entity_rg} --am x509_ca",
+                        f"-n {self.host_name} -g {self.entity_rg} --am x509_ca",
                         auth_type=auth_phase,
                     ),
                     checks=[
@@ -159,7 +159,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                 m0_d0_show = self.cmd(
                     self.set_cmd_auth_type(
                         f"iot hub module-identity show "
-                        f"-m {module_ids[0]} -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg}",
+                        f"-m {module_ids[0]} -d {device_ids[0]} -n {self.host_name} -g {self.entity_rg}",
                         auth_type=auth_phase,
                     ),
                     checks=m0_d0_checks,
@@ -169,7 +169,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                 m0_d0_updated = self.cmd(
                     self.set_cmd_auth_type(
                         f"iot hub module-identity update -m {module_ids[0]} -d {device_ids[0]} "
-                        f'-n {self.entity_name} -g {self.entity_rg} --set authentication.symmetricKey.primaryKey="" '
+                        f'-n {self.host_name} -g {self.entity_rg} --set authentication.symmetricKey.primaryKey="" '
                         'authentication.symmetricKey.secondaryKey=""',
                         auth_type=auth_phase,
                     )
@@ -196,7 +196,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                 # Query device modules. Edge devices include the $edgeAgent and $edgeHub system modules.
                 module_query_result = self.cmd(
                     self.set_cmd_auth_type(
-                        f"iot hub query -n {self.entity_name} -g {self.entity_rg} "
+                        f"iot hub query -n {self.host_name} -g {self.entity_rg} "
                         f"-q \"select * from devices.modules where devices.deviceId='{device_ids[0]}'\"",
                         auth_type=auth_phase,
                     ),
@@ -210,7 +210,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
 
                 self.cmd(
                     self.set_cmd_auth_type(
-                        f"iot hub module-identity list -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg}",
+                        f"iot hub module-identity list -d {device_ids[0]} -n {self.host_name} -g {self.entity_rg}",
                         auth_type=auth_phase,
                     ),
                     checks=query_checks,
@@ -220,7 +220,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                 self.cmd(
                     self.set_cmd_auth_type(
                         f"iot hub module-identity delete "
-                        f"-m {module_ids[2]} -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg}",
+                        f"-m {module_ids[2]} -d {device_ids[0]} -n {self.host_name} -g {self.entity_rg}",
                         auth_type=auth_phase,
                     ),
                     checks=self.is_empty(),
@@ -230,7 +230,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                 self.cmd(
                     self.set_cmd_auth_type(
                         f"iot hub module-identity show "
-                        f"-m {module_ids[2]} -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg}",
+                        f"-m {module_ids[2]} -d {device_ids[0]} -n {self.host_name} -g {self.entity_rg}",
                         auth_type=auth_phase,
                     ),
                     expect_failure=True,
@@ -260,7 +260,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
             renew_primary_key_module = self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub module-identity renew-key -m {module_ids[0]} "
-                    f"-d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg} --kt primary",
+                    f"-d {device_ids[0]} -n {self.host_name} -g {self.entity_rg} --kt primary",
                     auth_type=auth_phase,
                 )
             ).get_output_in_json()
@@ -278,7 +278,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
         swap_keys_module = self.cmd(
             self.set_cmd_auth_type(
                 f"iot hub module-identity renew-key "
-                f"-m {module_ids[0]} -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg} --kt swap",
+                f"-m {module_ids[0]} -d {device_ids[0]} -n {self.host_name} -g {self.entity_rg} --kt swap",
                 auth_type=auth_phase,
             )
         ).get_output_in_json()
@@ -294,7 +294,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
         self.cmd(
             self.set_cmd_auth_type(
                 f"iot hub module-identity renew-key -m {module_ids[1]} "
-                f"-d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg} --kt secondary",
+                f"-d {device_ids[0]} -n {self.host_name} -g {self.entity_rg} --kt secondary",
                 auth_type=auth_phase,
             ),
             expect_failure=True,
@@ -332,7 +332,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
             primary_key_cstring = self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub module-identity connection-string show -m {module_ids[0]} -d {device_ids[0]} "
-                    f"-n {self.entity_name} -g {self.entity_rg}",
+                    f"-n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 )
             ).get_output_in_json()
@@ -347,7 +347,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
             secondary_key_cstring = self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub module-identity connection-string show -m {module_ids[0]} -d {device_ids[0]} "
-                    f"-n {self.entity_name} -g {self.entity_rg} --kt secondary",
+                    f"-n {self.host_name} -g {self.entity_rg} --kt secondary",
                     auth_type=auth_phase,
                 )
             ).get_output_in_json()
@@ -362,7 +362,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
             x509_cstring = self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub module-identity connection-string show -m {module_ids[1]} -d {device_ids[0]} "
-                    f"-n {self.entity_name} -g {self.entity_rg}",
+                    f"-n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 )
             ).get_output_in_json()
@@ -392,7 +392,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
         for auth_phase in DATAPLANE_AUTH_TYPES:
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub generate-sas-token -m {module_ids[0]} -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg}",
+                    f"iot hub generate-sas-token -m {module_ids[0]} -d {device_ids[0]} -n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 ),
                 checks=[self.exists("sas")],
@@ -402,7 +402,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub generate-sas-token "
-                    f"-m {module_ids[0]} -d {device_ids[0]} --du 1000 -n {self.entity_name} -g {self.entity_rg}",
+                    f"-m {module_ids[0]} -d {device_ids[0]} --du 1000 -n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 ),
                 checks=[self.exists("sas")],
@@ -412,7 +412,7 @@ class TestIoTHubModules(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     f'iot hub generate-sas-token -m {module_ids[0]} -d {device_ids[0]} --kt "secondary" '
-                    f"-n {self.entity_name} -g {self.entity_rg}",
+                    f"-n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 ),
                 checks=[self.exists("sas")],
