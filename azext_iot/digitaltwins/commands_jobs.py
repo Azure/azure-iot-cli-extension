@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from azext_iot.digitaltwins.providers.import_job import ImportJobProvider
+from azext_iot.digitaltwins.providers.delete_job import DeleteJobProvider
 
 
 def create_import_job(
@@ -38,3 +39,20 @@ def delete_import_job(cmd, name_or_hostname: str, job_id: str, resource_group_na
 def cancel_import_job(cmd, name_or_hostname: str, job_id: str, resource_group_name: str = None):
     import_job_provider = ImportJobProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
     return import_job_provider.cancel(job_id=job_id)
+
+
+def create_delete_job(
+    cmd, name_or_hostname: str, job_id: str = None, resource_group_name: str = None
+):
+    delete_job_provider = DeleteJobProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
+    return delete_job_provider.create(job_id=job_id)
+
+
+def show_delete_job(cmd, name_or_hostname: str, job_id: str, resource_group_name: str = None):
+    delete_job_provider = DeleteJobProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
+    return delete_job_provider.get(job_id=job_id)
+
+
+def list_delete_jobs(cmd, name_or_hostname: str, resource_group_name: str = None):
+    delete_job_provider = DeleteJobProvider(cmd=cmd, name=name_or_hostname, rg=resource_group_name)
+    return delete_job_provider.list()

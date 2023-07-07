@@ -58,7 +58,12 @@ def load_digitaltwins_commands(self, _):
         cmd_group.command("list", "list_instances")
         cmd_group.command("delete", "delete_instance", confirmation=True, supports_no_wait=True)
         cmd_group.wait_command("wait", "wait_instance")
-        cmd_group.command("reset", "reset_instance", confirmation=True, is_preview=True)
+        cmd_group.command(
+            "reset",
+            "reset_instance",
+            confirmation=True,
+            deprecate_info=self.deprecate(redirect="az dt job delete-all create", hide=True)
+        )
 
     with self.command_group(
         "dt data-history",
@@ -237,3 +242,12 @@ def load_digitaltwins_commands(self, _):
         cmd_group.command("list", "list_import_jobs")
         cmd_group.command("delete", "delete_import_job", confirmation=True)
         cmd_group.command("cancel", "cancel_import_job", confirmation=True)
+
+    with self.command_group(
+        "dt job delete-all",
+        command_type=digitaltwins_job_ops,
+        is_preview=True
+    ) as cmd_group:
+        cmd_group.command("create", "create_delete_job", confirmation=True)
+        cmd_group.show_command("show", "show_delete_job")
+        cmd_group.command("list", "list_delete_jobs")

@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from typing import Optional
 from azext_iot.common.utility import handle_service_exception
 from azext_iot.digitaltwins.providers.base import DigitalTwinsProvider
 from azext_iot.digitaltwins.providers import ErrorResponseException
@@ -12,14 +13,14 @@ from azure.cli.core.azclierror import ResourceNotFoundError
 from knack.log import get_logger
 from uuid import uuid4
 
-DEFAULT_IMPORT_JOB_ID_PREFIX = "import-job-"
+DEFAULT_DELETE_JOB_ID_PREFIX = "delete-job-"
 logger = get_logger(__name__)
 
 
-class ImportJobProvider(DigitalTwinsProvider):
+class DeleteJobProvider(DigitalTwinsProvider):
     def __init__(self, cmd, name: str, rg: str = None):
-        super(ImportJobProvider, self).__init__(cmd=cmd, name=name, rg=rg)
-        self.sdk = self.get_sdk().import_jobs
+        super(DeleteJobProvider, self).__init__(cmd=cmd, name=name, rg=rg)
+        self.sdk = self.get_sdk().delete_jobs
         self.cli = EmbeddedCLI(cli_ctx=cmd.cli_ctx)
 
     def _get_blob_url(self, blob_name: str, blob_container: str, storage_account: str):
@@ -52,43 +53,19 @@ class ImportJobProvider(DigitalTwinsProvider):
             handle_service_exception(e)
 
     def list(self, top: int = None):  # top is guarded for int() in arg def
-        from azext_iot.sdk.digitaltwins.dataplane.models import ImportJobsListOptions
+        from azext_iot.sdk.digitaltwins.dataplane.models import DeleteJobsListOptions
 
-        list_options = ImportJobsListOptions(max_items_per_page=top)
+        list_options = DeleteJobsListOptions(max_items_per_page=top)
 
         try:
             return self.sdk.list(import_jobs_list_options=list_options,)
         except ErrorResponseException as e:
             handle_service_exception(e)
 
-    def create(
-        self, input_blob_name: str, input_blob_container: str, input_storage_account: str, output_blob_name: str = None,
-        output_blob_container: str = None, output_storage_account: str = None, job_id: str = None,
-    ):
-        from azext_iot.sdk.digitaltwins.dataplane.models import ImportJob
-
-        job_id = job_id if job_id else DEFAULT_IMPORT_JOB_ID_PREFIX + str(uuid4()).replace("-", "")
-        output_blob_name = output_blob_name if output_blob_name else "{}_output.txt".format(job_id)
-        output_storage_account = output_storage_account if output_storage_account else input_storage_account
-        output_blob_container = output_blob_container if output_blob_container else input_blob_container
-
-        input_blob_url = self._get_blob_url(input_blob_name, input_blob_container, input_storage_account)
-        output_blob_url = self._get_blob_url(output_blob_name, output_blob_container, output_storage_account)
-
+    def create(self, job_id: Optional[str] = None):
+        job_id = job_id if job_id else DEFAULT_DELETE_JOB_ID_PREFIX + str(uuid4()).replace("-", "")
+        self.sdk.config.operation_id = job_id
         try:
-            import_job = ImportJob(input_blob_uri=input_blob_url, output_blob_uri=output_blob_url)
-            return self.sdk.add(id=job_id, import_job=import_job)
-        except ErrorResponseException as e:
-            handle_service_exception(e)
-
-    def delete(self, job_id: str):
-        try:
-            return self.sdk.delete(id=job_id)
-        except ErrorResponseException as e:
-            handle_service_exception(e)
-
-    def cancel(self, job_id: str):
-        try:
-            return self.sdk.cancel(id=job_id)
+            return self.sdk.add()
         except ErrorResponseException as e:
             handle_service_exception(e)

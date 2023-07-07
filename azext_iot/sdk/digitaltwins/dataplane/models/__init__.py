@@ -17,6 +17,7 @@ from .query_result_py3 import QueryResult
 from .inner_error_py3 import InnerError
 from .error_py3 import Error
 from .import_job_py3 import ImportJob
+from .delete_job_py3 import DeleteJob
 from .error_response_py3 import ErrorResponse, ErrorResponseException
 from .digital_twin_models_add_options_py3 import DigitalTwinModelsAddOptions
 from .digital_twin_models_list_options_py3 import DigitalTwinModelsListOptions
@@ -47,13 +48,18 @@ from .import_jobs_add_options_py3 import ImportJobsAddOptions
 from .import_jobs_get_by_id_options_py3 import ImportJobsGetByIdOptions
 from .import_jobs_delete_options_py3 import ImportJobsDeleteOptions
 from .import_jobs_cancel_options_py3 import ImportJobsCancelOptions
+from .delete_jobs_add_options_py3 import DeleteJobsAddOptions
+from .delete_jobs_list_options_py3 import DeleteJobsListOptions
+from .delete_jobs_get_by_id_options_py3 import DeleteJobsGetByIdOptions
 from .digital_twins_model_data_paged import DigitalTwinsModelDataPaged
 from .object_paged import ObjectPaged
 from .incoming_relationship_paged import IncomingRelationshipPaged
 from .event_route_paged import EventRoutePaged
 from .import_job_paged import ImportJobPaged
+from .delete_job_paged import DeleteJobPaged
 from .azure_digital_twins_api_enums import (
     Status,
+    DeleteJobStatus,
 )
 
 __all__ = [
@@ -65,6 +71,7 @@ __all__ = [
     'InnerError',
     'Error',
     'ImportJob',
+    'DeleteJob',
     'ErrorResponse', 'ErrorResponseException',
     'DigitalTwinModelsAddOptions',
     'DigitalTwinModelsListOptions',
@@ -95,10 +102,15 @@ __all__ = [
     'ImportJobsGetByIdOptions',
     'ImportJobsDeleteOptions',
     'ImportJobsCancelOptions',
+    'DeleteJobsAddOptions',
+    'DeleteJobsListOptions',
+    'DeleteJobsGetByIdOptions',
     'DigitalTwinsModelDataPaged',
     'ObjectPaged',
     'IncomingRelationshipPaged',
     'EventRoutePaged',
     'ImportJobPaged',
+    'DeleteJobPaged',
     'Status',
+    'DeleteJobStatus',
 ]
