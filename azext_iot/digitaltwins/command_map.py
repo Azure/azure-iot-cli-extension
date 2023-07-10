@@ -244,7 +244,7 @@ def load_digitaltwins_commands(self, _):
         cmd_group.command("cancel", "cancel_import_job", confirmation=True)
 
     with self.command_group(
-        "dt job delete-all",
+        "dt job deletion",
         command_type=digitaltwins_job_ops,
         is_preview=True
     ) as cmd_group:

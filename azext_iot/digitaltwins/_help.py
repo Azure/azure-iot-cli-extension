@@ -1124,13 +1124,13 @@ def load_digitaltwins_help():
         short-summary: Manage and configure jobs for a digital twin instance.
     """
 
-    helps["dt job delete-all"] = """
+    helps["dt job deletion"] = """
         type: group
         short-summary: Manage and configure jobs for deleting model, twin and relationships data in a digital twin instance.
         long-summary: A deletion job cannot be cancelled or deleted.
     """
 
-    helps["dt job delete-all create"] = """
+    helps["dt job deletion create"] = """
         type: command
         short-summary: Create and execute a deletion job on a digital twin instance.
         long-summary: |
@@ -1144,30 +1144,30 @@ def load_digitaltwins_help():
         examples:
         - name: Creates a deletion job with a given job id.
           text: >
-            az dt job delete-all create -n {instance_or_hostname} -j {job_id}
+            az dt job deletion create -n {instance_or_hostname} -j {job_id}
         - name: Creates a deletion job with a generated job id and no confirmation prompts.
           text: >
-            az dt job delete-all create -n {instance_or_hostname} -y
+            az dt job deletion create -n {instance_or_hostname} -y
     """
 
-    helps["dt job delete-all show"] = """
+    helps["dt job deletion show"] = """
         type: command
         short-summary: Show details of a deletion job executed on a digital twins instance.
 
         examples:
         - name: Show details of a data deletion job by job id.
           text: >
-            az dt job delete-all show -n {instance_or_hostname} -j {job_id}
+            az dt job deletion show -n {instance_or_hostname} -j {job_id}
     """
 
-    helps["dt job delete-all list"] = """
+    helps["dt job deletion list"] = """
         type: command
         short-summary: List all deletion jobs executed on a digital twins instance.
 
         examples:
         - name: List all deletion jobs on a target digital twins instance.
           text: >
-            az dt job delete-all list -n {instance_or_hostname}
+            az dt job deletion list -n {instance_or_hostname}
     """
 
     helps["dt job import"] = """

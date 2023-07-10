@@ -17,9 +17,9 @@ DEFAULT_DELETE_JOB_ID_PREFIX = "delete-job-"
 logger = get_logger(__name__)
 
 
-class DeleteJobProvider(DigitalTwinsProvider):
+class DeletionJobProvider(DigitalTwinsProvider):
     def __init__(self, cmd, name: str, rg: str = None):
-        super(DeleteJobProvider, self).__init__(cmd=cmd, name=name, rg=rg)
+        super(DeletionJobProvider, self).__init__(cmd=cmd, name=name, rg=rg)
         self.sdk = self.get_sdk().delete_jobs
         self.cli = EmbeddedCLI(cli_ctx=cmd.cli_ctx)
 

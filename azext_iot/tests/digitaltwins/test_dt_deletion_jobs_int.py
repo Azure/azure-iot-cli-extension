@@ -8,7 +8,7 @@ import json
 from typing import List, Optional
 
 from knack.log import get_logger
-from azext_iot.digitaltwins.providers.delete_job import DEFAULT_DELETE_JOB_ID_PREFIX
+from azext_iot.digitaltwins.providers.deletion_job import DEFAULT_DELETE_JOB_ID_PREFIX
 
 from azext_iot.tests.helpers import assign_role_assignment
 from . import DTLiveScenarioTest
@@ -116,7 +116,7 @@ class TestDTDeleteJobs(DTLiveScenarioTest):
         # Job part
         valid_delete_job_id = "{}_valid_delete_job".format(instance_name)
         create_valid_delete_job_output = self.cmd(
-            "dt job delete-all create -n '{}' -g '{}' -j '{}'".format(
+            "dt job deletion create -n '{}' -g '{}' -j '{}'".format(
                 instance_name, self.rg, valid_delete_job_id
             )
         ).get_output_in_json()
@@ -147,7 +147,7 @@ class TestDTDeleteJobs(DTLiveScenarioTest):
         assert len(twin_query_result["result"]) == 0
 
         create_generated_delete_job_output = self.cmd(
-            "dt job delete-all create -n '{}' -g '{}'".format(
+            "dt job deletion create -n '{}' -g '{}'".format(
                 instance_name, self.rg
             )
         ).get_output_in_json()
@@ -166,7 +166,7 @@ class TestDTDeleteJobs(DTLiveScenarioTest):
         assert error is None
 
         list_job_output = self.cmd(
-            "dt job delete-all list -n '{}' -g '{}'".format(
+            "dt job deletion list -n '{}' -g '{}'".format(
                 instance_name, self.rg
             )
         ).get_output_in_json()
