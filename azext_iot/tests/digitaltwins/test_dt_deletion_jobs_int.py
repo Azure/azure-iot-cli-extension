@@ -175,7 +175,7 @@ class TestDTDeleteJobs(DTLiveScenarioTest):
 
 def poll_job_status(cmd, rg: str, instance_name: str, job_id: str, expected_statuses: List[str]) -> Optional[dict]:
     """
-    Helper function to poll job import status until finalized. Returns the error.
+    Helper function to poll job deletion status until finalized. Returns the error.
 
     Note that the first status in expected_statuses should be the expected final status. This method will check for running
     and not started statuses without needing to be specified in expected_statuses.
@@ -185,12 +185,12 @@ def poll_job_status(cmd, rg: str, instance_name: str, job_id: str, expected_stat
     expected_statuses.extend(["running", "notstarted"])
     while num_tries < MAX_TRIES:
         num_tries += 1
-        import_job_output = cmd(
-            "dt job import show -n '{}' -g '{}' -j '{}'".format(instance_name, rg, job_id)
+        deletion_job_output = cmd(
+            "dt job deletion show -n '{}' -g '{}' -j '{}'".format(instance_name, rg, job_id)
         ).get_output_in_json()
-        assert import_job_output["status"] in expected_statuses
-        if import_job_output["status"] == final_status:
-            return import_job_output["error"]
+        assert deletion_job_output["status"] in expected_statuses
+        if deletion_job_output["status"] == final_status:
+            return deletion_job_output["error"]
         sleep(POLL_SLEEP_INTERVAL)
 
 

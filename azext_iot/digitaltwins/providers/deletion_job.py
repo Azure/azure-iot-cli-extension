@@ -66,6 +66,6 @@ class DeletionJobProvider(DigitalTwinsProvider):
         job_id = job_id if job_id else DEFAULT_DELETE_JOB_ID_PREFIX + str(uuid4()).replace("-", "")
         self.sdk.config.operation_id = job_id
         try:
-            return self.sdk.add()
+            return self.sdk.add(polling=False)
         except ErrorResponseException as e:
             handle_service_exception(e)
