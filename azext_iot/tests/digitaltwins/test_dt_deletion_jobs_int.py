@@ -22,7 +22,6 @@ POLL_SLEEP_INTERVAL = 30
 
 class TestDTDeleteJobs(DTLiveScenarioTest):
     def __init__(self, test_case):
-        self.storage_cstring = None
         super(TestDTDeleteJobs, self).__init__(test_case)
 
     def test_dt_job_delete_all(self):
