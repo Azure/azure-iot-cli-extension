@@ -28,5 +28,5 @@ steps:
         WHEELS=$(ls $ARTIFACTS_DIR/azure-iot/*.whl)
         az --version
         for i in $WHEELS; do
-          python ../azure-cli-extensions/scripts/refdoc/generate.py -e $i
+          python ../azure-cli-extensions/scripts/refdoc/generate.py -e $i -d None
         done
