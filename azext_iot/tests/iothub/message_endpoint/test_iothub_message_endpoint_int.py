@@ -758,14 +758,13 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     # Update
     # Keybased -> System, change all optional props
     cli.invoke(
-        "iot hub message-endpoint update storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {} "
+        "iot hub message-endpoint update storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} "
         "--identity [system] -b {} -w {} --ff {}".format(
             iot_hub,
             iot_rg,
             endpoint_names[0],
             iot_rg,
             endpoint_uri,
-            container_name,
             100,
             50,
             custom_file_format
@@ -797,13 +796,13 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
     # System -> User, change some optional props
     custom_file_format = default_file_format.replace("/", "_")
     cli.invoke(
-        "iot hub message-endpoint update storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} --container {} "
+        "iot hub message-endpoint update storage-container -n {} -g {} --en {} --erg {} --endpoint-uri {} "
         "--identity {} -b {}".format(
             iot_hub,
             iot_rg,
             endpoint_names[1],
-            iot_rg, endpoint_uri,
-            container_name,
+            iot_rg,
+            endpoint_uri,
             user_id,
             70,
         )
@@ -833,13 +832,12 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
 
     # User -> Keybased, change no optional props
     cli.invoke(
-        "iot hub message-endpoint update storage-container -n {} -g {} --en {} --erg {} --container {} "
+        "iot hub message-endpoint update storage-container -n {} -g {} --en {} --erg {} "
         "-c {}".format(
             iot_hub,
             iot_rg,
             endpoint_names[2],
             iot_rg,
-            container_name,
             storage_cs,
         )
     )
@@ -1049,14 +1047,13 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
     # Keybased -> User, add pkn + pkt
     cli.invoke(
         "iot hub message-endpoint update cosmosdb-container -n {} -g {} --en {} --erg {} --endpoint-uri {} "
-        "--identity {} --container {} --db {} --pkn {} --pkt {}".format(
+        "--identity {} --db {} --pkn {} --pkt {}".format(
             iot_hub,
             iot_rg,
             endpoint_names[0],
             iot_rg,
             endpoint_uri,
             user_id,
-            container,
             database,
             partition_path,
             partition_template
@@ -1086,14 +1083,13 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
 
     # System -> Keybased, keep
     cli.invoke(
-        "iot hub message-endpoint update cosmosdb-container -n {} -g {} --en {} --erg {} -c {} --container {} "
+        "iot hub message-endpoint update cosmosdb-container -n {} -g {} --en {} --erg {} -c {} "
         "--db {}".format(
             iot_hub,
             iot_rg,
             endpoint_names[1],
             iot_rg,
             cosmos_cstring,
-            container,
             database
         )
     )
@@ -1122,13 +1118,12 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
     # User -> System, remove pkn, pkt
     cli.invoke(
         "iot hub message-endpoint update cosmosdb-container -n {} -g {} --en {} --erg {} --endpoint-uri {} "
-        "--identity [system] --container {} --db {} --pkn {} --pkt {}".format(
+        "--identity [system] --db {} --pkn {} --pkt {}".format(
             iot_hub,
             iot_rg,
             endpoint_names[2],
             iot_rg,
             endpoint_uri,
-            container,
             database,
             partition_path,
             partition_template
