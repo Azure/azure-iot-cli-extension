@@ -491,11 +491,6 @@ def load_iothub_arguments(self, _):
 
         with self.argument_context(f"iot hub message-endpoint {endpoint_op} storage-container") as context:
             context.argument(
-                "container_name",
-                options_list=["--container-name", "--container"],
-                help="Name of the storage container.",
-            )
-            context.argument(
                 "batch_frequency",
                 options_list=["--batch-frequency", "-b"],
                 type=int,
@@ -521,11 +516,6 @@ def load_iothub_arguments(self, _):
                 "database_name",
                 options_list=["--database-name", "--db"],
                 help="The name of the cosmos DB database in the cosmos DB account.",
-            )
-            context.argument(
-                "container_name",
-                options_list=["--container-name", "--container"],
-                help="The name of the Cosmos DB SQL Container in the cosmos DB Database.",
             )
             context.argument(
                 "primary_key",
@@ -579,6 +569,18 @@ def load_iothub_arguments(self, _):
             options_list=["--encoding"],
             arg_type=get_enum_type(EncodingFormat),
             help="Encoding format for the container.",
+        )
+        context.argument(
+            "container_name",
+            options_list=["--container-name", "--container"],
+            help="Name of the storage container.",
+        )
+
+    with self.argument_context("iot hub message-endpoint create cosmosdb-container") as context:
+        context.argument(
+            "container_name",
+            options_list=["--container-name", "--container"],
+            help="The name of the Cosmos DB SQL Container in the cosmos DB Database.",
         )
 
     with self.argument_context("iot hub message-endpoint update cosmosdb-container") as context:

@@ -658,11 +658,13 @@ def load_iothub_help():
         type: command
         short-summary: Update the properties of an existing Cosmos DB Container endpoint for an IoT Hub.
         long-summary: |
-                      If updating the authentication type from a key-based to identity-based Cosmos DB Container endpoint, you must provide the endpoint account (via --endpoint-account). The old primary key and secondary key will be nulled out.
+                      If updating the authentication type from a key-based to identity-based Cosmos DB Container endpoint, you must provide the identity (via --identity) and the endpoint uri (via --endpoint-uri). The old primary key and secondary key will be nulled out.
 
-                      If updating the authentication type from an identity-based to key-based Cosmos DB Container endpoint, you must provide the connection string (via --connection-string) or the primary key (via --primary-key) or the secondary key (via --secondary-key).
+                      If updating the authentication type from an identity-based to key-based Cosmos DB Container endpoint, you must provide the connection string (via --connection-string), the primary key (via --primary-key) or the secondary key (via --secondary-key).
+
+                      Container name for the endpoint cannot be changed. Account names can only be changed if containers with the same name exist in both accounts.
         examples:
-          - name: Update a key-based Cosmos DB Container endpoint for an IoT Hub to use a new specified connection string.
+          - name: Update a key-based or identity-based Cosmos DB Container endpoint for an IoT Hub to use a new specified connection string.
             text: >
               az iot hub message-endpoint update cosmosdb-container -n {iothub_name} --en {endpoint_name} --connection-string {connection_string}
           - name: Update a Cosmos DB Container endpoint for an IoT Hub to use a specified primary key and secondary key.
@@ -672,10 +674,10 @@ def load_iothub_help():
                   The partition key template will be the default.
             text: >
               az iot hub message-endpoint update cosmosdb-container -n {iothub_name} --en {endpoint_name} --pkn {partition_key_name} --identity [system]
-          - name: Update a Cosmos DB Container endpoint for an IoT Hub to use user assigned identity
+          - name: Update a key-based Cosmos DB Container endpoint for an IoT Hub to use user assigned identity (you can omit --endpoint-uri if the endpoint is already identity-based).
             text: >
               az iot hub message-endpoint update cosmosdb-container -n {iothub_name} --en {endpoint_name}
-              --identity {user_identity_resource_id}
+              --identity {user_identity_resource_id} --endpoint-uri {endpoint_uri}
     """
 
     helps[
@@ -684,20 +686,20 @@ def load_iothub_help():
         type: command
         short-summary: Update the properties of an existing Event Hub endpoint for an IoT Hub.
         long-summary: |
-                      If updating the authentication type from a key-based to identity-based Event Hub endpoint, you must provide the endpoint uri (via --endpoint-uri) and the entity path (via --entity-path). The old connection string will be nulled out.
+                      If updating the authentication type from a key-based to identity-based Event Hub endpoint, you must provide the identity (via --identity), the endpoint uri (via --endpoint-uri) and the entity path (via --entity-path). The old connection string will be nulled out.
 
                       If updating the authentication type from an identity-based to key-based Event Hub endpoint, you must provide the connection string (via --connection-string). The old endpoint uri and entity path will be nulled out.
         examples:
-          - name: Update an Event Hub endpoint for an IoT Hub to use a new specified connection string.
+          - name: Update a key-based or identity-based Event Hub endpoint for an IoT Hub to use a new specified connection string.
             text: >
               az iot hub message-endpoint update eventhub -n {iothub_name} --en {endpoint_name} -c {connection_string}
           - name: Update an Event Hub endpoint for an IoT Hub to use system assigned identity and a different entity path.
             text: >
               az iot hub message-endpoint update eventhub -n {iothub_name} --en {endpoint_name}
               --entity-path {entity_path} --identity [system]
-          - name: Update an Event Hub endpoint for an IoT Hub to use user assigned identity.
+          - name: Update a key-based Event Hub endpoint for an IoT Hub to use user assigned identity (you can omit --endpoint-uri if the endpoint is already identity-based).
             text: >
-              az iot hub message-endpoint update eventhub -n {iothub_name} --en {endpoint_name} --identity {user_identity_resource_id}
+              az iot hub message-endpoint update eventhub -n {iothub_name} --en {endpoint_name} --identity {user_identity_resource_id} --endpoint-uri {endpoint_uri} --entity-path {entity_path}
     """
 
     helps[
@@ -706,20 +708,20 @@ def load_iothub_help():
         type: command
         short-summary: Update the properties of an existing Service Bus Queue endpoint for an IoT Hub.
         long-summary: |
-                      If updating the authentication type from a key-based to identity-based Service Bus Queue endpoint, you must provide the endpoint uri (via --endpoint-uri) and the entity path (via --entity-path). The old connection string will be nulled out.
+                      If updating the authentication type from a key-based to identity-based Service Bus Queue endpoint, you must provide the identity (via --identity), the endpoint uri (via --endpoint-uri) and the entity path (via --entity-path). The old connection string will be nulled out.
 
                       If updating the authentication type from an identity-based to key-based Service Bus Queue endpoint, you must provide the connection string (via --connection-string). The old endpoint uri and entity path will be nulled out.
         examples:
-          - name: Update a Service Bus Queue endpoint for an IoT Hub to use a new specified connection string.
+          - name: Update a key-based or identity-based Service Bus Queue endpoint for an IoT Hub to use a new specified connection string.
             text: >
               az iot hub message-endpoint update servicebus-queue -n {iothub_name} --en {endpoint_name} -c {connection_string}
           - name: Update a Service Bus Queue endpoint for an IoT Hub to use system assigned identity and a different entity path.
             text: >
               az iot hub message-endpoint update servicebus-queue -n {iothub_name} --en {endpoint_name}
               --entity-path {entity_path} --identity [system]
-          - name: Update a Service Bus Queue endpoint for an IoT Hub to use user assigned identity.
+          - name: Update a key-based Service Bus Queue endpoint for an IoT Hub to use user assigned identity (you can omit --endpoint-uri if the endpoint is already identity-based).
             text: >
-              az iot hub message-endpoint update servicebus-queue -n {iothub_name} --en {endpoint_name} --identity {user_identity_resource_id}
+              az iot hub message-endpoint update servicebus-queue -n {iothub_name} --en {endpoint_name} --identity {user_identity_resource_id} --endpoint-uri {endpoint_uri} --entity-path {entity_path}
     """
 
     helps[
@@ -728,20 +730,20 @@ def load_iothub_help():
         type: command
         short-summary: Update the properties of an existing Service Bus Topic endpoint for an IoT Hub.
         long-summary: |
-                      If updating the authentication type from a key-based to identity-based Service Bus Topic endpoint, you must provide the endpoint uri (via --endpoint-uri) and the entity path (via --entity-path). The old connection string will be nulled out.
+                      If updating the authentication type from a key-based to identity-based Service Bus Topic endpoint, you must provide the identity (via --identity), the endpoint uri (via --endpoint-uri) and the entity path (via --entity-path). The old connection string will be nulled out.
 
                       If updating the authentication type from an identity-based to key-based Service Bus Topic endpoint, you must provide the connection string (via --connection-string). The old endpoint uri and entity path will be nulled out.
         examples:
-          - name: Update a Service Bus Topic endpoint for an IoT Hub to use a new specified connection string.
+          - name: Update a key-based or identity-based Service Bus Topic endpoint for an IoT Hub to use a new specified connection string.
             text: >
               az iot hub message-endpoint update servicebus-topic -n {iothub_name} --en {endpoint_name} -c {connection_string}
           - name: Update a Service Bus Topic endpoint for an IoT Hub to use system assigned identity and a different entity path.
             text: >
               az iot hub message-endpoint update servicebus-topic -n {iothub_name} --en {endpoint_name}
               --entity-path {entity_path} --identity [system]
-          - name: Update a Service Bus Topic endpoint for an IoT Hub to use user assigned identity.
+          - name: Update a key-based Service Bus Topic endpoint for an IoT Hub to use user assigned identity (you can omit --endpoint-uri if the endpoint is already identity-based).
             text: >
-              az iot hub message-endpoint update servicebus-topic -n {iothub_name} --en {endpoint_name}  --identity {user_identity_resource_id}
+              az iot hub message-endpoint update servicebus-topic -n {iothub_name} --en {endpoint_name}  --identity {user_identity_resource_id} --endpoint-uri {endpoint_uri} --entity-path {entity_path}
     """
 
     helps[
@@ -750,21 +752,21 @@ def load_iothub_help():
         type: command
         short-summary: Update the properties of an existing Storage Container endpoint for an IoT Hub.
         long-summary: |
-                      If updating the authentication type from a key-based to identity-based Storage Container endpoint, you must provide the endpoint account (via --endpoint-account). The old connection string will be nulled out.
+                      If updating the authentication type from a key-based to identity-based Storage Container endpoint, you must provide the identity (via --identity) and the endpoint uri (via --endpoint-uri). The old connection string will be nulled out.
 
                       If updating the authentication type from an identity-based to key-based Storage Container endpoint, you must provide the connection string (via --connection-string).
 
-                      Encoding for the endpoint cannot be changed.
+                      Container name and encoding for the endpoint cannot be changed. Account names can only be changed if containers with the same name exist in both accounts.
         examples:
-          - name: Update a Storage Container endpoint for an IoT Hub to use a new specified connection string.
+          - name: Update a key-based or identity-based Storage Container endpoint for an IoT Hub to use a new specified connection string.
             text: >
               az iot hub message-endpoint update storage-container -n {iothub_name} --en {endpoint_name} -c {connection_string}
           - name: Update a Storage Container endpoint for an IoT Hub to use system assigned identity with the given batch frequency, chunk size, and file name format.
             text: >
               az iot hub message-endpoint update storage-container -n {iothub_name} --en {endpoint_name}  -b {batch_frequency} -w {chunk_size} --ff {file_format} --identity [system]
-          - name: Update a Storage Container endpoint for an IoT Hub to use user assigned identity.
+          - name: Update a key-based Storage Container endpoint for an IoT Hub to use user assigned identity (you can omit --endpoint-uri if the endpoint is already identity-based).
             text: >
-              az iot hub message-endpoint update storage-container -n {iothub_name} --en {endpoint_name}  --identity {user_identity_resource_id}
+              az iot hub message-endpoint update storage-container -n {iothub_name} --en {endpoint_name} --identity {user_identity_resource_id} --endpoint-uri {endpoint_uri}
     """
 
     helps[
