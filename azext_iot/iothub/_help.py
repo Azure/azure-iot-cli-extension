@@ -662,7 +662,7 @@ def load_iothub_help():
 
                       If updating the authentication type from an identity-based to key-based Cosmos DB Container endpoint, you must provide the connection string (via --connection-string), the primary key (via --primary-key) or the secondary key (via --secondary-key).
 
-                      Container name for the endpoint cannot be changed.
+                      Container name for the endpoint cannot be changed. Account names can only be changed if containers with the same name exist in both accounts.
         examples:
           - name: Update a key-based or identity-based Cosmos DB Container endpoint for an IoT Hub to use a new specified connection string.
             text: >
@@ -756,7 +756,7 @@ def load_iothub_help():
 
                       If updating the authentication type from an identity-based to key-based Storage Container endpoint, you must provide the connection string (via --connection-string).
 
-                      Container name and encoding for the endpoint cannot be changed.
+                      Container name and encoding for the endpoint cannot be changed. Account names can only be changed if containers with the same name exist in both accounts.
         examples:
           - name: Update a key-based or identity-based Storage Container endpoint for an IoT Hub to use a new specified connection string.
             text: >
