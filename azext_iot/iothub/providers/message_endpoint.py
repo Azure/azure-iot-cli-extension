@@ -237,7 +237,6 @@ class MessageEndpoint(IoTHubProvider):
         endpoint_resource_group: Optional[str] = None,
         endpoint_subscription_id: Optional[str] = None,
         connection_string: Optional[str] = None,
-        container_name: Optional[str] = None,
         batch_frequency: Optional[int] = None,
         chunk_size_window: Optional[int] = None,
         file_name_format: Optional[str] = None,
@@ -316,8 +315,6 @@ class MessageEndpoint(IoTHubProvider):
             original_endpoint.entity_path = entity_path
 
         if endpoint_type == EndpointType.AzureStorageContainer.value:
-            if container_name:
-                original_endpoint.container_name = container_name
             if file_name_format:
                 original_endpoint.file_name_format = file_name_format
             if batch_frequency:
@@ -336,10 +333,6 @@ class MessageEndpoint(IoTHubProvider):
                     original_endpoint.endpoint_uri = parsed_cs["AccountEndpoint"]
             if database_name:
                 original_endpoint.database_name = database_name
-            if container_name and self.support_cosmos == 2:
-                original_endpoint.container_name = container_name
-            if container_name and self.support_cosmos == 1:
-                original_endpoint.collection_name = container_name
             if partition_key_name:
                 original_endpoint.partition_key_name = None if partition_key_name == "" else partition_key_name
             if partition_key_template:
