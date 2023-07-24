@@ -482,7 +482,6 @@ class TestMessageEndpointUpdate:
                 "endpoint_subscription_id": generate_names(),
                 "connection_string": None,
                 "endpoint_uri": generate_names(),
-                "container_name": generate_names(),
                 "batch_frequency": 1,
                 "chunk_size_window": 100,
                 "file_name_format": generate_names(),
@@ -494,7 +493,6 @@ class TestMessageEndpointUpdate:
                 "endpoint_subscription_id": generate_names(),
                 "connection_string": None,
                 "endpoint_uri": generate_names(),
-                "container_name": generate_names(),
                 "batch_frequency": None,
                 "chunk_size_window": 30,
                 "file_name_format": generate_names(),
@@ -506,7 +504,6 @@ class TestMessageEndpointUpdate:
                 "endpoint_subscription_id": None,
                 "connection_string": None,
                 "endpoint_uri": None,
-                "container_name": None,
                 "batch_frequency": None,
                 "chunk_size_window": None,
                 "file_name_format": None,
@@ -518,7 +515,6 @@ class TestMessageEndpointUpdate:
                 "endpoint_subscription_id": None,
                 "connection_string": generate_names(),
                 "endpoint_uri": generate_names(),
-                "container_name": None,
                 "batch_frequency": None,
                 "chunk_size_window": None,
                 "file_name_format": None,
@@ -558,11 +554,6 @@ class TestMessageEndpointUpdate:
             assert endpoint.subscription_id == req.get("endpoint_subscription_id")
         else:
             assert isinstance(endpoint.subscription_id, mock)
-
-        if req.get("container_name"):
-            assert endpoint.container_name == req.get("container_name")
-        else:
-            assert isinstance(endpoint.container_name, mock)
 
         if req.get("file_name_format"):
             assert endpoint.file_name_format == req.get("file_name_format")
@@ -639,7 +630,6 @@ class TestMessageEndpointUpdate:
             {
                 "endpoint_resource_group": generate_names(),
                 "endpoint_subscription_id": generate_names(),
-                "container_name": generate_names(),
                 "database_name": generate_names(),
                 "connection_string": generate_names(),
                 "primary_key": None,
@@ -653,7 +643,6 @@ class TestMessageEndpointUpdate:
             {
                 "endpoint_resource_group": None,
                 "endpoint_subscription_id": None,
-                "container_name": None,
                 "database_name": None,
                 "connection_string": None,
                 "primary_key": None,
@@ -667,7 +656,6 @@ class TestMessageEndpointUpdate:
             {
                 "endpoint_resource_group": None,
                 "endpoint_subscription_id": None,
-                "container_name": None,
                 "database_name": None,
                 "connection_string": None,
                 "primary_key": None,
@@ -681,7 +669,6 @@ class TestMessageEndpointUpdate:
             {
                 "endpoint_resource_group": None,
                 "endpoint_subscription_id": None,
-                "container_name": None,
                 "database_name": None,
                 "connection_string": generate_names(),
                 "primary_key": None,
@@ -695,7 +682,6 @@ class TestMessageEndpointUpdate:
             {
                 "endpoint_resource_group": generate_names(),
                 "endpoint_subscription_id": None,
-                "container_name": None,
                 "database_name": None,
                 "connection_string": generate_names(),
                 "primary_key": generate_names(),
@@ -709,7 +695,6 @@ class TestMessageEndpointUpdate:
             {
                 "endpoint_resource_group": None,
                 "endpoint_subscription_id": None,
-                "container_name": generate_names(),
                 "database_name": generate_names(),
                 "connection_string": None,
                 "primary_key": None,
@@ -754,11 +739,6 @@ class TestMessageEndpointUpdate:
             assert endpoint.subscription_id == req.get("endpoint_subscription_id")
         else:
             assert isinstance(endpoint.subscription_id, mock)
-
-        if req.get("container_name"):
-            assert endpoint.container_name == req.get("container_name")
-        else:
-            assert isinstance(endpoint.container_name, mock)
 
         if req.get("database_name"):
             assert endpoint.database_name == req.get("database_name").lower()
