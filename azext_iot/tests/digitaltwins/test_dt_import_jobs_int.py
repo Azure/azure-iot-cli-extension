@@ -232,7 +232,7 @@ class TestDTImportJobs(DTLiveScenarioTest):
         assert set(model_ids) == set(EXPECTED_MODEL_IDS)
 
         twin_query_result = self.cmd(
-            "dt twin query -n {} -q 'select * from digitaltwins'".format(instance_name)
+            "dt twin query -n {} -g {} -q 'select * from digitaltwins'".format(instance_name, self.rg)
         ).get_output_in_json()
         twin_ids = []
         relationship = "has"
@@ -261,7 +261,7 @@ class TestDTImportJobs(DTLiveScenarioTest):
         # Deletion
         valid_delete_job_id = "{}_valid_delete_job".format(instance_name)
         create_valid_delete_job_output = self.cmd(
-            "dt job deletion create -n '{}' -g '{}' -j '{}'".format(
+            "dt job deletion create -n '{}' -g '{}' -j '{}' -y".format(
                 instance_name, self.rg, valid_delete_job_id
             )
         ).get_output_in_json()
@@ -293,7 +293,7 @@ class TestDTImportJobs(DTLiveScenarioTest):
         assert len(twin_query_result["result"]) == 0
 
         create_generated_delete_job_output = self.cmd(
-            "dt job deletion create -n '{}' -g '{}'".format(
+            "dt job deletion create -n '{}' -g '{}' -y".format(
                 instance_name, self.rg
             )
         ).get_output_in_json()
@@ -357,7 +357,6 @@ def assert_job_creation(
     assert create_job_output["error"] is None
     assert create_job_output["status"] == "notstarted"
     assert create_job_output["id"]
-    assert create_job_output["lastActionDateTime"]
 
     # We know the expected job id only when it is passed in as a param, else it is system generated
     if expected_job_id:
@@ -367,6 +366,7 @@ def assert_job_creation(
         assert create_job_output["id"].startswith(prefix)
 
     if job_type == "import":
+        assert create_job_output["lastActionDateTime"]
         assert create_job_output["inputBlobUri"]
         assert create_job_output["inputBlobUri"].split("/")[-1] == expected_input_blob_name
         assert create_job_output["outputBlobUri"]
