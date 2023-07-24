@@ -9,7 +9,6 @@ from azext_iot.common.utility import handle_service_exception
 from azext_iot.digitaltwins.providers.base import DigitalTwinsProvider
 from azext_iot.digitaltwins.providers import ErrorResponseException
 from azext_iot.common.embedded_cli import EmbeddedCLI
-from azure.cli.core.azclierror import ResourceNotFoundError
 from knack.log import get_logger
 from uuid import uuid4
 
@@ -22,29 +21,6 @@ class DeletionJobProvider(DigitalTwinsProvider):
         super(DeletionJobProvider, self).__init__(cmd=cmd, name=name, rg=rg)
         self.sdk = self.get_sdk().delete_jobs
         self.cli = EmbeddedCLI(cli_ctx=cmd.cli_ctx)
-
-    def _get_blob_url(self, blob_name: str, blob_container: str, storage_account: str):
-        storage_account_cstring_op = self.cli.invoke(
-            "storage account show-connection-string -n '{}'".format(storage_account)
-        )
-        if not storage_account_cstring_op.success():
-            raise ResourceNotFoundError(
-                "Unable to retrieve connection string for input storage account: {}".format(storage_account)
-            )
-        storage_account_cstring = storage_account_cstring_op.as_json()
-        blob_url_op = self.cli.invoke(
-            "storage blob url --connection-string '{}' --container-name '{}' --name '{}'".format(
-                storage_account_cstring, blob_container, blob_name
-            )
-        )
-        if not blob_url_op.success():
-            raise ResourceNotFoundError(
-                "Unable to retrieve blob url for import data file: {} in {} container under {} account".format(
-                    blob_name, blob_container, storage_account
-                )
-            )
-        blob_url = blob_url_op.as_json()
-        return blob_url
 
     def get(self, job_id: str):
         try:
