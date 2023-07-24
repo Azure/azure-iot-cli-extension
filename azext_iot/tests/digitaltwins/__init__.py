@@ -196,8 +196,6 @@ class DTLiveScenarioTest(LiveScenarioTest):
         )
 
     def is_region_available(self, region, capacity: int = 1):
-        # TODO: Undo when ready
-        return True
         region_capacity = self.calculate_region_capacity
         return (region_capacity.get(region, 0) + capacity) <= REGION_RESOURCE_LIMIT
 

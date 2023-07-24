@@ -671,7 +671,7 @@ def load_digitaltwins_arguments(self, _):
         context.argument(
             "job_id",
             options_list=["--job-id", "-j"],
-            help="Id of bulk import job. A system generated id is assigned when this parameter is ommitted during job creation.",
+            help="Id of job. A system generated id is assigned when this parameter is ommitted during job creation.",
         )
 
     with self.argument_context("dt job import") as context:
