@@ -1,0 +1,103 @@
+id: 
+name: GitOps.PullRequestIssueManagement
+description: GitOps.PullRequestIssueManagement primitive
+owner: 
+resource: repository
+disabled: false
+where: 
+configuration:
+  resourceManagementConfiguration:
+    scheduledSearches: []
+    eventResponderTasks:
+    - if:
+      - payloadType: Issues
+      - bodyContains:
+          pattern: "'IotHubResourceOperations' object has no attribute 'config'"
+          isRegex: False
+      - isAction:
+          action: Opened
+      then:
+      - addReply:
+          reply: >-
+            Thanks for submitting an issue, @${issueAuthor}. I noticed your issue contains the following error:
+
+
+            `'IotHubResourceOperations' object has no attribute 'config'` 
+
+            which likely stems from a breaking change introduced in newer CLI core releases (2.24+) that affects users with older extension versions.
+
+
+            Please try upgrading your CLI extension to a newer version (fixed in 0.10.11+) and see if that resolves the issue:
+
+            `az extension update --name azure-iot`
+      description: 
+    - if:
+      - payloadType: Issues
+      - bodyContains:
+          pattern: No module named 'azure.mgmt.iothubprovisioningservices.iot_dps_client'
+          isRegex: False
+      - isAction:
+          action: Opened
+      then:
+      - addReply:
+          reply: >-
+            Thanks for submitting an issue, @${issueAuthor}. I noticed your issue contains the following error:
+
+
+            `No module named 'azure.mgmt.iothubprovisioningservices.iot_dps_client'`
+
+            which likely stems from a breaking change introduced in newer CLI core releases (2.32+) that affects users with older extension versions.
+
+
+            Please try upgrading your CLI extension to a newer version (fixed in 0.10.14+) and see if that resolves the issue:
+
+            `az extension update --name azure-iot`
+      description: 
+    - if:
+      - payloadType: Issues
+      - bodyContains:
+          pattern: gather() got an unexpected keyword argument 'loop'
+          isRegex: False
+      - isAction:
+          action: Opened
+      then:
+      - addReply:
+          reply: >-
+            Thanks for submitting an issue, @${issueAuthor}. I noticed your issue contains the following error:
+
+
+            `gather() got an unexpected keyword argument 'loop'`
+
+            which can often be solved quickly by updating your installed version of the `azure-iot` extension.
+
+
+            Please try upgrading your CLI extension to a newer version and see if that resolves the issue:
+
+            `az extension update --name azure-iot`
+      description: 
+    - if:
+      - payloadType: Issues
+      - bodyContains:
+          pattern: "ImportError: cannot import name 'c_uamqp' from partially initialized module 'uamqp'"
+          isRegex: False
+      - isAction:
+          action: Opened
+      then:
+      - addReply:
+          reply: >-
+            Thanks for submitting an issue, @${issueAuthor}. I noticed your issue contains the following error:
+
+
+            `ImportError: cannot import name 'c_uamqp' from partially initialized module 'uamqp'`
+
+            which can often be solved quickly by either:
+
+            - Updating your installed version of the `azure-iot` extension:
+              `az extension update --name azure-iot`
+            - Performing a repair of the uamqp dependency:
+              `az iot hub monitor-events --hub-name {} --device-id {} --repair`
+
+            Please try these two resolution methods and see if that helps resolve your issue.
+      description: 
+onFailure: 
+onSuccess: 
