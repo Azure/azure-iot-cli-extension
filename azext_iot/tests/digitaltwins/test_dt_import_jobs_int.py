@@ -8,6 +8,8 @@ import os
 from typing import List, Optional
 
 from knack.log import get_logger
+from azext_iot.digitaltwins.providers.deletion_job import DEFAULT_DELETE_JOB_ID_PREFIX
+from azext_iot.tests.generators import generate_generic_id
 
 from azext_iot.tests.helpers import assign_role_assignment
 from . import DTLiveScenarioTest
@@ -104,43 +106,60 @@ class TestDTImportJobs(DTLiveScenarioTest):
         invalid_import_data_filename = "bulk-models-twins-relationships-invalid.ndjson"
         self._upload_import_data_file(invalid_import_data_filename)
 
-        # Create import job for valid import data
-        valid_import_job_id = "{}_valid_import_job".format(instance_name)
-        create_valid_import_job_output = self.cmd(
-            "dt job import create -n '{}' -g '{}' -j '{}' --df '{}' --ibc '{}' --isa '{}'".format(
-                instance_name, self.rg, valid_import_job_id,
-                valid_import_data_filename, self.storage_container, self.storage_account_name
-            )
-        ).get_output_in_json()
+        tries = 0
+        while tries < MAX_TRIES:
+            try:
+                # Create import job for valid import data
+                valid_import_job_id = "{}_valid_import_job{}".format(instance_name, generate_generic_id())
+                create_valid_import_job_output = self.cmd(
+                    "dt job import create -n '{}' -g '{}' -j '{}' --df '{}' --ibc '{}' --isa '{}'".format(
+                        instance_name, self.rg, valid_import_job_id,
+                        valid_import_data_filename, self.storage_container, self.storage_account_name
+                    )
+                ).get_output_in_json()
 
-        expected_import_job_output_filename = "{}_output.txt".format(valid_import_job_id)
-        assert_import_job_creation(
-            create_valid_import_job_output, valid_import_data_filename, expected_import_job_output_filename, valid_import_job_id
-        )
-        valid_import_job_output_filename = create_valid_import_job_output["outputBlobUri"].split("/")[-1]
+                expected_import_job_output_filename = "{}_output.txt".format(valid_import_job_id)
+                assert_job_creation(
+                    create_valid_import_job_output,
+                    job_type="import",
+                    expected_input_blob_name=valid_import_data_filename,
+                    expected_output_blob_name=expected_import_job_output_filename,
+                    expected_job_id=valid_import_job_id
+                )
+                valid_import_job_output_filename = create_valid_import_job_output["outputBlobUri"].split("/")[-1]
 
-        # Run through import job lifecycle
-        # Cancel import job (there could be a race condition)
-        self.cmd(
-            "dt job import cancel -n '{}' -g '{}' -j '{}' -y".format(instance_name, self.rg, valid_import_job_id)
-        )
+                # Run through import job lifecycle
+                # Cancel import job (there could be a race condition)
+                self.cmd(
+                    "dt job import cancel -n '{}' -g '{}' -j '{}' -y".format(instance_name, self.rg, valid_import_job_id)
+                )
 
-        # Poll to make sure job is cancelled
-        error = poll_job_status(
-            cmd=self.cmd,
-            rg=self.rg,
-            instance_name=instance_name,
-            job_id=valid_import_job_id,
-            expected_statuses=["cancelled", "cancelling"]
-        )
-        assert error is None
+                # Poll to make sure job is cancelled
+                error = poll_job_status(
+                    cmd=self.cmd,
+                    rg=self.rg,
+                    instance_name=instance_name,
+                    job_id=valid_import_job_id,
+                    expected_statuses=["cancelled", "cancelling"],
+                    job_type="import"
+                )
+                assert error is None
+            except AssertionError as e:
+                # job succeeded before it could be canceled - try again.
+                if "assert 'succeeded'" in str(e):
+                    tries += 1
+                else:
+                    raise e
 
-        # Delete import job
+        if tries == MAX_TRIES:
+            logger.warn(f"Failed to create a canceled job before it suceeded {MAX_TRIES} times.")
+
+        # DELETE last import job try
         self.cmd(
             "dt job import delete -n '{}' -g '{}' -j '{}' -y".format(instance_name, self.rg, valid_import_job_id)
         )
 
-        # Recreate import job
+        # RECREATE import job
         self.cmd(
             "dt job import create -n '{}' -g '{}' -j '{}' --df '{}' --ibc '{}' --isa '{}'".format(
                 instance_name, self.rg, valid_import_job_id,
@@ -160,11 +179,12 @@ class TestDTImportJobs(DTLiveScenarioTest):
             rg=self.rg,
             instance_name=instance_name,
             job_id=valid_import_job_id,
-            expected_statuses=["succeeded"]
+            expected_statuses=["succeeded"],
+            job_type="import"
         )
         assert error is None
 
-        # Create import job for invalid import data
+        # CREATE import job for invalid import data
         invalid_import_job_output_filename = "{}_invalid_import_job_output.txt".format(instance_name)
         create_invalid_import_job_output = self.cmd(
             "dt job import create -n '{}' -g '{}' --df '{}' --ibc '{}' --isa '{}' --of '{}'".format(
@@ -173,8 +193,11 @@ class TestDTImportJobs(DTLiveScenarioTest):
             )
         ).get_output_in_json()
 
-        assert_import_job_creation(
-            create_invalid_import_job_output, invalid_import_data_filename, invalid_import_job_output_filename
+        assert_job_creation(
+            create_invalid_import_job_output,
+            job_type="import",
+            expected_input_blob_name=invalid_import_data_filename,
+            expected_output_blob_name=invalid_import_job_output_filename
         )
         invalid_import_job_id = create_invalid_import_job_output["id"]
 
@@ -182,10 +205,12 @@ class TestDTImportJobs(DTLiveScenarioTest):
         list_import_jobs_output = self.cmd(
             "dt job import list -n '{}' -g '{}'".format(instance_name, self.rg)
         ).get_output_in_json()
-        assert len(list_import_jobs_output) == 2
+
+        # Simplified from num_tries (of cleanup) + 2 jobs created - 1 job deleted
+        assert len(list_import_jobs_output) == tries + 1
         import_job_ids = [valid_import_job_id, invalid_import_job_id]
-        assert list_import_jobs_output[0]["id"] in import_job_ids
-        assert list_import_jobs_output[1]["id"] in import_job_ids
+        assert list_import_jobs_output[-2]["id"] in import_job_ids
+        assert list_import_jobs_output[-1]["id"] in import_job_ids
 
         # Poll to ensure desired status of invalid import job
         error = poll_job_status(
@@ -193,7 +218,8 @@ class TestDTImportJobs(DTLiveScenarioTest):
             rg=self.rg,
             instance_name=instance_name,
             job_id=invalid_import_job_id,
-            expected_statuses=["failed"]
+            expected_statuses=["failed"],
+            job_type="import"
         )
         assert error["code"] == "DTDLParsingError"
 
@@ -209,7 +235,7 @@ class TestDTImportJobs(DTLiveScenarioTest):
         assert set(model_ids) == set(EXPECTED_MODEL_IDS)
 
         twin_query_result = self.cmd(
-            "dt twin query -n {} -q 'select * from digitaltwins'".format(instance_name)
+            "dt twin query -n {} -g {} -q 'select * from digitaltwins'".format(instance_name, self.rg)
         ).get_output_in_json()
         twin_ids = []
         relationship = "has"
@@ -227,16 +253,87 @@ class TestDTImportJobs(DTLiveScenarioTest):
             ).get_output_in_json()
             assert len(twin_relationship_list_result) == 1
 
-        # Delete import jobs and their output files
+        # DELETE 2 import jobs (recreated + invalid) and their output files
         self._cleanup_import_job(instance_name, valid_import_job_id, valid_import_job_output_filename)
         self._cleanup_import_job(instance_name, invalid_import_job_id, invalid_import_job_output_filename)
         list_import_jobs_output = self.cmd(
             "dt job import list -n '{}' -g '{}'".format(instance_name, self.rg)
         ).get_output_in_json()
-        assert len(list_import_jobs_output) == 0
+
+        # Note that not all jobs (from the tries) are deleted
+        # Simplified from num_tries (of cleanup) + 2 jobs created - 3 job deleted
+        assert len(list_import_jobs_output) == tries - 1
+
+        # Deletion
+        valid_delete_job_id = "{}_valid_delete_job".format(instance_name)
+
+        # CREATE deletion job
+        create_valid_delete_job_output = self.cmd(
+            "dt job deletion create -n '{}' -g '{}' -j '{}' -y".format(
+                instance_name, self.rg, valid_delete_job_id
+            )
+        ).get_output_in_json()
+
+        assert_job_creation(
+            create_valid_delete_job_output, job_type="deletion", expected_job_id=valid_delete_job_id
+        )
+
+        error = poll_job_status(
+            cmd=self.cmd,
+            rg=self.rg,
+            instance_name=instance_name,
+            job_id=valid_delete_job_id,
+            expected_statuses=["succeeded"],
+            job_type="deletion"
+        )
+        assert error is None
+
+        model_query_result = self.cmd(
+            "dt model list -n {} -g {}".format(instance_name, self.rg)
+        ).get_output_in_json()
+        assert len(model_query_result) == 0
+
+        twin_query_result = self.cmd(
+            "dt twin query -n {} -g {} -q 'select * from digitaltwins' --cost".format(
+                instance_name, self.rg
+            )
+        ).get_output_in_json()
+        assert len(twin_query_result["result"]) == 0
+
+        # CREATE deletion job
+        create_generated_delete_job_output = self.cmd(
+            "dt job deletion create -n '{}' -g '{}' -y".format(
+                instance_name, self.rg
+            )
+        ).get_output_in_json()
+
+        assert_job_creation(
+            create_generated_delete_job_output, job_type="deletion"
+        )
+
+        error = poll_job_status(
+            cmd=self.cmd,
+            rg=self.rg,
+            instance_name=instance_name,
+            job_id=create_generated_delete_job_output["id"],
+            expected_statuses=["succeeded"],
+            job_type="deletion"
+        )
+        assert error is None
+
+        list_job_output = self.cmd(
+            "dt job deletion list -n '{}' -g '{}'".format(
+                instance_name, self.rg
+            )
+        ).get_output_in_json()
+
+        # 2 deletion jobs created
+        assert len(list_job_output) == 2
 
 
-def poll_job_status(cmd, rg: str, instance_name: str, job_id: str, expected_statuses: List[str]) -> Optional[dict]:
+def poll_job_status(
+    cmd, rg: str, instance_name: str, job_id: str, expected_statuses: List[str], job_type: str
+) -> Optional[dict]:
     """
     Helper function to poll job import status until finalized. Returns the error.
 
@@ -249,7 +346,7 @@ def poll_job_status(cmd, rg: str, instance_name: str, job_id: str, expected_stat
     while num_tries < MAX_TRIES:
         num_tries += 1
         import_job_output = cmd(
-            "dt job import show -n '{}' -g '{}' -j '{}'".format(instance_name, rg, job_id)
+            "dt job {} show -n '{}' -g '{}' -j '{}'".format(job_type, instance_name, rg, job_id)
         ).get_output_in_json()
         assert import_job_output["status"] in expected_statuses
         if import_job_output["status"] == final_status:
@@ -257,23 +354,31 @@ def poll_job_status(cmd, rg: str, instance_name: str, job_id: str, expected_stat
         sleep(POLL_SLEEP_INTERVAL)
 
 
-def assert_import_job_creation(
-    create_import_job_output: dict, expected_input_blob_name: str, expected_output_blob_name: str, expected_job_id: str = None
+def assert_job_creation(
+    create_job_output: dict,
+    job_type: str,
+    expected_input_blob_name: Optional[str] = None,
+    expected_output_blob_name: Optional[str] = None,
+    expected_job_id: Optional[str] = None
 ):
-    assert create_import_job_output
-    assert create_import_job_output["createdDateTime"]
-    assert create_import_job_output["lastActionDateTime"]
-    assert create_import_job_output["purgeDateTime"]
-    assert create_import_job_output["finishedDateTime"] is None
-    assert create_import_job_output["error"] is None
-    assert create_import_job_output["status"] == "notstarted"
-    assert create_import_job_output["inputBlobUri"]
-    assert create_import_job_output["inputBlobUri"].split("/")[-1] == expected_input_blob_name
-    assert create_import_job_output["outputBlobUri"]
-    assert create_import_job_output["outputBlobUri"].split("/")[-1] == expected_output_blob_name
-    assert create_import_job_output["id"]
+    assert create_job_output
+    assert create_job_output["createdDateTime"]
+    assert create_job_output["purgeDateTime"]
+    assert create_job_output["finishedDateTime"] is None
+    assert create_job_output["error"] is None
+    assert create_job_output["status"] == "notstarted"
+    assert create_job_output["id"]
+
     # We know the expected job id only when it is passed in as a param, else it is system generated
     if expected_job_id:
-        assert create_import_job_output["id"] == expected_job_id
+        assert create_job_output["id"] == expected_job_id
     else:
-        assert create_import_job_output["id"].startswith(DEFAULT_IMPORT_JOB_ID_PREFIX)
+        prefix = DEFAULT_IMPORT_JOB_ID_PREFIX if job_type == "import" else DEFAULT_DELETE_JOB_ID_PREFIX
+        assert create_job_output["id"].startswith(prefix)
+
+    if job_type == "import":
+        assert create_job_output["lastActionDateTime"]
+        assert create_job_output["inputBlobUri"]
+        assert create_job_output["inputBlobUri"].split("/")[-1] == expected_input_blob_name
+        assert create_job_output["outputBlobUri"]
+        assert create_job_output["outputBlobUri"].split("/")[-1] == expected_output_blob_name

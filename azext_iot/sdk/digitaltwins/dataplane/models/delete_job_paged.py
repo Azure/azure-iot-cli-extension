@@ -9,5 +9,19 @@
 # regenerated.
 # --------------------------------------------------------------------------
 
-VERSION = "2023-07-31-preview"
+from msrest.paging import Paged
 
+
+class DeleteJobPaged(Paged):
+    """
+    A paging container for iterating over a list of :class:`DeleteJob <dataplane.models.DeleteJob>` object
+    """
+
+    _attribute_map = {
+        'next_link': {'key': 'nextLink', 'type': 'str'},
+        'current_page': {'key': 'value', 'type': '[DeleteJob]'}
+    }
+
+    def __init__(self, *args, **kwargs):
+
+        super(DeleteJobPaged, self).__init__(*args, **kwargs)
