@@ -145,6 +145,7 @@ class TestDTImportJobs(DTLiveScenarioTest):
                 )
                 assert error is None
             except AssertionError as e:
+                # job succeeded before it could be canceled - try again.
                 if "assert 'succeeded'" in str(e):
                     tries += 1
                 else:
@@ -153,12 +154,12 @@ class TestDTImportJobs(DTLiveScenarioTest):
         if tries == MAX_TRIES:
             logger.warn(f"Failed to create a canceled job before it suceeded {MAX_TRIES} times.")
 
-        # Delete import job
+        # DELETE last import job try
         self.cmd(
             "dt job import delete -n '{}' -g '{}' -j '{}' -y".format(instance_name, self.rg, valid_import_job_id)
         )
 
-        # Recreate import job
+        # RECREATE import job
         self.cmd(
             "dt job import create -n '{}' -g '{}' -j '{}' --df '{}' --ibc '{}' --isa '{}'".format(
                 instance_name, self.rg, valid_import_job_id,
@@ -183,7 +184,7 @@ class TestDTImportJobs(DTLiveScenarioTest):
         )
         assert error is None
 
-        # Create import job for invalid import data
+        # CREATE import job for invalid import data
         invalid_import_job_output_filename = "{}_invalid_import_job_output.txt".format(instance_name)
         create_invalid_import_job_output = self.cmd(
             "dt job import create -n '{}' -g '{}' --df '{}' --ibc '{}' --isa '{}' --of '{}'".format(
@@ -204,7 +205,9 @@ class TestDTImportJobs(DTLiveScenarioTest):
         list_import_jobs_output = self.cmd(
             "dt job import list -n '{}' -g '{}'".format(instance_name, self.rg)
         ).get_output_in_json()
-        assert len(list_import_jobs_output) - tries + 1 == 2
+
+        # Simplified from num_tries (of cleanup) + 2 jobs created - 1 job deleted
+        assert len(list_import_jobs_output) == tries + 1
         import_job_ids = [valid_import_job_id, invalid_import_job_id]
         assert list_import_jobs_output[-2]["id"] in import_job_ids
         assert list_import_jobs_output[-1]["id"] in import_job_ids
@@ -250,16 +253,20 @@ class TestDTImportJobs(DTLiveScenarioTest):
             ).get_output_in_json()
             assert len(twin_relationship_list_result) == 1
 
-        # Delete import jobs and their output files
+        # DELETE 2 import jobs (recreated + invalid) and their output files
         self._cleanup_import_job(instance_name, valid_import_job_id, valid_import_job_output_filename)
         self._cleanup_import_job(instance_name, invalid_import_job_id, invalid_import_job_output_filename)
         list_import_jobs_output = self.cmd(
             "dt job import list -n '{}' -g '{}'".format(instance_name, self.rg)
         ).get_output_in_json()
-        assert len(list_import_jobs_output) - tries + 1 == 0
+
+        # Simplified from num_tries (of cleanup) + 2 jobs created - 3 job deleted
+        assert len(list_import_jobs_output) == tries - 1
 
         # Deletion
         valid_delete_job_id = "{}_valid_delete_job".format(instance_name)
+
+        # CREATE deletion job
         create_valid_delete_job_output = self.cmd(
             "dt job deletion create -n '{}' -g '{}' -j '{}' -y".format(
                 instance_name, self.rg, valid_delete_job_id
@@ -292,6 +299,7 @@ class TestDTImportJobs(DTLiveScenarioTest):
         ).get_output_in_json()
         assert len(twin_query_result["result"]) == 0
 
+        # CREATE deletion job
         create_generated_delete_job_output = self.cmd(
             "dt job deletion create -n '{}' -g '{}' -y".format(
                 instance_name, self.rg
@@ -317,6 +325,8 @@ class TestDTImportJobs(DTLiveScenarioTest):
                 instance_name, self.rg
             )
         ).get_output_in_json()
+
+        # 2 deletion jobs created
         assert len(list_job_output) == 2
 
 
