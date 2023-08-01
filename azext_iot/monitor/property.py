@@ -99,7 +99,7 @@ class PropertyMonitor:
         return diff
 
     def _is_component(self, prop):
-        return type(prop) == dict and prop.get(PNP_DTDLV2_COMPONENT_MARKER) == "c"
+        return isinstance(prop, dict) and prop.get(PNP_DTDLV2_COMPONENT_MARKER) == "c"
 
     def _validate_payload(self, changes, minimum_severity):
         for value in changes:
