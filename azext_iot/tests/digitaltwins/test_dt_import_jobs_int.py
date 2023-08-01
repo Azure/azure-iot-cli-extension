@@ -260,6 +260,7 @@ class TestDTImportJobs(DTLiveScenarioTest):
             "dt job import list -n '{}' -g '{}'".format(instance_name, self.rg)
         ).get_output_in_json()
 
+        # Note that not all jobs (from the tries) are deleted
         # Simplified from num_tries (of cleanup) + 2 jobs created - 3 job deleted
         assert len(list_import_jobs_output) == tries - 1
 
