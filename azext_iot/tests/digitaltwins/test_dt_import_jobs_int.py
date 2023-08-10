@@ -9,6 +9,7 @@ from typing import List, Optional
 
 from knack.log import get_logger
 from azext_iot.digitaltwins.providers.deletion_job import DEFAULT_DELETE_JOB_ID_PREFIX
+from azext_iot.tests.generators import generate_generic_id
 
 from azext_iot.tests.helpers import assign_role_assignment
 from . import DTLiveScenarioTest
@@ -114,7 +115,7 @@ class TestDTImportJobs(DTLiveScenarioTest):
         while tries < MAX_TRIES:
             try:
                 # Create import job for valid import data
-                valid_import_job_id = "{}_valid_import_job{}".format(instance_name, tries + 1)
+                valid_import_job_id = "{}_valid_import_job{}_{}".format(instance_name, tries + 1, generate_generic_id())
                 create_valid_import_job_output = self.cmd(
                     "dt job import create -n '{}' -g '{}' -j '{}' --df '{}' --ibc '{}' --isa '{}'".format(
                         instance_name, self.rg, valid_import_job_id,
@@ -148,6 +149,7 @@ class TestDTImportJobs(DTLiveScenarioTest):
                     job_type="import"
                 )
                 assert error is None
+                break
             except AssertionError as e:
                 # job succeeded before it could be canceled - try again.
                 if "assert 'succeeded'" in str(e):
