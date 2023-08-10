@@ -9,7 +9,6 @@ from typing import List, Optional
 
 from knack.log import get_logger
 from azext_iot.digitaltwins.providers.deletion_job import DEFAULT_DELETE_JOB_ID_PREFIX
-from azext_iot.tests.generators import generate_generic_id
 
 from azext_iot.tests.helpers import assign_role_assignment
 from . import DTLiveScenarioTest
@@ -115,7 +114,7 @@ class TestDTImportJobs(DTLiveScenarioTest):
         while tries < MAX_TRIES:
             try:
                 # Create import job for valid import data
-                valid_import_job_id = "{}_valid_import_job{}".format(instance_name, generate_generic_id())
+                valid_import_job_id = "{}_valid_import_job{}".format(instance_name, tries + 1)
                 create_valid_import_job_output = self.cmd(
                     "dt job import create -n '{}' -g '{}' -j '{}' --df '{}' --ibc '{}' --isa '{}'".format(
                         instance_name, self.rg, valid_import_job_id,
@@ -212,6 +211,12 @@ class TestDTImportJobs(DTLiveScenarioTest):
         ).get_output_in_json()
 
         # Simplified from num_tries (of cleanup) + 2 jobs created - 1 job deleted + initial num
+        print()
+        print(instance_name)
+        print("jobs:")
+        for j in list_import_jobs_output:
+            print(j["id"])
+        print()
         assert len(list_import_jobs_output) == tries + 1 + initial_num_import_jobs
         import_job_ids = [valid_import_job_id, invalid_import_job_id]
         assert list_import_jobs_output[-2]["id"] in import_job_ids
@@ -312,6 +317,8 @@ class TestDTImportJobs(DTLiveScenarioTest):
             )
         ).get_output_in_json())
 
+        print("deletion jobs")
+
         # CREATE deletion job
         create_generated_delete_job_output = self.cmd(
             "dt job deletion create -n '{}' -g '{}' -y".format(
@@ -341,6 +348,7 @@ class TestDTImportJobs(DTLiveScenarioTest):
 
         # 2 deletion jobs created
         assert len(list_job_output) == 2 + initial_num_delete_jobs
+        print("finish jobs")
 
 
 def poll_job_status(
