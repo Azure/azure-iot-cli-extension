@@ -111,11 +111,11 @@ class TestDTImportJobs(DTLiveScenarioTest):
             "dt job import list -n '{}' -g '{}'".format(instance_name, self.rg)
         ).get_output_in_json())
 
-        tries = 0
+        tries = 1
         while tries < MAX_TRIES:
             try:
                 # Create import job for valid import data
-                valid_import_job_id = "{}_valid_import_job{}_{}".format(instance_name, tries + 1, generate_generic_id())
+                valid_import_job_id = "{}_valid_import_job{}_{}".format(instance_name, tries, generate_generic_id())
                 create_valid_import_job_output = self.cmd(
                     "dt job import create -n '{}' -g '{}' -j '{}' --df '{}' --ibc '{}' --isa '{}'".format(
                         instance_name, self.rg, valid_import_job_id,
