@@ -277,6 +277,14 @@ class TestDTImportJobs(DTLiveScenarioTest):
         assert len(list_import_jobs_output) == tries - 1 + initial_num_import_jobs
 
         # Deletion
+        # Record initial number of deletion jobs
+        initial_num_delete_jobs = len(self.cmd(
+            "dt job deletion list -n '{}' -g '{}'".format(
+                instance_name, self.rg
+            )
+        ).get_output_in_json())
+
+        print("deletion jobs")
         valid_delete_job_id = "{}_valid_delete_job".format(instance_name)
 
         # CREATE deletion job
@@ -311,15 +319,6 @@ class TestDTImportJobs(DTLiveScenarioTest):
             )
         ).get_output_in_json()
         assert len(twin_query_result["result"]) == 0
-
-        # Record initial number of deletion jobs
-        initial_num_delete_jobs = len(self.cmd(
-            "dt job deletion list -n '{}' -g '{}'".format(
-                instance_name, self.rg
-            )
-        ).get_output_in_json())
-
-        print("deletion jobs")
 
         # CREATE deletion job
         create_generated_delete_job_output = self.cmd(
