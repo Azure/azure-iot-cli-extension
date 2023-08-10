@@ -4,6 +4,18 @@ Release History
 ===============
 
 
+0.21.5
++++++++++++++++
+
+**Digital Twins updates**
+
+* Addition of `az dt job deletion` to create deletion jobs. This job will delete all models, twins, and relationships, replacing `az dt reset`. The deletion jobs cannot be canceled or deleted. The added commands are:
+  * `az dt job deletion create`
+  * `az dt job deletion list`
+  * `az dt job deletion show`
+* The command `az dt reset` is deprecated and will be removed in a later update.
+
+
 0.21.4
 +++++++++++++++
 
