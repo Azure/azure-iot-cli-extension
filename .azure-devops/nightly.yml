@@ -6,7 +6,7 @@ pr: none
 
 # Run nightly at midnight (Pacific).
 schedules:
-- cron: "0 8 * * *"
+- cron: "0 16 * * *"
   displayName: 'Nightly Integration Build'
   branches:
     include:
@@ -35,7 +35,7 @@ parameters:
   type: object
   default: >
     {
-      Python37: 
+      Python37:
       {
         python: '3.7'
       },
@@ -72,7 +72,7 @@ variables:
   - name: msiTestingMatrix
     value: >
       {
-        PythonMSI: 
+        PythonMSI:
         {
           python: '3.8'
         }
@@ -152,7 +152,7 @@ stages:
         testDPS: ${{ parameters.testDPS }}
         testHub: ${{ parameters.testHub }}
         testADU: ${{ parameters.testADU }}
-  
+
   - stage: 'smokeTests_min'
     displayName: 'Run smoke tests with min CLI'
     dependsOn: test_min
