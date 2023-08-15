@@ -12,7 +12,7 @@ from azure.cli.core.azclierror import ResourceNotFoundError
 from knack.log import get_logger
 from uuid import uuid4
 
-DEFAULT_IMPORT_JOB_ID_PREFIX = "bulk-import-job-"
+DEFAULT_IMPORT_JOB_ID_PREFIX = "import-job-"
 logger = get_logger(__name__)
 
 

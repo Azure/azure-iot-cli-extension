@@ -22,7 +22,7 @@ class ImportJobsOperations(object):
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: The requested API version. Constant value: "2023-06-30".
+    :ivar api_version: The requested API version. Constant value: "2023-07-31-preview".
     """
 
     models = models
@@ -32,7 +32,7 @@ class ImportJobsOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2023-06-30"
+        self.api_version = "2023-07-31-preview"
 
         self.config = config
 
@@ -52,8 +52,7 @@ class ImportJobsOperations(object):
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
         :return: An iterator like instance of ImportJob
-        :rtype:
-         ~dataplane.models.ImportJobPaged[~dataplane.models.ImportJob]
+        :rtype: ~dataplane.models.ImportJobPaged[~dataplane.models.ImportJob]
         :raises:
          :class:`ErrorResponseException<dataplane.models.ErrorResponseException>`
         """
@@ -135,8 +134,7 @@ class ImportJobsOperations(object):
         :type import_job: ~dataplane.models.ImportJob
         :param import_jobs_add_options: Additional parameters for the
          operation
-        :type import_jobs_add_options:
-         ~dataplane.models.ImportJobsAddOptions
+        :type import_jobs_add_options: ~dataplane.models.ImportJobsAddOptions
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response

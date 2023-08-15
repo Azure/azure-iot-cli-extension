@@ -20,3 +20,11 @@ class Status(str, Enum):
     succeeded = "succeeded"
     cancelling = "cancelling"
     cancelled = "cancelled"
+
+
+class DeleteJobStatus(str, Enum):
+
+    notstarted = "notstarted"
+    running = "running"
+    failed = "failed"
+    succeeded = "succeeded"

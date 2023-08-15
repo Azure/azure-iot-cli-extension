@@ -14,6 +14,7 @@ from .query_operations import QueryOperations
 from .digital_twins_operations import DigitalTwinsOperations
 from .event_routes_operations import EventRoutesOperations
 from .import_jobs_operations import ImportJobsOperations
+from .delete_jobs_operations import DeleteJobsOperations
 
 __all__ = [
     'DigitalTwinModelsOperations',
@@ -21,4 +22,5 @@ __all__ = [
     'DigitalTwinsOperations',
     'EventRoutesOperations',
     'ImportJobsOperations',
+    'DeleteJobsOperations',
 ]

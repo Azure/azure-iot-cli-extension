@@ -18,6 +18,7 @@ from .operations.query_operations import QueryOperations
 from .operations.digital_twins_operations import DigitalTwinsOperations
 from .operations.event_routes_operations import EventRoutesOperations
 from .operations.import_jobs_operations import ImportJobsOperations
+from .operations.delete_jobs_operations import DeleteJobsOperations
 from . import models
 
 
@@ -29,11 +30,14 @@ class AzureDigitalTwinsAPIConfiguration(AzureConfiguration):
     :param credentials: Credentials needed for the client to connect to Azure.
     :type credentials: :mod:`A msrestazure Credentials
      object<msrestazure.azure_active_directory>`
+    :param operation_id: ID for the operation's status monitor. The ID is
+     generated if header was not passed by the client.
+    :type operation_id: str
     :param str base_url: Service URL
     """
 
     def __init__(
-            self, credentials, base_url=None):
+            self, credentials, operation_id=None, base_url=None):
 
         if credentials is None:
             raise ValueError("Parameter 'credentials' must not be None.")
@@ -46,6 +50,7 @@ class AzureDigitalTwinsAPIConfiguration(AzureConfiguration):
         self.add_user_agent('Azure-SDK-For-Python')
 
         self.credentials = credentials
+        self.operation_id = operation_id
 
 
 class AzureDigitalTwinsAPI(SDKClient):
@@ -64,21 +69,26 @@ class AzureDigitalTwinsAPI(SDKClient):
     :vartype event_routes: dataplane.operations.EventRoutesOperations
     :ivar import_jobs: ImportJobs operations
     :vartype import_jobs: dataplane.operations.ImportJobsOperations
+    :ivar delete_jobs: DeleteJobs operations
+    :vartype delete_jobs: dataplane.operations.DeleteJobsOperations
 
     :param credentials: Credentials needed for the client to connect to Azure.
     :type credentials: :mod:`A msrestazure Credentials
      object<msrestazure.azure_active_directory>`
+    :param operation_id: ID for the operation's status monitor. The ID is
+     generated if header was not passed by the client.
+    :type operation_id: str
     :param str base_url: Service URL
     """
 
     def __init__(
-            self, credentials, base_url=None):
+            self, credentials, operation_id=None, base_url=None):
 
-        self.config = AzureDigitalTwinsAPIConfiguration(credentials, base_url)
+        self.config = AzureDigitalTwinsAPIConfiguration(credentials, operation_id, base_url)
         super(AzureDigitalTwinsAPI, self).__init__(self.config.credentials, self.config)
 
         client_models = {k: v for k, v in models.__dict__.items() if isinstance(v, type)}
-        self.api_version = '2023-06-30'
+        self.api_version = '2023-07-31-preview'
         self._serialize = Serializer(client_models)
         self._deserialize = Deserializer(client_models)
 
@@ -91,4 +101,6 @@ class AzureDigitalTwinsAPI(SDKClient):
         self.event_routes = EventRoutesOperations(
             self._client, self.config, self._serialize, self._deserialize)
         self.import_jobs = ImportJobsOperations(
+            self._client, self.config, self._serialize, self._deserialize)
+        self.delete_jobs = DeleteJobsOperations(
             self._client, self.config, self._serialize, self._deserialize)

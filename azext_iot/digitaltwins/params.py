@@ -667,13 +667,14 @@ def load_digitaltwins_arguments(self, _):
                  "permissions are not in place. Setting this to 'true' does not delete any recorded data.",
         )
 
-    with self.argument_context("dt job import") as context:
+    with self.argument_context("dt job") as context:
         context.argument(
             "job_id",
             options_list=["--job-id", "-j"],
-            help="Id of bulk import job. A system generated id is assigned when this parameter is ommitted during job creation.",
-            arg_group="Bulk Import Job",
+            help="Id of job. A system generated id is assigned when this parameter is ommitted during job creation.",
         )
+
+    with self.argument_context("dt job import") as context:
         context.argument(
             "data_file_name",
             options_list=["--data-file", "--df"],
