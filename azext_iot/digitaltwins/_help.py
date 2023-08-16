@@ -1083,7 +1083,7 @@ def load_digitaltwins_help():
           text: >
             az dt model list -n {instance_or_hostname} --definition
 
-        - name: List dependencies of particular pre-existing model(s). Space seperate dtmi values.
+        - name: List dependencies of particular pre-existing model(s). Space separate dtmi values.
           text: >
             az dt model list -n {instance_or_hostname} --dependencies-for {model_id0} {model_id1}
     """

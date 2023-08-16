@@ -53,7 +53,7 @@ def load_deviceupdate_help():
             --scopes /subscriptions/a12345ea-bb21-994d-2263-c716348e32a1/resourceGroups/ProResourceGroup/providers/Microsoft.Storage/storageAccounts/myStorageAccount
 
         - name: Create a Device Update account in target resource group with system and user-assigned managed identities then
-                assign the system identity to one or more scopes (space-seperated) with a custom specified role.
+                assign the system identity to one or more scopes (space-separated) with a custom specified role.
           text: >
             az iot du account create -n {account_name} -g {resouce_group}
             --assign-identity [system] /subscriptions/a12345ea-bb21-994d-2263-c716348e32a1/resourcegroups/ProResourceGroup/providers/Microsoft.ManagedIdentity/userAssignedIdentities/myIdentity

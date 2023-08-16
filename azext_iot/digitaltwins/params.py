@@ -519,7 +519,7 @@ def load_digitaltwins_arguments(self, _):
         context.argument(
             "group_ids",
             options_list=["--group-ids"],
-            help="Space seperated list of group ids that the private endpoint should connect to.",
+            help="Space separated list of group ids that the private endpoint should connect to.",
             arg_group="Private Endpoint",
             nargs="+",
         )
