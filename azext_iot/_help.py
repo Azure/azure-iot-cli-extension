@@ -433,7 +433,7 @@ helps[
     type: command
     short-summary: Remove child devices from a target edge device.
     examples:
-    - name: Remove a space-seperated list of child devices from a target parent device.
+    - name: Remove a space-separated list of child devices from a target parent device.
       text: >
         az iot hub device-identity children remove -d {edge_device_id} --child-list {space_separated_device_id}
         -n {iothub_name}
