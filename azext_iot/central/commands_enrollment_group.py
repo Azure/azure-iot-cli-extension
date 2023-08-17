@@ -93,7 +93,7 @@ def create_enrollment_group(
         central_dns_suffix=central_dns_suffix,
     )
 
-    # For x509 we need to call a seperate API
+    # For x509 we need to call a separate API
     primary_cert = None
     secondary_cert = None
 
