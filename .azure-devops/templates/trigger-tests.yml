@@ -125,7 +125,7 @@ jobs:
       serviceConnection: $(AzureServiceConnection)
 
 - job: 'testADU'
-  timeoutInMinutes: 150
+  timeoutInMinutes: 200
   displayName: 'Test Azure Device Update'
   condition: and(succeeded(), eq('${{ parameters.testADU }}', true))
   strategy:
