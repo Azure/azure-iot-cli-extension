@@ -193,3 +193,17 @@ class CertificateAuthorityVersions(Enum):
     """
     v2 = "v2"
     v1 = "v1"
+
+
+class IoTHubSDKVersion(Enum):
+    """
+    Types to determine which object properties the hub supports for backwards compatibility with the
+    control plane sdk. Currently has these distinctions (from oldest to newest versions):
+
+    No cosmos endpoints
+    Cosmos endpoints as collections
+    Cosmos endpoints as containers
+    """
+    NoCosmos = 0
+    CosmosCollections = 1
+    CosmosContainers = 2

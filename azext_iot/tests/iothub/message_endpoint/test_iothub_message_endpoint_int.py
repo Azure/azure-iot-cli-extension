@@ -1041,7 +1041,8 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
     ).as_json()
 
     assert len(cosmos_list) == 3
-    assert endpoint_list["cosmosDbSqlCollections"] == cosmos_list
+    expected_list = endpoint_list.get("cosmosDbSqlCollections", []) + endpoint_list.get("cosmosDbSqlContainers", [])
+    assert cosmos_list == expected_list
 
     # Update
     # Keybased -> User, add pkn + pkt
@@ -1457,8 +1458,7 @@ def build_expected_endpoint(
         expected["connectionString"] = connection_string
     if entity_path:
         expected["entityPath"] = entity_path
-    if container_name and not database_name:
-        # storage container
+    if container_name:
         expected["containerName"] = container_name
     if encoding:
         expected["encoding"] = encoding
@@ -1471,9 +1471,6 @@ def build_expected_endpoint(
         expected["maxChunkSizeInBytes"] = max_chunk_size_in_bytes * max_chunk_size_constant
     if database_name:
         expected["databaseName"] = database_name
-    if container_name and database_name:
-        # cosmosdb container
-        expected["collectionName"] = container_name
     if partition_key_name:
         expected["partitionKeyName"] = partition_key_name
     if partition_key_template:
@@ -1522,9 +1519,15 @@ def assert_endpoint_properties(result: dict, expected: dict):
     if "entityPath" in expected:
         assert result["entityPath"] == expected["entityPath"]
 
-    # Storage Account only
+    # Shared between Storage and Cosmos Db:
     if "containerName" in expected:
-        assert result["containerName"] == expected["containerName"]
+        resulting_container_name = result.get("containerName")
+        if resulting_container_name is None:
+            # older version of cosmos
+            resulting_container_name = result.get("collectionName")
+        assert resulting_container_name == expected["containerName"]
+
+    # Storage Account only
     if "encoding" in expected:
         assert result["encoding"] == expected["encoding"]
     if "fileNameFormat" in expected:
@@ -1537,8 +1540,6 @@ def assert_endpoint_properties(result: dict, expected: dict):
     # Cosmos DB only
     if "databaseName" in expected:
         assert result["databaseName"] == expected["databaseName"]
-    if "collectionName" in expected:
-        assert result["collectionName"] == expected["collectionName"]
     if "partitionKeyName" in expected:
         assert result["partitionKeyName"] == expected["partitionKeyName"]
     if "partitionKeyTemplate" in expected:
