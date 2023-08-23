@@ -32,10 +32,6 @@ parameters:
   type: object
   default: >
     {
-      Python37:
-      {
-        python: '3.7'
-      },
       Python38:
       {
         python: '3.8'

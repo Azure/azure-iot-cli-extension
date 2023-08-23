@@ -2,10 +2,6 @@ trigger: none
 pr: none
 
 parameters:
-- name: python37
-  displayName: 'Test Python 3.7'
-  type: boolean
-  default: true
 - name: python38
   displayName: 'Test Python 3.8'
   type: boolean
@@ -42,25 +38,9 @@ jobs:
   strategy:
     matrix:
       'linters':
-        python: '3.7'
+        python: '3.8'
         toxEnvStr: 'lint'
         desc: 'Flake8, Pylint'
-      ${{ if parameters.python37 }}:
-        ${{ if parameters.azmin }}:
-          'python 3.7 tests, min CLI':
-            python: '3.7'
-            toxEnvStr: 'py3.7-azmin-unit'
-            desc: 'python 3.7 tests, min CLI'
-        ${{ if parameters.azcur }}:
-          'python 3.7 tests, current CLI':
-            python: '3.7'
-            toxEnvStr: 'py3.7-azcur-unit'
-            desc: 'Python 3.7 tests, current CLI'
-        ${{ if parameters.azdev }}:
-          'python 3.7 tests, dev CLI':
-            python: '3.7'
-            toxEnvStr: 'py3.7-azdev-unit'
-            desc: 'Python 3.7 tests, dev CLI'
       ${{ if parameters.python38 }}:
         ${{ if parameters.azmin }}:
           'python 3.8 tests, min CLI':
