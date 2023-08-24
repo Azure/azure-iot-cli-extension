@@ -365,11 +365,7 @@ def test_import_and_version(package, expected_version):
     is at least the expected version. This utility will not work for packages
     that are installed without metadata.
     """
-
-    try:
-        from importlib import metadata
-    except ImportError:
-        import importlib_metadata as metadata
+    from importlib import metadata
 
     try:
         return metadata.version(package) >= expected_version
