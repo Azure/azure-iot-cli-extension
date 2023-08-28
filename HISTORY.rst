@@ -4,6 +4,15 @@ Release History
 ===============
 
 
+0.22.0
++++++++++++++++
+
+**General updates**
+
+* Dropped support for Python 3.7. The IoT extension is constrained to Python 3.8 or greater.
+  If for whatever reason you cannot upgrade from 3.7 you are able to use older extension versions.
+
+
 0.21.5
 +++++++++++++++
 
