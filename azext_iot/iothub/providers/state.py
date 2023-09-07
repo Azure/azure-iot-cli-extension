@@ -790,7 +790,7 @@ class StateProvider(IoTHubProvider):
                         "servicebus topic authorization-rule keys list --namespace-name {} --resource-group {} "
                         "--topic-name {} --name {} --subscription {}".format(
                             namespace,
-                            ep.get("resourceGroup", hub_resource["resourcegroup"]),
+                            ep.get("resourceGroup"),
                             endpoint_props["EntityPath"],
                             endpoint_props["SharedAccessKeyName"],
                             ep.get("subscriptionId")
@@ -815,7 +815,7 @@ class StateProvider(IoTHubProvider):
                     "servicebus topic show --namespace-name {} --resource-group {} "
                     "--name {} --subscription {}".format(
                         namespace,
-                        ep.get("resourceGroup", hub_resource["resourcegroup"]),
+                        ep.get("resourceGroup"),
                         ep["entityPath"],
                         ep.get("subscriptionId")
                     )
@@ -838,7 +838,7 @@ class StateProvider(IoTHubProvider):
                     ep["connectionString"] = cli.invoke(
                         "storage account show-connection-string -n {} -g {} --subscription {}".format(
                             endpoint_props["AccountName"],
-                            ep.get("resourceGroup", hub_resource["resourcegroup"]),
+                            ep.get("resourceGroup"),
                             ep.get("subscriptionId")
                         )
                     ).as_json()["connectionString"]
