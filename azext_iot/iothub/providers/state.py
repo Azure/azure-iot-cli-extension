@@ -636,7 +636,7 @@ class StateProvider(IoTHubProvider):
 
         # Cosmos Db
         cosmos_endpoints = []
-        for ep in endpoints.get("cosmosDBSqlCollections", []):
+        for ep in endpoints.get("cosmosDBSqlContainers", []):
             account_name = ep["endpointUri"].strip("https://").split(".")[0]
             if ep.get("primaryKey") or ep.get("secondaryKey"):
                 try:
@@ -685,7 +685,7 @@ class StateProvider(IoTHubProvider):
                     continue
 
             cosmos_endpoints.append(ep)
-        endpoints["cosmosDBSqlCollections"] = cosmos_endpoints
+        endpoints["cosmosDBSqlContainers"] = cosmos_endpoints
 
         # Event Hub
         eventhub_endpoints = []
