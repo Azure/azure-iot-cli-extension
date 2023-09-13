@@ -636,15 +636,15 @@ class StateProvider(IoTHubProvider):
 
         # Cosmos Db
         cosmos_endpoints = []
-        for ep in endpoints.get("cosmosDBSqlCollections", []):
+        for ep in endpoints.get("cosmosDBSqlContainers", []):
             account_name = ep["endpointUri"].strip("https://").split(".")[0]
             if ep.get("primaryKey") or ep.get("secondaryKey"):
                 try:
                     cosmos_keys = cli.invoke(
                         "cosmosdb keys list --name {} --resource-group {} --type connection-strings --subscription {}".format(
                             account_name,
-                            ep["resourceGroup"],
-                            ep["subscriptionId"]
+                            ep.get("resourceGroup"),
+                            ep.get("subscriptionId")
                         )
                     ).as_json()
                 except AzCLIError:
@@ -671,10 +671,10 @@ class StateProvider(IoTHubProvider):
                     "cosmosdb sql container show --account-name {} --resource-group {} --database-name {} "
                     "--name {} --subscription {}".format(
                         account_name,
-                        ep["resourceGroup"],
+                        ep.get("resourceGroup"),
                         ep["databaseName"],
                         ep["collectionName"],
-                        ep["subscriptionId"]
+                        ep.get("subscriptionId")
                     )
                 ).success()
                 if not success:
@@ -685,7 +685,7 @@ class StateProvider(IoTHubProvider):
                     continue
 
             cosmos_endpoints.append(ep)
-        endpoints["cosmosDBSqlCollections"] = cosmos_endpoints
+        endpoints["cosmosDBSqlContainers"] = cosmos_endpoints
 
         # Event Hub
         eventhub_endpoints = []
@@ -698,10 +698,10 @@ class StateProvider(IoTHubProvider):
                         "eventhubs eventhub authorization-rule keys list --namespace-name {} --resource-group {} "
                         "--eventhub-name {} --name {}  --subscription {}".format(
                             namespace,
-                            ep["resourceGroup"],
+                            ep.get("resourceGroup"),
                             endpoint_props["EntityPath"],
                             endpoint_props["SharedAccessKeyName"],
-                            ep["subscriptionId"]
+                            ep.get("subscriptionId")
                         )
                     ).as_json()["primaryConnectionString"]
                 except AzCLIError:
@@ -721,9 +721,9 @@ class StateProvider(IoTHubProvider):
                     "eventhubs eventhub show --namespace-name {} --resource-group {} "
                     "--name {} --subscription {}".format(
                         namespace,
-                        ep["resourceGroup"],
+                        ep.get("resourceGroup"),
                         ep["entityPath"],
-                        ep["subscriptionId"]
+                        ep.get("subscriptionId")
                     )
                 ).success()
                 if not success:
@@ -744,10 +744,10 @@ class StateProvider(IoTHubProvider):
                         "servicebus queue authorization-rule keys list --namespace-name {} --resource-group {} "
                         "--queue-name {} --name {} --subscription {}".format(
                             namespace,
-                            ep["resourceGroup"],
+                            ep.get("resourceGroup"),
                             endpoint_props["EntityPath"],
                             endpoint_props["SharedAccessKeyName"],
-                            ep["subscriptionId"]
+                            ep.get("subscriptionId")
                         )
                     ).as_json()["primaryConnectionString"]
                 except AzCLIError:
@@ -767,9 +767,9 @@ class StateProvider(IoTHubProvider):
                     "servicebus queue show --namespace-name {} --resource-group {} "
                     "--name {} --subscription {}".format(
                         namespace,
-                        ep["resourceGroup"],
+                        ep.get("resourceGroup"),
                         ep["entityPath"],
-                        ep["subscriptionId"]
+                        ep.get("subscriptionId")
                     )
                 ).success()
                 if not success:
@@ -790,10 +790,10 @@ class StateProvider(IoTHubProvider):
                         "servicebus topic authorization-rule keys list --namespace-name {} --resource-group {} "
                         "--topic-name {} --name {} --subscription {}".format(
                             namespace,
-                            ep["resourceGroup"],
+                            ep.get("resourceGroup"),
                             endpoint_props["EntityPath"],
                             endpoint_props["SharedAccessKeyName"],
-                            ep["subscriptionId"]
+                            ep.get("subscriptionId")
                         )
                     ).as_json()["primaryConnectionString"]
                 except AzCLIError:
@@ -815,9 +815,9 @@ class StateProvider(IoTHubProvider):
                     "servicebus topic show --namespace-name {} --resource-group {} "
                     "--name {} --subscription {}".format(
                         namespace,
-                        ep["resourceGroup"],
+                        ep.get("resourceGroup"),
                         ep["entityPath"],
-                        ep["subscriptionId"]
+                        ep.get("subscriptionId")
                     )
                 ).success()
                 if not success:
@@ -838,8 +838,8 @@ class StateProvider(IoTHubProvider):
                     ep["connectionString"] = cli.invoke(
                         "storage account show-connection-string -n {} -g {} --subscription {}".format(
                             endpoint_props["AccountName"],
-                            ep["resourceGroup"],
-                            ep["subscriptionId"]
+                            ep.get("resourceGroup"),
+                            ep.get("subscriptionId")
                         )
                     ).as_json()["connectionString"]
                 except AzCLIError:
@@ -860,7 +860,7 @@ class StateProvider(IoTHubProvider):
                 success = cli.invoke(
                     "storage account show --name {} --subscription {}".format(
                         account_name,
-                        ep["subscriptionId"],
+                        ep.get("subscriptionId"),
                     )
                 ).success()
                 if not success:

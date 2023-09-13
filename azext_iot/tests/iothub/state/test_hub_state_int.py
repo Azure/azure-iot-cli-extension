@@ -199,6 +199,15 @@ def setup_hub_states_controlplane(setup_hub_controlplane_states):
         os.remove(filename)
 
 
+@pytest.fixture()
+def setup_file():
+    """Fixture to track a file (and make sure it is deleted at the end)."""
+    filename = generate_generic_id() + ".json"
+    yield filename
+    if os.path.isfile(filename):
+        os.remove(filename)
+
+
 def clean_up_hub_controlplane(hub_name, hub_rg, hub_location):
     # Note that the file has system assigned identity on - this removes the need to reassign permissions.
     blank_hub_file = os.path.join(Path(CWD), "blank_hub_arm.json")
@@ -388,6 +397,39 @@ def test_export_import_controlplane_with_create(setup_hub_states_controlplane):
     )
     time.sleep(10)  # gives the hub time to update before the checks
     compare_hub_controlplane_to_file(filename, dest_name, hub_rg)
+
+
+@pytest.mark.hub_infrastructure(
+    count=1,
+)
+def test_custom_scenarios_controlplane(provisioned_only_iot_hubs_module, provisioned_event_hub_module, setup_file):
+    """
+    Try using export/import to create new hubs. One hub is needed, one new hub will be created.
+    """
+    hub_name = provisioned_only_iot_hubs_module[0]["name"]
+    hub_rg = provisioned_only_iot_hubs_module[0]["rg"]
+    # ensure that there are no system endpoints
+    delete_system_endpoints(hub_name, hub_rg)
+
+    # add the keybased endpoint without rg or sub
+    eventhub_cstring = provisioned_event_hub_module["connectionString"]
+    endpoint_name = generate_generic_id()
+    cli.invoke(
+        f"resource update -n {hub_name} -g {hub_rg} --resource-type Microsoft.Devices/IotHubs "
+        f"--add properties.routing.endpoints.eventHubs connectionString='{eventhub_cstring}' name={endpoint_name}"
+    )
+    time.sleep(60)
+
+    cli.invoke(
+        f"iot hub state export -n {hub_name} -f {setup_file} -g {hub_rg} -r --aspects {CONTROLPLANE}"
+    )
+
+    # check that the file does not have said props
+    with open(setup_file, 'r', encoding='utf-8') as f:
+        hub_info = json.load(f)
+    hub_resource = hub_info["arm"]["resources"][0]
+    eventhub_endpoints = hub_resource["properties"]["routing"]["endpoints"]["eventHubs"]
+    assert len(eventhub_endpoints) == 0
 
 
 @pytest.mark.hub_infrastructure(count=1)
