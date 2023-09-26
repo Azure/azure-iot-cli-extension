@@ -9,9 +9,13 @@ Release History
 
 **General updates**
 
-* Dropped support for Python 3.7. The IoT extension is constrained to Python 3.8 or greater.
+* **Dropped support for Python 3.7**. The IoT extension is constrained to Python 3.8 or greater.
   If for whatever reason you cannot upgrade from 3.7 you are able to use older extension versions.
 
+**IoT Hub updates**
+
+* Fix for `iot hub state` commands failing on IoT Hubs missing certain ARM properties
+* Minor updates to support GA of Cosmos DB container message endpoints
 
 0.21.5
 +++++++++++++++
