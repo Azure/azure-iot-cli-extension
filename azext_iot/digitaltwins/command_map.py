@@ -245,8 +245,7 @@ def load_digitaltwins_commands(self, _):
 
     with self.command_group(
         "dt job deletion",
-        command_type=digitaltwins_job_ops,
-        is_preview=True
+        command_type=digitaltwins_job_ops
     ) as cmd_group:
         cmd_group.command("create", "create_delete_job", confirmation=True)
         cmd_group.show_command("show", "show_delete_job")
