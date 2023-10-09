@@ -716,3 +716,10 @@ def load_digitaltwins_arguments(self, _):
             "If not provided, will use the input storage account.",
             arg_group="Bulk Import Job",
         )
+
+    with self.argument_context("dt job deletion create") as context:
+        context.argument(
+            "timeout_in_min",
+            options_list=["--timeout", "-t"],
+            help="Timeout in minutes for the deletion job. Must be a positive integer between 15 and 1440 inclusive.",
+        )

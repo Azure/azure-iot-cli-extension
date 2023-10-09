@@ -22,7 +22,7 @@ class ImportJobsOperations(object):
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: The requested API version. Constant value: "2023-07-31-preview".
+    :ivar api_version: The requested API version. Constant value: "2023-10-31".
     """
 
     models = models
@@ -32,7 +32,7 @@ class ImportJobsOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2023-07-31-preview"
+        self.api_version = "2023-10-31"
 
         self.config = config
 
@@ -290,7 +290,9 @@ class ImportJobsOperations(object):
 
     def delete(
             self, id, import_jobs_delete_options=None, custom_headers=None, raw=False, **operation_config):
-        """Deletes an import job.
+        """Deletes an import job. This is simply used to remove a job id, so it
+        may be reused later. It can not be used to stop entities from being
+        imported.
         Status codes:
         * 204 No Content
         * 400 Bad Request
@@ -362,7 +364,11 @@ class ImportJobsOperations(object):
 
     def cancel(
             self, id, import_jobs_cancel_options=None, custom_headers=None, raw=False, **operation_config):
-        """Cancels an import job.
+        """Cancels an import job that is currently running. Service will stop any
+        import operations triggered by the current import job that are in
+        progress, and go to a cancelled state. Please note that this will leave
+        your instance in an unknown state as there won't be any rollback
+        operation.
         Status codes:
         * 200 Request Accepted
         * 400 Bad Request
