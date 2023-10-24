@@ -301,6 +301,8 @@ class TestDTJobs(DTLiveScenarioTest):
         )
         # none or timeout
         assert error is None
+        # give the queries a chance to catch up
+        sleep(20)
 
         model_query_result = self.cmd(
             "dt model list -n {} -g {}".format(instance_name, self.rg)

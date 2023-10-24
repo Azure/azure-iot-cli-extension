@@ -39,9 +39,6 @@ class DeletionJobProvider(DigitalTwinsProvider):
             handle_service_exception(e)
 
     def create(self, job_id: Optional[str] = None, timeout_in_min: Optional[int] = None):
-        # Check if error msg is good enough first.
-        # if timeout_in_min < 1:
-        #     raise Exception("Timeout needs to be a postiive integer.")
         job_id = job_id if job_id else DEFAULT_DELETE_JOB_ID_PREFIX + str(uuid4()).replace("-", "")
         self.sdk.config.operation_id = job_id
         self.sdk.config.timeout_in_minutes = timeout_in_min

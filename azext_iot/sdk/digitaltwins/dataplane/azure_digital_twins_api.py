@@ -52,7 +52,7 @@ class AzureDigitalTwinsAPIConfiguration(AzureConfiguration):
 
         super(AzureDigitalTwinsAPIConfiguration, self).__init__(base_url)
 
-        self.add_user_agent('azure-mgmt-device/{}'.format(VERSION))
+        self.add_user_agent('azuredigitaltwinsapi/{}'.format(VERSION))
         self.add_user_agent('Azure-SDK-For-Python')
 
         self.credentials = credentials
