@@ -33,11 +33,17 @@ class AzureDigitalTwinsAPIConfiguration(AzureConfiguration):
     :param operation_id: ID for the operation's status monitor. The ID is
      generated if header was not passed by the client.
     :type operation_id: str
+    :param timeout_in_minutes: Desired timeout for the delete job. Once the
+     specified timeout is reached, service will stop any delete operations
+     triggered by the current delete job that are in progress, and go to a
+     failed state. Please note that this will leave your instance in an unknown
+     state as there won't be any rollback operation.
+    :type timeout_in_minutes: int
     :param str base_url: Service URL
     """
 
     def __init__(
-            self, credentials, operation_id=None, base_url=None):
+            self, credentials, operation_id=None, timeout_in_minutes=None, base_url=None):
 
         if credentials is None:
             raise ValueError("Parameter 'credentials' must not be None.")
@@ -51,6 +57,7 @@ class AzureDigitalTwinsAPIConfiguration(AzureConfiguration):
 
         self.credentials = credentials
         self.operation_id = operation_id
+        self.timeout_in_minutes = timeout_in_minutes
 
 
 class AzureDigitalTwinsAPI(SDKClient):
@@ -78,17 +85,23 @@ class AzureDigitalTwinsAPI(SDKClient):
     :param operation_id: ID for the operation's status monitor. The ID is
      generated if header was not passed by the client.
     :type operation_id: str
+    :param timeout_in_minutes: Desired timeout for the delete job. Once the
+     specified timeout is reached, service will stop any delete operations
+     triggered by the current delete job that are in progress, and go to a
+     failed state. Please note that this will leave your instance in an unknown
+     state as there won't be any rollback operation.
+    :type timeout_in_minutes: int
     :param str base_url: Service URL
     """
 
     def __init__(
-            self, credentials, operation_id=None, base_url=None):
+            self, credentials, operation_id=None, timeout_in_minutes=None, base_url=None):
 
-        self.config = AzureDigitalTwinsAPIConfiguration(credentials, operation_id, base_url)
+        self.config = AzureDigitalTwinsAPIConfiguration(credentials, operation_id, timeout_in_minutes, base_url)
         super(AzureDigitalTwinsAPI, self).__init__(self.config.credentials, self.config)
 
         client_models = {k: v for k, v in models.__dict__.items() if isinstance(v, type)}
-        self.api_version = '2023-07-31-preview'
+        self.api_version = '2023-10-31'
         self._serialize = Serializer(client_models)
         self._deserialize = Deserializer(client_models)
 

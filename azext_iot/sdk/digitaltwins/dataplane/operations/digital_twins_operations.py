@@ -22,7 +22,7 @@ class DigitalTwinsOperations(object):
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: The requested API version. Constant value: "2023-07-31-preview".
+    :ivar api_version: The requested API version. Constant value: "2023-10-31".
     """
 
     models = models
@@ -32,7 +32,7 @@ class DigitalTwinsOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2023-07-31-preview"
+        self.api_version = "2023-10-31"
 
         self.config = config
 
@@ -201,8 +201,7 @@ class DigitalTwinsOperations(object):
         response = self._client.send(
             request, header_parameters, body_content, stream=False, **operation_config)
 
-        # @vilit - added 202
-        if response.status_code not in [200, 202]:
+        if response.status_code not in [200]:
             raise models.ErrorResponseException(self._deserialize, response)
 
         deserialized = None
@@ -296,7 +295,8 @@ class DigitalTwinsOperations(object):
         request = self._client.delete(url, query_parameters)
         response = self._client.send(request, header_parameters, stream=False, **operation_config)
 
-        if response.status_code not in [204]:
+        # @vilit - added 202
+        if response.status_code not in [202, 204]:
             raise models.ErrorResponseException(self._deserialize, response)
 
         if raw:
@@ -676,7 +676,8 @@ class DigitalTwinsOperations(object):
         request = self._client.delete(url, query_parameters)
         response = self._client.send(request, header_parameters, stream=False, **operation_config)
 
-        if response.status_code not in [204]:
+        # @vilit - added 202
+        if response.status_code not in [202, 204]:
             raise models.ErrorResponseException(self._deserialize, response)
 
         if raw:
@@ -775,7 +776,8 @@ class DigitalTwinsOperations(object):
         response = self._client.send(
             request, header_parameters, body_content, stream=False, **operation_config)
 
-        if response.status_code not in [204]:
+        # @vilit - added 202
+        if response.status_code not in [202, 204]:
             raise models.ErrorResponseException(self._deserialize, response)
 
         if raw:
@@ -1046,7 +1048,8 @@ class DigitalTwinsOperations(object):
         response = self._client.send(
             request, header_parameters, body_content, stream=False, **operation_config)
 
-        if response.status_code not in [204]:
+        # @vilit - added 202
+        if response.status_code not in [202, 204]:
             raise models.ErrorResponseException(self._deserialize, response)
 
         if raw:
@@ -1142,7 +1145,8 @@ class DigitalTwinsOperations(object):
         response = self._client.send(
             request, header_parameters, body_content, stream=False, **operation_config)
 
-        if response.status_code not in [204]:
+        # @vilit - added 202
+        if response.status_code not in [202, 204]:
             raise models.ErrorResponseException(self._deserialize, response)
 
         if raw:

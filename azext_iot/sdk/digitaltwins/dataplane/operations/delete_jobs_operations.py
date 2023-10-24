@@ -24,7 +24,7 @@ class DeleteJobsOperations(object):
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: The requested API version. Constant value: "2023-07-31-preview".
+    :ivar api_version: The requested API version. Constant value: "2023-10-31".
     """
 
     models = models
@@ -34,7 +34,7 @@ class DeleteJobsOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2023-07-31-preview"
+        self.api_version = "2023-10-31"
 
         self.config = config
 
@@ -54,6 +54,8 @@ class DeleteJobsOperations(object):
         # Construct parameters
         query_parameters = {}
         query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str', min_length=1)
+        if self.config.timeout_in_minutes is not None:
+            query_parameters['timeoutInMinutes'] = self._serialize.query("self.config.timeout_in_minutes", self.config.timeout_in_minutes, 'int')
 
         # Construct headers
         header_parameters = {}
@@ -97,7 +99,8 @@ class DeleteJobsOperations(object):
 
     def add(
             self, delete_jobs_add_options=None, custom_headers=None, raw=False, polling=True, **operation_config):
-        """Creates a delete job.
+        """Initiates a job which deletes all models, twins, and relationships on
+        the instance. Does not delete any other types of entities.
         Status codes:
         * 202 Created
         * 400 Bad Request
@@ -150,11 +153,13 @@ class DeleteJobsOperations(object):
         elif polling is False: polling_method = NoPolling()
         else: polling_method = polling
         return LROPoller(self._client, raw_result, get_long_running_output, polling_method)
-    add.metadata = {'url': '/jobs/delete'}
+    add.metadata = {'url': '/jobs/deletions'}
 
     def list(
             self, delete_jobs_list_options=None, custom_headers=None, raw=False, **operation_config):
-        """Retrieves all Delete jobs.
+        """Retrieves all deletion jobs. This may be useful to find a delete job
+        that was previously requested, or to view a history of delete jobs that
+        have run or are currently running on the instance.
         Status codes:
         * 200 OK.
 
@@ -231,7 +236,7 @@ class DeleteJobsOperations(object):
             return client_raw_response
 
         return deserialized
-    list.metadata = {'url': '/jobs/delete'}
+    list.metadata = {'url': '/jobs/deletions'}
 
     def get_by_id(
             self, id, delete_jobs_get_by_id_options=None, custom_headers=None, raw=False, **operation_config):
@@ -313,4 +318,4 @@ class DeleteJobsOperations(object):
             return client_raw_response
 
         return deserialized
-    get_by_id.metadata = {'url': '/jobs/delete/{id}'}
+    get_by_id.metadata = {'url': '/jobs/deletions/{id}'}

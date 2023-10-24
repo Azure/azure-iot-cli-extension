@@ -34,10 +34,10 @@ EXPECTED_TWIN_IDS = [
 ]
 
 
-class TestDTImportJobs(DTLiveScenarioTest):
+class TestDTJobs(DTLiveScenarioTest):
     def __init__(self, test_case):
         self.storage_cstring = None
-        super(TestDTImportJobs, self).__init__(test_case)
+        super(TestDTJobs, self).__init__(test_case)
 
     def _upload_import_data_file(self, import_data_filename):
         import_data_file = os.path.join(Path(CWD), "import_data", import_data_filename)
@@ -77,7 +77,7 @@ class TestDTImportJobs(DTLiveScenarioTest):
                 )
             )
 
-    def test_dt_import_jobs(self):
+    def test_dt_jobs(self):
         self.wait_for_capacity()
 
         storage_account_id = self.cmd(
@@ -280,9 +280,9 @@ class TestDTImportJobs(DTLiveScenarioTest):
 
         valid_delete_job_id = "{}_valid_delete_job".format(instance_name)
 
-        # CREATE deletion job
+        # CREATE deletion job, set timeout to 15
         create_valid_delete_job_output = self.cmd(
-            "dt job deletion create -n '{}' -g '{}' -j '{}' -y".format(
+            "dt job deletion create -n '{}' -g '{}' -j '{}' -t 15 -y".format(
                 instance_name, self.rg, valid_delete_job_id
             )
         ).get_output_in_json()
@@ -299,7 +299,10 @@ class TestDTImportJobs(DTLiveScenarioTest):
             expected_statuses=["succeeded"],
             job_type="deletion"
         )
+        # none or timeout
         assert error is None
+        # give the queries a chance to catch up
+        sleep(20)
 
         model_query_result = self.cmd(
             "dt model list -n {} -g {}".format(instance_name, self.rg)

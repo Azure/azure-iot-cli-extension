@@ -38,9 +38,10 @@ class DeletionJobProvider(DigitalTwinsProvider):
         except ErrorResponseException as e:
             handle_service_exception(e)
 
-    def create(self, job_id: Optional[str] = None):
+    def create(self, job_id: Optional[str] = None, timeout_in_min: Optional[int] = None):
         job_id = job_id if job_id else DEFAULT_DELETE_JOB_ID_PREFIX + str(uuid4()).replace("-", "")
         self.sdk.config.operation_id = job_id
+        self.sdk.config.timeout_in_minutes = timeout_in_min
         try:
             return self.sdk.add(polling=False)
         except ErrorResponseException as e:

@@ -4,6 +4,17 @@ Release History
 ===============
 
 
+0.22.1
++++++++++++++++
+
+**Digital Twins updates**
+
+
+* Updated Digital Twin dataplane API to use 2023-10-31. Affected commands:
+  * `az dt job deletion` is now GA. Deletion jobs now have an option to add a timeout in minutes to cancel long-running jobs.
+  * `az dt job import`, `az dt model`, and `az dt twin` now use the newer API but functionality remains the same.
+
+
 0.22.0
 +++++++++++++++
 
@@ -16,6 +27,7 @@ Release History
 
 * Fix for `iot hub state` commands failing on IoT Hubs missing certain ARM properties
 * Minor updates to support GA of Cosmos DB container message endpoints
+
 
 0.21.5
 +++++++++++++++
