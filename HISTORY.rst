@@ -4,7 +4,7 @@ Release History
 ===============
 
 
-0.22.1
+0.23.0
 +++++++++++++++
 
 **Digital Twins updates**
