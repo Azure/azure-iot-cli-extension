@@ -57,22 +57,6 @@ def assign_iot_hub_dataplane_rbac_role(hub_results):
 
 
 @pytest.fixture()
-def fixture_provision_existing_hub_certificate(request):
-    if settings.env.azext_iot_testhub:
-        # Make sure root certificate is Baltimore(Default)
-        authority = cli.invoke(
-            f"iot hub certificate root-authority show -n {HUB_NAME} -g {RG}"
-        ).as_json()
-
-        if authority["enableRootCertificateV2"]:
-            # Transition to Baltimore (initial transition)
-            cli.invoke(
-                f"iot hub certificate root-authority set -n {HUB_NAME} -g {RG} --cav v1 --yes",
-            )
-    yield
-
-
-@pytest.fixture()
 def fixture_provision_existing_hub_device_config(request):
     # Clean up existing devices and configurations
     if settings.env.azext_iot_testhub:
