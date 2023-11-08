@@ -77,7 +77,8 @@ class CertificateProvider(IoTHubProvider):
 
         if root_ca is None:
             properties["rootCertificate"] = {"enableRootCertificateV2": not root_ca}
-            command += f" --set properties='{json.dumps(properties)}'"
+            dumped = json.dumps(properties).replace('"', '\\"')
+            command += f" --set properties=\"{dumped}\""
         else:
             command += f" --set properties.rootCertificate.enableRootCertificateV2={not root_ca}"
 
