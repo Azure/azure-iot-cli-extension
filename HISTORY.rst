@@ -4,15 +4,20 @@ Release History
 ===============
 
 
-0.22.1
+0.23.0
 +++++++++++++++
 
 **Digital Twins updates**
 
-
 * Updated Digital Twin dataplane API to use 2023-10-31. Affected commands:
   * `az dt job deletion` is now GA. Deletion jobs now have an option to add a timeout in minutes to cancel long-running jobs.
   * `az dt job import`, `az dt model`, and `az dt twin` now use the newer API but functionality remains the same.
+
+**IoT Hub updates**
+
+* Deprecation of `az iot hub certificate root-authority`. If your hub still uses a certificate on the Baltimore CyberTrust root,
+  your hub will be migrated to the DigiCert Global G2 root in the next wave. For any issues, email iot-ca-updates@microsoft.com.
+  This command will be removed in a later release.
 
 
 0.22.0
