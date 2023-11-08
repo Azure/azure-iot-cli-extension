@@ -4,6 +4,15 @@ Release History
 ===============
 
 
+0.23.1
++++++++++++++++
+
+
+**IoT Hub updates**
+
+* Fix parsing issue for `az iot hub certificate root-authority`.
+
+
 0.23.0
 +++++++++++++++
 
