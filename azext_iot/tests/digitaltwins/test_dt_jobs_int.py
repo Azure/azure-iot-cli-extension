@@ -20,9 +20,9 @@ from azext_iot.digitaltwins.providers.import_job import DEFAULT_IMPORT_JOB_ID_PR
 
 logger = get_logger(__name__)
 CWD = os.path.dirname(os.path.abspath(__file__))
-MAX_TRIES = 5
+MAX_TRIES = 10
 RBAC_SLEEP_INTERVAL = 60
-POLL_SLEEP_INTERVAL = 30
+POLL_SLEEP_INTERVAL = 60
 EXPECTED_MODEL_IDS = [
     "dtmi:com:microsoft:azure:iot:model0;1", "dtmi:com:microsoft:azure:iot:model1;1", "dtmi:com:microsoft:azure:iot:model2;1",
     "dtmi:com:microsoft:azure:iot:model3;1", "dtmi:com:microsoft:azure:iot:model4;1", "dtmi:com:microsoft:azure:iot:model5;1",
@@ -368,6 +368,7 @@ def poll_job_status(
         if import_job_output["status"] == final_status:
             return import_job_output["error"]
         sleep(POLL_SLEEP_INTERVAL)
+    raise Exception(f"Job {job_id} for {instance_name} not finalized.")
 
 
 def assert_job_creation(
