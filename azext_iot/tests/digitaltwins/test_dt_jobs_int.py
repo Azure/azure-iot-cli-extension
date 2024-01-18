@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import os
+import pytest
 from typing import List, Optional
 
 from knack.log import get_logger
@@ -34,6 +35,7 @@ EXPECTED_TWIN_IDS = [
 ]
 
 
+@pytest.mark.skip("Wait till service can fix.")
 class TestDTJobs(DTLiveScenarioTest):
     def __init__(self, test_case):
         self.storage_cstring = None
