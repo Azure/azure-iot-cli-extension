@@ -19,7 +19,7 @@ steps:
         pip install virtualenv
         python -m virtualenv venv/
         source ./venv/bin/activate
-        pip install azdev sphinx==1.7.0 Jinja2==3.0.3 install wheel==0.30.0
+        pip install azdev sphinx==5.0 Jinja2==3.0.3 install wheel==0.30.0
         git clone --single-branch -b dev https://github.com/Azure/azure-cli.git ../azure-cli
         azdev --version
         azdev setup -c ../azure-cli -r ./
