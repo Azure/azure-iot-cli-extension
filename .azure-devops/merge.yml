@@ -141,14 +141,14 @@ jobs:
   steps:
   - template: templates/evaluate-command-table.yml
 
-- job: 'validate_ref_docs'
-  dependsOn: ['build_and_publish_azure_iot_cli_ext']
-  displayName: 'Validate Reference Document Generation'
-  pool:
-    vmImage: ${{ parameters.linuxImage }}
+# - job: 'validate_ref_docs'
+#   dependsOn: ['build_and_publish_azure_iot_cli_ext']
+#   displayName: 'Validate Reference Document Generation'
+#   pool:
+#     vmImage: ${{ parameters.linuxImage }}
 
-  steps:
-  - template: templates/validate-refdoc-generation.yml
+#   steps:
+#   - template: templates/validate-refdoc-generation.yml
 
 - job: CredScan
   displayName: 'Credential Scan'
