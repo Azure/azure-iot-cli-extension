@@ -84,7 +84,6 @@ Tests are organized into folders by resource in `azext_iot\tests\`:
 - Digital Twins
 - Device Provisioning Service
 - IoT Hub
-- Product
 - Utility
 
 ### Unit Tests
