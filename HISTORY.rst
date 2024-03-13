@@ -4,6 +4,15 @@ Release History
 ===============
 
 
+0.24.0
++++++++++++++++
+
+
+**IoT Product**
+
+* Removal of `az iot product`.
+
+
 0.23.1
 +++++++++++++++
 

@@ -9,7 +9,3 @@ azext_iot/central/   @valluriraj
 azext_iot/tests/central/   @valluriraj
 azext_iot/tests/test_iot_central_int.py   @valluriraj
 azext_iot/tests/test_iot_central_unit.py   @valluriraj
-
-# AICS Code Owner(s)
-azext_iot/product/   @montgomp @c-ryan-k
-azext_iot/tests/product/   @montgomp @c-ryan-k
