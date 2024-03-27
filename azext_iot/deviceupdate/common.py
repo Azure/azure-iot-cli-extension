@@ -79,6 +79,7 @@ class ADUContentHandlerType(Enum):
     SIMULATOR_V1 = "microsoft/simulator:1"
     SWUPDATE_V1 = "microsoft/swupdate:1"
     SWUPDATE_V2 = "microsoft/swupdate:2"
+    WIM_V1 = "microsoft/wim:1"
 
 
 FP_HANDLERS: List[str] = [
@@ -87,6 +88,7 @@ FP_HANDLERS: List[str] = [
     ADUContentHandlerType.SIMULATOR_V1.value,
     ADUContentHandlerType.SWUPDATE_V1.value,
     ADUContentHandlerType.SWUPDATE_V2.value,
+    ADUContentHandlerType.WIM_V1.value,
 ]
 
 
