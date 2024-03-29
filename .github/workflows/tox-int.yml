@@ -45,6 +45,8 @@ jobs:
         with:
           python-version: ${{ matrix.py }}
       - uses: actions/checkout@v4
+      - name: Setup tox
+        run: pip install tox
       - name: Setup test suite
         run: tox r -vv --notest
       - name: "AZ CLI login"
