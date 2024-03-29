@@ -1,0 +1,95 @@
+name: Testing dynamic matrix
+on:
+  workflow_dispatch:
+    inputs:
+      Python311:
+        type: boolean
+        default: true
+      Python310:
+        type: boolean
+        default: true
+      Python39:
+        type: boolean
+        default: false
+      Python38:
+        type: boolean
+        default: false
+      Central:
+        type: boolean
+        default: false
+      ADT:  
+        type: boolean
+        default: false
+      DPS:
+        type: boolean
+        default: true
+      Hub1:
+        type: boolean
+        default: false
+      Hub2:
+        type: boolean
+        default: true
+      ADU:
+        type: boolean
+        default: false
+      
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  test-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    env:
+        py311: ${{ inputs.Python311 }}
+        py310: ${{ inputs.Python310 }}
+        py39: ${{ inputs.Python39 }}
+        py38: ${{ inputs.Python38 }}
+        Central: ${{ inputs.Central }}
+        ADT: ${{ inputs.ADT }}
+        DPS: ${{ inputs.DPS }}
+        Hub1: ${{ inputs.Hub1 }}
+        Hub2: ${{ inputs.Hub2 }}
+        ADU: ${{ inputs.ADU }}
+    steps:
+      - name: Set matrix
+        id: set-matrix
+        run: |
+            python_versions="py311 py310 py39 py38"
+            test_options="Central ADT DPS Hub1 Hub2 ADU"
+
+            python_arr=()
+            test_arr=()
+
+            for py_ver in $python_versions; do
+                if [ ${!py_ver} -a ${!py_ver} = "true" ]; then
+                    python_arr+=($py_ver)
+                fi
+            done
+
+            for test in $test_options; do
+                if [ ${!test} -a ${!test} = "true" ]; then
+                    test_arr+=($test)
+                fi
+            done
+
+            python_matrix=$(printf '%s\n' "${python_arr[@]}" | jq -R . | jq -s .)
+            toxenv_matrix=$(printf '%s\n' "${test_arr[@]}" | jq -R . | jq -s .)
+            echo "matrix={\"py\": $python_matrix, \"toxenv\": $toxenv_matrix}" >> $GITHUB_OUTPUT
+  int-test:
+    name: toxenv ${{ matrix.toxenv }} - python ${{ matrix.py }}
+    needs: [test-matrix]
+    continue-on-error: ${{ inputs.continue-on-error }}
+    strategy:
+      fail-fast: false
+      matrix: ${{fromJson(needs.test-matrix.outputs.matrix)}}
+    runs-on: ubuntu-22.04
+    steps:
+      - name: test
+        run: |
+            echo "Running test"
+            echo "py: ${{ matrix.py }}"
+            echo "toxenv: ${{ matrix.toxenv }}"
