@@ -76,10 +76,10 @@ jobs:
                 fi
             done
 
-            python_matrix=$(printf '%s\n' "${python_arr[@]}" | jq -R . | jq -s .)
+            python_matrix=$(printf '%s' "${python_arr[@]}" | jq -R . | jq -s .)
             echo "python_matrix" $python_matrix
 
-            toxenv_matrix=$(printf '%s\n' "${test_arr[@]}" | jq -R . | jq -s .)
+            toxenv_matrix=$(printf '%s' "${test_arr[@]}" | jq -R . | jq -s .)
             echo "python_matrix" $toxenv_matrix
 
             matrix="{\"py\": $python_matrix, \"toxenv\": $toxenv_matrix}"
