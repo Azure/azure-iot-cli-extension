@@ -2,36 +2,14 @@ name: Testing dynamic matrix
 on:
   workflow_dispatch:
     inputs:
-      Python311:
-        type: boolean
-        default: true
-      Python310:
-        type: boolean
-        default: true
-      Python39:
-        type: boolean
-        default: false
-      Python38:
-        type: boolean
-        default: false
-      Central:
-        type: boolean
-        default: false
-      ADT:  
-        type: boolean
-        default: false
-      DPS:
-        type: boolean
-        default: true
-      Hub1:
-        type: boolean
-        default: false
-      Hub2:
-        type: boolean
-        default: true
-      ADU:
-        type: boolean
-        default: false
+      python:
+        description: 'Python versions'
+        required: true
+        default: '["3.11", "3.10", "3.9", "3.8"]'
+      toxenv:
+        description: 'Tox envs to run'
+        required: true
+        default: '["Central", "ADT", "DPS", "Hub1", "Hub2", "ADU"]'
       
 
 permissions:
@@ -44,45 +22,16 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     env:
-        py311: ${{ inputs.Python311 }}
-        py310: ${{ inputs.Python310 }}
-        py39: ${{ inputs.Python39 }}
-        py38: ${{ inputs.Python38 }}
-        Central: ${{ inputs.Central }}
-        ADT: ${{ inputs.ADT }}
-        DPS: ${{ inputs.DPS }}
-        Hub1: ${{ inputs.Hub1 }}
-        Hub2: ${{ inputs.Hub2 }}
-        ADU: ${{ inputs.ADU }}
+        python: ${{ inputs.python}}
+        toxenv: ${{ inputs.toxenv}}
     steps:
       - name: Set matrix
         id: set-matrix
         run: |
-            python_versions="py311 py310 py39 py38"
-            test_options="Central ADT DPS Hub1 Hub2 ADU"
-
-            python_arr=()
-            test_arr=()
-
-            for py_ver in $python_versions; do
-                if [ ${!py_ver} -a ${!py_ver} = "true" ]; then
-                    python_arr+=($py_ver)
-                fi
-            done
-
-            for test in $test_options; do
-                if [ ${!test} -a ${!test} = "true" ]; then
-                    test_arr+=($test)
-                fi
-            done
-
-            python_matrix=$(printf '%s' "${python_arr[@]}" | jq -R . | jq -s .)
-            echo "python_matrix" $python_matrix
-
-            toxenv_matrix=$(printf '%s' "${test_arr[@]}" | jq -R . | jq -s .)
-            echo "python_matrix" $toxenv_matrix
-
-            matrix="{\"py\": $python_matrix, \"toxenv\": $toxenv_matrix}"
+            echo "python" $python
+            echo "toxenv" $toxenv
+            
+            matrix="{\"py\": $python, \"toxenv\": $toxenv}"
             echo "matrix" $matrix
 
             echo "matrix=$matrix" >> $GITHUB_OUTPUT
