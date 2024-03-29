@@ -1,0 +1,47 @@
+name: Tox integration tests
+on:
+  workflow_call:
+    inputs:
+      continue-on-error:
+        type: boolean
+        required: false
+        default: false
+  workflow_dispatch:
+    inputs:
+      continue-on-error:
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  int-test:
+    name: Int test ${{ matrix.toxenv }} - python ${{ matrix.py }}
+    continue-on-error: ${{ inputs.continue-on-error }}
+    strategy:
+      fail-fast: false
+      matrix:
+        py:
+          - "3.10"
+          - "3.9"
+          - "3.8"
+        toxenv:
+          - "Central"
+          - "ADT"
+          - "DPS"
+          - "Hub1"
+          - "Hub2"
+          - "ADU"
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Setup python ${{ matrix.py }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.py }}
+      - uses: actions/checkout@v4
+      - name: Setup test suite
+        run: tox r -vv --notest
+      - name: Run test suite
+        run: tox r --skip-pkg-install -e ${{ matrix.toxenv }}-int

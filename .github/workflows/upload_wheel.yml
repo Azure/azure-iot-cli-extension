@@ -1,0 +1,56 @@
+name: "[auto] Upload wheel to storage account"
+
+on:
+  workflow_call:
+    outputs:
+      upload_success:
+        description: 'Whether or not the wheel was uploaded from this workflow'
+        value: ${{ jobs.upload_wheel.outputs.upload_success }}
+env:
+  storage_container_url: ${{ secrets.storage_container_url }}
+  sas_token: ${{ secrets.sas_token }}
+jobs:
+  # Upload wheel to storage account
+  upload_wheel:
+    permissions:
+      # ensures this release job has no access to source
+      contents: none
+    outputs:
+      upload_success: ${{ steps.upload.outputs.upload_success }}
+    # TODO - associate pool
+    # runs-on: [self-hosted, 1ES.Pool=iotupx-github-hosted-pool, 1ES.ImageOverride=MMSUbuntu20.04]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download wheel
+        id: wheel
+        uses: actions/download-artifact@v4
+        with:
+          name: azure-iot-cli-ext
+          path: ./
+      - name: Install azcopy
+        run: |
+          curl -so azcopy.tar.gz -L 'https://aka.ms/downloadazcopy-v10-linux'
+          tar -zxvf azcopy.tar.gz --strip 1
+      - name: Determine if version already exists
+        id: duplicate_check
+        run: |
+          wheel=$(find *.whl)
+          echo "wheel=$wheel" >> $GITHUB_ENV
+          extensions=$(azcopy list "${{ env.storage_container_url }}?${{ env.SAS_TOKEN }}")
+          echo "extensions: $extensions"
+          echo "Checking if $wheel exists in $extensions"
+          if $(echo "$extensions" | grep -Fq $wheel); then
+            echo "Wheel already uploaded, skipping upload" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "CONTINUE=true" >> $GITHUB_OUTPUT
+          fi
+        env:
+          SAS_TOKEN: ${{ secrets.SAS_TOKEN }}
+      - name: Upload Wheel
+        id: upload
+        if: steps.duplicate_check.outputs.CONTINUE == 'true'
+        run: |
+          azcopy copy ${{ env.wheel }} "${{ env.storage_container_url }}/${{ env.wheel }}?${{ env.SAS_TOKEN }}"
+          echo "upload_success=true" >> $GITHUB_OUTPUT 
+        env:
+          SAS_TOKEN: ${{ secrets.SAS_TOKEN }}

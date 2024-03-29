@@ -1,0 +1,77 @@
+name: Build and Publish Release
+run-name: Build and publish release${{ github.event.inputs.upload_wheel == 'true' &&  ' - Wheel upload' || ''}}${{ github.event.inputs.github_release == 'true' &&  ' - Stage Release' || ''}}
+on:
+  # only manual trigger
+  workflow_dispatch:
+    inputs:
+      continue-on-error:
+        description: Continue release if pre-checks fail
+        type: boolean
+        required: false
+        default: false
+      github_release:
+        description: Stage github release
+        type: boolean
+        required: false
+        default: false
+      upload_wheel:
+        description: Upload wheel to storage
+        type: boolean
+        required: false
+        default: false
+jobs:
+  security:
+    permissions:
+      # needed to write security info to repository
+      security-events: write
+      contents: read
+    uses: ./.github/workflows/security_checks.yml
+    with:
+      continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
+  build:
+    uses: ./.github/workflows/release_build.yml
+  unit-test:
+    uses: ./.github/workflows/tox.yml
+    with:
+      continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
+  int-test:
+    uses: ./.github/workflows/tox-int.yml
+    with:
+      # review any flaky tests but don't stop the release
+      continue-on-error: true
+  azdev_linter:
+    needs: [build]
+    uses: ./.github/workflows/azdev_linter.yml
+    with:
+      continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
+  approval:
+    needs: [security, build, unit-test, int-test, azdev_linter]
+    # only needed if (release || wheel)
+    if: (github.event.inputs.github_release == 'true' || github.event.inputs.upload_wheel == 'true')
+    environment: production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm
+        run: |
+          echo "Approved" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ inputs.upload_wheel }}" == "true" ]; then
+            echo "Wheel will be uploaded to storage account." >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "${{ inputs.github_release }}" == "true" ]; then
+            echo "Github release will be drafted." >> $GITHUB_STEP_SUMMARY
+          fi
+  # github_release == 'true'
+  draft_github_release:
+    permissions:
+      # needed to create draft release
+      contents: write
+    needs: [approval]
+    if: github.event.inputs.github_release == 'true'
+    uses: ./.github/workflows/stage_release.yml
+    secrets: inherit
+  # upload_wheel == 'true'
+  upload_wheel:
+    needs: [approval]
+    if: github.event.inputs.upload_wheel == 'true'
+    uses: ./.github/workflows/upload_wheel.yml
+    secrets: inherit

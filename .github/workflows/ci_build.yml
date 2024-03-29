@@ -1,0 +1,23 @@
+name: "[auto] Simple Build"
+on:
+  workflow_call:
+jobs:
+  build:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup python
+        uses: actions/setup-python@v5
+        with:
+            python-version: "3.9"
+      - name: Build Wheel
+        run: |
+          pip install wheel
+          python -m setup bdist_wheel -d dist
+      - name: Upload Wheel Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          path: dist/*.whl
+          name: azure-iot-cli-ext
