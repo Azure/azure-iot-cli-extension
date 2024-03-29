@@ -48,12 +48,12 @@ jobs:
       - name: Setup tox
         run: pip install tox
       - name: Setup test suite
-        run: tox r -vv --notest
+        run: tox r -e ${{ matrix.toxenv }}-int -vv --notest
       - name: "AZ CLI login"
         uses: azure/login@v2
         with:
             client-id: ${{ secrets.AZURE_CLIENT_ID }}
-            subscription-id: ${{ secrets.AZURE_SUBCRIPTION_ID }}
+            subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
             tenant-id: ${{ secrets.AZURE_TENANT_ID }}
       - name: Run test suite
         run: tox r --skip-pkg-install -e ${{ matrix.toxenv }}-int
