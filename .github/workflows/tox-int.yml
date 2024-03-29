@@ -37,9 +37,9 @@ jobs:
         #   - "ADU"
     runs-on: ubuntu-22.04
     env:
-        AZEXT_IOT_TESTRG: ${{ secrets.AZEXT_IOT_TESTRG}}
-        AZEXT_IOT_TESTSTORAGEACCOUNT: ${{ secrets.AZEXT_IOT_TESTSTORAGEACCOUNT}}
-        AZEXT_DT_ADX_CLUSTER: ${{ secrets.AZEXT_DT_ADX_CLUSTER}}
+        azext_iot_testrg: ${{ secrets.AZEXT_IOT_TESTRG}}
+        azext_iot_teststorageaccount: ${{ secrets.AZEXT_IOT_TESTSTORAGEACCOUNT}}
+        azext_dt_adx_cluster: ${{ secrets.AZEXT_DT_ADX_CLUSTER}}
     steps:
       - name: Setup python ${{ matrix.py }}
         uses: actions/setup-python@v5
