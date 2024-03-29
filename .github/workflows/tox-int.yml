@@ -50,8 +50,8 @@ jobs:
       - name: "AZ CLI login"
         uses: azure/login@v2
         with:
-            AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-            AZURE_SUBCRIPTION_ID: ${{ secrets.AZURE_SUBCRIPTION_ID }}
-            AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+            client-id: ${{ secrets.AZURE_CLIENT_ID }}
+            subscription-id: ${{ secrets.AZURE_SUBCRIPTION_ID }}
+            tenant-id: ${{ secrets.AZURE_TENANT_ID }}
       - name: Run test suite
         run: tox r --skip-pkg-install -e ${{ matrix.toxenv }}-int
