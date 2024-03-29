@@ -77,8 +77,15 @@ jobs:
             done
 
             python_matrix=$(printf '%s\n' "${python_arr[@]}" | jq -R . | jq -s .)
+            echo "python_matrix" $python_matrix
+
             toxenv_matrix=$(printf '%s\n' "${test_arr[@]}" | jq -R . | jq -s .)
-            echo "matrix={\"py\": $python_matrix, \"toxenv\": $toxenv_matrix}" >> $GITHUB_OUTPUT
+            echo "python_matrix" $toxenv_matrix
+
+            matrix="{\"py\": $python_matrix, \"toxenv\": $toxenv_matrix}"
+            echo "matrix" $matrix
+
+            echo "matrix=$matrix" >> $GITHUB_OUTPUT
   int-test:
     name: toxenv ${{ matrix.toxenv }} - python ${{ matrix.py }}
     needs: [test-matrix]
