@@ -6,35 +6,63 @@ on:
         type: boolean
         required: false
         default: false
+      python:
+        description: 'Python versions'
+        type: string
+        required: true
+        default: '["3.11", "3.10", "3.9", "3.8"]'
+      toxenv:
+        description: 'Tox envs to run'
+        type: string
+        required: true
+        default: '["Central", "ADT", "DPS", "Hub1", "Hub2", "ADU"]'
   workflow_dispatch:
     inputs:
       continue-on-error:
         type: boolean
         required: false
         default: false
+      python:
+        description: 'Python versions'
+        type: string
+        required: true
+        default: '["3.11", "3.10", "3.9", "3.8"]'
+      toxenv:
+        description: 'Tox envs to run'
+        type: string
+        required: true
+        default: '["Central", "ADT", "DPS", "Hub1", "Hub2", "ADU"]'
 
 permissions:
   contents: read
   id-token: write
 
 jobs:
+  set-test-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    env:
+        python: ${{ inputs.python}}
+        toxenv: ${{ inputs.toxenv}}
+    steps:
+    - name: Set matrix
+      id: set-matrix
+      run: |
+        echo "python values:" $python
+        echo "toxenv values:" $toxenv
+        
+        matrix="{\"py\": $python, \"toxenv\": $toxenv}"
+        echo "testing matrix" $matrix
+
+        echo "matrix=$matrix" >> $GITHUB_OUTPUT
   int-test:
     name: Int test ${{ matrix.toxenv }} - python ${{ matrix.py }}
+    needs: set-test-matrix
     continue-on-error: ${{ inputs.continue-on-error }}
     strategy:
       fail-fast: false
-      matrix:
-        py:
-          - "3.10"
-        #   - "3.9"
-        #   - "3.8"
-        toxenv:
-        #   - "Central"
-        #   - "ADT"
-          - "DPS"
-        #   - "Hub1"
-          - "Hub2"
-        #   - "ADU"
+      matrix: ${{fromJson(needs.set-test-matrix.outputs.matrix)}}
     runs-on: ubuntu-22.04
     env:
         azext_iot_testrg: ${{ secrets.AZEXT_IOT_TESTRG}}
