@@ -43,5 +43,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Setup test suite
         run: tox r -vv --notest
+      - name: "AZ CLI login"
+        uses: azure/login@v2
+        with:
+            AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+            AZURE_SUBCRIPTION_ID: ${{ secrets.AZURE_SUBCRIPTION_ID }}
+            AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       - name: Run test suite
         run: tox r --skip-pkg-install -e ${{ matrix.toxenv }}-int
