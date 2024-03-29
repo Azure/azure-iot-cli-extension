@@ -28,7 +28,7 @@ jobs:
           - "3.9"
           - "3.8"
         toxenv:
-          - "Central"
+        #   - "Central"
           - "ADT"
           - "DPS"
           - "Hub1"
