@@ -15,7 +15,7 @@ on:
         description: 'Tox envs to run'
         type: string
         required: true
-        default: '["Central", "ADT", "DPS", "Hub1", "Hub2", "ADU"]'
+        default: '["ADT", "DPS", "Hub1", "Hub2", "ADU"]'
   workflow_dispatch:
     inputs:
       continue-on-error:
@@ -31,7 +31,7 @@ on:
         description: 'Tox envs to run'
         type: string
         required: true
-        default: '["Central", "ADT", "DPS", "Hub1", "Hub2", "ADU"]'
+        default: '["ADT", "DPS", "Hub1", "Hub2", "ADU"]'
 
 permissions:
   contents: read
@@ -68,6 +68,7 @@ jobs:
         azext_iot_testrg: ${{ secrets.AZEXT_IOT_TESTRG}}
         azext_iot_teststorageaccount: ${{ secrets.AZEXT_IOT_TESTSTORAGEACCOUNT}}
         azext_dt_adx_cluster: ${{ secrets.AZEXT_DT_ADX_CLUSTER}}
+        COVERAGE_FILE: .coverage.${{ matrix.toxenv }}-${{ matrix.py }}
     steps:
       - name: Setup python ${{ matrix.py }}
         uses: actions/setup-python@v5
@@ -85,4 +86,4 @@ jobs:
             subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
             tenant-id: ${{ secrets.AZURE_TENANT_ID }}
       - name: Run test suite
-        run: tox r --skip-pkg-install -e ${{ matrix.toxenv }}-int
+        run: tox r --skip-pkg-install -e ${{ matrix.toxenv }}-int -vv -- -rsx
