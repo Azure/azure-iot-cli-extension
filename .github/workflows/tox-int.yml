@@ -62,6 +62,7 @@ jobs:
         azext_dt_adx_cluster: ${{ secrets.AZEXT_DT_ADX_CLUSTER}}
         COVERAGE_FILE: .coverage.${{ matrix.toxenv }}-${{ matrix.py }}
     steps:
+      - uses: actions/checkout@v4
       - name: Setup python ${{ matrix.py }}
         uses: actions/setup-python@v5
         with:
@@ -70,7 +71,6 @@ jobs:
           cache-dependency-path: |
             dev_requirements.txt
             setup.py
-      - uses: actions/checkout@v4
       - name: Setup tox
         run: pip install tox
       - name: Setup test suite
