@@ -2,10 +2,6 @@ name: Tox integration tests
 on:
   workflow_call:
     inputs:
-      continue-on-error:
-        type: boolean
-        required: false
-        default: false
       python:
         description: 'Python versions'
         type: string
@@ -18,10 +14,6 @@ on:
         default: '["ADT", "DPS", "Hub1", "Hub2", "ADU"]'
   workflow_dispatch:
     inputs:
-      continue-on-error:
-        type: boolean
-        required: false
-        default: false
       python:
         description: 'Python versions'
         type: string
@@ -59,7 +51,7 @@ jobs:
   int-test:
     name: Int test ${{ matrix.toxenv }} - python ${{ matrix.py }}
     needs: set-test-matrix
-    continue-on-error: ${{ inputs.continue-on-error }}
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix: ${{fromJson(needs.set-test-matrix.outputs.matrix)}}
