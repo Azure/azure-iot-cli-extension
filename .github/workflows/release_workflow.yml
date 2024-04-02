@@ -45,13 +45,13 @@ jobs:
     with:
       continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
   int-test:
+    secrets: inherit
     uses: ./.github/workflows/tox-int.yml
     with:
       # review any flaky tests but don't stop the release
       continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
       toxenv: ${{ inputs.toxenv }}
       python: ${{ inputs.python }}
-      secrets: inherit
   azdev_linter:
     needs: [build]
     uses: ./.github/workflows/azdev_linter.yml
