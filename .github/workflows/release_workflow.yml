@@ -51,6 +51,7 @@ jobs:
       continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
       toxenv: ${{ inputs.toxenv }}
       python: ${{ inputs.python }}
+      secrets: inherit
   azdev_linter:
     needs: [build]
     uses: ./.github/workflows/azdev_linter.yml
