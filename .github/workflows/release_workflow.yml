@@ -4,6 +4,16 @@ on:
   # only manual trigger
   workflow_dispatch:
     inputs:
+      python:
+        description: 'Python versions for integration tests'
+        type: string
+        required: true
+        default: '["3.11", "3.10", "3.9", "3.8"]'
+      toxenv:
+        description: 'Int test Scenarios'
+        type: string
+        required: true
+        default: '["ADT", "DPS", "Hub1", "Hub2"]'
       continue-on-error:
         description: Continue release if pre-checks fail
         type: boolean
@@ -38,7 +48,9 @@ jobs:
     uses: ./.github/workflows/tox-int.yml
     with:
       # review any flaky tests but don't stop the release
-      continue-on-error: true
+      continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
+      toxenv: ${{ inputs.toxenv }}
+      pyenv: ${{ inputs.python }}
   azdev_linter:
     needs: [build]
     uses: ./.github/workflows/azdev_linter.yml
