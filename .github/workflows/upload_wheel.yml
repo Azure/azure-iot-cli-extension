@@ -8,7 +8,7 @@ on:
         value: ${{ jobs.upload_wheel.outputs.upload_success }}
 env:
   storage_container_url: ${{ secrets.storage_container_url }}
-  sas_token: ${{ secrets.sas_token }}
+  AZCOPY_AUTO_LOGIN_TYPE: "AZCLI"
 jobs:
   # Upload wheel to storage account
   upload_wheel:
@@ -31,12 +31,18 @@ jobs:
         run: |
           curl -so azcopy.tar.gz -L 'https://aka.ms/downloadazcopy-v10-linux'
           tar -zxvf azcopy.tar.gz --strip 1
+      - name: "Az CLI login"
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }} 
       - name: Determine if version already exists
         id: duplicate_check
         run: |
           wheel=$(find *.whl)
           echo "wheel=$wheel" >> $GITHUB_ENV
-          extensions=$(azcopy list "${{ env.storage_container_url }}?${{ env.SAS_TOKEN }}")
+          extensions=$(azcopy list "${{ env.storage_container_url }}")
           echo "extensions: $extensions"
           echo "Checking if $wheel exists in $extensions"
           if $(echo "$extensions" | grep -Fq $wheel); then
@@ -44,13 +50,9 @@ jobs:
           else
             echo "CONTINUE=true" >> $GITHUB_OUTPUT
           fi
-        env:
-          SAS_TOKEN: ${{ secrets.SAS_TOKEN }}
       - name: Upload Wheel
         id: upload
         if: steps.duplicate_check.outputs.CONTINUE == 'true'
         run: |
-          azcopy copy ${{ env.wheel }} "${{ env.storage_container_url }}/${{ env.wheel }}?${{ env.SAS_TOKEN }}"
+          azcopy copy ${{ env.wheel }} "${{ env.storage_container_url }}/${{ env.wheel }}"
           echo "upload_success=true" >> $GITHUB_OUTPUT 
-        env:
-          SAS_TOKEN: ${{ secrets.SAS_TOKEN }}
