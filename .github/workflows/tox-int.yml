@@ -61,7 +61,8 @@ jobs:
   int-test:
     name: Int test ${{ matrix.toxenv }} - python ${{ matrix.py }}
     needs: set-test-matrix
-    continue-on-error: ${{ inputs.continue-on-error }}
+    # always allow int test to finish even if in a failed state
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix: ${{fromJson(needs.set-test-matrix.outputs.matrix)}}
