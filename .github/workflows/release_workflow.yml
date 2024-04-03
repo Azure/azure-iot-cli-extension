@@ -85,12 +85,12 @@ jobs:
       # needed to create draft release
       contents: write
     needs: [approval]
-    if: github.event.inputs.github_release == 'true'
+    if:  always() && !cancelled() && !failure() && github.event.inputs.github_release == 'true'
     uses: ./.github/workflows/stage_release.yml
     secrets: inherit
   # upload_wheel == 'true'
   upload_wheel:
     needs: [approval]
-    if: github.event.inputs.upload_wheel == 'true'
+    if:  always() && !cancelled() && !failure() && github.event.inputs.upload_wheel == 'true'
     uses: ./.github/workflows/upload_wheel.yml
     secrets: inherit
