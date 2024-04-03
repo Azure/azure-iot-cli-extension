@@ -4,6 +4,11 @@ on:
   # only manual trigger
   workflow_dispatch:
     inputs:
+      int-test:
+        description: run int tests?
+        type: boolean
+        required: false
+        default: true
       python:
         description: 'Python versions for integration tests'
         type: string
@@ -45,6 +50,7 @@ jobs:
     with:
       continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
   int-test:
+    if: ${{ github.event.inputs.int-test == 'true' }}
     secrets: inherit
     uses: ./.github/workflows/tox-int.yml
     with:
