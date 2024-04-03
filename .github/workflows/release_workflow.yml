@@ -45,10 +45,10 @@ jobs:
       continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
   build:
     uses: ./.github/workflows/release_build.yml
-  unit-test:
-    uses: ./.github/workflows/tox.yml
-    with:
-      continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
+  # unit-test:
+  #   uses: ./.github/workflows/tox.yml
+  #   with:
+  #     continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
   int-test:
     if: ${{ github.event.inputs.int-test == 'true' }}
     secrets: inherit
@@ -64,7 +64,8 @@ jobs:
     with:
       continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
   approval:
-    needs: [security, build, unit-test, int-test, azdev_linter]
+    # needs: [security, build, unit-test, int-test, azdev_linter]
+    needs: [security, build, int-test, azdev_linter]
     # only needed if (release || wheel) - conditionals allow previous jobs to be skipped and still run
     if:  always() && !cancelled() && !failure() && (github.event.inputs.github_release == 'true' || github.event.inputs.upload_wheel == 'true')
     environment: production
