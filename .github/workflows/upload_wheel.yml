@@ -15,6 +15,8 @@ jobs:
     permissions:
       # ensures this release job has no access to source
       contents: none
+      # needed for login
+      id-token: write
     outputs:
       upload_success: ${{ steps.upload.outputs.upload_success }}
     # TODO - associate pool
