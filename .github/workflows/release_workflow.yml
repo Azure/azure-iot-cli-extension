@@ -18,7 +18,7 @@ on:
         description: 'Int test Scenarios'
         type: string
         required: true
-        default: '["ADT", "DPS", "Hub1", "Hub2"]'
+        default: '["ADT", "ADU", "DPS", "Hub1", "Hub2"]'
       continue-on-error:
         description: Continue release if pre-checks fail
         type: boolean
