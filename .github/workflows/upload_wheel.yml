@@ -21,8 +21,7 @@ jobs:
     outputs:
       upload_success: ${{ steps.upload.outputs.upload_success }}
     # TODO - associate pool
-    # runs-on: [self-hosted, 1ES.Pool=iotupx-github-hosted-pool, 1ES.ImageOverride=MMSUbuntu20.04]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, 1ES.Pool=iotupx-iot-cli-github-hosted-pool, 1ES.ImageOverride=Ubuntu20.04Compliant]
     steps:
       - name: Download wheel
         id: wheel

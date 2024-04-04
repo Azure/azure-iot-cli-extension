@@ -5,9 +5,7 @@ on:
 
 jobs:
   create_draft_release:
-    # TODO - associate pool
-    # runs-on: [self-hosted, 1ES.Pool=iotupx-github-hosted-pool, 1ES.ImageOverride=MMSUbuntu20.04]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, 1ES.Pool=iotupx-iot-cli-github-hosted-pool, 1ES.ImageOverride=MMSUbuntu20.04]
     permissions:
       # needed to create a draft release
       contents: write
