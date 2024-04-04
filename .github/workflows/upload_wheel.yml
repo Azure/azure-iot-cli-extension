@@ -9,6 +9,7 @@ on:
 env:
   storage_container_url: ${{ secrets.storage_container_url }}
   AZCOPY_AUTO_LOGIN_TYPE: "AZCLI"
+  AZCOPY_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
 jobs:
   # Upload wheel to storage account
   upload_wheel:
@@ -44,7 +45,10 @@ jobs:
         run: |
           wheel=$(find *.whl)
           echo "wheel=$wheel" >> $GITHUB_ENV
-          extensions=$(azcopy list "${{ env.storage_container_url }}")
+          echo "debug:"
+          azcopy list "${{ env.storage_container_url }}"
+          sleep 5
+          extensions=$(azcopy list "${{ env.storage_container_url }}" --output-level quiet)
           echo "extensions: $extensions"
           echo "Checking if $wheel exists in $extensions"
           if $(echo "$extensions" | grep -Fq $wheel); then

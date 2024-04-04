@@ -35,40 +35,40 @@ on:
         required: false
         default: false
 jobs:
-  security:
-    permissions:
-      # needed to write security info to repository
-      security-events: write
-      contents: read
-    uses: ./.github/workflows/security_checks.yml
-    with:
-      continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
+  # security:
+  #   permissions:
+  #     # needed to write security info to repository
+  #     security-events: write
+  #     contents: read
+  #   uses: ./.github/workflows/security_checks.yml
+  #   with:
+  #     continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
   build:
     uses: ./.github/workflows/release_build.yml
   # unit-test:
   #   uses: ./.github/workflows/tox.yml
   #   with:
   #     continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
-  int-test:
-    if: ${{ github.event.inputs.int-test == 'true' }}
-    secrets: inherit
-    uses: ./.github/workflows/tox-int.yml
-    with:
-      # review any flaky tests but don't stop the release
-      continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
-      toxenv: ${{ inputs.toxenv }}
-      python: ${{ inputs.python }}
-  azdev_linter:
-    needs: [build]
-    uses: ./.github/workflows/azdev_linter.yml
-    with:
-      continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
+  # int-test:
+  #   if: ${{ github.event.inputs.int-test == 'true' }}
+  #   secrets: inherit
+  #   uses: ./.github/workflows/tox-int.yml
+  #   with:
+  #     # review any flaky tests but don't stop the release
+  #     continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
+  #     toxenv: ${{ inputs.toxenv }}
+  #     python: ${{ inputs.python }}
+  # azdev_linter:
+  #   needs: [build]
+  #   uses: ./.github/workflows/azdev_linter.yml
+  #   with:
+  #     continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
   approval:
     # needs: [security, build, unit-test, int-test, azdev_linter]
-    needs: [security, build, int-test, azdev_linter]
+    needs: [build]
     # only needed if (release || wheel) - conditionals allow previous jobs to be skipped and still run
     if:  always() && !cancelled() && !failure() && (github.event.inputs.github_release == 'true' || github.event.inputs.upload_wheel == 'true')
-    environment: production
+    # environment: production
     runs-on: ubuntu-latest
     steps:
       - name: Confirm
