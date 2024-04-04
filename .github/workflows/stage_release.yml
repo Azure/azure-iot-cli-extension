@@ -5,7 +5,7 @@ on:
 
 jobs:
   create_draft_release:
-    runs-on: [self-hosted, 1ES.Pool=iotupx-iot-cli-github-hosted-pool, 1ES.ImageOverride=MMSUbuntu20.04]
+    runs-on: [self-hosted, 1ES.Pool=iotupx-iot-cli-github-hosted-pool, 1ES.ImageOverride=Ubuntu20.04Compliant]
     permissions:
       # needed to create a draft release
       contents: write

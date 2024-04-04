@@ -67,7 +67,7 @@ jobs:
     needs: [security, build, unit-test, int-test, azdev_linter]
     # only needed if (release || wheel) - conditionals allow previous jobs to be skipped and still run
     if:  always() && !cancelled() && !failure() && (github.event.inputs.github_release == 'true' || github.event.inputs.upload_wheel == 'true')
-    # environment: production
+    environment: production
     runs-on: ubuntu-latest
     steps:
       - name: Confirm
