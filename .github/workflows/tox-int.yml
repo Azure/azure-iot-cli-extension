@@ -11,7 +11,7 @@ on:
         description: 'Tox envs to run'
         type: string
         required: true
-        default: '["ADT", "DPS", "Hub1", "Hub2", "ADU"]'
+        default: '["ADT", "DPS", "Hub1", "Hub2", "ADU1", "ADU2", "ADU3"]'
       continue-on-error:
         description: Continue release if pre-checks fail
         type: boolean
@@ -28,7 +28,7 @@ on:
         description: 'Tox envs to run'
         type: string
         required: true
-        default: '["ADT", "DPS", "Hub1", "Hub2", "ADU"]'
+        default: '["ADT", "DPS", "Hub1", "Hub2", "ADU1", "ADU2", "ADU3"]'
       continue-on-error:
         description: Continue release if pre-checks fail
         type: boolean
