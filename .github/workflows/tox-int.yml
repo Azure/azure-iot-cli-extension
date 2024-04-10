@@ -12,11 +12,6 @@ on:
         type: string
         required: true
         default: '["ADT", "DPS", "Hub1", "Hub2", "ADU"]'
-      continue-on-error:
-        description: Continue release if pre-checks fail
-        type: boolean
-        required: false
-        default: false
   workflow_dispatch:
     inputs:
       python:
@@ -29,11 +24,6 @@ on:
         type: string
         required: true
         default: '["ADT", "DPS", "Hub1", "Hub2", "ADU"]'
-      continue-on-error:
-        description: Continue release if pre-checks fail
-        type: boolean
-        required: false
-        default: false
 
 permissions:
   contents: read

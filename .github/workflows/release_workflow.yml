@@ -54,8 +54,6 @@ jobs:
     secrets: inherit
     uses: ./.github/workflows/tox-int.yml
     with:
-      # review any flaky tests but don't stop the release
-      continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
       toxenv: ${{ inputs.toxenv }}
       python: ${{ inputs.python }}
   azdev_linter:
