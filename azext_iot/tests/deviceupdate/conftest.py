@@ -303,15 +303,15 @@ def _iothub_provisioner(request) -> Optional[dict]:
             hub_names = []
 
             # Assign Data Contributor role to resource group if it does not exist
-            account = cli.invoke("account show").as_json()
-            scope_id = "/subscriptions/{}/resourceGroups/{}".format(
-                account["id"],
-                ACCOUNT_RG
-            )
-            assign_role_assignment(
-                role="IoT Hub Data Contributor",
-                scope=scope_id,
-                assignee=AUTH_RESOURCE_ID)
+            # account = cli.invoke("account show").as_json()
+            # scope_id = "/subscriptions/{}/resourceGroups/{}".format(
+            #     account["id"],
+            #     ACCOUNT_RG
+            # )
+            # assign_role_assignment(
+            #     role="IoT Hub Data Contributor",
+            #     scope=scope_id,
+            #     assignee=AUTH_RESOURCE_ID)
 
             for _ in range(desired_instance_count):
                 target_name = generate_linked_hub_id()
