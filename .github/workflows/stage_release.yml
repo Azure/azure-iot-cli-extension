@@ -1,0 +1,44 @@
+name: "[auto] Draft Github Release"
+
+on:
+  workflow_call:
+
+jobs:
+  create_draft_release:
+    runs-on: [self-hosted, 1ES.Pool=iotupx-iot-cli-github-hosted-pool, 1ES.ImageOverride=Ubuntu20.04Compliant]
+    permissions:
+      # needed to create a draft release
+      contents: write
+    steps:
+      - name: Download Wheel
+        uses: actions/download-artifact@v4
+        with:
+          name: azure-iot-cli-ext
+          path: ./release
+      - name: Setup python
+        uses: actions/setup-python@v5
+        with:
+            python-version: "3.9"
+      - name: Install and determine version
+        run: |
+          wheel=$(find ./release/*.whl)
+          pip install $wheel
+          version=$(pip show azure_iot | grep Version: | awk '{print $2}')
+          echo "wheel=$wheel" >> $GITHUB_ENV
+          echo "version=$version" >> $GITHUB_ENV
+          echo "tag=v$version" >> $GITHUB_ENV
+      - name: Download SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: SBOM
+          path: ./release/SBOM
+      - name: Zip SBOM
+        run: zip ./SBOM.zip ./release/SBOM -r
+      - name: Create Release
+        run: |
+          echo tag: "${{ env.tag }}"
+          echo version: "${{ env.version }}"
+          echo wheel: "${{ env.wheel }}"
+          gh release create "${{ env.tag }}" --generate-notes -d -t "azure-iot ${{ env.version }}" "${{ env.wheel }}" "./SBOM.zip#SBOM" --repo "${{ github.repository }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

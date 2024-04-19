@@ -1,0 +1,44 @@
+name: "[auto] Build Wheel for Release"
+on:
+  workflow_call:
+
+jobs:
+  build:
+      runs-on: [self-hosted, 1ES.Pool=iotupx-iot-cli-github-hosted-pool, 1ES.ImageOverride=Ubuntu20.04Compliant]
+      permissions:
+        contents: read
+      steps:
+      - name: Setup python
+        uses: actions/setup-python@v5
+        with:
+            python-version: "3.9"
+      
+      - uses: actions/checkout@v4
+
+      - name: Build Wheel
+        run: |
+          pip install wheel==0.30.0
+          python -m setup bdist_wheel -d dist
+      - name: Determine Wheel Version
+        run: |
+          wheel=$(find ./dist/*.whl)
+          echo "wheel=$wheel" >> $GITHUB_ENV
+          pip install $wheel
+          version=$(pip show azure_iot | grep Version: | awk '{print $2}')
+          echo "version=$version" >> $GITHUB_ENV
+      - name: Generate SBOM
+        run: |
+          curl -Lo $RUNNER_TEMP/sbom-tool https://github.com/microsoft/sbom-tool/releases/download/v2.2.3/sbom-tool-linux-x64
+          chmod +x $RUNNER_TEMP/sbom-tool
+          $RUNNER_TEMP/sbom-tool generate -b ./dist -bc . -pn "Azure IoT CLI Extension" -pv "${{ env.version }}" -ps Microsoft
+
+      - name: Upload Wheel Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          path: ${{ env.wheel }}
+          name: azure-iot-cli-ext
+      - name: Upload SBOM Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          path: dist/_manifest/
+          name: SBOM
