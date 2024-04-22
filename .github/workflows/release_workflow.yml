@@ -1,5 +1,5 @@
 name: Build and Publish Release
-run-name: Build and publish release${{ github.event.inputs.upload_wheel == 'true' &&  ' - Wheel upload' || ''}}${{ github.event.inputs.github_release == 'true' &&  ' - Stage Release' || ''}}
+run-name: Build and publish release${{ github.event.inputs.github_release == 'true' &&  ' - Stage Release' || ''}}
 on:
   # only manual trigger
   workflow_dispatch:
@@ -11,11 +11,6 @@ on:
         default: false
       github_release:
         description: Stage github release
-        type: boolean
-        required: false
-        default: false
-      upload_wheel:
-        description: Upload wheel to storage
         type: boolean
         required: false
         default: false
@@ -42,16 +37,13 @@ jobs:
   approval:
     needs: [security, build, unit-test, azdev_linter]
     # only needed if (release || wheel) - conditionals allow previous jobs to be skipped and still run
-    if:  always() && !cancelled() && !failure() && (github.event.inputs.github_release == 'true' || github.event.inputs.upload_wheel == 'true')
+    if:  always() && !cancelled() && !failure() && (github.event.inputs.github_release == 'true')
     environment: production
     runs-on: ubuntu-latest
     steps:
       - name: Confirm
         run: |
           echo "Approved" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ inputs.upload_wheel }}" == "true" ]; then
-            echo "Wheel will be uploaded to storage account." >> $GITHUB_STEP_SUMMARY
-          fi
           if [ "${{ inputs.github_release }}" == "true" ]; then
             echo "Github release will be drafted." >> $GITHUB_STEP_SUMMARY
           fi
@@ -63,12 +55,4 @@ jobs:
     needs: [approval]
     if:  always() && !cancelled() && !failure() && github.event.inputs.github_release == 'true'
     uses: ./.github/workflows/stage_release.yml
-    secrets: inherit
-  # upload_wheel == 'true'
-  upload_wheel:
-    permissions:
-      id-token: write
-    needs: [approval]
-    if:  always() && !cancelled() && !failure() && github.event.inputs.upload_wheel == 'true'
-    uses: ./.github/workflows/upload_wheel.yml
     secrets: inherit
