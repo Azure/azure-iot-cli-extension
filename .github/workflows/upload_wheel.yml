@@ -44,12 +44,7 @@ jobs:
         run: |
           wheel=$(find *.whl)
           echo "wheel=$wheel" >> $GITHUB_ENV
-          echo "debug:"
-          azcopy list "${{ env.storage_container_url }}"
-          sleep 5
           extensions=$(azcopy list "${{ env.storage_container_url }}" --output-level quiet)
-          echo "extensions: $extensions"
-          echo "Checking if $wheel exists in $extensions"
           if $(echo "$extensions" | grep -Fq $wheel); then
             echo "Wheel already uploaded, skipping upload" >> $GITHUB_STEP_SUMMARY
           else
