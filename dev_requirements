@@ -1,5 +1,5 @@
 pytest
-pytest-mock==3.12.0
+pytest-mock
 pytest-cov
 pytest-env
 uamqp~=1.2
