@@ -304,23 +304,26 @@ def iot_dps_device_enrollment_update(
             enrollment_record, initial_twin_tags, initial_twin_properties
         )
         iot_hub_list = iot_hubs.split() if isinstance(iot_hubs, str) else iot_hubs
-        if not iot_hub_list:
-            iot_hub_list = enrollment_record.iot_hubs
         _validate_allocation_policy_for_enrollment(
-            allocation_policy or enrollment_record.allocation_policy,
+            allocation_policy,
             iot_hub_host_name,
             iot_hub_list,
             webhook_url,
-            api_version
+            api_version,
+            current_enrollment=enrollment_record
         )
-        if allocation_policy:
-            enrollment_record.allocation_policy = allocation_policy
+        if iot_hub_list:
             enrollment_record.iot_hubs = iot_hub_list
             enrollment_record.iot_hub_host_name = None
-            if allocation_policy == AllocationType.custom.value:
-                enrollment_record.custom_allocation_definition = CustomAllocationDefinition(
-                    webhook_url=webhook_url, api_version=api_version
-                )
+        if allocation_policy:
+            enrollment_record.allocation_policy = allocation_policy
+        if enrollment_record.allocation_policy == AllocationType.custom.value and any([
+            webhook_url, api_version
+        ]):
+            enrollment_record.custom_allocation_definition = CustomAllocationDefinition(
+                webhook_url=webhook_url or enrollment_record.custom_allocation_definition.webhook_url,
+                api_version=api_version or enrollment_record.custom_allocation_definition.api_version
+            )
         if edge_enabled is not None:
             enrollment_record.capabilities = DeviceCapabilities(iot_edge=edge_enabled)
         if device_information:
@@ -628,23 +631,26 @@ def iot_dps_device_enrollment_group_update(
             enrollment_record, initial_twin_tags, initial_twin_properties
         )
         iot_hub_list = iot_hubs.split() if isinstance(iot_hubs, str) else iot_hubs
-        if not iot_hub_list:
-            iot_hub_list = enrollment_record.iot_hubs
         _validate_allocation_policy_for_enrollment(
-            allocation_policy or enrollment_record.allocation_policy,
+            allocation_policy,
             iot_hub_host_name,
             iot_hub_list,
             webhook_url,
-            api_version
+            api_version,
+            current_enrollment=enrollment_record
         )
-        if allocation_policy:
-            enrollment_record.allocation_policy = allocation_policy
+        if iot_hub_list:
             enrollment_record.iot_hubs = iot_hub_list
             enrollment_record.iot_hub_host_name = None
-            if allocation_policy == AllocationType.custom.value:
-                enrollment_record.custom_allocation_definition = CustomAllocationDefinition(
-                    webhook_url=webhook_url, api_version=api_version
-                )
+        if allocation_policy:
+            enrollment_record.allocation_policy = allocation_policy
+        if enrollment_record.allocation_policy == AllocationType.custom.value and any([
+            webhook_url, api_version
+        ]):
+            enrollment_record.custom_allocation_definition = CustomAllocationDefinition(
+                webhook_url=webhook_url or enrollment_record.custom_allocation_definition.webhook_url,
+                api_version=api_version or enrollment_record.custom_allocation_definition.api_version
+            )
         if edge_enabled is not None:
             enrollment_record.capabilities = DeviceCapabilities(iot_edge=edge_enabled)
         return sdk.enrollment_group.create_or_update(
@@ -1149,8 +1155,16 @@ def _validate_arguments_for_attestation_mechanism(
 
 
 def _validate_allocation_policy_for_enrollment(
-    allocation_policy, iot_hub_host_name, iot_hub_list, webhook_url, api_version
+    allocation_policy, iot_hub_host_name, iot_hub_list, webhook_url, api_version, current_enrollment=None
 ):
+    # get the enrollment values if not provided but present
+    if current_enrollment:
+        iot_hub_list = iot_hub_list or current_enrollment.iot_hubs
+        allocation_policy = allocation_policy or current_enrollment.allocation_policy
+        if current_enrollment.allocation_policy == AllocationType.custom.value:
+            webhook_url = webhook_url or current_enrollment.custom_allocation_definition.webhook_url
+            api_version = api_version or current_enrollment.custom_allocation_definition.api_version
+
     if allocation_policy:
         if iot_hub_host_name is not None:
             raise MutuallyExclusiveArgumentError(
@@ -1161,6 +1175,7 @@ def _validate_allocation_policy_for_enrollment(
             allocation_policy == allocation.value for allocation in AllocationType
         ):
             raise RequiredArgumentMissingError("Please provide valid allocation policy.")
+
         if allocation_policy == AllocationType.static.value:
             if iot_hub_list is None:
                 raise RequiredArgumentMissingError("Please provide a hub to be assigned with device.")
@@ -1172,6 +1187,5 @@ def _validate_allocation_policy_for_enrollment(
                     "Please provide both the Azure function webhook url and provisioning"
                     " service api-version when the allocation-policy is defined as Custom."
                 )
-    else:
-        if iot_hub_list:
-            raise RequiredArgumentMissingError("Please provide allocation policy.")
+    elif iot_hub_list and not current_enrollment:
+        raise RequiredArgumentMissingError("Please provide allocation policy.")
