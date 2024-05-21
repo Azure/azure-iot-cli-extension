@@ -7,12 +7,6 @@ parameters:
 - name: variableGroup
   type: string
   default: 'aziotcli_test_primary'
-- name: buildAgentPoolVar
-  type: string
-  default: 'BuildAgentPool'
-- name: buildAgentVmImageVar
-  type: string
-  default: 'BuildAgentVmImage'
 - name: testAgentVmImage
   type: string
   default: 'ubuntu-20.04'
@@ -69,10 +63,6 @@ parameters:
 
 variables:
   - group: ${{ parameters.variableGroup }}
-  - name: vmImage
-    value: $[variables.${{ parameters.buildAgentVmImageVar }}]
-  - name: buildPool
-    value: $[variables.${{ parameters.buildAgentPoolVar }}]
 
 stages:
   - stage: 'build'
@@ -81,10 +71,7 @@ stages:
 
     - job: 'Build_Publish_Azure_IoT_CLI_Extension'
       pool:
-        name: $(buildPool)
-        vmImage: $(vmImage)
-        demands:
-        - ImageOverride -equals $(vmImage)
+        vmImage: ubuntu-latest
       steps:
       - task: UsePythonVersion@0
         inputs:
@@ -148,7 +135,6 @@ stages:
     #   displayName: 'Validate Reference Document Generation'
     #   steps:
     #   - template: templates/validate-refdoc-generation.yml
-
   - stage: 'smokeTest'
     displayName: 'Run smoke tests'
     dependsOn: test
@@ -186,10 +172,7 @@ stages:
     - job: 'Calculate_Sha_And_Create_Release'
       displayName: 'Calculate package hash and publish'
       pool:
-        name: $(buildPool)
-        vmImage: $(vmImage)
-        demands:
-        - ImageOverride -equals $(vmImage)
+        vmImage: ubuntu-latest
       variables:
         CLIVersion: $[ stageDependencies.build.recordVersion.outputs['setupVersion.CLIVersion'] ]
         ReleaseTitle: $[ stageDependencies.build.recordVersion.outputs['setupVersion.ReleaseTitle'] ]
@@ -216,18 +199,3 @@ stages:
             }
             Write-Host "done"
           workingDirectory: '$(System.ArtifactsDirectory)/extension'
-
-      - task: GitHubRelease@1
-        inputs:
-          gitHubConnection: $(GithubReleaseConnection)
-          repositoryName: $(Build.Repository.Name)
-          action: 'create'
-          target: '$(Build.SourceVersion)'
-          tagSource: userSpecifiedTag
-          tag: 'v$(CLIVersion)'
-          title: $(ReleaseTitle)
-          assets: '$(System.ArtifactsDirectory)/extension/**/*.whl'
-          assetUploadMode: 'replace'
-          isDraft: true
-          isPreRelease: false
-          addChangeLog: false

@@ -139,7 +139,7 @@ jobs:
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
       pythonVersion: $(python)
       num_reruns: 0
-      serviceConnection: $(AzureServiceConnectionAlt)
+      serviceConnection: $(AzureServiceConnection)
 
 - job: 'unitTests'
   displayName: 'Unit tests and code coverage'
