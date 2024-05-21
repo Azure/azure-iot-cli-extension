@@ -181,7 +181,7 @@ def iot_dps_device_enrollment_create(
             )
         reprovision = _get_reprovision_policy(reprovision_policy)
         initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)
-        iot_hub_list = iot_hubs.split() if iot_hubs else iot_hubs
+        iot_hub_list = iot_hubs.split() if isinstance(iot_hubs, str) else iot_hubs
         _validate_allocation_policy_for_enrollment(
             allocation_policy, iot_hub_host_name, iot_hub_list, webhook_url, api_version
         )
@@ -303,9 +303,15 @@ def iot_dps_device_enrollment_update(
         enrollment_record.initial_twin = _get_updated_inital_twin(
             enrollment_record, initial_twin_tags, initial_twin_properties
         )
-        iot_hub_list = iot_hubs.split() if iot_hubs else iot_hubs
+        iot_hub_list = iot_hubs.split() if isinstance(iot_hubs, str) else iot_hubs
+        if not iot_hub_list:
+            iot_hub_list = enrollment_record.iot_hubs
         _validate_allocation_policy_for_enrollment(
-            allocation_policy, iot_hub_host_name, iot_hub_list, webhook_url, api_version
+            allocation_policy or enrollment_record.allocation_policy,
+            iot_hub_host_name,
+            iot_hub_list,
+            webhook_url,
+            api_version
         )
         if allocation_policy:
             enrollment_record.allocation_policy = allocation_policy
@@ -481,7 +487,7 @@ def iot_dps_device_enrollment_group_create(
             )
         reprovision = _get_reprovision_policy(reprovision_policy)
         initial_twin = _get_initial_twin(initial_twin_tags, initial_twin_properties)
-        iot_hub_list = iot_hubs.split() if iot_hubs else iot_hubs
+        iot_hub_list = iot_hubs.split() if isinstance(iot_hubs, str) else iot_hubs
         _validate_allocation_policy_for_enrollment(
             allocation_policy, iot_hub_host_name, iot_hub_list, webhook_url, api_version
         )
@@ -621,9 +627,15 @@ def iot_dps_device_enrollment_group_update(
         enrollment_record.initial_twin = _get_updated_inital_twin(
             enrollment_record, initial_twin_tags, initial_twin_properties
         )
-        iot_hub_list = iot_hubs.split() if iot_hubs else iot_hubs
+        iot_hub_list = iot_hubs.split() if isinstance(iot_hubs, str) else iot_hubs
+        if not iot_hub_list:
+            iot_hub_list = enrollment_record.iot_hubs
         _validate_allocation_policy_for_enrollment(
-            allocation_policy, iot_hub_host_name, iot_hub_list, webhook_url, api_version
+            allocation_policy or enrollment_record.allocation_policy,
+            iot_hub_host_name,
+            iot_hub_list,
+            webhook_url,
+            api_version
         )
         if allocation_policy:
             enrollment_record.allocation_policy = allocation_policy
