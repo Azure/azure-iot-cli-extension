@@ -11,4 +11,4 @@ pylint<=2.13.8
 flake8
 pytest-xdist
 pytest-rerunfailures
-tox
+tox==4.12.1
