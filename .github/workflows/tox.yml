@@ -40,7 +40,7 @@ jobs:
           python-version: ${{ matrix.py }}
       - uses: actions/checkout@v4
       - name: Install tox-gh
-        run: python -m pip install tox-gh
+        run: python -m pip install tox-gh tox==4.12.1
       - name: Setup test suite
         run: tox r -vv --notest
       - name: Run test suite
@@ -53,7 +53,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run code coverage
         run: |
-          python -m pip install tox
+          python -m pip install tox==4.12.1
           tox -e coverage
           coverage=$(jq .totals.percent_covered coverage.json | cut -c1-4)
           echo "Code coverage: $coverage%" >> $GITHUB_STEP_SUMMARY
