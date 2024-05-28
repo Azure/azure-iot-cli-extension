@@ -1114,7 +1114,7 @@ helps[
       text: >
         az iot dps enrollment create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --attestation-type tpm --allocation-policy hashed
-        --endorsement-key 14963E8F3BA5B3984110B3C1CA8E8B89 --iot-hubs "{iot_hub_host_name1} {iot_hub_host_name2}"
+        --endorsement-key 14963E8F3BA5B3984110B3C1CA8E8B89 --iot-hubs {iot_hub_host_name1} {iot_hub_host_name2}
     - name: Create an enrollment 'MyEnrollment' with custom allocation policy,
       text: >
         az iot dps enrollment create -g {resource_group_name} --dps-name {dps_name}
@@ -1161,7 +1161,7 @@ helps[
       text: >
         az iot dps enrollment update -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --allocation-policy geolatency
-        --etag AAAAAAAAAAA= --iot-hubs "{iot_hub_host_name1} {iot_hub_host_name2} {iot_hub_host_name3}"
+        --etag AAAAAAAAAAA= --iot-hubs {iot_hub_host_name1} {iot_hub_host_name2} {iot_hub_host_name3}
     - name: Update enrollment '{enrollment_id}' in the Azure IoT Device Provisioning Service '{dps_name}'
             in the resource group '{resource_group_name}' with
             initial twin properties '{"location":{"region":"USA"}}', initial twin tags '{"version":"2"}',
