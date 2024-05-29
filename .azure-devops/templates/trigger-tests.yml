@@ -24,6 +24,9 @@ parameters:
 - name: 'testADU'
   type: boolean
   default: true
+- name: 'testADUupdate'
+  type: boolean
+  default: true
 - name: 'maxParallelCentral'
   type: number
   default: 1
@@ -126,7 +129,7 @@ jobs:
 
 - job: 'testADU'
   timeoutInMinutes: 200
-  displayName: 'Test Azure Device Update'
+  displayName: 'Test ADU'
   condition: and(succeeded(), eq('${{ parameters.testADU }}', true))
   strategy:
     matrix: $[ variables['pythonVersions'] ]
@@ -134,8 +137,26 @@ jobs:
   steps:
   - template: run-tests-parallel.yml
     parameters:
-      path: 'azext_iot/tests/deviceupdate'
+      path: 'azext_iot/tests/deviceupdate --ignore=azext_iot/tests/deviceupdate/test_adu_update_int.py'
       name: 'azure-deviceupdate'
+      azureCLIVersion: ${{ parameters.azureCLIVersion }}
+      pythonVersion: $(python)
+      num_reruns: 0
+      serviceConnection: $(AzureServiceConnection)
+      
+# Splitting up adu update tests due to timeout failures and other inconsistencies
+- job: 'testADUupdate'
+  timeoutInMinutes: 200
+  displayName: 'Test ADU Update'
+  condition: and(succeeded(), eq('${{ parameters.testADUupdate }}', true))
+  strategy:
+    matrix: $[ variables['pythonVersions'] ]
+    maxParallel: ${{ parameters.maxParallelADU }}
+  steps:
+  - template: run-tests-parallel.yml
+    parameters:
+      path: 'azext_iot/tests/deviceupdate/test_adu_update_int.py'
+      name: 'azure-deviceupdate-update'
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
       pythonVersion: $(python)
       num_reruns: 0

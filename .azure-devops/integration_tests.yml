@@ -60,6 +60,9 @@ parameters:
 - name: 'testADU'
   type: boolean
   default: true
+- name: 'testADUupdate'
+  type: boolean
+  default: true
 
 variables:
   - group: ${{ parameters.variableGroup }}
@@ -123,6 +126,7 @@ stages:
         testDPS: ${{ parameters.testDPS }}
         testHub: ${{ parameters.testHub }}
         testADU: ${{ parameters.testADU }}
+        testADUupdate: ${{ parameters.testADUupdate }}
         maxParallelADT: 2
         maxParallelDPS: 2
         maxParallelHub: 2
