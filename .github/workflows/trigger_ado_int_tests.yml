@@ -116,7 +116,7 @@ jobs:
             exit 1
           fi
 
-          cmdArgs=(--org "https://dev.azure.com/$ORG" --project "$PROJECT" --branch "add_ado_int_tests" --debug)
+          cmdArgs=(--org "https://dev.azure.com/$ORG" --project "$PROJECT" --branch "ado_tests")
 
           if [ -n "$DEFINITION_ID" ]; then
             cmdArgs+=(--id "$DEFINITION_ID")
