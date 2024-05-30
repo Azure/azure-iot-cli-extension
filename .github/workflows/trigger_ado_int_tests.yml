@@ -82,11 +82,11 @@ on:
         required: true
         type: string
         default: >
-            {
+            "{
                 Python38: { python: '3.8' },
                 Python39: { python: '3.9' },
                 Python310: { python: '3.10' }
-            }
+            }"
 env:
   DEFAULT_TITLE: "Azure DevOps Pipeline"
   AZURE_DEVOPS_EXT_PAT: ${{ secrets.ADO_PAT }}
