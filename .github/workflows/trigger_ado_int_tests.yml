@@ -126,7 +126,7 @@ jobs:
           fi
 
           cmdArgs+=("--parameters")
-          cmdArgs+=("pythonVersionsTestingMatrix=${{inputs.python_versions}}")
+          cmdArgs+=("pythonVersionsTestingMatrix=\"${{inputs.python_versions}}\")
           cmdArgs+=("testCentral=${{inputs.testCentral}}")
           cmdArgs+=("testADT=${{inputs.testADT}}")
           cmdArgs+=("testDPS=${{inputs.testDPS}}")
