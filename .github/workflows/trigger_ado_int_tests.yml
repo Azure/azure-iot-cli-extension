@@ -125,8 +125,14 @@ jobs:
             exit 1
           fi
 
+          python_versions=${{inputs.python_versions}}
+          echo "input: "
+          echo $python_versions
+          python_version_strings=$(echo $python_versions | jq -R .)
+          echo "stringified: "
+          echo "python_version_strings"
           cmdArgs+=("--parameters")
-          cmdArgs+=("pythonVersionsTestingMatrix=\"${{inputs.python_versions}}\")
+          cmdArgs+=("pythonVersionsTestingMatrix=$python_version_strings")
           cmdArgs+=("testCentral=${{inputs.testCentral}}")
           cmdArgs+=("testADT=${{inputs.testADT}}")
           cmdArgs+=("testDPS=${{inputs.testDPS}}")
