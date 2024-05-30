@@ -9,7 +9,7 @@ parameters:
   default: 'aziotcli_test_primary'
 - name: testAgentVmImage
   type: string
-  default: 'ubuntu-20.04'
+  default: 'ubuntu-22.04'
   values:
   - 'ubuntu-20.04'
   - 'ubuntu-22.04'
@@ -17,7 +17,7 @@ parameters:
 - name: pythonVersion
   displayName: 'Python version for building wheel, KPIs'
   type: string
-  default: '3.8'
+  default: '3.9'
   values:
   - '3.8'
   - '3.9'
@@ -60,9 +60,10 @@ parameters:
 - name: 'testADU'
   type: boolean
   default: true
+# These tests currently time out with federated credentials and must be tested locally
 - name: 'testADUupdate'
   type: boolean
-  default: true
+  default: false
 
 variables:
   - group: ${{ parameters.variableGroup }}

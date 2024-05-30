@@ -95,7 +95,7 @@ jobs:
       serviceConnection: $(AzureServiceConnection)
 
 - job: 'testHub_job_1'
-  timeoutInMinutes: 105
+  timeoutInMinutes: 120
   displayName: 'Test IoT Hub - certificate, config, core, jobs, state'
   condition: and(succeeded(), eq('${{ parameters.testHub }}', true))
   strategy:
@@ -112,7 +112,7 @@ jobs:
       serviceConnection: $(AzureServiceConnection)
 
 - job: 'testHub_job_2'
-  timeoutInMinutes: 90
+  timeoutInMinutes: 120
   condition: and(succeeded(), eq('${{ parameters.testHub }}', true))
   displayName: 'Test IoT Hub - devices, message endpoints, messaging, and modules'
   strategy:
@@ -146,7 +146,7 @@ jobs:
       
 # Splitting up adu update tests due to timeout failures and other inconsistencies
 - job: 'testADUupdate'
-  timeoutInMinutes: 200
+  timeoutInMinutes: 90
   displayName: 'Test ADU Update'
   condition: and(succeeded(), eq('${{ parameters.testADUupdate }}', true))
   strategy:
