@@ -28,10 +28,10 @@ on:
         type: boolean
         default: true
     # These tests currently time out with federated credentials and must be tested locally
-      testADUupdate:
-        description: Run ADU update tests
-        type: boolean
-        default: false
+      # testADUupdate:
+      #   description: Run ADU update tests
+      #   type: boolean
+      #   default: false
       python_versions:
         description: "Python versions to test"
         required: true
@@ -73,10 +73,10 @@ on:
         type: boolean
         default: true
     # These tests currently time out with federated credentials and must be tested locally
-      testADUupdate:
-        description: Run ADU update tests
-        type: boolean
-        default: false
+      # testADUupdate:
+      #   description: Run ADU update tests
+      #   type: boolean
+      #   default: false
       python_versions:
         description: "Python versions to test"
         required: true
@@ -126,11 +126,7 @@ jobs:
           fi
 
           python_versions=${{inputs.python_versions}}
-          echo "input: "
-          echo $python_versions
           python_version_strings=$(echo $python_versions | jq -R .)
-          echo "stringified: "
-          echo "python_version_strings"
           cmdArgs+=("--parameters")
           cmdArgs+=("pythonVersionsTestingMatrix=$python_version_strings")
           cmdArgs+=("testCentral=${{inputs.testCentral}}")
@@ -138,7 +134,7 @@ jobs:
           cmdArgs+=("testDPS=${{inputs.testDPS}}")
           cmdArgs+=("testHub=${{inputs.testHub}}")
           cmdArgs+=("testADU=${{inputs.testADU}}")
-          cmdArgs+=("testADUupdate=${{inputs.testADUupdate}}")
+          # cmdArgs+=("testADUupdate=${{inputs.testADUupdate}}")
           echo "Running: az pipelines run ${cmdArgs[@]}"
           res=$(az pipelines run "${cmdArgs[@]}")
 
