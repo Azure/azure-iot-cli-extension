@@ -36,11 +36,11 @@ on:
         description: "Python versions to test"
         type: string
         default: >
-          {
+          "{
               Python38: { python: '3.8' },
               Python39: { python: '3.9' },
               Python310: { python: '3.10' }
-          }
+          }"
     secrets:
       ADO_PAT:
         required: true
