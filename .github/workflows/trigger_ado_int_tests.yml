@@ -34,7 +34,6 @@ on:
       #   default: false
       python_versions:
         description: "Python versions to test"
-        required: true
         type: string
         default: >
           {

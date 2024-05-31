@@ -34,6 +34,10 @@ jobs:
     uses: ./.github/workflows/azdev_linter.yml
     with:
       continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
+  int_test:
+    needs: [build]
+    uses: ./.github/workflows/trigger_ado_int_tests.yml
+    secrets: inherit
   approval:
     needs: [security, build, unit-test, azdev_linter]
     # only needed if (release || wheel) - conditionals allow previous jobs to be skipped and still run
