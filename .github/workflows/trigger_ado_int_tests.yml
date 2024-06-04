@@ -27,11 +27,6 @@ on:
         description: Run ADU tests
         type: boolean
         default: true
-    # These tests currently time out with federated credentials and must be tested locally
-      # testADUupdate:
-      #   description: Run ADU update tests
-      #   type: boolean
-      #   default: false
       python_versions:
         description: "Python versions to test"
         type: string
@@ -71,11 +66,6 @@ on:
         description: Run ADU tests
         type: boolean
         default: true
-    # These tests currently time out with federated credentials and must be tested locally
-      # testADUupdate:
-      #   description: Run ADU update tests
-      #   type: boolean
-      #   default: false
       python_versions:
         description: "Python versions to test"
         required: true

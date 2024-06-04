@@ -60,10 +60,6 @@ parameters:
 - name: 'testADU'
   type: boolean
   default: true
-# These tests currently time out with federated credentials and must be tested locally
-# - name: 'testADUupdate'
-#   type: boolean
-#   default: false
 
 variables:
   - group: ${{ parameters.variableGroup }}
@@ -127,7 +123,6 @@ stages:
         testDPS: ${{ parameters.testDPS }}
         testHub: ${{ parameters.testHub }}
         testADU: ${{ parameters.testADU }}
-        # testADUupdate: ${{ parameters.testADUupdate }}
         maxParallelADT: 2
         maxParallelDPS: 2
         maxParallelHub: 2
