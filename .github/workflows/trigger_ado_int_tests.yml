@@ -2,11 +2,6 @@ name: Run Azure DevOps Integration Tests
 on:
   workflow_call:
     inputs:
-      showLogs:
-        description: "Show logs"
-        required: false
-        type: boolean
-        default: false
       testCentral:
         description: Run Central tests
         type: boolean
@@ -41,11 +36,6 @@ on:
         required: true
   workflow_dispatch:
     inputs:
-      showLogs:
-        description: "Show logs"
-        required: false
-        type: boolean
-        default: false
       testCentral:
         description: Run Central tests
         type: boolean
@@ -147,7 +137,6 @@ jobs:
     name: Wait for the pipeline to complete
     needs: [call-ado-pipeline]
     env:
-      SHOW_LOGS: ${{ inputs.showLogs }}
       RUN_ID: ${{ needs.call-ado-pipeline.outputs.runId }}
       PORTAL_URL: ${{ needs.call-ado-pipeline.outputs.portalUrl }}
     steps:
@@ -163,29 +152,6 @@ jobs:
             res=$(az pipelines runs show --id "$RUN_ID" --org "https://dev.azure.com/$ORG" --project "$PROJECT")
             status=$(echo "$res" | jq -r '.status')
             result=$(echo "$res" | jq -r '.result')
-            logsUrl=$(echo "$res" | jq -r '.logs.url')
-            logsList=$(curl -s -u ":$AZURE_DEVOPS_EXT_PAT" -H "Content-Type: application/json" -X GET "$logsUrl")
-            count=$(echo $logsList | jq -r '.count')
-
-            if [[ "$SHOW_LOGS" == "false" ]]; then
-              continue
-            fi
-
-            # we skip the first log as it's the pipeline template
-            # also we want to log up to n-1 logs because the current log is still being written to
-
-            items=$(echo $logsList | jq -r '.value')
-            if [[ $count -gt 1 ]]; then
-              for i in $(seq $(($lastLog+1)) $(($count-1))); do
-                log="${logsUrl}/$i" # or we can use jq to get the log url from each item
-                curl -s -u ":$AZURE_DEVOPS_EXT_PAT" -H "Content-Type: application/json" -X GET "$log" 
-                lastLog=$i
-                echo "===================================================================================================="
-                echo "Logs are streaming in. For more realtime structured logs, check ${PORTAL_URL}"
-                echo "===================================================================================================="
-                sleep 2
-              done
-            fi
           done
 
           # if status is not completed, or the result is one of failed, canceled; then fail the job
@@ -194,11 +160,6 @@ jobs:
             echo "# ❌ ${PIPELINE:-$DEFAULT_TITLE} Failed ❌" >> $GITHUB_STEP_SUMMARY
             echo "The pipeline did not complete successfully. Please check the logs [here](${PORTAL_URL})" >> $GITHUB_STEP_SUMMARY
             exit 1
-          fi
-
-          if [[ "$SHOW_LOGS" == "true" ]]; then
-            # curl the last log
-            curl -s -u ":$AZURE_DEVOPS_EXT_PAT" -H "Content-Type: application/json" -X GET "${logsUrl}/${count}"
           fi
 
           echo "# ✅ ${PIPELINE:-$DEFAULT_TITLE} Completed ✅" >> $GITHUB_STEP_SUMMARY
