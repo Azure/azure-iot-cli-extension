@@ -123,7 +123,6 @@ jobs:
           cmdArgs+=("testDPS=${{inputs.testDPS}}")
           cmdArgs+=("testHub=${{inputs.testHub}}")
           cmdArgs+=("testADU=${{inputs.testADU}}")
-          # cmdArgs+=("testADUupdate=${{inputs.testADUupdate}}")
           echo "Running: az pipelines run ${cmdArgs[@]}"
           res=$(az pipelines run "${cmdArgs[@]}")
 
