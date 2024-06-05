@@ -95,7 +95,7 @@ jobs:
             exit 1
           fi
 
-          cmdArgs=(--org "https://dev.azure.com/$ORG" --project "$PROJECT" --branch "ado_tests")
+          cmdArgs=(--org "https://dev.azure.com/$ORG" --project "$PROJECT" --branch "${{ github.ref }}")
 
           if [ -n "$DEFINITION_ID" ]; then
             cmdArgs+=(--id "$DEFINITION_ID")
