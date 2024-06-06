@@ -248,7 +248,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
         assert enrollment_update["customAllocationDefinition"]["webhookUrl"] == WEBHOOK_URL
         assert enrollment_update["customAllocationDefinition"]["apiVersion"] == API_VERSION
         assert enrollment_update["enrollmentGroupId"] == enrollment_id
-        assert enrollment_update["iotHubs"] is None
+        assert enrollment_update["iotHubs"] == [hub_hostname]
         assert enrollment_update["initialTwin"]["tags"]
         assert enrollment_update["initialTwin"]["properties"]["desired"]
         assert enrollment_update["provisioningStatus"] == EntityStatusType.disabled.value
