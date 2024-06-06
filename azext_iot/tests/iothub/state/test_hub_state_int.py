@@ -259,6 +259,9 @@ def delete_system_endpoints(hub_name, rg):
     cli.invoke(
         f"iot hub routing-endpoint delete --hub-name {hub_name} -g {rg} -n queue-systemid"
     )
+    cli.invoke(
+        f"iot hub routing-endpoint delete --hub-name {hub_name} -g {rg} -n storagecontainer-systemid"
+    )
 
 
 @pytest.mark.hub_infrastructure(count=2, sys_identity=True, user_identity=True, storage=True, desired_tags="abc=def")

@@ -15,6 +15,10 @@ Release History
 
 * Removal of `az iot product`.
 
+**IoT Hub updates**
+
+* Fix for `az iot hub state export` to support storage account endpoints with system-assigned identity.
+
 
 0.23.1
 +++++++++++++++
