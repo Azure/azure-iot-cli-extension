@@ -92,7 +92,7 @@ jobs:
       serviceConnection: $(AzureServiceConnection)
 
 - job: 'testHub_job_1'
-  timeoutInMinutes: 105
+  timeoutInMinutes: 120
   displayName: 'Test IoT Hub - certificate, config, core, jobs, state'
   condition: and(succeeded(), eq('${{ parameters.testHub }}', true))
   strategy:
@@ -109,7 +109,7 @@ jobs:
       serviceConnection: $(AzureServiceConnection)
 
 - job: 'testHub_job_2'
-  timeoutInMinutes: 90
+  timeoutInMinutes: 120
   condition: and(succeeded(), eq('${{ parameters.testHub }}', true))
   displayName: 'Test IoT Hub - devices, message endpoints, messaging, and modules'
   strategy:
@@ -126,7 +126,7 @@ jobs:
 
 - job: 'testADU'
   timeoutInMinutes: 200
-  displayName: 'Test Azure Device Update'
+  displayName: 'Test ADU'
   condition: and(succeeded(), eq('${{ parameters.testADU }}', true))
   strategy:
     matrix: $[ variables['pythonVersions'] ]
@@ -139,7 +139,7 @@ jobs:
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
       pythonVersion: $(python)
       num_reruns: 0
-      serviceConnection: $(AzureServiceConnectionAlt)
+      serviceConnection: $(AzureServiceConnection)
 
 - job: 'unitTests'
   displayName: 'Unit tests and code coverage'

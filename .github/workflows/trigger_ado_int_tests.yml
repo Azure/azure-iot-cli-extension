@@ -1,0 +1,191 @@
+name: Run Azure DevOps Integration Tests
+on:
+  workflow_call:
+    inputs:
+      testCentral:
+        description: Run Central tests
+        type: boolean
+        default: true
+      testADT:
+        description: Run ADT tests
+        type: boolean
+        default: true
+      testDPS:
+        description: Run DPS tests
+        type: boolean
+        default: true
+      testHub:
+        description: Run Hub tests
+        type: boolean
+        default: true
+      testADU:
+        description: Run ADU tests
+        type: boolean
+        default: true
+      python_versions:
+        description: "Python versions to test"
+        type: string
+        default: >
+          "{
+              Python38: { python: '3.8' },
+              Python39: { python: '3.9' },
+              Python310: { python: '3.10' }
+          }"
+    secrets:
+      ADO_PAT:
+        required: true
+  workflow_dispatch:
+    inputs:
+      testCentral:
+        description: Run Central tests
+        type: boolean
+        default: true
+      testADT:
+        description: Run ADT tests
+        type: boolean
+        default: true
+      testDPS:
+        description: Run DPS tests
+        type: boolean
+        default: true
+      testHub:
+        description: Run Hub tests
+        type: boolean
+        default: true
+      testADU:
+        description: Run ADU tests
+        type: boolean
+        default: true
+      python_versions:
+        description: "Python versions to test"
+        required: true
+        type: string
+        default: >
+            "{
+                Python38: { python: '3.8' },
+                Python39: { python: '3.9' },
+                Python310: { python: '3.10' }
+            }"
+env:
+  DEFAULT_TITLE: "Azure DevOps Pipeline"
+  AZURE_DEVOPS_EXT_PAT: ${{ secrets.ADO_PAT }}
+  DEFINITION_ID: 147
+  ORG: azureiotdevxp
+  PROJECT: aziotcli
+jobs:
+  call-ado-pipeline:
+    runs-on: ubuntu-latest
+    name: Run integration tests
+    outputs:
+      runId: ${{ steps.start.outputs.runId }}
+      portalUrl: ${{ steps.start.outputs.portalUrl }}
+      url: ${{ steps.start.outputs.url }}
+    steps:
+      - shell: bash
+        id: start
+        name: Trigger the pipeline
+        run: |-
+          set -ex
+          if [ -z "$ORG" ]; then
+            echo "::error::Organization is required"
+            exit 1
+          fi
+          if [ -z "$PROJECT" ]; then
+            echo "::error::Project is required"
+            exit 1
+          fi
+
+          cmdArgs=(--org "https://dev.azure.com/$ORG" --project "$PROJECT" --branch "${{ github.ref }}")
+
+          if [ -n "$DEFINITION_ID" ]; then
+            cmdArgs+=(--id "$DEFINITION_ID")
+          else
+            echo "::error::Pipeline definition ID must be provided"
+            exit 1
+          fi
+
+          python_versions=${{inputs.python_versions}}
+          python_version_strings=$(echo $python_versions | jq -R .)
+          cmdArgs+=("--parameters")
+          cmdArgs+=("pythonVersionsTestingMatrix=$python_version_strings")
+          cmdArgs+=("testCentral=${{inputs.testCentral}}")
+          cmdArgs+=("testADT=${{inputs.testADT}}")
+          cmdArgs+=("testDPS=${{inputs.testDPS}}")
+          cmdArgs+=("testHub=${{inputs.testHub}}")
+          cmdArgs+=("testADU=${{inputs.testADU}}")
+          echo "Running: az pipelines run ${cmdArgs[@]}"
+          res=$(az pipelines run "${cmdArgs[@]}")
+
+          if [ -z "$res" ]; then
+            echo "::error::Failed to trigger the pipeline"
+          fi
+          runId=$(echo $res | jq -r '.id')
+          portalUrl="https://dev.azure.com/$ORG/$PROJECT/_build/results?buildId=$runId&view=results"
+          url=$(echo $res | jq -r '.url')
+          echo "runId=$runId" >> $GITHUB_OUTPUT
+          echo "portalUrl=$portalUrl" >> $GITHUB_OUTPUT
+          echo "url=$url" >> $GITHUB_OUTPUT
+      - name: Summary
+        id: summary
+        run: |-
+          echo "# ${PIPELINE:-$DEFAULT_TITLE} Started" >> $GITHUB_STEP_SUMMARY
+          echo "## Azure DevOps Pipeline" >> $GITHUB_STEP_SUMMARY
+          echo "You can follow the progress [here](${{ steps.start.outputs.portalUrl }})" >> $GITHUB_STEP_SUMMARY
+
+  wait-for-completion:
+    runs-on: ubuntu-latest
+    name: Wait for the pipeline to complete
+    needs: [call-ado-pipeline]
+    env:
+      RUN_ID: ${{ needs.call-ado-pipeline.outputs.runId }}
+      PORTAL_URL: ${{ needs.call-ado-pipeline.outputs.portalUrl }}
+    steps:
+      - name: Wait for the pipeline to complete
+        run: |
+          set -e
+          runId="${{ needs.call-ado-pipeline.outputs.runId }}"
+          status="none"
+          result="none"
+          lastLog=1
+          while [[ "$status" =~ (inProgress|notStarted|postponed|none) ]]; do
+            sleep 60
+            res=$(az pipelines runs show --id "$RUN_ID" --org "https://dev.azure.com/$ORG" --project "$PROJECT")
+            status=$(echo "$res" | jq -r '.status')
+            result=$(echo "$res" | jq -r '.result')
+          done
+
+          # if status is not completed, or the result is one of failed, canceled; then fail the job
+          if [[ "$status" != "completed" || "$result" =~ (failed|canceled) ]]; then
+            echo "::error::Pipeline did not complete successfully"
+            echo "# ❌ ${PIPELINE:-$DEFAULT_TITLE} Failed ❌" >> $GITHUB_STEP_SUMMARY
+            echo "The pipeline did not complete successfully. Please check the logs [here](${PORTAL_URL})" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          echo "# ✅ ${PIPELINE:-$DEFAULT_TITLE} Completed ✅" >> $GITHUB_STEP_SUMMARY
+          echo "The pipeline completed successfully. You can check the logs [here](${PORTAL_URL})" >> $GITHUB_STEP_SUMMARY
+  CancelPipeline:
+    runs-on: ubuntu-latest
+    needs: [call-ado-pipeline, wait-for-completion]
+    if: cancelled()
+    env:
+      RUN_ID: ${{ needs.call-ado-pipeline.outputs.runId }}
+      RUN_URL: ${{ needs.call-ado-pipeline.outputs.url }}
+      PORTAL_URL: ${{ needs.call-ado-pipeline.outputs.portalUrl }}
+    steps:
+      - name: Cancel the pipeline
+        run: |
+          set -ex
+          if [[ -z "$RUN_ID" ]]; then
+            echo "No pipeline to cancel"
+            exit 0
+          fi
+
+          curl \
+            -X PATCH \
+            -u ":$AZURE_DEVOPS_EXT_PAT" \
+            -H "Content-Type: application/json" \
+            -d '{"status": "cancelling"}' \
+            "${RUN_URL}?api-version=7.2-preview.7"
+          echo "# ❌ ${PIPELINE:-$DEFAULT_TITLE} Cancelled ❌" >> $GITHUB_STEP_SUMMARY
+          echo "The pipeline was cancelled. You can check the logs [here](${PORTAL_URL})" >> $GITHUB_STEP_SUMMARY

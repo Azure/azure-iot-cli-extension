@@ -7,15 +7,9 @@ parameters:
 - name: variableGroup
   type: string
   default: 'aziotcli_test_primary'
-- name: buildAgentPoolVar
-  type: string
-  default: 'BuildAgentPool'
-- name: buildAgentVmImageVar
-  type: string
-  default: 'BuildAgentVmImage'
 - name: testAgentVmImage
   type: string
-  default: 'ubuntu-20.04'
+  default: 'ubuntu-22.04'
   values:
   - 'ubuntu-20.04'
   - 'ubuntu-22.04'
@@ -23,7 +17,7 @@ parameters:
 - name: pythonVersion
   displayName: 'Python version for building wheel, KPIs'
   type: string
-  default: '3.8'
+  default: '3.9'
   values:
   - '3.8'
   - '3.9'
@@ -69,10 +63,6 @@ parameters:
 
 variables:
   - group: ${{ parameters.variableGroup }}
-  - name: vmImage
-    value: $[variables.${{ parameters.buildAgentVmImageVar }}]
-  - name: buildPool
-    value: $[variables.${{ parameters.buildAgentPoolVar }}]
 
 stages:
   - stage: 'build'
@@ -81,10 +71,7 @@ stages:
 
     - job: 'Build_Publish_Azure_IoT_CLI_Extension'
       pool:
-        name: $(buildPool)
-        vmImage: $(vmImage)
-        demands:
-        - ImageOverride -equals $(vmImage)
+        vmImage: ubuntu-latest
       steps:
       - task: UsePythonVersion@0
         inputs:
@@ -148,7 +135,6 @@ stages:
     #   displayName: 'Validate Reference Document Generation'
     #   steps:
     #   - template: templates/validate-refdoc-generation.yml
-
   - stage: 'smokeTest'
     displayName: 'Run smoke tests'
     dependsOn: test
@@ -173,61 +159,3 @@ stages:
         parameters:
           pythonVersion: ${{ parameters.pythonVersion }}
           architecture: ${{ parameters.architecture }}
-
-  - stage: 'release'
-    displayName: 'Stage GitHub release'
-    dependsOn: build
-    condition: and(succeeded(), eq(${{ parameters.stageForPublish }}, 'true'))
-    jobs:
-    - deployment: 'StageGitHub'
-      displayName: 'Stage CLI extension on GitHub'
-      environment: 'production'
-
-    - job: 'Calculate_Sha_And_Create_Release'
-      displayName: 'Calculate package hash and publish'
-      pool:
-        name: $(buildPool)
-        vmImage: $(vmImage)
-        demands:
-        - ImageOverride -equals $(vmImage)
-      variables:
-        CLIVersion: $[ stageDependencies.build.recordVersion.outputs['setupVersion.CLIVersion'] ]
-        ReleaseTitle: $[ stageDependencies.build.recordVersion.outputs['setupVersion.ReleaseTitle'] ]
-
-      steps:
-      - task: DownloadBuildArtifacts@0
-        displayName : 'Download Extension wheel from Build Artifacts'
-        inputs:
-          buildType: 'current'
-          downloadType: 'single'
-          artifactName: 'azure-iot'
-          downloadPath: '$(System.ArtifactsDirectory)/extension'
-
-      - task: PowerShell@2
-        displayName: 'Calculate sha for downloaded extension'
-        inputs:
-          targetType: 'inline'
-          script: |
-            $extensions = Get-ChildItem -Filter "*.whl" -Recurse | Select-Object FullName
-            Foreach ($extension in $extensions)
-            {
-                Write-Host "calculating sha256 for " $extension.FullName
-                (Get-Filehash -Path $extension.Fullname -Algorithm SHA256).Hash.ToLower()
-            }
-            Write-Host "done"
-          workingDirectory: '$(System.ArtifactsDirectory)/extension'
-
-      - task: GitHubRelease@1
-        inputs:
-          gitHubConnection: $(GithubReleaseConnection)
-          repositoryName: $(Build.Repository.Name)
-          action: 'create'
-          target: '$(Build.SourceVersion)'
-          tagSource: userSpecifiedTag
-          tag: 'v$(CLIVersion)'
-          title: $(ReleaseTitle)
-          assets: '$(System.ArtifactsDirectory)/extension/**/*.whl'
-          assetUploadMode: 'replace'
-          isDraft: true
-          isPreRelease: false
-          addChangeLog: false

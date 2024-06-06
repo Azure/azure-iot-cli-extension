@@ -15,9 +15,8 @@ from knack.log import get_logger
 
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
-from azext_iot.tests.helpers import assign_role_assignment, get_role_assignments, tags_to_dict
+from azext_iot.tests.helpers import get_role_assignments, tags_to_dict
 from azext_iot.tests.settings import DynamoSettings
-from azext_iot.deviceupdate.common import AUTH_RESOURCE_ID
 
 logger = get_logger(__name__)
 
@@ -301,18 +300,6 @@ def _iothub_provisioner(request) -> Optional[dict]:
         if desired_instance_count:
             hub_id_map = {}
             hub_names = []
-
-            # Assign Data Contributor role to resource group if it does not exist
-            account = cli.invoke("account show").as_json()
-            scope_id = "/subscriptions/{}/resourceGroups/{}".format(
-                account["id"],
-                ACCOUNT_RG
-            )
-            assign_role_assignment(
-                role="IoT Hub Data Contributor",
-                scope=scope_id,
-                assignee=AUTH_RESOURCE_ID)
-
             for _ in range(desired_instance_count):
                 target_name = generate_linked_hub_id()
                 create_result = cli.invoke(f"iot hub create -g {ACCOUNT_RG} -n {target_name}")
