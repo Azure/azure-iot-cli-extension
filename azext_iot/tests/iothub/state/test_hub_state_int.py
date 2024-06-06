@@ -260,7 +260,7 @@ def delete_system_endpoints(hub_name, rg):
         f"iot hub routing-endpoint delete --hub-name {hub_name} -g {rg} -n queue-systemid"
     )
     cli.invoke(
-        f"iot hub routing-endpoint delete --hub-name {hub_name} -g {rg} -n storage-systemid"
+        f"iot hub routing-endpoint delete --hub-name {hub_name} -g {rg} -n storagecontainer-systemid"
     )
 
 
