@@ -114,6 +114,7 @@ def setup_hub_controlplane_states(
     provisioned_storage = provisioned_iot_hubs_with_storage_user_module[0]["storage"]
     storage_cstring = provisioned_storage["connectionString"]
     storage_container = provisioned_storage["container"]["name"]
+    storage_endpoint_uri = provisioned_storage["storage"]["primaryEndpoints"]["blob"]
 
     cosmosdb_container_name = provisioned_cosmos_db_module["container"]["name"]
     cosmosdb_database_name = provisioned_cosmos_db_module["database"]["name"]
@@ -176,7 +177,14 @@ def setup_hub_controlplane_states(
 
     cli.invoke(
         f"iot hub message-endpoint create storage-container --en storagecontainer-key -g {hub_rg} -n {hub_name} -c "
-        f"{storage_cstring} --container {storage_container}  -b 350 -w 250 --encoding json")
+        f"{storage_cstring} --container {storage_container}  -b 350 -w 250 --encoding json"
+    )
+
+    cli.invoke(
+        f"iot hub message-endpoint create storage-container --en storagecontainer-{suffix} -g {hub_rg} -n {hub_name} "
+        f"--identity {user_identity_parameter} --endpoint-uri {storage_endpoint_uri} --container {storage_container} "
+        "-b 350 -w 250 --encoding json"
+    )
 
     cli.invoke(
         f"iot hub message-endpoint create cosmosdb-container --en cosmosdb-key -g {hub_rg} -n {hub_name} --container "
