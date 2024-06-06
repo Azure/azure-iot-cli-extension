@@ -659,10 +659,10 @@ class StateProvider(IoTHubProvider):
                         ep["primaryKey"] = parse_cosmos_db_connection_string(cs_object["connectionString"])["AccountKey"]
                     if cs_object["description"] == "Secondary SQL Connection String" and ep.get("secondaryKey"):
                         ep["secondaryKey"] = parse_cosmos_db_connection_string(cs_object["connectionString"])["AccountKey"]
-            elif isinstance(ep.get("identity"), dict) and ep["identity"]["userAssignedIdentity"] in removed_identities:
+            elif isinstance(ep.get("identity"), dict) and ep["identity"].get("userAssignedIdentity") in removed_identities:
                 logger.warning(
                     usr_msgs.SAVE_ENDPOINT_UAI_RETRIEVE_FAIL_MSG.format(
-                        "Cosmos DB Sql Collection", ep["name"], ep["identity"]["userAssignedIdentity"]
+                        "Cosmos DB Sql Collection", ep["name"], ep["identity"].get("userAssignedIdentity")
                     )
                 )
                 removed_endpoints.append(ep["name"])
@@ -708,10 +708,10 @@ class StateProvider(IoTHubProvider):
                     logger.warning(usr_msgs.SAVE_ENDPOINT_RETRIEVE_FAIL_MSG.format("Event Hub", ep["name"]))
                     removed_endpoints.append(ep["name"])
                     continue
-            elif isinstance(ep.get("identity"), dict) and ep["identity"]["userAssignedIdentity"] in removed_identities:
+            elif isinstance(ep.get("identity"), dict) and ep["identity"].get("userAssignedIdentity") in removed_identities:
                 logger.warning(
                     usr_msgs.SAVE_ENDPOINT_UAI_RETRIEVE_FAIL_MSG.format(
-                        "Event Hub", ep["name"], ep["identity"]["userAssignedIdentity"]
+                        "Event Hub", ep["name"], ep["identity"].get("userAssignedIdentity")
                     )
                 )
                 removed_endpoints.append(ep["name"])
@@ -754,10 +754,10 @@ class StateProvider(IoTHubProvider):
                     logger.warning(usr_msgs.SAVE_ENDPOINT_RETRIEVE_FAIL_MSG.format("Service Bus Queue", ep["name"]))
                     removed_endpoints.append(ep["name"])
                     continue
-            elif isinstance(ep.get("identity"), dict) and ep["identity"]["userAssignedIdentity"] in removed_identities:
+            elif isinstance(ep.get("identity"), dict) and ep["identity"].get("userAssignedIdentity") in removed_identities:
                 logger.warning(
                     usr_msgs.SAVE_ENDPOINT_UAI_RETRIEVE_FAIL_MSG.format(
-                        "Service Bus Queue", ep["name"], ep["identity"]["userAssignedIdentity"]
+                        "Service Bus Queue", ep["name"], ep["identity"].get("userAssignedIdentity")
                     )
                 )
                 removed_endpoints.append(ep["name"])
@@ -802,10 +802,10 @@ class StateProvider(IoTHubProvider):
                     )
                     removed_endpoints.append(ep["name"])
                     continue
-            elif isinstance(ep.get("identity"), dict) and ep["identity"]["userAssignedIdentity"] in removed_identities:
+            elif isinstance(ep.get("identity"), dict) and ep["identity"].get("userAssignedIdentity") in removed_identities:
                 logger.warning(
                     usr_msgs.SAVE_ENDPOINT_UAI_RETRIEVE_FAIL_MSG.format(
-                        "Service Bus Topic", ep["name"], ep["identity"]["userAssignedIdentity"]
+                        "Service Bus Topic", ep["name"], ep["identity"].get("userAssignedIdentity")
                     )
                 )
                 removed_endpoints.append(ep["name"])
@@ -848,10 +848,10 @@ class StateProvider(IoTHubProvider):
                     )
                     removed_endpoints.append(ep["name"])
                     continue
-            elif isinstance(ep.get("identity"), dict) and ep["identity"]["userAssignedIdentity"] in removed_identities:
+            elif isinstance(ep.get("identity"), dict) and ep["identity"].get("userAssignedIdentity") in removed_identities:
                 logger.warning(
                     usr_msgs.SAVE_ENDPOINT_UAI_RETRIEVE_FAIL_MSG.format(
-                        "Storage Container", ep["name"], ep["identity"]["userAssignedIdentity"]
+                        "Storage Container", ep["name"], ep["identity"].get("userAssignedIdentity")
                     )
                 )
                 removed_endpoints.append(ep["name"])
@@ -888,10 +888,10 @@ class StateProvider(IoTHubProvider):
         file_upload = hub_resource["properties"]["storageEndpoints"].get("$default", {})
         if (
             isinstance(file_upload.get("identity"), dict)
-            and file_upload["identity"]["userAssignedIdentity"] in removed_identities
+            and file_upload["identity"].get("userAssignedIdentity") in removed_identities
         ):
             logger.warning(
-                usr_msgs.SAVE_FILE_UPLOAD_UAI_RETRIEVE_FAIL_MSG.format(file_upload["identity"]["userAssignedIdentity"])
+                usr_msgs.SAVE_FILE_UPLOAD_UAI_RETRIEVE_FAIL_MSG.format(file_upload["identity"].get("userAssignedIdentity"))
             )
             file_upload["authenticationType"] = None
             file_upload["connectionString"] = None
