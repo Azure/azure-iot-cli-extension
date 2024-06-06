@@ -7,6 +7,9 @@ Release History
 0.24.0
 +++++++++++++++
 
+**General updates**
+
+* Updated the minimum core CLI version to 2.46.0
 
 **IoT Product**
 

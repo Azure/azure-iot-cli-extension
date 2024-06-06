@@ -10,7 +10,7 @@ Currently, our testing matrix is broken up into the following groups:
     - 3.10
     - 3.11
 - Azure CLI Core versions to test extension against:
-    - `azmin` installs the minimum supported CLI version (currently `2.32.0`)
+    - `azmin` installs the minimum supported CLI version (currently `2.46.0`)
     - `azcur` installs the latest released CLI version from PyPi
     - `azdev` installs the CLI from your local CLI instance (located at `../azure-cli`)
 - Types of tests to run:

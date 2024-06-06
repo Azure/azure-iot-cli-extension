@@ -1006,6 +1006,8 @@ def load_arguments(self, _):
             options_list=["--iot-hubs", "--ih"],
             help="Host name of target IoT Hub associated with the allocation policy. Use space-separated "
             "list for multiple IoT Hubs.",
+            nargs="+",
+            action="extend",
             arg_group="Allocation Policy"
         )
         context.argument(

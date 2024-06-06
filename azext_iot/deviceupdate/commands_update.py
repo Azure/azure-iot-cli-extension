@@ -236,8 +236,8 @@ def manifest_init_v5(
 ):
     from datetime import datetime
     from pathlib import PurePath
-    from azure.cli.core.azclierror import ArgumentUsageError, InvalidArgumentValueError
-    from azext_iot.deviceupdate.common import FP_HANDLERS, FP_HANDLERS_REQUIRE_CRITERIA
+    from azure.cli.core.azclierror import ArgumentUsageError
+    from azext_iot.deviceupdate.common import FP_HANDLERS_REQUIRE_CRITERIA
     from azext_iot.deviceupdate.providers.utility import parse_manifest_json
 
     def _sanitize_safe_params(safe_params: list, keep: list) -> list:
@@ -322,10 +322,6 @@ def manifest_init_v5(
                 "type": "inline",
                 "handler": assembled_step["handler"],
             }
-
-            if step["handler"].lower().startswith("microsoft") and step["handler"] not in FP_HANDLERS:
-                if not no_validation:
-                    raise InvalidArgumentValueError(f"Valid Microsoft handlers: {', '.join(FP_HANDLERS)}")
 
             step["files"] = (
                 list(set([f.strip() for f in assembled_step["files"].split(",")])) if "files" in assembled_step else []

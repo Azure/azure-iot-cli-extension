@@ -97,6 +97,9 @@ class TestEnrollmentGroupCreate():
                                               allocation_policy='hashed',
                                               iot_hubs='hub1 hub2')),
         (generate_enrollment_group_create_req(certificate_path='myCert',
+                                              allocation_policy='hashed',
+                                              iot_hubs=['hub1', 'hub2'])),
+        (generate_enrollment_group_create_req(certificate_path='myCert',
                                               allocation_policy='geoLatency')),
         (generate_enrollment_group_create_req(certificate_path='myCert',
                                               allocation_policy='custom',
@@ -190,7 +193,9 @@ class TestEnrollmentGroupCreate():
                 assert body['customAllocationDefinition']['webhookUrl'] == req['webhook_url']
                 assert body['customAllocationDefinition']['apiVersion'] == req['api_version']
         if req['iot_hubs']:
-            assert body['iotHubs'] == req['iot_hubs'].split()
+            assert body['iotHubs'] == ((
+                req['iot_hubs'].split() if isinstance(req['iot_hubs'], str) else req['iot_hubs'])
+            )
         if req['edge_enabled']:
             assert body['capabilities']['iotEdge']
 
@@ -362,12 +367,14 @@ class TestEnrollmentGroupUpdate():
                                               webhook_url="https://www.test.test",
                                               api_version="2019-03-31")),
         (generate_enrollment_group_update_req(allocation_policy='hashed', iot_hubs='hub1 hub2')),
+        (generate_enrollment_group_update_req(allocation_policy='hashed', iot_hubs=['hub1', 'hub2'])),
         (generate_enrollment_group_update_req(allocation_policy='geoLatency')),
         (generate_enrollment_group_update_req(iot_hub_host_name='hub1')),
         (generate_enrollment_group_update_req(edge_enabled=True)),
         (generate_enrollment_group_update_req(edge_enabled=False))
     ])
-    def test_enrollment_group_update(self, serviceclient, fixture_cmd, req):
+    def test_enrollment_group_update(self, mocker, serviceclient, fixture_cmd, req):
+        mocker.patch("azext_iot.operations.dps._validate_allocation_policy_for_enrollment")
         subject.iot_dps_device_enrollment_group_update(
             cmd=fixture_cmd,
             enrollment_id=req['enrollment_id'],
@@ -445,7 +452,9 @@ class TestEnrollmentGroupUpdate():
                 assert body['customAllocationDefinition']['webhookUrl'] == req['webhook_url']
                 assert body['customAllocationDefinition']['apiVersion'] == req['api_version']
         if req['iot_hubs']:
-            assert body['iotHubs'] == req['iot_hubs'].split()
+            assert body['iotHubs'] == ((
+                req['iot_hubs'].split() if isinstance(req['iot_hubs'], str) else req['iot_hubs'])
+            )
         if req['edge_enabled'] is not None:
             assert body['capabilities']['iotEdge'] == req['edge_enabled']
 

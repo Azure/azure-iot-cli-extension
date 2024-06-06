@@ -298,7 +298,7 @@ def test_dps_enrollment_symmetrickey_lifecycle(provisioned_iot_dps_module):
         assert update_enrollment["customAllocationDefinition"]["webhookUrl"] == WEBHOOK_URL
         assert update_enrollment["customAllocationDefinition"]["apiVersion"] == API_VERSION
         assert update_enrollment["deviceId"] == device_id
-        assert update_enrollment["iotHubs"] is None
+        assert update_enrollment["iotHubs"] == [hub_hostname]
         assert update_enrollment["initialTwin"]["tags"]
         assert update_enrollment["initialTwin"]["properties"]["desired"]
         assert update_enrollment["optionalDeviceInformation"] == generic_dict
