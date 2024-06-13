@@ -16,8 +16,8 @@ from msrestazure.azure_exceptions import CloudError
 from .. import models
 
 
-class QueryOperations(object):
-    """QueryOperations operations.
+class ServiceOperations(object):
+    """ServiceOperations operations.
 
     :param client: Client for service requests.
     :param config: Configuration of service client.
@@ -35,37 +35,30 @@ class QueryOperations(object):
 
         self.config = config
 
-    def get_twins(
-            self, x_ms_continuation=None, x_ms_max_item_count=None, query=None, custom_headers=None, raw=False, **operation_config):
-        """Query an IoT Hub to retrieve information regarding device twins using a
-        SQL-like language. See
-        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language
-        for more information. Pagination is supported. This returns information
-        about device twins only.
+    def bulk_regenerate_device_key_method(
+            self, policy_key=None, devices=None, custom_headers=None, raw=False, **operation_config):
+        """Bulk regenerate device keys to be HIS compliant.
 
-        :param x_ms_continuation: The continuation token used to get the next
-         page of results.
-        :type x_ms_continuation: str
-        :param x_ms_max_item_count: The maximum number of items returned per
-         page. The service may use a different value if the value specified is
-         not acceptable.
-        :type x_ms_max_item_count: str
-        :param query: The query string.
-        :type query: str
+        :param policy_key: Device secret to regenerate. Possible values
+         include: 'Unknown', 'primaryKey', 'secondaryKey', 'both'
+        :type policy_key: str or ~service.models.enum
+        :param devices: List of devices to have secrets regenerated with HIS
+         compliant secrets
+        :type devices: list[~service.models.RegenerateDeviceKey]
         :param dict custom_headers: headers that will be added to the request
         :param bool raw: returns the direct response alongside the
          deserialized response
         :param operation_config: :ref:`Operation configuration
          overrides<msrest:optionsforoperations>`.
-        :return: list or ClientRawResponse if raw=true
-        :rtype: list[~service.models.Twin] or
+        :return: BulkRegenerateKeyResult or ClientRawResponse if raw=true
+        :rtype: ~service.models.BulkRegenerateKeyResult or
          ~msrest.pipeline.ClientRawResponse
         :raises: :class:`CloudError<msrestazure.azure_exceptions.CloudError>`
         """
-        query_specification = models.QuerySpecification(query=query)
+        regenerate_device_keys_request = models.BulkRegenerateDeviceKey(policy_key=policy_key, devices=devices)
 
         # Construct URL
-        url = self.get_twins.metadata['url']
+        url = self.bulk_regenerate_device_key_method.metadata['url']
 
         # Construct parameters
         query_parameters = {}
@@ -78,39 +71,33 @@ class QueryOperations(object):
             header_parameters['x-ms-client-request-id'] = str(uuid.uuid1())
         if custom_headers:
             header_parameters.update(custom_headers)
-        if x_ms_continuation is not None:
-            header_parameters['x-ms-continuation'] = self._serialize.header("x_ms_continuation", x_ms_continuation, 'str')
-        if x_ms_max_item_count is not None:
-            header_parameters['x-ms-max-item-count'] = self._serialize.header("x_ms_max_item_count", x_ms_max_item_count, 'str')
         if self.config.accept_language is not None:
             header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
 
         # Construct body
-        body_content = self._serialize.body(query_specification, 'QuerySpecification')
+        body_content = self._serialize.body(regenerate_device_keys_request, 'BulkRegenerateDeviceKey')
 
         # Construct and send request
         request = self._client.post(url, query_parameters, header_parameters, body_content)
         response = self._client.send(request, stream=False, **operation_config)
 
-        if response.status_code not in [200]:
+        if response.status_code not in [200, 207, 400]:
             exp = CloudError(response)
             exp.request_id = response.headers.get('x-ms-request-id')
             raise exp
 
         deserialized = None
-        header_dict = {}
 
         if response.status_code == 200:
-            deserialized = self._deserialize('[Twin]', response)
-            header_dict = {
-                'x-ms-item-type': 'str',
-                'x-ms-continuation': 'str',
-            }
+            deserialized = self._deserialize('BulkRegenerateKeyResult', response)
+        if response.status_code == 207:
+            deserialized = self._deserialize('BulkRegenerateKeyResult', response)
+        if response.status_code == 400:
+            deserialized = self._deserialize('BulkRegenerateKeyResult', response)
 
         if raw:
             client_raw_response = ClientRawResponse(deserialized, response)
-            client_raw_response.add_headers(header_dict)
             return client_raw_response
 
         return deserialized
-    get_twins.metadata = {'url': '/devices/query'}
+    bulk_regenerate_device_key_method.metadata = {'url': '/devices/keys/regenerate'}

@@ -16,6 +16,7 @@ from .bulk_registry_operations import BulkRegistryOperations
 from .query_operations import QueryOperations
 from .jobs_operations import JobsOperations
 from .cloud_to_device_messages_operations import CloudToDeviceMessagesOperations
+from .service_operations import ServiceOperations
 from .modules_operations import ModulesOperations
 from .digital_twin_operations import DigitalTwinOperations
 
@@ -27,6 +28,7 @@ __all__ = [
     'QueryOperations',
     'JobsOperations',
     'CloudToDeviceMessagesOperations',
+    'ServiceOperations',
     'ModulesOperations',
     'DigitalTwinOperations',
 ]

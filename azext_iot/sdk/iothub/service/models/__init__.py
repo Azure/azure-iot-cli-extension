@@ -32,6 +32,11 @@ from .twin_py3 import Twin
 from .managed_identity_py3 import ManagedIdentity
 from .job_properties_py3 import JobProperties
 from .purge_message_queue_result_py3 import PurgeMessageQueueResult
+from .regenerate_device_key_py3 import RegenerateDeviceKey
+from .bulk_regenerate_device_key_py3 import BulkRegenerateDeviceKey
+from .regenerate_key_result_py3 import RegenerateKeyResult
+from .regenerate_device_key_error_py3 import RegenerateDeviceKeyError
+from .bulk_regenerate_key_result_py3 import BulkRegenerateKeyResult
 from .cloud_to_device_method_py3 import CloudToDeviceMethod
 from .job_request_py3 import JobRequest
 from .device_job_statistics_py3 import DeviceJobStatistics
@@ -65,6 +70,11 @@ __all__ = [
     'ManagedIdentity',
     'JobProperties',
     'PurgeMessageQueueResult',
+    'RegenerateDeviceKey',
+    'BulkRegenerateDeviceKey',
+    'RegenerateKeyResult',
+    'RegenerateDeviceKeyError',
+    'BulkRegenerateKeyResult',
     'CloudToDeviceMethod',
     'JobRequest',
     'DeviceJobStatistics',
