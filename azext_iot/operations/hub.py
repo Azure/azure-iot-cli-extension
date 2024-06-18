@@ -512,25 +512,37 @@ def iot_device_key_regenerate(
         login=login,
         auth_type=auth_type_dataplane,
     )
-    device = _iot_device_show(target, device_id)
-    if device["authentication"]["type"] != DeviceAuthApiType.sas.value:
-        raise ClientRequestError("Device authentication should be of type sas")
+    if not device_id:
+        pass
+        # update all devices
 
-    pk = device["authentication"]["symmetricKey"]["primaryKey"]
-    sk = device["authentication"]["symmetricKey"]["secondaryKey"]
+    # device = _iot_device_show(target, device_id)
+    # if device["authentication"]["type"] != DeviceAuthApiType.sas.value:
+    #     raise ClientRequestError("Device authentication should be of type sas")
 
-    if renew_key_type == RenewKeyType.primary.value:
-        pk = generate_key()
-    if renew_key_type == RenewKeyType.secondary.value:
-        sk = generate_key()
-    if renew_key_type == RenewKeyType.swap.value:
-        temp = pk
-        pk = sk
-        sk = temp
+    # pk = device["authentication"]["symmetricKey"]["primaryKey"]
+    # sk = device["authentication"]["symmetricKey"]["secondaryKey"]
 
-    return _update_device_key(
-        target, device, device["authentication"]["type"], pk, sk, etag
+    # if renew_key_type == RenewKeyType.swap.value:
+    #     temp = pk
+    #     pk = sk
+    #     sk = temp
+    #     return _update_device_key(
+    #         target, device, device["authentication"]["type"], pk, sk, etag
+    #     )
+    
+    device_id = None
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+    if renew_key_type in [RenewKeyType.primary.value, RenewKeyType.secondary.value]:
+        renew_key_type += "Key"
+    import pdb; pdb.set_trace()
+    result = service_sdk.service.bulk_regenerate_device_key_method(
+        policy_key=renew_key_type,
+        devices=device_id
     )
+    return result
+
 
 
 def iot_device_get_parent(
