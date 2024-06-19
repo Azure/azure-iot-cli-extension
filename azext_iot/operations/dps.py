@@ -834,23 +834,10 @@ def iot_dps_registration_list(
         login=login,
         auth_type=auth_type_dataplane,
     )
-    registrations = []
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
-        cont_token = None
-        while True:
-            result = sdk.device_registration_state.query(
-                enrollment_id, x_ms_continuation=cont_token, raw=True
-            )
-            registrations.extend(result.response.json())
-            cont_token = result.headers.get("x-ms-continuation")
-            if top and len(registrations) > top:
-                registrations = registrations[:top]
-                cont_token = None
-            if not cont_token:
-                break
-        return registrations
+        return _execute_query([enrollment_id], sdk.device_registration_state.query, top)
     except ProvisioningServiceErrorDetailsException as e:
         handle_service_exception(e)
 
