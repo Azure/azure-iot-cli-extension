@@ -4,6 +4,14 @@ Release History
 ===============
 
 
+0.24.1
++++++++++++++++
+
+**DPS updates**
+
+* Fix for `az iot dps enrollement-group registration list` to support paging.
+
+
 0.24.0
 +++++++++++++++
 
