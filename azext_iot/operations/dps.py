@@ -816,15 +816,13 @@ def _get_dps_connection_string(
 
 
 # DPS Registration
-
-
 def iot_dps_registration_list(
-    cmd, 
-    enrollment_id, 
-    dps_name=None, 
-    resource_group_name=None, 
+    cmd,
+    enrollment_id,
+    dps_name=None,
+    resource_group_name=None,
     top=None,
-    login=None, 
+    login=None,
     auth_type_dataplane=None,
 ):
     discovery = DPSDiscovery(cmd)
