@@ -721,25 +721,82 @@ class TestRegistrationList():
         mocked_response.add(
             method=responses.POST,
             url="https://{}/registrations/{}/query?".format(mock_dps_target['entity'], enrollment_id),
-            body=json.dumps([generate_registration_state_show()]),
+            body=json.dumps([
+                generate_registration_state_show(),
+                generate_registration_state_show(),
+                generate_registration_state_show(),
+                generate_registration_state_show()
+            ]),
             status=request.param,
             content_type="application/json",
             match_querystring=False
         )
         yield mocked_response
 
-    def test_registration_list(self, serviceclient, fixture_cmd):
-        subject.iot_dps_registration_list(
+    @pytest.mark.parametrize("top", [None, 3])
+    def test_registration_list(self, serviceclient, fixture_cmd, top):
+        result = subject.iot_dps_registration_list(
             cmd=fixture_cmd,
             dps_name=mock_dps_target['entity'],
             enrollment_id=enrollment_id,
             resource_group_name=resource_group,
+            top=top
         )
         request = serviceclient.calls[0].request
         url = request.url
         method = request.method
         assert "{}/registrations/{}/query?".format(mock_dps_target['entity'], enrollment_id) in url
         assert method == 'POST'
+        if top:
+            assert len(result) == top
+
+    @pytest.fixture(params=[200])
+    def pagingserviceclient(
+        self, mocked_response, fixture_gdcs, fixture_dps_sas, patch_certificate_open, request
+    ):
+        mocked_response.assert_all_requests_are_fired = False
+        mocked_response.add(
+            method=responses.POST,
+            url="https://{}/registrations/{}/query?".format(mock_dps_target['entity'], enrollment_id),
+            body=json.dumps([
+                generate_registration_state_show(),
+                generate_registration_state_show(),
+                generate_registration_state_show(),
+                generate_registration_state_show()
+            ]),
+            headers={"x-ms-continuation": "continuation_token123"},
+            status=request.param,
+            content_type="application/json",
+            match_querystring=False
+        )
+        mocked_response.add(
+            method=responses.POST,
+            url="https://{}/registrations/{}/query?".format(mock_dps_target['entity'], enrollment_id),
+            body=json.dumps([
+                generate_registration_state_show(),
+                generate_registration_state_show(),
+                generate_registration_state_show(),
+            ]),
+            status=request.param,
+            content_type="application/json",
+            match_querystring=False
+        )
+        yield mocked_response
+
+    @pytest.mark.parametrize("top", [None, 3, 6])
+    def test_registration_list_paging(self, pagingserviceclient, fixture_cmd, top):
+        result = subject.iot_dps_registration_list(
+            cmd=fixture_cmd,
+            dps_name=mock_dps_target['entity'],
+            enrollment_id=enrollment_id,
+            resource_group_name=resource_group,
+            top=top
+        )
+        if top:
+            assert len(result) == top
+            assert len(pagingserviceclient.calls) == (1 + top // 4)
+        else:
+            assert len(pagingserviceclient.calls) == 2
 
     def test_registration_list_error(self, fixture_cmd):
         with pytest.raises(CLIError):
