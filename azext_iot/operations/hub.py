@@ -512,31 +512,34 @@ def iot_device_key_regenerate(
         login=login,
         auth_type=auth_type_dataplane,
     )
-    if not device_id:
-        pass
+    if device_id[0] == "*":
+        # TODO: see if we can pass in somethign to avoid getting all device names
+        device_id = None
         # update all devices
 
-    # device = _iot_device_show(target, device_id)
-    # if device["authentication"]["type"] != DeviceAuthApiType.sas.value:
-    #     raise ClientRequestError("Device authentication should be of type sas")
+    if renew_key_type == RenewKeyType.swap.value:
+        if len(device_id) > 1:
+            raise InvalidArgumentValueError(
+                "Currently bulk key regeneration operations do not support swapping keys."
+            )
+        device = _iot_device_show(target, device_id)
+        if device["authentication"]["type"] != DeviceAuthApiType.sas.value:
+            raise ClientRequestError("Device authentication should be of type sas")
 
-    # pk = device["authentication"]["symmetricKey"]["primaryKey"]
-    # sk = device["authentication"]["symmetricKey"]["secondaryKey"]
+        pk = device["authentication"]["symmetricKey"]["primaryKey"]
+        sk = device["authentication"]["symmetricKey"]["secondaryKey"]
 
-    # if renew_key_type == RenewKeyType.swap.value:
-    #     temp = pk
-    #     pk = sk
-    #     sk = temp
-    #     return _update_device_key(
-    #         target, device, device["authentication"]["type"], pk, sk, etag
-    #     )
-    
-    device_id = None
+        temp = pk
+        pk = sk
+        sk = temp
+        return _update_device_key(
+            target, device, device["authentication"]["type"], pk, sk, etag
+        )
+
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
     if renew_key_type in [RenewKeyType.primary.value, RenewKeyType.secondary.value]:
         renew_key_type += "Key"
-    import pdb; pdb.set_trace()
     result = service_sdk.service.bulk_regenerate_device_key_method(
         policy_key=renew_key_type,
         devices=device_id
