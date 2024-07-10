@@ -89,13 +89,13 @@ class EventTargetBuilder:
         else:
             endpoint = target["events"]["endpoint"]
             path = target["events"]["path"]
-            partition_count = target["events"].get("partitionCount")
+            partition_count = target["events"].get("partition_count")
 
         # if partition count is None or 0, throw
         if not partition_count or not int(partition_count):
             raise CLIInternalError(
-                f"{target['entity'].split('.')[0]} has no partition count. Please check with the IoT "
-                "Hub service team to fix your IoT Hub."
+                f"{target['entity'].split('.')[0]} has no partition count. Please contact a support "
+                "representative to fix your IoT Hub."
             )
 
         partitions = target["events"].get("partition_ids", [])
