@@ -94,7 +94,7 @@ async def _initiate_event_monitor(
     target: Target, enqueued_time_utc, on_message_received, timeout=0
 ):
     if not target.partitions:
-        logger.debug("No Event Hub partitions found to listen on.")
+        logger.warning("No Event Hub partitions found to listen on.")
         return
 
     coroutines = []
