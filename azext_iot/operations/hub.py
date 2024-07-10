@@ -520,7 +520,7 @@ def iot_device_key_regenerate(
     if renew_key_type == RenewKeyType.swap.value:
         if len(device_id) > 1:
             raise InvalidArgumentValueError(
-                "Currently bulk key regeneration operations do not support swapping keys."
+                "Currently, bulk key swap is not supported."
             )
         device = _iot_device_show(target, device_id)
         if device["authentication"]["type"] != DeviceAuthApiType.sas.value:
