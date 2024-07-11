@@ -1,4 +1,4 @@
-# coding=utf-8
+total_messages_purged: int=None,# coding=utf-8
 # --------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for
@@ -29,7 +29,7 @@ class PurgeMessageQueueResult(Model):
         'total_messages_purged': {'key': 'totalMessagesPurged', 'type': 'int'},
     }
 
-    def __init__(self, *, device_id: str=None, module_id: str=None, total_messages_purged: int=None, **kwargs) -> None:
+    def __init__(self, *, total_messages_purged: int=None, device_id: str=None, module_id: str=None, **kwargs) -> None:
         super(PurgeMessageQueueResult, self).__init__(**kwargs)
         self.device_id = device_id
         self.module_id = module_id

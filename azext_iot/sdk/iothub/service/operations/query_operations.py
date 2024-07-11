@@ -32,11 +32,12 @@ class QueryOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
+        self.api_version = "2021-04-12"
 
         self.config = config
 
     def get_twins(
-            self, x_ms_continuation=None, x_ms_max_item_count=None, query=None, custom_headers=None, raw=False, **operation_config):
+            self, query=None, x_ms_continuation=None, x_ms_max_item_count=None, custom_headers=None, raw=False, **operation_config):
         """Query an IoT Hub to retrieve information regarding device twins using a
         SQL-like language. See
         https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language
@@ -69,6 +70,7 @@ class QueryOperations(object):
 
         # Construct parameters
         query_parameters = {}
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
 
         # Construct headers
         header_parameters = {}
@@ -97,20 +99,6 @@ class QueryOperations(object):
             exp.request_id = response.headers.get('x-ms-request-id')
             raise exp
 
-        deserialized = None
-        header_dict = {}
-
-        if response.status_code == 200:
-            deserialized = self._deserialize('[Twin]', response)
-            header_dict = {
-                'x-ms-item-type': 'str',
-                'x-ms-continuation': 'str',
-            }
-
-        if raw:
-            client_raw_response = ClientRawResponse(deserialized, response)
-            client_raw_response.add_headers(header_dict)
-            return client_raw_response
-
-        return deserialized
+        # @digimaun - custom work, cut the fluff
+        return ClientRawResponse(None, response)
     get_twins.metadata = {'url': '/devices/query'}
