@@ -467,6 +467,13 @@ def load_arguments(self, _):
             arg_type=get_enum_type(RenewKeyType),
             help="Target key type to regenerate.",
         )
+        context.argument(
+            "device_ids",
+            options_list=["--device-id", "-d"],
+            help="Space seperated list of target Device Ids. Use `*` for all devices.",
+            nargs="+",
+            action="extend"
+        )
 
     with self.argument_context("iot hub device-identity export") as context:
         context.argument(
