@@ -7,6 +7,7 @@
 from os.path import exists
 from knack.log import get_logger
 from enum import Enum, EnumMeta
+from tqdm import tqdm
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
     CLIInternalError,
@@ -43,7 +44,6 @@ from azext_iot.common.utility import (
     read_file_content,
     init_monitoring,
     process_json_arg,
-    generate_key,
     generate_storage_account_sas_token,
 )
 from azext_iot._factory import SdkResolver, CloudError
@@ -538,73 +538,31 @@ def iot_device_key_regenerate(
     if renew_key_type in [RenewKeyType.primary.value, RenewKeyType.secondary.value]:
         renew_key_type += "Key"
 
-    overall_result = {
-        "policyKey": renew_key_type,
-        "errors": [],
-        "rotatedKeys": []
-    }
-
+    modules = []
     if device_ids[0] == "*":
-        devices = _iot_device_twin_list(target=target, top=-1)
-        devices.extend(_iot_device_twin_list(target=target, edge_enabled=True, top=-1))
+        devices = _iot_device_twin_list(target=target, top=None)
+        devices.extend(_iot_device_twin_list(target=target, edge_enabled=True, top=None))
         device_ids = []
         for device in devices:
-            if device["authentication"]["type"] == DeviceAuthApiType.sas.value:
+            if device["authenticationType"] == DeviceAuthApiType.sas.value:
                 device_ids.append(device["deviceId"])
             # non sas devices can have sas modules...
             if include_modules:
-                result = _iot_device_module_bulk_key_regenerate(
-                    service_sdk=service_sdk,
-                    target=target,
-                    device_id=device["deviceId"],
-                    module_ids="*",
-                    renew_key_type=renew_key_type
+                modules.extend(
+                    _iot_key_regenerate_process_modules(
+                        target=target, device_id=device["deviceId"], module_ids="*"
+                    )
                 )
-                if result.get("errors"):
-                    overall_result["errors"].extend(result["errors"])
-                if result.get("rotatedKeys"):
-                    overall_result["rotatedKeys"].extend(result["rotatedKeys"])
-
+    if modules:
+        logger.info(f"Found {len(modules)} modules.")
 
     # call friendly format
     devices = [{"id": device_ids[i]} for i in range(len(device_ids))]
-
-    print(device_ids)
-    while devices:
-        # make batch
-        if len(devices) > 1000:
-            batch = devices[:1000]
-            devices = devices[:1000]
-        else:
-            batch = devices[:]
-            devices = []
-        # call
-        try:
-            result = service_sdk.service.bulk_regenerate_device_key_method(
-                policy_key=renew_key_type,
-                devices=batch
-            )
-        except CloudError as e:
-            handle_service_exception(e)
-        # combine result
-        if result.get("errors"):
-            overall_result["errors"].extend(result["errors"])
-        if result.get("rotatedKeys"):
-            overall_result["rotatedKeys"].extend(result["rotatedKeys"])
-
-    return overall_result
-
-    # if no batching is needed
-    # try:
-    #     result = service_sdk.service.bulk_regenerate_device_key_method(
-    #         policy_key=renew_key_type,
-    #         devices=devices
-    #     )
-    # except CloudError as e:
-    #     handle_service_exception(e)
-    # import pdb; pdb.set_trace()
-    # return result
-
+    return _iot_key_regenerate_batch(
+        service_sdk=service_sdk,
+        renew_key_type=renew_key_type,
+        items=devices + modules,
+    )
 
 
 def iot_device_get_parent(
@@ -1054,8 +1012,8 @@ def iot_device_module_key_regenerate(
         sk = module["authentication"]["symmetricKey"]["secondaryKey"]
 
         temp = pk
-        pk = sk
-        sk = temp
+        module["authentication"]["symmetricKey"]["primaryKey"] = sk
+        module["authentication"]["symmetricKey"]["secondaryKey"] = temp
         try:
             return service_sdk.modules.create_or_update_identity(
                 id=device_id,
@@ -1071,54 +1029,73 @@ def iot_device_module_key_regenerate(
     if renew_key_type in [RenewKeyType.primary.value, RenewKeyType.secondary.value]:
         renew_key_type += "Key"
 
-    return _iot_device_module_bulk_key_regenerate(
-        service_sdk, target, device_id, module_ids, renew_key_type
+    modules = _iot_key_regenerate_process_modules(
+        target, device_id, module_ids
+    )
+    return _iot_key_regenerate_batch(
+        service_sdk=service_sdk,
+        renew_key_type=renew_key_type,
+        items=modules,
+        device_id=device_id
     )
 
-def _iot_device_module_bulk_key_regenerate(
-    service_sdk,
+
+def _iot_key_regenerate_process_modules(
     target,
     device_id,
     module_ids,
-    renew_key_type,
 ):
     if module_ids[0] == "*":
-        modules = _iot_device_module_list(target=target, device_id=device_id, top=-1)
+        modules = _iot_device_module_list(target=target, device_id=device_id, top=None)
         module_ids = []
-        for device in modules:
-            if device["authentication"]["type"] == DeviceAuthApiType.sas.value:
-                module_ids.append(device["deviceId"])
+        for module in modules:
+            # not going to question why the call the Module object - just making things
+            # easier for unit tests
+            if not isinstance(module, dict):
+                module = module.serialize()
+            if module["authentication"]["type"] == DeviceAuthApiType.sas.value:
+                module_ids.append(module["moduleId"])
 
-    # call friendly format
-    modules = [{"id": device_id, "module": module_ids[i]} for i in range(len(module_ids))]
+    return [{"id": device_id, "moduleId": module_ids[i]} for i in range(len(module_ids))]
 
+
+def _iot_key_regenerate_batch(
+    service_sdk,
+    renew_key_type,
+    items,
+    device_id = None,
+):
     overall_result = {
         "policyKey": renew_key_type,
         "errors": [],
         "rotatedKeys": []
     }
-    while modules:
-        # make batch
-        if len(modules) > 1000:
-            batch = modules[:1000]
-            modules = modules[:1000]
+    starting_msg = f"modules for device {device_id}" if device_id else "devices"
+    logger.info(f"Found {len(items)} {starting_msg}.")
+    if not items:
+        return {}
+    batches = []
+    while items:
+        if len(items) > 100:
+            batches.append(items[:100])
+            items = items[100:]
         else:
-            batch = modules[:]
-            modules = []
+            batches.append(items[:])
+            items = []
+    for i in tqdm(range(len(batches)), desc="Bulk key regeneration is in progress", ascii=' #'):
         # call
         try:
             result = service_sdk.service.bulk_regenerate_device_key_method(
                 policy_key=renew_key_type,
-                modules=batch
+                devices=batches[i]
             )
         except CloudError as e:
             handle_service_exception(e)
         # combine result
-        if result.get("errors"):
-            overall_result["errors"].extend(result["errors"])
-        if result.get("rotatedKeys"):
-            overall_result["rotatedKeys"].extend(result["rotatedKeys"])
-
+        if result.errors:
+            overall_result["errors"].extend(result.errors)
+        if result.rotated_keys:
+            overall_result["rotatedKeys"].extend(result.rotated_keys)
     return overall_result
 
 
@@ -1146,7 +1123,7 @@ def _iot_device_module_list(target, device_id, top=1000):
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
     try:
-        return service_sdk.modules.get_modules_on_device(device_id)[:top]
+        return service_sdk.modules.get_modules_on_device(device_id, raw=True)[:top]
     except CloudError as e:
         handle_service_exception(e)
 

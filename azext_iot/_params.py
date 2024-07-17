@@ -474,6 +474,12 @@ def load_arguments(self, _):
             nargs="+",
             action="extend"
         )
+        context.argument(
+            "include_modules",
+            options_list=["--include-modules", "--im"],
+            help="Flag to include device modules during key regeneration.",
+            arg_type=get_three_state_flag()
+        )
 
     with self.argument_context("iot hub device-identity export") as context:
         context.argument(
@@ -620,6 +626,13 @@ def load_arguments(self, _):
             options_list=["--key-type", "--kt"],
             arg_type=get_enum_type(RenewKeyType),
             help="Target key type to regenerate.",
+        )
+        context.argument(
+            "module_ids",
+            options_list=["--module-id", "-m"],
+            help="Space seperated list of target Module Ids. Use `*` for all modules.",
+            nargs="+",
+            action="extend"
         )
 
     with self.argument_context("iot hub distributed-tracing update") as context:

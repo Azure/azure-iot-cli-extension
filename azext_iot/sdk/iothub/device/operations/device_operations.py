@@ -33,7 +33,6 @@ class DeviceOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2021-04-12"
         self.api_version = "2019-10-01"
 
         self.config = config
