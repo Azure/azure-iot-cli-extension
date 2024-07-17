@@ -195,6 +195,15 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
         assert registration["status"] == "assigned"
 
         # Check for both registration from service side
+        random_registration = cli.invoke(
+            set_cmd_auth_type(
+                f"iot dps enrollment-group registration list --dps-name {dps_name} -g {dps_rg} --group-id {group_id} --top 1",
+                auth_type=auth_phase,
+                cstring=dps_cstring
+            ),
+        ).as_json()
+        assert len(random_registration) == 1
+
         service_side_registrations = cli.invoke(
             set_cmd_auth_type(
                 f"iot dps enrollment-group registration list --dps-name {dps_name} -g {dps_rg} --group-id {group_id}",

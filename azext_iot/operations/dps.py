@@ -816,10 +816,14 @@ def _get_dps_connection_string(
 
 
 # DPS Registration
-
-
 def iot_dps_registration_list(
-    cmd, enrollment_id, dps_name=None, resource_group_name=None, login=None, auth_type_dataplane=None,
+    cmd,
+    enrollment_id,
+    dps_name=None,
+    resource_group_name=None,
+    top=None,
+    login=None,
+    auth_type_dataplane=None,
 ):
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
@@ -831,10 +835,7 @@ def iot_dps_registration_list(
     try:
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
-
-        return sdk.device_registration_state.query(
-            enrollment_id, raw=True
-        ).response.json()
+        return _execute_query([enrollment_id], sdk.device_registration_state.query, top)
     except ProvisioningServiceErrorDetailsException as e:
         handle_service_exception(e)
 
