@@ -1123,7 +1123,7 @@ def _iot_device_module_list(target, device_id, top=1000):
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
 
     try:
-        return service_sdk.modules.get_modules_on_device(device_id, raw=True)[:top]
+        return service_sdk.modules.get_modules_on_device(device_id)[:top]
     except CloudError as e:
         handle_service_exception(e)
 

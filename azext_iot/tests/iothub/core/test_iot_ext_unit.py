@@ -215,6 +215,8 @@ def generate_device_show(**kvp):
             "x509Thumbprint": {"primaryThumbprint": None, "secondaryThumbprint": None},
             "type": DeviceAuthApiType.sas.value,
         },
+        # for twin lists
+        "authenticationType": DeviceAuthApiType.sas.value,
         "capabilities": {"iotEdge": True},
         "deviceId": device_id,
         "status": "disabled",
@@ -544,68 +546,196 @@ class TestDeviceRegenerateKey:
 
     @pytest.mark.parametrize(
         "req, etag",
-        [("primary", generate_generic_id()), ("secondary", None), ("swap", None)],
+        [("primary", None), ("secondary", None), ("swap", generate_generic_id()), ("both", None)],
     )
     def test_device_key_regenerate(self, fixture_cmd, serviceclient, req, etag):
+        # one device
         subject.iot_device_key_regenerate(
             cmd=fixture_cmd,
             hub_name_or_hostname=mock_target["entity"],
-            device_id=device_id,
+            device_ids=[device_id],
             renew_key_type=req,
             etag=etag
         )
-        args = serviceclient.call_args
-        assert (
-            "{}/devices/{}?".format(mock_target["entity"], device_id) in args[0][0].url
-        )
-        assert args[0][0].method == "PUT"
+        call_args = serviceclient.call_args[0][0]
 
-        body = args[0][2]
-        if req == "primary":
-            assert body["authentication"]["symmetricKey"]["primaryKey"] != "123"
-        if req == "secondary":
-            assert body["authentication"]["symmetricKey"]["secondaryKey"] != "321"
         if req == "swap":
+            assert call_args.method == "PUT"
+            assert (
+                "{}/devices/{}?".format(mock_target["entity"], device_id) in call_args.url
+            )
+            body = serviceclient.call_args[0][2]
             assert body["authentication"]["symmetricKey"]["primaryKey"] == "321"
             assert body["authentication"]["symmetricKey"]["secondaryKey"] == "123"
+            headers = serviceclient.call_args[0][1]
+            assert headers["If-Match"] == '"{}"'.format(etag if etag else "*")
+        else:
+            assert call_args.method == "POST"
+            assert (
+                "{}/devices/keys/regenerate?".format(mock_target["entity"]) in call_args.url
+            )
+            body = serviceclient.call_args[0][2]
+            assert body["devices"][0]["id"] == device_id
+            assert body["policyKey"] == (req if req == "both" else f"{req}Key")
 
-        headers = args[0][1]
-        assert headers["If-Match"] == '"{}"'.format(etag if etag else "*")
 
     @pytest.fixture(params=[200])
-    def serviceclient_invalid_args(self, mocker, fixture_ghcs, fixture_sas, request):
-        service_client = mocker.patch(path_service_client)
-        kvp = {}
-        kvp.setdefault("authentication", {"type": "test"})
-        test_side_effect = [
-            build_mock_response(mocker, 200, generate_device_show(**kvp))
-        ]
-        service_client.side_effect = test_side_effect
-        return service_client
+    def minclient(self, mocker, fixture_ghcs, fixture_sas, request):
+        return mocker.patch(path_service_client)
 
-    @pytest.mark.parametrize(
-        "req, exp", [("primary", CLIError), ("secondary", CLIError), ("swap", CLIError)]
-    )
-    def test_device_key_regenerate_invalid_args(
-        self, fixture_cmd, serviceclient_invalid_args, req, exp
-    ):
-        with pytest.raises(exp):
-            subject.iot_device_key_regenerate(
-                cmd=fixture_cmd,
-                hub_name_or_hostname=mock_target["entity"],
-                device_id=device_id,
-                renew_key_type=req,
+    @pytest.mark.parametrize("num_devices", [19, 140, '*'])
+    def test_device_bulk_key_regenerate(self, mocker, fixture_cmd, minclient, num_devices):
+        # to avoid memory issues, we use numbers as small as possible/minimize pages
+        if isinstance(num_devices, str):
+            device_ids = ["*"]
+            num_devices = 11
+            # one for normal devices one for edge devices; 5 + 6 = 11
+            side_effects = [
+                build_mock_response(mocker, 200, [generate_device_show()] * 5),
+                build_mock_response(mocker, 200, [generate_device_show()] * 6)
+            ]
+        else:
+            side_effects = []
+            device_ids = [device_id] * num_devices
+
+        expected_batch_num = num_devices // 100 + 1
+        for _ in range(expected_batch_num):
+            side_effects.append(
+                build_mock_response(mocker, 200, {
+                    "rotated_key": [{"id": generate_generic_id()}],
+                    "errors": [{"id": generate_generic_id()}]
+                })
             )
+        minclient.side_effect = side_effects
 
-    @pytest.mark.parametrize("req", ["primary", "secondary", "swap"])
-    def test_device_key_regenerate_error(self, serviceclient_generic_error, req):
+        subject.iot_device_key_regenerate(
+            cmd=fixture_cmd,
+            hub_name_or_hostname=mock_target["entity"],
+            device_ids=device_ids,
+            renew_key_type="primary",
+        )
+        calls = minclient.call_args_list
+        assert len(calls) == (int(device_ids == ["*"]) * 2 + expected_batch_num)
+
+        if device_ids == ["*"]:
+            # ensure that query calls happened
+            assert "/devices/query?" in calls[0][0][0].url
+            assert "/devices/query?" in calls[1][0][0].url
+        elif num_devices > 100:
+            body = calls[0][0][2]
+            assert body["policyKey"] == "primaryKey"
+            assert len(body["devices"]) == 100
+
+        # last call
+        body = calls[-1][0][2]
+        assert body["policyKey"] == "primaryKey"
+        assert len(body["devices"]) == num_devices % 100
+
+    @pytest.mark.parametrize("module_counts", [
+        [1],  # one device with one module
+        [0, 0],  # 2 devices with no modules
+        [2, 0, 3],  # 3 devices, one with 2, one with 0, one with 3 modules
+    ])
+    def test_device_key_regenerate_include_module(
+        self, mocker, fixture_cmd, minclient, module_counts
+    ):
+        devices = []
+        for i in range(len(module_counts)):
+            # create a mix of sas vs non sas devices
+            kvp = {}
+            kvp.setdefault(
+                "authenticationType",
+                generate_generic_id() if i % 2 else DeviceAuthApiType.sas.value,
+            )
+            devices.append(generate_device_show(**kvp))
+
+        # device get - only have non edge here
+        side_effects = [
+            build_mock_response(mocker, 200, devices),
+            build_mock_response(mocker, 200, {}),
+        ]
+        # modules get
+        side_effects.extend([
+            build_mock_response(mocker, 200, [generate_device_module_show()] * i) for i in module_counts
+        ])
+
+        side_effects.extend([
+            build_mock_response(mocker, 200, {  # final result
+                "rotated_key": [{"id": generate_generic_id()}],
+                "errors": [{"id": generate_generic_id()}]
+            })
+        ])
+        minclient.side_effect = side_effects
+
+        subject.iot_device_key_regenerate(
+            cmd=fixture_cmd,
+            hub_name_or_hostname=mock_target["entity"],
+            device_ids="*",
+            renew_key_type="primary",
+            include_modules=True
+        )
+        calls = minclient.call_args_list
+        # 2 calls for device get + one call for regen + module get calls
+        assert len(calls) == (len(module_counts) + 3)
+        body = calls[-1][0][2]
+        sas_devices = [device for device in devices if device["authenticationType"] == "sas"]
+        assert len(body["devices"]) == (sum(module_counts) + len(sas_devices))
+        for i in range(len(sas_devices)):
+            assert "moduleId" not in body["devices"][i]
+        for i in range(sum(module_counts)):
+            assert body["devices"][i + len(sas_devices)]["moduleId"] == module_id
+
+    def test_device_key_regenerate_swap_errors(
+        self, mocker, fixture_cmd, minclient
+    ):
+        # cannot do bulk swap
         with pytest.raises(CLIError):
             subject.iot_device_key_regenerate(
                 cmd=fixture_cmd,
                 hub_name_or_hostname=mock_target["entity"],
-                device_id=device_id,
+                device_ids=[device_id] * 2,
+                renew_key_type="swap",
+            )
+        with pytest.raises(CLIError):
+            subject.iot_device_key_regenerate(
+                cmd=fixture_cmd,
+                hub_name_or_hostname=mock_target["entity"],
+                device_ids="*",
+                renew_key_type="swap",
+            )
+
+        # swap will check for sas since we fetch the keys here
+        kvp = {}
+        kvp.setdefault("authentication", {"type": "test"})
+        minclient.side_effect = [
+            build_mock_response(mocker, 200, generate_device_show(**kvp))
+        ]
+        with pytest.raises(CLIError):
+            subject.iot_device_key_regenerate(
+                cmd=fixture_cmd,
+                hub_name_or_hostname=mock_target["entity"],
+                device_ids=[device_id],
+                renew_key_type="swap",
+            )
+
+    @pytest.mark.parametrize("req", ["primary", "secondary", "swap", "both"])
+    def test_device_key_regenerate_error(self, serviceclient_generic_error, req):
+        if serviceclient_generic_error.return_value.status_code == 400 and req != "swap":
+            # 400s do not fail
+            subject.iot_device_key_regenerate(
+                cmd=fixture_cmd,
+                hub_name_or_hostname=mock_target["entity"],
+                device_ids=[device_id],
                 renew_key_type=req,
             )
+        else:
+            with pytest.raises(CLIError):
+                subject.iot_device_key_regenerate(
+                    cmd=fixture_cmd,
+                    hub_name_or_hostname=mock_target["entity"],
+                    device_ids=[device_id],
+                    renew_key_type=req,
+                )
 
 
 class TestDeviceDelete:
@@ -1060,6 +1190,173 @@ class TestDeviceModuleList:
             subject.iot_device_module_list(
                 cmd=fixture_cmd, device_id=device_id, hub_name_or_hostname=mock_target["entity"]
             )
+
+
+class TestDeviceModuleRegenerateKey:
+    @pytest.fixture(params=[200])
+    def serviceclient(self, mocker, fixture_ghcs, fixture_sas, request):
+        service_client = mocker.patch(path_service_client)
+        kvp = {}
+        kvp.setdefault(
+            "authentication",
+            {
+                "symmetricKey": {"primaryKey": "123", "secondaryKey": "321"},
+                "type": DeviceAuthApiType.sas.value,
+            },
+        )
+        test_side_effect = [
+            build_mock_response(mocker, 200, generate_device_module_show(**kvp)),
+            build_mock_response(mocker, 200, {}),
+        ]
+        service_client.side_effect = test_side_effect
+        return service_client
+
+    @pytest.mark.parametrize(
+        "req, etag",
+        [("primary", None), ("secondary", None), ("swap", generate_generic_id()), ("both", None)],
+    )
+    def test_module_key_regenerate(self, fixture_cmd, serviceclient, req, etag):
+        # one device
+        subject.iot_device_module_key_regenerate(
+            cmd=fixture_cmd,
+            hub_name_or_hostname=mock_target["entity"],
+            device_id=device_id,
+            module_ids=[module_id],
+            renew_key_type=req,
+            etag=etag
+        )
+        call_args = serviceclient.call_args[0][0]
+
+        if req == "swap":
+            assert call_args.method == "PUT"
+            assert (
+                "{}/devices/{}/modules/{}?".format(
+                    mock_target["entity"], device_id, module_id
+                ) in call_args.url
+            )
+            body = serviceclient.call_args[0][2]
+            assert body["authentication"]["symmetricKey"]["primaryKey"] == "321"
+            assert body["authentication"]["symmetricKey"]["secondaryKey"] == "123"
+            headers = serviceclient.call_args[0][1]
+            assert headers["If-Match"] == '"{}"'.format(etag if etag else "*")
+        else:
+            assert call_args.method == "POST"
+            assert (
+                "{}/devices/keys/regenerate?".format(mock_target["entity"]) in call_args.url
+            )
+            body = serviceclient.call_args[0][2]
+            assert body["devices"][0]["id"] == device_id
+            assert body["devices"][0]["moduleId"] == module_id
+            assert body["policyKey"] == (req if req == "both" else f"{req}Key")
+
+
+    @pytest.fixture(params=[200])
+    def minclient(self, mocker, fixture_ghcs, fixture_sas, request):
+        return mocker.patch(path_service_client)
+
+    @pytest.mark.parametrize("num_modules", [19, 140, '*'])
+    def test_module_bulk_key_regenerate(self, mocker, fixture_cmd, minclient, num_modules):
+        # to avoid memory issues, we use numbers as small as possible/minimize pages
+        if isinstance(num_modules, str):
+            module_ids = ["*"]
+            num_modules = 11
+            # one for normal devices one for edge devices; 5 + 6 = 11
+            side_effects = [
+                build_mock_response(mocker, 200, [generate_device_module_show()] * 11),
+            ]
+        else:
+            side_effects = []
+            module_ids = [module_id] * num_modules
+
+        expected_batch_num = num_modules // 100 + 1
+        for _ in range(expected_batch_num):
+            side_effects.append(
+                build_mock_response(mocker, 200, {
+                    "rotated_key": [{"id": generate_generic_id()}],
+                    "errors": [{"id": generate_generic_id()}]
+                })
+            )
+        minclient.side_effect = side_effects
+
+        subject.iot_device_module_key_regenerate(
+            cmd=fixture_cmd,
+            hub_name_or_hostname=mock_target["entity"],
+            device_id=device_id,
+            module_ids=module_ids,
+            renew_key_type="primary",
+        )
+        calls = minclient.call_args_list
+        assert len(calls) == (int(module_ids == ["*"]) + expected_batch_num)
+
+        if module_ids == ["*"]:
+            # ensure that query calls happened
+            assert f"/devices/{device_id}/modules?" in calls[0][0][0].url
+        elif num_modules > 100:
+            body = calls[0][0][2]
+            assert body["policyKey"] == "primaryKey"
+            assert len(body["devices"]) == 100
+
+        # last call
+        body = calls[-1][0][2]
+        assert body["policyKey"] == "primaryKey"
+        assert len(body["devices"]) == num_modules % 100
+
+    def test_module_key_regenerate_swap_errors(
+        self, mocker, fixture_cmd, minclient
+    ):
+        # cannot do bulk swap
+        with pytest.raises(CLIError):
+            subject.iot_device_module_key_regenerate(
+                cmd=fixture_cmd,
+                hub_name_or_hostname=mock_target["entity"],
+                device_id=device_id,
+                module_ids=[module_id] * 2,
+                renew_key_type="swap",
+            )
+        with pytest.raises(CLIError):
+            subject.iot_device_module_key_regenerate(
+                cmd=fixture_cmd,
+                hub_name_or_hostname=mock_target["entity"],
+                device_id=device_id,
+                module_ids="*",
+                renew_key_type="swap",
+            )
+
+        # swap will check for sas since we fetch the keys here
+        kvp = {}
+        kvp.setdefault("authentication", {"type": "test"})
+        minclient.side_effect = [
+            build_mock_response(mocker, 200, generate_device_show(**kvp))
+        ]
+        with pytest.raises(CLIError):
+            subject.iot_device_module_key_regenerate(
+                cmd=fixture_cmd,
+                hub_name_or_hostname=mock_target["entity"],
+                device_id=device_id,
+                module_ids=[module_id],
+                renew_key_type="swap",
+            )
+
+    @pytest.mark.parametrize("req", ["primary", "secondary", "swap", "both"])
+    def test_module_key_regenerate_error(self, serviceclient_generic_error, req):
+        if serviceclient_generic_error.return_value.status_code == 400 and req != "swap":
+            # 400s do not fail
+            subject.iot_device_module_key_regenerate(
+                cmd=fixture_cmd,
+                hub_name_or_hostname=mock_target["entity"],
+                device_id=device_id,
+                module_ids=[module_id],
+                renew_key_type=req,
+            )
+        else:
+            with pytest.raises(CLIError):
+                subject.iot_device_module_key_regenerate(
+                    cmd=fixture_cmd,
+                    hub_name_or_hostname=mock_target["entity"],
+                    device_id=device_id,
+                    module_ids=[module_id],
+                    renew_key_type=req,
+                )
 
 
 def change_dir():

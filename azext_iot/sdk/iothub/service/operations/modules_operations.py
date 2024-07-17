@@ -226,8 +226,7 @@ class ModulesOperations(object):
             header_parameters['accept-language'] = self._serialize.header("self.config.accept_language", self.config.accept_language, 'str')
 
         # Construct body
-        # @digimaun - Change deserialize type to {object} from Twin
-        body_content = self._serialize.body(device_twin_info, '{object}')
+        body_content = self._serialize.body(device_twin_info, 'Twin')
 
         # Construct and send request
         request = self._client.patch(url, query_parameters)
