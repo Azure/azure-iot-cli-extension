@@ -504,18 +504,22 @@ class JobsOperations(object):
         request = self._client.get(url, query_parameters)
         response = self._client.send(request, header_parameters, stream=False, **operation_config)
 
-        if response.status_code not in [200]:
-            exp = CloudError(response)
-            exp.request_id = response.headers.get('x-ms-request-id')
-            raise exp
-
-        deserialized = None
+        # @digimaun
+        header_dict = {}
 
         if response.status_code == 200:
-            deserialized = self._deserialize('QueryResult', response)
+            # @digimaun - changed from 'QueryResult' to [object]. Also note link tokens are in the headers.
+            deserialized = self._deserialize('[object]', response)
+            # @digimaun - Consistent querying change (twin vs job query)
+            header_dict = {
+                'x-ms-item-type': 'str',
+                'x-ms-continuation': 'str',
+            }
 
         if raw:
             client_raw_response = ClientRawResponse(deserialized, response)
+            # @digimaun - Consistent querying change (twin vs job query)
+            client_raw_response.add_headers(header_dict)
             return client_raw_response
 
         return deserialized
