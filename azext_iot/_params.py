@@ -480,6 +480,12 @@ def load_arguments(self, _):
             help="Flag to include device modules during key regeneration.",
             arg_type=get_three_state_flag()
         )
+        context.argument(
+            "etag",
+            options_list=["--etag", "-e"],
+            help="Etag or entity tag corresponding to the last state of the resource. "
+            "If no etag is provided the value '*' is used. This arguement only applies to `swap`.",
+        )
 
     with self.argument_context("iot hub device-identity export") as context:
         context.argument(
@@ -633,6 +639,12 @@ def load_arguments(self, _):
             help="Space seperated list of target Module Ids. Use `*` for all modules.",
             nargs="+",
             action="extend"
+        )
+        context.argument(
+            "etag",
+            options_list=["--etag", "-e"],
+            help="Etag or entity tag corresponding to the last state of the resource. "
+            "If no etag is provided the value '*' is used. This arguement only applies to `swap`.",
         )
 
     with self.argument_context("iot hub distributed-tracing update") as context:
