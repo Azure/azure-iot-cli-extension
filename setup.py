@@ -51,7 +51,7 @@ DEPENDENCIES = [
     "msrest>=0.6.21",
     "msrestazure>=0.6.3,<2.0.0",
     "jsonschema~=3.2.0",
-    "azure-iot-device~=2.11",
+    "azure-iot-device==2.13.1",
     "tomli~=2.0",
     "tomli-w~=1.0",
     "tqdm~=4.62",
