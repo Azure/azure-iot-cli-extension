@@ -63,6 +63,7 @@ steps:
 
   - ${{ if eq(parameters.runUnitTests, 'true') }}:
     - script: |
+        pip freeze
         pytest -vv ${{ parameters.path }} -k "_unit.py" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-unit-${{ parameters.name }}.xml
       displayName: '${{ parameters.name }} unit tests'
       env:
