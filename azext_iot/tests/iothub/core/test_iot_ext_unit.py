@@ -578,7 +578,6 @@ class TestDeviceRegenerateKey:
             assert body["devices"][0]["id"] == device_id
             assert body["policyKey"] == (req if req == "both" else f"{req}Key")
 
-
     @pytest.fixture(params=[200])
     def minclient(self, mocker, fixture_ghcs, fixture_sas, request):
         return mocker.patch(path_service_client)
@@ -1248,7 +1247,6 @@ class TestDeviceModuleRegenerateKey:
             assert body["devices"][0]["id"] == device_id
             assert body["devices"][0]["moduleId"] == module_id
             assert body["policyKey"] == (req if req == "both" else f"{req}Key")
-
 
     @pytest.fixture(params=[200])
     def minclient(self, mocker, fixture_ghcs, fixture_sas, request):

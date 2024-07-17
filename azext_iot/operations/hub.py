@@ -1063,7 +1063,7 @@ def _iot_key_regenerate_batch(
     service_sdk,
     renew_key_type,
     items,
-    device_id = None,
+    device_id=None,
 ):
     overall_result = {
         "policyKey": renew_key_type,
