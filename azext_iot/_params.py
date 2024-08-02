@@ -46,7 +46,7 @@ dps_auth_type_dataplane_param_type = CLIArgumentType(
     arg_group="Access Control",
     help="Indicates whether the operation should auto-derive a policy key or use the current Azure AD session. "
     "If the authentication type is login and the resource hostname is provided, resource lookup will be skipped unless needed."
-    "You can configure the default using `az configure --defaults iotdps-data-auth-type=<auth-type-value>`",
+    "You can configure the default using `az configure --defaults iotdps-data-auth-type={auth-type-value}`",
     configured_default="iotdps-data-auth-type",
 )
 
@@ -58,7 +58,7 @@ hub_auth_type_dataplane_param_type = CLIArgumentType(
     arg_group="Access Control",
     help="Indicates whether the operation should auto-derive a policy key or use the current Azure AD session. "
     "If the authentication type is login and the resource hostname is provided, resource lookup will be skipped unless needed."
-    "You can configure the default using `az configure --defaults iothub-data-auth-type=<auth-type-value>`",
+    "You can configure the default using `az configure --defaults iothub-data-auth-type={auth-type-value}`",
     configured_default="iothub-data-auth-type",
 )
 
