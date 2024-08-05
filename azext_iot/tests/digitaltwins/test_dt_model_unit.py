@@ -464,7 +464,7 @@ class TestUpdateModel(object):
             url="https://{}/models/{}".format(
                 hostname, url_model_id
             ),
-            body=generic_result,
+            body=None,
             status=204,
             content_type="application/json",
             match_querystring=False,
@@ -528,7 +528,7 @@ class TestUpdateModel(object):
             url="https://{}/models/{}".format(
                 hostname, url_model_id
             ),
-            body=generic_result,
+            body=None,
             status=request.param[1],
             content_type="application/json",
             match_querystring=False,
@@ -555,7 +555,7 @@ class TestDeleteModel(object):
             url="https://{}/models/{}".format(
                 hostname, url_model_id
             ),
-            body=generic_result,
+            body=None,
             status=204,
             content_type="application/json",
             match_querystring=False,
@@ -585,7 +585,7 @@ class TestDeleteModel(object):
             url="https://{}/models/{}".format(
                 hostname, url_model_id
             ),
-            body=generic_result,
+            body=None,
             status=request.param,
             content_type="application/json",
             match_querystring=False,
@@ -626,7 +626,7 @@ class TestDeleteAllModels(object):
         service_client.add(
             method=responses.DELETE,
             url="https://{}/models/{}".format(hostname, url_model_id),
-            body=generic_result,
+            body=None,
             status=204 if num_dependencies % 2 == 0 else 400,
             content_type="application/json",
             match_querystring=False,
