@@ -301,46 +301,47 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
         )
 
         for auth_phase in DATAPLANE_AUTH_TYPES:
-            renew_primary_key_device = self.cmd(
+            # swap returns normal key still
+            swap_keys_device = self.cmd(
+                self.set_cmd_auth_type(
+                    f"iot hub device-identity renew-key -d {device_ids[0]} -n {self.host_name} -g {self.entity_rg} --kt swap",
+                    auth_type=auth_phase,
+                )
+            ).get_output_in_json()
+            assert (
+                original_device["authentication"]["symmetricKey"]["primaryKey"]
+                == swap_keys_device["authentication"]["symmetricKey"]["secondaryKey"]
+            )
+            assert (
+                original_device["authentication"]["symmetricKey"]["secondaryKey"]
+                == swap_keys_device["authentication"]["symmetricKey"]["primaryKey"]
+            )
+            original_device = swap_keys_device
+        # avoid having this affect swap results
+        for auth_phase in DATAPLANE_AUTH_TYPES:
+            # non swap returns a different result now
+            renew_result = self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub device-identity renew-key "
                     f"-d {device_ids[0]} -n {self.host_name} -g {self.entity_rg} --kt primary",
                     auth_type=auth_phase,
                 )
             ).get_output_in_json()
+            assert renew_result.get("policyKey") == "primaryKey"
+            assert renew_result["rotatedKeys"][0]["id"] == device_ids[0]
             assert (
-                renew_primary_key_device["authentication"]["symmetricKey"]["primaryKey"]
-                != original_device["authentication"]["symmetricKey"]["primaryKey"]
+                renew_result["rotatedKeys"][0]["primaryKey"]
+                != swap_keys_device["authentication"]["symmetricKey"]["primaryKey"]
             )
-            assert (
-                renew_primary_key_device["authentication"]["symmetricKey"][
-                    "secondaryKey"
-                ]
-                == original_device["authentication"]["symmetricKey"]["secondaryKey"]
-            )
+            assert renew_result["rotatedKeys"][0]["secondaryKey"] is None
 
-        swap_keys_device = self.cmd(
-            self.set_cmd_auth_type(
-                f"iot hub device-identity renew-key -d {device_ids[0]} -n {self.host_name} -g {self.entity_rg} --kt swap",
-                auth_type=auth_phase,
+            self.cmd(
+                self.set_cmd_auth_type(
+                    f"iot hub device-identity renew-key -d {' '.join(device_ids)} -n {self.host_name} -g {self.entity_rg} "
+                    "--kt secondary --include-modules",
+                    auth_type=auth_phase,
+                ),
             )
-        ).get_output_in_json()
-        assert (
-            renew_primary_key_device["authentication"]["symmetricKey"]["primaryKey"]
-            == swap_keys_device["authentication"]["symmetricKey"]["secondaryKey"]
-        )
-        assert (
-            renew_primary_key_device["authentication"]["symmetricKey"]["secondaryKey"]
-            == swap_keys_device["authentication"]["symmetricKey"]["primaryKey"]
-        )
-
-        self.cmd(
-            self.set_cmd_auth_type(
-                f"iot hub device-identity renew-key -d {device_ids[1]} -n {self.host_name} -g {self.entity_rg} --kt secondary",
-                auth_type=auth_phase,
-            ),
-            expect_failure=True,
-        )
 
     def test_iothub_device_connection_string_show(self):
         device_count = 2

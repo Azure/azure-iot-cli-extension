@@ -1001,7 +1001,7 @@ def iot_device_module_key_regenerate(
             )
         try:
             module = service_sdk.modules.get_identity(
-                id=device_id, mid=module_ids, raw=True
+                id=device_id, mid=module_ids[0], raw=True
             ).response.json()
         except CloudError as e:
             handle_service_exception(e)
