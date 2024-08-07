@@ -2,7 +2,7 @@ pytest==8.1.1
 pytest-mock==3.12.0
 pytest-cov
 pytest-env
-uamqp~=1.2
+uamqp>=1.2,<=1.6.8
 responses==0.22.0
 black
 wheel==0.30.0
