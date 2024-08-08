@@ -231,7 +231,9 @@ helps[
 ] = """
     type: command
     short-summary: Renew target keys of an IoT Hub device with sas authentication.
-    long-summary: Currently etags and key type `swap` are not supported for bulk key regeneration.
+    long-summary: |
+                  Currently etags and key type `swap` are not supported for bulk key regeneration.
+                  Bulk Key regeneration will yeild a different output format from single device key regeneration.
     examples:
       - name: Renew the primary key.
         text: az iot hub device-identity renew-key -d {device_id} -n {iothub_name} --kt primary
@@ -563,7 +565,9 @@ helps[
 ] = """
     type: command
     short-summary: Renew target keys of an IoT Hub device module with sas authentication.
-    long-summary: Currently etags and key type `swap` are not supported for bulk key regeneration.
+    long-summary: |
+                  Currently etags and key type `swap` are not supported for bulk key regeneration.
+                  Bulk Key regeneration will yeild a different output format from single module key regeneration.
     examples:
       - name: Renew the primary key.
         text: az iot hub module-identity renew-key -m {module_name} -d {device_id} -n {iothub_name} --kt primary
