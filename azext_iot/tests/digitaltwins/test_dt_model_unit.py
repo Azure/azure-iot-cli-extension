@@ -153,8 +153,7 @@ class TestAddModels(object):
 
         def post_request_callback_second(request):
             headers = {"content_type": "application/json"}
-            resp_body = [{"status": "failed"}]
-            return (400, headers, json.dumps(resp_body))
+            return (400, headers, None)
 
         responses.add_callback(
             responses.POST,
@@ -184,12 +183,10 @@ class TestAddModels(object):
             model = url.split("/")[-1]
             # Ensures that we are deleting the models which were added in the successful batch
             if model in models_added:
-                resp_body = [{"status": "succeeded"}]
                 models_deleted.append(model)
-                return (204, headers, json.dumps(resp_body))
+                return (204, headers, None)
             else:
-                resp_body = [{"status": "Failed - Unexpected model deletion"}]
-                return (400, headers, json.dumps(resp_body))
+                return (400, headers, None)
 
         responses.add_callback(
             responses.DELETE,
