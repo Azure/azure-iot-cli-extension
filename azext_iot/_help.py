@@ -230,7 +230,7 @@ helps[
     "iot hub device-identity renew-key"
 ] = """
     type: command
-    short-summary: Renew target keys of an IoT Hub device with sas authentication.
+    short-summary: Renew target keys of IoT Hub devices with sas authentication.
     long-summary: |
                   Currently etags and key type `swap` are not supported for bulk key regeneration.
                   Bulk Key regeneration will yeild a different output format from single device key regeneration.
@@ -564,7 +564,7 @@ helps[
     "iot hub module-identity renew-key"
 ] = """
     type: command
-    short-summary: Renew target keys of an IoT Hub device module with sas authentication.
+    short-summary: Renew target keys of IoT Hub device modules with sas authentication.
     long-summary: |
                   Currently etags and key type `swap` are not supported for bulk key regeneration.
                   Bulk Key regeneration will yeild a different output format from single module key regeneration.

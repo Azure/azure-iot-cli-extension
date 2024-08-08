@@ -20,6 +20,10 @@ from azure.cli.core.azclierror import (
 )
 from azext_iot.constants import (
     DEVICE_DEVICESCOPE_PREFIX,
+    IOTHUB_RENEW_KEY_BATCH_SIZE,
+    IOTHUB_THROTTLE_MAX_TRIES,
+    IOTHUB_THROTTLE_SLEEP_SEC,
+    THROTTLE_HTTP_STATUS_CODE,
     TRACING_PROPERTY,
     TRACING_ALLOWED_FOR_LOCATION,
     TRACING_ALLOWED_FOR_SKU,
@@ -1083,9 +1087,9 @@ def _iot_key_regenerate_batch(
         return {}
     batches = []
     while items:
-        if len(items) > 100:
-            batches.append(items[:100])
-            items = items[100:]
+        if len(items) > IOTHUB_RENEW_KEY_BATCH_SIZE:
+            batches.append(items[:IOTHUB_RENEW_KEY_BATCH_SIZE])
+            items = items[IOTHUB_RENEW_KEY_BATCH_SIZE:]
         else:
             batches.append(items[:])
             items = []
@@ -1093,7 +1097,7 @@ def _iot_key_regenerate_batch(
         # call
         result = None
         tries = 0
-        while tries < 3:
+        while tries < IOTHUB_THROTTLE_MAX_TRIES:
             try:
                 result = service_sdk.service.bulk_regenerate_device_key_method(
                     policy_key=renew_key_type,
@@ -1102,9 +1106,13 @@ def _iot_key_regenerate_batch(
                 break
             except CloudError as e:
                 tries += 1
-                if tries == 3 or e.status_code != 429:
+                if tries == IOTHUB_THROTTLE_MAX_TRIES or e.status_code != THROTTLE_HTTP_STATUS_CODE:
+                    if overall_result["rotatedKeys"]:
+                        logger.warning(
+                            f"Managed to renew the following keys:\n{overall_result['rotatedKeys']}"
+                        )
                     handle_service_exception(e)
-                sleep(20)
+                sleep(IOTHUB_THROTTLE_SLEEP_SEC)
         # combine result
         if result.errors:
             overall_result["errors"].extend(result.errors)
