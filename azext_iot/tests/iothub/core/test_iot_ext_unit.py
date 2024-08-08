@@ -557,24 +557,26 @@ class TestDeviceRegenerateKey:
             renew_key_type=req,
             etag=etag
         )
-        call_args = serviceclient.call_args[0][0]
+        calls = serviceclient.call_args_list
 
         if req == "swap":
+            call_args = calls[1].args[0]
             assert call_args.method == "PUT"
             assert (
                 "{}/devices/{}?".format(mock_target["entity"], device_id) in call_args.url
             )
-            body = serviceclient.call_args[0][2]
+            body = calls[1].args[2]
             assert body["authentication"]["symmetricKey"]["primaryKey"] == "321"
             assert body["authentication"]["symmetricKey"]["secondaryKey"] == "123"
             headers = serviceclient.call_args[0][1]
             assert headers["If-Match"] == '"{}"'.format(etag if etag else "*")
         else:
+            call_args = calls[0].args[0]
             assert call_args.method == "POST"
             assert (
                 "{}/devices/keys/regenerate?".format(mock_target["entity"]) in call_args.url
             )
-            body = serviceclient.call_args[0][2]
+            body = calls[0].args[2]
             assert body["devices"][0]["id"] == device_id
             assert body["policyKey"] == (req if req == "both" else f"{req}Key")
 
@@ -684,6 +686,38 @@ class TestDeviceRegenerateKey:
         for i in range(sum(module_counts)):
             assert body["devices"][i + len(sas_devices)]["moduleId"] == module_id
 
+    @pytest.mark.parametrize("num_throttles", [1, 3])
+    def test_device_key_throttling(
+        self, mocker, fixture_cmd, minclient, num_throttles
+    ):
+        mocker.patch("time.sleep")
+        # throttles
+        side_effects = [build_mock_response(mocker, 429, {"errors": "throttling"})] * num_throttles
+        side_effects.extend([
+            build_mock_response(mocker, 200, {  # final result
+                "rotated_key": [{"id": generate_generic_id()}],
+                "errors": [{"id": generate_generic_id()}]
+            })
+        ])
+        minclient.side_effect = side_effects
+
+        if num_throttles >= 3:
+            with pytest.raises(CLIError):
+                subject.iot_device_key_regenerate(
+                    cmd=fixture_cmd,
+                    hub_name_or_hostname=mock_target["entity"],
+                    device_ids=[generate_generic_id(), generate_generic_id()],
+                    renew_key_type="primary",
+                )
+            return
+        subject.iot_device_key_regenerate(
+            cmd=fixture_cmd,
+            hub_name_or_hostname=mock_target["entity"],
+            device_ids=[generate_generic_id(), generate_generic_id()],
+            renew_key_type="primary",
+        )
+        assert minclient.call_count == (num_throttles + 1)
+
     def test_device_key_regenerate_swap_errors(
         self, mocker, fixture_cmd, minclient
     ):
@@ -719,22 +753,13 @@ class TestDeviceRegenerateKey:
 
     @pytest.mark.parametrize("req", ["primary", "secondary", "swap", "both"])
     def test_device_key_regenerate_error(self, serviceclient_generic_error, req):
-        if serviceclient_generic_error.return_value.status_code == 400 and req != "swap":
-            # 400s do not fail
+        with pytest.raises(CLIError):
             subject.iot_device_key_regenerate(
                 cmd=fixture_cmd,
                 hub_name_or_hostname=mock_target["entity"],
                 device_ids=[device_id],
                 renew_key_type=req,
             )
-        else:
-            with pytest.raises(CLIError):
-                subject.iot_device_key_regenerate(
-                    cmd=fixture_cmd,
-                    hub_name_or_hostname=mock_target["entity"],
-                    device_ids=[device_id],
-                    renew_key_type=req,
-                )
 
 
 class TestDeviceDelete:
@@ -1224,26 +1249,28 @@ class TestDeviceModuleRegenerateKey:
             renew_key_type=req,
             etag=etag
         )
-        call_args = serviceclient.call_args[0][0]
+        calls = serviceclient.call_args_list
 
         if req == "swap":
+            call_args = calls[1].args[0]
             assert call_args.method == "PUT"
             assert (
                 "{}/devices/{}/modules/{}?".format(
                     mock_target["entity"], device_id, module_id
                 ) in call_args.url
             )
-            body = serviceclient.call_args[0][2]
+            body = calls[1].args[2]
             assert body["authentication"]["symmetricKey"]["primaryKey"] == "321"
             assert body["authentication"]["symmetricKey"]["secondaryKey"] == "123"
             headers = serviceclient.call_args[0][1]
             assert headers["If-Match"] == '"{}"'.format(etag if etag else "*")
         else:
+            call_args = calls[0].args[0]
             assert call_args.method == "POST"
             assert (
                 "{}/devices/keys/regenerate?".format(mock_target["entity"]) in call_args.url
             )
-            body = serviceclient.call_args[0][2]
+            body = calls[0].args[2]
             assert body["devices"][0]["id"] == device_id
             assert body["devices"][0]["moduleId"] == module_id
             assert body["policyKey"] == (req if req == "both" else f"{req}Key")
@@ -1299,6 +1326,40 @@ class TestDeviceModuleRegenerateKey:
         assert body["policyKey"] == "primaryKey"
         assert len(body["devices"]) == num_modules % 100
 
+    @pytest.mark.parametrize("num_throttles", [1, 3])
+    def test_device_key_throttling(
+        self, mocker, fixture_cmd, minclient, num_throttles
+    ):
+        mocker.patch("time.sleep")
+        # throttles
+        side_effects = [build_mock_response(mocker, 429, {"errors": "throttling"})] * num_throttles
+        side_effects.extend([
+            build_mock_response(mocker, 200, {  # final result
+                "rotated_key": [{"id": generate_generic_id()}],
+                "errors": [{"id": generate_generic_id()}]
+            })
+        ])
+        minclient.side_effect = side_effects
+
+        if num_throttles >= 3:
+            with pytest.raises(CLIError):
+                subject.iot_device_module_key_regenerate(
+                    cmd=fixture_cmd,
+                    hub_name_or_hostname=mock_target["entity"],
+                    device_id=generate_generic_id(),
+                    module_ids=[generate_generic_id(), generate_generic_id()],
+                    renew_key_type="primary",
+                )
+            return
+        subject.iot_device_module_key_regenerate(
+            cmd=fixture_cmd,
+            hub_name_or_hostname=mock_target["entity"],
+            device_id=generate_generic_id(),
+            module_ids=[generate_generic_id(), generate_generic_id()],
+            renew_key_type="primary",
+        )
+        assert minclient.call_count == (num_throttles + 1)
+
     def test_module_key_regenerate_swap_errors(
         self, mocker, fixture_cmd, minclient
     ):
@@ -1337,8 +1398,7 @@ class TestDeviceModuleRegenerateKey:
 
     @pytest.mark.parametrize("req", ["primary", "secondary", "swap", "both"])
     def test_module_key_regenerate_error(self, serviceclient_generic_error, req):
-        if serviceclient_generic_error.return_value.status_code == 400 and req != "swap":
-            # 400s do not fail
+        with pytest.raises(CLIError):
             subject.iot_device_module_key_regenerate(
                 cmd=fixture_cmd,
                 hub_name_or_hostname=mock_target["entity"],
@@ -1346,15 +1406,6 @@ class TestDeviceModuleRegenerateKey:
                 module_ids=[module_id],
                 renew_key_type=req,
             )
-        else:
-            with pytest.raises(CLIError):
-                subject.iot_device_module_key_regenerate(
-                    cmd=fixture_cmd,
-                    hub_name_or_hostname=mock_target["entity"],
-                    device_id=device_id,
-                    module_ids=[module_id],
-                    renew_key_type=req,
-                )
 
 
 def change_dir():

@@ -539,13 +539,13 @@ def iot_device_key_regenerate(
         renew_key_type += "Key"
 
     modules = []
+    devices = []
     if device_ids[0] == "*":
-        devices = _iot_device_twin_list(target=target, top=None)
-        devices.extend(_iot_device_twin_list(target=target, edge_enabled=True, top=None))
-        device_ids = []
-        for device in devices:
+        device_twins = _iot_device_twin_list(target=target, top=None)
+        device_twins.extend(_iot_device_twin_list(target=target, edge_enabled=True, top=None))
+        for device in device_twins:
             if device["authenticationType"] == DeviceAuthApiType.sas.value:
-                device_ids.append(device["deviceId"])
+                devices.append({"id": device["deviceId"]})
             # non sas devices can have sas modules...
             if include_modules:
                 modules.extend(
@@ -553,16 +553,23 @@ def iot_device_key_regenerate(
                         target=target, device_id=device["deviceId"], module_ids="*"
                     )
                 )
+    else:
+        devices = [{"id": device_id} for device_id in device_ids]
+
     if modules:
         logger.info(f"Found {len(modules)} modules.")
 
-    # call friendly format
-    devices = [{"id": device_ids[i]} for i in range(len(device_ids))]
-    return _iot_key_regenerate_batch(
+    result = _iot_key_regenerate_batch(
         service_sdk=service_sdk,
         renew_key_type=renew_key_type,
         items=devices + modules,
     )
+
+    # avoid breaking changes by having one device return the device identity
+    if all({len(device_ids) == 1, device_ids[0] != "*", not include_modules}):
+        return _iot_device_show(target, device_ids[0])
+
+    return result
 
 
 def iot_device_get_parent(
@@ -999,12 +1006,7 @@ def iot_device_module_key_regenerate(
             raise InvalidArgumentValueError(
                 "Currently, bulk key swap is not supported."
             )
-        try:
-            module = service_sdk.modules.get_identity(
-                id=device_id, mid=module_ids[0], raw=True
-            ).response.json()
-        except CloudError as e:
-            handle_service_exception(e)
+        module = _iot_device_module_show(target=target, device_id=device_id, module_id=module_ids[0])
         if module["authentication"]["type"] != DeviceAuthApiType.sas.value:
             raise ClientRequestError("Module authentication should be of type sas")
 
@@ -1032,12 +1034,16 @@ def iot_device_module_key_regenerate(
     modules = _iot_key_regenerate_process_modules(
         target, device_id, module_ids
     )
-    return _iot_key_regenerate_batch(
+    result = _iot_key_regenerate_batch(
         service_sdk=service_sdk,
         renew_key_type=renew_key_type,
         items=modules,
         device_id=device_id
     )
+
+    if len(module_ids) == 1 and module_ids[0] != "*":
+        return _iot_device_module_show(target=target, device_id=device_id, module_id=module_ids[0])
+    return result
 
 
 def _iot_key_regenerate_process_modules(
@@ -1056,7 +1062,7 @@ def _iot_key_regenerate_process_modules(
             if module["authentication"]["type"] == DeviceAuthApiType.sas.value:
                 module_ids.append(module["moduleId"])
 
-    return [{"id": device_id, "moduleId": module_ids[i]} for i in range(len(module_ids))]
+    return [{"id": device_id, "moduleId": module_id} for module_id in module_ids]
 
 
 def _iot_key_regenerate_batch(
@@ -1065,6 +1071,7 @@ def _iot_key_regenerate_batch(
     items,
     device_id=None,
 ):
+    from time import sleep
     overall_result = {
         "policyKey": renew_key_type,
         "errors": [],
@@ -1082,15 +1089,22 @@ def _iot_key_regenerate_batch(
         else:
             batches.append(items[:])
             items = []
-    for i in tqdm(range(len(batches)), desc="Bulk key regeneration is in progress", ascii=' #'):
+    for batch in tqdm(batches, desc="Bulk key regeneration is in progress", ascii=' #'):
         # call
-        try:
-            result = service_sdk.service.bulk_regenerate_device_key_method(
-                policy_key=renew_key_type,
-                devices=batches[i]
-            )
-        except CloudError as e:
-            handle_service_exception(e)
+        result = None
+        tries = 0
+        while tries < 3:
+            try:
+                result = service_sdk.service.bulk_regenerate_device_key_method(
+                    policy_key=renew_key_type,
+                    devices=batch
+                )
+                break
+            except CloudError as e:
+                tries += 1
+                if tries == 3 or e.status_code != 429:
+                    handle_service_exception(e)
+                sleep(20)
         # combine result
         if result.errors:
             overall_result["errors"].extend(result.errors)
