@@ -316,32 +316,38 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
                 original_device["authentication"]["symmetricKey"]["secondaryKey"]
                 == swap_keys_device["authentication"]["symmetricKey"]["primaryKey"]
             )
-            original_device = swap_keys_device
-        # avoid having this affect swap results
-        for auth_phase in DATAPLANE_AUTH_TYPES:
-            # non swap returns a different result now
-            renew_result = self.cmd(
+            renew_device = self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub device-identity renew-key "
                     f"-d {device_ids[0]} -n {self.host_name} -g {self.entity_rg} --kt primary",
                     auth_type=auth_phase,
                 )
             ).get_output_in_json()
-            assert renew_result.get("policyKey") == "primaryKey"
-            assert renew_result["rotatedKeys"][0]["id"] == device_ids[0]
             assert (
-                renew_result["rotatedKeys"][0]["primaryKey"]
+                renew_device["authentication"]["symmetricKey"]["primaryKey"]
                 != swap_keys_device["authentication"]["symmetricKey"]["primaryKey"]
             )
-            assert renew_result["rotatedKeys"][0]["secondaryKey"] is None
+            assert (
+                renew_device["authentication"]["symmetricKey"]["secondaryKey"]
+                == swap_keys_device["authentication"]["symmetricKey"]["secondaryKey"]
+            )
+            original_device = renew_device
 
-            self.cmd(
+        # avoid having this affect swap results
+        for auth_phase in DATAPLANE_AUTH_TYPES:
+            renew_result = self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub device-identity renew-key -d {' '.join(device_ids)} -n {self.host_name} -g {self.entity_rg} "
-                    "--kt secondary --include-modules",
+                    "--kt both --include-modules",
                     auth_type=auth_phase,
                 ),
-            )
+            ).get_output_in_json()
+            assert renew_result.get("policyKey") == "both"
+            # since only one sas device, one result
+            device_result = renew_result["rotatedKeys"][0]
+            assert device_result["id"] == device_ids[0]
+            assert device_result["primaryKey"]
+            assert device_result["secondaryKey"]
 
     def test_iothub_device_connection_string_show(self):
         device_count = 2
