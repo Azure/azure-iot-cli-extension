@@ -232,6 +232,7 @@ class RenewKeyType(Enum):
     primary = KeyType.primary.value
     secondary = KeyType.secondary.value
     swap = "swap"
+    both = "both"
 
 
 class IoTHubStateType(Enum):

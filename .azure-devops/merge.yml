@@ -82,7 +82,7 @@ jobs:
 - job: 'run_unit_tests_macOs'
   dependsOn: ['build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
   pool:
-    vmImage: 'macOS-11'
+    vmImage: 'macOS-13'
 
   steps:
   - template: templates/run-tests-parallel.yml

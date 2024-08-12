@@ -608,7 +608,7 @@ class TestEnrollmentDelete():
         mocked_response.add(
             method=responses.DELETE,
             url="https://{}/enrollments/{}".format(mock_dps_target['entity'], enrollment_id),
-            body='{}',
+            body=None,
             status=request.param,
             content_type="application/json",
             match_querystring=False,
@@ -693,7 +693,7 @@ class TestRegistrationDelete():
         mocked_response.add(
             method=responses.DELETE,
             url="https://{}/registrations/{}".format(mock_dps_target['entity'], enrollment_id),
-            body='{}',
+            body=None,
             status=request.param,
             content_type="application/json",
             match_querystring=False

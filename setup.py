@@ -58,7 +58,7 @@ DEPENDENCIES = [
     "treelib~=1.6",
     "packaging"
 ]
-EXTRAS = {"uamqp": ["uamqp~=1.2"]}
+EXTRAS = {"uamqp": ["uamqp>=1.2,<=1.6.8"]}
 
 CLASSIFIERS = [
     "Development Status :: 4 - Beta",

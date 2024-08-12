@@ -467,6 +467,25 @@ def load_arguments(self, _):
             arg_type=get_enum_type(RenewKeyType),
             help="Target key type to regenerate.",
         )
+        context.argument(
+            "device_ids",
+            options_list=["--device-id", "-d"],
+            help="Space seperated list of target Device Ids. Use `*` for all devices.",
+            nargs="+",
+            action="extend"
+        )
+        context.argument(
+            "include_modules",
+            options_list=["--include-modules", "--im"],
+            help="Flag to include device modules during key regeneration.",
+            arg_type=get_three_state_flag()
+        )
+        context.argument(
+            "etag",
+            options_list=["--etag", "-e"],
+            help="Etag or entity tag corresponding to the last state of the resource. "
+            "If no etag is provided the value '*' is used. This arguement only applies to `swap`.",
+        )
 
     with self.argument_context("iot hub device-identity export") as context:
         context.argument(
@@ -613,6 +632,19 @@ def load_arguments(self, _):
             options_list=["--key-type", "--kt"],
             arg_type=get_enum_type(RenewKeyType),
             help="Target key type to regenerate.",
+        )
+        context.argument(
+            "module_ids",
+            options_list=["--module-id", "-m"],
+            help="Space seperated list of target Module Ids. Use `*` for all modules.",
+            nargs="+",
+            action="extend"
+        )
+        context.argument(
+            "etag",
+            options_list=["--etag", "-e"],
+            help="Etag or entity tag corresponding to the last state of the resource. "
+            "If no etag is provided the value '*' is used. This arguement only applies to `swap`.",
         )
 
     with self.argument_context("iot hub distributed-tracing update") as context:

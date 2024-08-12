@@ -74,7 +74,7 @@ class TestCloudToDeviceMessaging:
             url="https://{}/devices/{}/messages/deviceBound/{}".format(
                 mock_target["entity"], device_id, eTag
             ),
-            body="",
+            body=None,
             headers=payload["headers"],
             status=204,
             match_querystring=False,
@@ -101,7 +101,7 @@ class TestCloudToDeviceMessaging:
             url="https://{}/devices/{}/messages/deviceBound/{}".format(
                 mock_target["entity"], device_id, message_etag
             ),
-            body="",
+            body=None,
             status=204,
             match_querystring=False,
         )
@@ -114,7 +114,7 @@ class TestCloudToDeviceMessaging:
             url="https://{}/devices/{}/messages/deviceBound/{}?reject=".format(
                 mock_target["entity"], device_id, message_etag
             ),
-            body="",
+            body=None,
             status=204,
             match_querystring=False,
         )

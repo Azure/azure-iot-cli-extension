@@ -317,7 +317,7 @@ class TestTwinUpdateTwin(object):
             url="https://{}/digitaltwins/{}".format(
                 hostname, twin_id
             ),
-            body=generic_result,
+            body=None,
             status=202,
             content_type="application/json",
             match_querystring=False,
@@ -391,7 +391,7 @@ class TestTwinUpdateTwin(object):
             url="https://{}/digitaltwins/{}".format(
                 hostname, twin_id
             ),
-            body=generic_result,
+            body=None,
             status=request.param[0],
             content_type="application/json",
             match_querystring=False,
@@ -430,7 +430,7 @@ class TestTwinDeleteTwin(object):
             url="https://{}/digitaltwins/{}".format(
                 hostname, twin_id
             ),
-            body=generic_result,
+            body=None,
             status=204,
             content_type="application/json",
             match_querystring=False,
@@ -464,7 +464,7 @@ class TestTwinDeleteTwin(object):
             url="https://{}/digitaltwins/{}".format(
                 hostname, twin_id
             ),
-            body=generic_result,
+            body=None,
             status=request.param,
             content_type="application/json",
             match_querystring=False,
@@ -535,7 +535,7 @@ class TestTwinDeleteAllTwin(object):
                 url="https://{}/digitaltwins/{}".format(
                     hostname, twin["$dtId"]
                 ),
-                body=generic_result,
+                body=None,
                 status=204 if i % 2 == 0 else 400,
                 content_type="application/json",
                 match_querystring=False,
@@ -742,7 +742,7 @@ class TestTwinUpdateRelationship(object):
             url="https://{}/digitaltwins/{}/relationships/{}".format(
                 hostname, twin_id, relationship_id
             ),
-            body=generic_result,
+            body=None,
             status=204,
             content_type="application/json",
             match_querystring=False,
@@ -817,7 +817,7 @@ class TestTwinUpdateRelationship(object):
             url="https://{}/digitaltwins/{}/relationships/{}".format(
                 hostname, twin_id, relationship_id
             ),
-            body=generic_result,
+            body=None,
             status=request.param[1],
             content_type="application/json",
             match_querystring=False,
@@ -987,7 +987,7 @@ class TestTwinDeleteRelationship(object):
             url="https://{}/digitaltwins/{}/relationships/{}".format(
                 hostname, twin_id, relationship_id
             ),
-            body=generic_result,
+            body=None,
             status=204,
             content_type="application/json",
             match_querystring=False,
@@ -1022,7 +1022,7 @@ class TestTwinDeleteRelationship(object):
             url="https://{}/digitaltwins/{}/relationships/{}".format(
                 hostname, twin_id, relationship_id
             ),
-            body=generic_result,
+            body=None,
             status=request.param,
             content_type="application/json",
             match_querystring=False,
@@ -1070,7 +1070,7 @@ class TestTwinDeleteAllRelationship(object):
                 url="https://{}/digitaltwins/{}/relationships/{}".format(
                     hostname, relationship["$sourceId"], relationship["$relationshipId"]
                 ),
-                body=generic_result,
+                body=None,
                 status=204 if i % 2 == 0 else 400,
                 content_type="application/json",
                 match_querystring=False,
@@ -1099,7 +1099,7 @@ class TestTwinDeleteAllRelationship(object):
                 url="https://{}/digitaltwins/{}/relationships/{}".format(
                     hostname, twin_id, relationship["$relationshipId"]
                 ),
-                body=generic_result,
+                body=None,
                 status=204 if i % 2 == 0 else 400,
                 content_type="application/json",
                 match_querystring=False,
@@ -1233,7 +1233,7 @@ class TestTwinSendTelemetry(object):
             url="https://{}/digitaltwins/{}/telemetry".format(
                 hostname, twin_id
             ),
-            body=generic_result,
+            body=None,
             status=204,
             content_type="application/json",
             match_querystring=False,
@@ -1244,7 +1244,7 @@ class TestTwinSendTelemetry(object):
             url="https://{}/digitaltwins/{}/components/{}/telemetry".format(
                 hostname, twin_id, component_path
             ),
-            body=generic_result,
+            body=None,
             status=204,
             content_type="application/json",
             match_querystring=False,
@@ -1267,7 +1267,7 @@ class TestTwinSendTelemetry(object):
     def test_send_telemetry(
         self, fixture_cmd, service_client, dt_id, component_path, telemetry, telemetry_source_time, resource_group_name
     ):
-        result = subject.send_telemetry(
+        subject.send_telemetry(
             cmd=fixture_cmd,
             name_or_hostname=hostname,
             twin_id=twin_id,
@@ -1308,8 +1308,6 @@ class TestTwinSendTelemetry(object):
         if telemetry_source_time:
             twin_telemetry_request.headers["Telemetry-Source-Time"] == telemetry_source_time
 
-        assert result is None
-
     @pytest.fixture(params=[(400, 204), (401, 204), (500, 204), (204, 400), (204, 401), (204, 500)])
     def service_client_error(self, mocked_response, start_twin_response, request):
         mocked_response.add(
@@ -1317,7 +1315,7 @@ class TestTwinSendTelemetry(object):
             url="https://{}/digitaltwins/{}/telemetry".format(
                 hostname, twin_id
             ),
-            body=generic_result,
+            body=None,
             status=request.param[0],
             content_type="application/json",
             match_querystring=False,
@@ -1328,7 +1326,7 @@ class TestTwinSendTelemetry(object):
             url="https://{}/digitaltwins/{}/components/{}/telemetry".format(
                 hostname, twin_id, component_path
             ),
-            body=generic_result,
+            body=None,
             status=request.param[1],
             content_type="application/json",
             match_querystring=False,
@@ -1411,7 +1409,7 @@ class TestTwinUpdateComponent(object):
             url="https://{}/digitaltwins/{}/components/{}".format(
                 hostname, twin_id, component_path
             ),
-            body=generic_result,
+            body=None,
             status=204,
             content_type="application/json",
             match_querystring=False,
@@ -1486,7 +1484,7 @@ class TestTwinUpdateComponent(object):
             url="https://{}/digitaltwins/{}/components/{}".format(
                 hostname, twin_id, component_path
             ),
-            body=generic_result,
+            body=None,
             status=request.param,
             content_type="application/json",
             match_querystring=False,

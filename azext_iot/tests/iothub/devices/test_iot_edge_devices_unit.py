@@ -99,7 +99,7 @@ class TestEdgeHierarchyCreateArgs:
         mocked_response.add(
             method=responses.DELETE,
             url=re.compile(r"{}/dev\d+".format(devices_url)),
-            body="{}",
+            body=None,
             status=204,
             content_type="application/json",
             match_querystring=False,
@@ -445,7 +445,7 @@ class TestHierarchyCreateConfig:
         mocked_response.add(
             method=responses.DELETE,
             url=re.compile(r"{}/device_\d+".format(devices_url)),
-            body="{}",
+            body=None,
             status=204,
             content_type="application/json",
             match_querystring=False,
@@ -1252,7 +1252,7 @@ class TestDevicesDelete:
         mocked_response.add(
             method=responses.DELETE,
             url=re.compile(r"{}/device_\d+".format(devices_url)),
-            body="{}",
+            body=None,
             status=204,
             content_type="application/json",
             match_querystring=False,
