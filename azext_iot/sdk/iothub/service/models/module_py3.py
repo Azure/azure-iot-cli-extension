@@ -44,6 +44,14 @@ class Module(Model):
     :param authentication: The authentication mechanism used by the module
      when connecting to the service and edge hub.
     :type authentication: ~service.models.AuthenticationMechanism
+    :param attributes: The collection of key-value pairs read and written by
+     the solution back end.
+     They are not visible to device apps. They keys are UTF-8 encoded,
+     case-sensitive and up-to 1KB in length.
+     Allowed characters exclude UNICODE control characters (segments C0 and
+     C1), '.', '$' and space.
+     The values are string, boolean, integer or array.
+    :type attributes: dict[str, object]
     """
 
     _attribute_map = {
@@ -57,9 +65,10 @@ class Module(Model):
         'last_activity_time': {'key': 'lastActivityTime', 'type': 'iso-8601'},
         'cloud_to_device_message_count': {'key': 'cloudToDeviceMessageCount', 'type': 'int'},
         'authentication': {'key': 'authentication', 'type': 'AuthenticationMechanism'},
+        'attributes': {'key': 'attributes', 'type': '{object}'},
     }
 
-    def __init__(self, *, module_id: str=None, managed_by: str=None, device_id: str=None, generation_id: str=None, etag: str=None, connection_state=None, connection_state_updated_time=None, last_activity_time=None, cloud_to_device_message_count: int=None, authentication=None, **kwargs) -> None:
+    def __init__(self, *, module_id: str=None, managed_by: str=None, device_id: str=None, generation_id: str=None, etag: str=None, connection_state=None, connection_state_updated_time=None, last_activity_time=None, cloud_to_device_message_count: int=None, authentication=None, attributes=None, **kwargs) -> None:
         super(Module, self).__init__(**kwargs)
         self.module_id = module_id
         self.managed_by = managed_by
@@ -71,3 +80,4 @@ class Module(Model):
         self.last_activity_time = last_activity_time
         self.cloud_to_device_message_count = cloud_to_device_message_count
         self.authentication = authentication
+        self.attributes = attributes

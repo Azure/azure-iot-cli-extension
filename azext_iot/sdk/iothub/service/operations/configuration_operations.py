@@ -23,7 +23,7 @@ class ConfigurationOperations(object):
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: Version of the Api. Constant value: "2021-04-12".
+    :ivar api_version: Version of the Api. Constant value: "2024-03-31".
     """
 
     models = models
@@ -33,7 +33,7 @@ class ConfigurationOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2021-04-12"
+        self.api_version = "2024-03-31"
 
         self.config = config
 
@@ -254,9 +254,9 @@ class ConfigurationOperations(object):
 
         # Construct parameters
         query_parameters = {}
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
         if top is not None:
             query_parameters['top'] = self._serialize.query("top", top, 'int')
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
 
         # Construct headers
         header_parameters = {}
@@ -401,6 +401,7 @@ class ConfigurationOperations(object):
         response = self._client.send(
             request, header_parameters, body_content, stream=False, **operation_config)
 
+        # @vilit handcrafted change
         if response.status_code not in [200, 204]:
             exp = CloudError(response)
             exp.request_id = response.headers.get('x-ms-request-id')

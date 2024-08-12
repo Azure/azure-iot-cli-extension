@@ -153,8 +153,7 @@ class TestAddModels(object):
 
         def post_request_callback_second(request):
             headers = {"content_type": "application/json"}
-            resp_body = [{"status": "failed"}]
-            return (400, headers, json.dumps(resp_body))
+            return (400, headers, None)
 
         responses.add_callback(
             responses.POST,
@@ -184,12 +183,10 @@ class TestAddModels(object):
             model = url.split("/")[-1]
             # Ensures that we are deleting the models which were added in the successful batch
             if model in models_added:
-                resp_body = [{"status": "succeeded"}]
                 models_deleted.append(model)
-                return (204, headers, json.dumps(resp_body))
+                return (204, headers, None)
             else:
-                resp_body = [{"status": "Failed - Unexpected model deletion"}]
-                return (400, headers, json.dumps(resp_body))
+                return (400, headers, None)
 
         responses.add_callback(
             responses.DELETE,
@@ -464,7 +461,7 @@ class TestUpdateModel(object):
             url="https://{}/models/{}".format(
                 hostname, url_model_id
             ),
-            body=generic_result,
+            body=None,
             status=204,
             content_type="application/json",
             match_querystring=False,
@@ -528,7 +525,7 @@ class TestUpdateModel(object):
             url="https://{}/models/{}".format(
                 hostname, url_model_id
             ),
-            body=generic_result,
+            body=None,
             status=request.param[1],
             content_type="application/json",
             match_querystring=False,
@@ -555,7 +552,7 @@ class TestDeleteModel(object):
             url="https://{}/models/{}".format(
                 hostname, url_model_id
             ),
-            body=generic_result,
+            body=None,
             status=204,
             content_type="application/json",
             match_querystring=False,
@@ -585,7 +582,7 @@ class TestDeleteModel(object):
             url="https://{}/models/{}".format(
                 hostname, url_model_id
             ),
-            body=generic_result,
+            body=None,
             status=request.param,
             content_type="application/json",
             match_querystring=False,
@@ -626,7 +623,7 @@ class TestDeleteAllModels(object):
         service_client.add(
             method=responses.DELETE,
             url="https://{}/models/{}".format(hostname, url_model_id),
-            body=generic_result,
+            body=None,
             status=204 if num_dependencies % 2 == 0 else 400,
             content_type="application/json",
             match_querystring=False,

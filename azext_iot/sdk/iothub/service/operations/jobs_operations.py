@@ -23,7 +23,7 @@ class JobsOperations(object):
     :param config: Configuration of service client.
     :param serializer: An object model serializer.
     :param deserializer: An object model deserializer.
-    :ivar api_version: Version of the Api. Constant value: "2021-04-12".
+    :ivar api_version: Version of the Api. Constant value: "2024-03-31".
     """
 
     models = models
@@ -33,7 +33,7 @@ class JobsOperations(object):
         self._client = client
         self._serialize = serializer
         self._deserialize = deserializer
-        self.api_version = "2021-04-12"
+        self.api_version = "2024-03-31"
 
         self.config = config
 
@@ -484,11 +484,11 @@ class JobsOperations(object):
 
         # Construct parameters
         query_parameters = {}
+        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
         if job_type is not None:
             query_parameters['jobType'] = self._serialize.query("job_type", job_type, 'str')
         if job_status is not None:
             query_parameters['jobStatus'] = self._serialize.query("job_status", job_status, 'str')
-        query_parameters['api-version'] = self._serialize.query("self.api_version", self.api_version, 'str')
 
         # Construct headers
         header_parameters = {}
@@ -510,7 +510,6 @@ class JobsOperations(object):
             raise exp
 
         deserialized = None
-
         # @digimaun
         header_dict = {}
 

@@ -58,6 +58,14 @@ class Device(Model):
     :param parent_scopes: The scopes of the upper level edge devices if
      applicable. Only available for edge devices.
     :type parent_scopes: list[str]
+    :param attributes: The collection of key-value pairs read and written by
+     the solution back end.
+     They are not visible to device apps. They keys are UTF-8 encoded,
+     case-sensitive and up-to 1KB in length.
+     Allowed characters exclude UNICODE control characters (segments C0 and
+     C1), '.', '$' and space.
+     The values are string, boolean, integer or array.
+    :type attributes: dict[str, object]
     """
 
     _attribute_map = {
@@ -75,9 +83,10 @@ class Device(Model):
         'capabilities': {'key': 'capabilities', 'type': 'DeviceCapabilities'},
         'device_scope': {'key': 'deviceScope', 'type': 'str'},
         'parent_scopes': {'key': 'parentScopes', 'type': '[str]'},
+        'attributes': {'key': 'attributes', 'type': '{object}'},
     }
 
-    def __init__(self, *, device_id: str=None, generation_id: str=None, etag: str=None, connection_state=None, status=None, status_reason: str=None, connection_state_updated_time=None, status_updated_time=None, last_activity_time=None, cloud_to_device_message_count: int=None, authentication=None, capabilities=None, device_scope: str=None, parent_scopes=None, **kwargs) -> None:
+    def __init__(self, *, device_id: str=None, generation_id: str=None, etag: str=None, connection_state=None, status=None, status_reason: str=None, connection_state_updated_time=None, status_updated_time=None, last_activity_time=None, cloud_to_device_message_count: int=None, authentication=None, capabilities=None, device_scope: str=None, parent_scopes=None, attributes=None, **kwargs) -> None:
         super(Device, self).__init__(**kwargs)
         self.device_id = device_id
         self.generation_id = generation_id
@@ -93,3 +102,4 @@ class Device(Model):
         self.capabilities = capabilities
         self.device_scope = device_scope
         self.parent_scopes = parent_scopes
+        self.attributes = attributes

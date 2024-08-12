@@ -12,25 +12,21 @@
 from msrest.serialization import Model
 
 
-class PurgeMessageQueueResult(Model):
-    """The result of a device message queue purge operation.
+class RegenerateDeviceKey(Model):
+    """RegenerateDeviceKey.
 
-    :param device_id: The unique identifier of the device.
-    :type device_id: str
+    :param id: The unique identifier of the device.
+    :type id: str
     :param module_id: The unique identifier of the module.
     :type module_id: str
-    :param total_messages_purged: The total number of messages purged.
-    :type total_messages_purged: int
     """
 
     _attribute_map = {
-        'device_id': {'key': 'deviceId', 'type': 'str'},
+        'id': {'key': 'id', 'type': 'str'},
         'module_id': {'key': 'moduleId', 'type': 'str'},
-        'total_messages_purged': {'key': 'totalMessagesPurged', 'type': 'int'},
     }
 
-    def __init__(self, *, total_messages_purged: int=None, device_id: str=None, module_id: str=None, **kwargs) -> None:
-        super(PurgeMessageQueueResult, self).__init__(**kwargs)
-        self.total_messages_purged = total_messages_purged
-        self.device_id = device_id
+    def __init__(self, *, id: str=None, module_id: str=None, **kwargs) -> None:
+        super(RegenerateDeviceKey, self).__init__(**kwargs)
+        self.id = id
         self.module_id = module_id
