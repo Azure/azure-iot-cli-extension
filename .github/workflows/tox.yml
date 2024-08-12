@@ -20,14 +20,14 @@ jobs:
   unit-test:
     name: Unit test ${{ matrix.py }} - ${{ matrix.os }}
     continue-on-error: ${{ inputs.continue-on-error }}
-    runs-on: ${{ matrix.os }}-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os:
-          - ubuntu
-          - windows
-          - macos
+          - ubuntu-22.04
+          - windows-2022
+          - macos-13
         py:
           - "3.11"
           - "3.10"

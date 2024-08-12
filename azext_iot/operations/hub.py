@@ -7,6 +7,7 @@
 from os.path import exists
 from knack.log import get_logger
 from enum import Enum, EnumMeta
+from tqdm import tqdm
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
     CLIInternalError,
@@ -19,6 +20,10 @@ from azure.cli.core.azclierror import (
 )
 from azext_iot.constants import (
     DEVICE_DEVICESCOPE_PREFIX,
+    IOTHUB_RENEW_KEY_BATCH_SIZE,
+    IOTHUB_THROTTLE_MAX_TRIES,
+    IOTHUB_THROTTLE_SLEEP_SEC,
+    THROTTLE_HTTP_STATUS_CODE,
     TRACING_PROPERTY,
     TRACING_ALLOWED_FOR_LOCATION,
     TRACING_ALLOWED_FOR_SKU,
@@ -43,7 +48,6 @@ from azext_iot.common.utility import (
     read_file_content,
     init_monitoring,
     process_json_arg,
-    generate_key,
     generate_storage_account_sas_token,
 )
 from azext_iot._factory import SdkResolver, CloudError
@@ -498,8 +502,9 @@ def _update_device_key(target, device, auth_method, pk, sk, etag=None):
 def iot_device_key_regenerate(
     cmd,
     hub_name_or_hostname,
-    device_id,
+    device_ids,
     renew_key_type,
+    include_modules=False,
     resource_group_name=None,
     login=None,
     etag=None,
@@ -512,25 +517,63 @@ def iot_device_key_regenerate(
         login=login,
         auth_type=auth_type_dataplane,
     )
-    device = _iot_device_show(target, device_id)
-    if device["authentication"]["type"] != DeviceAuthApiType.sas.value:
-        raise ClientRequestError("Device authentication should be of type sas")
 
-    pk = device["authentication"]["symmetricKey"]["primaryKey"]
-    sk = device["authentication"]["symmetricKey"]["secondaryKey"]
-
-    if renew_key_type == RenewKeyType.primary.value:
-        pk = generate_key()
-    if renew_key_type == RenewKeyType.secondary.value:
-        sk = generate_key()
     if renew_key_type == RenewKeyType.swap.value:
+        if len(device_ids) > 1 or device_ids[0] == "*":
+            raise InvalidArgumentValueError(
+                "Currently, bulk key swap is not supported."
+            )
+        device = _iot_device_show(target, device_ids[0])
+        if device["authentication"]["type"] != DeviceAuthApiType.sas.value:
+            raise ClientRequestError("Device authentication should be of type sas")
+
+        pk = device["authentication"]["symmetricKey"]["primaryKey"]
+        sk = device["authentication"]["symmetricKey"]["secondaryKey"]
+
         temp = pk
         pk = sk
         sk = temp
+        return _update_device_key(
+            target, device, device["authentication"]["type"], pk, sk, etag
+        )
 
-    return _update_device_key(
-        target, device, device["authentication"]["type"], pk, sk, etag
+    resolver = SdkResolver(target=target)
+    service_sdk = resolver.get_sdk(SdkType.service_sdk)
+    if renew_key_type in [RenewKeyType.primary.value, RenewKeyType.secondary.value]:
+        renew_key_type += "Key"
+
+    modules = []
+    devices = []
+    if device_ids[0] == "*":
+        device_twins = _iot_device_twin_list(target=target, top=None)
+        device_twins.extend(_iot_device_twin_list(target=target, edge_enabled=True, top=None))
+        for device in device_twins:
+            if device["authenticationType"] == DeviceAuthApiType.sas.value:
+                devices.append({"id": device["deviceId"]})
+            # non sas devices can have sas modules...
+            if include_modules:
+                modules.extend(
+                    _iot_key_regenerate_process_modules(
+                        target=target, device_id=device["deviceId"], module_ids="*"
+                    )
+                )
+    else:
+        devices = [{"id": device_id} for device_id in device_ids]
+
+    if modules:
+        logger.info(f"Found {len(modules)} modules.")
+
+    result = _iot_key_regenerate_batch(
+        service_sdk=service_sdk,
+        renew_key_type=renew_key_type,
+        items=devices + modules,
     )
+
+    # avoid breaking changes by having one device return the device identity
+    if all({len(device_ids) == 1, device_ids[0] != "*", not include_modules}):
+        return _iot_device_show(target, device_ids[0])
+
+    return result
 
 
 def iot_device_get_parent(
@@ -945,7 +988,7 @@ def iot_device_module_key_regenerate(
     cmd,
     hub_name_or_hostname,
     device_id,
-    module_id,
+    module_ids,
     renew_key_type,
     resource_group_name=None,
     login=None,
@@ -961,42 +1004,121 @@ def iot_device_module_key_regenerate(
     )
     resolver = SdkResolver(target=target)
     service_sdk = resolver.get_sdk(SdkType.service_sdk)
-    try:
-        module = service_sdk.modules.get_identity(
-            id=device_id, mid=module_id, raw=True
-        ).response.json()
-    except CloudError as e:
-        handle_service_exception(e)
 
-    if module["authentication"]["type"] != "sas":
-        raise ClientRequestError("Module authentication should be of type sas")
-
-    pk = module["authentication"]["symmetricKey"]["primaryKey"]
-    sk = module["authentication"]["symmetricKey"]["secondaryKey"]
-
-    if renew_key_type == RenewKeyType.primary.value:
-        pk = generate_key()
-    if renew_key_type == RenewKeyType.secondary.value:
-        sk = generate_key()
     if renew_key_type == RenewKeyType.swap.value:
+        if len(module_ids) > 1 or module_ids[0] == "*":
+            raise InvalidArgumentValueError(
+                "Currently, bulk key swap is not supported."
+            )
+        module = _iot_device_module_show(target=target, device_id=device_id, module_id=module_ids[0])
+        if module["authentication"]["type"] != DeviceAuthApiType.sas.value:
+            raise ClientRequestError("Module authentication should be of type sas")
+
+        pk = module["authentication"]["symmetricKey"]["primaryKey"]
+        sk = module["authentication"]["symmetricKey"]["secondaryKey"]
+
         temp = pk
-        pk = sk
-        sk = temp
+        module["authentication"]["symmetricKey"]["primaryKey"] = sk
+        module["authentication"]["symmetricKey"]["secondaryKey"] = temp
+        try:
+            return service_sdk.modules.create_or_update_identity(
+                id=device_id,
+                mid=module_ids[0],
+                module=module,
+                custom_headers={
+                    "If-Match": '"{}"'.format(etag if etag else "*")
+                },
+            )
+        except CloudError as e:
+            handle_service_exception(e)
 
-    module["authentication"]["symmetricKey"]["primaryKey"] = pk
-    module["authentication"]["symmetricKey"]["secondaryKey"] = sk
+    if renew_key_type in [RenewKeyType.primary.value, RenewKeyType.secondary.value]:
+        renew_key_type += "Key"
 
-    try:
-        headers = {}
-        headers["If-Match"] = '"{}"'.format(etag if etag else "*")
-        return service_sdk.modules.create_or_update_identity(
-            id=device_id,
-            mid=module_id,
-            module=module,
-            custom_headers=headers,
-        )
-    except CloudError as e:
-        handle_service_exception(e)
+    modules = _iot_key_regenerate_process_modules(
+        target, device_id, module_ids
+    )
+    result = _iot_key_regenerate_batch(
+        service_sdk=service_sdk,
+        renew_key_type=renew_key_type,
+        items=modules,
+        device_id=device_id
+    )
+
+    if len(module_ids) == 1 and module_ids[0] != "*":
+        return _iot_device_module_show(target=target, device_id=device_id, module_id=module_ids[0])
+    return result
+
+
+def _iot_key_regenerate_process_modules(
+    target,
+    device_id,
+    module_ids,
+):
+    if module_ids[0] == "*":
+        modules = _iot_device_module_list(target=target, device_id=device_id, top=None)
+        module_ids = []
+        for module in modules:
+            # not going to question why the call the Module object - just making things
+            # easier for unit tests
+            if not isinstance(module, dict):
+                module = module.serialize()
+            if module["authentication"]["type"] == DeviceAuthApiType.sas.value:
+                module_ids.append(module["moduleId"])
+
+    return [{"id": device_id, "moduleId": module_id} for module_id in module_ids]
+
+
+def _iot_key_regenerate_batch(
+    service_sdk,
+    renew_key_type,
+    items,
+    device_id=None,
+):
+    from time import sleep
+    overall_result = {
+        "policyKey": renew_key_type,
+        "errors": [],
+        "rotatedKeys": []
+    }
+    starting_msg = f"modules for device {device_id}" if device_id else "devices"
+    logger.info(f"Found {len(items)} {starting_msg}.")
+    if not items:
+        return {}
+    batches = []
+    while items:
+        if len(items) > IOTHUB_RENEW_KEY_BATCH_SIZE:
+            batches.append(items[:IOTHUB_RENEW_KEY_BATCH_SIZE])
+            items = items[IOTHUB_RENEW_KEY_BATCH_SIZE:]
+        else:
+            batches.append(items[:])
+            items = []
+    for batch in tqdm(batches, desc="Bulk key regeneration is in progress", ascii=' #'):
+        # call
+        result = None
+        tries = 0
+        while tries < IOTHUB_THROTTLE_MAX_TRIES:
+            try:
+                result = service_sdk.service.bulk_regenerate_device_key_method(
+                    policy_key=renew_key_type,
+                    devices=batch
+                )
+                break
+            except CloudError as e:
+                tries += 1
+                if tries == IOTHUB_THROTTLE_MAX_TRIES or e.status_code != THROTTLE_HTTP_STATUS_CODE:
+                    if overall_result["rotatedKeys"]:
+                        logger.warning(
+                            f"Managed to renew the following keys:\n{overall_result['rotatedKeys']}"
+                        )
+                    handle_service_exception(e)
+                sleep(IOTHUB_THROTTLE_SLEEP_SEC)
+        # combine result
+        if result.errors:
+            overall_result["errors"].extend(result.errors)
+        if result.rotated_keys:
+            overall_result["rotatedKeys"].extend(result.rotated_keys)
+    return overall_result
 
 
 def iot_device_module_list(

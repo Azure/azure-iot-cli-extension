@@ -12,11 +12,13 @@
 from msrest.serialization import Model
 
 
-class DeviceRegistryOperationError(Model):
-    """The device registry operation error details.
+class RegenerateDeviceKeyError(Model):
+    """RegenerateDeviceKeyError.
 
-    :param device_id: The unique identifier of the device.
-    :type device_id: str
+    :param id: The unique identifier of the device.
+    :type id: str
+    :param module_id: The unique identifier of the module.
+    :type module_id: str
     :param error_code: The error code. Possible values include:
      'InvalidErrorCode', 'GenericBadRequest', 'InvalidProtocolVersion',
      'DeviceInvalidResultCount', 'InvalidOperation', 'ArgumentInvalid',
@@ -59,7 +61,7 @@ class DeviceRegistryOperationError(Model):
      'DeviceMaximumQueueSizeExceeded', 'RoutingEndpointResponseForbidden',
      'InvalidMessageExpiryTime', 'OperationNotAvailableInCurrentTier',
      'KeyEncryptionKeyRevoked', 'DeviceDisabled',
-     'DeviceModelMaxPropertiesExceeded',
+     'DeviceMaximumInflightMethodExceeded', 'DeviceModelMaxPropertiesExceeded',
      'DeviceModelMaxIndexablePropertiesExceeded', 'IotDpsSuspended',
      'IotDpsSuspending', 'GenericNotFound', 'DeviceNotFound', 'JobNotFound',
      'QuotaMetricNotFound', 'SystemPropertyNotFound', 'AmqpAddressNotFound',
@@ -74,21 +76,24 @@ class DeviceRegistryOperationError(Model):
      'ProvisioningRecordNotFound', 'LinkedHubNotFound',
      'CertificateAuthorityNotFound', 'ConfigurationNotFound', 'GroupNotFound',
      'DigitalTwinModelNotFound', 'InterfaceNameModelNotFound',
-     'GenericMethodNotAllowed', 'OperationNotAllowedInCurrentState',
-     'ImportDevicesNotSupported', 'BulkAddDevicesNotSupported',
-     'GenericConflict', 'DeviceAlreadyExists', 'LinkCreationConflict',
-     'CallbackSubscriptionConflict', 'ModelAlreadyExists', 'DeviceLocked',
-     'DeviceJobAlreadyExists', 'JobAlreadyExists', 'EnrollmentConflict',
-     'EnrollmentGroupConflict', 'RegistrationStatusConflict',
-     'DeviceRecordConflict', 'GroupRecordConflict', 'DeviceGroupConflict',
+     'PurchaseNotFound', 'OfferNotFound', 'OfferStopSell',
+     'PurchaseNotValidated', 'GenericMethodNotAllowed',
+     'OperationNotAllowedInCurrentState', 'ImportDevicesNotSupported',
+     'BulkAddDevicesNotSupported', 'GenericConflict', 'DeviceAlreadyExists',
+     'LinkCreationConflict', 'CallbackSubscriptionConflict',
+     'ModelAlreadyExists', 'DeviceLocked', 'DeviceJobAlreadyExists',
+     'JobAlreadyExists', 'EnrollmentConflict', 'EnrollmentGroupConflict',
+     'RegistrationStatusConflict', 'DeviceRecordConflict',
+     'GroupRecordConflict', 'DeviceGroupConflict',
      'ProvisioningSettingsConflict', 'ProvisioningRecordConflict',
      'LinkedHubConflict', 'CertificateAuthorityConflict',
      'ModuleAlreadyExistsOnDevice', 'ConfigurationAlreadyExists',
      'ApplyConfigurationAlreadyInProgressOnDevice',
      'DigitalTwinModelAlreadyExists',
      'DigitalTwinModelExistsWithOtherModelType',
-     'InterfaceNameModelAlreadyExists', 'GenericPreconditionFailed',
-     'PreconditionFailed', 'DeviceMessageLockLost', 'JobRunPreconditionFailed',
+     'InterfaceNameModelAlreadyExists', 'PurchaseAlreadyExists',
+     'GenericPreconditionFailed', 'PreconditionFailed',
+     'DeviceMessageLockLost', 'JobRunPreconditionFailed',
      'InflightMessagesInLink', 'GenericRequestEntityTooLarge',
      'MessageTooLarge', 'TooManyDevices', 'TooManyModulesOnDevice',
      'ConfigurationCountLimitExceeded', 'DigitalTwinModelCountLimitExceeded',
@@ -107,39 +112,34 @@ class DeviceRegistryOperationError(Model):
      'ReliableBlobStoreTimeoutError', 'ConfigReadFailed',
      'InvalidContainerReceiveLink', 'InvalidPartitionEpoch', 'RestoreTimedOut',
      'StreamReservationFailure', 'SerializationError',
-     'UnexpectedPropertyValue', 'OrchestrationOperationFailed',
-     'ModelRepoEndpointError', 'ResolutionError', 'UnableToFetchCredentials',
-     'UnableToFetchTenantInfo', 'UnableToShareIdentity',
-     'UnableToExpandDiscoveryInfo', 'UnableToExpandComponentInfo',
-     'UnableToCompressComponentInfo', 'UnableToCompressDiscoveryInfo',
-     'OrphanDiscoveryDocument', 'GenericBadGateway',
-     'InvalidResponseWhileProxying', 'GenericServiceUnavailable',
-     'ServiceUnavailable', 'PartitionNotFound', 'IotHubActivationFailed',
-     'ServerBusy', 'IotHubRestoring', 'ReceiveLinkOpensThrottled',
-     'ConnectionUnavailable', 'DeviceUnavailable', 'ConfigurationNotAvailable',
-     'GroupNotAvailable', 'HostingServiceNotAvailable',
+     'InvalidStorePartitionKey', 'UnexpectedPropertyValue',
+     'OrchestrationOperationFailed', 'ModelRepoEndpointError',
+     'ResolutionError', 'UnableToFetchCredentials', 'UnableToFetchTenantInfo',
+     'UnableToShareIdentity', 'UnableToExpandDiscoveryInfo',
+     'UnableToExpandComponentInfo', 'UnableToCompressComponentInfo',
+     'UnableToCompressDiscoveryInfo', 'OrphanDiscoveryDocument',
+     'GenericBadGateway', 'InvalidResponseWhileProxying',
+     'GenericServiceUnavailable', 'ServiceUnavailable', 'PartitionNotFound',
+     'IotHubActivationFailed', 'ServerBusy', 'IotHubRestoring',
+     'ReceiveLinkOpensThrottled', 'ConnectionUnavailable', 'DeviceUnavailable',
+     'ConfigurationNotAvailable', 'GroupNotAvailable',
+     'HostingServiceNotAvailable', 'PurchaseNotAvailable',
      'GenericGatewayTimeout', 'GatewayTimeout'
     :type error_code: str or ~service.models.enum
     :param error_status: The details of the error.
     :type error_status: str
-    :param module_id: The unique identifier of the module, if applicable.
-    :type module_id: str
-    :param operation: The type of the operation that failed.
-    :type operation: str
     """
 
     _attribute_map = {
-        'device_id': {'key': 'deviceId', 'type': 'str'},
+        'id': {'key': 'id', 'type': 'str'},
+        'module_id': {'key': 'moduleId', 'type': 'str'},
         'error_code': {'key': 'errorCode', 'type': 'str'},
         'error_status': {'key': 'errorStatus', 'type': 'str'},
-        'module_id': {'key': 'moduleId', 'type': 'str'},
-        'operation': {'key': 'operation', 'type': 'str'},
     }
 
-    def __init__(self, *, device_id: str=None, error_code=None, error_status: str=None, module_id: str=None, operation: str=None, **kwargs) -> None:
-        super(DeviceRegistryOperationError, self).__init__(**kwargs)
-        self.device_id = device_id
+    def __init__(self, *, id: str=None, module_id: str=None, error_code=None, error_status: str=None, **kwargs) -> None:
+        super(RegenerateDeviceKeyError, self).__init__(**kwargs)
+        self.id = id
+        self.module_id = module_id
         self.error_code = error_code
         self.error_status = error_status
-        self.module_id = module_id
-        self.operation = operation
