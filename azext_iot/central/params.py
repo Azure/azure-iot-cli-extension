@@ -97,7 +97,7 @@ def load_central_arguments(self, _):
             "content",
             options_list=["--content", "-k"],
             help="The device template definition. Provide path to JSON file or raw stringified JSON."
-            " [File Path Example: ./path/to/file.json] [Example of stringified JSON: {<Device Template JSON>}]."
+            " [File Path Example: ./path/to/file.json] [Example of stringified JSON: {Device Template JSON}]."
             " The request body must contain CapabilityModel.",
         )
 
@@ -480,7 +480,7 @@ def load_central_arguments(self, _):
             options_list=["--content", "-k"],
             help="The job data definition. Provide path to JSON file or raw stringified JSON."
             " [File Path Example:./path/to/file.json]"
-            " [Example of stringified JSON:[{<Job Data JSON>}]. The request body must contain array of JobData.",
+            " [Example of stringified JSON:[{Job Data JSON}]. The request body must contain array of JobData.",
         )
         context.argument(
             "batch_type",
@@ -591,7 +591,7 @@ def load_central_arguments(self, _):
             options_list=["--content", "-k"],
             help="The partial export definition. Provide path to JSON file or raw stringified JSON."
             " [File Path Example:./path/to/file.json]"
-            " [Example of stringified JSON:{<Export Data JSON>}]. The request body must contain partial content of Export.",
+            " [Example of stringified JSON:{Export Data JSON}]. The request body must contain partial content of Export.",
         )
 
     with self.argument_context("iot central export destination") as context:
@@ -650,7 +650,7 @@ def load_central_arguments(self, _):
             options_list=["--content", "-k"],
             help="The partial destination definition. Provide path to JSON file or raw stringified JSON."
             " [File Path Example:./path/to/file.json]"
-            " [Example of stringified JSON:{<Destination Data JSON>}]."
+            " [Example of stringified JSON:{Destination Data JSON}]."
             " The request body must contain partial content of Destination.",
         )
 

@@ -40,7 +40,7 @@ def load_digitaltwins_arguments(self, _):
             "resource_group_name",
             arg_type=resource_group_name_type,
             help="Digital Twins instance resource group. "
-            "You can configure the default group using `az configure --defaults group=<name>`.",
+            "You can configure the default group using `az configure --defaults group={name}`.",
         )
         context.argument(
             "name",
@@ -58,7 +58,7 @@ def load_digitaltwins_arguments(self, _):
             "location",
             options_list=["--location", "-l"],
             help="Digital Twins instance location. If no location is provided the resource group location is used."
-            "You can configure the default location using `az configure --defaults location=<name>`.",
+            "You can configure the default location using `az configure --defaults location={name}`.",
         ),
         context.argument(
             "tags",
@@ -699,7 +699,7 @@ def load_digitaltwins_arguments(self, _):
             options_list=["--output-file", "--of"],
             help="Name of the bulk import job's output file. This file will contain logs as well as error information. "
             "The file gets created automatically once the job finishes. The file gets overwritten if it already exists. "
-            "If not provided the output file is created with the name: <job_id>_output.txt",
+            "If not provided the output file is created with the name: {job_id}_output.txt",
             arg_group="Bulk Import Job",
         )
         context.argument(

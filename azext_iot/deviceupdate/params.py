@@ -32,7 +32,7 @@ def load_deviceupdate_arguments(self, _):
             "resource_group_name",
             arg_type=resource_group_name_type,
             help="Device Update account resource group name. "
-            "You can configure the default group using `az config set defaults.adu_group=<name>`.",
+            "You can configure the default group using `az config set defaults.adu_group={name}`.",
             arg_group="Account Identifier",
             configured_default="adu_group",
         )
@@ -40,7 +40,7 @@ def load_deviceupdate_arguments(self, _):
             "name",
             options_list=["-n", "--account"],
             help="Device Update account name. "
-            "You can configure the default account name using `az config set defaults.adu_account=<name>`.",
+            "You can configure the default account name using `az config set defaults.adu_account={name}`.",
             arg_group="Account Identifier",
             configured_default="adu_account",
         )
@@ -48,7 +48,7 @@ def load_deviceupdate_arguments(self, _):
             "instance_name",
             options_list=["-i", "--instance"],
             help="Device Update instance name. "
-            "You can configure the default instance name using `az config set defaults.adu_instance=<name>`.",
+            "You can configure the default instance name using `az config set defaults.adu_instance={name}`.",
             arg_group="Account Identifier",
             configured_default="adu_instance",
         )
@@ -71,7 +71,7 @@ def load_deviceupdate_arguments(self, _):
             "location",
             options_list=["-l", "--location"],
             help="Device Update account location. If no location is provided the resource group location is used. "
-            "You can configure the default location using `az configure --defaults location=<name>`.",
+            "You can configure the default location using `az configure --defaults location={name}`.",
         )
         context.argument(
             "assign_identity",
