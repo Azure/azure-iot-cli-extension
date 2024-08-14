@@ -7,6 +7,10 @@ Release History
 0.24.1
 +++++++++++++++
 
+** IoT Hub updates **
+
+* Fix for `az iot hub monitor-events` when the IoT Hub has no partition Id's populated.
+
 **DPS updates**
 
 * Fix for `az iot dps enrollement-group registration list` to support paging.
