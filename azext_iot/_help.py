@@ -471,6 +471,7 @@ helps[
     long-summary: |
                    This command is the same as iot hub query with the query "select * from devices" for
                    all devices and "select * from devices where capabilities.iotEdge = true" for edge devices.
+                   Use `az iot hub query` for more powerful queries on devices.
 """
 
 helps[
