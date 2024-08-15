@@ -4,10 +4,12 @@ Release History
 ===============
 
 
-0.24.1
+0.25.0
 +++++++++++++++
 
-** IoT Hub updates **
+**IoT Hub updates**
+
+* Addition of bulk key regeneration for `az iot hub device-identity renew-key` and `az iot hub module-identity renew-key`.
 
 * Fix for `az iot hub monitor-events` when the IoT Hub has no partition Id's populated.
 
