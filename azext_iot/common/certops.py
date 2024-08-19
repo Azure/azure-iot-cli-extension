@@ -29,7 +29,7 @@ def create_self_signed_certificate(
     key_size: int = 2048,
     cert_only: bool = False,
     file_prefix: str = None,
-    sha_version: int = SHAHashVersions.SHA1.value,
+    sha_version: int = SHAHashVersions.SHA256.value,
     v3_extensions: bool = False,
 ) -> Dict[str, str]:
     """
