@@ -19,7 +19,6 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from azext_iot.common.fileops import write_content_to_file
 from azext_iot.common.utility import read_file_content
 from azure.cli.core.azclierror import FileOperationError
-from azext_iot.common.shared import SHAHashVersions
 
 
 def create_self_signed_certificate(
