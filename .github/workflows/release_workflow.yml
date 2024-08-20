@@ -14,6 +14,11 @@ on:
         type: boolean
         required: false
         default: false
+      run_int_tests:
+        description: Run integration test step
+        type: boolean
+        required: false
+        default: true
 jobs:
   security:
     permissions:
@@ -36,6 +41,7 @@ jobs:
       continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
   int_test:
     needs: [build]
+    if:  always() && !cancelled() && !failure() && (github.event.inputs.run_int_tests == 'true')
     uses: ./.github/workflows/trigger_ado_int_tests.yml
     secrets: inherit
   approval:
