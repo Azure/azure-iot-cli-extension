@@ -308,6 +308,4 @@ class SHAHashVersions(Enum):
     """
     Supported SHA types for generating the certificate thumbprint.
     """
-
-    SHA1 = 1
     SHA256 = 256

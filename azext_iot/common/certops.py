@@ -29,7 +29,6 @@ def create_self_signed_certificate(
     key_size: int = 2048,
     cert_only: bool = False,
     file_prefix: str = None,
-    sha_version: int = SHAHashVersions.SHA256.value,
     v3_extensions: bool = False,
 ) -> Dict[str, str]:
     """
@@ -43,7 +42,7 @@ def create_self_signed_certificate(
         cert_only (bool): generate certificate only; no private key or thumbprint.
         file_prefix (str): Certificate file name if it needs to be different from the subject.
         sha_version (int): The SHA version to use for generating the thumbprint. For
-            IoT Hub, SHA1 is currently used. For DPS, SHA256 has to be used.
+            IoT Hub and DPS, SHA256 has to be used.
 
     Returns:
         result (dict): dict with certificate value, private key and thumbprint.
@@ -110,16 +109,8 @@ def create_self_signed_certificate(
     # certificate string
     cert_dump = cert.public_bytes(serialization.Encoding.PEM).decode("utf-8")
 
-    hash = None
-    if sha_version == SHAHashVersions.SHA1.value:
-        hash = hashes.SHA1()
-    elif sha_version == SHAHashVersions.SHA256.value:
-        hash = hashes.SHA256()
-    else:
-        raise ValueError("Only SHA1 and SHA256 supported for now.")
-
     # thumbprint
-    thumbprint = cert.fingerprint(hash).hex().upper()
+    thumbprint = cert.fingerprint(hashes.SHA256()).hex().upper()
 
     if cert_output_dir and exists(cert_output_dir):
         cert_file = (file_prefix or subject) + "-cert.pem"
