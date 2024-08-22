@@ -1,15 +1,21 @@
 name: "[auto] Security Checks"
 on:
+  schedule:
+    - cron: '0 6 * * *'
+  push:
+    branches:
+      - dev
+      - feature/*
   workflow_call:
     inputs:
       continue-on-error:
         type: boolean
         required: false
         default: false
-
+permissions: {}
 jobs:
   sdl:
-    continue-on-error: ${{ inputs.continue-on-error }}
+    continue-on-error: ${{ inputs.continue-on-error || false }}
     name: SDL Compliance Checks
     runs-on: windows-latest
     permissions:
