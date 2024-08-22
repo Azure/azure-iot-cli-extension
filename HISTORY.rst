@@ -9,6 +9,8 @@ Release History
 
 **IoT Hub updates**
 
+* Deprecate use of SHA1 hashes for certificate thumbprints. SHA256 hashes will be used for all certificate thumbprints.
+
 * Addition of bulk key regeneration for `az iot hub device-identity renew-key` and `az iot hub module-identity renew-key`.
 
 * Fix for `az iot hub monitor-events` when the IoT Hub has no partition Id's populated.

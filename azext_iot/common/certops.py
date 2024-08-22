@@ -40,8 +40,6 @@ def create_self_signed_certificate(
         cert_putput_dir (str): string value of output directory.
         cert_only (bool): generate certificate only; no private key or thumbprint.
         file_prefix (str): Certificate file name if it needs to be different from the subject.
-        sha_version (int): The SHA version to use for generating the thumbprint. For
-            IoT Hub and DPS, SHA256 has to be used.
 
     Returns:
         result (dict): dict with certificate value, private key and thumbprint.
