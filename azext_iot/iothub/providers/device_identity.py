@@ -272,7 +272,6 @@ class DeviceIdentityProvider(IoTHubProvider):
                     subject=device_id,
                     valid_days=365,
                     key_size=4096,
-                    sha_version=256,
                     v3_extensions=True
                 )
                 device_pk = signed_device_cert["thumbprint"]

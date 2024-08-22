@@ -622,7 +622,6 @@ class TestHierarchyCreateConfig:
             root_cert = create_self_signed_certificate(
                 subject=EDGE_ROOT_CERTIFICATE_SUBJECT,
                 key_size=4096,
-                sha_version=256,
                 v3_extensions=True
             )
             write_content_to_file(
@@ -717,7 +716,6 @@ class TestEdgeHierarchyConfigFunctions:
         root_cert = create_self_signed_certificate(
             subject=EDGE_ROOT_CERTIFICATE_SUBJECT,
             key_size=4096,
-            sha_version=256,
             v3_extensions=True
         )
         write_content_to_file(

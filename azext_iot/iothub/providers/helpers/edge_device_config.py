@@ -376,7 +376,6 @@ def process_edge_devices_config_file_content(
         root_cert = create_self_signed_certificate(
             subject=EDGE_ROOT_CERTIFICATE_SUBJECT,
             key_size=4096,
-            sha_version=256,
             v3_extensions=True
         )
 
@@ -520,7 +519,6 @@ def process_edge_devices_config_args(
         else create_self_signed_certificate(
             subject=EDGE_ROOT_CERTIFICATE_SUBJECT,
             key_size=4096,
-            sha_version=256,
             v3_extensions=True
         )
     )
