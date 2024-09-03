@@ -684,7 +684,7 @@ def _cosmos_db_provisioner():
     database_name = generate_hub_depenency_id()
     collection_name = generate_hub_depenency_id()
     partition_key_path = "/test"
-    location = "eastus"
+    location = "westus"
     cosmos_obj = cli.invoke(
         "cosmosdb create --name {} --resource-group {} --locations regionName={} failoverPriority=0".format(
             account_name, RG, location
