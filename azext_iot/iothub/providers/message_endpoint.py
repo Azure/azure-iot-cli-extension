@@ -122,7 +122,8 @@ class MessageEndpoint(IoTHubProvider):
                     rg=endpoint_resource_group,
                     sub=endpoint_subscription_id
                 )
-            new_endpoint["entityPath"] = entity_path
+            else:
+                new_endpoint["entityPath"] = entity_path
             endpoints.event_hubs.append(new_endpoint)
         elif endpoint_type.lower() == EndpointType.ServiceBusQueue.value:
             if fetch_connection_string:
@@ -559,9 +560,10 @@ def get_eventhub_cstring(
 ) -> str:
     return cmd.invoke(
         "eventhubs eventhub authorization-rule keys list --namespace-name {} --resource-group {} "
-        "--eventhub-name {} --name {} --subscription {}".format(
-            namespace_name, rg, eventhub_name, policy_name, sub
-        )
+        "--eventhub-name {} --name {}".format(
+            namespace_name, rg, eventhub_name, policy_name
+        ),
+        subscription=sub
     ).as_json()["primaryConnectionString"]
 
 
@@ -570,9 +572,10 @@ def get_servicebus_topic_cstring(
 ) -> str:
     return cmd.invoke(
         "servicebus topic authorization-rule keys list --namespace-name {} --resource-group {} "
-        "--topic-name {} --name {} --subscription {}".format(
-            namespace_name, rg, topic_name, policy_name, sub
-        )
+        "--topic-name {} --name {}".format(
+            namespace_name, rg, topic_name, policy_name
+        ),
+        subscription=sub
     ).as_json()["primaryConnectionString"]
 
 
@@ -581,9 +584,10 @@ def get_servicebus_queue_cstring(
 ) -> str:
     return cmd.invoke(
         "servicebus queue authorization-rule keys list --namespace-name {} --resource-group {} "
-        "--queue-name {} --name {}  --subscription {}".format(
-            namespace_name, rg, queue_name, policy_name, sub
-        )
+        "--queue-name {} --name {}".format(
+            namespace_name, rg, queue_name, policy_name
+        ),
+        subscription=sub
     ).as_json()["primaryConnectionString"]
 
 
@@ -591,9 +595,10 @@ def get_cosmos_db_cstring(
     cmd, account_name: str, rg: str, sub: str
 ) -> str:
     output = cmd.invoke(
-        'cosmosdb keys list --resource-group {} --name {} --type connection-strings --subscription {}'.format(
-            rg, account_name, sub
-        )
+        'cosmosdb keys list --resource-group {} --name {} --type connection-strings'.format(
+            rg, account_name
+        ),
+        subscription=sub
     ).as_json()
 
     for cs_object in output["connectionStrings"]:
@@ -603,7 +608,8 @@ def get_cosmos_db_cstring(
 
 def get_storage_cstring(cmd, account_name: str, rg: str, sub: str) -> str:
     return cmd.invoke(
-        "storage account show-connection-string -n {} -g {}  --subscription {}".format(
-            account_name, rg, sub
-        )
+        "storage account show-connection-string -n {} -g {}".format(
+            account_name, rg
+        ),
+        subscription=sub
     ).as_json()["connectionString"]
