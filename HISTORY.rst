@@ -9,6 +9,8 @@ Release History
 
 **IoT Hub updates**
 
+* Fix `az iot hub message-endpoint create` to correctly pass the endpoint subscription when provided.
+
 * Deprecate use of SHA1 hashes for certificate thumbprints. SHA256 hashes will be used for all certificate thumbprints.
 
 * Addition of bulk key regeneration for `az iot hub device-identity renew-key` and `az iot hub module-identity renew-key`.
