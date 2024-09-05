@@ -107,7 +107,7 @@ $commands += "az iot hub configuration show -g $resource_group_name -c $hub_conf
 # IoT Hub Device
 $commands += "az iot hub device-identity create -g $resource_group_name -n $iothub_name -d $device_id --ee"
 $commands += "az iot hub device-identity show -g $resource_group_name -n $iothub_name -d $device_id"
-$commands += "az iot hub device-identity renew-key -g $resource_group_name -n $iothub_name -d $device_id --kt primary"
+$commands += "az iot hub device-identity renew-key -g $resource_group_name -n $iothub_name -d $device_id --kt primary --no-progress"
 $commands += "az iot hub device-twin show -g $resource_group_name -n $iothub_name -d $device_id"
 $commands += "az iot hub device-twin update -g $resource_group_name -n $iothub_name -d $device_id --desired $desired_twin_properties"
 $commands += "az iot hub generate-sas-token -g $resource_group_name -d $device_id -n $iothub_name"
