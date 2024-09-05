@@ -486,6 +486,12 @@ def load_arguments(self, _):
             help="Etag or entity tag corresponding to the last state of the resource. "
             "If no etag is provided the value '*' is used. This arguement only applies to `swap`.",
         )
+        context.argument(
+            "no_progress",
+            options_list=["--no-progress"],
+            arg_type=get_three_state_flag(),
+            help="Hide the progress bar for bulk key regeneration.",
+        )
 
     with self.argument_context("iot hub device-identity export") as context:
         context.argument(
@@ -645,6 +651,12 @@ def load_arguments(self, _):
             options_list=["--etag", "-e"],
             help="Etag or entity tag corresponding to the last state of the resource. "
             "If no etag is provided the value '*' is used. This arguement only applies to `swap`.",
+        )
+        context.argument(
+            "no_progress",
+            options_list=["--no-progress"],
+            arg_type=get_three_state_flag(),
+            help="Hide the progress bar for bulk key regeneration.",
         )
 
     with self.argument_context("iot hub distributed-tracing update") as context:

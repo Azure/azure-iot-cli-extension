@@ -505,6 +505,7 @@ def iot_device_key_regenerate(
     device_ids,
     renew_key_type,
     include_modules=False,
+    no_progress=False,
     resource_group_name=None,
     login=None,
     etag=None,
@@ -567,6 +568,7 @@ def iot_device_key_regenerate(
         service_sdk=service_sdk,
         renew_key_type=renew_key_type,
         items=devices + modules,
+        no_progress=no_progress
     )
 
     # avoid breaking changes by having one device return the device identity
@@ -990,6 +992,7 @@ def iot_device_module_key_regenerate(
     device_id,
     module_ids,
     renew_key_type,
+    no_progress=None,
     resource_group_name=None,
     login=None,
     etag=None,
@@ -1042,7 +1045,8 @@ def iot_device_module_key_regenerate(
         service_sdk=service_sdk,
         renew_key_type=renew_key_type,
         items=modules,
-        device_id=device_id
+        device_id=device_id,
+        no_progress=no_progress
     )
 
     if len(module_ids) == 1 and module_ids[0] != "*":
@@ -1074,6 +1078,7 @@ def _iot_key_regenerate_batch(
     renew_key_type,
     items,
     device_id=None,
+    no_progress=False,
 ):
     from time import sleep
     overall_result = {
@@ -1093,7 +1098,7 @@ def _iot_key_regenerate_batch(
         else:
             batches.append(items[:])
             items = []
-    for batch in tqdm(batches, desc="Bulk key regeneration is in progress", ascii=' #'):
+    for batch in tqdm(batches, desc="Bulk key regeneration is in progress", ascii=' #', disable=no_progress):
         # call
         result = None
         tries = 0
