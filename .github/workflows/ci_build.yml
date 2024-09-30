@@ -14,7 +14,7 @@ jobs:
             python-version: "3.12"
       - name: Build Wheel
         run: |
-          pip install wheel
+          pip install -r dev_requirements
           python -m setup bdist_wheel -d dist
       - name: Upload Wheel Artifact
         uses: actions/upload-artifact@v4
