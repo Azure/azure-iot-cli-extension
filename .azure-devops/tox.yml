@@ -2,10 +2,6 @@ trigger: none
 pr: none
 
 parameters:
-- name: python38
-  displayName: 'Test Python 3.8'
-  type: boolean
-  default: true
 - name: python39
   displayName: 'Test Python 3.9'
   type: boolean
@@ -17,7 +13,11 @@ parameters:
 - name: python311
   displayName: 'Test Python 3.11'
   type: boolean
-  default: false
+  default: true
+- name: python311
+  displayName: 'Test Python 3.12'
+  type: boolean
+  default: true
 - name: azdev
   displayName: 'Test development CLI'
   type: boolean
@@ -38,25 +38,9 @@ jobs:
   strategy:
     matrix:
       'linters':
-        python: '3.8'
+        python: '3.12'
         toxEnvStr: 'lint'
         desc: 'Flake8, Pylint'
-      ${{ if parameters.python38 }}:
-        ${{ if parameters.azmin }}:
-          'python 3.8 tests, min CLI':
-            python: '3.8'
-            toxEnvStr: 'py3.8-azmin-unit'
-            desc: 'python 3.8 tests, min CLI'
-        ${{ if parameters.azcur }}:
-          'python 3.8 tests, current CLI':
-            python: '3.8'
-            toxEnvStr: 'py3.8-azcur-unit'
-            desc: 'Python 3.8 tests, current CLI'
-        ${{ if parameters.azdev }}:
-          'python 3.8 tests, dev CLI':
-            python: '3.8'
-            toxEnvStr: 'py3.8-azdev-unit'
-            desc: 'Python 3.8 tests, dev CLI'
       ${{ if parameters.python39 }}:
         ${{ if parameters.azmin }}:
           'python 3.9 tests, min CLI':
@@ -100,6 +84,17 @@ jobs:
             python: '3.11'
             toxEnvStr: 'py3.11-azdev-unit'
             desc: 'Python 3.11 tests, dev CLI'
+      ${{ if parameters.python312 }}:
+        ${{ if parameters.azcur }}:
+          'python 3.12 tests, current CLI':
+            python: '3.12'
+            toxEnvStr: 'py3.12-azcur-unit'
+            desc: 'Python 3.12 tests, current CLI'
+        ${{ if parameters.azdev }}:
+          'python 3.12 tests, dev CLI':
+            python: '3.12'
+            toxEnvStr: 'py3.12-azdev-unit'
+            desc: 'Python 3.12 tests, dev CLI'
   steps:
   - task: UsePythonVersion@0
     inputs:
