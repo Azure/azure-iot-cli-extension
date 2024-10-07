@@ -9,6 +9,7 @@ from typing import Optional, List
 import os
 
 import pytest
+from azure.cli.core.azclierror import CLIInternalError
 from knack.log import get_logger
 
 from azext_iot.common.embedded_cli import EmbeddedCLI
@@ -46,7 +47,7 @@ def assign_iot_hub_dataplane_rbac_role(hub_results):
             user = account["user"]
 
             if user["name"] is None:
-                raise Exception("User not found")
+                raise CLIInternalError("User not found")  # pylint: disable=broad-except
 
             assign_role_assignment(
                 assignee=user["name"],

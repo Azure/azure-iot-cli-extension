@@ -17,7 +17,7 @@ jobs:
 
       - name: Build Wheel
         run: |
-          pip install wheel==0.30.0
+          pip install -r dev_requirements
           python -m setup bdist_wheel -d dist
       - name: Determine Wheel Version
         run: |

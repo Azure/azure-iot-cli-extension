@@ -9,6 +9,7 @@ import pytest
 from typing import List, Optional
 
 from knack.log import get_logger
+from azure.cli.core.azclierror import CLIInternalError
 from azext_iot.digitaltwins.providers.deletion_job import DEFAULT_DELETE_JOB_ID_PREFIX
 from azext_iot.tests.generators import generate_generic_id
 
@@ -370,7 +371,7 @@ def poll_job_status(
         if import_job_output["status"] == final_status:
             return import_job_output["error"]
         sleep(POLL_SLEEP_INTERVAL)
-    raise Exception(f"Job {job_id} for {instance_name} not finalized.")
+    raise CLIInternalError(f"Job {job_id} for {instance_name} not finalized.")
 
 
 def assert_job_creation(

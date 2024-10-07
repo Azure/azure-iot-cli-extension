@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import os
+from azure.cli.core.azclierror import CLIInternalError
 from time import sleep
 from knack.util import CLIError
 from pathlib import Path
@@ -401,7 +402,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
         if job_state["status"] == "failed":
             logger.error(job_state)
         if job_state["status"] != "completed":
-            raise Exception(f"Job was not completed - status is {job_state['status']}.")
+            raise CLIInternalError(f"Job was not completed - status is {job_state['status']}.")
 
     def check_for_running_import_export(self):
         job_list = []

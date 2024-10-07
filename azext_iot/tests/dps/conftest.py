@@ -9,6 +9,7 @@ from typing import Dict, Optional
 import os
 
 import pytest
+from azure.cli.core.azclierror import CLIInternalError
 from knack.log import get_logger
 
 from azext_iot.common.embedded_cli import EmbeddedCLI
@@ -47,7 +48,7 @@ def assign_iot_dps_dataplane_rbac_role(target_dps):
     account = cli.invoke("account show").as_json()
     user = account["user"]
     if user["name"] is None:
-        raise Exception("User not found")
+        raise CLIInternalError("User not found")
     assign_role_assignment(
         role=DPS_USER_ROLE,
         scope=target_dps["id"],

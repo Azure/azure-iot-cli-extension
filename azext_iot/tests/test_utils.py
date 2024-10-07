@@ -9,6 +9,7 @@ Test cert utils: Functions for working with certificates for test devices in dps
 """
 
 import datetime
+from azure.cli.core.azclierror import CLIInternalError
 from os.path import exists, join
 from typing import Any, Dict
 from cryptography import x509
@@ -51,13 +52,13 @@ def _load_cert_data(
             with open(key_path, "rb") as cert_file:
                 pem_key_data = cert_file.read()
         else:
-            raise Exception("Need key file to sign new certificate.")
+            raise CLIInternalError("Need key file to sign new certificate.")
 
         if cert_path and cert_path.endswith(".pem"):
             with open(cert_path, "rb") as cert_file:
                 pem_cert_text = cert_file.read()
         else:
-            raise Exception("Need certificate file to get issuer for new certificate.")
+            raise CLIInternalError("Need certificate file to get issuer for new certificate.")
     result = {
         "certificate": x509.load_pem_x509_certificate(pem_cert_text),
         "certificate_text": pem_cert_text.decode("utf-8"),

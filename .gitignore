@@ -319,6 +319,8 @@ src/build
 
 # Code coverage
 .coverage
+coverage.json
+htmlcov
 
 # Shell scripts
 *.sh
@@ -330,3 +332,6 @@ src/build
 
 # tox
 .tox/
+
+# junit (tests)
+junit

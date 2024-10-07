@@ -150,12 +150,12 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
         # there is no current way to get the app_primary_key and not all tests can be executed.
         if not settings.env.azext_iot_central_app_id:
             if not APP_RG:
-                raise Exception("Tests need either app name or resource group.")
+                raise CLIInternalError("Tests need either app name or resource group.")
             if (
                 settings.env.azext_iot_central_dns_suffix
                 or settings.env.azext_iot_central_token
             ):
-                raise Exception(
+                raise CLIInternalError(
                     "Create an IoT Central App with a valid API token and populate the azext_iot_central_app_id, "
                     "azext_iot_central_dns_suffix, and azext_iot_central_token variables for testing in non-prod environments."
                 )
@@ -203,7 +203,9 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     self.app_rg = app['resourceGroup']
                     return
             # Throw if no resource group found
-            raise Exception(f"Please provide API token (azext_iot_central_token) in the setting for application {self.app_id}")
+            raise CLIInternalError(
+                f"Please provide API token (azext_iot_central_token) in the setting for application {self.app_id}"
+            )
 
     def _create_device(self, api_version, **kwargs) -> Tuple[str, str]:
         """
