@@ -5,9 +5,10 @@ pytest-env
 uamqp>=1.2,<=1.6.8
 responses==0.22.0
 black
+setuptools==70.0.0
 wheel==0.30.0
 pre-commit
-pylint<=2.13.8
+pylint==3.0.3
 flake8
 pytest-xdist
 pytest-rerunfailures

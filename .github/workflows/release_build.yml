@@ -11,13 +11,13 @@ jobs:
       - name: Setup python
         uses: actions/setup-python@v5
         with:
-            python-version: "3.9"
+            python-version: "3.12"
       
       - uses: actions/checkout@v4
 
       - name: Build Wheel
         run: |
-          pip install wheel==0.30.0
+          pip install -r dev_requirements
           python -m setup bdist_wheel -d dist
       - name: Determine Wheel Version
         run: |

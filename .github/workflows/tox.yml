@@ -29,10 +29,10 @@ jobs:
           - windows-2022
           - macos-13
         py:
+          - "3.12"
           - "3.11"
           - "3.10"
           - "3.9"
-          - "3.8"
     steps:
       - name: Setup python ${{ matrix.py }}
         uses: actions/setup-python@v5

@@ -38,7 +38,7 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.8'
+      versionSpec: '3.12'
       architecture: 'x64'
 
   - template: templates/setup-ci-machine.yml
@@ -51,7 +51,7 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.8'
+      versionSpec: '3.12'
       architecture: 'x64'
 
   - template: templates/setup-ci-machine.yml
@@ -63,12 +63,14 @@ jobs:
     vmImage: ${{ parameters.linuxImage }}
   strategy:
     matrix:
-      Python38:
-        python.version: '3.8'
       Python39:
         python.version: '3.9'
       Python310:
         python.version: '3.10'
+      Python311:
+        python.version: '3.11'
+      Python312:
+        python.version: '3.12'
 
   steps:
   - bash: sudo rm -R -f /usr/local/lib/azureExtensionDir
@@ -87,7 +89,7 @@ jobs:
   steps:
   - template: templates/run-tests-parallel.yml
     parameters:
-      pythonVersion: '3.8'
+      pythonVersion: '3.12'
       runUnitTests: true
       runIntTests: false
 
@@ -104,7 +106,7 @@ jobs:
 
   - template: templates/run-tests-parallel.yml
     parameters:
-      pythonVersion: '3.8'
+      pythonVersion: '3.12'
       runUnitTests: true
       runIntTests: false
 
@@ -116,7 +118,7 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.8'
+      versionSpec: '3.12'
       architecture: 'x64'
 
   - template: templates/install-azure-cli-released.yml

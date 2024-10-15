@@ -6,6 +6,7 @@
 
 import pytest
 
+from azure.cli.core.azclierror import CLIInternalError
 from time import sleep
 from azext_iot.tests.helpers import (
     add_test_tag,
@@ -115,7 +116,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         user = account["user"]
 
         if user["name"] is None:
-            raise Exception("User not found")
+            raise CLIInternalError("User not found")  # pylint: disable=broad-except
 
         assign_role_assignment(
             role=USER_ROLE,

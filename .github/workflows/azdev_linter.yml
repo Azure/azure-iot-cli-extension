@@ -29,7 +29,7 @@ jobs:
     - uses: actions/setup-python@v5
       name: Setup python
       with:
-          python-version: "3.11"
+          python-version: "3.12"
 
     # Lint
     - name: azdev linter
@@ -38,6 +38,7 @@ jobs:
         pip install virtualenv
         python -m virtualenv venv/
         source ./venv/bin/activate
+        pip install -r dev_requirements
         git clone --single-branch -b dev https://github.com/Azure/azure-cli.git ../azure-cli
         pip install azdev
         azdev --version

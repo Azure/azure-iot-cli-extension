@@ -26,7 +26,7 @@ jobs:
     steps:
     - task: UsePythonVersion@0
       inputs:
-        versionSpec: '3.8'
+        versionSpec: '3.12'
         architecture: 'x64'
 
     - template: templates/setup-ci-machine.yml

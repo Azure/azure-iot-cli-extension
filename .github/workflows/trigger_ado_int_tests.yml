@@ -27,9 +27,10 @@ on:
         type: string
         default: >
           "{
-              Python38: { python: '3.8' },
               Python39: { python: '3.9' },
-              Python310: { python: '3.10' }
+              Python310: { python: '3.10' },
+              Python311: { python: '3.11' },
+              Python312: { python: '3.12' }
           }"
     secrets:
       ADO_PAT:
@@ -61,11 +62,12 @@ on:
         required: true
         type: string
         default: >
-            "{
-                Python38: { python: '3.8' },
-                Python39: { python: '3.9' },
-                Python310: { python: '3.10' }
-            }"
+          "{
+              Python39: { python: '3.9' },
+              Python310: { python: '3.10' },
+              Python311: { python: '3.11' },
+              Python312: { python: '3.12' }
+          }"
 env:
   DEFAULT_TITLE: "Azure DevOps Pipeline"
   AZURE_DEVOPS_EXT_PAT: ${{ secrets.ADO_PAT }}
