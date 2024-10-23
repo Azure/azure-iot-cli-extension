@@ -91,6 +91,7 @@ class Template(BaseTemplate):
                     interfaces = self._extract_interfaces(template)
                     schema_names = self._extract_schema_names(interfaces)
                     components = self._extract_components(template)
+                    component_schema_names = []
                     if components:
                         component_schema_names = self._extract_schema_names(components)
 
