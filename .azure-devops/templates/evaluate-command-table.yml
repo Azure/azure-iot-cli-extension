@@ -31,4 +31,6 @@ steps:
           az extension add --source $i -y --debug
         done
         cp ./linter_exclusions.yml $AZURE_EXTENSION_DIR/azure-iot/
+        # temp fix for newest azdev v0.1.65
+        cp .pylintrc pylintrc
         azdev linter --include-whl-extensions azure-iot --min-severity medium
