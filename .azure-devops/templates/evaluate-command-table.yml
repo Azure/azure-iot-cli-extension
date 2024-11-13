@@ -20,6 +20,7 @@ steps:
         source ./venv/bin/activate
         git clone --single-branch -b dev https://github.com/Azure/azure-cli.git ../azure-cli
         pip install azdev
+        pip install wheel==0.30.0 setuptools==70.0.0
         azdev --version
         azdev setup -c ../azure-cli -r ./
         AZURE_EXTENSION_DIR=~/.azure/cliextensions
@@ -30,4 +31,6 @@ steps:
           az extension add --source $i -y --debug
         done
         cp ./linter_exclusions.yml $AZURE_EXTENSION_DIR/azure-iot/
+        # temp fix for newest azdev v0.1.65
+        cp .pylintrc pylintrc
         azdev linter --include-whl-extensions azure-iot --min-severity medium

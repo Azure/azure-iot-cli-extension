@@ -51,7 +51,7 @@ class TestIoTHubDistributedTracing(IoTLiveScenarioTest):
             result = self.cmd(
                 self.set_cmd_auth_type(
                     f"iot hub distributed-tracing update "
-                    f"-d {device_ids[0]} -n {self.host_name} -g { self.entity_rg} --sm on --sr 50",
+                    f"-d {device_ids[0]} -n {self.host_name} -g {self.entity_rg} --sm on --sr 50",
                     auth_type=auth_phase,
                 )
             ).get_output_in_json()
