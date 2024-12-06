@@ -918,7 +918,7 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
     endpoint_names = generate_ep_names(3)
     partition_template = "{iothub}-{device_id}-{DD}-{MM}-{YYYY}"
     partition_template_default = "{deviceid}-{YYYY}-{MM}"
-    partition_path = "example"
+    partition_path = cosmosdb_obj["partitionKey"]
     # use connection string - no pkn or pkt
     cli.invoke(
         "iot hub message-endpoint create cosmosdb-container -n {} -g {} --en {} --erg {} -c {} --container {} "

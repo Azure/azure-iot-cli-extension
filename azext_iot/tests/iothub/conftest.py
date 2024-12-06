@@ -707,6 +707,7 @@ def _cosmos_db_provisioner():
         "cosmosdb": cosmos_obj,
         "database": database_obj,
         "container": container_obj,
+        "partitionKey": partition_key_path,
         "connectionString": _cosmos_db_get_cstring(account_name)
     }
 
