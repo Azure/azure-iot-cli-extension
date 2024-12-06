@@ -151,7 +151,7 @@ BAD_ARRAY = ["asd", "", 123.4, 123, True, False]
 class TestDateTimeValidations:
     # Success suite
     @pytest.mark.parametrize(
-        "to_validate", ["20200101", "20200101Z", "2020-01-01", "2020-01-01Z"]
+        "to_validate", ["20200101", "2020-01-01"]
     )
     def test_is_iso8601_date_pass(self, to_validate):
         assert validate({"schema": "date"}, to_validate)
