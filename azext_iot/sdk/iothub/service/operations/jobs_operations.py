@@ -40,7 +40,7 @@ class JobsOperations(object):
     def create_import_export_job(
             self, job_properties, custom_headers=None, raw=False, **operation_config):
         """Creates a new import or export job on the IoT Hub. See
-        https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
+        https://learn.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
         for more information.
 
         :param job_properties: The job specifications.
@@ -100,7 +100,7 @@ class JobsOperations(object):
     def get_import_export_jobs(
             self, custom_headers=None, raw=False, **operation_config):
         """Gets the status of all import and export jobs in the IoT Hub. See
-        https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
+        https://learn.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
         for more information.
 
         :param dict custom_headers: headers that will be added to the request
@@ -154,7 +154,7 @@ class JobsOperations(object):
     def get_import_export_job(
             self, id, custom_headers=None, raw=False, **operation_config):
         """Gets the status of an import or export job in the IoT Hub. See
-        https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
+        https://learn.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities
         for more information.
 
         :param id: The unique identifier of the job.
@@ -271,7 +271,7 @@ class JobsOperations(object):
     def get_scheduled_job(
             self, id, custom_headers=None, raw=False, **operation_config):
         """Gets details of a scheduled job from the IoT Hub. See
-        https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-jobs
+        https://learn.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-jobs
         for more information.
 
         :param id: The unique identifier of the job.
@@ -332,7 +332,7 @@ class JobsOperations(object):
             self, id, job_request, custom_headers=None, raw=False, **operation_config):
         """Creates a new job to schedule twin updates or direct methods on the IoT
         Hub at a scheduled time. See
-        https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-jobs
+        https://learn.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-jobs
         for more information.
 
         :param id: The unique identifier of the job.
@@ -398,7 +398,7 @@ class JobsOperations(object):
     def cancel_scheduled_job(
             self, id, custom_headers=None, raw=False, **operation_config):
         """Cancels a scheduled job on the IoT Hub. See
-        https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-jobs
+        https://learn.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-jobs
         for more information.
 
         :param id: The unique identifier of the job.
@@ -458,15 +458,15 @@ class JobsOperations(object):
     def query_scheduled_jobs(
             self, job_type=None, job_status=None, custom_headers=None, raw=False, **operation_config):
         """Gets the information about jobs using an IoT Hub query. See
-        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language
+        https://learn.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language
         for more information.
 
         :param job_type: The job type. See
-         https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-jobs#querying-for-progress-on-jobs
+         https://learn.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-jobs#querying-for-progress-on-jobs
          for a list of possible job types.
         :type job_type: str
         :param job_status: The job status. See
-         https://docs.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-jobs#querying-for-progress-on-jobs
+         https://learn.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-jobs#querying-for-progress-on-jobs
          for a list of possible statuses.
         :type job_status: str
         :param dict custom_headers: headers that will be added to the request

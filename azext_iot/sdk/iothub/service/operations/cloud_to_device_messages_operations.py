@@ -98,7 +98,7 @@ class CloudToDeviceMessagesOperations(object):
     def receive_feedback_notification(
             self, custom_headers=None, raw=False, **operation_config):
         """Gets the feedback for cloud-to-device messages. See
-        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging for
+        https://learn.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging for
         more information. This capability is only available in the standard
         tier IoT Hub. For more information, see [Choose the right IoT Hub
         tier](https://aka.ms/scaleyouriotsolution).
@@ -147,7 +147,7 @@ class CloudToDeviceMessagesOperations(object):
             self, lock_token, custom_headers=None, raw=False, **operation_config):
         """Completes the cloud-to-device feedback message. A completed message is
         deleted from the feedback queue of the service. See
-        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging for
+        https://learn.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging for
         more information.
 
         :param lock_token: The lock token obtained when the cloud-to-device
@@ -201,7 +201,7 @@ class CloudToDeviceMessagesOperations(object):
     def abandon_feedback_notification(
             self, lock_token, custom_headers=None, raw=False, **operation_config):
         """Abandons the lock on a cloud-to-device feedback message. See
-        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging for
+        https://learn.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging for
         more information.
 
         :param lock_token: The lock token obtained when the cloud-to-device

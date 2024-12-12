@@ -36,7 +36,7 @@ def load_central_help():
     ] = """
         type: command
         short-summary: Query device telemetry or property data with IoT Central Query Language.
-        long-summary: For query syntax details, visit https://docs.microsoft.com/en-us/azure/iot-central/core/howto-query-with-rest-api.
+        long-summary: For query syntax details, visit https://learn.microsoft.com/en-us/azure/iot-central/core/howto-query-with-rest-api.
         examples:
           - name: Query device telemetry
             text: >

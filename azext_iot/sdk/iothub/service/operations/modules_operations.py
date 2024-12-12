@@ -40,7 +40,7 @@ class ModulesOperations(object):
     def get_twin(
             self, id, mid, custom_headers=None, raw=False, **operation_config):
         """Gets the module twin. See
-        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-device-twins
+        https://learn.microsoft.com/azure/iot-hub/iot-hub-devguide-device-twins
         for more information.
 
         :param id: The unique identifier of the device.
@@ -102,7 +102,7 @@ class ModulesOperations(object):
     def replace_twin(
             self, id, mid, device_twin_info, if_match=None, custom_headers=None, raw=False, **operation_config):
         """Replaces the tags and desired properties of a module twin. See
-        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-device-twins
+        https://learn.microsoft.com/azure/iot-hub/iot-hub-devguide-device-twins
         for more information.
 
         :param id: The unique identifier of the device.
@@ -178,7 +178,7 @@ class ModulesOperations(object):
     def update_twin(
             self, id, mid, device_twin_info, if_match=None, custom_headers=None, raw=False, **operation_config):
         """Updates the tags and desired properties of a module twin. See
-        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-device-twins
+        https://learn.microsoft.com/azure/iot-hub/iot-hub-devguide-device-twins
         for more information.
 
         :param id: The unique identifier of the device.
@@ -507,7 +507,7 @@ class ModulesOperations(object):
     def invoke_method(
             self, device_id, module_id, direct_method_request, custom_headers=None, raw=False, **operation_config):
         """Invokes a direct method on a module of a device. See
-        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-direct-methods
+        https://learn.microsoft.com/azure/iot-hub/iot-hub-devguide-direct-methods
         for more information.
 
         :param device_id: The unique identifier of the device.

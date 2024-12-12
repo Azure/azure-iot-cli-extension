@@ -44,7 +44,7 @@ class DeviceOperations(object):
 
         Query IotHub to retrieve information regarding devices which belong to
         the same deviceScope. See
-        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language
+        https://learn.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language
         for more information. Pagination of results is supported. This returns
         information about device twins only.
 
@@ -112,7 +112,7 @@ class DeviceOperations(object):
 
         Get device registry information using module connect for a specific
         device in deviceScope. See
-        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language
+        https://learn.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language
         for more information. Pagination of results is supported. This returns
         information about device twins only.
 
@@ -179,7 +179,7 @@ class DeviceOperations(object):
         """Send a device-to-cloud message.
 
         Send a device-to-cloud message. See
-        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging for
+        https://learn.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging for
         more information.
 
         :param id: Device ID.
@@ -242,7 +242,7 @@ class DeviceOperations(object):
         """This method is used to retrieve a cloud-to-device message.
 
         This method is used to retrieve a cloud-to-device message See
-        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging for
+        https://learn.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging for
         more information. This capability is only available in the standard
         tier IoT Hub. For more information, see [Choose the right IoT Hub
         tier](https://aka.ms/scaleyouriotsolution).
@@ -301,7 +301,7 @@ class DeviceOperations(object):
         when completing, rejecting, or abandoning a message. A abandoned
         message is put back in the device message queue for re-delivery to the
         device. See
-        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging for
+        https://learn.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging for
         more information. Currently, the use of the Etag in the header does not
         comply with RFC 7232. A fix for this issue is currently on our backlog.
         This capability is only available in the standard tier IoT Hub. For
@@ -361,7 +361,7 @@ class DeviceOperations(object):
         """This method is used to retrieve a storage SAS URI to upload a file.
 
         This method is used to retrieve a storage SAS URI to upload a file. See
-        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload
+        https://learn.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload
         for more information.
 
         :param device_id: Device ID.
@@ -432,7 +432,7 @@ class DeviceOperations(object):
 
         This method is used to notify an IoT hub of a completed file upload.
         See
-        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload
+        https://learn.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload
         for more information.
 
         :param device_id: Device ID.
@@ -545,7 +545,7 @@ class DeviceOperations(object):
         positive acknowledgment is sent to the application back-end if
         requested. A rejected message causes it to be deadlettered. To reject a
         message, include a query parameter called \"reject\". See
-        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging for
+        https://learn.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging for
         more information. Currently, the use of the Etag in the header does not
         comply with RFC 7232. A fix for this issue is currently on our backlog.
         This capability is only available in the standard tier IoT Hub. For

@@ -20,7 +20,7 @@ def load_deviceupdate_help():
           of reliability and security and are easy to connect and manage at scale. Device Update for IoT Hub is an end-to-end platform that customers
           can use to publish, distribute, and manage over-the-air updates for everything from tiny sensors to gateway-level devices.
 
-          To learn more about the Device Update for IoT Hub service visit https://docs.microsoft.com/en-us/azure/iot-hub-device-update/
+          To learn more about the Device Update for IoT Hub service visit https://learn.microsoft.com/en-us/azure/iot-hub-device-update/
     """
 
     helps["iot du account"] = """

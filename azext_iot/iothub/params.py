@@ -134,7 +134,7 @@ def load_iothub_arguments(self, _):
             "model_id",
             options_list=["--model-id", "--dtmi"],
             help="The Digital Twin Model Id the device will report when connecting to the hub. See "
-            "https://docs.microsoft.com/en-us/azure/iot-develop/overview-iot-plug-and-play for more details.",
+            "https://learn.microsoft.com/en-us/azure/iot-develop/overview-iot-plug-and-play for more details.",
             arg_group="Digital Twin",
             validator=validate_device_model_id,
         )

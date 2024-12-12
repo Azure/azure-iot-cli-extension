@@ -41,7 +41,7 @@ class QueryOperations(object):
             self, query=None, x_ms_continuation=None, x_ms_max_item_count=None, custom_headers=None, raw=False, **operation_config):
         """Query an IoT Hub to retrieve information regarding device twins using a
         SQL-like language. See
-        https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language
+        https://learn.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language
         for more information. Pagination is supported. This returns information
         about device twins only.
 

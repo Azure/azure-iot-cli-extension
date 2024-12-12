@@ -3,7 +3,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-# This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/roles
+# This is largely derived from https://learn.microsoft.com/en-us/rest/api/iotcentral/roles
 
 from typing import List
 import requests

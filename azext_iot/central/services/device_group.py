@@ -3,7 +3,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-# This is largely derived from https://docs.microsoft.com/en-us/rest/api/iotcentral/deviceGroups
+# This is largely derived from https://learn.microsoft.com/en-us/rest/api/iotcentral/deviceGroups
 
 from typing import List
 import requests
@@ -131,7 +131,7 @@ def create_device_group(
         display_name: Display name of the device group
         filter: Query defining which devices should be in this group,
             or check here for more information
-            https://docs.microsoft.com/en-us/azure/iot-central/core/howto-query-with-rest-api
+            https://learn.microsoft.com/en-us/azure/iot-central/core/howto-query-with-rest-api
         description: Short summary of device group
         organizations: List of organization IDs of the device group
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
@@ -189,7 +189,7 @@ def update_device_group(
         display_name: Display name of the device group
         filter: Query defining which devices should be in this group,
             or check here for more information
-            https://docs.microsoft.com/en-us/azure/iot-central/core/howto-query-with-rest-api
+            https://learn.microsoft.com/en-us/azure/iot-central/core/howto-query-with-rest-api
         description: Short summary of device group
         organizations: List of organization IDs of the device group
         token: (OPTIONAL) authorization token to fetch device details from IoTC.

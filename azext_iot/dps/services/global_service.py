@@ -18,7 +18,7 @@ def get_registration_state(id_scope: str, key: str, device_id: str):
     Gets device registration state from global dps endpoint
     Usefule for when dps name is unknown
 
-    https://docs.microsoft.com/en-us/rest/api/iot-dps/getdeviceregistrationstate/getdeviceregistrationstate
+    https://learn.microsoft.com/en-us/rest/api/iot-dps/getdeviceregistrationstate/getdeviceregistrationstate
 
     Params:
         id_scope: dps id_scope

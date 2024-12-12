@@ -123,7 +123,7 @@ class MessageEndpoint(IoTHubProvider):
                     sub=endpoint_subscription_id
                 )
             else:
-                new_endpoint["entityPath"] = entity_path
+                new_endpoint["entityPath"] = entity_path.replace("~", "/")
             endpoints.event_hubs.append(new_endpoint)
         elif endpoint_type.lower() == EndpointType.ServiceBusQueue.value:
             if fetch_connection_string:

@@ -3,7 +3,7 @@
 ![Python](https://img.shields.io/pypi/pyversions/azure-cli.svg?maxAge=2592000)
 ![Build Status](https://dev.azure.com/azureiotdevxp/aziotcli/_apis/build/status/Merge%20-%20Azure.azure-iot-cli-extension?branchName=dev)
 
-The **Azure IoT extension for Azure CLI** aims to accelerate the development, management and automation of Azure IoT solutions. It does this via addition of rich features and functionality to the official [Azure CLI](https://docs.microsoft.com/en-us/cli/azure).
+The **Azure IoT extension for Azure CLI** aims to accelerate the development, management and automation of Azure IoT solutions. It does this via addition of rich features and functionality to the official [Azure CLI](https://learn.microsoft.com/en-us/cli/azure).
 
 ## News
 
@@ -34,11 +34,11 @@ The **Azure IoT extension for Azure CLI** aims to accelerate the development, ma
 
 ## Commands
 
-Please refer to the official `az iot` reference on [Microsoft Docs](https://docs.microsoft.com/en-us/cli/azure/ext/azure-iot/iot) for a complete list of supported commands.  You can also find IoT CLI usage tips on the [wiki](https://github.com/Azure/azure-iot-cli-extension/wiki/Tips).
+Please refer to the official `az iot` reference on [Microsoft Docs](https://learn.microsoft.com/en-us/cli/azure/ext/azure-iot/iot) for a complete list of supported commands.  You can also find IoT CLI usage tips on the [wiki](https://github.com/Azure/azure-iot-cli-extension/wiki/Tips).
 
 ## Installation
 
-1. Install the [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli)
+1. Install the [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)
     - You must have at least `v2.46.0` for the latest versions of `azure-iot`, which you can verify with `az --version`
 1. Add, Update or Remove the IoT extension with the following commands:
     - Add: `az extension add --name azure-iot`
@@ -116,7 +116,7 @@ Subgroups:
     export      [Preview] : Manage and configure IoT Central data exports.
     file-upload-config    : Manage and configure IoT Central file upload.
     job                   : Manage and configure jobs for an IoT Central application.
-    organization          : Manage and configure organizations for an IoT Central application.      
+    organization          : Manage and configure organizations for an IoT Central application.
     role                  : Manage and configure roles for an IoT Central application.
     scheduled-job         : Manage and configure IoT Central schedule job.
     user                  : Manage and configure IoT Central users.
@@ -246,7 +246,7 @@ Group
         to-end platform that customers can use to publish, distribute, and manage over-the-air
         updates for everything from tiny sensors to gateway-level devices.
         To learn more about the Device Update for IoT Hub service visit
-        https://docs.microsoft.com/en-us/azure/iot-hub-device-update/.
+        https://learn.microsoft.com/en-us/azure/iot-hub-device-update/.
 
 Subgroups:
     account  : Device Update account management.

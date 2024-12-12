@@ -45,7 +45,7 @@ class BulkRegistryOperations(object):
         different devices are allowed. A maximum of 100 devices can be
         specified per invocation. For large scale operations, use the import
         feature using blob storage
-        (https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities).
+        (https://learn.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities).
 
         :param devices: The registry operations to perform.
         :type devices: list[~service.models.ExportImportDevice]

@@ -812,7 +812,7 @@ def load_digitaltwins_help():
         short-summary: Query the digital twins of an instance. Allows traversing relationships and filtering by property values.
         long-summary: In many twin queries, the `$` character is used to reference the `$dtId` property of a twin. In bash-like
           shells or powershell the `$` character has functional meaning and must be escaped as part of the query input. Please review the
-          Digital Twins CLI concepts document https://docs.microsoft.com/en-us/azure/digital-twins/concepts-cli for more information.
+          Digital Twins CLI concepts document https://learn.microsoft.com/en-us/azure/digital-twins/concepts-cli for more information.
 
         examples:
         - name: Query all digital twins in target instance and project all attributes. Also show cost in query units.
