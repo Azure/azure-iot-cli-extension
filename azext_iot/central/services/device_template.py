@@ -3,7 +3,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-# This is largely derived from https://learn.microsoft.com/en-us/rest/api/iotcentral/devicetemplates
 
 import requests
 from typing import List
@@ -138,8 +137,6 @@ def create_device_template(
         device_template_id: case sensitive device template id,
         payload: see example payload available in
             <repo-root>/azext_iot/tests/central/json/device_template_int_test.json
-            or check here for more information
-            https://learn.microsoft.com/en-us/rest/api/iotcentral/devicetemplates
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs
@@ -181,8 +178,6 @@ def update_device_template(
         device_template_id: case sensitive device template id,
         payload: see example payload available in
             <repo-root>/azext_iot/tests/central/json/device_template_int_test.json
-            or check here for more information
-            https://learn.microsoft.com/en-us/rest/api/iotcentral/devicetemplates
         token: (OPTIONAL) authorization token to fetch device details from IoTC.
             MUST INCLUDE type (e.g. 'SharedAccessToken ...', 'Bearer ...')
         central_dns_suffix: {centralDnsSuffixInPath} as found in docs

@@ -3,7 +3,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-# This is largely derived from https://learn.microsoft.com/en-us/rest/api/iotcentral/jobs
 
 import requests
 from typing import List, Union
@@ -358,8 +357,6 @@ def create_job(
         group_id: The ID of the device group on which to execute the job.
         content: see example payload available in
             <repo-root>/azext_iot/tests/central/json/job_int_test.json
-            or check here for more information
-            https://learn.microsoft.com/en-us/rest/api/iotcentral/1.1-preview/jobs/create#cloudpropertyjobdata
         job_name: (OPTIONAL)(non-unique) human readable name for the job
         description: (OPTIONAL) Detailed description of the job.
         token: (OPTIONAL) authorization token to fetch job details from IoTC.

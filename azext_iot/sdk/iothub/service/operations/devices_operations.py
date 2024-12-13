@@ -42,8 +42,6 @@ class DevicesOperations(object):
         """Gets the identities of multiple devices from the IoT Hub identity
         registry. Not recommended. Use the IoT Hub query API to retrieve device
         twin and device identity information. See
-        https://learn.microsoft.com/en-us/rest/api/iothub/service/queryiothub
-        and
         https://learn.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-query-language
         for more information.
 
