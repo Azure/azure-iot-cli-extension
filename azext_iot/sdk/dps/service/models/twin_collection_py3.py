@@ -28,7 +28,7 @@ class TwinCollection(Model):
 
     _attribute_map = {
         'additional_properties': {'key': '', 'type': '{object}'},
-        'version': {'key': 'version', 'type': 'long'},
+        'version': {'key': 'version', 'type': 'object'},  # 'long' -> 'object': rest API spec is not accurate. More than int is supported.
         'count': {'key': 'count', 'type': 'int'},
         'metadata': {'key': 'metadata', 'type': 'Metadata'},
     }
