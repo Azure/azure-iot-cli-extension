@@ -343,7 +343,7 @@ def load_deviceupdate_arguments(self, _):
             "deployment_id",
             options_list=["--deployment-id", "--did"],
             help="The caller-provided deployment Id. This cannot be longer than 73 characters, "
-            "must be all lower-case, and cannot contain '&', '^', '[', ']', '{', '}', '|', '<', '>', "
+            "must be all lower-case, and cannot contain `&`, `^`, `[`, `]`, `{`, `}`, `|`, `<`, `>`, "
             "forward slash, backslash, or double quote.",
         )
         context.argument(
