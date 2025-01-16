@@ -180,9 +180,3 @@ def load_iothub_commands(self, _):
         "iot edge devices", command_type=device_identity_ops
     ) as cmd_group:
         cmd_group.command("create", "iot_edge_devices_create", is_experimental=True)
-
-    with self.command_group(
-        "iot hub certificate root-authority", command_type=iothub_resource_ops, deprecate_info=self.deprecate()
-    ) as cmd_group:
-        cmd_group.show_command("show", "certificate_root_authority_show")
-        cmd_group.command("set", "certificate_root_authority_set")
