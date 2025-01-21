@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 
 from azext_iot.iothub.providers.state import HubAspects
-from azext_iot.iothub.common import CertificateAuthorityVersions
 from azure.cli.core.commands.parameters import get_enum_type, get_three_state_flag
 from azext_iot.common.shared import DeviceAuthType, SettleType, ProtocolType, AckType
 from azext_iot.assets.user_messages import info_param_properties_device
