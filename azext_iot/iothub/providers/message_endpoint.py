@@ -122,7 +122,7 @@ class MessageEndpoint(IoTHubProvider):
                     rg=endpoint_resource_group,
                     sub=endpoint_subscription_id
                 )
-            else:
+            elif entity_path:
                 new_endpoint["entityPath"] = entity_path.replace("~", "/")
             endpoints.event_hubs.append(new_endpoint)
         elif endpoint_type.lower() == EndpointType.ServiceBusQueue.value:
@@ -135,7 +135,8 @@ class MessageEndpoint(IoTHubProvider):
                     rg=endpoint_resource_group,
                     sub=endpoint_subscription_id
                 )
-            new_endpoint["entityPath"] = entity_path
+            if entity_path:
+                new_endpoint["entityPath"] = entity_path
             endpoints.service_bus_queues.append(new_endpoint)
         elif endpoint_type.lower() == EndpointType.ServiceBusTopic.value:
             if fetch_connection_string:
@@ -147,7 +148,8 @@ class MessageEndpoint(IoTHubProvider):
                     rg=endpoint_resource_group,
                     sub=endpoint_subscription_id
                 )
-            new_endpoint["entityPath"] = entity_path
+            if entity_path:
+                new_endpoint["entityPath"] = entity_path
             endpoints.service_bus_topics.append(new_endpoint)
         elif endpoint_type.lower() == EndpointType.CosmosDBContainer.value:
             if fetch_connection_string:
