@@ -187,14 +187,6 @@ class RouteSourceType(Enum):
         return list(filter(lambda d: d != RouteSourceType.Invalid.value, map(lambda c: c.value, cls)))
 
 
-class CertificateAuthorityVersions(Enum):
-    """
-    Certificate Authority Versions
-    """
-    v2 = "v2"
-    v1 = "v1"
-
-
 class IoTHubSDKVersion(Enum):
     """
     Types to determine which object properties the hub supports for backwards compatibility with the
