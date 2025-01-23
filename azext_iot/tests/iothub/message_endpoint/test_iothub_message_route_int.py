@@ -466,5 +466,4 @@ def assert_route_properties(result: dict, expected: dict):
 
 
 def remove_fallback_route(result: list) -> list:
-    # import pdb; pdb.set_trace()
     return [route for route in result if route["properties"]["name"].lower() != "$fallback"]
