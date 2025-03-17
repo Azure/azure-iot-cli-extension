@@ -8,7 +8,6 @@ from typing import Optional
 from azure.cli.core.azclierror import InvalidArgumentValueError
 from azext_iot.assets.user_messages import error_param_top_out_of_bounds
 
-from datetime import datetime
 
 def _execute_query(query_args, query_method, top: Optional[int] = None):
     payload = []
@@ -16,18 +15,13 @@ def _execute_query(query_args, query_method, top: Optional[int] = None):
 
     if top:
         headers["x-ms-max-item-count"] = str(top)
-    print(headers)
-    start = datetime.now()
-    print(start)
+
     result = query_method(*query_args, custom_headers=headers, raw=True)
     token = result.response.headers.get("x-ms-continuation")
-    new_time = datetime.now()
-    print(f"page 0 took {(new_time - start).total_seconds()} seconds.")
+
     payload.extend(result.response.json())
 
-    i = 0
     while token:
-        old_time = new_time
         # In case requested count is > service max page size
         if top:
             pl = len(payload)
@@ -40,11 +34,6 @@ def _execute_query(query_args, query_method, top: Optional[int] = None):
         result = query_method(*query_args, custom_headers=headers, raw=True)
         token = result.response.headers.get("x-ms-continuation")
         payload.extend(result.response.json())
-        new_time = datetime.now()
-        i += 1
-        print(f"page {i} took {(new_time - old_time).total_seconds()} seconds.")
-    print(f"total time {(datetime.now() - start).total_seconds()} seconds")
-    return
     return payload[:top] if top else payload
 
 
