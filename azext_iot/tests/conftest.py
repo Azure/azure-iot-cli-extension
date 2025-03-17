@@ -390,7 +390,7 @@ def fixture_dt_client(mocker, fixture_cmd):
         AzureDigitalTwinsManagementClient,
     )
     from azext_iot.sdk.digitaltwins.dataplane import AzureDigitalTwinsAPI
-    from azext_iot.digitaltwins.providers.auth import DigitalTwinAuthentication
+    from azext_iot.common.auth import IoTOAuth
 
     patched_get_raw_token = mocker.patch(
         "azure.cli.core._profile.Profile.get_raw_token"
@@ -405,8 +405,8 @@ def fixture_dt_client(mocker, fixture_cmd):
         "azext_iot.digitaltwins.providers.digitaltwins_service_factory"
     )
     control_plane_patch.return_value = AzureDigitalTwinsManagementClient(
-        credentials=DigitalTwinAuthentication(
-            fixture_cmd, "00000000-0000-0000-0000-000000000000"
+        credentials=IoTOAuth(
+            fixture_cmd.cli_ctx, "00000000-0000-0000-0000-000000000000"
         ),
         subscription_id="00000000-0000-0000-0000-000000000000",
     )
@@ -416,8 +416,8 @@ def fixture_dt_client(mocker, fixture_cmd):
     )
 
     data_plane_patch.return_value = AzureDigitalTwinsAPI(
-        credentials=DigitalTwinAuthentication(
-            fixture_cmd, "00000000-0000-0000-0000-000000000000"
+        credentials=IoTOAuth(
+            fixture_cmd.cli_ctx, "00000000-0000-0000-0000-000000000000"
         ),
         base_url="https://{}/".format(hostname),
     )
