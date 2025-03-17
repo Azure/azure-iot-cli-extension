@@ -20,7 +20,6 @@ def _execute_query(query_args, query_method, top: Optional[int] = None):
     token = result.response.headers.get("x-ms-continuation")
 
     payload.extend(result.response.json())
-
     while token:
         # In case requested count is > service max page size
         if top:
