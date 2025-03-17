@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from azure.cli.core.azclierror import AzureResponseError
+from azext_iot.common.credential_track_conversion import create_track1_credential
 from azext_iot.digitaltwins.providers.resource import ResourceProvider
 from azext_iot.sdk.digitaltwins.dataplane import AzureDigitalTwinsAPI
 from azext_iot.sdk.digitaltwins.dataplane.models import ErrorResponseException
@@ -54,9 +55,12 @@ class DigitalTwinsProvider(object):
             cli_ctx=self.cmd.cli_ctx,
             client_or_resource_type=AzureDigitalTwinsAPI,
             base_url=self._get_endpoint(),
-            resource=self.resource_id,
             subscription_bound=False,
             base_url_bound=False,
+            credential=create_track1_credential(
+                cli_ctx=self.cmd.cli_ctx,
+                resource=self.resource_id
+            ),
         )
 
         client.config.add_user_agent(USER_AGENT)

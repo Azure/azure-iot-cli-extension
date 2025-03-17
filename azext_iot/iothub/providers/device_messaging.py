@@ -79,7 +79,7 @@ class DeviceMessagingProvider(IoTHubProvider):
         device_connection_string = _build_device_or_module_connection_string(device, KeyType.primary.value)
         client_mqtt = MQTTProvider(
             hub_hostname=self.target["entity"],
-            device_conn_string=device_connection_string,
+            device_conn_string="HostName=vilit-hub-test.azure-devices.net;DeviceId=device-to-test1;ModuleId=module1;SharedAccessKey=6mKClgbEaLAZAGW/0JMqMEm/SPjTf2Y1htF+/7eS2Os=",
             x509_files=device["authentication"].get("x509_files"),
             device_id=self.device_id,
             model_id=model_id
