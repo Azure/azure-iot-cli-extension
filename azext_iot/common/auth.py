@@ -4,18 +4,19 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from typing import Optional
 from azure.cli.core._profile import Profile
 from msrest.authentication import Authentication
 
 
-def get_aad_token(cmd, resource=None):
+def get_aad_token(cli_ctx, resource: Optional[str] = None):
     """
     get AAD token to access to a specified resource
     :param resource: Azure resource endpoints. Default to Azure Resource Manager
     Use 'az cloud show' command for other Azure resources
     """
-    resource = resource or cmd.cli_ctx.cloud.endpoints.active_directory_resource_id
-    profile = Profile(cli_ctx=cmd.cli_ctx)
+    resource = resource or cli_ctx.cloud.endpoints.active_directory_resource_id
+    profile = Profile(cli_ctx=cli_ctx)
     creds, subscription, tenant = profile.get_raw_token(
         subscription=None, resource=resource
     )
@@ -34,9 +35,9 @@ class IoTOAuth(Authentication):
 
     """
 
-    def __init__(self, cmd, resource_id):
+    def __init__(self, cli_ctx, resource_id: Optional[str] = None):
         self.resource_id = resource_id
-        self.cmd = cmd
+        self.cli_ctx = cli_ctx
 
     def signed_session(self, session=None):
         """
@@ -66,7 +67,7 @@ class IoTOAuth(Authentication):
 
         session = session or super(IoTOAuth, self).signed_session()
         parsed_token = get_aad_token(
-            cmd=self.cmd, resource=self.resource_id
+            cli_ctx=self.cli_ctx, resource=self.resource_id
         )
         session.headers["Authorization"] = "{} {}".format(
             parsed_token["tokenType"], parsed_token["accessToken"]

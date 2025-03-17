@@ -110,7 +110,7 @@ class SdkResolver(object):
             credentials = self.auth_override
         elif self.target["policy"] == AuthenticationTypeDataplane.login.value:
             credentials = IoTOAuth(
-                cmd=self.target["cmd"],
+                cli_ctx=self.target["cmd"].cli_ctx,
                 resource_id=IOTHUB_RESOURCE_ID
             )
         else:
@@ -131,7 +131,7 @@ class SdkResolver(object):
             credentials = self.auth_override
         elif self.target["policy"] == AuthenticationTypeDataplane.login.value:
             credentials = IoTOAuth(
-                cmd=self.target["cmd"],
+                cli_ctx=self.target["cmd"].cli_ctx,
                 resource_id=IOTDPS_RESOURCE_ID
             )
         else:

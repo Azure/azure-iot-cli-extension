@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from azure.cli.core.commands.client_factory import get_subscription_id
-from azext_iot.common.credential_track_conversion import create_track1_credential
+from azext_iot.common.auth import IoTOAuth
 from azext_iot.sdk.digitaltwins.controlplane import AzureDigitalTwinsManagementClient
 from azext_iot.sdk.digitaltwins.controlplane.models import ErrorResponseException
 from msrestazure.azure_exceptions import CloudError
@@ -35,7 +35,7 @@ def digitaltwins_service_factory(cli_ctx, *_) -> AzureDigitalTwinsManagementClie
     return get_mgmt_service_client(
         cli_ctx=cli_ctx,
         client_or_resource_type=AzureDigitalTwinsManagementClient,
-        credential=create_track1_credential(cli_ctx=cli_ctx),
+        credential=IoTOAuth(cli_ctx=cli_ctx),
         subscription_id=get_subscription_id(cli_ctx=cli_ctx)
     )
 

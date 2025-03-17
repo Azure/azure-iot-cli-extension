@@ -90,12 +90,10 @@ class DeviceUpdateClientHandler(object):
     def get_data_client(self, endpoint: str, instance_id: str) -> DeviceUpdateClient:
         from azure.cli.core._profile import Profile
         from azure.cli.core.commands.client_factory import prepare_client_kwargs_track2
-        from azext_iot.common.credential_track_conversion import Track1Credential
 
         profile = Profile()
         client: DeviceUpdateClient = DeviceUpdateClient(
             credential=profile.get_login_credentials()[0],
-            # credential=Track1Credential(profile.get_login_credentials()[0], resource=AUTH_RESOURCE_ID),
             endpoint=endpoint,
             instance_id=instance_id,
             **prepare_client_kwargs_track2(self.cmd.cli_ctx),
