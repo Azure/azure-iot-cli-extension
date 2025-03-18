@@ -27,7 +27,7 @@ from msrest.serialization import Model
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.common.utility import handle_service_exception
 from azext_iot.constants import USER_AGENT
-from azext_iot.deviceupdate.common import AUTH_RESOURCE_ID, SYSTEM_IDENTITY_ARG
+from azext_iot.deviceupdate.common import SYSTEM_IDENTITY_ARG
 from azext_iot.sdk.deviceupdate.controlplane import DeviceUpdate
 from azext_iot.sdk.deviceupdate.controlplane import models as DeviceUpdateMgmtModels
 from azext_iot.sdk.deviceupdate.dataplane import DeviceUpdateClient
