@@ -25,8 +25,7 @@ from . import (
     EP_SERVICEBUS_TOPIC,
     MOCK_RESOURCE_TAGS,
     MOCK_RESOURCE_TAGS_DICT,
-    MOCK_DEAD_LETTER_SECRET,
-    MOCK_DEAD_LETTER_ENDPOINT,
+    MOCK_DEAD_LETTER_PLACEHOLDER,
     generate_resource_id,
 )
 
@@ -343,6 +342,26 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 EP_RG,
             )
         ).as_json()["id"]
+
+        self._create_storage_account()
+        storage_account_uri = self.embedded_cli.invoke(
+            "storage account show -n {} -g {}".format(
+                self.storage_account_name,
+                self.rg
+            )
+        ).as_json()["primaryEndpoints"]["blob"]
+
+        storage_account_sas = self.embedded_cli.invoke(
+            "storage container generate-sas -n {} --account-key {} --account-name {}".format(
+                self.storage_container,
+                self.storage_cstring,
+                self.storage_account_name,
+            )
+        ).output.strip('"\n')
+
+        storage_account_uri = f"{storage_account_uri}{self.storage_container}"
+        storage_account_full_sas = f'"{storage_account_uri}?{storage_account_sas}"'
+
         endpoint_instance = self.cmd(
             "dt create -n {} -g {} -l {} --mi-system-assigned --scopes {} {} --role {}".format(
                 endpoints_instance_name,
@@ -381,7 +400,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 "" if EP_RG == self.rg else f"--egg {EP_RG}",
                 EP_EVENTGRID_TOPIC,
                 eventgrid_endpoint,
-                MOCK_DEAD_LETTER_SECRET,
+                storage_account_full_sas,
             )
         )
         endpoint_tuple_collection.append(
@@ -403,7 +422,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 EP_SERVICEBUS_POLICY,
                 EP_SERVICEBUS_TOPIC,
                 servicebus_endpoint,
-                MOCK_DEAD_LETTER_SECRET,
+                storage_account_full_sas,
             )
         )
         endpoint_tuple_collection.append(
@@ -426,7 +445,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 EP_EVENTHUB_TOPIC,
                 self.current_subscription,
                 eventhub_endpoint_msi,
-                MOCK_DEAD_LETTER_ENDPOINT,
+                storage_account_uri,
             )
         )
 
@@ -543,6 +562,25 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             scope=eh_resource_id, role=target_scope_role, assignee=user_identity_principal_id
         )
 
+        self._create_storage_account()
+        storage_account_uri = self.embedded_cli.invoke(
+            "storage account show -n {} -g {}".format(
+                self.storage_account_name,
+                self.rg
+            )
+        ).as_json()["primaryEndpoints"]["blob"]
+
+        storage_account_sas = self.embedded_cli.invoke(
+            "storage container generate-sas -n {} --account-key {} --account-name {}".format(
+                self.storage_container,
+                self.storage_cstring,
+                self.storage_account_name,
+            )
+        ).output.strip('"\n')
+
+        storage_account_uri = f"{storage_account_uri}{self.storage_container}"
+        storage_account_full_sas = f'"{storage_account_uri}?{storage_account_sas}"'
+
         endpoint_instance = self.cmd(
             "dt create -n {} -g {} -l {} --mi-system-assigned --scopes {} {} --role {} --mi-user-assigned {}".format(
                 endpoints_instance_name,
@@ -575,7 +613,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 EP_RG,
                 EP_EVENTGRID_TOPIC,
                 eventgrid_endpoint,
-                MOCK_DEAD_LETTER_SECRET,
+                storage_account_full_sas,
             )
         ).get_output_in_json()
 
@@ -591,7 +629,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             add_ep_output,
             eventgrid_endpoint,
             ADTEndpointType.eventgridtopic,
-            dead_letter_secret=MOCK_DEAD_LETTER_SECRET,
+            dead_letter_secret=storage_account_full_sas,
         )
 
         # Delete and re-add endpoint with no wait
@@ -610,7 +648,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 EP_RG,
                 EP_EVENTGRID_TOPIC,
                 eventgrid_endpoint,
-                MOCK_DEAD_LETTER_SECRET,
+                storage_account_full_sas,
             )
         )
 
@@ -634,7 +672,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             show_ep_output,
             eventgrid_endpoint,
             ADTEndpointType.eventgridtopic,
-            dead_letter_secret=MOCK_DEAD_LETTER_SECRET,
+            dead_letter_secret=storage_account_full_sas,
         )
 
         endpoint_tuple_collection.append(
@@ -658,7 +696,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 EP_SERVICEBUS_POLICY,
                 EP_SERVICEBUS_TOPIC,
                 servicebus_endpoint,
-                MOCK_DEAD_LETTER_SECRET,
+                storage_account_full_sas,
             )
         ).get_output_in_json()
 
@@ -675,7 +713,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             servicebus_endpoint,
             endpoint_type=ADTEndpointType.servicebus,
             auth_type=ADTEndpointAuthType.keybased,
-            dead_letter_secret=MOCK_DEAD_LETTER_SECRET,
+            dead_letter_secret=storage_account_full_sas,
         )
 
         # Delete and re-add endpoint with no wait
@@ -695,7 +733,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 EP_SERVICEBUS_POLICY,
                 EP_SERVICEBUS_TOPIC,
                 servicebus_endpoint,
-                MOCK_DEAD_LETTER_SECRET,
+                storage_account_full_sas,
             )
         )
 
@@ -720,7 +758,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             servicebus_endpoint,
             endpoint_type=ADTEndpointType.servicebus,
             auth_type=ADTEndpointAuthType.keybased,
-            dead_letter_secret=MOCK_DEAD_LETTER_SECRET,
+            dead_letter_secret=storage_account_full_sas,
         )
         endpoint_tuple_collection.append(
             EndpointTuple(
@@ -738,7 +776,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 EP_SERVICEBUS_NAMESPACE,
                 EP_SERVICEBUS_TOPIC,
                 servicebus_endpoint_msi,
-                MOCK_DEAD_LETTER_ENDPOINT,
+                storage_account_uri,
             )
         ).get_output_in_json()
 
@@ -755,7 +793,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             servicebus_endpoint_msi,
             endpoint_type=ADTEndpointType.servicebus,
             auth_type=ADTEndpointAuthType.identitybased,
-            dead_letter_endpoint=MOCK_DEAD_LETTER_ENDPOINT,
+            dead_letter_endpoint=storage_account_uri,
         )
         endpoint_tuple_collection.append(
             EndpointTuple(
@@ -773,7 +811,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 EP_SERVICEBUS_NAMESPACE,
                 EP_SERVICEBUS_TOPIC,
                 servicebus_endpoint_uai,
-                MOCK_DEAD_LETTER_ENDPOINT,
+                storage_account_uri,
                 user_identity_id
             )
         ).get_output_in_json()
@@ -791,7 +829,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             servicebus_endpoint_uai,
             endpoint_type=ADTEndpointType.servicebus,
             auth_type=ADTEndpointAuthType.identitybased,
-            dead_letter_endpoint=MOCK_DEAD_LETTER_ENDPOINT,
+            dead_letter_endpoint=storage_account_uri,
         )
 
         # Delete endpoint to avoid endpoint limits
@@ -810,7 +848,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
         # Cannot use both system and user identities
         add_ep_output = self.cmd(
             "dt endpoint create eventhub -n {} --ehg {} --ehn {} --ehp {} --eh {} --ehs {} --en {}"
-            " --dsu '{}' --system --user {}".format(
+            " --dsu {} --system --user {}".format(
                 endpoints_instance_name,
                 EP_RG,
                 EP_EVENTHUB_NAMESPACE,
@@ -818,7 +856,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 EP_EVENTHUB_TOPIC,
                 self.current_subscription,
                 eventhub_endpoint,
-                MOCK_DEAD_LETTER_SECRET,
+                storage_account_full_sas,
                 user_identity_id
             ),
             expect_failure=True
@@ -826,7 +864,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
 
         logger.debug("Adding key based eventhub endpoint...")
         add_ep_output = self.cmd(
-            "dt endpoint create eventhub -n {} --ehg {} --ehn {} --ehp {} --eh {} --ehs {} --en {} --dsu '{}'".format(
+            "dt endpoint create eventhub -n {} --ehg {} --ehn {} --ehp {} --eh {} --ehs {} --en {} --dsu {}".format(
                 endpoints_instance_name,
                 EP_RG,
                 EP_EVENTHUB_NAMESPACE,
@@ -834,7 +872,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 EP_EVENTHUB_TOPIC,
                 self.current_subscription,
                 eventhub_endpoint,
-                MOCK_DEAD_LETTER_SECRET,
+                storage_account_full_sas,
             )
         ).get_output_in_json()
 
@@ -851,7 +889,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             eventhub_endpoint,
             ADTEndpointType.eventhub,
             auth_type=ADTEndpointAuthType.keybased,
-            dead_letter_secret=MOCK_DEAD_LETTER_SECRET,
+            dead_letter_secret=storage_account_full_sas,
         )
         endpoint_tuple_collection.append(
             EndpointTuple(
@@ -871,7 +909,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 EP_EVENTHUB_TOPIC,
                 self.current_subscription,
                 eventhub_endpoint_msi,
-                MOCK_DEAD_LETTER_ENDPOINT,
+                storage_account_uri,
             )
         ).get_output_in_json()
 
@@ -888,7 +926,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             eventhub_endpoint_msi,
             endpoint_type=ADTEndpointType.eventhub,
             auth_type=ADTEndpointAuthType.identitybased,
-            dead_letter_endpoint=MOCK_DEAD_LETTER_ENDPOINT,
+            dead_letter_endpoint=storage_account_uri,
         )
 
         # Delete and re-add endpoint with no wait
@@ -909,7 +947,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 EP_EVENTHUB_TOPIC,
                 self.current_subscription,
                 eventhub_endpoint_msi,
-                MOCK_DEAD_LETTER_ENDPOINT,
+                storage_account_uri,
             )
         )
 
@@ -934,7 +972,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             eventhub_endpoint_msi,
             endpoint_type=ADTEndpointType.eventhub,
             auth_type=ADTEndpointAuthType.identitybased,
-            dead_letter_endpoint=MOCK_DEAD_LETTER_ENDPOINT,
+            dead_letter_endpoint=storage_account_uri,
         )
         endpoint_tuple_collection.append(
             EndpointTuple(
@@ -954,7 +992,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
                 EP_EVENTHUB_TOPIC,
                 self.current_subscription,
                 eventhub_endpoint_uai,
-                MOCK_DEAD_LETTER_ENDPOINT,
+                storage_account_uri,
                 user_identity_id
             )
         ).get_output_in_json()
@@ -972,7 +1010,7 @@ class TestDTResourceLifecycle(DTLiveScenarioTest):
             eventhub_endpoint_uai,
             endpoint_type=ADTEndpointType.eventhub,
             auth_type=ADTEndpointAuthType.identitybased,
-            dead_letter_endpoint=MOCK_DEAD_LETTER_ENDPOINT,
+            dead_letter_endpoint=storage_account_uri,
         )
         endpoint_tuple_collection.append(
             EndpointTuple(
