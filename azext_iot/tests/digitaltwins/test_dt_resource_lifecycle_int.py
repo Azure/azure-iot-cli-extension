@@ -25,7 +25,6 @@ from . import (
     EP_SERVICEBUS_TOPIC,
     MOCK_RESOURCE_TAGS,
     MOCK_RESOURCE_TAGS_DICT,
-    MOCK_DEAD_LETTER_PLACEHOLDER,
     generate_resource_id,
 )
 
