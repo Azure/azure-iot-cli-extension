@@ -69,6 +69,20 @@ steps:
         COVERAGE_FILE: .coverage.${{ parameters.name }}
 
   - ${{ if eq(parameters.runIntTests, 'true') }}:
+    - script: |
+        echo "Listing files in test directories:"
+        echo "---certificates---"
+        ls -R azext_iot/tests/iothub/certificate
+        echo "---configurations---"
+        ls -R azext_iot/tests/iothub/configurations
+        echo "---core---"
+        ls -R azext_iot/tests/iothub/core
+        echo "---jobs---"
+        ls -R azext_iot/tests/iothub/jobs
+        echo "---state---"
+        ls -R azext_iot/tests/iothub/state
+        pip freeze
+      displayName: 'debugging output'
     - task: AzureCLI@2
       continueOnError: true
       displayName: '${{ parameters.name }} integration tests'
@@ -88,14 +102,13 @@ steps:
         ${{ if contains(parameters.path, 'azext_iot/tests/iothub') }}:
           inlineScript: |
             export COVERAGE_FILE=.coverage.${{ parameters.name }}
-            echo "Running iothub tests"
-            echo "pytest -vv ${{ parameters.path }} -k '_int.py' --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }}"
-            pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }}
+            echo "Running iothub tests in folders: ${{ parameters.path }}"
+            echo "pytest -vv  ${{parameters.path}} -k '_int.py'"
+            pytest -vv ${{ parameters.path }} -k "_int.py"
         ${{ if contains(parameters.path, 'azext_iot/tests/dps') }}:
           inlineScript: |
             export COVERAGE_FILE=.coverage.${{ parameters.name }}
             pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --durations=0
-
   - task: PublishBuildArtifacts@1
     inputs:
       pathToPublish: .coverage.${{ parameters.name }}
