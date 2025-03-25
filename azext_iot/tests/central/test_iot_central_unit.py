@@ -137,7 +137,7 @@ class TestCentralHelpers:
             cli_ctx = ""
 
         # Test to ensure _get_aad_token is called and returns the right values based on profile.get_raw_tokens
-        assert get_aad_token(Cmd(), "resource") == {
+        assert get_aad_token(Cmd().cli_ctx, "resource") == {
             "accessToken": "raw token 0 -b",
             "expiresOn": "value",
             "subscription": "raw token 1",
@@ -241,7 +241,7 @@ class TestCentralDeviceProvider:
     def test_should_list_device_modules(self, get_aad_token_svc, req_svc):
         # setup
         provider = CentralDeviceProvider(
-            cmd=None, app_id=app_id, api_version=API_VERSION
+            cmd=None, app_id=app_id, api_version=API_VERSION, token="token"
         )
         response = mock.MagicMock()
         response.status_code = 200

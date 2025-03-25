@@ -744,7 +744,7 @@ def get_device_twin(
     """
 
     if not token:
-        aad_token = get_aad_token(cmd, resource="https://apps.azureiotcentral.com")[
+        aad_token = get_aad_token(cmd.cli_ctx, resource="https://apps.azureiotcentral.com")[
             "accessToken"
         ]
         token = "Bearer {}".format(aad_token)
@@ -905,7 +905,7 @@ def list_device_modules(
         modules: list
     """
     if not token:
-        aad_token = get_aad_token(cmd, resource="https://apps.azureiotcentral.com")[
+        aad_token = get_aad_token(cmd.cli_ctx, resource="https://apps.azureiotcentral.com")[
             "accessToken"
         ]
         token = "Bearer {}".format(aad_token)
@@ -954,7 +954,7 @@ def restart_device_module(
     """
 
     if not token:
-        aad_token = get_aad_token(cmd, resource="https://apps.azureiotcentral.com")[
+        aad_token = get_aad_token(cmd.cli_ctx, resource="https://apps.azureiotcentral.com")[
             "accessToken"
         ]
         token = "Bearer {}".format(aad_token)

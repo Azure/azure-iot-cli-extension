@@ -71,7 +71,7 @@ def get_iot_central_tokens(cmd, app_id, token, central_dns_suffix):
     import requests
 
     if not token:
-        aad_token = get_aad_token(cmd, resource="https://apps.azureiotcentral.com")[
+        aad_token = get_aad_token(cmd.cli_ctx, resource="https://apps.azureiotcentral.com")[
             "accessToken"
         ]
         token = "Bearer {}".format(aad_token)
