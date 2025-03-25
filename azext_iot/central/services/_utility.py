@@ -55,7 +55,7 @@ def make_api_call(
 
 def get_headers(token, cmd, has_json_payload=False):
     if not token:
-        aad_token = auth.get_aad_token(cmd, resource="https://apps.azureiotcentral.com")
+        aad_token = auth.get_aad_token(cmd.cli_ctx, resource="https://apps.azureiotcentral.com")
         token = "Bearer {}".format(aad_token["accessToken"])
 
     headers = {
