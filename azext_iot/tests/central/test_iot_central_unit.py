@@ -137,7 +137,7 @@ class TestCentralHelpers:
             cli_ctx = ""
 
         # Test to ensure _get_aad_token is called and returns the right values based on profile.get_raw_tokens
-        assert get_aad_token(Cmd(), "resource") == {
+        assert get_aad_token(Cmd().cli_ctx, "resource") == {
             "accessToken": "raw token 0 -b",
             "expiresOn": "value",
             "subscription": "raw token 1",
