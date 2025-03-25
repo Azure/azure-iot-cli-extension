@@ -241,7 +241,7 @@ class TestCentralDeviceProvider:
     def test_should_list_device_modules(self, get_aad_token_svc, req_svc):
         # setup
         provider = CentralDeviceProvider(
-            cmd=None, app_id=app_id, api_version=API_VERSION
+            cmd=None, app_id=app_id, api_version=API_VERSION, token="token"
         )
         response = mock.MagicMock()
         response.status_code = 200
