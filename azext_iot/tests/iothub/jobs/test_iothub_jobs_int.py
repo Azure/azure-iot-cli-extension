@@ -6,7 +6,7 @@
 
 import json
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 
@@ -28,24 +28,23 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
                 self.cmd(
                     self.set_cmd_auth_type(
                         f"iot hub device-identity create -d {device_id} -n {self.host_name} -g {self.entity_rg}",
-                        auth_type=auth_phase
+                        auth_type=auth_phase,
                     )
                 )
 
             # Focus is on scheduleUpdateTwin jobs until we improve JIT device simulation
 
             # Update twin tags scenario
-            self.kwargs[
-                "twin_patch_tags"
-            ] = '{"tags": {"deviceClass": "Class1, Class2, Class3"}}'
+            self.kwargs["twin_patch_tags"] = '{"tags": {"deviceClass": "Class1, Class2, Class3"}}'
             query_condition = "deviceId in ['{}']".format("','".join(device_ids_twin_tags))
 
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub job create --job-id {self.job_ids[0]} --job-type scheduleUpdateTwin -q \"{query_condition}\" "
+                    f'iot hub job create --job-id {self.job_ids[0]} --job-type scheduleUpdateTwin -q "{query_condition}" '
                     f"-n {self.host_name} -g {self.entity_rg} "
-                    "--twin-patch '{twin_patch_tags}' --ttl 300 --wait",
-                    auth_type=auth_phase
+                    "--twin-patch '{twin_patch_tags}' --ttl 300 --wait "
+                    f"--start-time '{(datetime.now(timezone.utc) + timedelta(seconds=1)).isoformat()}'",
+                    auth_type=auth_phase,
                 ),
                 checks=[
                     self.check("jobId", self.job_ids[0]),
@@ -64,26 +63,21 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
                 self.cmd(
                     self.set_cmd_auth_type(
                         f"iot hub device-twin show -d {device_id} -n {self.host_name} -g {self.entity_rg}",
-                        auth_type=auth_phase
+                        auth_type=auth_phase,
                     ),
-                    checks=[
-                        self.check(
-                            "tags", json.loads(self.kwargs["twin_patch_tags"])["tags"]
-                        )
-                    ],
+                    checks=[self.check("tags", json.loads(self.kwargs["twin_patch_tags"])["tags"])],
                 )
 
             # Update twin desired properties
-            self.kwargs[
-                "twin_patch_props"
-            ] = '{"properties": {"desired": {"arbitrary": "value"}}}'
+            self.kwargs["twin_patch_props"] = '{"properties": {"desired": {"arbitrary": "value"}}}'
             query_condition = "deviceId in ['{}']".format("','".join(device_ids_twin_props))
 
             self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub job create --job-id {self.job_ids[1]} --job-type scheduleUpdateTwin -q \"{query_condition}\" "
+                    f'iot hub job create --job-id {self.job_ids[1]} --job-type scheduleUpdateTwin -q "{query_condition}" '
                     f"-n {self.host_name} -g {self.entity_rg} "
-                    "--twin-patch '{twin_patch_props}' --ttl 300 --wait",
+                    "--twin-patch '{twin_patch_props}' --ttl 300 --wait "
+                    f"--start-time '{(datetime.now(timezone.utc) + timedelta(seconds=1)).isoformat()}'",
                     auth_type=auth_phase,
                 ),
                 checks=[
@@ -100,10 +94,15 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             )
 
             # Error - omit queryCondition when scheduleUpdateTwin or scheduleDeviceMethod
+
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot hub job create --job-id {} --job-type {} --twin-patch '{}' -n {}".format(
-                        self.job_ids[1], "scheduleUpdateTwin", "{twin_patch_props}", self.host_name
+                    "iot hub job create --job-id {} --job-type {} --twin-patch '{}'  --start-time '{}' -n {}".format(
+                        self.job_ids[1],
+                        "scheduleUpdateTwin",
+                        "{twin_patch_props}",
+                        (datetime.now(timezone.utc) + timedelta(seconds=1)).isoformat(),
+                        self.host_name,
                     ),
                     auth_type=auth_phase,
                 ),
@@ -112,10 +111,14 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
 
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot hub job create --job-id {} --job-type {} --twin-patch '{}' -n {}".format(
-                        self.job_ids[1], "scheduleDeviceMethod", "{twin_patch_props}", self.host_name
+                    "iot hub job create --job-id {} --job-type {} --twin-patch '{}'  --start-time '{}' -n {}".format(
+                        self.job_ids[1],
+                        "scheduleDeviceMethod",
+                        "{twin_patch_props}",
+                        (datetime.now(timezone.utc) + timedelta(seconds=1)).isoformat(),
+                        self.host_name,
                     ),
-                    auth_type=auth_phase
+                    auth_type=auth_phase,
                 ),
                 expect_failure=True,
             )
@@ -123,10 +126,10 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             # Error - omit twin patch when scheduleUpdateTwin
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot hub job create --job-id {} --job-type {} -q '*' -n {}".format(
-                        self.job_ids[1], "scheduleUpdateTwin", self.host_name
+                    "iot hub job create --job-id {} --job-type {} -q '*'  --start-time '{}' -n {}".format(
+                        self.job_ids[1], "scheduleUpdateTwin", (datetime.now(timezone.utc) + timedelta(seconds=1)).isoformat(), self.host_name
                     ),
-                    auth_type=auth_phase
+                    auth_type=auth_phase,
                 ),
                 expect_failure=True,
             )
@@ -134,10 +137,10 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             # Error - omit method name when scheduleDeviceMethod
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot hub job create --job-id {} --job-type {} -q '*' -n {}".format(
-                        self.job_ids[1], "scheduleDeviceMethod", self.host_name
+                    "iot hub job create --job-id {} --job-type {} -q '*'  --start-time '{}' -n {}".format(
+                        self.job_ids[1], "scheduleDeviceMethod", (datetime.now(timezone.utc) + timedelta(seconds=1)).isoformat(), self.host_name
                     ),
-                    auth_type=auth_phase
+                    auth_type=auth_phase,
                 ),
                 expect_failure=True,
             )
@@ -146,10 +149,8 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             # Using --wait when creating effectively uses show
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot hub job show --job-id {} -n {} -g {}".format(
-                        self.job_ids[0], self.host_name, self.entity_rg
-                    ),
-                    auth_type=auth_phase
+                    "iot hub job show --job-id {} -n {} -g {}".format(self.job_ids[0], self.host_name, self.entity_rg),
+                    auth_type=auth_phase,
                 ),
                 checks=[
                     self.check("jobId", self.job_ids[0]),
@@ -160,17 +161,15 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             # Error - Show non-existant job
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot hub job show --job-id notarealjobid -n {} -g {}".format(
-                        self.host_name, self.entity_rg
-                    ),
-                    auth_type=auth_phase
+                    "iot hub job show --job-id notarealjobid -n {} -g {}".format(self.host_name, self.entity_rg),
+                    auth_type=auth_phase,
                 ),
                 expect_failure=True,
             )
 
             # Cancel Job test
             # Create job to be cancelled - scheduled +7 days from now.
-            scheduled_time_iso = (datetime.utcnow() + timedelta(days=6)).isoformat()
+            scheduled_time_iso = (datetime.now(timezone.utc) + timedelta(days=6)).isoformat()
 
             self.cmd(
                 self.set_cmd_auth_type(
@@ -183,21 +182,20 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
                         self.host_name,
                         self.entity_rg,
                     ),
-                    auth_type=auth_phase
+                    auth_type=auth_phase,
                 ),
                 checks=[self.check("jobId", self.job_ids[2])],
             )
 
             # Allow time for job to transfer to scheduled state (cannot cancel job in running state)
             from time import sleep
+
             sleep(5)
 
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot hub job show --job-id {} -n {} -g {}".format(
-                        self.job_ids[2], self.host_name, self.entity_rg
-                    ),
-                    auth_type=auth_phase
+                    "iot hub job show --job-id {} -n {} -g {}".format(self.job_ids[2], self.host_name, self.entity_rg),
+                    auth_type=auth_phase,
                 ),
                 checks=[
                     self.check("jobId", self.job_ids[2]),
@@ -222,10 +220,8 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             # Error - Cancel non-existant job
             self.cmd(
                 self.set_cmd_auth_type(
-                    "iot hub job cancel --job-id notarealjobid -n {} -g {}".format(
-                        self.host_name, self.entity_rg
-                    ),
-                    auth_type=auth_phase
+                    "iot hub job cancel --job-id notarealjobid -n {} -g {}".format(self.host_name, self.entity_rg),
+                    auth_type=auth_phase,
                 ),
                 expect_failure=True,
             )
