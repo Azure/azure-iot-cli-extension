@@ -40,6 +40,20 @@ else {
     az iot dps create -g $resource_group_name --name $dps_name
 }
 
+if ($args[4]) {
+    $storage_SAS = $args[4]
+}
+else {
+    Write-Host "`r`nProvisioning Storage Account for running smoke tests..."
+    $storage_container_name = "testcontainer"
+    $storage_acct_name = "smoketeststor$run_id"
+    az storage account create -g $resource_group_name -n $storage_acct_name --sku Standard_LRS --kind StorageV2 -l eastus2
+    az storage container create --name $storage_container_name--account-name $storage_acct_name
+    $storage_SAS = az storage container generate-sas --name $storage_container_name --account-name $storage_acct_name --permissions acdlrw --expiry $(date -u -d "1 hour" '+%Y-%m-%dT%H:%MZ') --output tsv
+
+}
+
+
 $hub_module_id = "smoke-test-module"
 $hub_config_name = "smoke-config-$run_id"
 $hub_config_content = "`"{'moduleContent': {'properties.desired.chillerWaterSettings': {'temperature': 38, 'pressure': 78}}}`""
@@ -62,7 +76,6 @@ $dt_instance_name = "smoketest-dt-$run_id"
 $dt_location = "westus2"
 $dt_eventgrid_endpoint = "smoketest-dt-eventgrid-endpoint"
 $dt_eventgrid_topic = "smoketest-dt-eventgrid-topic"
-$dt_eventgrid_secret = "https://accountname.blob.core.windows.net/containerName?sasToken"
 $dt_route_name = "smoketest-dt-route"
 $dtmi_model_content = "scripts/smoke_tests/dtmi_model.json"
 $dtmi_target_model_content = "scripts/smoke_tests/Room.json"
@@ -151,8 +164,8 @@ $commands += "az iot dps enrollment-group delete -g $resource_group_name --dps-n
 # Digital Twins
 $commands += "az dt show -n $dt_instance_name"
 
-$commands += "az dt endpoint create eventgrid -n $dt_instance_name -g $resource_group_name --egg $resource_group_name --egt $dt_eventgrid_topic --en $dt_eventgrid_endpoint --dsu $dt_eventgrid_secret"
-$commands += "az dt endpoint wait --created -n $dt_instance_name -g $resource_group_name --en $dt_eventgrid_endpoint --interval 1"
+$commands += "az dt endpoint create eventgrid -n $dt_instance_name -g $resource_group_name --egg $resource_group_name --egt $dt_eventgrid_topic --en $dt_eventgrid_endpoint --dsu $storage_SAS"
+$commands += "az dt endpoint wait --created -n $dt_instance_name -g $resource_group_name --en $dt_eventgrid_endpoint --interval 5 --timeout 600" # wait 10 mins max
 
 $commands += "az dt route create -n $dt_instance_name -g $resource_group_name --endpoint-name $dt_eventgrid_endpoint --route-name $dt_route_name"
 $commands += "az dt route show -g $resource_group_name -n $dt_instance_name --route-name $dt_route_name"
@@ -271,6 +284,11 @@ if (!$args[2]) {
 if (!$args[3]) {
     Write-Host "`r`nDeleting the temporarily provisioned DPS instance..."
     az iot dps delete -g $resource_group_name --name $dps_name
+}
+# Storage Account needs to be deleted if it was created for running smoke tests
+if (!$args[4]) {
+    Write-Host "`r`nDeleting the temporarily provisioned DPS instance..."
+    az storage account delete -g $resource_group_name --name $storage_acct_name -y
 }
 
 Write-Host "`r`nSmoke testing complete."
