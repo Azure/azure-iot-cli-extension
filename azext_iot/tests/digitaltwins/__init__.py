@@ -294,7 +294,9 @@ class DTLiveScenarioTest(LiveScenarioTest):
 
             if retries == MAX_ADX_RETRIES:
                 waited_min = retries * wait_time // 60
-                cluster_msg = f"Waited {waited_min} minutes and ADX cluster {ADX_CLUSTER} has not been created yet."
+                cluster_msg = (
+                    f"Waited {waited_min} minutes ({retries} retries) and ADX cluster {ADX_CLUSTER} has not been created yet."
+                )
                 logger.error(cluster_msg)
 
         if not settings.env.azext_dt_adx_database:
