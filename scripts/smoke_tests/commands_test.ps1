@@ -49,9 +49,10 @@ else {
     $suffix = Get-Random -Minimum 100000 -Maximum 999999
     $storage_acct_name = "smoketeststorage$suffix"
     az storage account create -g $resource_group_name -n $storage_acct_name --sku Standard_LRS --kind StorageV2 -l eastus2
-    az storage container create --name $storage_container_name--account-name $storage_acct_name
+    az storage container create --name $storage_container_name --account-name $storage_acct_name
     $storage_SAS = az storage container generate-sas --name $storage_container_name --account-name $storage_acct_name --permissions acdlrw --expiry $(date -u -d "1 hour" '+%Y-%m-%dT%H:%MZ') --output tsv
-
+    $account_url = az storage account show -n $storage_acct_name --query "primaryEndpoints.blob" -o tsv
+    $sas_url = $account_url + $storage_container_name + '?' + $storage_SAS
 }
 
 
@@ -165,7 +166,7 @@ $commands += "az iot dps enrollment-group delete -g $resource_group_name --dps-n
 # Digital Twins
 $commands += "az dt show -n $dt_instance_name"
 
-$commands += "az dt endpoint create eventgrid -n $dt_instance_name -g $resource_group_name --egg $resource_group_name --egt $dt_eventgrid_topic --en $dt_eventgrid_endpoint --dsu $storage_SAS"
+$commands += "az dt endpoint create eventgrid -n $dt_instance_name -g $resource_group_name --egg $resource_group_name --egt $dt_eventgrid_topic --en $dt_eventgrid_endpoint --dsu $sas_url"
 $commands += "az dt endpoint wait --created -n $dt_instance_name -g $resource_group_name --en $dt_eventgrid_endpoint --interval 5 --timeout 600" # wait 10 mins max
 
 $commands += "az dt route create -n $dt_instance_name -g $resource_group_name --endpoint-name $dt_eventgrid_endpoint --route-name $dt_route_name"
