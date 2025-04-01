@@ -46,7 +46,8 @@ if ($args[4]) {
 else {
     Write-Host "`r`nProvisioning Storage Account for running smoke tests..."
     $storage_container_name = "testcontainer"
-    $storage_acct_name = "smoketeststor$run_id"
+    $suffix = Get-Random -Minimum 100000 -Maximum 999999
+    $storage_acct_name = "smoketeststorage$suffix"
     az storage account create -g $resource_group_name -n $storage_acct_name --sku Standard_LRS --kind StorageV2 -l eastus2
     az storage container create --name $storage_container_name--account-name $storage_acct_name
     $storage_SAS = az storage container generate-sas --name $storage_container_name --account-name $storage_acct_name --permissions acdlrw --expiry $(date -u -d "1 hour" '+%Y-%m-%dT%H:%MZ') --output tsv
@@ -287,7 +288,7 @@ if (!$args[3]) {
 }
 # Storage Account needs to be deleted if it was created for running smoke tests
 if (!$args[4]) {
-    Write-Host "`r`nDeleting the temporarily provisioned DPS instance..."
+    Write-Host "`r`nDeleting the temporarily provisioned storage account..."
     az storage account delete -g $resource_group_name --name $storage_acct_name -y
 }
 
