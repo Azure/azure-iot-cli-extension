@@ -5,10 +5,9 @@
 # --------------------------------------------------------------------------------------------
 
 import json
-
 from datetime import datetime, timedelta, timezone
-from azext_iot.tests.iothub import IoTLiveScenarioTest
-from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
+
+from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES, IoTLiveScenarioTest
 
 
 class TestIoTHubJobs(IoTLiveScenarioTest):
@@ -127,7 +126,10 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot hub job create --job-id {} --job-type {} -q '*'  --start-time '{}' -n {}".format(
-                        self.job_ids[1], "scheduleUpdateTwin", (datetime.now(timezone.utc) + timedelta(seconds=1)).isoformat(), self.host_name
+                        self.job_ids[1],
+                        "scheduleUpdateTwin",
+                        (datetime.now(timezone.utc) + timedelta(seconds=1)).isoformat(),
+                        self.host_name,
                     ),
                     auth_type=auth_phase,
                 ),
@@ -138,7 +140,10 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             self.cmd(
                 self.set_cmd_auth_type(
                     "iot hub job create --job-id {} --job-type {} -q '*'  --start-time '{}' -n {}".format(
-                        self.job_ids[1], "scheduleDeviceMethod", (datetime.now(timezone.utc) + timedelta(seconds=1)).isoformat(), self.host_name
+                        self.job_ids[1],
+                        "scheduleDeviceMethod",
+                        (datetime.now(timezone.utc) + timedelta(seconds=1)).isoformat(),
+                        self.host_name,
                     ),
                     auth_type=auth_phase,
                 ),
