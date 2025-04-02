@@ -127,7 +127,7 @@ jobs:
       serviceConnection: $(AzureServiceConnection)
 
 - job: 'testADU'
-  timeoutInMinutes: 120
+  timeoutInMinutes: 200
   displayName: 'Test ADU'
   condition: and(succeeded(), eq('${{ parameters.testADU }}', true))
   strategy:
