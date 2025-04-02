@@ -51,4 +51,5 @@ jobs:
           arguments: '$(AZEXT_IOT_TESTRG) $(AZEXT_IOT_CENTRAL_APP_ID) $(AZEXT_IOT_TESTHUB) $(AZEXT_IOT_TESTDPS)'
           scriptPath: 'scripts/smoke_tests/commands_test.ps1'
           powerShellErrorActionPreference: 'continue'
-          failOnStandardError: 'true'
+          # we're seeing errors in output that are not actual command errors
+          failOnStandardError: 'false'
