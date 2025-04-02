@@ -166,7 +166,7 @@ $commands += "az iot dps enrollment-group delete -g $resource_group_name --dps-n
 # Digital Twins
 $commands += "az dt show -n $dt_instance_name"
 
-$commands += "az dt endpoint create eventgrid -n $dt_instance_name -g $resource_group_name --egg $resource_group_name --egt $dt_eventgrid_topic --en $dt_eventgrid_endpoint --dsu $sas_url"
+$commands += "az dt endpoint create eventgrid -n $dt_instance_name -g $resource_group_name --egg $resource_group_name --egt $dt_eventgrid_topic --en $dt_eventgrid_endpoint --dsu '$sas_url'"
 $commands += "az dt endpoint wait --created -n $dt_instance_name -g $resource_group_name --en $dt_eventgrid_endpoint --interval 5 --timeout 600" # wait 10 mins max
 
 $commands += "az dt route create -n $dt_instance_name -g $resource_group_name --endpoint-name $dt_eventgrid_endpoint --route-name $dt_route_name"
