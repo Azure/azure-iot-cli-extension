@@ -65,7 +65,13 @@ parameters:
 - name: 'testADU'
   type: boolean
   default: true
-
+- name: 'azureCLIVersion'
+  type: string
+  default: 'released'
+  values:
+  - min
+  - released
+  - msi
 variables:
   - group: ${{ parameters.variableGroup }}
 
@@ -123,6 +129,7 @@ stages:
     jobs:
     - template: templates/trigger-tests.yml
       parameters:
+        azureCLIVersion: ${{ parameters.azureCLIVersion }}
         testADT: ${{ parameters.testADT }}
         testCentral: ${{ parameters.testCentral }}
         testDPS: ${{ parameters.testDPS }}
@@ -151,7 +158,7 @@ stages:
     jobs:
     - template: templates/smoke-tests.yml
       parameters:
-        azureCLIVersion: released
+        azureCLIVersion: ${{ parameters.azureCLIVersion }}
 
   - stage: 'kpi'
     displayName: 'Build KPIs'

@@ -94,7 +94,7 @@ class TestDTPrivateLinksLifecycle(DTLiveScenarioTest):
         )
         self.cmd(
             "network vnet subnet update -n {} --vnet-name {} -g {} "
-            "--disable-private-endpoint-network-policies true".format(
+            "--private-endpoint-network-policies Disabled".format(
                 subnet_name, vnet_name, self.rg
             ),
             checks=self.check("privateEndpointNetworkPolicies", "Disabled"),
