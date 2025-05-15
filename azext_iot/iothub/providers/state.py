@@ -248,7 +248,6 @@ class StateProvider(IoTHubProvider):
                     hub_rg = control_plane_obj.additional_properties["resourcegroup"]
                 hub_resource_id = control_plane_obj.id
                 hub_arm = cli.invoke(f"group export -n {hub_rg} --resource-ids '{hub_resource_id}' --skip-all-params").as_json()
-                hub_arm = {}
                 if hub_arm and hub_arm["resources"]:
                     hub_state["arm"] = hub_arm
                     hub_resource = hub_state["arm"]["resources"][0]
