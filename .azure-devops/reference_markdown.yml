@@ -11,9 +11,8 @@ parameters:
   default: 'iot'
 - name: linuxImage
   type: string
-  default: 'ubuntu-20.04'
+  default: 'ubuntu-22.04'
   values:
-  - 'ubuntu-20.04'
   - 'ubuntu-22.04'
   - 'ubuntu-latest'
 
