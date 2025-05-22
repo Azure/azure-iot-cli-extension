@@ -7,6 +7,7 @@ jobs:
       runs-on: [self-hosted, 1ES.Pool=iotupx-iot-cli-github-hosted-pool, 1ES.ImageOverride=Ubuntu20.04Compliant]
       permissions:
         contents: read
+        id-token: write
       steps:
       - name: Setup python
         uses: actions/setup-python@v5
@@ -14,7 +15,13 @@ jobs:
             python-version: "3.12"
       
       - uses: actions/checkout@v4
-
+      - name: Package feed authentication
+        env:
+          PIP_FEED_URL: ${{ secrets.PIP_FEED_URL }}
+        run: |
+          TOKEN=$(az account get-access-token --query accessToken -o tsv)
+          echo "::add-mask::$TOKEN"
+          echo "PIP_INDEX_URL=https://token:$TOKEN@${{ env.PIP_FEED_URL }}/simple/" >> $GITHUB_ENV
       - name: Build Wheel
         run: |
           pip install -r dev_requirements

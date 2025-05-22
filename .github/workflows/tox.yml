@@ -9,6 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       continue-on-error:
+        description: Continue on error for tests
         type: boolean
         required: false
         default: false
@@ -17,7 +18,7 @@ permissions:
   contents: read
 
 jobs:
-  unit-test:
+  tox:
     name: Unit test ${{ matrix.py }} - ${{ matrix.os }}
     continue-on-error: ${{ inputs.continue-on-error }}
     runs-on: ${{ matrix.os }}
@@ -39,26 +40,16 @@ jobs:
         with:
           python-version: ${{ matrix.py }}
       - uses: actions/checkout@v4
-      - name: Install tox-gh
-        run: python -m pip install tox-gh tox==4.12.1
       - name: Setup test suite
-        run: tox r -vv --notest
+        run: |
+          python -m pip install tox
+          tox r -vv --notest
       - name: Run test suite
         run: tox r --skip-pkg-install
-  code-coverage:
-    name: Calculate code coverage
-    continue-on-error: true
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run code coverage
-        run: |
-          python -m pip install tox==4.12.1
-          tox -e coverage
-          coverage=$(jq .totals.percent_covered coverage.json | cut -c1-4)
-          echo "Code coverage: $coverage%" >> $GITHUB_STEP_SUMMARY
-      - name: Upload code coverage
+      - name: Upload coverage report
+        if: ${{ matrix.os == 'ubuntu-22.04' && matrix.py == '3.12' }}
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          path: ./htmlcov
-          name: code_coverage
+          name: code-coverage
+          path: htmlcov/
