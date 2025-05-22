@@ -4,17 +4,23 @@ on:
 
 jobs:
   build:
-      runs-on: ubuntu-latest #  [self-hosted, 1ES.Pool=iotupx-iot-cli-github-hosted-pool, 1ES.ImageOverride=Ubuntu20.04Compliant]
-      permissions:
-        contents: read
-        id-token: write
-      steps:
+    runs-on: ubuntu-latest #  [self-hosted, 1ES.Pool=iotupx-iot-cli-github-hosted-pool, 1ES.ImageOverride=Ubuntu20.04Compliant]
+    permissions:
+      contents: read
+      id-token: write
+    steps:
       - name: Setup python
         uses: actions/setup-python@v5
         with:
-            python-version: "3.12"
-      
+          python-version: "3.12"
+
       - uses: actions/checkout@v4
+      - name: "Az CLI login"
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       - name: Package feed authentication
         env:
           PIP_FEED_URL: ${{ secrets.PIP_FEED_URL }}
