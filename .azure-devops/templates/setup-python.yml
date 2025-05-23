@@ -12,7 +12,6 @@ steps:
       artifactFeeds: "$(ARTIFACT_FEED)"
   - task: PowerShell@2
     displayName: "Upgrade pip, install dev_requirements and cryptography"
-    name: "Python setup"
     inputs:
       targetType: "inline"
       script: |
