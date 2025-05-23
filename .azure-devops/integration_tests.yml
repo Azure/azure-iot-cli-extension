@@ -80,7 +80,7 @@ stages:
           vmImage: ubuntu-latest
         steps:
           - template: templates/setup-python.yml
-            with:
+            parameters:
               pythonVersion: ${{ parameters.pythonVersion }}
           - template: templates/build-publish-azure-iot-cli-extension.yml
 
@@ -90,7 +90,7 @@ stages:
 
         steps:
           - template: templates/setup-python.yml
-            with:
+            parameters:
               pythonVersion: ${{ parameters.pythonVersion }}
           - template: templates/build-publish-azure-cli-test-sdk.yml
 

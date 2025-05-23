@@ -1,18 +1,16 @@
 steps:
-  - task: UsePythonVersion@0
-    inputs:
-      versionSpec: '3.12'
+  - template: setup-python.yml
   - task: DownloadBuildArtifacts@0
-    displayName : 'Download Extension wheel from Build Artifacts'
+    displayName: "Download Extension wheel from Build Artifacts"
     inputs:
-      buildType: 'current'
-      downloadType: 'single'
-      artifactName: 'azure-iot'
-      downloadPath: '$(System.ArtifactsDirectory)/extension'
+      buildType: "current"
+      downloadType: "single"
+      artifactName: "azure-iot"
+      downloadPath: "$(System.ArtifactsDirectory)/extension"
   - task: Bash@3
-    displayName: 'Validate reference doc generation'
+    displayName: "Validate reference doc generation"
     inputs:
-      targetType: 'inline'
+      targetType: "inline"
       script: |
         set -ev
         pip install virtualenv

@@ -1,12 +1,11 @@
 parameters:
-  pythonVersion: "3.12"
-
+  - name: pythonVersion
+    type: string
+    default: "3.12"
 steps:
-  - task: UsePythonVersion@0
-    inputs:
-      versionSpec: ${{ parameters.pythonVersion }}
-
-  - template: setup-ci-machine.yml
+  - template: setup-python.yml
+    parameters:
+      pythonVersion: ${{ parameters.pythonVersion }}
 
   - task: DownloadBuildArtifacts@0
     displayName: "Download code coverage KPIs"

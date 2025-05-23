@@ -96,10 +96,9 @@ jobs:
               toxEnvStr: "py3.12-azdev-unit"
               desc: "Python 3.12 tests, dev CLI"
     steps:
-      - task: UsePythonVersion@0
-        inputs:
-          versionSpec: $(python)
-        displayName: "Use Python $(python) for tests."
+      - template: templates/setup-python.yml
+        parameters:
+          pythonVersion: $(python)
       - template: templates/clone-cli-repo.yml
       - template: templates/setup-tox.yml
       - template: templates/set-testenv-sentinel.yml

@@ -12,8 +12,8 @@ parameters:
 
 steps:
   - template: setup-python.yml
-    inputs:
-      versionSpec: ${{ parameters.pythonVersion }}
+    parameters:
+      pythonVersion: ${{ parameters.pythonVersion }}
 
   - ${{ if eq(parameters.azureCLIVersion, 'min') }}:
       - template: install-azure-cli-min.yml
