@@ -1,7 +1,4 @@
 parameters:
-- name: architecture
-  type: string
-  default: 'x64'
 - name: azureCLIVersion
   type: string
   default: released
@@ -23,7 +20,6 @@ jobs:
       - task: UsePythonVersion@0
         inputs:
           versionSpec: $(python)
-          architecture: ${{ parameters.architecture }}
 
       - ${{ if eq(parameters.azureCLIVersion, 'min') }}:
         - template: install-azure-cli-min.yml

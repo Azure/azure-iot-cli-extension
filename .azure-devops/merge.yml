@@ -3,185 +3,179 @@
 trigger:
   branches:
     include:
-      - '*'
+      - "*"
   paths:
     exclude:
-    - '**/*.md'
+      - "**/*.md"
 
 pr:
   branches:
     include:
-      - '*'
+      - "*"
   paths:
     exclude:
-    - '**/*.md'
+      - "**/*.md"
 
 variables:
   iot_ext_package: azure-iot
   iot_ext_venv: venv
 
 parameters:
-- name: linuxImage
-  type: string
-  default: 'ubuntu-22.04'
-  values:
-  - 'ubuntu-22.04'
-  - 'ubuntu-latest'
+  - name: linuxImage
+    type: string
+    default: "ubuntu-22.04"
+    values:
+      - "ubuntu-22.04"
+      - "ubuntu-latest"
 
 jobs:
+  - job: "build_and_publish_azure_iot_cli_ext"
+    pool:
+      vmImage: ${{ parameters.linuxImage }}
 
-- job: 'build_and_publish_azure_iot_cli_ext'
-  pool:
-    vmImage: ${{ parameters.linuxImage }}
+    steps:
+      - template: templates/setup-python.yml
+      - template: templates/build-publish-azure-iot-cli-extension.yml
 
-  steps:
-  - task: UsePythonVersion@0
-    inputs:
-      versionSpec: '3.12'
-      architecture: 'x64'
-  - task: PipAuthenticate@1
-    inputs:
-      artifactFeeds: '$(ARTIFACT_FEED)'
+  - job: "build_and_publish_azure_cli_test_sdk"
+    pool:
+      vmImage: ${{ parameters.linuxImage }}
 
-  - template: templates/setup-ci-machine.yml
-  - template: templates/build-publish-azure-iot-cli-extension.yml
+    steps:
+      - template: templates/setup-python.yml
+      - template: templates/build-publish-azure-cli-test-sdk.yml
 
-- job: 'build_and_publish_azure_cli_test_sdk'
-  pool:
-    vmImage: ${{ parameters.linuxImage }}
+  - job: "run_unit_tests_ubuntu"
+    dependsOn:
+      [
+        "build_and_publish_azure_iot_cli_ext",
+        "build_and_publish_azure_cli_test_sdk",
+      ]
+    pool:
+      vmImage: ${{ parameters.linuxImage }}
+    strategy:
+      matrix:
+        Python39:
+          python.version: "3.9"
+        Python310:
+          python.version: "3.10"
+        Python311:
+          python.version: "3.11"
+        Python312:
+          python.version: "3.12"
 
-  steps:
-  - task: UsePythonVersion@0
-    inputs:
-      versionSpec: '3.12'
-      architecture: 'x64'
-  - task: PipAuthenticate@1
-    inputs:
-      artifactFeeds: '$(ARTIFACT_FEED)'
+    steps:
+      - bash: sudo rm -R -f /usr/local/lib/azureExtensionDir
 
-  - template: templates/setup-ci-machine.yml
-  - template: templates/build-publish-azure-cli-test-sdk.yml
+      - template: templates/run-tests-parallel.yml
+        parameters:
+          pythonVersion: "$(python.version)"
+          runUnitTests: true
+          runIntTests: false
 
-- job: 'run_unit_tests_ubuntu'
-  dependsOn: [ 'build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
-  pool:
-    vmImage: ${{ parameters.linuxImage }}
-  strategy:
-    matrix:
-      Python39:
-        python.version: '3.9'
-      Python310:
-        python.version: '3.10'
-      Python311:
-        python.version: '3.11'
-      Python312:
-        python.version: '3.12'
+  - job: "run_unit_tests_macOs"
+    dependsOn:
+      [
+        "build_and_publish_azure_iot_cli_ext",
+        "build_and_publish_azure_cli_test_sdk",
+      ]
+    pool:
+      vmImage: "macOS-13"
 
-  steps:
-  - bash: sudo rm -R -f /usr/local/lib/azureExtensionDir
+    steps:
+      - template: templates/run-tests-parallel.yml
+        parameters:
+          pythonVersion: "3.12"
+          runUnitTests: true
+          runIntTests: false
 
-  - template: templates/run-tests-parallel.yml
-    parameters:
-      pythonVersion: '$(python.version)'
-      runUnitTests: true
-      runIntTests: false
+  - job: "run_unit_tests_windows"
+    dependsOn:
+      [
+        "build_and_publish_azure_iot_cli_ext",
+        "build_and_publish_azure_cli_test_sdk",
+      ]
+    pool:
+      vmImage: "windows-2019"
 
-- job: 'run_unit_tests_macOs'
-  dependsOn: ['build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
-  pool:
-    vmImage: 'macOS-13'
+    steps:
+      - task: PowerShell@2
+        inputs:
+          targetType: "inline"
+          script: 'ren "C:\Program Files\Common Files\AzureCliExtensionDirectory" "C:\Program Files\Common Files\AzureCliExtensionDirectory1"'
 
-  steps:
-  - template: templates/run-tests-parallel.yml
-    parameters:
-      pythonVersion: '3.12'
-      runUnitTests: true
-      runIntTests: false
+      - template: templates/run-tests-parallel.yml
+        parameters:
+          pythonVersion: "3.12"
+          runUnitTests: true
+          runIntTests: false
 
-- job: 'run_unit_tests_windows'
-  dependsOn : [ 'build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
-  pool:
-    vmImage: 'windows-2019'
+  - job: "run_style_check"
+    dependsOn:
+      [
+        "build_and_publish_azure_iot_cli_ext",
+        "build_and_publish_azure_cli_test_sdk",
+      ]
+    pool:
+      vmImage: ${{ parameters.linuxImage }}
 
-  steps:
-  - task: PowerShell@2
-    inputs:
-      targetType: 'inline'
-      script : 'ren "C:\Program Files\Common Files\AzureCliExtensionDirectory" "C:\Program Files\Common Files\AzureCliExtensionDirectory1"'
+    steps:
+      - template: templates/install-azure-cli-released.yml
+      - template: templates/setup-python.yml
+      - template: templates/download-install-local-azure-iot-cli-extension-with-pip.yml
 
-  - template: templates/run-tests-parallel.yml
-    parameters:
-      pythonVersion: '3.12'
-      runUnitTests: true
-      runIntTests: false
+      - script: "pylint azext_iot/ --rcfile=.pylintrc"
+        displayName: "Evaluate with pylint"
+        workingDirectory: "."
 
-- job: 'run_style_check'
-  dependsOn: ['build_and_publish_azure_iot_cli_ext', 'build_and_publish_azure_cli_test_sdk']
-  pool:
-    vmImage: ${{ parameters.linuxImage }}
+      - script: "flake8 azext_iot/ --statistics --config=setup.cfg"
+        displayName: "Evaluate with flake8"
+        workingDirectory: "."
 
-  steps:
-  - task: UsePythonVersion@0
-    inputs:
-      versionSpec: '3.12'
-      architecture: 'x64'
+  # TODO: Evaluate this style or similar alternative for setting up CLI env
+  - job: "run_azdev_linter_on_command_table"
+    dependsOn: ["build_and_publish_azure_iot_cli_ext"]
+    displayName: "Evaluate IoT extension command table"
+    pool:
+      vmImage: ${{ parameters.linuxImage }}
 
-  - template: templates/install-azure-cli-released.yml
-  - template: templates/setup-ci-machine.yml
-  - template: templates/download-install-local-azure-iot-cli-extension-with-pip.yml
+    steps:
+      - template: templates/evaluate-command-table.yml
 
-  - script: 'pylint azext_iot/ --rcfile=.pylintrc'
-    displayName: 'Evaluate with pylint'
-    workingDirectory: '.'
+  # - job: 'validate_ref_docs'
+  #   dependsOn: ['build_and_publish_azure_iot_cli_ext']
+  #   displayName: 'Validate Reference Document Generation'
+  #   pool:
+  #     vmImage: ${{ parameters.linuxImage }}
 
-  - script: 'flake8 azext_iot/ --statistics --config=setup.cfg'
-    displayName: 'Evaluate with flake8'
-    workingDirectory: '.'
+  #   steps:
+  #   - template: templates/validate-refdoc-generation.yml
 
-# TODO: Evaluate this style or similar alternative for setting up CLI env
-- job: 'run_azdev_linter_on_command_table'
-  dependsOn: ['build_and_publish_azure_iot_cli_ext']
-  displayName: 'Evaluate IoT extension command table'
-  pool:
-    vmImage: ${{ parameters.linuxImage }}
+  - job: CredScan
+    displayName: "Credential Scan"
+    pool:
+      vmImage: "windows-2019"
 
-  steps:
-  - template: templates/evaluate-command-table.yml
+    steps:
+      - task: CredScan@3
+        inputs:
+          outputFormat: "pre"
+          scanFolder: "$(Build.SourcesDirectory)"
+          suppressionsFile: "$(Build.SourcesDirectory)/CredScanSuppressions.json"
 
-# - job: 'validate_ref_docs'
-#   dependsOn: ['build_and_publish_azure_iot_cli_ext']
-#   displayName: 'Validate Reference Document Generation'
-#   pool:
-#     vmImage: ${{ parameters.linuxImage }}
-
-#   steps:
-#   - template: templates/validate-refdoc-generation.yml
-
-- job: CredScan
-  displayName: 'Credential Scan'
-  pool:
-    vmImage: 'windows-2019'
-
-  steps:
-  - task: CredScan@3
-    inputs:
-      outputFormat: 'pre'
-      scanFolder: '$(Build.SourcesDirectory)'
-      suppressionsFile: '$(Build.SourcesDirectory)/CredScanSuppressions.json'
-
-  - task: PostAnalysis@1
-    inputs:
-      AllTools: false
-      APIScan: false
-      BinSkim: false
-      CodesignValidation: false
-      CredScan: true
-      FortifySCA: false
-      FxCop: false
-      ModernCop: false
-      PoliCheck: false
-      RoslynAnalyzers: false
-      SDLNativeRules: false
-      Semmle: false
-      TSLint: false
-      ToolLogsNotFoundAction: 'Standard'
+      - task: PostAnalysis@1
+        inputs:
+          AllTools: false
+          APIScan: false
+          BinSkim: false
+          CodesignValidation: false
+          CredScan: true
+          FortifySCA: false
+          FxCop: false
+          ModernCop: false
+          PoliCheck: false
+          RoslynAnalyzers: false
+          SDLNativeRules: false
+          Semmle: false
+          TSLint: false
+          ToolLogsNotFoundAction: "Standard"

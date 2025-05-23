@@ -1,55 +1,51 @@
 parameters:
-- name: pythonVersion
-  type: string
-  default: '3.12'
-- name: architecture
-  type: string
-  default: 'x64'
-- name: runUnitTests
-  type: boolean
-  default: false
-- name: runIntTests
-  type: boolean
-  default: true
-- name: azureCLIVersion
-  type: string
-  default: released
-  values:
-  - min
-  - released
-  - msi
-- name: path
-  type: string
-  default: 'azext_iot/tests'
-- name: name
-  type: string
-  default: 'all'
-- name: serviceConnection
-  type: string
-  default: ''
-- name: num_threads
-  type: number
-  default: 6
-- name: num_reruns
-  type: number
-  default: 2
-- name: reruns_delay
-  type: number
-  default: 60
-- name: parallel_execution_dirs
-  type: object
-  default:
-  - 'azext_iot/tests/digitaltwins'
-  - 'azext_iot/tests/deviceupdate'
+  - name: pythonVersion
+    type: string
+    default: "3.12"
+  - name: runUnitTests
+    type: boolean
+    default: false
+  - name: runIntTests
+    type: boolean
+    default: true
+  - name: azureCLIVersion
+    type: string
+    default: released
+    values:
+      - min
+      - released
+      - msi
+  - name: path
+    type: string
+    default: "azext_iot/tests"
+  - name: name
+    type: string
+    default: "all"
+  - name: serviceConnection
+    type: string
+    default: ""
+  - name: num_threads
+    type: number
+    default: 6
+  - name: num_reruns
+    type: number
+    default: 2
+  - name: reruns_delay
+    type: number
+    default: 60
+  - name: parallel_execution_dirs
+    type: object
+    default:
+      - "azext_iot/tests/digitaltwins"
+      - "azext_iot/tests/deviceupdate"
 
 steps:
   - checkout: self
-    displayName: 'Checkout repository and submodules needed for tests'
+    displayName: "Checkout repository and submodules needed for tests"
     submodules: true
 
   - template: setup-dev-test-env.yml
     parameters:
-      architecture: ${{ parameters.architecture }}
       pythonVersion: ${{ parameters.pythonVersion }}
       azureCLIVersion: ${{ parameters.azureCLIVersion }}
 
@@ -62,49 +58,49 @@ steps:
     condition: and(succeededOrFailed(), eq( variables['Agent.OS'], 'Linux' ))
 
   - ${{ if eq(parameters.runUnitTests, 'true') }}:
-    - script: |
-        pytest -vv ${{ parameters.path }} -k "_unit.py" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-unit-${{ parameters.name }}.xml
-      displayName: '${{ parameters.name }} unit tests'
-      env:
-        COVERAGE_FILE: .coverage.${{ parameters.name }}
+      - script: |
+          pytest -vv ${{ parameters.path }} -k "_unit.py" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-unit-${{ parameters.name }}.xml
+        displayName: "${{ parameters.name }} unit tests"
+        env:
+          COVERAGE_FILE: .coverage.${{ parameters.name }}
 
   - ${{ if eq(parameters.runIntTests, 'true') }}:
-    - task: AzureCLI@2
-      continueOnError: true
-      displayName: '${{ parameters.name }} integration tests'
-      inputs:
-        azureSubscription: ${{ parameters.serviceConnection }}
-        scriptType: bash
-        scriptLocation: inlineScript
-        ${{ if containsValue(parameters.parallel_execution_dirs, parameters.path) }}:
-          inlineScript: |
-            export COVERAGE_FILE=.coverage.${{ parameters.name }}
-            pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --durations=0
-        # remove parallelization from central tests
-        ${{ if contains(parameters.path, 'azext_iot/tests/central') }}:
-          inlineScript: |
-            export COVERAGE_FILE=.coverage.${{ parameters.name }}
-            pytest -vv ${{ parameters.path }} -k "_int.py" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml
-        ${{ if contains(parameters.path, 'azext_iot/tests/iothub') }}:
-          inlineScript: |
-            export COVERAGE_FILE=.coverage.${{ parameters.name }}
-            pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --deselect=azext_iot/tests/iothub/core/test_iothub_discovery_int.py::TestIoTHubDiscovery::test_iothub_targets --durations=0
-        ${{ if contains(parameters.path, 'azext_iot/tests/dps') }}:
-          inlineScript: |
-            export COVERAGE_FILE=.coverage.${{ parameters.name }}
-            pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --durations=0
+      - task: AzureCLI@2
+        continueOnError: true
+        displayName: "${{ parameters.name }} integration tests"
+        inputs:
+          azureSubscription: ${{ parameters.serviceConnection }}
+          scriptType: bash
+          scriptLocation: inlineScript
+          ${{ if containsValue(parameters.parallel_execution_dirs, parameters.path) }}:
+            inlineScript: |
+              export COVERAGE_FILE=.coverage.${{ parameters.name }}
+              pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --durations=0
+          # remove parallelization from central tests
+          ${{ if contains(parameters.path, 'azext_iot/tests/central') }}:
+            inlineScript: |
+              export COVERAGE_FILE=.coverage.${{ parameters.name }}
+              pytest -vv ${{ parameters.path }} -k "_int.py" --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml
+          ${{ if contains(parameters.path, 'azext_iot/tests/iothub') }}:
+            inlineScript: |
+              export COVERAGE_FILE=.coverage.${{ parameters.name }}
+              pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --deselect=azext_iot/tests/iothub/core/test_iothub_discovery_int.py::TestIoTHubDiscovery::test_iothub_targets --durations=0
+          ${{ if contains(parameters.path, 'azext_iot/tests/dps') }}:
+            inlineScript: |
+              export COVERAGE_FILE=.coverage.${{ parameters.name }}
+              pytest -vv ${{ parameters.path }} -k "_int.py" --dist=loadfile -n ${{ parameters.num_threads }} --reruns ${{ parameters.num_reruns }} --reruns-delay ${{ parameters.reruns_delay }} --cov=azext_iot --cov-config .coveragerc --junitxml=junit/test-iotext-int.xml --durations=0
 
   - task: PublishBuildArtifacts@1
     inputs:
       pathToPublish: .coverage.${{ parameters.name }}
-      publishLocation: 'Container'
-      artifactName: 'coverage'
+      publishLocation: "Container"
+      artifactName: "coverage"
 
   - task: PublishTestResults@2
     condition: succeededOrFailed()
-    displayName: 'Publish Test Results'
+    displayName: "Publish Test Results"
     inputs:
-      testResultsFormat: 'JUnit'
-      testResultsFiles: '**/test-*.xml'
-      testRunTitle: 'Publish ${{ parameters.name }} test results for Python ${{ parameters.pythonVersion }} on OS $(Agent.OS)'
-      searchFolder: '$(System.DefaultWorkingDirectory)'
+      testResultsFormat: "JUnit"
+      testResultsFiles: "**/test-*.xml"
+      testRunTitle: "Publish ${{ parameters.name }} test results for Python ${{ parameters.pythonVersion }} on OS $(Agent.OS)"
+      searchFolder: "$(System.DefaultWorkingDirectory)"

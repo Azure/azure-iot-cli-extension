@@ -6,69 +6,64 @@ pr: none
 
 # Run nightly at midnight (Pacific).
 schedules:
-- cron: "0 8 * * *"
-  displayName: 'Nightly Integration Build'
-  branches:
-    include:
-    - dev
+  - cron: "0 8 * * *"
+    displayName: "Nightly Integration Build"
+    branches:
+      include:
+        - dev
 
 parameters:
-- name: variableGroup
-  type: string
-  default: 'aziotcli_test_nightly'
-- name: vmImage
-  type: string
-  default: 'ubuntu-22.04'
-  values:
-  - 'ubuntu-22.04'
-  - 'ubuntu-latest'
-- name: pythonVersion
-  displayName: 'Python version for building wheel, KPIs'
-  type: string
-  default: '3.12'
-  values:
-  - '3.9'
-  - '3.10'
-  - '3.11'
-  - '3.12'
-- name: pythonVersionsTestingMatrix
-  type: object
-  default: >
-    {
-      Python39:
+  - name: variableGroup
+    type: string
+    default: "aziotcli_test_nightly"
+  - name: vmImage
+    type: string
+    default: "ubuntu-22.04"
+    values:
+      - "ubuntu-22.04"
+      - "ubuntu-latest"
+  - name: pythonVersion
+    displayName: "Python version for building wheel, KPIs"
+    type: string
+    default: "3.12"
+    values:
+      - "3.9"
+      - "3.10"
+      - "3.11"
+      - "3.12"
+  - name: pythonVersionsTestingMatrix
+    type: object
+    default: >
       {
-        python: '3.9'
-      },
-      Python312:
-      {
-        python: '3.12'
+        Python39:
+        {
+          python: '3.9'
+        },
+        Python312:
+        {
+          python: '3.12'
+        }
       }
-    }
-- name: architecture
-  type: string
-  default: 'x64'
-- name: 'testCentral'
-  type: boolean
-  default: true
-- name: 'testADT'
-  type: boolean
-  default: true
-- name: 'testDPS'
-  type: boolean
-  default: true
-- name: 'testHub'
-  type: boolean
-  default: true
-- name: 'testADU'
-  type: boolean
-  default: true
+  - name: "testCentral"
+    type: boolean
+    default: true
+  - name: "testADT"
+    type: boolean
+    default: true
+  - name: "testDPS"
+    type: boolean
+    default: true
+  - name: "testHub"
+    type: boolean
+    default: true
+  - name: "testADU"
+    type: boolean
+    default: true
 
 variables:
   - group: ${{ parameters.variableGroup }}
   - name: pythonVersion
     value: ${{ parameters.pythonVersion }}
-  - name: architecture
-    value: ${{ parameters.architecture }}
   - name: msiTestingMatrix
     value: >
       {
@@ -79,82 +74,76 @@ variables:
       }
 
 stages:
-  - stage: 'build'
-    displayName: 'Build and Publish Artifacts'
+  - stage: "build"
+    displayName: "Build and Publish Artifacts"
     pool:
       vmImage: ${{ parameters.vmImage }}
     jobs:
+      - job: "Build_Publish_Azure_IoT_CLI_Extension"
+        steps:
+          - template: templates/setup-python.yml
+            inputs:
+              versionSpec: ${{ parameters.pythonVersion }}
+          - template: templates/build-publish-azure-iot-cli-extension.yml
 
-    - job: 'Build_Publish_Azure_IoT_CLI_Extension'
-      steps:
-      - task: UsePythonVersion@0
-        inputs:
-          versionSpec: ${{ parameters.pythonVersion }}
-          architecture: ${{ parameters.architecture }}
+      - job: "Build_Publish_Azure_CLI_Test_SDK"
+        steps:
+          - template: templates/setup-python.yml
+            inputs:
+              versionSpec: ${{ parameters.pythonVersion }}
+          - template: templates/build-publish-azure-cli-test-sdk.yml
 
-      - template: templates/setup-ci-machine.yml
+      - job: "recordVersion"
+        displayName: "Install and verify version"
+        dependsOn:
+          [
+            Build_Publish_Azure_IoT_CLI_Extension,
+            Build_Publish_Azure_CLI_Test_SDK,
+          ]
+        steps:
+          - template: templates/setup-dev-test-env.yml
+            parameters:
+              pythonVersion: ${{ parameters.pythonVersion }}
 
-      - template: templates/build-publish-azure-iot-cli-extension.yml
+          - template: templates/install-and-record-version.yml
 
-    - job: 'Build_Publish_Azure_CLI_Test_SDK'
-      steps:
-      - task: UsePythonVersion@0
-        inputs:
-          versionSpec: ${{ parameters.pythonVersion }}
-          architecture: ${{ parameters.architecture }}
-
-      - template: templates/setup-ci-machine.yml
-
-      - template: templates/build-publish-azure-cli-test-sdk.yml
-
-    - job: 'recordVersion'
-      displayName: 'Install and verify version'
-      dependsOn: [Build_Publish_Azure_IoT_CLI_Extension, Build_Publish_Azure_CLI_Test_SDK]
-      steps:
-      - template: templates/setup-dev-test-env.yml
-        parameters:
-          pythonVersion: ${{ parameters.pythonVersion }}
-          architecture: ${{ parameters.architecture }}
-
-      - template: templates/install-and-record-version.yml
-
-  - stage: 'test_min'
-    displayName: 'Run all tests with min CLI'
+  - stage: "test_min"
+    displayName: "Run all tests with min CLI"
     pool:
       vmImage: ${{ parameters.vmImage }}
     dependsOn: build
     variables:
       pythonVersions: ${{ parameters.pythonVersionsTestingMatrix }}
     jobs:
-    - template: templates/trigger-tests.yml
-      parameters:
-        azureCLIVersion: min
-        testADT: ${{ parameters.testADT }}
-        testCentral: ${{ parameters.testCentral }}
-        testDPS: ${{ parameters.testDPS }}
-        testHub: ${{ parameters.testHub }}
-        testADU: ${{ parameters.testADU }}
-        maxParallelADU: 2
+      - template: templates/trigger-tests.yml
+        parameters:
+          azureCLIVersion: min
+          testADT: ${{ parameters.testADT }}
+          testCentral: ${{ parameters.testCentral }}
+          testDPS: ${{ parameters.testDPS }}
+          testHub: ${{ parameters.testHub }}
+          testADU: ${{ parameters.testADU }}
+          maxParallelADU: 2
 
-  - stage: 'test_msi'
-    displayName: 'Run all tests against Windows MSI install'
+  - stage: "test_msi"
+    displayName: "Run all tests against Windows MSI install"
     pool:
-      vmImage: 'windows-2019'
+      vmImage: "windows-2019"
     dependsOn: [build, test_min]
     variables:
       pythonVersions: $[variables['msiTestingMatrix']]
     jobs:
-    - template: templates/trigger-tests.yml
-      parameters:
-        azureCLIVersion: msi
-        testADT: ${{ parameters.testADT }}
-        testCentral: ${{ parameters.testCentral }}
-        testDPS: ${{ parameters.testDPS }}
-        testHub: ${{ parameters.testHub }}
-        testADU: ${{ parameters.testADU }}
+      - template: templates/trigger-tests.yml
+        parameters:
+          azureCLIVersion: msi
+          testADT: ${{ parameters.testADT }}
+          testCentral: ${{ parameters.testCentral }}
+          testDPS: ${{ parameters.testDPS }}
+          testHub: ${{ parameters.testHub }}
+          testADU: ${{ parameters.testADU }}
 
-  - stage: 'smokeTests_min'
-    displayName: 'Run smoke tests with min CLI'
+  - stage: "smokeTests_min"
+    displayName: "Run smoke tests with min CLI"
     dependsOn: test_min
     variables:
       pythonVersions: ${{ parameters.pythonVersionsTestingMatrix }}
@@ -162,31 +151,30 @@ stages:
     pool:
       vmImage: ${{ parameters.vmImage }}
     jobs:
-    - template: templates/smoke-tests.yml
-      parameters:
-        azureCLIVersion: min
+      - template: templates/smoke-tests.yml
+        parameters:
+          azureCLIVersion: min
 
-  - stage: 'smokeTests_msi'
-    displayName: 'Run smoke tests against Windows MSI install'
+  - stage: "smokeTests_msi"
+    displayName: "Run smoke tests against Windows MSI install"
     dependsOn: test_msi
     variables:
       pythonVersions: $[variables['msiTestingMatrix']]
     condition: succeeded()
     pool:
-      vmImage: 'windows-2019'
+      vmImage: "windows-2019"
     jobs:
-    - template: templates/smoke-tests.yml
-      parameters:
-        azureCLIVersion: msi
+      - template: templates/smoke-tests.yml
+        parameters:
+          azureCLIVersion: msi
 
-  - stage: 'kpi'
-    displayName: 'Build KPIs'
+  - stage: "kpi"
+    displayName: "Build KPIs"
     dependsOn: [build, test_min, test_msi]
     jobs:
-    - job: 'calculateCodeCoverage'
-      displayName: 'Calculate distributed code coverage'
-      steps:
-      - template: templates/calculate-code-coverage.yml
-        parameters:
-          pythonVersion: ${{ parameters.pythonVersion }}
-          architecture: ${{ parameters.architecture }}
+      - job: "calculateCodeCoverage"
+        displayName: "Calculate distributed code coverage"
+        steps:
+          - template: templates/calculate-code-coverage.yml
+            parameters:
+              pythonVersion: ${{ parameters.pythonVersion }}

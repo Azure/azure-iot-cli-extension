@@ -1,0 +1,21 @@
+parameters:
+  - name: pythonVersion
+    type: string
+    default: "3.12"
+
+steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: ${{ parameters.pythonVersion }}
+  - task: PipAuthenticate@1
+    inputs:
+      artifactFeeds: "$(ARTIFACT_FEED)"
+  - task: PowerShell@2
+    displayName: "Upgrade pip, install dev_requirements and cryptography"
+    name: "Python setup"
+    inputs:
+      targetType: "inline"
+      script: |
+        python -m pip install --upgrade pip
+        python -m pip install -r dev_requirements
+        python -m pip install cryptography

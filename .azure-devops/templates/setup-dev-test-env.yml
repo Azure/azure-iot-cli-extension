@@ -1,34 +1,28 @@
 parameters:
-- name: pythonVersion
-  type: string
-  default: '3.12'
-- name: architecture
-  type: string
-  default: 'x64'
-- name: azureCLIVersion
-  type: string
-  default: 'released'
-  values:
-  - min
-  - released
-  - msi
+  - name: pythonVersion
+    type: string
+    default: "3.12"
+  - name: azureCLIVersion
+    type: string
+    default: "released"
+    values:
+      - min
+      - released
+      - msi
 
 steps:
-  - task: UsePythonVersion@0
+  - template: setup-python.yml
     inputs:
       versionSpec: ${{ parameters.pythonVersion }}
-      architecture: ${{ parameters.architecture }}
-
-  - template: setup-ci-machine.yml
 
   - ${{ if eq(parameters.azureCLIVersion, 'min') }}:
-    - template: install-azure-cli-min.yml
+      - template: install-azure-cli-min.yml
 
   - ${{ if eq(parameters.azureCLIVersion, 'released') }}:
-    - template: install-azure-cli-released.yml
+      - template: install-azure-cli-released.yml
 
   - ${{ if eq(parameters.azureCLIVersion, 'msi') }}:
-    - template: install-azure-cli-msi.yml
+      - template: install-azure-cli-msi.yml
 
   - template: download-install-local-azure-test-sdk.yml
 

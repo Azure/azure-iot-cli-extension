@@ -1,22 +1,20 @@
 parameters:
-  pythonVersion: '3.12'
-  architecture: 'x64'
+  pythonVersion: "3.12"
 
 steps:
   - task: UsePythonVersion@0
     inputs:
       versionSpec: ${{ parameters.pythonVersion }}
-      architecture: ${{ parameters.architecture }}
 
   - template: setup-ci-machine.yml
 
   - task: DownloadBuildArtifacts@0
-    displayName : 'Download code coverage KPIs'
+    displayName: "Download code coverage KPIs"
     inputs:
-      buildType: 'current'
-      downloadType: 'single'
-      artifactName: 'coverage'
-      downloadPath: '$(System.ArtifactsDirectory)/aziotext_kpi/'
+      buildType: "current"
+      downloadType: "single"
+      artifactName: "coverage"
+      downloadPath: "$(System.ArtifactsDirectory)/aziotext_kpi/"
 
   - bash: |
       ls -l ./coverage
@@ -25,10 +23,10 @@ steps:
         coverage combine -a $i
       done
       coverage xml -i --rcfile="$(System.DefaultWorkingDirectory)/.coveragerc"
-    workingDirectory: '$(System.ArtifactsDirectory)/aziotext_kpi/'
-    displayName: 'Merging code coverage data'
+    workingDirectory: "$(System.ArtifactsDirectory)/aziotext_kpi/"
+    displayName: "Merging code coverage data"
 
   - task: PublishCodeCoverageResults@1
     inputs:
-      codeCoverageTool: 'cobertura'
-      summaryFileLocation: '$(System.ArtifactsDirectory)/aziotext_kpi/coverage.xml'
+      codeCoverageTool: "cobertura"
+      summaryFileLocation: "$(System.ArtifactsDirectory)/aziotext_kpi/coverage.xml"
