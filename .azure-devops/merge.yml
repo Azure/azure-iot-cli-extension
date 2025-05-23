@@ -39,6 +39,9 @@ jobs:
     inputs:
       versionSpec: '3.12'
       architecture: 'x64'
+  - task: PipAuthenticate@1
+    inputs:
+      artifactFeeds: '$(ARTIFACT_FEED)'
 
   - template: templates/setup-ci-machine.yml
   - template: templates/build-publish-azure-iot-cli-extension.yml
