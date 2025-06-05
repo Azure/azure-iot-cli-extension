@@ -1,0 +1,51 @@
+{
+	"name": "Azure IoT CLI devcontainer",
+	"image": "mcr.microsoft.com/devcontainers/universal:linux",
+	"hostRequirements": {
+		"cpus": 2,
+		"memory": "8gb",
+		"storage": "32gb"
+	},
+	"features": {
+		"ghcr.io/devcontainers/features/azure-cli:1": {
+			"installUsingPython": true,
+			"version": "latest",
+			"extensions": [
+				"azure-devops"
+			]
+		}
+	},
+	"secrets": {
+		"SUBSCRIPTION_ID": {
+			"description": "Your Azure subscription ID"
+		},
+		"RESOURCE_GROUP": {
+			"description": "Your Azure resource group"
+		}
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				// python language support
+				"ms-python.python",
+				// python linting
+				"ms-python.black-formatter",
+				// import ordering
+				"ms-python.isort",
+				// github actions support
+				"github.vscode-github-actions",
+				// yaml
+				"redhat.vscode-yaml"
+			],
+			"settings": {
+				"python.terminal.activateEnvironment": true,
+				"python.terminal.activateEnvInCurrentTerminal": true,
+				"python.defaultInterpreterPath": "./env/bin/python",
+				"[python]": {
+					"editor.defaultFormatter": "ms-python.black-formatter"
+				}
+			}
+		}
+	},
+	"onCreateCommand": "bash ./.devcontainer/on_create_commands.sh"
+}
