@@ -84,6 +84,9 @@ def start_multiple_monitors(
             pass  # no running loop anymore
     finally:
         if result:
+            if isinstance(result[0], Exception):
+                raise result[0]
+
             errors = result[0]
             if errors and errors[0]:
                 logger.debug(errors)

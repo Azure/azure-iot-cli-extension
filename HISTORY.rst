@@ -3,6 +3,14 @@
 Release History
 ===============
 
+0.26.1
++++++++++++++++
+
+**General updates**
+
+* `az iot hub monitor-events` now supports Free sku  IoT Hubs.
+
+
 0.26.0
 +++++++++++++++
 

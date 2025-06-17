@@ -74,30 +74,38 @@ class EventTargetBuilder:
 
     async def _build_iot_hub_target_async(self, target):
         endpoint = AmqpBuilder.build_iothub_amqp_endpoint_from_target(target)
-        _, update = await self._evaluate_redirect(endpoint)
-        target["events"] = update["events"]
+        if "events" not in target:
+            _, link_redirect_events = await self._evaluate_redirect(endpoint)
+            target.update(link_redirect_events)
         endpoint = target["events"]["endpoint"]
         path = target["events"]["path"]
         auth = self._build_auth_container(target)
+        partition_ids = target["events"].get("partition_ids", [])
+        partition_count = target["events"].get("partition_count", 0)
+        if partition_ids:
+            return Target(hostname=endpoint, path=path, partitions=partition_ids, auth=auth)
+        if partition_count:
+            for i in range(int(partition_count)):
+                partition_ids.append(str(i))
+            return Target(hostname=endpoint, path=path, partitions=partition_ids, auth=auth)
         meta_data = await query_meta_data(
             address=target["events"]["address"],
             path=target["events"]["path"],
             auth=auth,
         )
-        partition_count = meta_data.get(b"partition_count")
-
-        # if partition count is None or 0, throw
-        if not partition_count or not int(partition_count):
-            raise CLIInternalError(
-                f"{target['entity'].split('.')[0]} has no partition count. Please contact a support "
-                "representative to fix your IoT Hub."
-            )
-
-        partitions = [partition.decode("utf-8") for partition in meta_data.get(b"partition_ids", [])]
-        if not partitions:
-            for i in range(int(partition_count)):
-                partitions.append(str(i))
-            target["events"]["partition_ids"] = partitions
+        # Re-make auth container otherwise ValueError: The supplied authentication
+        # has already been consumed by another connection.
         auth = self._build_auth_container(target)
+        if meta_data:
+            amqp_partition_ids = [partition.decode("utf-8") for partition in meta_data.get(b"partition_ids", [])]
+            amqp_partition_count = meta_data.get(b"partition_count", 0)
+            if amqp_partition_ids:
+                return Target(hostname=endpoint, path=path, partitions=amqp_partition_ids, auth=auth)
+            if amqp_partition_count:
+                for i in range(int(amqp_partition_count)):
+                    amqp_partition_ids.append(str(i))
+                return Target(hostname=endpoint, path=path, partitions=amqp_partition_ids, auth=auth)
 
-        return Target(hostname=endpoint, path=path, partitions=partitions, auth=auth)
+        raise CLIInternalError(
+            f"Unable to determine partitions for '{target['entity'].split('.')[0]}'. Please contact support."
+        )
