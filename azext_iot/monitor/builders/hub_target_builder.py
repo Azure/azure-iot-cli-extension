@@ -107,5 +107,5 @@ class EventTargetBuilder:
                 return Target(hostname=endpoint, path=path, partitions=amqp_partition_ids, auth=auth)
 
         raise CLIInternalError(
-            f"Unable to determine partitions for '{target['entity'].split('.')[0]}'. Please contact support."
+            f"Unable to determine partitions for '{target['entity'].split('.')[0]}'."
         )

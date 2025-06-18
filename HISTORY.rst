@@ -8,7 +8,7 @@ Release History
 
 **General updates**
 
-* `az iot hub monitor-events` now supports Free sku  IoT Hubs.
+* `az iot hub monitor-events` now supports free SKU IoT Hubs when control plane access is available.
 
 
 0.26.0
