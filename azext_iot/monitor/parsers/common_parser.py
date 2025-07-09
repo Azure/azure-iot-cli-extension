@@ -60,7 +60,7 @@ class CommonParser(AbstractBaseParser):
         self._parse_content_encoding(message, system_properties)
 
         content_type = self._parse_content_type(content_type, system_properties)
-
+        is_payload_compressed = False
         if properties:
             event["properties"] = {}
 
@@ -72,10 +72,10 @@ class CommonParser(AbstractBaseParser):
             event["properties"]["system"] = system_properties
 
         if "app" in properties or "all" in properties:
-            application_properties = self._parse_application_properties(message)
+            application_properties, is_payload_compressed = self._parse_application_properties(message)
             event["properties"]["application"] = application_properties
 
-        payload = self._parse_payload(message, content_type)
+        payload = self._parse_payload(message, content_type, is_payload_compressed)
 
         event["payload"] = payload
 
@@ -184,19 +184,23 @@ class CommonParser(AbstractBaseParser):
             return {}
 
     def _parse_application_properties(self, message: Message):
+        compressed = False
         try:
-            return unicode_binary_map(message.application_properties)
+            message_props = unicode_binary_map(message.application_properties)
+            if 'cpr' in message_props:
+                compressed = True
+            return message_props, compressed
         except Exception:
             details = strings.invalid_application_properties()
             self._add_issue(severity=Severity.warning, details=details)
-            return {}
+            return {}, False
 
-    def _parse_payload(self, message: Message, content_type):
+    def _parse_payload(self, message: Message, content_type, compressed):
         payload = ""
         data = next(message.get_data())
 
         if data:
-            payload = unicode_decode(data=data, default=NON_DECODABLE_PAYLOAD)
+            payload = unicode_decode(data=data, compression=compressed, default=NON_DECODABLE_PAYLOAD)
 
         if "application/json" in content_type.lower():
             return self._try_parse_json(payload)

@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import asyncio
-
+import base64
 
 def generate_on_start_string(device_id=None):
     device_filter_txt = None
@@ -29,8 +29,9 @@ def get_loop() -> asyncio.AbstractEventLoop:
 
     return loop
 
-
-def unicode_decode(data: bytes, default: str = None):
+def unicode_decode(data: bytes, compression: bool = False, default: str = None):
+    if compression:
+        data = base64.standard_b64encode(data)
     for encoding in ["utf-8", "utf-16", "utf-32"]:
         try:
             data = data.decode(encoding)
@@ -39,5 +40,4 @@ def unicode_decode(data: bytes, default: str = None):
             continue
     else:
         data = default
-
     return data
