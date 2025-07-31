@@ -27,7 +27,7 @@ class DeviceStreamProvider(IoTHubProvider):
 
     def show(self) -> dict:
         result = self.cli.invoke(
-            f"resource show -n {self.target["name"]} -g {self.target["resourcegroup"]} "
+            f"resource show -n {self.target['name']} -g {self.target['resourcegroup']} "
             f"--api-version {DEVICE_STREAMS_API_VERSION} --resource-type {HUB_PROVIDER}",
             capture_stderr=True
         ).as_json()
