@@ -23,8 +23,8 @@ iothub_state_ops = CliCommandType(operations_tmpl="azext_iot.iothub.commands_sta
 device_identity_ops = CliCommandType(
     operations_tmpl="azext_iot.iothub.commands_device_identity#{}"
 )
-iothub_resource_ops = CliCommandType(
-    operations_tmpl="azext_iot.iothub.commands_certificate#{}"
+iothub_devicestream_ops = CliCommandType(
+    operations_tmpl="azext_iot.iothub.commands_device_stream#{}"
 )
 
 
@@ -155,6 +155,9 @@ def load_iothub_commands(self, _):
     with self.command_group("iot hub message-route fallback", command_type=iothub_message_route_ops) as cmd_group:
         cmd_group.show_command("show", "message_fallback_route_show")
         cmd_group.command("set", "message_fallback_route_set")
+
+    with self.command_group("iot hub devicestream", command_type=iothub_devicestream_ops, is_preview=True) as cmd_group:
+        cmd_group.command("show", "show_device_stream")
 
     with self.command_group("iot device", command_type=device_messaging_ops) as cmd_group:
         cmd_group.command("send-d2c-message", "iot_device_send_message")
