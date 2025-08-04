@@ -1099,7 +1099,7 @@ helps[
         --enrollment-id {enrollment_id} --attestation-type x509
         --certificate-path /certificates/Certificate.pem --provisioning-status disabled
         --initial-twin-properties "{'location':{'region':'US'}}"
-        --initial-twin-tags "{'version':'1'}" --device-info "{'color':'red'}" --device-id {device_id}
+        --initial-twin-tags "{'version':'1'}" --device-information "{'color':'red'}" --device-id {device_id}
     - name: Create an enrollment 'MyEnrollment' with attestation type 'tpm' in the Azure IoT
             Device Provisioning Service '{dps_name}' in the resource group '{resource_group_name}'.
       text: >
@@ -1184,7 +1184,7 @@ helps[
       text: >
         az iot dps enrollment update -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --initial-twin-properties "{'location':{'region':'USA'}}"
-        --initial-twin-tags "{'version1':'2'}" --device-info "{'color':'red'}"
+        --initial-twin-tags "{'version1':'2'}" --device-information "{'color':'red'}"
 """
 
 helps[
