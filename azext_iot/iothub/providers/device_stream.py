@@ -33,5 +33,5 @@ class DeviceStreamProvider(IoTHubProvider):
         ).as_json()
         device_streams = result.get("properties", {}).get("deviceStreams")
         if not device_streams:
-            raise InvalidArgumentValueError("Device streams are not enabled for this IoT Hub.")
+            logger.warning("Device streams are not enabled for this IoT Hub.")
         return device_streams

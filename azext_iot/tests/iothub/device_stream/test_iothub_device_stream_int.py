@@ -18,10 +18,6 @@ def test_device_stream(provisioned_only_iot_hubs_module):
     hub_name = provisioned_only_iot_hubs_module[0]["name"]
     rg = provisioned_only_iot_hubs_module[0]["rg"]
 
-    if not device_stream:
-        # just in case
-        pytest.skip("Device streams are not enabled for this IoT Hub.")
-
     result = cli.invoke(
         f"iot hub devicestream show -n {hub_name} -g {rg}",
         capture_stderr=True

@@ -6,7 +6,6 @@
 
 import pytest
 from azext_iot.common.embedded_cli import EmbeddedCLI
-from azure.cli.core.azclierror import InvalidArgumentValueError
 from azext_iot.iothub.commands_device_stream import show_device_stream
 from azext_iot.tests.generators import generate_names
 
@@ -27,19 +26,18 @@ def test_device_stream(fixture_cmd, fixture_ghcs, mocker, has_device_streams):
     )
     patched_cli.return_value.invoke.return_value.as_json.return_value = hub_body
 
-    if not has_device_streams:
-        with pytest.raises(InvalidArgumentValueError) as e:
-            show_device_stream(
-                cmd=fixture_cmd,
-                hub_name=generate_names(),
-                resource_group_name=generate_names()
-            )
-        assert "Device streams are not enabled for this IoT Hub." in str(e.value)
-        return
+    patched_logger = mocker.patch(
+        "azext_iot.iothub.providers.device_stream.logger.warning"
+    )
 
     result = show_device_stream(
         cmd=fixture_cmd,
         hub_name=generate_names(),
         resource_group_name=generate_names()
     )
-    assert result == hub_body["properties"]["deviceStreams"]
+    if has_device_streams:
+        assert result == hub_body["properties"]["deviceStreams"]
+    else:
+        patched_logger.assert_called_once_with("Device streams are not enabled for this IoT Hub.")
+        # if device streams are not enabled, the result should be None
+        assert result is None
