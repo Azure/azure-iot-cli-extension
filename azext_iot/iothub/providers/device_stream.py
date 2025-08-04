@@ -8,7 +8,6 @@ from typing import Optional
 from knack.log import get_logger
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.iothub.providers.base import IoTHubProvider
-from azure.cli.core.azclierror import InvalidArgumentValueError
 from azext_iot.iothub.common import HUB_PROVIDER
 
 logger = get_logger(__name__)
