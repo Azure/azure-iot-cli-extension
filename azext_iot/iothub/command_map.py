@@ -157,7 +157,7 @@ def load_iothub_commands(self, _):
         cmd_group.command("set", "message_fallback_route_set")
 
     with self.command_group("iot hub devicestream", command_type=iothub_devicestream_ops, is_preview=True) as cmd_group:
-        cmd_group.command("show", "show_device_stream")
+        cmd_group.show_command("show", "show_device_stream")
 
     with self.command_group("iot device", command_type=device_messaging_ops) as cmd_group:
         cmd_group.command("send-d2c-message", "iot_device_send_message")
