@@ -25,12 +25,13 @@ parameters:
   - name: pythonVersion
     displayName: "Python version for building wheel, KPIs"
     type: string
-    default: "3.12"
+    default: "3.13"
     values:
       - "3.9"
       - "3.10"
       - "3.11"
       - "3.12"
+      - "3.13"
   - name: pythonVersionsTestingMatrix
     type: object
     default: >
@@ -41,7 +42,7 @@ parameters:
         },
         Python312:
         {
-          python: '3.12'
+          python: '3.13'
         }
       }
   - name: "testCentral"
@@ -69,7 +70,7 @@ variables:
       {
         PythonMSI:
         {
-          python: '3.12'
+          python: '3.13'
         }
       }
 
