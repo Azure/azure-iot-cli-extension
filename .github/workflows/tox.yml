@@ -30,6 +30,7 @@ jobs:
           - windows-2022
           - macos-13
         py:
+          - "3.13"
           - "3.12"
           - "3.11"
           - "3.10"
@@ -47,7 +48,7 @@ jobs:
       - name: Run test suite
         run: tox r --skip-pkg-install
       - name: Upload coverage report
-        if: ${{ matrix.os == 'ubuntu-22.04' && matrix.py == '3.12' }}
+        if: ${{ matrix.os == 'ubuntu-22.04' && matrix.py == '3.13' }}
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:

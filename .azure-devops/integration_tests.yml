@@ -16,12 +16,13 @@ parameters:
   - name: pythonVersion
     displayName: "Python version for building wheels, KPIs"
     type: string
-    default: "3.12"
+    default: "3.13"
     values:
       - "3.9"
       - "3.10"
       - "3.11"
       - "3.12"
+      - "3.13"
   - name: pythonVersionsTestingMatrix
     type: object
     default: >
@@ -41,6 +42,10 @@ parameters:
         Python312:
         {
           python: '3.12'
+        },
+        Python313:
+        {
+          python: '3.13'
         }
       }
   - name: stageForPublish
