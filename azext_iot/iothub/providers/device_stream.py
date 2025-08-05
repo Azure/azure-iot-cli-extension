@@ -24,7 +24,7 @@ class DeviceStreamProvider(IoTHubProvider):
         super(DeviceStreamProvider, self).__init__(cmd, hub_name, rg)
         self.cli = EmbeddedCLI(cli_ctx=self.cmd.cli_ctx)
 
-    def show(self) -> dict:
+    def show(self) -> Optional[dict]:
         result = self.cli.invoke(
             f"resource show -n {self.target['name']} -g {self.target['resourcegroup']} "
             f"--api-version {DEVICE_STREAMS_API_VERSION} --resource-type {HUB_PROVIDER}",
