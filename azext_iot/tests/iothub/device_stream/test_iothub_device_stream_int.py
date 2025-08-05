@@ -27,9 +27,7 @@ def provisioned_preview_hub():
 
 @pytest.mark.hub_infrastructure(location="northeurope")
 def test_device_stream(provisioned_preview_hub):
-    device_stream = provisioned_preview_hub["properties"].get(
-        "deviceStreams", None
-    )
+    device_stream = provisioned_preview_hub["properties"]["deviceStreams"]
     hub_name = provisioned_preview_hub["name"]
 
     result = cli.invoke(
