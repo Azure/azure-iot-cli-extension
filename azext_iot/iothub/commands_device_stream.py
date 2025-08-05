@@ -13,7 +13,6 @@ def show_device_stream(
     hub_name: str,
     resource_group_name: Optional[str] = None,
 ) -> List[dict]:
-    print("in extension")
     return DeviceStreamProvider(
         cmd=cmd, hub_name=hub_name, rg=resource_group_name
     ).show()
