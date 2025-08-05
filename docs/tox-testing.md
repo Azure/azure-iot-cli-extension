@@ -9,6 +9,7 @@ Currently, our testing matrix is broken up into the following groups:
     - 3.10
     - 3.11
     - 3.12
+    - 3.13
 - Azure CLI Core versions to test extension against:
     - `azmin` installs the minimum supported CLI version (currently `2.46.0`)
     - `azcur` installs the latest released CLI version from PyPi
@@ -47,7 +48,7 @@ The [current tox config](../tox.ini) supports local test configurations for the 
 - Various Python and AZ CLI Versions
   - The tox environment string (passed to `-e`) will be parsed as such:
 
-        py{thon,3.9...3.12}-az{min,cur,dev}-{int,unit}
+        py{thon,3.9...3.13}-az{min,cur,dev}-{int,unit}
 
     |Python version | CLI version   | Test type     |
     |---------------|---------------|---------------|
@@ -56,6 +57,7 @@ The [current tox config](../tox.ini) supports local test configurations for the 
     |"py3.10"|||
     |"py3.11"|||
     |"py3.12"|||
+    |"py3.13"|||
 
 **If you choose not to select a specific python version (which is also the current default), you can use `python` instead, to invoke whichever interpreter version `python` invokes in your environment.**
 
@@ -70,11 +72,11 @@ The [current tox config](../tox.ini) supports local test configurations for the 
         - Current python interpreter, released azure CLI install, unit tests
     tox -e "py3.9-azmin-unit"
         - Python 3.9, min supported CLI, unit tests
-    tox -e "py{3.9,3.12}-az{min,cur}-unit"
+    tox -e "py{3.9,3.13}-az{min,cur}-unit"
         - Python 3.9, min supported CLI core, unit tests
         - Python 3.9, currently released CLI core, unit tests
-        - Python 3.12, max supported CLI core, unit tests
-        - Python 3.12, currently released CLI core, unit tests
+        - Python 3.13, max supported CLI core, unit tests
+        - Python 3.13, currently released CLI core, unit tests
 
 
 In order to list all recognized environments, you can type `tox -av`, which will display them all in a list:

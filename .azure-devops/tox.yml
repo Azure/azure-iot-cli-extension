@@ -18,6 +18,10 @@ parameters:
     displayName: "Test Python 3.12"
     type: boolean
     default: true
+  - name: python313
+    displayName: "Test Python 3.13"
+    type: boolean
+    default: true
   - name: azdev
     displayName: "Test development CLI"
     type: boolean
@@ -38,7 +42,7 @@ jobs:
     strategy:
       matrix:
         "linters":
-          python: "3.12"
+          python: "3.13"
           toxEnvStr: "lint"
           desc: "Flake8, Pylint"
         ${{ if parameters.python39 }}:
@@ -95,6 +99,17 @@ jobs:
               python: "3.12"
               toxEnvStr: "py3.12-azdev-unit"
               desc: "Python 3.12 tests, dev CLI"
+        ${{ if parameters.python313 }}:
+          ${{ if parameters.azcur }}:
+            "python 3.13 tests, current CLI":
+              python: "3.13"
+              toxEnvStr: "py3.13-azcur-unit"
+              desc: "Python 3.13 tests, current CLI"
+          ${{ if parameters.azdev }}:
+            "python 3.13 tests, dev CLI":
+              python: "3.13"
+              toxEnvStr: "py3.13-azdev-unit"
+              desc: "Python 3.13 tests, dev CLI"
     steps:
       - template: templates/setup-python.yml
         parameters:
