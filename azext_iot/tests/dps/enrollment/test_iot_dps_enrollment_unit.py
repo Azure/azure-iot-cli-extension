@@ -305,6 +305,7 @@ def generate_enrollment_show(**kvp):
                            'subjectName': 'test',
                            'version': '3'}}, 'secondary': None},
                          }, 'tpm': None, 'type': 'x509'},
+               'initialTwin': {'tags': {}, 'properties': {'desired': {}}},
                'registrationId': enrollment_id, 'etag': etag,
                'provisioningStatus': 'disabled', 'iotHubHostName': 'myHub',
                'deviceId': 'myDevice'}
@@ -423,6 +424,8 @@ class TestEnrollmentUpdate():
         assert get_request.method == 'GET'
         assert "{}/enrollments/{}?".format(mock_dps_target['entity'], enrollment_id) in get_request.url
 
+        initial_enrollment = json.loads(serviceclient.calls[0].response.content)
+
         update_request = serviceclient.calls[1].request
         url = update_request.url
 
@@ -448,8 +451,12 @@ class TestEnrollmentUpdate():
             assert body['provisioningStatus'] == req['provisioning_status']
         if req['initial_twin_properties']:
             assert body['initialTwin']['properties']['desired'] == req['initial_twin_properties']
+        else:
+            assert body['initialTwin']['properties']['desired'] == initial_enrollment['initialTwin']['properties']['desired']
         if req['initial_twin_tags']:
             assert body['initialTwin']['tags'] == req['initial_twin_tags']
+        else:
+            assert body['initialTwin']['tags'] == initial_enrollment['initialTwin']['tags']
         if req['device_id']:
             assert body['deviceId'] == req['device_id']
         if req['reprovision_policy'] == 'reprovisionandmigratedata':

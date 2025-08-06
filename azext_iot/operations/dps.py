@@ -911,17 +911,22 @@ def _get_initial_twin(initial_twin_tags=None, initial_twin_properties=None):
 def _get_updated_inital_twin(
     enrollment_record, initial_twin_tags=None, initial_twin_properties=None
 ):
-    if initial_twin_properties != "" and not initial_twin_tags:
-        if hasattr(enrollment_record, "initial_twin"):
-            if hasattr(enrollment_record.initial_twin, "tags"):
-                initial_twin_tags = enrollment_record.initial_twin.tags
-    if initial_twin_properties != "" and not initial_twin_properties:
-        if hasattr(enrollment_record, "initial_twin"):
-            if hasattr(enrollment_record.initial_twin, "properties"):
-                if hasattr(enrollment_record.initial_twin.properties, "desired"):
-                    initial_twin_properties = (
-                        enrollment_record.initial_twin.properties.desired
-                    )
+    if (
+        initial_twin_tags != "" and not initial_twin_tags
+        and hasattr(enrollment_record, "initial_twin")
+        and hasattr(enrollment_record.initial_twin, "tags")
+    ):
+        initial_twin_tags = enrollment_record.initial_twin.tags.as_dict()
+
+    if (
+        initial_twin_properties != "" and not initial_twin_properties
+        and hasattr(enrollment_record, "initial_twin")
+        and hasattr(enrollment_record.initial_twin, "properties")
+        and hasattr(enrollment_record.initial_twin.properties, "desired")
+    ):
+        initial_twin_properties = (
+            enrollment_record.initial_twin.properties.desired.as_dict()
+        )
     return _get_initial_twin(initial_twin_tags, initial_twin_properties)
 
 
