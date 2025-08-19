@@ -11,6 +11,7 @@ from azure.core import PipelineClient
 from azure.core.pipeline import policies
 from azure.core.rest import HttpRequest, HttpResponse
 
+from . import models as _models
 from ._configuration import IotHubClientConfiguration
 from ._serialization import Deserializer, Serializer
 from .operations import (
@@ -87,8 +88,10 @@ class IotHubClient:  # pylint: disable=client-accepts-api-version-keyword,too-ma
             ]
         self._client: PipelineClient = PipelineClient(base_url=endpoint, policies=_policies, **kwargs)
 
-        self._serialize = Serializer()
-        self._deserialize = Deserializer()
+        client_models = {k: v for k, v in _models._models.__dict__.items() if isinstance(v, type)}
+        client_models.update({k: v for k, v in _models.__dict__.items() if isinstance(v, type)})
+        self._serialize = Serializer(client_models)
+        self._deserialize = Deserializer(client_models)
         self._serialize.client_side_validation = False
         self.operations = Operations(self._client, self._config, self._serialize, self._deserialize)
         self.iot_hub_resource = IotHubResourceOperations(self._client, self._config, self._serialize, self._deserialize)

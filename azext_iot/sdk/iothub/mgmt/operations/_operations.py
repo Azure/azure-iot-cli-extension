@@ -27,6 +27,7 @@ from azure.core.rest import HttpRequest, HttpResponse
 from azure.core.tracing.decorator import distributed_trace
 from azure.core.utils import case_insensitive_dict
 
+from .. import models as _models
 from .._serialization import Serializer
 from .._vendor import prep_if_match, prep_if_none_match
 
@@ -34,7 +35,6 @@ if sys.version_info >= (3, 9):
     from collections.abc import MutableMapping
 else:
     from typing import MutableMapping  # type: ignore  # pylint: disable=ungrouped-imports
-JSON = MutableMapping[str, Any]  # pylint: disable=unsubscriptable-object
 T = TypeVar("T")
 ClsType = Optional[Callable[[PipelineResponse[HttpRequest, HttpResponse], T, Dict[str, Any]], Any]]
 
@@ -1261,6 +1261,8 @@ class Operations:
         :attr:`operations` attribute.
     """
 
+    models = _models
+
     def __init__(self, *args, **kwargs):
         input_args = list(args)
         self._client = input_args.pop(0) if input_args else kwargs.pop("client")
@@ -1269,32 +1271,17 @@ class Operations:
         self._deserialize = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
     @distributed_trace
-    def list(self, **kwargs: Any) -> Iterable[JSON]:
+    def list(self, **kwargs: Any) -> Iterable["_models.Operation"]:
         """Lists all of the available IoT Hub REST API operations.
 
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.paging.ItemPaged[JSON]
+        :return: An iterator like instance of Operation
+        :rtype: ~azure.core.paging.ItemPaged[~iot_hub_client.models.Operation]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "display": {
-                        "description": "str",  # Optional. Description of the operation.
-                        "operation": "str",  # Optional. Name of the operation.
-                        "provider": "str",  # Optional. Service provider: Microsoft Devices.
-                        "resource": "str"  # Optional. Resource Type: IotHubs.
-                    },
-                    "name": "str"  # Optional. Operation name: {provider}/{resource}/{read |
-                      write | action | delete}.
-                }
         """
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models._models.OperationListResult] = kwargs.pop("cls", None)  # pylint: disable=protected-access
 
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -1332,11 +1319,13 @@ class Operations:
             return _request
 
         def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
+            deserialized = self._deserialize(
+                _models._models.OperationListResult, pipeline_response  # pylint: disable=protected-access
+            )
+            list_of_elem = deserialized.value
             if cls:
                 list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, iter(list_of_elem)
+            return deserialized.next_link or None, iter(list_of_elem)
 
         def get_next(next_link=None):
             _request = prepare_request(next_link)
@@ -1351,7 +1340,8 @@ class Operations:
                 if _stream:
                     response.read()  # Load the body in memory and close the socket
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response)
+                error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+                raise HttpResponseError(response=response, model=error)
 
             return pipeline_response
 
@@ -1368,6 +1358,8 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :attr:`iot_hub_resource` attribute.
     """
 
+    models = _models
+
     def __init__(self, *args, **kwargs):
         input_args = list(args)
         self._client = input_args.pop(0) if input_args else kwargs.pop("client")
@@ -1376,8 +1368,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         self._deserialize = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
     @distributed_trace
-    def get(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> JSON:
-        # pylint: disable=line-too-long
+    def get(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> _models.IotHubDescription:
         """Get the non-security related metadata of an IoT hub.
 
         Get the non-security related metadata of an IoT hub.
@@ -1386,550 +1377,9 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :type resource_group_name: str
         :param resource_name: The name of the IoT hub. Required.
         :type resource_name: str
-        :return: JSON object
-        :rtype: JSON
+        :return: IotHubDescription
+        :rtype: ~iot_hub_client.models.IotHubDescription
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",  # The resource location. Required.
-                    "sku": {
-                        "name": "str",  # The name of the SKU. Required. Known values are:
-                          "F1", "S1", "S2", "S3", "B1", "B2", "B3", "P1", "P2", and "P3".
-                        "capacity": 0,  # Optional. The number of provisioned IoT Hub units.
-                          See:
-                          https://docs.microsoft.com/azure/azure-subscription-service-limits#iot-hub-limits.
-                        "tier": "str"  # Optional. The billing tier for the IoT hub. Known
-                          values are: "Free", "Standard", "Basic", and "Premium".
-                    },
-                    "etag": "str",  # Optional. The Etag field is *not* required. If it is
-                      provided in the response body, it must also be provided as a header per the
-                      normal ETag convention.
-                    "id": "str",  # Optional. The resource identifier.
-                    "identity": {
-                        "principalId": "str",  # Optional. Principal Id.
-                        "tenantId": "str",  # Optional. Tenant Id.
-                        "type": "str",  # Optional. The type of identity used for the
-                          resource. The type 'SystemAssigned,UserAssigned' includes both an implicitly
-                          created identity and a set of user assigned identities. The type 'None' will
-                          remove any identities from the service. Known values are: "SystemAssigned",
-                          "UserAssigned", "SystemAssigned, UserAssigned", and "None".
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",  # Optional. Dictionary of
-                                  :code:`<ArmUserIdentity>`.
-                                "principalId": "str"  # Optional. Dictionary of
-                                  :code:`<ArmUserIdentity>`.
-                            }
-                        }
-                    },
-                    "name": "str",  # Optional. The resource name.
-                    "properties": {
-                        "adrProperties": {
-                            "identityResourceId": "str",  # Optional. The identity used
-                              to manage the ADR namespace from the data plane.
-                            "namespaceResourceId": "str"  # Optional. The identifier of
-                              the Azure Device Registry namespace associated with the P SKU hub.
-                        },
-                        "allowedFqdnList": [
-                            "str"  # Optional. List of allowed FQDNs(Fully Qualified
-                              Domain Name) for egress from Iot Hub.
-                        ],
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",  # The name of the shared access
-                                  policy. Required.
-                                "rights": "str",  # The permissions assigned to the
-                                  shared access policy. Required. Known values are: "RegistryRead",
-                                  "RegistryWrite", "ServiceConnect", "DeviceConnect", "RegistryRead,
-                                  RegistryWrite", "RegistryRead, ServiceConnect", "RegistryRead,
-                                  DeviceConnect", "RegistryWrite, ServiceConnect", "RegistryWrite,
-                                  DeviceConnect", "ServiceConnect, DeviceConnect", "RegistryRead,
-                                  RegistryWrite, ServiceConnect", "RegistryRead, RegistryWrite,
-                                  DeviceConnect", "RegistryRead, ServiceConnect, DeviceConnect",
-                                  "RegistryWrite, ServiceConnect, DeviceConnect", and "RegistryRead,
-                                  RegistryWrite, ServiceConnect, DeviceConnect".
-                                "primaryKey": "str",  # Optional. The primary key.
-                                "secondaryKey": "str"  # Optional. The secondary key.
-                            }
-                        ],
-                        "cloudToDevice": {
-                            "defaultTtlAsIso8601": "1 day, 0:00:00",  # Optional. The
-                              default time to live for cloud-to-device messages in the device queue.
-                              See:
-                              https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                            "feedback": {
-                                "lockDurationAsIso8601": "1 day, 0:00:00",  #
-                                  Optional. The lock duration for the feedback queue. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                                "maxDeliveryCount": 0,  # Optional. The number of
-                                  times the IoT hub attempts to deliver a message on the feedback
-                                  queue. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                                "ttlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which a message is available to consume before it
-                                  is expired by the IoT hub. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                            },
-                            "maxDeliveryCount": 0  # Optional. The max delivery count for
-                              cloud-to-device messages in the device queue. See:
-                              https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                        },
-                        "comments": "str",  # Optional. IoT hub comments.
-                        "deviceStreams": {
-                            "streamingEndpoints": [
-                                "str"  # Optional. List of Device Streams Endpoints.
-                            ]
-                        },
-                        "disableDeviceSAS": bool,  # Optional. If true, all device(including
-                          Edge devices but excluding modules) scoped SAS keys cannot be used for
-                          authentication.
-                        "disableLocalAuth": bool,  # Optional. If true, SAS tokens with Iot
-                          hub scoped SAS keys cannot be used for authentication.
-                        "disableModuleSAS": bool,  # Optional. If true, all module scoped SAS
-                          keys cannot be used for authentication.
-                        "enableDataResidency": bool,  # Optional. This property when set to
-                          true, will enable data residency, thus, disabling disaster recovery.
-                        "enableFileUploadNotifications": bool,  # Optional. If True, file
-                          upload notifications are enabled.
-                        "encryption": {
-                            "keySource": "str",  # Optional. The source of the key.
-                            "keyVaultProperties": [
-                                {
-                                    "identity": {
-                                        "userAssignedIdentity": "str"  #
-                                          Optional. The user assigned identity.
-                                    },
-                                    "keyIdentifier": "str"  # Optional. The
-                                      identifier of the key.
-                                }
-                            ]
-                        },
-                        "eventHubEndpoints": {
-                            "str": {
-                                "endpoint": "str",  # Optional. The Event
-                                  Hub-compatible endpoint.
-                                "partitionCount": 0,  # Optional. The number of
-                                  partitions for receiving device-to-cloud messages in the Event
-                                  Hub-compatible endpoint. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#device-to-cloud-messages.
-                                "partitionIds": [
-                                    "str"  # Optional. The partition ids in the
-                                      Event Hub-compatible endpoint.
-                                ],
-                                "path": "str",  # Optional. The Event Hub-compatible
-                                  name.
-                                "retentionTimeInDays": 0  # Optional. The retention
-                                  time for device-to-cloud messages in days. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#device-to-cloud-messages.
-                            }
-                        },
-                        "features": "str",  # Optional. The capabilities and features enabled
-                          for the IoT hub. Known values are: "None" and "DeviceManagement".
-                        "hostName": "str",  # Optional. The name of the host.
-                        "ipFilterRules": [
-                            {
-                                "action": "str",  # The desired action for requests
-                                  captured by this rule. Required. Known values are: "Accept" and
-                                  "Reject".
-                                "filterName": "str",  # The name of the IP filter
-                                  rule. Required.
-                                "ipMask": "str"  # A string that contains the IP
-                                  address range in CIDR notation for the rule. Required.
-                            }
-                        ],
-                        "ipVersion": "str",  # Optional. This property specifies the IP
-                          Version the hub is currently utilizing. Known values are: "ipv4", "ipv6", and
-                          "ipv4ipv6".
-                        "locations": [
-                            {
-                                "location": "str",  # Optional. The name of the Azure
-                                  region.
-                                "role": "str"  # Optional. The role of the region,
-                                  can be either primary or secondary. The primary region is where the
-                                  IoT hub is currently provisioned. The secondary region is the Azure
-                                  disaster recovery (DR) paired region and also the region where the
-                                  IoT hub can failover to. Known values are: "primary" and "secondary".
-                            }
-                        ],
-                        "messagingEndpoints": {
-                            "str": {
-                                "lockDurationAsIso8601": "1 day, 0:00:00",  #
-                                  Optional. The lock duration. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                                "maxDeliveryCount": 0,  # Optional. The number of
-                                  times the IoT hub attempts to deliver a message. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                                "ttlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which a message is available to consume before it
-                                  is expired by the IoT hub. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                            }
-                        },
-                        "minTlsVersion": "str",  # Optional. Specifies the minimum TLS
-                          version to support for this hub. Can be set to "1.2" to have clients that use
-                          a TLS version below 1.2 to be rejected.
-                        "networkRuleSets": {
-                            "applyToBuiltInEventHubEndpoint": bool,  # If True, then
-                              Network Rule Set is also applied to BuiltIn EventHub EndPoint of IotHub.
-                              Required.
-                            "ipRules": [
-                                {
-                                    "filterName": "str",  # Name of the IP filter
-                                      rule. Required.
-                                    "ipMask": "str",  # A string that contains
-                                      the IP address range in CIDR notation for the rule. Required.
-                                    "action": "Allow"  # Optional. Default value
-                                      is "Allow". IP Filter Action. "Allow"
-                                }
-                            ],
-                            "defaultAction": "Deny"  # Optional. Default value is "Deny".
-                              Default Action for Network Rule Set. Known values are: "Deny" and
-                              "Allow".
-                        },
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",  # The
-                                          description for the current state of a private endpoint
-                                          connection. Required.
-                                        "status": "str",  # The status of a
-                                          private endpoint connection. Required. Known values are:
-                                          "Pending", "Approved", "Rejected", and "Disconnected".
-                                        "actionsRequired": "str"  # Optional.
-                                          Actions required for a private endpoint connection.
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"  # Optional. The resource
-                                          identifier.
-                                    }
-                                },
-                                "id": "str",  # Optional. The resource identifier.
-                                "name": "str",  # Optional. The resource name.
-                                "type": "str"  # Optional. The resource type.
-                            }
-                        ],
-                        "provisioningState": "str",  # Optional. The provisioning state.
-                        "publicNetworkAccess": "str",  # Optional. Whether requests from
-                          Public Network are allowed. Known values are: "Enabled" and "Disabled".
-                        "restrictOutboundNetworkAccess": bool,  # Optional. If true, egress
-                          from IotHub will be restricted to only the allowed FQDNs that are configured
-                          via allowedFqdnList.
-                        "rootCertificate": {
-                            "enableRootCertificateV2": bool,  # Optional. This property
-                              when set to true, hub will use G2 cert; while it's set to false, hub uses
-                              Baltimore Cert.
-                            "lastUpdatedTimeUtc": "2020-02-20 00:00:00"  # Optional. the
-                              last update time to root certificate flag.
-                        },
-                        "routing": {
-                            "endpoints": {
-                                "cosmosDBSqlContainers": [
-                                    {
-                                        "containerName": "str",  # The name
-                                          of the cosmos DB sql container in the cosmos DB database.
-                                          Required.
-                                        "databaseName": "str",  # The name of
-                                          the cosmos DB database in the cosmos DB account. Required.
-                                        "endpointUri": "str",  # The url of
-                                          the cosmos DB account. It must include the protocol https://.
-                                          Required.
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the cosmos DB
-                                          sql container endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "id": "str",  # Optional. Id of the
-                                          cosmos DB sql container endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "partitionKeyName": "str",  #
-                                          Optional. The name of the partition key associated with this
-                                          cosmos DB sql container if one exists. This is an optional
-                                          parameter.
-                                        "partitionKeyTemplate": "str",  #
-                                          Optional. The template for generating a synthetic partition
-                                          key value for use with this cosmos DB sql container. The
-                                          template must include at least one of the following
-                                          placeholders: {iothub}, {deviceid}, {DD}, {MM}, and {YYYY}.
-                                          Any one placeholder may be specified at most once, but order
-                                          and non-placeholder components are arbitrary. This parameter
-                                          is only required if PartitionKeyName is specified.
-                                        "primaryKey": "str",  # Optional. The
-                                          primary key of the cosmos DB account.
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the cosmos DB account.
-                                        "secondaryKey": "str",  # Optional.
-                                          The secondary key of the cosmos DB account.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the cosmos DB account.
-                                    }
-                                ],
-                                "eventHubs": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the event hub
-                                          endpoint. Known values are: "keyBased" and "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the event hub endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the event hub endpoint. It must include the
-                                          protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Event hub name on the event hub namespace.
-                                        "id": "str",  # Optional. Id of the
-                                          event hub endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the event hub endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the event hub endpoint.
-                                    }
-                                ],
-                                "serviceBusQueues": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. The name need not
-                                          be the same as the actual queue name. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the service bus
-                                          queue endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the service bus queue
-                                          endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the service bus queue endpoint. It must include
-                                          the protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Queue name on the service bus namespace.
-                                        "id": "str",  # Optional. Id of the
-                                          service bus queue endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the service bus queue
-                                          endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the service bus queue
-                                          endpoint.
-                                    }
-                                ],
-                                "serviceBusTopics": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types.  The name need
-                                          not be the same as the actual topic name. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the service bus
-                                          topic endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the service bus topic
-                                          endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the service bus topic endpoint. It must include
-                                          the protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Queue name on the service bus topic.
-                                        "id": "str",  # Optional. Id of the
-                                          service bus topic endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the service bus topic
-                                          endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the service bus topic
-                                          endpoint.
-                                    }
-                                ],
-                                "storageContainers": [
-                                    {
-                                        "containerName": "str",  # The name
-                                          of storage container in the storage account. Required.
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the storage
-                                          endpoint. Known values are: "keyBased" and "identityBased".
-                                        "batchFrequencyInSeconds": 0,  #
-                                          Optional. Time interval at which blobs are written to
-                                          storage. Value should be between 60 and 720 seconds. Default
-                                          value is 300 seconds.
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the storage account.
-                                        "encoding": "str",  # Optional.
-                                          Encoding that is used to serialize messages to blobs.
-                                          Supported values are 'avro', 'avrodeflate', and 'JSON'.
-                                          Default value is 'avro'. Known values are: "Avro",
-                                          "AvroDeflate", and "JSON".
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the storage endpoint. It must include the protocol
-                                          https://.
-                                        "fileNameFormat": "str",  # Optional.
-                                          File name format for the blob. Default format is
-                                          {iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}. All
-                                          parameters are mandatory but can be reordered.
-                                        "id": "str",  # Optional. Id of the
-                                          storage container endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "maxChunkSizeInBytes": 0,  #
-                                          Optional. Maximum number of bytes for each blob written to
-                                          storage. Value should be between 10485760(10MB) and
-                                          524288000(500MB). Default value is 314572800(300MB).
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the storage account.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the storage account.
-                                    }
-                                ]
-                            },
-                            "enrichments": [
-                                {
-                                    "endpointNames": [
-                                        "str"  # The list of endpoints for
-                                          which the enrichment is applied to the message. Required.
-                                    ],
-                                    "key": "str",  # The key or name for the
-                                      enrichment property. Required.
-                                    "value": "str"  # The value for the
-                                      enrichment property. Required.
-                                }
-                            ],
-                            "fallbackRoute": {
-                                "endpointNames": [
-                                    "str"  # The list of endpoints to which the
-                                      messages that satisfy the condition are routed to. Currently only
-                                      1 endpoint is allowed. Required.
-                                ],
-                                "isEnabled": bool,  # Used to specify whether the
-                                  fallback route is enabled. Required.
-                                "source": "str",  # The source to which the routing
-                                  rule is to be applied to. For example, DeviceMessages. Required.
-                                  Known values are: "Invalid", "DeviceMessages", "TwinChangeEvents",
-                                  "DeviceLifecycleEvents", "DeviceJobLifecycleEvents",
-                                  "DigitalTwinChangeEvents", "DeviceConnectionStateEvents", and
-                                  "MqttBrokerMessages".
-                                "condition": "str",  # Optional. The condition which
-                                  is evaluated in order to apply the fallback route. If the condition
-                                  is not provided it will evaluate to true by default. For grammar,
-                                  See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                                "name": "str"  # Optional. The name of the route. The
-                                  name can only include alphanumeric characters, periods, underscores,
-                                  hyphens, has a maximum length of 64 characters, and must be unique.
-                            },
-                            "routes": [
-                                {
-                                    "endpointNames": [
-                                        "str"  # The list of endpoints to
-                                          which messages that satisfy the condition are routed.
-                                          Currently only one endpoint is allowed. Required.
-                                    ],
-                                    "isEnabled": bool,  # Used to specify whether
-                                      a route is enabled. Required.
-                                    "name": "str",  # The name of the route. The
-                                      name can only include alphanumeric characters, periods,
-                                      underscores, hyphens, has a maximum length of 64 characters, and
-                                      must be unique. Required.
-                                    "source": "str",  # The source that the
-                                      routing rule is to be applied to, such as DeviceMessages.
-                                      Required. Known values are: "Invalid", "DeviceMessages",
-                                      "TwinChangeEvents", "DeviceLifecycleEvents",
-                                      "DeviceJobLifecycleEvents", "DigitalTwinChangeEvents",
-                                      "DeviceConnectionStateEvents", and "MqttBrokerMessages".
-                                    "condition": "str"  # Optional. The condition
-                                      that is evaluated to apply the routing rule. If no condition is
-                                      provided, it evaluates to true by default. For grammar, see:
-                                      https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                                }
-                            ]
-                        },
-                        "state": "str",  # Optional. The hub state.
-                        "storageEndpoints": {
-                            "str": {
-                                "connectionString": "str",  # The connection string
-                                  for the Azure Storage account to which files are uploaded. Required.
-                                "containerName": "str",  # The name of the root
-                                  container where you upload files. The container need not exist but
-                                  should be creatable using the connectionString specified. Required.
-                                "authenticationType": "str",  # Optional. Specifies
-                                  authentication type being used for connecting to the storage account.
-                                  Known values are: "keyBased" and "identityBased".
-                                "identity": {
-                                    "userAssignedIdentity": "str"  # Optional.
-                                      The user assigned identity.
-                                },
-                                "sasTtlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which the SAS URI generated by IoT Hub for file
-                                  upload is valid. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload#file-upload-notification-configuration-options.
-                            }
-                        },
-                        "tlsCompatibilityMode": bool  # Optional. If True, TLS compatibility
-                          mode is enabled.
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. The resource tags.
-                    },
-                    "type": "str"  # Optional. The resource type.
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -1942,7 +1392,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.IotHubDescription] = kwargs.pop("cls", None)
 
         _request = build_iot_hub_resource_get_request(
             resource_group_name=resource_group_name,
@@ -1965,28 +1415,26 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("IotHubDescription", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     def _create_or_update_initial(
         self,
         resource_group_name: str,
         resource_name: str,
-        iot_hub_description: Union[JSON, IO[bytes]],
+        iot_hub_description: Union[_models.IotHubDescription, IO[bytes]],
         *,
         etag: Optional[str] = None,
         match_condition: Optional[MatchConditions] = None,
         **kwargs: Any
-    ) -> JSON:
+    ) -> _models.IotHubDescription:
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
             404: ResourceNotFoundError,
@@ -2005,7 +1453,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         _params = kwargs.pop("params", {}) or {}
 
         content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.IotHubDescription] = kwargs.pop("cls", None)
 
         content_type = content_type or "application/json"
         _json = None
@@ -2013,7 +1461,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         if isinstance(iot_hub_description, (IOBase, bytes)):
             _content = iot_hub_description
         else:
-            _json = iot_hub_description
+            _json = self._serialize.body(iot_hub_description, "IotHubDescription")
 
         _request = build_iot_hub_resource_create_or_update_request(
             resource_group_name=resource_group_name,
@@ -2041,43 +1489,37 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
         response_headers = {}
         if response.status_code == 200:
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("IotHubDescription", pipeline_response)
 
         if response.status_code == 201:
             response_headers["Azure-AsyncOperation"] = self._deserialize(
                 "str", response.headers.get("Azure-AsyncOperation")
             )
 
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("IotHubDescription", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), response_headers)  # type: ignore
+            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @overload
     def begin_create_or_update(
         self,
         resource_group_name: str,
         resource_name: str,
-        iot_hub_description: JSON,
+        iot_hub_description: _models.IotHubDescription,
         *,
         content_type: str = "application/json",
         etag: Optional[str] = None,
         match_condition: Optional[MatchConditions] = None,
         **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
+    ) -> LROPoller[_models.IotHubDescription]:
         """Create or update the metadata of an IoT hub.
 
         Create or update the metadata of an Iot hub. The usual pattern to modify a property is to
@@ -2089,7 +1531,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :param resource_name: The name of the IoT hub. Required.
         :type resource_name: str
         :param iot_hub_description: The IoT hub metadata and security metadata. Required.
-        :type iot_hub_description: JSON
+        :type iot_hub_description: ~iot_hub_client.models.IotHubDescription
         :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
          Default value is "application/json".
         :paramtype content_type: str
@@ -2098,1088 +1540,9 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :paramtype etag: str
         :keyword match_condition: The match condition to use upon the etag. Default value is None.
         :paramtype match_condition: ~azure.core.MatchConditions
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :return: An instance of LROPoller that returns IotHubDescription
+        :rtype: ~azure.core.polling.LROPoller[~iot_hub_client.models.IotHubDescription]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                iot_hub_description = {
-                    "location": "str",  # The resource location. Required.
-                    "sku": {
-                        "name": "str",  # The name of the SKU. Required. Known values are:
-                          "F1", "S1", "S2", "S3", "B1", "B2", "B3", "P1", "P2", and "P3".
-                        "capacity": 0,  # Optional. The number of provisioned IoT Hub units.
-                          See:
-                          https://docs.microsoft.com/azure/azure-subscription-service-limits#iot-hub-limits.
-                        "tier": "str"  # Optional. The billing tier for the IoT hub. Known
-                          values are: "Free", "Standard", "Basic", and "Premium".
-                    },
-                    "etag": "str",  # Optional. The Etag field is *not* required. If it is
-                      provided in the response body, it must also be provided as a header per the
-                      normal ETag convention.
-                    "id": "str",  # Optional. The resource identifier.
-                    "identity": {
-                        "principalId": "str",  # Optional. Principal Id.
-                        "tenantId": "str",  # Optional. Tenant Id.
-                        "type": "str",  # Optional. The type of identity used for the
-                          resource. The type 'SystemAssigned,UserAssigned' includes both an implicitly
-                          created identity and a set of user assigned identities. The type 'None' will
-                          remove any identities from the service. Known values are: "SystemAssigned",
-                          "UserAssigned", "SystemAssigned, UserAssigned", and "None".
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",  # Optional. Dictionary of
-                                  :code:`<ArmUserIdentity>`.
-                                "principalId": "str"  # Optional. Dictionary of
-                                  :code:`<ArmUserIdentity>`.
-                            }
-                        }
-                    },
-                    "name": "str",  # Optional. The resource name.
-                    "properties": {
-                        "adrProperties": {
-                            "identityResourceId": "str",  # Optional. The identity used
-                              to manage the ADR namespace from the data plane.
-                            "namespaceResourceId": "str"  # Optional. The identifier of
-                              the Azure Device Registry namespace associated with the P SKU hub.
-                        },
-                        "allowedFqdnList": [
-                            "str"  # Optional. List of allowed FQDNs(Fully Qualified
-                              Domain Name) for egress from Iot Hub.
-                        ],
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",  # The name of the shared access
-                                  policy. Required.
-                                "rights": "str",  # The permissions assigned to the
-                                  shared access policy. Required. Known values are: "RegistryRead",
-                                  "RegistryWrite", "ServiceConnect", "DeviceConnect", "RegistryRead,
-                                  RegistryWrite", "RegistryRead, ServiceConnect", "RegistryRead,
-                                  DeviceConnect", "RegistryWrite, ServiceConnect", "RegistryWrite,
-                                  DeviceConnect", "ServiceConnect, DeviceConnect", "RegistryRead,
-                                  RegistryWrite, ServiceConnect", "RegistryRead, RegistryWrite,
-                                  DeviceConnect", "RegistryRead, ServiceConnect, DeviceConnect",
-                                  "RegistryWrite, ServiceConnect, DeviceConnect", and "RegistryRead,
-                                  RegistryWrite, ServiceConnect, DeviceConnect".
-                                "primaryKey": "str",  # Optional. The primary key.
-                                "secondaryKey": "str"  # Optional. The secondary key.
-                            }
-                        ],
-                        "cloudToDevice": {
-                            "defaultTtlAsIso8601": "1 day, 0:00:00",  # Optional. The
-                              default time to live for cloud-to-device messages in the device queue.
-                              See:
-                              https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                            "feedback": {
-                                "lockDurationAsIso8601": "1 day, 0:00:00",  #
-                                  Optional. The lock duration for the feedback queue. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                                "maxDeliveryCount": 0,  # Optional. The number of
-                                  times the IoT hub attempts to deliver a message on the feedback
-                                  queue. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                                "ttlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which a message is available to consume before it
-                                  is expired by the IoT hub. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                            },
-                            "maxDeliveryCount": 0  # Optional. The max delivery count for
-                              cloud-to-device messages in the device queue. See:
-                              https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                        },
-                        "comments": "str",  # Optional. IoT hub comments.
-                        "deviceStreams": {
-                            "streamingEndpoints": [
-                                "str"  # Optional. List of Device Streams Endpoints.
-                            ]
-                        },
-                        "disableDeviceSAS": bool,  # Optional. If true, all device(including
-                          Edge devices but excluding modules) scoped SAS keys cannot be used for
-                          authentication.
-                        "disableLocalAuth": bool,  # Optional. If true, SAS tokens with Iot
-                          hub scoped SAS keys cannot be used for authentication.
-                        "disableModuleSAS": bool,  # Optional. If true, all module scoped SAS
-                          keys cannot be used for authentication.
-                        "enableDataResidency": bool,  # Optional. This property when set to
-                          true, will enable data residency, thus, disabling disaster recovery.
-                        "enableFileUploadNotifications": bool,  # Optional. If True, file
-                          upload notifications are enabled.
-                        "encryption": {
-                            "keySource": "str",  # Optional. The source of the key.
-                            "keyVaultProperties": [
-                                {
-                                    "identity": {
-                                        "userAssignedIdentity": "str"  #
-                                          Optional. The user assigned identity.
-                                    },
-                                    "keyIdentifier": "str"  # Optional. The
-                                      identifier of the key.
-                                }
-                            ]
-                        },
-                        "eventHubEndpoints": {
-                            "str": {
-                                "endpoint": "str",  # Optional. The Event
-                                  Hub-compatible endpoint.
-                                "partitionCount": 0,  # Optional. The number of
-                                  partitions for receiving device-to-cloud messages in the Event
-                                  Hub-compatible endpoint. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#device-to-cloud-messages.
-                                "partitionIds": [
-                                    "str"  # Optional. The partition ids in the
-                                      Event Hub-compatible endpoint.
-                                ],
-                                "path": "str",  # Optional. The Event Hub-compatible
-                                  name.
-                                "retentionTimeInDays": 0  # Optional. The retention
-                                  time for device-to-cloud messages in days. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#device-to-cloud-messages.
-                            }
-                        },
-                        "features": "str",  # Optional. The capabilities and features enabled
-                          for the IoT hub. Known values are: "None" and "DeviceManagement".
-                        "hostName": "str",  # Optional. The name of the host.
-                        "ipFilterRules": [
-                            {
-                                "action": "str",  # The desired action for requests
-                                  captured by this rule. Required. Known values are: "Accept" and
-                                  "Reject".
-                                "filterName": "str",  # The name of the IP filter
-                                  rule. Required.
-                                "ipMask": "str"  # A string that contains the IP
-                                  address range in CIDR notation for the rule. Required.
-                            }
-                        ],
-                        "ipVersion": "str",  # Optional. This property specifies the IP
-                          Version the hub is currently utilizing. Known values are: "ipv4", "ipv6", and
-                          "ipv4ipv6".
-                        "locations": [
-                            {
-                                "location": "str",  # Optional. The name of the Azure
-                                  region.
-                                "role": "str"  # Optional. The role of the region,
-                                  can be either primary or secondary. The primary region is where the
-                                  IoT hub is currently provisioned. The secondary region is the Azure
-                                  disaster recovery (DR) paired region and also the region where the
-                                  IoT hub can failover to. Known values are: "primary" and "secondary".
-                            }
-                        ],
-                        "messagingEndpoints": {
-                            "str": {
-                                "lockDurationAsIso8601": "1 day, 0:00:00",  #
-                                  Optional. The lock duration. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                                "maxDeliveryCount": 0,  # Optional. The number of
-                                  times the IoT hub attempts to deliver a message. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                                "ttlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which a message is available to consume before it
-                                  is expired by the IoT hub. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                            }
-                        },
-                        "minTlsVersion": "str",  # Optional. Specifies the minimum TLS
-                          version to support for this hub. Can be set to "1.2" to have clients that use
-                          a TLS version below 1.2 to be rejected.
-                        "networkRuleSets": {
-                            "applyToBuiltInEventHubEndpoint": bool,  # If True, then
-                              Network Rule Set is also applied to BuiltIn EventHub EndPoint of IotHub.
-                              Required.
-                            "ipRules": [
-                                {
-                                    "filterName": "str",  # Name of the IP filter
-                                      rule. Required.
-                                    "ipMask": "str",  # A string that contains
-                                      the IP address range in CIDR notation for the rule. Required.
-                                    "action": "Allow"  # Optional. Default value
-                                      is "Allow". IP Filter Action. "Allow"
-                                }
-                            ],
-                            "defaultAction": "Deny"  # Optional. Default value is "Deny".
-                              Default Action for Network Rule Set. Known values are: "Deny" and
-                              "Allow".
-                        },
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",  # The
-                                          description for the current state of a private endpoint
-                                          connection. Required.
-                                        "status": "str",  # The status of a
-                                          private endpoint connection. Required. Known values are:
-                                          "Pending", "Approved", "Rejected", and "Disconnected".
-                                        "actionsRequired": "str"  # Optional.
-                                          Actions required for a private endpoint connection.
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"  # Optional. The resource
-                                          identifier.
-                                    }
-                                },
-                                "id": "str",  # Optional. The resource identifier.
-                                "name": "str",  # Optional. The resource name.
-                                "type": "str"  # Optional. The resource type.
-                            }
-                        ],
-                        "provisioningState": "str",  # Optional. The provisioning state.
-                        "publicNetworkAccess": "str",  # Optional. Whether requests from
-                          Public Network are allowed. Known values are: "Enabled" and "Disabled".
-                        "restrictOutboundNetworkAccess": bool,  # Optional. If true, egress
-                          from IotHub will be restricted to only the allowed FQDNs that are configured
-                          via allowedFqdnList.
-                        "rootCertificate": {
-                            "enableRootCertificateV2": bool,  # Optional. This property
-                              when set to true, hub will use G2 cert; while it's set to false, hub uses
-                              Baltimore Cert.
-                            "lastUpdatedTimeUtc": "2020-02-20 00:00:00"  # Optional. the
-                              last update time to root certificate flag.
-                        },
-                        "routing": {
-                            "endpoints": {
-                                "cosmosDBSqlContainers": [
-                                    {
-                                        "containerName": "str",  # The name
-                                          of the cosmos DB sql container in the cosmos DB database.
-                                          Required.
-                                        "databaseName": "str",  # The name of
-                                          the cosmos DB database in the cosmos DB account. Required.
-                                        "endpointUri": "str",  # The url of
-                                          the cosmos DB account. It must include the protocol https://.
-                                          Required.
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the cosmos DB
-                                          sql container endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "id": "str",  # Optional. Id of the
-                                          cosmos DB sql container endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "partitionKeyName": "str",  #
-                                          Optional. The name of the partition key associated with this
-                                          cosmos DB sql container if one exists. This is an optional
-                                          parameter.
-                                        "partitionKeyTemplate": "str",  #
-                                          Optional. The template for generating a synthetic partition
-                                          key value for use with this cosmos DB sql container. The
-                                          template must include at least one of the following
-                                          placeholders: {iothub}, {deviceid}, {DD}, {MM}, and {YYYY}.
-                                          Any one placeholder may be specified at most once, but order
-                                          and non-placeholder components are arbitrary. This parameter
-                                          is only required if PartitionKeyName is specified.
-                                        "primaryKey": "str",  # Optional. The
-                                          primary key of the cosmos DB account.
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the cosmos DB account.
-                                        "secondaryKey": "str",  # Optional.
-                                          The secondary key of the cosmos DB account.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the cosmos DB account.
-                                    }
-                                ],
-                                "eventHubs": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the event hub
-                                          endpoint. Known values are: "keyBased" and "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the event hub endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the event hub endpoint. It must include the
-                                          protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Event hub name on the event hub namespace.
-                                        "id": "str",  # Optional. Id of the
-                                          event hub endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the event hub endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the event hub endpoint.
-                                    }
-                                ],
-                                "serviceBusQueues": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. The name need not
-                                          be the same as the actual queue name. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the service bus
-                                          queue endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the service bus queue
-                                          endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the service bus queue endpoint. It must include
-                                          the protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Queue name on the service bus namespace.
-                                        "id": "str",  # Optional. Id of the
-                                          service bus queue endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the service bus queue
-                                          endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the service bus queue
-                                          endpoint.
-                                    }
-                                ],
-                                "serviceBusTopics": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types.  The name need
-                                          not be the same as the actual topic name. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the service bus
-                                          topic endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the service bus topic
-                                          endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the service bus topic endpoint. It must include
-                                          the protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Queue name on the service bus topic.
-                                        "id": "str",  # Optional. Id of the
-                                          service bus topic endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the service bus topic
-                                          endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the service bus topic
-                                          endpoint.
-                                    }
-                                ],
-                                "storageContainers": [
-                                    {
-                                        "containerName": "str",  # The name
-                                          of storage container in the storage account. Required.
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the storage
-                                          endpoint. Known values are: "keyBased" and "identityBased".
-                                        "batchFrequencyInSeconds": 0,  #
-                                          Optional. Time interval at which blobs are written to
-                                          storage. Value should be between 60 and 720 seconds. Default
-                                          value is 300 seconds.
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the storage account.
-                                        "encoding": "str",  # Optional.
-                                          Encoding that is used to serialize messages to blobs.
-                                          Supported values are 'avro', 'avrodeflate', and 'JSON'.
-                                          Default value is 'avro'. Known values are: "Avro",
-                                          "AvroDeflate", and "JSON".
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the storage endpoint. It must include the protocol
-                                          https://.
-                                        "fileNameFormat": "str",  # Optional.
-                                          File name format for the blob. Default format is
-                                          {iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}. All
-                                          parameters are mandatory but can be reordered.
-                                        "id": "str",  # Optional. Id of the
-                                          storage container endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "maxChunkSizeInBytes": 0,  #
-                                          Optional. Maximum number of bytes for each blob written to
-                                          storage. Value should be between 10485760(10MB) and
-                                          524288000(500MB). Default value is 314572800(300MB).
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the storage account.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the storage account.
-                                    }
-                                ]
-                            },
-                            "enrichments": [
-                                {
-                                    "endpointNames": [
-                                        "str"  # The list of endpoints for
-                                          which the enrichment is applied to the message. Required.
-                                    ],
-                                    "key": "str",  # The key or name for the
-                                      enrichment property. Required.
-                                    "value": "str"  # The value for the
-                                      enrichment property. Required.
-                                }
-                            ],
-                            "fallbackRoute": {
-                                "endpointNames": [
-                                    "str"  # The list of endpoints to which the
-                                      messages that satisfy the condition are routed to. Currently only
-                                      1 endpoint is allowed. Required.
-                                ],
-                                "isEnabled": bool,  # Used to specify whether the
-                                  fallback route is enabled. Required.
-                                "source": "str",  # The source to which the routing
-                                  rule is to be applied to. For example, DeviceMessages. Required.
-                                  Known values are: "Invalid", "DeviceMessages", "TwinChangeEvents",
-                                  "DeviceLifecycleEvents", "DeviceJobLifecycleEvents",
-                                  "DigitalTwinChangeEvents", "DeviceConnectionStateEvents", and
-                                  "MqttBrokerMessages".
-                                "condition": "str",  # Optional. The condition which
-                                  is evaluated in order to apply the fallback route. If the condition
-                                  is not provided it will evaluate to true by default. For grammar,
-                                  See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                                "name": "str"  # Optional. The name of the route. The
-                                  name can only include alphanumeric characters, periods, underscores,
-                                  hyphens, has a maximum length of 64 characters, and must be unique.
-                            },
-                            "routes": [
-                                {
-                                    "endpointNames": [
-                                        "str"  # The list of endpoints to
-                                          which messages that satisfy the condition are routed.
-                                          Currently only one endpoint is allowed. Required.
-                                    ],
-                                    "isEnabled": bool,  # Used to specify whether
-                                      a route is enabled. Required.
-                                    "name": "str",  # The name of the route. The
-                                      name can only include alphanumeric characters, periods,
-                                      underscores, hyphens, has a maximum length of 64 characters, and
-                                      must be unique. Required.
-                                    "source": "str",  # The source that the
-                                      routing rule is to be applied to, such as DeviceMessages.
-                                      Required. Known values are: "Invalid", "DeviceMessages",
-                                      "TwinChangeEvents", "DeviceLifecycleEvents",
-                                      "DeviceJobLifecycleEvents", "DigitalTwinChangeEvents",
-                                      "DeviceConnectionStateEvents", and "MqttBrokerMessages".
-                                    "condition": "str"  # Optional. The condition
-                                      that is evaluated to apply the routing rule. If no condition is
-                                      provided, it evaluates to true by default. For grammar, see:
-                                      https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                                }
-                            ]
-                        },
-                        "state": "str",  # Optional. The hub state.
-                        "storageEndpoints": {
-                            "str": {
-                                "connectionString": "str",  # The connection string
-                                  for the Azure Storage account to which files are uploaded. Required.
-                                "containerName": "str",  # The name of the root
-                                  container where you upload files. The container need not exist but
-                                  should be creatable using the connectionString specified. Required.
-                                "authenticationType": "str",  # Optional. Specifies
-                                  authentication type being used for connecting to the storage account.
-                                  Known values are: "keyBased" and "identityBased".
-                                "identity": {
-                                    "userAssignedIdentity": "str"  # Optional.
-                                      The user assigned identity.
-                                },
-                                "sasTtlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which the SAS URI generated by IoT Hub for file
-                                  upload is valid. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload#file-upload-notification-configuration-options.
-                            }
-                        },
-                        "tlsCompatibilityMode": bool  # Optional. If True, TLS compatibility
-                          mode is enabled.
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. The resource tags.
-                    },
-                    "type": "str"  # Optional. The resource type.
-                }
-
-                # response body for status code(s): 200, 201
-                response == {
-                    "location": "str",  # The resource location. Required.
-                    "sku": {
-                        "name": "str",  # The name of the SKU. Required. Known values are:
-                          "F1", "S1", "S2", "S3", "B1", "B2", "B3", "P1", "P2", and "P3".
-                        "capacity": 0,  # Optional. The number of provisioned IoT Hub units.
-                          See:
-                          https://docs.microsoft.com/azure/azure-subscription-service-limits#iot-hub-limits.
-                        "tier": "str"  # Optional. The billing tier for the IoT hub. Known
-                          values are: "Free", "Standard", "Basic", and "Premium".
-                    },
-                    "etag": "str",  # Optional. The Etag field is *not* required. If it is
-                      provided in the response body, it must also be provided as a header per the
-                      normal ETag convention.
-                    "id": "str",  # Optional. The resource identifier.
-                    "identity": {
-                        "principalId": "str",  # Optional. Principal Id.
-                        "tenantId": "str",  # Optional. Tenant Id.
-                        "type": "str",  # Optional. The type of identity used for the
-                          resource. The type 'SystemAssigned,UserAssigned' includes both an implicitly
-                          created identity and a set of user assigned identities. The type 'None' will
-                          remove any identities from the service. Known values are: "SystemAssigned",
-                          "UserAssigned", "SystemAssigned, UserAssigned", and "None".
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",  # Optional. Dictionary of
-                                  :code:`<ArmUserIdentity>`.
-                                "principalId": "str"  # Optional. Dictionary of
-                                  :code:`<ArmUserIdentity>`.
-                            }
-                        }
-                    },
-                    "name": "str",  # Optional. The resource name.
-                    "properties": {
-                        "adrProperties": {
-                            "identityResourceId": "str",  # Optional. The identity used
-                              to manage the ADR namespace from the data plane.
-                            "namespaceResourceId": "str"  # Optional. The identifier of
-                              the Azure Device Registry namespace associated with the P SKU hub.
-                        },
-                        "allowedFqdnList": [
-                            "str"  # Optional. List of allowed FQDNs(Fully Qualified
-                              Domain Name) for egress from Iot Hub.
-                        ],
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",  # The name of the shared access
-                                  policy. Required.
-                                "rights": "str",  # The permissions assigned to the
-                                  shared access policy. Required. Known values are: "RegistryRead",
-                                  "RegistryWrite", "ServiceConnect", "DeviceConnect", "RegistryRead,
-                                  RegistryWrite", "RegistryRead, ServiceConnect", "RegistryRead,
-                                  DeviceConnect", "RegistryWrite, ServiceConnect", "RegistryWrite,
-                                  DeviceConnect", "ServiceConnect, DeviceConnect", "RegistryRead,
-                                  RegistryWrite, ServiceConnect", "RegistryRead, RegistryWrite,
-                                  DeviceConnect", "RegistryRead, ServiceConnect, DeviceConnect",
-                                  "RegistryWrite, ServiceConnect, DeviceConnect", and "RegistryRead,
-                                  RegistryWrite, ServiceConnect, DeviceConnect".
-                                "primaryKey": "str",  # Optional. The primary key.
-                                "secondaryKey": "str"  # Optional. The secondary key.
-                            }
-                        ],
-                        "cloudToDevice": {
-                            "defaultTtlAsIso8601": "1 day, 0:00:00",  # Optional. The
-                              default time to live for cloud-to-device messages in the device queue.
-                              See:
-                              https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                            "feedback": {
-                                "lockDurationAsIso8601": "1 day, 0:00:00",  #
-                                  Optional. The lock duration for the feedback queue. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                                "maxDeliveryCount": 0,  # Optional. The number of
-                                  times the IoT hub attempts to deliver a message on the feedback
-                                  queue. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                                "ttlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which a message is available to consume before it
-                                  is expired by the IoT hub. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                            },
-                            "maxDeliveryCount": 0  # Optional. The max delivery count for
-                              cloud-to-device messages in the device queue. See:
-                              https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                        },
-                        "comments": "str",  # Optional. IoT hub comments.
-                        "deviceStreams": {
-                            "streamingEndpoints": [
-                                "str"  # Optional. List of Device Streams Endpoints.
-                            ]
-                        },
-                        "disableDeviceSAS": bool,  # Optional. If true, all device(including
-                          Edge devices but excluding modules) scoped SAS keys cannot be used for
-                          authentication.
-                        "disableLocalAuth": bool,  # Optional. If true, SAS tokens with Iot
-                          hub scoped SAS keys cannot be used for authentication.
-                        "disableModuleSAS": bool,  # Optional. If true, all module scoped SAS
-                          keys cannot be used for authentication.
-                        "enableDataResidency": bool,  # Optional. This property when set to
-                          true, will enable data residency, thus, disabling disaster recovery.
-                        "enableFileUploadNotifications": bool,  # Optional. If True, file
-                          upload notifications are enabled.
-                        "encryption": {
-                            "keySource": "str",  # Optional. The source of the key.
-                            "keyVaultProperties": [
-                                {
-                                    "identity": {
-                                        "userAssignedIdentity": "str"  #
-                                          Optional. The user assigned identity.
-                                    },
-                                    "keyIdentifier": "str"  # Optional. The
-                                      identifier of the key.
-                                }
-                            ]
-                        },
-                        "eventHubEndpoints": {
-                            "str": {
-                                "endpoint": "str",  # Optional. The Event
-                                  Hub-compatible endpoint.
-                                "partitionCount": 0,  # Optional. The number of
-                                  partitions for receiving device-to-cloud messages in the Event
-                                  Hub-compatible endpoint. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#device-to-cloud-messages.
-                                "partitionIds": [
-                                    "str"  # Optional. The partition ids in the
-                                      Event Hub-compatible endpoint.
-                                ],
-                                "path": "str",  # Optional. The Event Hub-compatible
-                                  name.
-                                "retentionTimeInDays": 0  # Optional. The retention
-                                  time for device-to-cloud messages in days. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#device-to-cloud-messages.
-                            }
-                        },
-                        "features": "str",  # Optional. The capabilities and features enabled
-                          for the IoT hub. Known values are: "None" and "DeviceManagement".
-                        "hostName": "str",  # Optional. The name of the host.
-                        "ipFilterRules": [
-                            {
-                                "action": "str",  # The desired action for requests
-                                  captured by this rule. Required. Known values are: "Accept" and
-                                  "Reject".
-                                "filterName": "str",  # The name of the IP filter
-                                  rule. Required.
-                                "ipMask": "str"  # A string that contains the IP
-                                  address range in CIDR notation for the rule. Required.
-                            }
-                        ],
-                        "ipVersion": "str",  # Optional. This property specifies the IP
-                          Version the hub is currently utilizing. Known values are: "ipv4", "ipv6", and
-                          "ipv4ipv6".
-                        "locations": [
-                            {
-                                "location": "str",  # Optional. The name of the Azure
-                                  region.
-                                "role": "str"  # Optional. The role of the region,
-                                  can be either primary or secondary. The primary region is where the
-                                  IoT hub is currently provisioned. The secondary region is the Azure
-                                  disaster recovery (DR) paired region and also the region where the
-                                  IoT hub can failover to. Known values are: "primary" and "secondary".
-                            }
-                        ],
-                        "messagingEndpoints": {
-                            "str": {
-                                "lockDurationAsIso8601": "1 day, 0:00:00",  #
-                                  Optional. The lock duration. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                                "maxDeliveryCount": 0,  # Optional. The number of
-                                  times the IoT hub attempts to deliver a message. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                                "ttlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which a message is available to consume before it
-                                  is expired by the IoT hub. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                            }
-                        },
-                        "minTlsVersion": "str",  # Optional. Specifies the minimum TLS
-                          version to support for this hub. Can be set to "1.2" to have clients that use
-                          a TLS version below 1.2 to be rejected.
-                        "networkRuleSets": {
-                            "applyToBuiltInEventHubEndpoint": bool,  # If True, then
-                              Network Rule Set is also applied to BuiltIn EventHub EndPoint of IotHub.
-                              Required.
-                            "ipRules": [
-                                {
-                                    "filterName": "str",  # Name of the IP filter
-                                      rule. Required.
-                                    "ipMask": "str",  # A string that contains
-                                      the IP address range in CIDR notation for the rule. Required.
-                                    "action": "Allow"  # Optional. Default value
-                                      is "Allow". IP Filter Action. "Allow"
-                                }
-                            ],
-                            "defaultAction": "Deny"  # Optional. Default value is "Deny".
-                              Default Action for Network Rule Set. Known values are: "Deny" and
-                              "Allow".
-                        },
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",  # The
-                                          description for the current state of a private endpoint
-                                          connection. Required.
-                                        "status": "str",  # The status of a
-                                          private endpoint connection. Required. Known values are:
-                                          "Pending", "Approved", "Rejected", and "Disconnected".
-                                        "actionsRequired": "str"  # Optional.
-                                          Actions required for a private endpoint connection.
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"  # Optional. The resource
-                                          identifier.
-                                    }
-                                },
-                                "id": "str",  # Optional. The resource identifier.
-                                "name": "str",  # Optional. The resource name.
-                                "type": "str"  # Optional. The resource type.
-                            }
-                        ],
-                        "provisioningState": "str",  # Optional. The provisioning state.
-                        "publicNetworkAccess": "str",  # Optional. Whether requests from
-                          Public Network are allowed. Known values are: "Enabled" and "Disabled".
-                        "restrictOutboundNetworkAccess": bool,  # Optional. If true, egress
-                          from IotHub will be restricted to only the allowed FQDNs that are configured
-                          via allowedFqdnList.
-                        "rootCertificate": {
-                            "enableRootCertificateV2": bool,  # Optional. This property
-                              when set to true, hub will use G2 cert; while it's set to false, hub uses
-                              Baltimore Cert.
-                            "lastUpdatedTimeUtc": "2020-02-20 00:00:00"  # Optional. the
-                              last update time to root certificate flag.
-                        },
-                        "routing": {
-                            "endpoints": {
-                                "cosmosDBSqlContainers": [
-                                    {
-                                        "containerName": "str",  # The name
-                                          of the cosmos DB sql container in the cosmos DB database.
-                                          Required.
-                                        "databaseName": "str",  # The name of
-                                          the cosmos DB database in the cosmos DB account. Required.
-                                        "endpointUri": "str",  # The url of
-                                          the cosmos DB account. It must include the protocol https://.
-                                          Required.
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the cosmos DB
-                                          sql container endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "id": "str",  # Optional. Id of the
-                                          cosmos DB sql container endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "partitionKeyName": "str",  #
-                                          Optional. The name of the partition key associated with this
-                                          cosmos DB sql container if one exists. This is an optional
-                                          parameter.
-                                        "partitionKeyTemplate": "str",  #
-                                          Optional. The template for generating a synthetic partition
-                                          key value for use with this cosmos DB sql container. The
-                                          template must include at least one of the following
-                                          placeholders: {iothub}, {deviceid}, {DD}, {MM}, and {YYYY}.
-                                          Any one placeholder may be specified at most once, but order
-                                          and non-placeholder components are arbitrary. This parameter
-                                          is only required if PartitionKeyName is specified.
-                                        "primaryKey": "str",  # Optional. The
-                                          primary key of the cosmos DB account.
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the cosmos DB account.
-                                        "secondaryKey": "str",  # Optional.
-                                          The secondary key of the cosmos DB account.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the cosmos DB account.
-                                    }
-                                ],
-                                "eventHubs": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the event hub
-                                          endpoint. Known values are: "keyBased" and "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the event hub endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the event hub endpoint. It must include the
-                                          protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Event hub name on the event hub namespace.
-                                        "id": "str",  # Optional. Id of the
-                                          event hub endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the event hub endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the event hub endpoint.
-                                    }
-                                ],
-                                "serviceBusQueues": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. The name need not
-                                          be the same as the actual queue name. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the service bus
-                                          queue endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the service bus queue
-                                          endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the service bus queue endpoint. It must include
-                                          the protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Queue name on the service bus namespace.
-                                        "id": "str",  # Optional. Id of the
-                                          service bus queue endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the service bus queue
-                                          endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the service bus queue
-                                          endpoint.
-                                    }
-                                ],
-                                "serviceBusTopics": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types.  The name need
-                                          not be the same as the actual topic name. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the service bus
-                                          topic endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the service bus topic
-                                          endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the service bus topic endpoint. It must include
-                                          the protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Queue name on the service bus topic.
-                                        "id": "str",  # Optional. Id of the
-                                          service bus topic endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the service bus topic
-                                          endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the service bus topic
-                                          endpoint.
-                                    }
-                                ],
-                                "storageContainers": [
-                                    {
-                                        "containerName": "str",  # The name
-                                          of storage container in the storage account. Required.
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the storage
-                                          endpoint. Known values are: "keyBased" and "identityBased".
-                                        "batchFrequencyInSeconds": 0,  #
-                                          Optional. Time interval at which blobs are written to
-                                          storage. Value should be between 60 and 720 seconds. Default
-                                          value is 300 seconds.
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the storage account.
-                                        "encoding": "str",  # Optional.
-                                          Encoding that is used to serialize messages to blobs.
-                                          Supported values are 'avro', 'avrodeflate', and 'JSON'.
-                                          Default value is 'avro'. Known values are: "Avro",
-                                          "AvroDeflate", and "JSON".
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the storage endpoint. It must include the protocol
-                                          https://.
-                                        "fileNameFormat": "str",  # Optional.
-                                          File name format for the blob. Default format is
-                                          {iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}. All
-                                          parameters are mandatory but can be reordered.
-                                        "id": "str",  # Optional. Id of the
-                                          storage container endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "maxChunkSizeInBytes": 0,  #
-                                          Optional. Maximum number of bytes for each blob written to
-                                          storage. Value should be between 10485760(10MB) and
-                                          524288000(500MB). Default value is 314572800(300MB).
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the storage account.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the storage account.
-                                    }
-                                ]
-                            },
-                            "enrichments": [
-                                {
-                                    "endpointNames": [
-                                        "str"  # The list of endpoints for
-                                          which the enrichment is applied to the message. Required.
-                                    ],
-                                    "key": "str",  # The key or name for the
-                                      enrichment property. Required.
-                                    "value": "str"  # The value for the
-                                      enrichment property. Required.
-                                }
-                            ],
-                            "fallbackRoute": {
-                                "endpointNames": [
-                                    "str"  # The list of endpoints to which the
-                                      messages that satisfy the condition are routed to. Currently only
-                                      1 endpoint is allowed. Required.
-                                ],
-                                "isEnabled": bool,  # Used to specify whether the
-                                  fallback route is enabled. Required.
-                                "source": "str",  # The source to which the routing
-                                  rule is to be applied to. For example, DeviceMessages. Required.
-                                  Known values are: "Invalid", "DeviceMessages", "TwinChangeEvents",
-                                  "DeviceLifecycleEvents", "DeviceJobLifecycleEvents",
-                                  "DigitalTwinChangeEvents", "DeviceConnectionStateEvents", and
-                                  "MqttBrokerMessages".
-                                "condition": "str",  # Optional. The condition which
-                                  is evaluated in order to apply the fallback route. If the condition
-                                  is not provided it will evaluate to true by default. For grammar,
-                                  See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                                "name": "str"  # Optional. The name of the route. The
-                                  name can only include alphanumeric characters, periods, underscores,
-                                  hyphens, has a maximum length of 64 characters, and must be unique.
-                            },
-                            "routes": [
-                                {
-                                    "endpointNames": [
-                                        "str"  # The list of endpoints to
-                                          which messages that satisfy the condition are routed.
-                                          Currently only one endpoint is allowed. Required.
-                                    ],
-                                    "isEnabled": bool,  # Used to specify whether
-                                      a route is enabled. Required.
-                                    "name": "str",  # The name of the route. The
-                                      name can only include alphanumeric characters, periods,
-                                      underscores, hyphens, has a maximum length of 64 characters, and
-                                      must be unique. Required.
-                                    "source": "str",  # The source that the
-                                      routing rule is to be applied to, such as DeviceMessages.
-                                      Required. Known values are: "Invalid", "DeviceMessages",
-                                      "TwinChangeEvents", "DeviceLifecycleEvents",
-                                      "DeviceJobLifecycleEvents", "DigitalTwinChangeEvents",
-                                      "DeviceConnectionStateEvents", and "MqttBrokerMessages".
-                                    "condition": "str"  # Optional. The condition
-                                      that is evaluated to apply the routing rule. If no condition is
-                                      provided, it evaluates to true by default. For grammar, see:
-                                      https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                                }
-                            ]
-                        },
-                        "state": "str",  # Optional. The hub state.
-                        "storageEndpoints": {
-                            "str": {
-                                "connectionString": "str",  # The connection string
-                                  for the Azure Storage account to which files are uploaded. Required.
-                                "containerName": "str",  # The name of the root
-                                  container where you upload files. The container need not exist but
-                                  should be creatable using the connectionString specified. Required.
-                                "authenticationType": "str",  # Optional. Specifies
-                                  authentication type being used for connecting to the storage account.
-                                  Known values are: "keyBased" and "identityBased".
-                                "identity": {
-                                    "userAssignedIdentity": "str"  # Optional.
-                                      The user assigned identity.
-                                },
-                                "sasTtlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which the SAS URI generated by IoT Hub for file
-                                  upload is valid. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload#file-upload-notification-configuration-options.
-                            }
-                        },
-                        "tlsCompatibilityMode": bool  # Optional. If True, TLS compatibility
-                          mode is enabled.
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. The resource tags.
-                    },
-                    "type": "str"  # Optional. The resource type.
-                }
         """
 
     @overload
@@ -3193,8 +1556,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         etag: Optional[str] = None,
         match_condition: Optional[MatchConditions] = None,
         **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
+    ) -> LROPoller[_models.IotHubDescription]:
         """Create or update the metadata of an IoT hub.
 
         Create or update the metadata of an Iot hub. The usual pattern to modify a property is to
@@ -3215,550 +1577,9 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :paramtype etag: str
         :keyword match_condition: The match condition to use upon the etag. Default value is None.
         :paramtype match_condition: ~azure.core.MatchConditions
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :return: An instance of LROPoller that returns IotHubDescription
+        :rtype: ~azure.core.polling.LROPoller[~iot_hub_client.models.IotHubDescription]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200, 201
-                response == {
-                    "location": "str",  # The resource location. Required.
-                    "sku": {
-                        "name": "str",  # The name of the SKU. Required. Known values are:
-                          "F1", "S1", "S2", "S3", "B1", "B2", "B3", "P1", "P2", and "P3".
-                        "capacity": 0,  # Optional. The number of provisioned IoT Hub units.
-                          See:
-                          https://docs.microsoft.com/azure/azure-subscription-service-limits#iot-hub-limits.
-                        "tier": "str"  # Optional. The billing tier for the IoT hub. Known
-                          values are: "Free", "Standard", "Basic", and "Premium".
-                    },
-                    "etag": "str",  # Optional. The Etag field is *not* required. If it is
-                      provided in the response body, it must also be provided as a header per the
-                      normal ETag convention.
-                    "id": "str",  # Optional. The resource identifier.
-                    "identity": {
-                        "principalId": "str",  # Optional. Principal Id.
-                        "tenantId": "str",  # Optional. Tenant Id.
-                        "type": "str",  # Optional. The type of identity used for the
-                          resource. The type 'SystemAssigned,UserAssigned' includes both an implicitly
-                          created identity and a set of user assigned identities. The type 'None' will
-                          remove any identities from the service. Known values are: "SystemAssigned",
-                          "UserAssigned", "SystemAssigned, UserAssigned", and "None".
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",  # Optional. Dictionary of
-                                  :code:`<ArmUserIdentity>`.
-                                "principalId": "str"  # Optional. Dictionary of
-                                  :code:`<ArmUserIdentity>`.
-                            }
-                        }
-                    },
-                    "name": "str",  # Optional. The resource name.
-                    "properties": {
-                        "adrProperties": {
-                            "identityResourceId": "str",  # Optional. The identity used
-                              to manage the ADR namespace from the data plane.
-                            "namespaceResourceId": "str"  # Optional. The identifier of
-                              the Azure Device Registry namespace associated with the P SKU hub.
-                        },
-                        "allowedFqdnList": [
-                            "str"  # Optional. List of allowed FQDNs(Fully Qualified
-                              Domain Name) for egress from Iot Hub.
-                        ],
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",  # The name of the shared access
-                                  policy. Required.
-                                "rights": "str",  # The permissions assigned to the
-                                  shared access policy. Required. Known values are: "RegistryRead",
-                                  "RegistryWrite", "ServiceConnect", "DeviceConnect", "RegistryRead,
-                                  RegistryWrite", "RegistryRead, ServiceConnect", "RegistryRead,
-                                  DeviceConnect", "RegistryWrite, ServiceConnect", "RegistryWrite,
-                                  DeviceConnect", "ServiceConnect, DeviceConnect", "RegistryRead,
-                                  RegistryWrite, ServiceConnect", "RegistryRead, RegistryWrite,
-                                  DeviceConnect", "RegistryRead, ServiceConnect, DeviceConnect",
-                                  "RegistryWrite, ServiceConnect, DeviceConnect", and "RegistryRead,
-                                  RegistryWrite, ServiceConnect, DeviceConnect".
-                                "primaryKey": "str",  # Optional. The primary key.
-                                "secondaryKey": "str"  # Optional. The secondary key.
-                            }
-                        ],
-                        "cloudToDevice": {
-                            "defaultTtlAsIso8601": "1 day, 0:00:00",  # Optional. The
-                              default time to live for cloud-to-device messages in the device queue.
-                              See:
-                              https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                            "feedback": {
-                                "lockDurationAsIso8601": "1 day, 0:00:00",  #
-                                  Optional. The lock duration for the feedback queue. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                                "maxDeliveryCount": 0,  # Optional. The number of
-                                  times the IoT hub attempts to deliver a message on the feedback
-                                  queue. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                                "ttlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which a message is available to consume before it
-                                  is expired by the IoT hub. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                            },
-                            "maxDeliveryCount": 0  # Optional. The max delivery count for
-                              cloud-to-device messages in the device queue. See:
-                              https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                        },
-                        "comments": "str",  # Optional. IoT hub comments.
-                        "deviceStreams": {
-                            "streamingEndpoints": [
-                                "str"  # Optional. List of Device Streams Endpoints.
-                            ]
-                        },
-                        "disableDeviceSAS": bool,  # Optional. If true, all device(including
-                          Edge devices but excluding modules) scoped SAS keys cannot be used for
-                          authentication.
-                        "disableLocalAuth": bool,  # Optional. If true, SAS tokens with Iot
-                          hub scoped SAS keys cannot be used for authentication.
-                        "disableModuleSAS": bool,  # Optional. If true, all module scoped SAS
-                          keys cannot be used for authentication.
-                        "enableDataResidency": bool,  # Optional. This property when set to
-                          true, will enable data residency, thus, disabling disaster recovery.
-                        "enableFileUploadNotifications": bool,  # Optional. If True, file
-                          upload notifications are enabled.
-                        "encryption": {
-                            "keySource": "str",  # Optional. The source of the key.
-                            "keyVaultProperties": [
-                                {
-                                    "identity": {
-                                        "userAssignedIdentity": "str"  #
-                                          Optional. The user assigned identity.
-                                    },
-                                    "keyIdentifier": "str"  # Optional. The
-                                      identifier of the key.
-                                }
-                            ]
-                        },
-                        "eventHubEndpoints": {
-                            "str": {
-                                "endpoint": "str",  # Optional. The Event
-                                  Hub-compatible endpoint.
-                                "partitionCount": 0,  # Optional. The number of
-                                  partitions for receiving device-to-cloud messages in the Event
-                                  Hub-compatible endpoint. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#device-to-cloud-messages.
-                                "partitionIds": [
-                                    "str"  # Optional. The partition ids in the
-                                      Event Hub-compatible endpoint.
-                                ],
-                                "path": "str",  # Optional. The Event Hub-compatible
-                                  name.
-                                "retentionTimeInDays": 0  # Optional. The retention
-                                  time for device-to-cloud messages in days. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#device-to-cloud-messages.
-                            }
-                        },
-                        "features": "str",  # Optional. The capabilities and features enabled
-                          for the IoT hub. Known values are: "None" and "DeviceManagement".
-                        "hostName": "str",  # Optional. The name of the host.
-                        "ipFilterRules": [
-                            {
-                                "action": "str",  # The desired action for requests
-                                  captured by this rule. Required. Known values are: "Accept" and
-                                  "Reject".
-                                "filterName": "str",  # The name of the IP filter
-                                  rule. Required.
-                                "ipMask": "str"  # A string that contains the IP
-                                  address range in CIDR notation for the rule. Required.
-                            }
-                        ],
-                        "ipVersion": "str",  # Optional. This property specifies the IP
-                          Version the hub is currently utilizing. Known values are: "ipv4", "ipv6", and
-                          "ipv4ipv6".
-                        "locations": [
-                            {
-                                "location": "str",  # Optional. The name of the Azure
-                                  region.
-                                "role": "str"  # Optional. The role of the region,
-                                  can be either primary or secondary. The primary region is where the
-                                  IoT hub is currently provisioned. The secondary region is the Azure
-                                  disaster recovery (DR) paired region and also the region where the
-                                  IoT hub can failover to. Known values are: "primary" and "secondary".
-                            }
-                        ],
-                        "messagingEndpoints": {
-                            "str": {
-                                "lockDurationAsIso8601": "1 day, 0:00:00",  #
-                                  Optional. The lock duration. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                                "maxDeliveryCount": 0,  # Optional. The number of
-                                  times the IoT hub attempts to deliver a message. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                                "ttlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which a message is available to consume before it
-                                  is expired by the IoT hub. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                            }
-                        },
-                        "minTlsVersion": "str",  # Optional. Specifies the minimum TLS
-                          version to support for this hub. Can be set to "1.2" to have clients that use
-                          a TLS version below 1.2 to be rejected.
-                        "networkRuleSets": {
-                            "applyToBuiltInEventHubEndpoint": bool,  # If True, then
-                              Network Rule Set is also applied to BuiltIn EventHub EndPoint of IotHub.
-                              Required.
-                            "ipRules": [
-                                {
-                                    "filterName": "str",  # Name of the IP filter
-                                      rule. Required.
-                                    "ipMask": "str",  # A string that contains
-                                      the IP address range in CIDR notation for the rule. Required.
-                                    "action": "Allow"  # Optional. Default value
-                                      is "Allow". IP Filter Action. "Allow"
-                                }
-                            ],
-                            "defaultAction": "Deny"  # Optional. Default value is "Deny".
-                              Default Action for Network Rule Set. Known values are: "Deny" and
-                              "Allow".
-                        },
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",  # The
-                                          description for the current state of a private endpoint
-                                          connection. Required.
-                                        "status": "str",  # The status of a
-                                          private endpoint connection. Required. Known values are:
-                                          "Pending", "Approved", "Rejected", and "Disconnected".
-                                        "actionsRequired": "str"  # Optional.
-                                          Actions required for a private endpoint connection.
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"  # Optional. The resource
-                                          identifier.
-                                    }
-                                },
-                                "id": "str",  # Optional. The resource identifier.
-                                "name": "str",  # Optional. The resource name.
-                                "type": "str"  # Optional. The resource type.
-                            }
-                        ],
-                        "provisioningState": "str",  # Optional. The provisioning state.
-                        "publicNetworkAccess": "str",  # Optional. Whether requests from
-                          Public Network are allowed. Known values are: "Enabled" and "Disabled".
-                        "restrictOutboundNetworkAccess": bool,  # Optional. If true, egress
-                          from IotHub will be restricted to only the allowed FQDNs that are configured
-                          via allowedFqdnList.
-                        "rootCertificate": {
-                            "enableRootCertificateV2": bool,  # Optional. This property
-                              when set to true, hub will use G2 cert; while it's set to false, hub uses
-                              Baltimore Cert.
-                            "lastUpdatedTimeUtc": "2020-02-20 00:00:00"  # Optional. the
-                              last update time to root certificate flag.
-                        },
-                        "routing": {
-                            "endpoints": {
-                                "cosmosDBSqlContainers": [
-                                    {
-                                        "containerName": "str",  # The name
-                                          of the cosmos DB sql container in the cosmos DB database.
-                                          Required.
-                                        "databaseName": "str",  # The name of
-                                          the cosmos DB database in the cosmos DB account. Required.
-                                        "endpointUri": "str",  # The url of
-                                          the cosmos DB account. It must include the protocol https://.
-                                          Required.
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the cosmos DB
-                                          sql container endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "id": "str",  # Optional. Id of the
-                                          cosmos DB sql container endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "partitionKeyName": "str",  #
-                                          Optional. The name of the partition key associated with this
-                                          cosmos DB sql container if one exists. This is an optional
-                                          parameter.
-                                        "partitionKeyTemplate": "str",  #
-                                          Optional. The template for generating a synthetic partition
-                                          key value for use with this cosmos DB sql container. The
-                                          template must include at least one of the following
-                                          placeholders: {iothub}, {deviceid}, {DD}, {MM}, and {YYYY}.
-                                          Any one placeholder may be specified at most once, but order
-                                          and non-placeholder components are arbitrary. This parameter
-                                          is only required if PartitionKeyName is specified.
-                                        "primaryKey": "str",  # Optional. The
-                                          primary key of the cosmos DB account.
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the cosmos DB account.
-                                        "secondaryKey": "str",  # Optional.
-                                          The secondary key of the cosmos DB account.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the cosmos DB account.
-                                    }
-                                ],
-                                "eventHubs": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the event hub
-                                          endpoint. Known values are: "keyBased" and "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the event hub endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the event hub endpoint. It must include the
-                                          protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Event hub name on the event hub namespace.
-                                        "id": "str",  # Optional. Id of the
-                                          event hub endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the event hub endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the event hub endpoint.
-                                    }
-                                ],
-                                "serviceBusQueues": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. The name need not
-                                          be the same as the actual queue name. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the service bus
-                                          queue endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the service bus queue
-                                          endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the service bus queue endpoint. It must include
-                                          the protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Queue name on the service bus namespace.
-                                        "id": "str",  # Optional. Id of the
-                                          service bus queue endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the service bus queue
-                                          endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the service bus queue
-                                          endpoint.
-                                    }
-                                ],
-                                "serviceBusTopics": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types.  The name need
-                                          not be the same as the actual topic name. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the service bus
-                                          topic endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the service bus topic
-                                          endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the service bus topic endpoint. It must include
-                                          the protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Queue name on the service bus topic.
-                                        "id": "str",  # Optional. Id of the
-                                          service bus topic endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the service bus topic
-                                          endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the service bus topic
-                                          endpoint.
-                                    }
-                                ],
-                                "storageContainers": [
-                                    {
-                                        "containerName": "str",  # The name
-                                          of storage container in the storage account. Required.
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the storage
-                                          endpoint. Known values are: "keyBased" and "identityBased".
-                                        "batchFrequencyInSeconds": 0,  #
-                                          Optional. Time interval at which blobs are written to
-                                          storage. Value should be between 60 and 720 seconds. Default
-                                          value is 300 seconds.
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the storage account.
-                                        "encoding": "str",  # Optional.
-                                          Encoding that is used to serialize messages to blobs.
-                                          Supported values are 'avro', 'avrodeflate', and 'JSON'.
-                                          Default value is 'avro'. Known values are: "Avro",
-                                          "AvroDeflate", and "JSON".
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the storage endpoint. It must include the protocol
-                                          https://.
-                                        "fileNameFormat": "str",  # Optional.
-                                          File name format for the blob. Default format is
-                                          {iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}. All
-                                          parameters are mandatory but can be reordered.
-                                        "id": "str",  # Optional. Id of the
-                                          storage container endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "maxChunkSizeInBytes": 0,  #
-                                          Optional. Maximum number of bytes for each blob written to
-                                          storage. Value should be between 10485760(10MB) and
-                                          524288000(500MB). Default value is 314572800(300MB).
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the storage account.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the storage account.
-                                    }
-                                ]
-                            },
-                            "enrichments": [
-                                {
-                                    "endpointNames": [
-                                        "str"  # The list of endpoints for
-                                          which the enrichment is applied to the message. Required.
-                                    ],
-                                    "key": "str",  # The key or name for the
-                                      enrichment property. Required.
-                                    "value": "str"  # The value for the
-                                      enrichment property. Required.
-                                }
-                            ],
-                            "fallbackRoute": {
-                                "endpointNames": [
-                                    "str"  # The list of endpoints to which the
-                                      messages that satisfy the condition are routed to. Currently only
-                                      1 endpoint is allowed. Required.
-                                ],
-                                "isEnabled": bool,  # Used to specify whether the
-                                  fallback route is enabled. Required.
-                                "source": "str",  # The source to which the routing
-                                  rule is to be applied to. For example, DeviceMessages. Required.
-                                  Known values are: "Invalid", "DeviceMessages", "TwinChangeEvents",
-                                  "DeviceLifecycleEvents", "DeviceJobLifecycleEvents",
-                                  "DigitalTwinChangeEvents", "DeviceConnectionStateEvents", and
-                                  "MqttBrokerMessages".
-                                "condition": "str",  # Optional. The condition which
-                                  is evaluated in order to apply the fallback route. If the condition
-                                  is not provided it will evaluate to true by default. For grammar,
-                                  See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                                "name": "str"  # Optional. The name of the route. The
-                                  name can only include alphanumeric characters, periods, underscores,
-                                  hyphens, has a maximum length of 64 characters, and must be unique.
-                            },
-                            "routes": [
-                                {
-                                    "endpointNames": [
-                                        "str"  # The list of endpoints to
-                                          which messages that satisfy the condition are routed.
-                                          Currently only one endpoint is allowed. Required.
-                                    ],
-                                    "isEnabled": bool,  # Used to specify whether
-                                      a route is enabled. Required.
-                                    "name": "str",  # The name of the route. The
-                                      name can only include alphanumeric characters, periods,
-                                      underscores, hyphens, has a maximum length of 64 characters, and
-                                      must be unique. Required.
-                                    "source": "str",  # The source that the
-                                      routing rule is to be applied to, such as DeviceMessages.
-                                      Required. Known values are: "Invalid", "DeviceMessages",
-                                      "TwinChangeEvents", "DeviceLifecycleEvents",
-                                      "DeviceJobLifecycleEvents", "DigitalTwinChangeEvents",
-                                      "DeviceConnectionStateEvents", and "MqttBrokerMessages".
-                                    "condition": "str"  # Optional. The condition
-                                      that is evaluated to apply the routing rule. If no condition is
-                                      provided, it evaluates to true by default. For grammar, see:
-                                      https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                                }
-                            ]
-                        },
-                        "state": "str",  # Optional. The hub state.
-                        "storageEndpoints": {
-                            "str": {
-                                "connectionString": "str",  # The connection string
-                                  for the Azure Storage account to which files are uploaded. Required.
-                                "containerName": "str",  # The name of the root
-                                  container where you upload files. The container need not exist but
-                                  should be creatable using the connectionString specified. Required.
-                                "authenticationType": "str",  # Optional. Specifies
-                                  authentication type being used for connecting to the storage account.
-                                  Known values are: "keyBased" and "identityBased".
-                                "identity": {
-                                    "userAssignedIdentity": "str"  # Optional.
-                                      The user assigned identity.
-                                },
-                                "sasTtlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which the SAS URI generated by IoT Hub for file
-                                  upload is valid. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload#file-upload-notification-configuration-options.
-                            }
-                        },
-                        "tlsCompatibilityMode": bool  # Optional. If True, TLS compatibility
-                          mode is enabled.
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. The resource tags.
-                    },
-                    "type": "str"  # Optional. The resource type.
-                }
         """
 
     @distributed_trace
@@ -3766,13 +1587,12 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         self,
         resource_group_name: str,
         resource_name: str,
-        iot_hub_description: Union[JSON, IO[bytes]],
+        iot_hub_description: Union[_models.IotHubDescription, IO[bytes]],
         *,
         etag: Optional[str] = None,
         match_condition: Optional[MatchConditions] = None,
         **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
+    ) -> LROPoller[_models.IotHubDescription]:
         """Create or update the metadata of an IoT hub.
 
         Create or update the metadata of an Iot hub. The usual pattern to modify a property is to
@@ -3783,1102 +1603,23 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :type resource_group_name: str
         :param resource_name: The name of the IoT hub. Required.
         :type resource_name: str
-        :param iot_hub_description: The IoT hub metadata and security metadata. Is either a JSON type
-         or a IO[bytes] type. Required.
-        :type iot_hub_description: JSON or IO[bytes]
+        :param iot_hub_description: The IoT hub metadata and security metadata. Is either a
+         IotHubDescription type or a IO[bytes] type. Required.
+        :type iot_hub_description: ~iot_hub_client.models.IotHubDescription or IO[bytes]
         :keyword etag: check if resource is changed. Set None to skip checking etag. Default value is
          None.
         :paramtype etag: str
         :keyword match_condition: The match condition to use upon the etag. Default value is None.
         :paramtype match_condition: ~azure.core.MatchConditions
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :return: An instance of LROPoller that returns IotHubDescription
+        :rtype: ~azure.core.polling.LROPoller[~iot_hub_client.models.IotHubDescription]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                iot_hub_description = {
-                    "location": "str",  # The resource location. Required.
-                    "sku": {
-                        "name": "str",  # The name of the SKU. Required. Known values are:
-                          "F1", "S1", "S2", "S3", "B1", "B2", "B3", "P1", "P2", and "P3".
-                        "capacity": 0,  # Optional. The number of provisioned IoT Hub units.
-                          See:
-                          https://docs.microsoft.com/azure/azure-subscription-service-limits#iot-hub-limits.
-                        "tier": "str"  # Optional. The billing tier for the IoT hub. Known
-                          values are: "Free", "Standard", "Basic", and "Premium".
-                    },
-                    "etag": "str",  # Optional. The Etag field is *not* required. If it is
-                      provided in the response body, it must also be provided as a header per the
-                      normal ETag convention.
-                    "id": "str",  # Optional. The resource identifier.
-                    "identity": {
-                        "principalId": "str",  # Optional. Principal Id.
-                        "tenantId": "str",  # Optional. Tenant Id.
-                        "type": "str",  # Optional. The type of identity used for the
-                          resource. The type 'SystemAssigned,UserAssigned' includes both an implicitly
-                          created identity and a set of user assigned identities. The type 'None' will
-                          remove any identities from the service. Known values are: "SystemAssigned",
-                          "UserAssigned", "SystemAssigned, UserAssigned", and "None".
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",  # Optional. Dictionary of
-                                  :code:`<ArmUserIdentity>`.
-                                "principalId": "str"  # Optional. Dictionary of
-                                  :code:`<ArmUserIdentity>`.
-                            }
-                        }
-                    },
-                    "name": "str",  # Optional. The resource name.
-                    "properties": {
-                        "adrProperties": {
-                            "identityResourceId": "str",  # Optional. The identity used
-                              to manage the ADR namespace from the data plane.
-                            "namespaceResourceId": "str"  # Optional. The identifier of
-                              the Azure Device Registry namespace associated with the P SKU hub.
-                        },
-                        "allowedFqdnList": [
-                            "str"  # Optional. List of allowed FQDNs(Fully Qualified
-                              Domain Name) for egress from Iot Hub.
-                        ],
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",  # The name of the shared access
-                                  policy. Required.
-                                "rights": "str",  # The permissions assigned to the
-                                  shared access policy. Required. Known values are: "RegistryRead",
-                                  "RegistryWrite", "ServiceConnect", "DeviceConnect", "RegistryRead,
-                                  RegistryWrite", "RegistryRead, ServiceConnect", "RegistryRead,
-                                  DeviceConnect", "RegistryWrite, ServiceConnect", "RegistryWrite,
-                                  DeviceConnect", "ServiceConnect, DeviceConnect", "RegistryRead,
-                                  RegistryWrite, ServiceConnect", "RegistryRead, RegistryWrite,
-                                  DeviceConnect", "RegistryRead, ServiceConnect, DeviceConnect",
-                                  "RegistryWrite, ServiceConnect, DeviceConnect", and "RegistryRead,
-                                  RegistryWrite, ServiceConnect, DeviceConnect".
-                                "primaryKey": "str",  # Optional. The primary key.
-                                "secondaryKey": "str"  # Optional. The secondary key.
-                            }
-                        ],
-                        "cloudToDevice": {
-                            "defaultTtlAsIso8601": "1 day, 0:00:00",  # Optional. The
-                              default time to live for cloud-to-device messages in the device queue.
-                              See:
-                              https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                            "feedback": {
-                                "lockDurationAsIso8601": "1 day, 0:00:00",  #
-                                  Optional. The lock duration for the feedback queue. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                                "maxDeliveryCount": 0,  # Optional. The number of
-                                  times the IoT hub attempts to deliver a message on the feedback
-                                  queue. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                                "ttlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which a message is available to consume before it
-                                  is expired by the IoT hub. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                            },
-                            "maxDeliveryCount": 0  # Optional. The max delivery count for
-                              cloud-to-device messages in the device queue. See:
-                              https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                        },
-                        "comments": "str",  # Optional. IoT hub comments.
-                        "deviceStreams": {
-                            "streamingEndpoints": [
-                                "str"  # Optional. List of Device Streams Endpoints.
-                            ]
-                        },
-                        "disableDeviceSAS": bool,  # Optional. If true, all device(including
-                          Edge devices but excluding modules) scoped SAS keys cannot be used for
-                          authentication.
-                        "disableLocalAuth": bool,  # Optional. If true, SAS tokens with Iot
-                          hub scoped SAS keys cannot be used for authentication.
-                        "disableModuleSAS": bool,  # Optional. If true, all module scoped SAS
-                          keys cannot be used for authentication.
-                        "enableDataResidency": bool,  # Optional. This property when set to
-                          true, will enable data residency, thus, disabling disaster recovery.
-                        "enableFileUploadNotifications": bool,  # Optional. If True, file
-                          upload notifications are enabled.
-                        "encryption": {
-                            "keySource": "str",  # Optional. The source of the key.
-                            "keyVaultProperties": [
-                                {
-                                    "identity": {
-                                        "userAssignedIdentity": "str"  #
-                                          Optional. The user assigned identity.
-                                    },
-                                    "keyIdentifier": "str"  # Optional. The
-                                      identifier of the key.
-                                }
-                            ]
-                        },
-                        "eventHubEndpoints": {
-                            "str": {
-                                "endpoint": "str",  # Optional. The Event
-                                  Hub-compatible endpoint.
-                                "partitionCount": 0,  # Optional. The number of
-                                  partitions for receiving device-to-cloud messages in the Event
-                                  Hub-compatible endpoint. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#device-to-cloud-messages.
-                                "partitionIds": [
-                                    "str"  # Optional. The partition ids in the
-                                      Event Hub-compatible endpoint.
-                                ],
-                                "path": "str",  # Optional. The Event Hub-compatible
-                                  name.
-                                "retentionTimeInDays": 0  # Optional. The retention
-                                  time for device-to-cloud messages in days. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#device-to-cloud-messages.
-                            }
-                        },
-                        "features": "str",  # Optional. The capabilities and features enabled
-                          for the IoT hub. Known values are: "None" and "DeviceManagement".
-                        "hostName": "str",  # Optional. The name of the host.
-                        "ipFilterRules": [
-                            {
-                                "action": "str",  # The desired action for requests
-                                  captured by this rule. Required. Known values are: "Accept" and
-                                  "Reject".
-                                "filterName": "str",  # The name of the IP filter
-                                  rule. Required.
-                                "ipMask": "str"  # A string that contains the IP
-                                  address range in CIDR notation for the rule. Required.
-                            }
-                        ],
-                        "ipVersion": "str",  # Optional. This property specifies the IP
-                          Version the hub is currently utilizing. Known values are: "ipv4", "ipv6", and
-                          "ipv4ipv6".
-                        "locations": [
-                            {
-                                "location": "str",  # Optional. The name of the Azure
-                                  region.
-                                "role": "str"  # Optional. The role of the region,
-                                  can be either primary or secondary. The primary region is where the
-                                  IoT hub is currently provisioned. The secondary region is the Azure
-                                  disaster recovery (DR) paired region and also the region where the
-                                  IoT hub can failover to. Known values are: "primary" and "secondary".
-                            }
-                        ],
-                        "messagingEndpoints": {
-                            "str": {
-                                "lockDurationAsIso8601": "1 day, 0:00:00",  #
-                                  Optional. The lock duration. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                                "maxDeliveryCount": 0,  # Optional. The number of
-                                  times the IoT hub attempts to deliver a message. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                                "ttlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which a message is available to consume before it
-                                  is expired by the IoT hub. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                            }
-                        },
-                        "minTlsVersion": "str",  # Optional. Specifies the minimum TLS
-                          version to support for this hub. Can be set to "1.2" to have clients that use
-                          a TLS version below 1.2 to be rejected.
-                        "networkRuleSets": {
-                            "applyToBuiltInEventHubEndpoint": bool,  # If True, then
-                              Network Rule Set is also applied to BuiltIn EventHub EndPoint of IotHub.
-                              Required.
-                            "ipRules": [
-                                {
-                                    "filterName": "str",  # Name of the IP filter
-                                      rule. Required.
-                                    "ipMask": "str",  # A string that contains
-                                      the IP address range in CIDR notation for the rule. Required.
-                                    "action": "Allow"  # Optional. Default value
-                                      is "Allow". IP Filter Action. "Allow"
-                                }
-                            ],
-                            "defaultAction": "Deny"  # Optional. Default value is "Deny".
-                              Default Action for Network Rule Set. Known values are: "Deny" and
-                              "Allow".
-                        },
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",  # The
-                                          description for the current state of a private endpoint
-                                          connection. Required.
-                                        "status": "str",  # The status of a
-                                          private endpoint connection. Required. Known values are:
-                                          "Pending", "Approved", "Rejected", and "Disconnected".
-                                        "actionsRequired": "str"  # Optional.
-                                          Actions required for a private endpoint connection.
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"  # Optional. The resource
-                                          identifier.
-                                    }
-                                },
-                                "id": "str",  # Optional. The resource identifier.
-                                "name": "str",  # Optional. The resource name.
-                                "type": "str"  # Optional. The resource type.
-                            }
-                        ],
-                        "provisioningState": "str",  # Optional. The provisioning state.
-                        "publicNetworkAccess": "str",  # Optional. Whether requests from
-                          Public Network are allowed. Known values are: "Enabled" and "Disabled".
-                        "restrictOutboundNetworkAccess": bool,  # Optional. If true, egress
-                          from IotHub will be restricted to only the allowed FQDNs that are configured
-                          via allowedFqdnList.
-                        "rootCertificate": {
-                            "enableRootCertificateV2": bool,  # Optional. This property
-                              when set to true, hub will use G2 cert; while it's set to false, hub uses
-                              Baltimore Cert.
-                            "lastUpdatedTimeUtc": "2020-02-20 00:00:00"  # Optional. the
-                              last update time to root certificate flag.
-                        },
-                        "routing": {
-                            "endpoints": {
-                                "cosmosDBSqlContainers": [
-                                    {
-                                        "containerName": "str",  # The name
-                                          of the cosmos DB sql container in the cosmos DB database.
-                                          Required.
-                                        "databaseName": "str",  # The name of
-                                          the cosmos DB database in the cosmos DB account. Required.
-                                        "endpointUri": "str",  # The url of
-                                          the cosmos DB account. It must include the protocol https://.
-                                          Required.
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the cosmos DB
-                                          sql container endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "id": "str",  # Optional. Id of the
-                                          cosmos DB sql container endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "partitionKeyName": "str",  #
-                                          Optional. The name of the partition key associated with this
-                                          cosmos DB sql container if one exists. This is an optional
-                                          parameter.
-                                        "partitionKeyTemplate": "str",  #
-                                          Optional. The template for generating a synthetic partition
-                                          key value for use with this cosmos DB sql container. The
-                                          template must include at least one of the following
-                                          placeholders: {iothub}, {deviceid}, {DD}, {MM}, and {YYYY}.
-                                          Any one placeholder may be specified at most once, but order
-                                          and non-placeholder components are arbitrary. This parameter
-                                          is only required if PartitionKeyName is specified.
-                                        "primaryKey": "str",  # Optional. The
-                                          primary key of the cosmos DB account.
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the cosmos DB account.
-                                        "secondaryKey": "str",  # Optional.
-                                          The secondary key of the cosmos DB account.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the cosmos DB account.
-                                    }
-                                ],
-                                "eventHubs": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the event hub
-                                          endpoint. Known values are: "keyBased" and "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the event hub endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the event hub endpoint. It must include the
-                                          protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Event hub name on the event hub namespace.
-                                        "id": "str",  # Optional. Id of the
-                                          event hub endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the event hub endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the event hub endpoint.
-                                    }
-                                ],
-                                "serviceBusQueues": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. The name need not
-                                          be the same as the actual queue name. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the service bus
-                                          queue endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the service bus queue
-                                          endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the service bus queue endpoint. It must include
-                                          the protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Queue name on the service bus namespace.
-                                        "id": "str",  # Optional. Id of the
-                                          service bus queue endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the service bus queue
-                                          endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the service bus queue
-                                          endpoint.
-                                    }
-                                ],
-                                "serviceBusTopics": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types.  The name need
-                                          not be the same as the actual topic name. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the service bus
-                                          topic endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the service bus topic
-                                          endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the service bus topic endpoint. It must include
-                                          the protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Queue name on the service bus topic.
-                                        "id": "str",  # Optional. Id of the
-                                          service bus topic endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the service bus topic
-                                          endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the service bus topic
-                                          endpoint.
-                                    }
-                                ],
-                                "storageContainers": [
-                                    {
-                                        "containerName": "str",  # The name
-                                          of storage container in the storage account. Required.
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the storage
-                                          endpoint. Known values are: "keyBased" and "identityBased".
-                                        "batchFrequencyInSeconds": 0,  #
-                                          Optional. Time interval at which blobs are written to
-                                          storage. Value should be between 60 and 720 seconds. Default
-                                          value is 300 seconds.
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the storage account.
-                                        "encoding": "str",  # Optional.
-                                          Encoding that is used to serialize messages to blobs.
-                                          Supported values are 'avro', 'avrodeflate', and 'JSON'.
-                                          Default value is 'avro'. Known values are: "Avro",
-                                          "AvroDeflate", and "JSON".
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the storage endpoint. It must include the protocol
-                                          https://.
-                                        "fileNameFormat": "str",  # Optional.
-                                          File name format for the blob. Default format is
-                                          {iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}. All
-                                          parameters are mandatory but can be reordered.
-                                        "id": "str",  # Optional. Id of the
-                                          storage container endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "maxChunkSizeInBytes": 0,  #
-                                          Optional. Maximum number of bytes for each blob written to
-                                          storage. Value should be between 10485760(10MB) and
-                                          524288000(500MB). Default value is 314572800(300MB).
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the storage account.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the storage account.
-                                    }
-                                ]
-                            },
-                            "enrichments": [
-                                {
-                                    "endpointNames": [
-                                        "str"  # The list of endpoints for
-                                          which the enrichment is applied to the message. Required.
-                                    ],
-                                    "key": "str",  # The key or name for the
-                                      enrichment property. Required.
-                                    "value": "str"  # The value for the
-                                      enrichment property. Required.
-                                }
-                            ],
-                            "fallbackRoute": {
-                                "endpointNames": [
-                                    "str"  # The list of endpoints to which the
-                                      messages that satisfy the condition are routed to. Currently only
-                                      1 endpoint is allowed. Required.
-                                ],
-                                "isEnabled": bool,  # Used to specify whether the
-                                  fallback route is enabled. Required.
-                                "source": "str",  # The source to which the routing
-                                  rule is to be applied to. For example, DeviceMessages. Required.
-                                  Known values are: "Invalid", "DeviceMessages", "TwinChangeEvents",
-                                  "DeviceLifecycleEvents", "DeviceJobLifecycleEvents",
-                                  "DigitalTwinChangeEvents", "DeviceConnectionStateEvents", and
-                                  "MqttBrokerMessages".
-                                "condition": "str",  # Optional. The condition which
-                                  is evaluated in order to apply the fallback route. If the condition
-                                  is not provided it will evaluate to true by default. For grammar,
-                                  See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                                "name": "str"  # Optional. The name of the route. The
-                                  name can only include alphanumeric characters, periods, underscores,
-                                  hyphens, has a maximum length of 64 characters, and must be unique.
-                            },
-                            "routes": [
-                                {
-                                    "endpointNames": [
-                                        "str"  # The list of endpoints to
-                                          which messages that satisfy the condition are routed.
-                                          Currently only one endpoint is allowed. Required.
-                                    ],
-                                    "isEnabled": bool,  # Used to specify whether
-                                      a route is enabled. Required.
-                                    "name": "str",  # The name of the route. The
-                                      name can only include alphanumeric characters, periods,
-                                      underscores, hyphens, has a maximum length of 64 characters, and
-                                      must be unique. Required.
-                                    "source": "str",  # The source that the
-                                      routing rule is to be applied to, such as DeviceMessages.
-                                      Required. Known values are: "Invalid", "DeviceMessages",
-                                      "TwinChangeEvents", "DeviceLifecycleEvents",
-                                      "DeviceJobLifecycleEvents", "DigitalTwinChangeEvents",
-                                      "DeviceConnectionStateEvents", and "MqttBrokerMessages".
-                                    "condition": "str"  # Optional. The condition
-                                      that is evaluated to apply the routing rule. If no condition is
-                                      provided, it evaluates to true by default. For grammar, see:
-                                      https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                                }
-                            ]
-                        },
-                        "state": "str",  # Optional. The hub state.
-                        "storageEndpoints": {
-                            "str": {
-                                "connectionString": "str",  # The connection string
-                                  for the Azure Storage account to which files are uploaded. Required.
-                                "containerName": "str",  # The name of the root
-                                  container where you upload files. The container need not exist but
-                                  should be creatable using the connectionString specified. Required.
-                                "authenticationType": "str",  # Optional. Specifies
-                                  authentication type being used for connecting to the storage account.
-                                  Known values are: "keyBased" and "identityBased".
-                                "identity": {
-                                    "userAssignedIdentity": "str"  # Optional.
-                                      The user assigned identity.
-                                },
-                                "sasTtlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which the SAS URI generated by IoT Hub for file
-                                  upload is valid. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload#file-upload-notification-configuration-options.
-                            }
-                        },
-                        "tlsCompatibilityMode": bool  # Optional. If True, TLS compatibility
-                          mode is enabled.
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. The resource tags.
-                    },
-                    "type": "str"  # Optional. The resource type.
-                }
-
-                # response body for status code(s): 200, 201
-                response == {
-                    "location": "str",  # The resource location. Required.
-                    "sku": {
-                        "name": "str",  # The name of the SKU. Required. Known values are:
-                          "F1", "S1", "S2", "S3", "B1", "B2", "B3", "P1", "P2", and "P3".
-                        "capacity": 0,  # Optional. The number of provisioned IoT Hub units.
-                          See:
-                          https://docs.microsoft.com/azure/azure-subscription-service-limits#iot-hub-limits.
-                        "tier": "str"  # Optional. The billing tier for the IoT hub. Known
-                          values are: "Free", "Standard", "Basic", and "Premium".
-                    },
-                    "etag": "str",  # Optional. The Etag field is *not* required. If it is
-                      provided in the response body, it must also be provided as a header per the
-                      normal ETag convention.
-                    "id": "str",  # Optional. The resource identifier.
-                    "identity": {
-                        "principalId": "str",  # Optional. Principal Id.
-                        "tenantId": "str",  # Optional. Tenant Id.
-                        "type": "str",  # Optional. The type of identity used for the
-                          resource. The type 'SystemAssigned,UserAssigned' includes both an implicitly
-                          created identity and a set of user assigned identities. The type 'None' will
-                          remove any identities from the service. Known values are: "SystemAssigned",
-                          "UserAssigned", "SystemAssigned, UserAssigned", and "None".
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",  # Optional. Dictionary of
-                                  :code:`<ArmUserIdentity>`.
-                                "principalId": "str"  # Optional. Dictionary of
-                                  :code:`<ArmUserIdentity>`.
-                            }
-                        }
-                    },
-                    "name": "str",  # Optional. The resource name.
-                    "properties": {
-                        "adrProperties": {
-                            "identityResourceId": "str",  # Optional. The identity used
-                              to manage the ADR namespace from the data plane.
-                            "namespaceResourceId": "str"  # Optional. The identifier of
-                              the Azure Device Registry namespace associated with the P SKU hub.
-                        },
-                        "allowedFqdnList": [
-                            "str"  # Optional. List of allowed FQDNs(Fully Qualified
-                              Domain Name) for egress from Iot Hub.
-                        ],
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",  # The name of the shared access
-                                  policy. Required.
-                                "rights": "str",  # The permissions assigned to the
-                                  shared access policy. Required. Known values are: "RegistryRead",
-                                  "RegistryWrite", "ServiceConnect", "DeviceConnect", "RegistryRead,
-                                  RegistryWrite", "RegistryRead, ServiceConnect", "RegistryRead,
-                                  DeviceConnect", "RegistryWrite, ServiceConnect", "RegistryWrite,
-                                  DeviceConnect", "ServiceConnect, DeviceConnect", "RegistryRead,
-                                  RegistryWrite, ServiceConnect", "RegistryRead, RegistryWrite,
-                                  DeviceConnect", "RegistryRead, ServiceConnect, DeviceConnect",
-                                  "RegistryWrite, ServiceConnect, DeviceConnect", and "RegistryRead,
-                                  RegistryWrite, ServiceConnect, DeviceConnect".
-                                "primaryKey": "str",  # Optional. The primary key.
-                                "secondaryKey": "str"  # Optional. The secondary key.
-                            }
-                        ],
-                        "cloudToDevice": {
-                            "defaultTtlAsIso8601": "1 day, 0:00:00",  # Optional. The
-                              default time to live for cloud-to-device messages in the device queue.
-                              See:
-                              https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                            "feedback": {
-                                "lockDurationAsIso8601": "1 day, 0:00:00",  #
-                                  Optional. The lock duration for the feedback queue. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                                "maxDeliveryCount": 0,  # Optional. The number of
-                                  times the IoT hub attempts to deliver a message on the feedback
-                                  queue. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                                "ttlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which a message is available to consume before it
-                                  is expired by the IoT hub. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                            },
-                            "maxDeliveryCount": 0  # Optional. The max delivery count for
-                              cloud-to-device messages in the device queue. See:
-                              https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                        },
-                        "comments": "str",  # Optional. IoT hub comments.
-                        "deviceStreams": {
-                            "streamingEndpoints": [
-                                "str"  # Optional. List of Device Streams Endpoints.
-                            ]
-                        },
-                        "disableDeviceSAS": bool,  # Optional. If true, all device(including
-                          Edge devices but excluding modules) scoped SAS keys cannot be used for
-                          authentication.
-                        "disableLocalAuth": bool,  # Optional. If true, SAS tokens with Iot
-                          hub scoped SAS keys cannot be used for authentication.
-                        "disableModuleSAS": bool,  # Optional. If true, all module scoped SAS
-                          keys cannot be used for authentication.
-                        "enableDataResidency": bool,  # Optional. This property when set to
-                          true, will enable data residency, thus, disabling disaster recovery.
-                        "enableFileUploadNotifications": bool,  # Optional. If True, file
-                          upload notifications are enabled.
-                        "encryption": {
-                            "keySource": "str",  # Optional. The source of the key.
-                            "keyVaultProperties": [
-                                {
-                                    "identity": {
-                                        "userAssignedIdentity": "str"  #
-                                          Optional. The user assigned identity.
-                                    },
-                                    "keyIdentifier": "str"  # Optional. The
-                                      identifier of the key.
-                                }
-                            ]
-                        },
-                        "eventHubEndpoints": {
-                            "str": {
-                                "endpoint": "str",  # Optional. The Event
-                                  Hub-compatible endpoint.
-                                "partitionCount": 0,  # Optional. The number of
-                                  partitions for receiving device-to-cloud messages in the Event
-                                  Hub-compatible endpoint. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#device-to-cloud-messages.
-                                "partitionIds": [
-                                    "str"  # Optional. The partition ids in the
-                                      Event Hub-compatible endpoint.
-                                ],
-                                "path": "str",  # Optional. The Event Hub-compatible
-                                  name.
-                                "retentionTimeInDays": 0  # Optional. The retention
-                                  time for device-to-cloud messages in days. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#device-to-cloud-messages.
-                            }
-                        },
-                        "features": "str",  # Optional. The capabilities and features enabled
-                          for the IoT hub. Known values are: "None" and "DeviceManagement".
-                        "hostName": "str",  # Optional. The name of the host.
-                        "ipFilterRules": [
-                            {
-                                "action": "str",  # The desired action for requests
-                                  captured by this rule. Required. Known values are: "Accept" and
-                                  "Reject".
-                                "filterName": "str",  # The name of the IP filter
-                                  rule. Required.
-                                "ipMask": "str"  # A string that contains the IP
-                                  address range in CIDR notation for the rule. Required.
-                            }
-                        ],
-                        "ipVersion": "str",  # Optional. This property specifies the IP
-                          Version the hub is currently utilizing. Known values are: "ipv4", "ipv6", and
-                          "ipv4ipv6".
-                        "locations": [
-                            {
-                                "location": "str",  # Optional. The name of the Azure
-                                  region.
-                                "role": "str"  # Optional. The role of the region,
-                                  can be either primary or secondary. The primary region is where the
-                                  IoT hub is currently provisioned. The secondary region is the Azure
-                                  disaster recovery (DR) paired region and also the region where the
-                                  IoT hub can failover to. Known values are: "primary" and "secondary".
-                            }
-                        ],
-                        "messagingEndpoints": {
-                            "str": {
-                                "lockDurationAsIso8601": "1 day, 0:00:00",  #
-                                  Optional. The lock duration. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                                "maxDeliveryCount": 0,  # Optional. The number of
-                                  times the IoT hub attempts to deliver a message. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                                "ttlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which a message is available to consume before it
-                                  is expired by the IoT hub. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                            }
-                        },
-                        "minTlsVersion": "str",  # Optional. Specifies the minimum TLS
-                          version to support for this hub. Can be set to "1.2" to have clients that use
-                          a TLS version below 1.2 to be rejected.
-                        "networkRuleSets": {
-                            "applyToBuiltInEventHubEndpoint": bool,  # If True, then
-                              Network Rule Set is also applied to BuiltIn EventHub EndPoint of IotHub.
-                              Required.
-                            "ipRules": [
-                                {
-                                    "filterName": "str",  # Name of the IP filter
-                                      rule. Required.
-                                    "ipMask": "str",  # A string that contains
-                                      the IP address range in CIDR notation for the rule. Required.
-                                    "action": "Allow"  # Optional. Default value
-                                      is "Allow". IP Filter Action. "Allow"
-                                }
-                            ],
-                            "defaultAction": "Deny"  # Optional. Default value is "Deny".
-                              Default Action for Network Rule Set. Known values are: "Deny" and
-                              "Allow".
-                        },
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",  # The
-                                          description for the current state of a private endpoint
-                                          connection. Required.
-                                        "status": "str",  # The status of a
-                                          private endpoint connection. Required. Known values are:
-                                          "Pending", "Approved", "Rejected", and "Disconnected".
-                                        "actionsRequired": "str"  # Optional.
-                                          Actions required for a private endpoint connection.
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"  # Optional. The resource
-                                          identifier.
-                                    }
-                                },
-                                "id": "str",  # Optional. The resource identifier.
-                                "name": "str",  # Optional. The resource name.
-                                "type": "str"  # Optional. The resource type.
-                            }
-                        ],
-                        "provisioningState": "str",  # Optional. The provisioning state.
-                        "publicNetworkAccess": "str",  # Optional. Whether requests from
-                          Public Network are allowed. Known values are: "Enabled" and "Disabled".
-                        "restrictOutboundNetworkAccess": bool,  # Optional. If true, egress
-                          from IotHub will be restricted to only the allowed FQDNs that are configured
-                          via allowedFqdnList.
-                        "rootCertificate": {
-                            "enableRootCertificateV2": bool,  # Optional. This property
-                              when set to true, hub will use G2 cert; while it's set to false, hub uses
-                              Baltimore Cert.
-                            "lastUpdatedTimeUtc": "2020-02-20 00:00:00"  # Optional. the
-                              last update time to root certificate flag.
-                        },
-                        "routing": {
-                            "endpoints": {
-                                "cosmosDBSqlContainers": [
-                                    {
-                                        "containerName": "str",  # The name
-                                          of the cosmos DB sql container in the cosmos DB database.
-                                          Required.
-                                        "databaseName": "str",  # The name of
-                                          the cosmos DB database in the cosmos DB account. Required.
-                                        "endpointUri": "str",  # The url of
-                                          the cosmos DB account. It must include the protocol https://.
-                                          Required.
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the cosmos DB
-                                          sql container endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "id": "str",  # Optional. Id of the
-                                          cosmos DB sql container endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "partitionKeyName": "str",  #
-                                          Optional. The name of the partition key associated with this
-                                          cosmos DB sql container if one exists. This is an optional
-                                          parameter.
-                                        "partitionKeyTemplate": "str",  #
-                                          Optional. The template for generating a synthetic partition
-                                          key value for use with this cosmos DB sql container. The
-                                          template must include at least one of the following
-                                          placeholders: {iothub}, {deviceid}, {DD}, {MM}, and {YYYY}.
-                                          Any one placeholder may be specified at most once, but order
-                                          and non-placeholder components are arbitrary. This parameter
-                                          is only required if PartitionKeyName is specified.
-                                        "primaryKey": "str",  # Optional. The
-                                          primary key of the cosmos DB account.
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the cosmos DB account.
-                                        "secondaryKey": "str",  # Optional.
-                                          The secondary key of the cosmos DB account.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the cosmos DB account.
-                                    }
-                                ],
-                                "eventHubs": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the event hub
-                                          endpoint. Known values are: "keyBased" and "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the event hub endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the event hub endpoint. It must include the
-                                          protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Event hub name on the event hub namespace.
-                                        "id": "str",  # Optional. Id of the
-                                          event hub endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the event hub endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the event hub endpoint.
-                                    }
-                                ],
-                                "serviceBusQueues": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. The name need not
-                                          be the same as the actual queue name. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the service bus
-                                          queue endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the service bus queue
-                                          endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the service bus queue endpoint. It must include
-                                          the protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Queue name on the service bus namespace.
-                                        "id": "str",  # Optional. Id of the
-                                          service bus queue endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the service bus queue
-                                          endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the service bus queue
-                                          endpoint.
-                                    }
-                                ],
-                                "serviceBusTopics": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types.  The name need
-                                          not be the same as the actual topic name. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the service bus
-                                          topic endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the service bus topic
-                                          endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the service bus topic endpoint. It must include
-                                          the protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Queue name on the service bus topic.
-                                        "id": "str",  # Optional. Id of the
-                                          service bus topic endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the service bus topic
-                                          endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the service bus topic
-                                          endpoint.
-                                    }
-                                ],
-                                "storageContainers": [
-                                    {
-                                        "containerName": "str",  # The name
-                                          of storage container in the storage account. Required.
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the storage
-                                          endpoint. Known values are: "keyBased" and "identityBased".
-                                        "batchFrequencyInSeconds": 0,  #
-                                          Optional. Time interval at which blobs are written to
-                                          storage. Value should be between 60 and 720 seconds. Default
-                                          value is 300 seconds.
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the storage account.
-                                        "encoding": "str",  # Optional.
-                                          Encoding that is used to serialize messages to blobs.
-                                          Supported values are 'avro', 'avrodeflate', and 'JSON'.
-                                          Default value is 'avro'. Known values are: "Avro",
-                                          "AvroDeflate", and "JSON".
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the storage endpoint. It must include the protocol
-                                          https://.
-                                        "fileNameFormat": "str",  # Optional.
-                                          File name format for the blob. Default format is
-                                          {iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}. All
-                                          parameters are mandatory but can be reordered.
-                                        "id": "str",  # Optional. Id of the
-                                          storage container endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "maxChunkSizeInBytes": 0,  #
-                                          Optional. Maximum number of bytes for each blob written to
-                                          storage. Value should be between 10485760(10MB) and
-                                          524288000(500MB). Default value is 314572800(300MB).
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the storage account.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the storage account.
-                                    }
-                                ]
-                            },
-                            "enrichments": [
-                                {
-                                    "endpointNames": [
-                                        "str"  # The list of endpoints for
-                                          which the enrichment is applied to the message. Required.
-                                    ],
-                                    "key": "str",  # The key or name for the
-                                      enrichment property. Required.
-                                    "value": "str"  # The value for the
-                                      enrichment property. Required.
-                                }
-                            ],
-                            "fallbackRoute": {
-                                "endpointNames": [
-                                    "str"  # The list of endpoints to which the
-                                      messages that satisfy the condition are routed to. Currently only
-                                      1 endpoint is allowed. Required.
-                                ],
-                                "isEnabled": bool,  # Used to specify whether the
-                                  fallback route is enabled. Required.
-                                "source": "str",  # The source to which the routing
-                                  rule is to be applied to. For example, DeviceMessages. Required.
-                                  Known values are: "Invalid", "DeviceMessages", "TwinChangeEvents",
-                                  "DeviceLifecycleEvents", "DeviceJobLifecycleEvents",
-                                  "DigitalTwinChangeEvents", "DeviceConnectionStateEvents", and
-                                  "MqttBrokerMessages".
-                                "condition": "str",  # Optional. The condition which
-                                  is evaluated in order to apply the fallback route. If the condition
-                                  is not provided it will evaluate to true by default. For grammar,
-                                  See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                                "name": "str"  # Optional. The name of the route. The
-                                  name can only include alphanumeric characters, periods, underscores,
-                                  hyphens, has a maximum length of 64 characters, and must be unique.
-                            },
-                            "routes": [
-                                {
-                                    "endpointNames": [
-                                        "str"  # The list of endpoints to
-                                          which messages that satisfy the condition are routed.
-                                          Currently only one endpoint is allowed. Required.
-                                    ],
-                                    "isEnabled": bool,  # Used to specify whether
-                                      a route is enabled. Required.
-                                    "name": "str",  # The name of the route. The
-                                      name can only include alphanumeric characters, periods,
-                                      underscores, hyphens, has a maximum length of 64 characters, and
-                                      must be unique. Required.
-                                    "source": "str",  # The source that the
-                                      routing rule is to be applied to, such as DeviceMessages.
-                                      Required. Known values are: "Invalid", "DeviceMessages",
-                                      "TwinChangeEvents", "DeviceLifecycleEvents",
-                                      "DeviceJobLifecycleEvents", "DigitalTwinChangeEvents",
-                                      "DeviceConnectionStateEvents", and "MqttBrokerMessages".
-                                    "condition": "str"  # Optional. The condition
-                                      that is evaluated to apply the routing rule. If no condition is
-                                      provided, it evaluates to true by default. For grammar, see:
-                                      https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                                }
-                            ]
-                        },
-                        "state": "str",  # Optional. The hub state.
-                        "storageEndpoints": {
-                            "str": {
-                                "connectionString": "str",  # The connection string
-                                  for the Azure Storage account to which files are uploaded. Required.
-                                "containerName": "str",  # The name of the root
-                                  container where you upload files. The container need not exist but
-                                  should be creatable using the connectionString specified. Required.
-                                "authenticationType": "str",  # Optional. Specifies
-                                  authentication type being used for connecting to the storage account.
-                                  Known values are: "keyBased" and "identityBased".
-                                "identity": {
-                                    "userAssignedIdentity": "str"  # Optional.
-                                      The user assigned identity.
-                                },
-                                "sasTtlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which the SAS URI generated by IoT Hub for file
-                                  upload is valid. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload#file-upload-notification-configuration-options.
-                            }
-                        },
-                        "tlsCompatibilityMode": bool  # Optional. If True, TLS compatibility
-                          mode is enabled.
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. The resource tags.
-                    },
-                    "type": "str"  # Optional. The resource type.
-                }
         """
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
         content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.IotHubDescription] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -4898,11 +1639,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
-            response = pipeline_response.http_response
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("IotHubDescription", pipeline_response)
             if cls:
                 return cls(pipeline_response, deserialized, {})  # type: ignore
             return deserialized
@@ -4914,17 +1651,23 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[JSON].from_continuation_token(
+            return LROPoller[_models.IotHubDescription].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
+        return LROPoller[_models.IotHubDescription](
+            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
+        )
 
     def _update_initial(
-        self, resource_group_name: str, resource_name: str, iot_hub_tags: Union[JSON, IO[bytes]], **kwargs: Any
-    ) -> JSON:
+        self,
+        resource_group_name: str,
+        resource_name: str,
+        iot_hub_tags: Union[_models.TagsResource, IO[bytes]],
+        **kwargs: Any
+    ) -> _models.IotHubDescription:
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
             404: ResourceNotFoundError,
@@ -4937,7 +1680,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         _params = kwargs.pop("params", {}) or {}
 
         content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.IotHubDescription] = kwargs.pop("cls", None)
 
         content_type = content_type or "application/json"
         _json = None
@@ -4945,7 +1688,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         if isinstance(iot_hub_tags, (IOBase, bytes)):
             _content = iot_hub_tags
         else:
-            _json = iot_hub_tags
+            _json = self._serialize.body(iot_hub_tags, "TagsResource")
 
         _request = build_iot_hub_resource_update_request(
             resource_group_name=resource_group_name,
@@ -4978,27 +1721,23 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
             "str", response.headers.get("Azure-AsyncOperation")
         )
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("IotHubDescription", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), response_headers)  # type: ignore
+            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @overload
     def begin_update(
         self,
         resource_group_name: str,
         resource_name: str,
-        iot_hub_tags: JSON,
+        iot_hub_tags: _models.TagsResource,
         *,
         content_type: str = "application/json",
         **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
+    ) -> LROPoller[_models.IotHubDescription]:
         """Update an existing IoT Hubs tags.
 
         Update an existing IoT Hub tags. to update other fields use the CreateOrUpdate method.
@@ -5008,561 +1747,13 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :param resource_name: Name of iot hub to update. Required.
         :type resource_name: str
         :param iot_hub_tags: Updated tag information to set into the iot hub instance. Required.
-        :type iot_hub_tags: JSON
+        :type iot_hub_tags: ~iot_hub_client.models.TagsResource
         :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :return: An instance of LROPoller that returns IotHubDescription
+        :rtype: ~azure.core.polling.LROPoller[~iot_hub_client.models.IotHubDescription]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                iot_hub_tags = {
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    }
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",  # The resource location. Required.
-                    "sku": {
-                        "name": "str",  # The name of the SKU. Required. Known values are:
-                          "F1", "S1", "S2", "S3", "B1", "B2", "B3", "P1", "P2", and "P3".
-                        "capacity": 0,  # Optional. The number of provisioned IoT Hub units.
-                          See:
-                          https://docs.microsoft.com/azure/azure-subscription-service-limits#iot-hub-limits.
-                        "tier": "str"  # Optional. The billing tier for the IoT hub. Known
-                          values are: "Free", "Standard", "Basic", and "Premium".
-                    },
-                    "etag": "str",  # Optional. The Etag field is *not* required. If it is
-                      provided in the response body, it must also be provided as a header per the
-                      normal ETag convention.
-                    "id": "str",  # Optional. The resource identifier.
-                    "identity": {
-                        "principalId": "str",  # Optional. Principal Id.
-                        "tenantId": "str",  # Optional. Tenant Id.
-                        "type": "str",  # Optional. The type of identity used for the
-                          resource. The type 'SystemAssigned,UserAssigned' includes both an implicitly
-                          created identity and a set of user assigned identities. The type 'None' will
-                          remove any identities from the service. Known values are: "SystemAssigned",
-                          "UserAssigned", "SystemAssigned, UserAssigned", and "None".
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",  # Optional. Dictionary of
-                                  :code:`<ArmUserIdentity>`.
-                                "principalId": "str"  # Optional. Dictionary of
-                                  :code:`<ArmUserIdentity>`.
-                            }
-                        }
-                    },
-                    "name": "str",  # Optional. The resource name.
-                    "properties": {
-                        "adrProperties": {
-                            "identityResourceId": "str",  # Optional. The identity used
-                              to manage the ADR namespace from the data plane.
-                            "namespaceResourceId": "str"  # Optional. The identifier of
-                              the Azure Device Registry namespace associated with the P SKU hub.
-                        },
-                        "allowedFqdnList": [
-                            "str"  # Optional. List of allowed FQDNs(Fully Qualified
-                              Domain Name) for egress from Iot Hub.
-                        ],
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",  # The name of the shared access
-                                  policy. Required.
-                                "rights": "str",  # The permissions assigned to the
-                                  shared access policy. Required. Known values are: "RegistryRead",
-                                  "RegistryWrite", "ServiceConnect", "DeviceConnect", "RegistryRead,
-                                  RegistryWrite", "RegistryRead, ServiceConnect", "RegistryRead,
-                                  DeviceConnect", "RegistryWrite, ServiceConnect", "RegistryWrite,
-                                  DeviceConnect", "ServiceConnect, DeviceConnect", "RegistryRead,
-                                  RegistryWrite, ServiceConnect", "RegistryRead, RegistryWrite,
-                                  DeviceConnect", "RegistryRead, ServiceConnect, DeviceConnect",
-                                  "RegistryWrite, ServiceConnect, DeviceConnect", and "RegistryRead,
-                                  RegistryWrite, ServiceConnect, DeviceConnect".
-                                "primaryKey": "str",  # Optional. The primary key.
-                                "secondaryKey": "str"  # Optional. The secondary key.
-                            }
-                        ],
-                        "cloudToDevice": {
-                            "defaultTtlAsIso8601": "1 day, 0:00:00",  # Optional. The
-                              default time to live for cloud-to-device messages in the device queue.
-                              See:
-                              https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                            "feedback": {
-                                "lockDurationAsIso8601": "1 day, 0:00:00",  #
-                                  Optional. The lock duration for the feedback queue. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                                "maxDeliveryCount": 0,  # Optional. The number of
-                                  times the IoT hub attempts to deliver a message on the feedback
-                                  queue. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                                "ttlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which a message is available to consume before it
-                                  is expired by the IoT hub. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                            },
-                            "maxDeliveryCount": 0  # Optional. The max delivery count for
-                              cloud-to-device messages in the device queue. See:
-                              https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                        },
-                        "comments": "str",  # Optional. IoT hub comments.
-                        "deviceStreams": {
-                            "streamingEndpoints": [
-                                "str"  # Optional. List of Device Streams Endpoints.
-                            ]
-                        },
-                        "disableDeviceSAS": bool,  # Optional. If true, all device(including
-                          Edge devices but excluding modules) scoped SAS keys cannot be used for
-                          authentication.
-                        "disableLocalAuth": bool,  # Optional. If true, SAS tokens with Iot
-                          hub scoped SAS keys cannot be used for authentication.
-                        "disableModuleSAS": bool,  # Optional. If true, all module scoped SAS
-                          keys cannot be used for authentication.
-                        "enableDataResidency": bool,  # Optional. This property when set to
-                          true, will enable data residency, thus, disabling disaster recovery.
-                        "enableFileUploadNotifications": bool,  # Optional. If True, file
-                          upload notifications are enabled.
-                        "encryption": {
-                            "keySource": "str",  # Optional. The source of the key.
-                            "keyVaultProperties": [
-                                {
-                                    "identity": {
-                                        "userAssignedIdentity": "str"  #
-                                          Optional. The user assigned identity.
-                                    },
-                                    "keyIdentifier": "str"  # Optional. The
-                                      identifier of the key.
-                                }
-                            ]
-                        },
-                        "eventHubEndpoints": {
-                            "str": {
-                                "endpoint": "str",  # Optional. The Event
-                                  Hub-compatible endpoint.
-                                "partitionCount": 0,  # Optional. The number of
-                                  partitions for receiving device-to-cloud messages in the Event
-                                  Hub-compatible endpoint. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#device-to-cloud-messages.
-                                "partitionIds": [
-                                    "str"  # Optional. The partition ids in the
-                                      Event Hub-compatible endpoint.
-                                ],
-                                "path": "str",  # Optional. The Event Hub-compatible
-                                  name.
-                                "retentionTimeInDays": 0  # Optional. The retention
-                                  time for device-to-cloud messages in days. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#device-to-cloud-messages.
-                            }
-                        },
-                        "features": "str",  # Optional. The capabilities and features enabled
-                          for the IoT hub. Known values are: "None" and "DeviceManagement".
-                        "hostName": "str",  # Optional. The name of the host.
-                        "ipFilterRules": [
-                            {
-                                "action": "str",  # The desired action for requests
-                                  captured by this rule. Required. Known values are: "Accept" and
-                                  "Reject".
-                                "filterName": "str",  # The name of the IP filter
-                                  rule. Required.
-                                "ipMask": "str"  # A string that contains the IP
-                                  address range in CIDR notation for the rule. Required.
-                            }
-                        ],
-                        "ipVersion": "str",  # Optional. This property specifies the IP
-                          Version the hub is currently utilizing. Known values are: "ipv4", "ipv6", and
-                          "ipv4ipv6".
-                        "locations": [
-                            {
-                                "location": "str",  # Optional. The name of the Azure
-                                  region.
-                                "role": "str"  # Optional. The role of the region,
-                                  can be either primary or secondary. The primary region is where the
-                                  IoT hub is currently provisioned. The secondary region is the Azure
-                                  disaster recovery (DR) paired region and also the region where the
-                                  IoT hub can failover to. Known values are: "primary" and "secondary".
-                            }
-                        ],
-                        "messagingEndpoints": {
-                            "str": {
-                                "lockDurationAsIso8601": "1 day, 0:00:00",  #
-                                  Optional. The lock duration. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                                "maxDeliveryCount": 0,  # Optional. The number of
-                                  times the IoT hub attempts to deliver a message. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                                "ttlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which a message is available to consume before it
-                                  is expired by the IoT hub. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                            }
-                        },
-                        "minTlsVersion": "str",  # Optional. Specifies the minimum TLS
-                          version to support for this hub. Can be set to "1.2" to have clients that use
-                          a TLS version below 1.2 to be rejected.
-                        "networkRuleSets": {
-                            "applyToBuiltInEventHubEndpoint": bool,  # If True, then
-                              Network Rule Set is also applied to BuiltIn EventHub EndPoint of IotHub.
-                              Required.
-                            "ipRules": [
-                                {
-                                    "filterName": "str",  # Name of the IP filter
-                                      rule. Required.
-                                    "ipMask": "str",  # A string that contains
-                                      the IP address range in CIDR notation for the rule. Required.
-                                    "action": "Allow"  # Optional. Default value
-                                      is "Allow". IP Filter Action. "Allow"
-                                }
-                            ],
-                            "defaultAction": "Deny"  # Optional. Default value is "Deny".
-                              Default Action for Network Rule Set. Known values are: "Deny" and
-                              "Allow".
-                        },
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",  # The
-                                          description for the current state of a private endpoint
-                                          connection. Required.
-                                        "status": "str",  # The status of a
-                                          private endpoint connection. Required. Known values are:
-                                          "Pending", "Approved", "Rejected", and "Disconnected".
-                                        "actionsRequired": "str"  # Optional.
-                                          Actions required for a private endpoint connection.
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"  # Optional. The resource
-                                          identifier.
-                                    }
-                                },
-                                "id": "str",  # Optional. The resource identifier.
-                                "name": "str",  # Optional. The resource name.
-                                "type": "str"  # Optional. The resource type.
-                            }
-                        ],
-                        "provisioningState": "str",  # Optional. The provisioning state.
-                        "publicNetworkAccess": "str",  # Optional. Whether requests from
-                          Public Network are allowed. Known values are: "Enabled" and "Disabled".
-                        "restrictOutboundNetworkAccess": bool,  # Optional. If true, egress
-                          from IotHub will be restricted to only the allowed FQDNs that are configured
-                          via allowedFqdnList.
-                        "rootCertificate": {
-                            "enableRootCertificateV2": bool,  # Optional. This property
-                              when set to true, hub will use G2 cert; while it's set to false, hub uses
-                              Baltimore Cert.
-                            "lastUpdatedTimeUtc": "2020-02-20 00:00:00"  # Optional. the
-                              last update time to root certificate flag.
-                        },
-                        "routing": {
-                            "endpoints": {
-                                "cosmosDBSqlContainers": [
-                                    {
-                                        "containerName": "str",  # The name
-                                          of the cosmos DB sql container in the cosmos DB database.
-                                          Required.
-                                        "databaseName": "str",  # The name of
-                                          the cosmos DB database in the cosmos DB account. Required.
-                                        "endpointUri": "str",  # The url of
-                                          the cosmos DB account. It must include the protocol https://.
-                                          Required.
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the cosmos DB
-                                          sql container endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "id": "str",  # Optional. Id of the
-                                          cosmos DB sql container endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "partitionKeyName": "str",  #
-                                          Optional. The name of the partition key associated with this
-                                          cosmos DB sql container if one exists. This is an optional
-                                          parameter.
-                                        "partitionKeyTemplate": "str",  #
-                                          Optional. The template for generating a synthetic partition
-                                          key value for use with this cosmos DB sql container. The
-                                          template must include at least one of the following
-                                          placeholders: {iothub}, {deviceid}, {DD}, {MM}, and {YYYY}.
-                                          Any one placeholder may be specified at most once, but order
-                                          and non-placeholder components are arbitrary. This parameter
-                                          is only required if PartitionKeyName is specified.
-                                        "primaryKey": "str",  # Optional. The
-                                          primary key of the cosmos DB account.
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the cosmos DB account.
-                                        "secondaryKey": "str",  # Optional.
-                                          The secondary key of the cosmos DB account.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the cosmos DB account.
-                                    }
-                                ],
-                                "eventHubs": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the event hub
-                                          endpoint. Known values are: "keyBased" and "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the event hub endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the event hub endpoint. It must include the
-                                          protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Event hub name on the event hub namespace.
-                                        "id": "str",  # Optional. Id of the
-                                          event hub endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the event hub endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the event hub endpoint.
-                                    }
-                                ],
-                                "serviceBusQueues": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. The name need not
-                                          be the same as the actual queue name. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the service bus
-                                          queue endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the service bus queue
-                                          endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the service bus queue endpoint. It must include
-                                          the protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Queue name on the service bus namespace.
-                                        "id": "str",  # Optional. Id of the
-                                          service bus queue endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the service bus queue
-                                          endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the service bus queue
-                                          endpoint.
-                                    }
-                                ],
-                                "serviceBusTopics": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types.  The name need
-                                          not be the same as the actual topic name. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the service bus
-                                          topic endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the service bus topic
-                                          endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the service bus topic endpoint. It must include
-                                          the protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Queue name on the service bus topic.
-                                        "id": "str",  # Optional. Id of the
-                                          service bus topic endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the service bus topic
-                                          endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the service bus topic
-                                          endpoint.
-                                    }
-                                ],
-                                "storageContainers": [
-                                    {
-                                        "containerName": "str",  # The name
-                                          of storage container in the storage account. Required.
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the storage
-                                          endpoint. Known values are: "keyBased" and "identityBased".
-                                        "batchFrequencyInSeconds": 0,  #
-                                          Optional. Time interval at which blobs are written to
-                                          storage. Value should be between 60 and 720 seconds. Default
-                                          value is 300 seconds.
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the storage account.
-                                        "encoding": "str",  # Optional.
-                                          Encoding that is used to serialize messages to blobs.
-                                          Supported values are 'avro', 'avrodeflate', and 'JSON'.
-                                          Default value is 'avro'. Known values are: "Avro",
-                                          "AvroDeflate", and "JSON".
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the storage endpoint. It must include the protocol
-                                          https://.
-                                        "fileNameFormat": "str",  # Optional.
-                                          File name format for the blob. Default format is
-                                          {iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}. All
-                                          parameters are mandatory but can be reordered.
-                                        "id": "str",  # Optional. Id of the
-                                          storage container endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "maxChunkSizeInBytes": 0,  #
-                                          Optional. Maximum number of bytes for each blob written to
-                                          storage. Value should be between 10485760(10MB) and
-                                          524288000(500MB). Default value is 314572800(300MB).
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the storage account.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the storage account.
-                                    }
-                                ]
-                            },
-                            "enrichments": [
-                                {
-                                    "endpointNames": [
-                                        "str"  # The list of endpoints for
-                                          which the enrichment is applied to the message. Required.
-                                    ],
-                                    "key": "str",  # The key or name for the
-                                      enrichment property. Required.
-                                    "value": "str"  # The value for the
-                                      enrichment property. Required.
-                                }
-                            ],
-                            "fallbackRoute": {
-                                "endpointNames": [
-                                    "str"  # The list of endpoints to which the
-                                      messages that satisfy the condition are routed to. Currently only
-                                      1 endpoint is allowed. Required.
-                                ],
-                                "isEnabled": bool,  # Used to specify whether the
-                                  fallback route is enabled. Required.
-                                "source": "str",  # The source to which the routing
-                                  rule is to be applied to. For example, DeviceMessages. Required.
-                                  Known values are: "Invalid", "DeviceMessages", "TwinChangeEvents",
-                                  "DeviceLifecycleEvents", "DeviceJobLifecycleEvents",
-                                  "DigitalTwinChangeEvents", "DeviceConnectionStateEvents", and
-                                  "MqttBrokerMessages".
-                                "condition": "str",  # Optional. The condition which
-                                  is evaluated in order to apply the fallback route. If the condition
-                                  is not provided it will evaluate to true by default. For grammar,
-                                  See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                                "name": "str"  # Optional. The name of the route. The
-                                  name can only include alphanumeric characters, periods, underscores,
-                                  hyphens, has a maximum length of 64 characters, and must be unique.
-                            },
-                            "routes": [
-                                {
-                                    "endpointNames": [
-                                        "str"  # The list of endpoints to
-                                          which messages that satisfy the condition are routed.
-                                          Currently only one endpoint is allowed. Required.
-                                    ],
-                                    "isEnabled": bool,  # Used to specify whether
-                                      a route is enabled. Required.
-                                    "name": "str",  # The name of the route. The
-                                      name can only include alphanumeric characters, periods,
-                                      underscores, hyphens, has a maximum length of 64 characters, and
-                                      must be unique. Required.
-                                    "source": "str",  # The source that the
-                                      routing rule is to be applied to, such as DeviceMessages.
-                                      Required. Known values are: "Invalid", "DeviceMessages",
-                                      "TwinChangeEvents", "DeviceLifecycleEvents",
-                                      "DeviceJobLifecycleEvents", "DigitalTwinChangeEvents",
-                                      "DeviceConnectionStateEvents", and "MqttBrokerMessages".
-                                    "condition": "str"  # Optional. The condition
-                                      that is evaluated to apply the routing rule. If no condition is
-                                      provided, it evaluates to true by default. For grammar, see:
-                                      https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                                }
-                            ]
-                        },
-                        "state": "str",  # Optional. The hub state.
-                        "storageEndpoints": {
-                            "str": {
-                                "connectionString": "str",  # The connection string
-                                  for the Azure Storage account to which files are uploaded. Required.
-                                "containerName": "str",  # The name of the root
-                                  container where you upload files. The container need not exist but
-                                  should be creatable using the connectionString specified. Required.
-                                "authenticationType": "str",  # Optional. Specifies
-                                  authentication type being used for connecting to the storage account.
-                                  Known values are: "keyBased" and "identityBased".
-                                "identity": {
-                                    "userAssignedIdentity": "str"  # Optional.
-                                      The user assigned identity.
-                                },
-                                "sasTtlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which the SAS URI generated by IoT Hub for file
-                                  upload is valid. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload#file-upload-notification-configuration-options.
-                            }
-                        },
-                        "tlsCompatibilityMode": bool  # Optional. If True, TLS compatibility
-                          mode is enabled.
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. The resource tags.
-                    },
-                    "type": "str"  # Optional. The resource type.
-                }
         """
 
     @overload
@@ -5574,8 +1765,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         *,
         content_type: str = "application/json",
         **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
+    ) -> LROPoller[_models.IotHubDescription]:
         """Update an existing IoT Hubs tags.
 
         Update an existing IoT Hub tags. to update other fields use the CreateOrUpdate method.
@@ -5589,557 +1779,19 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :return: An instance of LROPoller that returns IotHubDescription
+        :rtype: ~azure.core.polling.LROPoller[~iot_hub_client.models.IotHubDescription]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",  # The resource location. Required.
-                    "sku": {
-                        "name": "str",  # The name of the SKU. Required. Known values are:
-                          "F1", "S1", "S2", "S3", "B1", "B2", "B3", "P1", "P2", and "P3".
-                        "capacity": 0,  # Optional. The number of provisioned IoT Hub units.
-                          See:
-                          https://docs.microsoft.com/azure/azure-subscription-service-limits#iot-hub-limits.
-                        "tier": "str"  # Optional. The billing tier for the IoT hub. Known
-                          values are: "Free", "Standard", "Basic", and "Premium".
-                    },
-                    "etag": "str",  # Optional. The Etag field is *not* required. If it is
-                      provided in the response body, it must also be provided as a header per the
-                      normal ETag convention.
-                    "id": "str",  # Optional. The resource identifier.
-                    "identity": {
-                        "principalId": "str",  # Optional. Principal Id.
-                        "tenantId": "str",  # Optional. Tenant Id.
-                        "type": "str",  # Optional. The type of identity used for the
-                          resource. The type 'SystemAssigned,UserAssigned' includes both an implicitly
-                          created identity and a set of user assigned identities. The type 'None' will
-                          remove any identities from the service. Known values are: "SystemAssigned",
-                          "UserAssigned", "SystemAssigned, UserAssigned", and "None".
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",  # Optional. Dictionary of
-                                  :code:`<ArmUserIdentity>`.
-                                "principalId": "str"  # Optional. Dictionary of
-                                  :code:`<ArmUserIdentity>`.
-                            }
-                        }
-                    },
-                    "name": "str",  # Optional. The resource name.
-                    "properties": {
-                        "adrProperties": {
-                            "identityResourceId": "str",  # Optional. The identity used
-                              to manage the ADR namespace from the data plane.
-                            "namespaceResourceId": "str"  # Optional. The identifier of
-                              the Azure Device Registry namespace associated with the P SKU hub.
-                        },
-                        "allowedFqdnList": [
-                            "str"  # Optional. List of allowed FQDNs(Fully Qualified
-                              Domain Name) for egress from Iot Hub.
-                        ],
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",  # The name of the shared access
-                                  policy. Required.
-                                "rights": "str",  # The permissions assigned to the
-                                  shared access policy. Required. Known values are: "RegistryRead",
-                                  "RegistryWrite", "ServiceConnect", "DeviceConnect", "RegistryRead,
-                                  RegistryWrite", "RegistryRead, ServiceConnect", "RegistryRead,
-                                  DeviceConnect", "RegistryWrite, ServiceConnect", "RegistryWrite,
-                                  DeviceConnect", "ServiceConnect, DeviceConnect", "RegistryRead,
-                                  RegistryWrite, ServiceConnect", "RegistryRead, RegistryWrite,
-                                  DeviceConnect", "RegistryRead, ServiceConnect, DeviceConnect",
-                                  "RegistryWrite, ServiceConnect, DeviceConnect", and "RegistryRead,
-                                  RegistryWrite, ServiceConnect, DeviceConnect".
-                                "primaryKey": "str",  # Optional. The primary key.
-                                "secondaryKey": "str"  # Optional. The secondary key.
-                            }
-                        ],
-                        "cloudToDevice": {
-                            "defaultTtlAsIso8601": "1 day, 0:00:00",  # Optional. The
-                              default time to live for cloud-to-device messages in the device queue.
-                              See:
-                              https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                            "feedback": {
-                                "lockDurationAsIso8601": "1 day, 0:00:00",  #
-                                  Optional. The lock duration for the feedback queue. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                                "maxDeliveryCount": 0,  # Optional. The number of
-                                  times the IoT hub attempts to deliver a message on the feedback
-                                  queue. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                                "ttlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which a message is available to consume before it
-                                  is expired by the IoT hub. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                            },
-                            "maxDeliveryCount": 0  # Optional. The max delivery count for
-                              cloud-to-device messages in the device queue. See:
-                              https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                        },
-                        "comments": "str",  # Optional. IoT hub comments.
-                        "deviceStreams": {
-                            "streamingEndpoints": [
-                                "str"  # Optional. List of Device Streams Endpoints.
-                            ]
-                        },
-                        "disableDeviceSAS": bool,  # Optional. If true, all device(including
-                          Edge devices but excluding modules) scoped SAS keys cannot be used for
-                          authentication.
-                        "disableLocalAuth": bool,  # Optional. If true, SAS tokens with Iot
-                          hub scoped SAS keys cannot be used for authentication.
-                        "disableModuleSAS": bool,  # Optional. If true, all module scoped SAS
-                          keys cannot be used for authentication.
-                        "enableDataResidency": bool,  # Optional. This property when set to
-                          true, will enable data residency, thus, disabling disaster recovery.
-                        "enableFileUploadNotifications": bool,  # Optional. If True, file
-                          upload notifications are enabled.
-                        "encryption": {
-                            "keySource": "str",  # Optional. The source of the key.
-                            "keyVaultProperties": [
-                                {
-                                    "identity": {
-                                        "userAssignedIdentity": "str"  #
-                                          Optional. The user assigned identity.
-                                    },
-                                    "keyIdentifier": "str"  # Optional. The
-                                      identifier of the key.
-                                }
-                            ]
-                        },
-                        "eventHubEndpoints": {
-                            "str": {
-                                "endpoint": "str",  # Optional. The Event
-                                  Hub-compatible endpoint.
-                                "partitionCount": 0,  # Optional. The number of
-                                  partitions for receiving device-to-cloud messages in the Event
-                                  Hub-compatible endpoint. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#device-to-cloud-messages.
-                                "partitionIds": [
-                                    "str"  # Optional. The partition ids in the
-                                      Event Hub-compatible endpoint.
-                                ],
-                                "path": "str",  # Optional. The Event Hub-compatible
-                                  name.
-                                "retentionTimeInDays": 0  # Optional. The retention
-                                  time for device-to-cloud messages in days. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#device-to-cloud-messages.
-                            }
-                        },
-                        "features": "str",  # Optional. The capabilities and features enabled
-                          for the IoT hub. Known values are: "None" and "DeviceManagement".
-                        "hostName": "str",  # Optional. The name of the host.
-                        "ipFilterRules": [
-                            {
-                                "action": "str",  # The desired action for requests
-                                  captured by this rule. Required. Known values are: "Accept" and
-                                  "Reject".
-                                "filterName": "str",  # The name of the IP filter
-                                  rule. Required.
-                                "ipMask": "str"  # A string that contains the IP
-                                  address range in CIDR notation for the rule. Required.
-                            }
-                        ],
-                        "ipVersion": "str",  # Optional. This property specifies the IP
-                          Version the hub is currently utilizing. Known values are: "ipv4", "ipv6", and
-                          "ipv4ipv6".
-                        "locations": [
-                            {
-                                "location": "str",  # Optional. The name of the Azure
-                                  region.
-                                "role": "str"  # Optional. The role of the region,
-                                  can be either primary or secondary. The primary region is where the
-                                  IoT hub is currently provisioned. The secondary region is the Azure
-                                  disaster recovery (DR) paired region and also the region where the
-                                  IoT hub can failover to. Known values are: "primary" and "secondary".
-                            }
-                        ],
-                        "messagingEndpoints": {
-                            "str": {
-                                "lockDurationAsIso8601": "1 day, 0:00:00",  #
-                                  Optional. The lock duration. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                                "maxDeliveryCount": 0,  # Optional. The number of
-                                  times the IoT hub attempts to deliver a message. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                                "ttlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which a message is available to consume before it
-                                  is expired by the IoT hub. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                            }
-                        },
-                        "minTlsVersion": "str",  # Optional. Specifies the minimum TLS
-                          version to support for this hub. Can be set to "1.2" to have clients that use
-                          a TLS version below 1.2 to be rejected.
-                        "networkRuleSets": {
-                            "applyToBuiltInEventHubEndpoint": bool,  # If True, then
-                              Network Rule Set is also applied to BuiltIn EventHub EndPoint of IotHub.
-                              Required.
-                            "ipRules": [
-                                {
-                                    "filterName": "str",  # Name of the IP filter
-                                      rule. Required.
-                                    "ipMask": "str",  # A string that contains
-                                      the IP address range in CIDR notation for the rule. Required.
-                                    "action": "Allow"  # Optional. Default value
-                                      is "Allow". IP Filter Action. "Allow"
-                                }
-                            ],
-                            "defaultAction": "Deny"  # Optional. Default value is "Deny".
-                              Default Action for Network Rule Set. Known values are: "Deny" and
-                              "Allow".
-                        },
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",  # The
-                                          description for the current state of a private endpoint
-                                          connection. Required.
-                                        "status": "str",  # The status of a
-                                          private endpoint connection. Required. Known values are:
-                                          "Pending", "Approved", "Rejected", and "Disconnected".
-                                        "actionsRequired": "str"  # Optional.
-                                          Actions required for a private endpoint connection.
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"  # Optional. The resource
-                                          identifier.
-                                    }
-                                },
-                                "id": "str",  # Optional. The resource identifier.
-                                "name": "str",  # Optional. The resource name.
-                                "type": "str"  # Optional. The resource type.
-                            }
-                        ],
-                        "provisioningState": "str",  # Optional. The provisioning state.
-                        "publicNetworkAccess": "str",  # Optional. Whether requests from
-                          Public Network are allowed. Known values are: "Enabled" and "Disabled".
-                        "restrictOutboundNetworkAccess": bool,  # Optional. If true, egress
-                          from IotHub will be restricted to only the allowed FQDNs that are configured
-                          via allowedFqdnList.
-                        "rootCertificate": {
-                            "enableRootCertificateV2": bool,  # Optional. This property
-                              when set to true, hub will use G2 cert; while it's set to false, hub uses
-                              Baltimore Cert.
-                            "lastUpdatedTimeUtc": "2020-02-20 00:00:00"  # Optional. the
-                              last update time to root certificate flag.
-                        },
-                        "routing": {
-                            "endpoints": {
-                                "cosmosDBSqlContainers": [
-                                    {
-                                        "containerName": "str",  # The name
-                                          of the cosmos DB sql container in the cosmos DB database.
-                                          Required.
-                                        "databaseName": "str",  # The name of
-                                          the cosmos DB database in the cosmos DB account. Required.
-                                        "endpointUri": "str",  # The url of
-                                          the cosmos DB account. It must include the protocol https://.
-                                          Required.
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the cosmos DB
-                                          sql container endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "id": "str",  # Optional. Id of the
-                                          cosmos DB sql container endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "partitionKeyName": "str",  #
-                                          Optional. The name of the partition key associated with this
-                                          cosmos DB sql container if one exists. This is an optional
-                                          parameter.
-                                        "partitionKeyTemplate": "str",  #
-                                          Optional. The template for generating a synthetic partition
-                                          key value for use with this cosmos DB sql container. The
-                                          template must include at least one of the following
-                                          placeholders: {iothub}, {deviceid}, {DD}, {MM}, and {YYYY}.
-                                          Any one placeholder may be specified at most once, but order
-                                          and non-placeholder components are arbitrary. This parameter
-                                          is only required if PartitionKeyName is specified.
-                                        "primaryKey": "str",  # Optional. The
-                                          primary key of the cosmos DB account.
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the cosmos DB account.
-                                        "secondaryKey": "str",  # Optional.
-                                          The secondary key of the cosmos DB account.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the cosmos DB account.
-                                    }
-                                ],
-                                "eventHubs": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the event hub
-                                          endpoint. Known values are: "keyBased" and "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the event hub endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the event hub endpoint. It must include the
-                                          protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Event hub name on the event hub namespace.
-                                        "id": "str",  # Optional. Id of the
-                                          event hub endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the event hub endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the event hub endpoint.
-                                    }
-                                ],
-                                "serviceBusQueues": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. The name need not
-                                          be the same as the actual queue name. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the service bus
-                                          queue endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the service bus queue
-                                          endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the service bus queue endpoint. It must include
-                                          the protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Queue name on the service bus namespace.
-                                        "id": "str",  # Optional. Id of the
-                                          service bus queue endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the service bus queue
-                                          endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the service bus queue
-                                          endpoint.
-                                    }
-                                ],
-                                "serviceBusTopics": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types.  The name need
-                                          not be the same as the actual topic name. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the service bus
-                                          topic endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the service bus topic
-                                          endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the service bus topic endpoint. It must include
-                                          the protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Queue name on the service bus topic.
-                                        "id": "str",  # Optional. Id of the
-                                          service bus topic endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the service bus topic
-                                          endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the service bus topic
-                                          endpoint.
-                                    }
-                                ],
-                                "storageContainers": [
-                                    {
-                                        "containerName": "str",  # The name
-                                          of storage container in the storage account. Required.
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the storage
-                                          endpoint. Known values are: "keyBased" and "identityBased".
-                                        "batchFrequencyInSeconds": 0,  #
-                                          Optional. Time interval at which blobs are written to
-                                          storage. Value should be between 60 and 720 seconds. Default
-                                          value is 300 seconds.
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the storage account.
-                                        "encoding": "str",  # Optional.
-                                          Encoding that is used to serialize messages to blobs.
-                                          Supported values are 'avro', 'avrodeflate', and 'JSON'.
-                                          Default value is 'avro'. Known values are: "Avro",
-                                          "AvroDeflate", and "JSON".
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the storage endpoint. It must include the protocol
-                                          https://.
-                                        "fileNameFormat": "str",  # Optional.
-                                          File name format for the blob. Default format is
-                                          {iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}. All
-                                          parameters are mandatory but can be reordered.
-                                        "id": "str",  # Optional. Id of the
-                                          storage container endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "maxChunkSizeInBytes": 0,  #
-                                          Optional. Maximum number of bytes for each blob written to
-                                          storage. Value should be between 10485760(10MB) and
-                                          524288000(500MB). Default value is 314572800(300MB).
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the storage account.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the storage account.
-                                    }
-                                ]
-                            },
-                            "enrichments": [
-                                {
-                                    "endpointNames": [
-                                        "str"  # The list of endpoints for
-                                          which the enrichment is applied to the message. Required.
-                                    ],
-                                    "key": "str",  # The key or name for the
-                                      enrichment property. Required.
-                                    "value": "str"  # The value for the
-                                      enrichment property. Required.
-                                }
-                            ],
-                            "fallbackRoute": {
-                                "endpointNames": [
-                                    "str"  # The list of endpoints to which the
-                                      messages that satisfy the condition are routed to. Currently only
-                                      1 endpoint is allowed. Required.
-                                ],
-                                "isEnabled": bool,  # Used to specify whether the
-                                  fallback route is enabled. Required.
-                                "source": "str",  # The source to which the routing
-                                  rule is to be applied to. For example, DeviceMessages. Required.
-                                  Known values are: "Invalid", "DeviceMessages", "TwinChangeEvents",
-                                  "DeviceLifecycleEvents", "DeviceJobLifecycleEvents",
-                                  "DigitalTwinChangeEvents", "DeviceConnectionStateEvents", and
-                                  "MqttBrokerMessages".
-                                "condition": "str",  # Optional. The condition which
-                                  is evaluated in order to apply the fallback route. If the condition
-                                  is not provided it will evaluate to true by default. For grammar,
-                                  See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                                "name": "str"  # Optional. The name of the route. The
-                                  name can only include alphanumeric characters, periods, underscores,
-                                  hyphens, has a maximum length of 64 characters, and must be unique.
-                            },
-                            "routes": [
-                                {
-                                    "endpointNames": [
-                                        "str"  # The list of endpoints to
-                                          which messages that satisfy the condition are routed.
-                                          Currently only one endpoint is allowed. Required.
-                                    ],
-                                    "isEnabled": bool,  # Used to specify whether
-                                      a route is enabled. Required.
-                                    "name": "str",  # The name of the route. The
-                                      name can only include alphanumeric characters, periods,
-                                      underscores, hyphens, has a maximum length of 64 characters, and
-                                      must be unique. Required.
-                                    "source": "str",  # The source that the
-                                      routing rule is to be applied to, such as DeviceMessages.
-                                      Required. Known values are: "Invalid", "DeviceMessages",
-                                      "TwinChangeEvents", "DeviceLifecycleEvents",
-                                      "DeviceJobLifecycleEvents", "DigitalTwinChangeEvents",
-                                      "DeviceConnectionStateEvents", and "MqttBrokerMessages".
-                                    "condition": "str"  # Optional. The condition
-                                      that is evaluated to apply the routing rule. If no condition is
-                                      provided, it evaluates to true by default. For grammar, see:
-                                      https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                                }
-                            ]
-                        },
-                        "state": "str",  # Optional. The hub state.
-                        "storageEndpoints": {
-                            "str": {
-                                "connectionString": "str",  # The connection string
-                                  for the Azure Storage account to which files are uploaded. Required.
-                                "containerName": "str",  # The name of the root
-                                  container where you upload files. The container need not exist but
-                                  should be creatable using the connectionString specified. Required.
-                                "authenticationType": "str",  # Optional. Specifies
-                                  authentication type being used for connecting to the storage account.
-                                  Known values are: "keyBased" and "identityBased".
-                                "identity": {
-                                    "userAssignedIdentity": "str"  # Optional.
-                                      The user assigned identity.
-                                },
-                                "sasTtlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which the SAS URI generated by IoT Hub for file
-                                  upload is valid. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload#file-upload-notification-configuration-options.
-                            }
-                        },
-                        "tlsCompatibilityMode": bool  # Optional. If True, TLS compatibility
-                          mode is enabled.
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. The resource tags.
-                    },
-                    "type": "str"  # Optional. The resource type.
-                }
         """
 
     @distributed_trace
     def begin_update(
-        self, resource_group_name: str, resource_name: str, iot_hub_tags: Union[JSON, IO[bytes]], **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
+        self,
+        resource_group_name: str,
+        resource_name: str,
+        iot_hub_tags: Union[_models.TagsResource, IO[bytes]],
+        **kwargs: Any
+    ) -> LROPoller[_models.IotHubDescription]:
         """Update an existing IoT Hubs tags.
 
         Update an existing IoT Hub tags. to update other fields use the CreateOrUpdate method.
@@ -6148,566 +1800,18 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :type resource_group_name: str
         :param resource_name: Name of iot hub to update. Required.
         :type resource_name: str
-        :param iot_hub_tags: Updated tag information to set into the iot hub instance. Is either a JSON
-         type or a IO[bytes] type. Required.
-        :type iot_hub_tags: JSON or IO[bytes]
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :param iot_hub_tags: Updated tag information to set into the iot hub instance. Is either a
+         TagsResource type or a IO[bytes] type. Required.
+        :type iot_hub_tags: ~iot_hub_client.models.TagsResource or IO[bytes]
+        :return: An instance of LROPoller that returns IotHubDescription
+        :rtype: ~azure.core.polling.LROPoller[~iot_hub_client.models.IotHubDescription]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                iot_hub_tags = {
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    }
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",  # The resource location. Required.
-                    "sku": {
-                        "name": "str",  # The name of the SKU. Required. Known values are:
-                          "F1", "S1", "S2", "S3", "B1", "B2", "B3", "P1", "P2", and "P3".
-                        "capacity": 0,  # Optional. The number of provisioned IoT Hub units.
-                          See:
-                          https://docs.microsoft.com/azure/azure-subscription-service-limits#iot-hub-limits.
-                        "tier": "str"  # Optional. The billing tier for the IoT hub. Known
-                          values are: "Free", "Standard", "Basic", and "Premium".
-                    },
-                    "etag": "str",  # Optional. The Etag field is *not* required. If it is
-                      provided in the response body, it must also be provided as a header per the
-                      normal ETag convention.
-                    "id": "str",  # Optional. The resource identifier.
-                    "identity": {
-                        "principalId": "str",  # Optional. Principal Id.
-                        "tenantId": "str",  # Optional. Tenant Id.
-                        "type": "str",  # Optional. The type of identity used for the
-                          resource. The type 'SystemAssigned,UserAssigned' includes both an implicitly
-                          created identity and a set of user assigned identities. The type 'None' will
-                          remove any identities from the service. Known values are: "SystemAssigned",
-                          "UserAssigned", "SystemAssigned, UserAssigned", and "None".
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",  # Optional. Dictionary of
-                                  :code:`<ArmUserIdentity>`.
-                                "principalId": "str"  # Optional. Dictionary of
-                                  :code:`<ArmUserIdentity>`.
-                            }
-                        }
-                    },
-                    "name": "str",  # Optional. The resource name.
-                    "properties": {
-                        "adrProperties": {
-                            "identityResourceId": "str",  # Optional. The identity used
-                              to manage the ADR namespace from the data plane.
-                            "namespaceResourceId": "str"  # Optional. The identifier of
-                              the Azure Device Registry namespace associated with the P SKU hub.
-                        },
-                        "allowedFqdnList": [
-                            "str"  # Optional. List of allowed FQDNs(Fully Qualified
-                              Domain Name) for egress from Iot Hub.
-                        ],
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",  # The name of the shared access
-                                  policy. Required.
-                                "rights": "str",  # The permissions assigned to the
-                                  shared access policy. Required. Known values are: "RegistryRead",
-                                  "RegistryWrite", "ServiceConnect", "DeviceConnect", "RegistryRead,
-                                  RegistryWrite", "RegistryRead, ServiceConnect", "RegistryRead,
-                                  DeviceConnect", "RegistryWrite, ServiceConnect", "RegistryWrite,
-                                  DeviceConnect", "ServiceConnect, DeviceConnect", "RegistryRead,
-                                  RegistryWrite, ServiceConnect", "RegistryRead, RegistryWrite,
-                                  DeviceConnect", "RegistryRead, ServiceConnect, DeviceConnect",
-                                  "RegistryWrite, ServiceConnect, DeviceConnect", and "RegistryRead,
-                                  RegistryWrite, ServiceConnect, DeviceConnect".
-                                "primaryKey": "str",  # Optional. The primary key.
-                                "secondaryKey": "str"  # Optional. The secondary key.
-                            }
-                        ],
-                        "cloudToDevice": {
-                            "defaultTtlAsIso8601": "1 day, 0:00:00",  # Optional. The
-                              default time to live for cloud-to-device messages in the device queue.
-                              See:
-                              https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                            "feedback": {
-                                "lockDurationAsIso8601": "1 day, 0:00:00",  #
-                                  Optional. The lock duration for the feedback queue. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                                "maxDeliveryCount": 0,  # Optional. The number of
-                                  times the IoT hub attempts to deliver a message on the feedback
-                                  queue. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                                "ttlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which a message is available to consume before it
-                                  is expired by the IoT hub. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                            },
-                            "maxDeliveryCount": 0  # Optional. The max delivery count for
-                              cloud-to-device messages in the device queue. See:
-                              https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                        },
-                        "comments": "str",  # Optional. IoT hub comments.
-                        "deviceStreams": {
-                            "streamingEndpoints": [
-                                "str"  # Optional. List of Device Streams Endpoints.
-                            ]
-                        },
-                        "disableDeviceSAS": bool,  # Optional. If true, all device(including
-                          Edge devices but excluding modules) scoped SAS keys cannot be used for
-                          authentication.
-                        "disableLocalAuth": bool,  # Optional. If true, SAS tokens with Iot
-                          hub scoped SAS keys cannot be used for authentication.
-                        "disableModuleSAS": bool,  # Optional. If true, all module scoped SAS
-                          keys cannot be used for authentication.
-                        "enableDataResidency": bool,  # Optional. This property when set to
-                          true, will enable data residency, thus, disabling disaster recovery.
-                        "enableFileUploadNotifications": bool,  # Optional. If True, file
-                          upload notifications are enabled.
-                        "encryption": {
-                            "keySource": "str",  # Optional. The source of the key.
-                            "keyVaultProperties": [
-                                {
-                                    "identity": {
-                                        "userAssignedIdentity": "str"  #
-                                          Optional. The user assigned identity.
-                                    },
-                                    "keyIdentifier": "str"  # Optional. The
-                                      identifier of the key.
-                                }
-                            ]
-                        },
-                        "eventHubEndpoints": {
-                            "str": {
-                                "endpoint": "str",  # Optional. The Event
-                                  Hub-compatible endpoint.
-                                "partitionCount": 0,  # Optional. The number of
-                                  partitions for receiving device-to-cloud messages in the Event
-                                  Hub-compatible endpoint. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#device-to-cloud-messages.
-                                "partitionIds": [
-                                    "str"  # Optional. The partition ids in the
-                                      Event Hub-compatible endpoint.
-                                ],
-                                "path": "str",  # Optional. The Event Hub-compatible
-                                  name.
-                                "retentionTimeInDays": 0  # Optional. The retention
-                                  time for device-to-cloud messages in days. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#device-to-cloud-messages.
-                            }
-                        },
-                        "features": "str",  # Optional. The capabilities and features enabled
-                          for the IoT hub. Known values are: "None" and "DeviceManagement".
-                        "hostName": "str",  # Optional. The name of the host.
-                        "ipFilterRules": [
-                            {
-                                "action": "str",  # The desired action for requests
-                                  captured by this rule. Required. Known values are: "Accept" and
-                                  "Reject".
-                                "filterName": "str",  # The name of the IP filter
-                                  rule. Required.
-                                "ipMask": "str"  # A string that contains the IP
-                                  address range in CIDR notation for the rule. Required.
-                            }
-                        ],
-                        "ipVersion": "str",  # Optional. This property specifies the IP
-                          Version the hub is currently utilizing. Known values are: "ipv4", "ipv6", and
-                          "ipv4ipv6".
-                        "locations": [
-                            {
-                                "location": "str",  # Optional. The name of the Azure
-                                  region.
-                                "role": "str"  # Optional. The role of the region,
-                                  can be either primary or secondary. The primary region is where the
-                                  IoT hub is currently provisioned. The secondary region is the Azure
-                                  disaster recovery (DR) paired region and also the region where the
-                                  IoT hub can failover to. Known values are: "primary" and "secondary".
-                            }
-                        ],
-                        "messagingEndpoints": {
-                            "str": {
-                                "lockDurationAsIso8601": "1 day, 0:00:00",  #
-                                  Optional. The lock duration. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                                "maxDeliveryCount": 0,  # Optional. The number of
-                                  times the IoT hub attempts to deliver a message. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                                "ttlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which a message is available to consume before it
-                                  is expired by the IoT hub. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                            }
-                        },
-                        "minTlsVersion": "str",  # Optional. Specifies the minimum TLS
-                          version to support for this hub. Can be set to "1.2" to have clients that use
-                          a TLS version below 1.2 to be rejected.
-                        "networkRuleSets": {
-                            "applyToBuiltInEventHubEndpoint": bool,  # If True, then
-                              Network Rule Set is also applied to BuiltIn EventHub EndPoint of IotHub.
-                              Required.
-                            "ipRules": [
-                                {
-                                    "filterName": "str",  # Name of the IP filter
-                                      rule. Required.
-                                    "ipMask": "str",  # A string that contains
-                                      the IP address range in CIDR notation for the rule. Required.
-                                    "action": "Allow"  # Optional. Default value
-                                      is "Allow". IP Filter Action. "Allow"
-                                }
-                            ],
-                            "defaultAction": "Deny"  # Optional. Default value is "Deny".
-                              Default Action for Network Rule Set. Known values are: "Deny" and
-                              "Allow".
-                        },
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",  # The
-                                          description for the current state of a private endpoint
-                                          connection. Required.
-                                        "status": "str",  # The status of a
-                                          private endpoint connection. Required. Known values are:
-                                          "Pending", "Approved", "Rejected", and "Disconnected".
-                                        "actionsRequired": "str"  # Optional.
-                                          Actions required for a private endpoint connection.
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"  # Optional. The resource
-                                          identifier.
-                                    }
-                                },
-                                "id": "str",  # Optional. The resource identifier.
-                                "name": "str",  # Optional. The resource name.
-                                "type": "str"  # Optional. The resource type.
-                            }
-                        ],
-                        "provisioningState": "str",  # Optional. The provisioning state.
-                        "publicNetworkAccess": "str",  # Optional. Whether requests from
-                          Public Network are allowed. Known values are: "Enabled" and "Disabled".
-                        "restrictOutboundNetworkAccess": bool,  # Optional. If true, egress
-                          from IotHub will be restricted to only the allowed FQDNs that are configured
-                          via allowedFqdnList.
-                        "rootCertificate": {
-                            "enableRootCertificateV2": bool,  # Optional. This property
-                              when set to true, hub will use G2 cert; while it's set to false, hub uses
-                              Baltimore Cert.
-                            "lastUpdatedTimeUtc": "2020-02-20 00:00:00"  # Optional. the
-                              last update time to root certificate flag.
-                        },
-                        "routing": {
-                            "endpoints": {
-                                "cosmosDBSqlContainers": [
-                                    {
-                                        "containerName": "str",  # The name
-                                          of the cosmos DB sql container in the cosmos DB database.
-                                          Required.
-                                        "databaseName": "str",  # The name of
-                                          the cosmos DB database in the cosmos DB account. Required.
-                                        "endpointUri": "str",  # The url of
-                                          the cosmos DB account. It must include the protocol https://.
-                                          Required.
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the cosmos DB
-                                          sql container endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "id": "str",  # Optional. Id of the
-                                          cosmos DB sql container endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "partitionKeyName": "str",  #
-                                          Optional. The name of the partition key associated with this
-                                          cosmos DB sql container if one exists. This is an optional
-                                          parameter.
-                                        "partitionKeyTemplate": "str",  #
-                                          Optional. The template for generating a synthetic partition
-                                          key value for use with this cosmos DB sql container. The
-                                          template must include at least one of the following
-                                          placeholders: {iothub}, {deviceid}, {DD}, {MM}, and {YYYY}.
-                                          Any one placeholder may be specified at most once, but order
-                                          and non-placeholder components are arbitrary. This parameter
-                                          is only required if PartitionKeyName is specified.
-                                        "primaryKey": "str",  # Optional. The
-                                          primary key of the cosmos DB account.
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the cosmos DB account.
-                                        "secondaryKey": "str",  # Optional.
-                                          The secondary key of the cosmos DB account.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the cosmos DB account.
-                                    }
-                                ],
-                                "eventHubs": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the event hub
-                                          endpoint. Known values are: "keyBased" and "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the event hub endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the event hub endpoint. It must include the
-                                          protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Event hub name on the event hub namespace.
-                                        "id": "str",  # Optional. Id of the
-                                          event hub endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the event hub endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the event hub endpoint.
-                                    }
-                                ],
-                                "serviceBusQueues": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. The name need not
-                                          be the same as the actual queue name. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the service bus
-                                          queue endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the service bus queue
-                                          endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the service bus queue endpoint. It must include
-                                          the protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Queue name on the service bus namespace.
-                                        "id": "str",  # Optional. Id of the
-                                          service bus queue endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the service bus queue
-                                          endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the service bus queue
-                                          endpoint.
-                                    }
-                                ],
-                                "serviceBusTopics": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types.  The name need
-                                          not be the same as the actual topic name. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the service bus
-                                          topic endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the service bus topic
-                                          endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the service bus topic endpoint. It must include
-                                          the protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Queue name on the service bus topic.
-                                        "id": "str",  # Optional. Id of the
-                                          service bus topic endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the service bus topic
-                                          endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the service bus topic
-                                          endpoint.
-                                    }
-                                ],
-                                "storageContainers": [
-                                    {
-                                        "containerName": "str",  # The name
-                                          of storage container in the storage account. Required.
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the storage
-                                          endpoint. Known values are: "keyBased" and "identityBased".
-                                        "batchFrequencyInSeconds": 0,  #
-                                          Optional. Time interval at which blobs are written to
-                                          storage. Value should be between 60 and 720 seconds. Default
-                                          value is 300 seconds.
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the storage account.
-                                        "encoding": "str",  # Optional.
-                                          Encoding that is used to serialize messages to blobs.
-                                          Supported values are 'avro', 'avrodeflate', and 'JSON'.
-                                          Default value is 'avro'. Known values are: "Avro",
-                                          "AvroDeflate", and "JSON".
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the storage endpoint. It must include the protocol
-                                          https://.
-                                        "fileNameFormat": "str",  # Optional.
-                                          File name format for the blob. Default format is
-                                          {iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}. All
-                                          parameters are mandatory but can be reordered.
-                                        "id": "str",  # Optional. Id of the
-                                          storage container endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "maxChunkSizeInBytes": 0,  #
-                                          Optional. Maximum number of bytes for each blob written to
-                                          storage. Value should be between 10485760(10MB) and
-                                          524288000(500MB). Default value is 314572800(300MB).
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the storage account.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the storage account.
-                                    }
-                                ]
-                            },
-                            "enrichments": [
-                                {
-                                    "endpointNames": [
-                                        "str"  # The list of endpoints for
-                                          which the enrichment is applied to the message. Required.
-                                    ],
-                                    "key": "str",  # The key or name for the
-                                      enrichment property. Required.
-                                    "value": "str"  # The value for the
-                                      enrichment property. Required.
-                                }
-                            ],
-                            "fallbackRoute": {
-                                "endpointNames": [
-                                    "str"  # The list of endpoints to which the
-                                      messages that satisfy the condition are routed to. Currently only
-                                      1 endpoint is allowed. Required.
-                                ],
-                                "isEnabled": bool,  # Used to specify whether the
-                                  fallback route is enabled. Required.
-                                "source": "str",  # The source to which the routing
-                                  rule is to be applied to. For example, DeviceMessages. Required.
-                                  Known values are: "Invalid", "DeviceMessages", "TwinChangeEvents",
-                                  "DeviceLifecycleEvents", "DeviceJobLifecycleEvents",
-                                  "DigitalTwinChangeEvents", "DeviceConnectionStateEvents", and
-                                  "MqttBrokerMessages".
-                                "condition": "str",  # Optional. The condition which
-                                  is evaluated in order to apply the fallback route. If the condition
-                                  is not provided it will evaluate to true by default. For grammar,
-                                  See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                                "name": "str"  # Optional. The name of the route. The
-                                  name can only include alphanumeric characters, periods, underscores,
-                                  hyphens, has a maximum length of 64 characters, and must be unique.
-                            },
-                            "routes": [
-                                {
-                                    "endpointNames": [
-                                        "str"  # The list of endpoints to
-                                          which messages that satisfy the condition are routed.
-                                          Currently only one endpoint is allowed. Required.
-                                    ],
-                                    "isEnabled": bool,  # Used to specify whether
-                                      a route is enabled. Required.
-                                    "name": "str",  # The name of the route. The
-                                      name can only include alphanumeric characters, periods,
-                                      underscores, hyphens, has a maximum length of 64 characters, and
-                                      must be unique. Required.
-                                    "source": "str",  # The source that the
-                                      routing rule is to be applied to, such as DeviceMessages.
-                                      Required. Known values are: "Invalid", "DeviceMessages",
-                                      "TwinChangeEvents", "DeviceLifecycleEvents",
-                                      "DeviceJobLifecycleEvents", "DigitalTwinChangeEvents",
-                                      "DeviceConnectionStateEvents", and "MqttBrokerMessages".
-                                    "condition": "str"  # Optional. The condition
-                                      that is evaluated to apply the routing rule. If no condition is
-                                      provided, it evaluates to true by default. For grammar, see:
-                                      https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                                }
-                            ]
-                        },
-                        "state": "str",  # Optional. The hub state.
-                        "storageEndpoints": {
-                            "str": {
-                                "connectionString": "str",  # The connection string
-                                  for the Azure Storage account to which files are uploaded. Required.
-                                "containerName": "str",  # The name of the root
-                                  container where you upload files. The container need not exist but
-                                  should be creatable using the connectionString specified. Required.
-                                "authenticationType": "str",  # Optional. Specifies
-                                  authentication type being used for connecting to the storage account.
-                                  Known values are: "keyBased" and "identityBased".
-                                "identity": {
-                                    "userAssignedIdentity": "str"  # Optional.
-                                      The user assigned identity.
-                                },
-                                "sasTtlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which the SAS URI generated by IoT Hub for file
-                                  upload is valid. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload#file-upload-notification-configuration-options.
-                            }
-                        },
-                        "tlsCompatibilityMode": bool  # Optional. If True, TLS compatibility
-                          mode is enabled.
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. The resource tags.
-                    },
-                    "type": "str"  # Optional. The resource type.
-                }
         """
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
         content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.IotHubDescription] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -6731,10 +1835,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
                 "str", response.headers.get("Azure-AsyncOperation")
             )
 
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("IotHubDescription", pipeline_response)
             if cls:
                 return cls(pipeline_response, deserialized, response_headers)  # type: ignore
             return deserialized
@@ -6746,15 +1847,19 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[JSON].from_continuation_token(
+            return LROPoller[_models.IotHubDescription].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
+        return LROPoller[_models.IotHubDescription](
+            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
+        )
 
-    def _delete_initial(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> Optional[JSON]:
+    def _delete_initial(
+        self, resource_group_name: str, resource_name: str, **kwargs: Any
+    ) -> Union[_models.IotHubDescription, _models.ErrorDetails]:
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
             404: ResourceNotFoundError,
@@ -6766,7 +1871,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[Optional[JSON]] = kwargs.pop("cls", None)
+        cls: ClsType[Union[_models.IotHubDescription, _models.ErrorDetails]] = kwargs.pop("cls", None)
 
         _request = build_iot_hub_resource_delete_request(
             resource_group_name=resource_group_name,
@@ -6789,15 +1894,13 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
         deserialized = None
         response_headers = {}
         if response.status_code == 200:
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("IotHubDescription", pipeline_response)
 
         if response.status_code == 202:
             response_headers["Azure-AsyncOperation"] = self._deserialize(
@@ -6805,16 +1908,10 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
             )
             response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
 
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("IotHubDescription", pipeline_response)
 
         if response.status_code == 404:
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("ErrorDetails", pipeline_response)
 
         if cls:
             return cls(pipeline_response, deserialized, response_headers)  # type: ignore
@@ -6822,8 +1919,9 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         return deserialized  # type: ignore
 
     @distributed_trace
-    def begin_delete(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
+    def begin_delete(
+        self, resource_group_name: str, resource_name: str, **kwargs: Any
+    ) -> LROPoller[_models.IotHubDescription]:
         """Delete an IoT hub.
 
         Delete an IoT hub.
@@ -6832,562 +1930,16 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :type resource_group_name: str
         :param resource_name: The name of the IoT hub. Required.
         :type resource_name: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :return: An instance of LROPoller that returns IotHubDescription or An instance of LROPoller
+         that returns ErrorDetails
+        :rtype: ~azure.core.polling.LROPoller[~iot_hub_client.models.IotHubDescription] or
+         ~azure.core.polling.LROPoller[~iot_hub_client.models.ErrorDetails]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200, 202
-                response == {
-                    "location": "str",  # The resource location. Required.
-                    "sku": {
-                        "name": "str",  # The name of the SKU. Required. Known values are:
-                          "F1", "S1", "S2", "S3", "B1", "B2", "B3", "P1", "P2", and "P3".
-                        "capacity": 0,  # Optional. The number of provisioned IoT Hub units.
-                          See:
-                          https://docs.microsoft.com/azure/azure-subscription-service-limits#iot-hub-limits.
-                        "tier": "str"  # Optional. The billing tier for the IoT hub. Known
-                          values are: "Free", "Standard", "Basic", and "Premium".
-                    },
-                    "etag": "str",  # Optional. The Etag field is *not* required. If it is
-                      provided in the response body, it must also be provided as a header per the
-                      normal ETag convention.
-                    "id": "str",  # Optional. The resource identifier.
-                    "identity": {
-                        "principalId": "str",  # Optional. Principal Id.
-                        "tenantId": "str",  # Optional. Tenant Id.
-                        "type": "str",  # Optional. The type of identity used for the
-                          resource. The type 'SystemAssigned,UserAssigned' includes both an implicitly
-                          created identity and a set of user assigned identities. The type 'None' will
-                          remove any identities from the service. Known values are: "SystemAssigned",
-                          "UserAssigned", "SystemAssigned, UserAssigned", and "None".
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",  # Optional. Dictionary of
-                                  :code:`<ArmUserIdentity>`.
-                                "principalId": "str"  # Optional. Dictionary of
-                                  :code:`<ArmUserIdentity>`.
-                            }
-                        }
-                    },
-                    "name": "str",  # Optional. The resource name.
-                    "properties": {
-                        "adrProperties": {
-                            "identityResourceId": "str",  # Optional. The identity used
-                              to manage the ADR namespace from the data plane.
-                            "namespaceResourceId": "str"  # Optional. The identifier of
-                              the Azure Device Registry namespace associated with the P SKU hub.
-                        },
-                        "allowedFqdnList": [
-                            "str"  # Optional. List of allowed FQDNs(Fully Qualified
-                              Domain Name) for egress from Iot Hub.
-                        ],
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",  # The name of the shared access
-                                  policy. Required.
-                                "rights": "str",  # The permissions assigned to the
-                                  shared access policy. Required. Known values are: "RegistryRead",
-                                  "RegistryWrite", "ServiceConnect", "DeviceConnect", "RegistryRead,
-                                  RegistryWrite", "RegistryRead, ServiceConnect", "RegistryRead,
-                                  DeviceConnect", "RegistryWrite, ServiceConnect", "RegistryWrite,
-                                  DeviceConnect", "ServiceConnect, DeviceConnect", "RegistryRead,
-                                  RegistryWrite, ServiceConnect", "RegistryRead, RegistryWrite,
-                                  DeviceConnect", "RegistryRead, ServiceConnect, DeviceConnect",
-                                  "RegistryWrite, ServiceConnect, DeviceConnect", and "RegistryRead,
-                                  RegistryWrite, ServiceConnect, DeviceConnect".
-                                "primaryKey": "str",  # Optional. The primary key.
-                                "secondaryKey": "str"  # Optional. The secondary key.
-                            }
-                        ],
-                        "cloudToDevice": {
-                            "defaultTtlAsIso8601": "1 day, 0:00:00",  # Optional. The
-                              default time to live for cloud-to-device messages in the device queue.
-                              See:
-                              https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                            "feedback": {
-                                "lockDurationAsIso8601": "1 day, 0:00:00",  #
-                                  Optional. The lock duration for the feedback queue. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                                "maxDeliveryCount": 0,  # Optional. The number of
-                                  times the IoT hub attempts to deliver a message on the feedback
-                                  queue. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                                "ttlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which a message is available to consume before it
-                                  is expired by the IoT hub. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                            },
-                            "maxDeliveryCount": 0  # Optional. The max delivery count for
-                              cloud-to-device messages in the device queue. See:
-                              https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                        },
-                        "comments": "str",  # Optional. IoT hub comments.
-                        "deviceStreams": {
-                            "streamingEndpoints": [
-                                "str"  # Optional. List of Device Streams Endpoints.
-                            ]
-                        },
-                        "disableDeviceSAS": bool,  # Optional. If true, all device(including
-                          Edge devices but excluding modules) scoped SAS keys cannot be used for
-                          authentication.
-                        "disableLocalAuth": bool,  # Optional. If true, SAS tokens with Iot
-                          hub scoped SAS keys cannot be used for authentication.
-                        "disableModuleSAS": bool,  # Optional. If true, all module scoped SAS
-                          keys cannot be used for authentication.
-                        "enableDataResidency": bool,  # Optional. This property when set to
-                          true, will enable data residency, thus, disabling disaster recovery.
-                        "enableFileUploadNotifications": bool,  # Optional. If True, file
-                          upload notifications are enabled.
-                        "encryption": {
-                            "keySource": "str",  # Optional. The source of the key.
-                            "keyVaultProperties": [
-                                {
-                                    "identity": {
-                                        "userAssignedIdentity": "str"  #
-                                          Optional. The user assigned identity.
-                                    },
-                                    "keyIdentifier": "str"  # Optional. The
-                                      identifier of the key.
-                                }
-                            ]
-                        },
-                        "eventHubEndpoints": {
-                            "str": {
-                                "endpoint": "str",  # Optional. The Event
-                                  Hub-compatible endpoint.
-                                "partitionCount": 0,  # Optional. The number of
-                                  partitions for receiving device-to-cloud messages in the Event
-                                  Hub-compatible endpoint. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#device-to-cloud-messages.
-                                "partitionIds": [
-                                    "str"  # Optional. The partition ids in the
-                                      Event Hub-compatible endpoint.
-                                ],
-                                "path": "str",  # Optional. The Event Hub-compatible
-                                  name.
-                                "retentionTimeInDays": 0  # Optional. The retention
-                                  time for device-to-cloud messages in days. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#device-to-cloud-messages.
-                            }
-                        },
-                        "features": "str",  # Optional. The capabilities and features enabled
-                          for the IoT hub. Known values are: "None" and "DeviceManagement".
-                        "hostName": "str",  # Optional. The name of the host.
-                        "ipFilterRules": [
-                            {
-                                "action": "str",  # The desired action for requests
-                                  captured by this rule. Required. Known values are: "Accept" and
-                                  "Reject".
-                                "filterName": "str",  # The name of the IP filter
-                                  rule. Required.
-                                "ipMask": "str"  # A string that contains the IP
-                                  address range in CIDR notation for the rule. Required.
-                            }
-                        ],
-                        "ipVersion": "str",  # Optional. This property specifies the IP
-                          Version the hub is currently utilizing. Known values are: "ipv4", "ipv6", and
-                          "ipv4ipv6".
-                        "locations": [
-                            {
-                                "location": "str",  # Optional. The name of the Azure
-                                  region.
-                                "role": "str"  # Optional. The role of the region,
-                                  can be either primary or secondary. The primary region is where the
-                                  IoT hub is currently provisioned. The secondary region is the Azure
-                                  disaster recovery (DR) paired region and also the region where the
-                                  IoT hub can failover to. Known values are: "primary" and "secondary".
-                            }
-                        ],
-                        "messagingEndpoints": {
-                            "str": {
-                                "lockDurationAsIso8601": "1 day, 0:00:00",  #
-                                  Optional. The lock duration. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                                "maxDeliveryCount": 0,  # Optional. The number of
-                                  times the IoT hub attempts to deliver a message. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                                "ttlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which a message is available to consume before it
-                                  is expired by the IoT hub. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                            }
-                        },
-                        "minTlsVersion": "str",  # Optional. Specifies the minimum TLS
-                          version to support for this hub. Can be set to "1.2" to have clients that use
-                          a TLS version below 1.2 to be rejected.
-                        "networkRuleSets": {
-                            "applyToBuiltInEventHubEndpoint": bool,  # If True, then
-                              Network Rule Set is also applied to BuiltIn EventHub EndPoint of IotHub.
-                              Required.
-                            "ipRules": [
-                                {
-                                    "filterName": "str",  # Name of the IP filter
-                                      rule. Required.
-                                    "ipMask": "str",  # A string that contains
-                                      the IP address range in CIDR notation for the rule. Required.
-                                    "action": "Allow"  # Optional. Default value
-                                      is "Allow". IP Filter Action. "Allow"
-                                }
-                            ],
-                            "defaultAction": "Deny"  # Optional. Default value is "Deny".
-                              Default Action for Network Rule Set. Known values are: "Deny" and
-                              "Allow".
-                        },
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",  # The
-                                          description for the current state of a private endpoint
-                                          connection. Required.
-                                        "status": "str",  # The status of a
-                                          private endpoint connection. Required. Known values are:
-                                          "Pending", "Approved", "Rejected", and "Disconnected".
-                                        "actionsRequired": "str"  # Optional.
-                                          Actions required for a private endpoint connection.
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"  # Optional. The resource
-                                          identifier.
-                                    }
-                                },
-                                "id": "str",  # Optional. The resource identifier.
-                                "name": "str",  # Optional. The resource name.
-                                "type": "str"  # Optional. The resource type.
-                            }
-                        ],
-                        "provisioningState": "str",  # Optional. The provisioning state.
-                        "publicNetworkAccess": "str",  # Optional. Whether requests from
-                          Public Network are allowed. Known values are: "Enabled" and "Disabled".
-                        "restrictOutboundNetworkAccess": bool,  # Optional. If true, egress
-                          from IotHub will be restricted to only the allowed FQDNs that are configured
-                          via allowedFqdnList.
-                        "rootCertificate": {
-                            "enableRootCertificateV2": bool,  # Optional. This property
-                              when set to true, hub will use G2 cert; while it's set to false, hub uses
-                              Baltimore Cert.
-                            "lastUpdatedTimeUtc": "2020-02-20 00:00:00"  # Optional. the
-                              last update time to root certificate flag.
-                        },
-                        "routing": {
-                            "endpoints": {
-                                "cosmosDBSqlContainers": [
-                                    {
-                                        "containerName": "str",  # The name
-                                          of the cosmos DB sql container in the cosmos DB database.
-                                          Required.
-                                        "databaseName": "str",  # The name of
-                                          the cosmos DB database in the cosmos DB account. Required.
-                                        "endpointUri": "str",  # The url of
-                                          the cosmos DB account. It must include the protocol https://.
-                                          Required.
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the cosmos DB
-                                          sql container endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "id": "str",  # Optional. Id of the
-                                          cosmos DB sql container endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "partitionKeyName": "str",  #
-                                          Optional. The name of the partition key associated with this
-                                          cosmos DB sql container if one exists. This is an optional
-                                          parameter.
-                                        "partitionKeyTemplate": "str",  #
-                                          Optional. The template for generating a synthetic partition
-                                          key value for use with this cosmos DB sql container. The
-                                          template must include at least one of the following
-                                          placeholders: {iothub}, {deviceid}, {DD}, {MM}, and {YYYY}.
-                                          Any one placeholder may be specified at most once, but order
-                                          and non-placeholder components are arbitrary. This parameter
-                                          is only required if PartitionKeyName is specified.
-                                        "primaryKey": "str",  # Optional. The
-                                          primary key of the cosmos DB account.
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the cosmos DB account.
-                                        "secondaryKey": "str",  # Optional.
-                                          The secondary key of the cosmos DB account.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the cosmos DB account.
-                                    }
-                                ],
-                                "eventHubs": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the event hub
-                                          endpoint. Known values are: "keyBased" and "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the event hub endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the event hub endpoint. It must include the
-                                          protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Event hub name on the event hub namespace.
-                                        "id": "str",  # Optional. Id of the
-                                          event hub endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the event hub endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the event hub endpoint.
-                                    }
-                                ],
-                                "serviceBusQueues": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. The name need not
-                                          be the same as the actual queue name. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the service bus
-                                          queue endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the service bus queue
-                                          endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the service bus queue endpoint. It must include
-                                          the protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Queue name on the service bus namespace.
-                                        "id": "str",  # Optional. Id of the
-                                          service bus queue endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the service bus queue
-                                          endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the service bus queue
-                                          endpoint.
-                                    }
-                                ],
-                                "serviceBusTopics": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types.  The name need
-                                          not be the same as the actual topic name. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the service bus
-                                          topic endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the service bus topic
-                                          endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the service bus topic endpoint. It must include
-                                          the protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Queue name on the service bus topic.
-                                        "id": "str",  # Optional. Id of the
-                                          service bus topic endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the service bus topic
-                                          endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the service bus topic
-                                          endpoint.
-                                    }
-                                ],
-                                "storageContainers": [
-                                    {
-                                        "containerName": "str",  # The name
-                                          of storage container in the storage account. Required.
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the storage
-                                          endpoint. Known values are: "keyBased" and "identityBased".
-                                        "batchFrequencyInSeconds": 0,  #
-                                          Optional. Time interval at which blobs are written to
-                                          storage. Value should be between 60 and 720 seconds. Default
-                                          value is 300 seconds.
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the storage account.
-                                        "encoding": "str",  # Optional.
-                                          Encoding that is used to serialize messages to blobs.
-                                          Supported values are 'avro', 'avrodeflate', and 'JSON'.
-                                          Default value is 'avro'. Known values are: "Avro",
-                                          "AvroDeflate", and "JSON".
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the storage endpoint. It must include the protocol
-                                          https://.
-                                        "fileNameFormat": "str",  # Optional.
-                                          File name format for the blob. Default format is
-                                          {iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}. All
-                                          parameters are mandatory but can be reordered.
-                                        "id": "str",  # Optional. Id of the
-                                          storage container endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "maxChunkSizeInBytes": 0,  #
-                                          Optional. Maximum number of bytes for each blob written to
-                                          storage. Value should be between 10485760(10MB) and
-                                          524288000(500MB). Default value is 314572800(300MB).
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the storage account.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the storage account.
-                                    }
-                                ]
-                            },
-                            "enrichments": [
-                                {
-                                    "endpointNames": [
-                                        "str"  # The list of endpoints for
-                                          which the enrichment is applied to the message. Required.
-                                    ],
-                                    "key": "str",  # The key or name for the
-                                      enrichment property. Required.
-                                    "value": "str"  # The value for the
-                                      enrichment property. Required.
-                                }
-                            ],
-                            "fallbackRoute": {
-                                "endpointNames": [
-                                    "str"  # The list of endpoints to which the
-                                      messages that satisfy the condition are routed to. Currently only
-                                      1 endpoint is allowed. Required.
-                                ],
-                                "isEnabled": bool,  # Used to specify whether the
-                                  fallback route is enabled. Required.
-                                "source": "str",  # The source to which the routing
-                                  rule is to be applied to. For example, DeviceMessages. Required.
-                                  Known values are: "Invalid", "DeviceMessages", "TwinChangeEvents",
-                                  "DeviceLifecycleEvents", "DeviceJobLifecycleEvents",
-                                  "DigitalTwinChangeEvents", "DeviceConnectionStateEvents", and
-                                  "MqttBrokerMessages".
-                                "condition": "str",  # Optional. The condition which
-                                  is evaluated in order to apply the fallback route. If the condition
-                                  is not provided it will evaluate to true by default. For grammar,
-                                  See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                                "name": "str"  # Optional. The name of the route. The
-                                  name can only include alphanumeric characters, periods, underscores,
-                                  hyphens, has a maximum length of 64 characters, and must be unique.
-                            },
-                            "routes": [
-                                {
-                                    "endpointNames": [
-                                        "str"  # The list of endpoints to
-                                          which messages that satisfy the condition are routed.
-                                          Currently only one endpoint is allowed. Required.
-                                    ],
-                                    "isEnabled": bool,  # Used to specify whether
-                                      a route is enabled. Required.
-                                    "name": "str",  # The name of the route. The
-                                      name can only include alphanumeric characters, periods,
-                                      underscores, hyphens, has a maximum length of 64 characters, and
-                                      must be unique. Required.
-                                    "source": "str",  # The source that the
-                                      routing rule is to be applied to, such as DeviceMessages.
-                                      Required. Known values are: "Invalid", "DeviceMessages",
-                                      "TwinChangeEvents", "DeviceLifecycleEvents",
-                                      "DeviceJobLifecycleEvents", "DigitalTwinChangeEvents",
-                                      "DeviceConnectionStateEvents", and "MqttBrokerMessages".
-                                    "condition": "str"  # Optional. The condition
-                                      that is evaluated to apply the routing rule. If no condition is
-                                      provided, it evaluates to true by default. For grammar, see:
-                                      https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                                }
-                            ]
-                        },
-                        "state": "str",  # Optional. The hub state.
-                        "storageEndpoints": {
-                            "str": {
-                                "connectionString": "str",  # The connection string
-                                  for the Azure Storage account to which files are uploaded. Required.
-                                "containerName": "str",  # The name of the root
-                                  container where you upload files. The container need not exist but
-                                  should be creatable using the connectionString specified. Required.
-                                "authenticationType": "str",  # Optional. Specifies
-                                  authentication type being used for connecting to the storage account.
-                                  Known values are: "keyBased" and "identityBased".
-                                "identity": {
-                                    "userAssignedIdentity": "str"  # Optional.
-                                      The user assigned identity.
-                                },
-                                "sasTtlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which the SAS URI generated by IoT Hub for file
-                                  upload is valid. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload#file-upload-notification-configuration-options.
-                            }
-                        },
-                        "tlsCompatibilityMode": bool  # Optional. If True, TLS compatibility
-                          mode is enabled.
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. The resource tags.
-                    },
-                    "type": "str"  # Optional. The resource type.
-                }
-                # response body for status code(s): 404
-                response == {
-                    "code": "str",  # Optional. The error code.
-                    "details": "str",  # Optional. The error details.
-                    "httpStatusCode": "str",  # Optional. The HTTP status code.
-                    "message": "str"  # Optional. The error message.
-                }
         """
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.IotHubDescription] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -7403,11 +1955,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
-            response = pipeline_response.http_response
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("IotHubDescription", pipeline_response)
             if cls:
                 return cls(pipeline_response, deserialized, {})  # type: ignore
             return deserialized
@@ -7419,570 +1967,32 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[JSON].from_continuation_token(
+            return LROPoller[_models.IotHubDescription].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
+        return LROPoller[_models.IotHubDescription](
+            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
+        )
 
     @distributed_trace
-    def list_by_subscription(self, **kwargs: Any) -> Iterable[JSON]:
-        # pylint: disable=line-too-long
+    def list_by_subscription(self, **kwargs: Any) -> Iterable["_models.IotHubDescription"]:
         """Get all the IoT hubs in a subscription.
 
         Get all the IoT hubs in a subscription.
 
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.paging.ItemPaged[JSON]
+        :return: An iterator like instance of IotHubDescription
+        :rtype: ~azure.core.paging.ItemPaged[~iot_hub_client.models.IotHubDescription]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",  # The resource location. Required.
-                    "sku": {
-                        "name": "str",  # The name of the SKU. Required. Known values are:
-                          "F1", "S1", "S2", "S3", "B1", "B2", "B3", "P1", "P2", and "P3".
-                        "capacity": 0,  # Optional. The number of provisioned IoT Hub units.
-                          See:
-                          https://docs.microsoft.com/azure/azure-subscription-service-limits#iot-hub-limits.
-                        "tier": "str"  # Optional. The billing tier for the IoT hub. Known
-                          values are: "Free", "Standard", "Basic", and "Premium".
-                    },
-                    "etag": "str",  # Optional. The Etag field is *not* required. If it is
-                      provided in the response body, it must also be provided as a header per the
-                      normal ETag convention.
-                    "id": "str",  # Optional. The resource identifier.
-                    "identity": {
-                        "principalId": "str",  # Optional. Principal Id.
-                        "tenantId": "str",  # Optional. Tenant Id.
-                        "type": "str",  # Optional. The type of identity used for the
-                          resource. The type 'SystemAssigned,UserAssigned' includes both an implicitly
-                          created identity and a set of user assigned identities. The type 'None' will
-                          remove any identities from the service. Known values are: "SystemAssigned",
-                          "UserAssigned", "SystemAssigned, UserAssigned", and "None".
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",  # Optional. Dictionary of
-                                  :code:`<ArmUserIdentity>`.
-                                "principalId": "str"  # Optional. Dictionary of
-                                  :code:`<ArmUserIdentity>`.
-                            }
-                        }
-                    },
-                    "name": "str",  # Optional. The resource name.
-                    "properties": {
-                        "adrProperties": {
-                            "identityResourceId": "str",  # Optional. The identity used
-                              to manage the ADR namespace from the data plane.
-                            "namespaceResourceId": "str"  # Optional. The identifier of
-                              the Azure Device Registry namespace associated with the P SKU hub.
-                        },
-                        "allowedFqdnList": [
-                            "str"  # Optional. List of allowed FQDNs(Fully Qualified
-                              Domain Name) for egress from Iot Hub.
-                        ],
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",  # The name of the shared access
-                                  policy. Required.
-                                "rights": "str",  # The permissions assigned to the
-                                  shared access policy. Required. Known values are: "RegistryRead",
-                                  "RegistryWrite", "ServiceConnect", "DeviceConnect", "RegistryRead,
-                                  RegistryWrite", "RegistryRead, ServiceConnect", "RegistryRead,
-                                  DeviceConnect", "RegistryWrite, ServiceConnect", "RegistryWrite,
-                                  DeviceConnect", "ServiceConnect, DeviceConnect", "RegistryRead,
-                                  RegistryWrite, ServiceConnect", "RegistryRead, RegistryWrite,
-                                  DeviceConnect", "RegistryRead, ServiceConnect, DeviceConnect",
-                                  "RegistryWrite, ServiceConnect, DeviceConnect", and "RegistryRead,
-                                  RegistryWrite, ServiceConnect, DeviceConnect".
-                                "primaryKey": "str",  # Optional. The primary key.
-                                "secondaryKey": "str"  # Optional. The secondary key.
-                            }
-                        ],
-                        "cloudToDevice": {
-                            "defaultTtlAsIso8601": "1 day, 0:00:00",  # Optional. The
-                              default time to live for cloud-to-device messages in the device queue.
-                              See:
-                              https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                            "feedback": {
-                                "lockDurationAsIso8601": "1 day, 0:00:00",  #
-                                  Optional. The lock duration for the feedback queue. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                                "maxDeliveryCount": 0,  # Optional. The number of
-                                  times the IoT hub attempts to deliver a message on the feedback
-                                  queue. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                                "ttlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which a message is available to consume before it
-                                  is expired by the IoT hub. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                            },
-                            "maxDeliveryCount": 0  # Optional. The max delivery count for
-                              cloud-to-device messages in the device queue. See:
-                              https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                        },
-                        "comments": "str",  # Optional. IoT hub comments.
-                        "deviceStreams": {
-                            "streamingEndpoints": [
-                                "str"  # Optional. List of Device Streams Endpoints.
-                            ]
-                        },
-                        "disableDeviceSAS": bool,  # Optional. If true, all device(including
-                          Edge devices but excluding modules) scoped SAS keys cannot be used for
-                          authentication.
-                        "disableLocalAuth": bool,  # Optional. If true, SAS tokens with Iot
-                          hub scoped SAS keys cannot be used for authentication.
-                        "disableModuleSAS": bool,  # Optional. If true, all module scoped SAS
-                          keys cannot be used for authentication.
-                        "enableDataResidency": bool,  # Optional. This property when set to
-                          true, will enable data residency, thus, disabling disaster recovery.
-                        "enableFileUploadNotifications": bool,  # Optional. If True, file
-                          upload notifications are enabled.
-                        "encryption": {
-                            "keySource": "str",  # Optional. The source of the key.
-                            "keyVaultProperties": [
-                                {
-                                    "identity": {
-                                        "userAssignedIdentity": "str"  #
-                                          Optional. The user assigned identity.
-                                    },
-                                    "keyIdentifier": "str"  # Optional. The
-                                      identifier of the key.
-                                }
-                            ]
-                        },
-                        "eventHubEndpoints": {
-                            "str": {
-                                "endpoint": "str",  # Optional. The Event
-                                  Hub-compatible endpoint.
-                                "partitionCount": 0,  # Optional. The number of
-                                  partitions for receiving device-to-cloud messages in the Event
-                                  Hub-compatible endpoint. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#device-to-cloud-messages.
-                                "partitionIds": [
-                                    "str"  # Optional. The partition ids in the
-                                      Event Hub-compatible endpoint.
-                                ],
-                                "path": "str",  # Optional. The Event Hub-compatible
-                                  name.
-                                "retentionTimeInDays": 0  # Optional. The retention
-                                  time for device-to-cloud messages in days. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#device-to-cloud-messages.
-                            }
-                        },
-                        "features": "str",  # Optional. The capabilities and features enabled
-                          for the IoT hub. Known values are: "None" and "DeviceManagement".
-                        "hostName": "str",  # Optional. The name of the host.
-                        "ipFilterRules": [
-                            {
-                                "action": "str",  # The desired action for requests
-                                  captured by this rule. Required. Known values are: "Accept" and
-                                  "Reject".
-                                "filterName": "str",  # The name of the IP filter
-                                  rule. Required.
-                                "ipMask": "str"  # A string that contains the IP
-                                  address range in CIDR notation for the rule. Required.
-                            }
-                        ],
-                        "ipVersion": "str",  # Optional. This property specifies the IP
-                          Version the hub is currently utilizing. Known values are: "ipv4", "ipv6", and
-                          "ipv4ipv6".
-                        "locations": [
-                            {
-                                "location": "str",  # Optional. The name of the Azure
-                                  region.
-                                "role": "str"  # Optional. The role of the region,
-                                  can be either primary or secondary. The primary region is where the
-                                  IoT hub is currently provisioned. The secondary region is the Azure
-                                  disaster recovery (DR) paired region and also the region where the
-                                  IoT hub can failover to. Known values are: "primary" and "secondary".
-                            }
-                        ],
-                        "messagingEndpoints": {
-                            "str": {
-                                "lockDurationAsIso8601": "1 day, 0:00:00",  #
-                                  Optional. The lock duration. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                                "maxDeliveryCount": 0,  # Optional. The number of
-                                  times the IoT hub attempts to deliver a message. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                                "ttlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which a message is available to consume before it
-                                  is expired by the IoT hub. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                            }
-                        },
-                        "minTlsVersion": "str",  # Optional. Specifies the minimum TLS
-                          version to support for this hub. Can be set to "1.2" to have clients that use
-                          a TLS version below 1.2 to be rejected.
-                        "networkRuleSets": {
-                            "applyToBuiltInEventHubEndpoint": bool,  # If True, then
-                              Network Rule Set is also applied to BuiltIn EventHub EndPoint of IotHub.
-                              Required.
-                            "ipRules": [
-                                {
-                                    "filterName": "str",  # Name of the IP filter
-                                      rule. Required.
-                                    "ipMask": "str",  # A string that contains
-                                      the IP address range in CIDR notation for the rule. Required.
-                                    "action": "Allow"  # Optional. Default value
-                                      is "Allow". IP Filter Action. "Allow"
-                                }
-                            ],
-                            "defaultAction": "Deny"  # Optional. Default value is "Deny".
-                              Default Action for Network Rule Set. Known values are: "Deny" and
-                              "Allow".
-                        },
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",  # The
-                                          description for the current state of a private endpoint
-                                          connection. Required.
-                                        "status": "str",  # The status of a
-                                          private endpoint connection. Required. Known values are:
-                                          "Pending", "Approved", "Rejected", and "Disconnected".
-                                        "actionsRequired": "str"  # Optional.
-                                          Actions required for a private endpoint connection.
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"  # Optional. The resource
-                                          identifier.
-                                    }
-                                },
-                                "id": "str",  # Optional. The resource identifier.
-                                "name": "str",  # Optional. The resource name.
-                                "type": "str"  # Optional. The resource type.
-                            }
-                        ],
-                        "provisioningState": "str",  # Optional. The provisioning state.
-                        "publicNetworkAccess": "str",  # Optional. Whether requests from
-                          Public Network are allowed. Known values are: "Enabled" and "Disabled".
-                        "restrictOutboundNetworkAccess": bool,  # Optional. If true, egress
-                          from IotHub will be restricted to only the allowed FQDNs that are configured
-                          via allowedFqdnList.
-                        "rootCertificate": {
-                            "enableRootCertificateV2": bool,  # Optional. This property
-                              when set to true, hub will use G2 cert; while it's set to false, hub uses
-                              Baltimore Cert.
-                            "lastUpdatedTimeUtc": "2020-02-20 00:00:00"  # Optional. the
-                              last update time to root certificate flag.
-                        },
-                        "routing": {
-                            "endpoints": {
-                                "cosmosDBSqlContainers": [
-                                    {
-                                        "containerName": "str",  # The name
-                                          of the cosmos DB sql container in the cosmos DB database.
-                                          Required.
-                                        "databaseName": "str",  # The name of
-                                          the cosmos DB database in the cosmos DB account. Required.
-                                        "endpointUri": "str",  # The url of
-                                          the cosmos DB account. It must include the protocol https://.
-                                          Required.
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the cosmos DB
-                                          sql container endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "id": "str",  # Optional. Id of the
-                                          cosmos DB sql container endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "partitionKeyName": "str",  #
-                                          Optional. The name of the partition key associated with this
-                                          cosmos DB sql container if one exists. This is an optional
-                                          parameter.
-                                        "partitionKeyTemplate": "str",  #
-                                          Optional. The template for generating a synthetic partition
-                                          key value for use with this cosmos DB sql container. The
-                                          template must include at least one of the following
-                                          placeholders: {iothub}, {deviceid}, {DD}, {MM}, and {YYYY}.
-                                          Any one placeholder may be specified at most once, but order
-                                          and non-placeholder components are arbitrary. This parameter
-                                          is only required if PartitionKeyName is specified.
-                                        "primaryKey": "str",  # Optional. The
-                                          primary key of the cosmos DB account.
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the cosmos DB account.
-                                        "secondaryKey": "str",  # Optional.
-                                          The secondary key of the cosmos DB account.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the cosmos DB account.
-                                    }
-                                ],
-                                "eventHubs": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the event hub
-                                          endpoint. Known values are: "keyBased" and "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the event hub endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the event hub endpoint. It must include the
-                                          protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Event hub name on the event hub namespace.
-                                        "id": "str",  # Optional. Id of the
-                                          event hub endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the event hub endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the event hub endpoint.
-                                    }
-                                ],
-                                "serviceBusQueues": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. The name need not
-                                          be the same as the actual queue name. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the service bus
-                                          queue endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the service bus queue
-                                          endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the service bus queue endpoint. It must include
-                                          the protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Queue name on the service bus namespace.
-                                        "id": "str",  # Optional. Id of the
-                                          service bus queue endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the service bus queue
-                                          endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the service bus queue
-                                          endpoint.
-                                    }
-                                ],
-                                "serviceBusTopics": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types.  The name need
-                                          not be the same as the actual topic name. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the service bus
-                                          topic endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the service bus topic
-                                          endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the service bus topic endpoint. It must include
-                                          the protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Queue name on the service bus topic.
-                                        "id": "str",  # Optional. Id of the
-                                          service bus topic endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the service bus topic
-                                          endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the service bus topic
-                                          endpoint.
-                                    }
-                                ],
-                                "storageContainers": [
-                                    {
-                                        "containerName": "str",  # The name
-                                          of storage container in the storage account. Required.
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the storage
-                                          endpoint. Known values are: "keyBased" and "identityBased".
-                                        "batchFrequencyInSeconds": 0,  #
-                                          Optional. Time interval at which blobs are written to
-                                          storage. Value should be between 60 and 720 seconds. Default
-                                          value is 300 seconds.
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the storage account.
-                                        "encoding": "str",  # Optional.
-                                          Encoding that is used to serialize messages to blobs.
-                                          Supported values are 'avro', 'avrodeflate', and 'JSON'.
-                                          Default value is 'avro'. Known values are: "Avro",
-                                          "AvroDeflate", and "JSON".
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the storage endpoint. It must include the protocol
-                                          https://.
-                                        "fileNameFormat": "str",  # Optional.
-                                          File name format for the blob. Default format is
-                                          {iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}. All
-                                          parameters are mandatory but can be reordered.
-                                        "id": "str",  # Optional. Id of the
-                                          storage container endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "maxChunkSizeInBytes": 0,  #
-                                          Optional. Maximum number of bytes for each blob written to
-                                          storage. Value should be between 10485760(10MB) and
-                                          524288000(500MB). Default value is 314572800(300MB).
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the storage account.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the storage account.
-                                    }
-                                ]
-                            },
-                            "enrichments": [
-                                {
-                                    "endpointNames": [
-                                        "str"  # The list of endpoints for
-                                          which the enrichment is applied to the message. Required.
-                                    ],
-                                    "key": "str",  # The key or name for the
-                                      enrichment property. Required.
-                                    "value": "str"  # The value for the
-                                      enrichment property. Required.
-                                }
-                            ],
-                            "fallbackRoute": {
-                                "endpointNames": [
-                                    "str"  # The list of endpoints to which the
-                                      messages that satisfy the condition are routed to. Currently only
-                                      1 endpoint is allowed. Required.
-                                ],
-                                "isEnabled": bool,  # Used to specify whether the
-                                  fallback route is enabled. Required.
-                                "source": "str",  # The source to which the routing
-                                  rule is to be applied to. For example, DeviceMessages. Required.
-                                  Known values are: "Invalid", "DeviceMessages", "TwinChangeEvents",
-                                  "DeviceLifecycleEvents", "DeviceJobLifecycleEvents",
-                                  "DigitalTwinChangeEvents", "DeviceConnectionStateEvents", and
-                                  "MqttBrokerMessages".
-                                "condition": "str",  # Optional. The condition which
-                                  is evaluated in order to apply the fallback route. If the condition
-                                  is not provided it will evaluate to true by default. For grammar,
-                                  See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                                "name": "str"  # Optional. The name of the route. The
-                                  name can only include alphanumeric characters, periods, underscores,
-                                  hyphens, has a maximum length of 64 characters, and must be unique.
-                            },
-                            "routes": [
-                                {
-                                    "endpointNames": [
-                                        "str"  # The list of endpoints to
-                                          which messages that satisfy the condition are routed.
-                                          Currently only one endpoint is allowed. Required.
-                                    ],
-                                    "isEnabled": bool,  # Used to specify whether
-                                      a route is enabled. Required.
-                                    "name": "str",  # The name of the route. The
-                                      name can only include alphanumeric characters, periods,
-                                      underscores, hyphens, has a maximum length of 64 characters, and
-                                      must be unique. Required.
-                                    "source": "str",  # The source that the
-                                      routing rule is to be applied to, such as DeviceMessages.
-                                      Required. Known values are: "Invalid", "DeviceMessages",
-                                      "TwinChangeEvents", "DeviceLifecycleEvents",
-                                      "DeviceJobLifecycleEvents", "DigitalTwinChangeEvents",
-                                      "DeviceConnectionStateEvents", and "MqttBrokerMessages".
-                                    "condition": "str"  # Optional. The condition
-                                      that is evaluated to apply the routing rule. If no condition is
-                                      provided, it evaluates to true by default. For grammar, see:
-                                      https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                                }
-                            ]
-                        },
-                        "state": "str",  # Optional. The hub state.
-                        "storageEndpoints": {
-                            "str": {
-                                "connectionString": "str",  # The connection string
-                                  for the Azure Storage account to which files are uploaded. Required.
-                                "containerName": "str",  # The name of the root
-                                  container where you upload files. The container need not exist but
-                                  should be creatable using the connectionString specified. Required.
-                                "authenticationType": "str",  # Optional. Specifies
-                                  authentication type being used for connecting to the storage account.
-                                  Known values are: "keyBased" and "identityBased".
-                                "identity": {
-                                    "userAssignedIdentity": "str"  # Optional.
-                                      The user assigned identity.
-                                },
-                                "sasTtlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which the SAS URI generated by IoT Hub for file
-                                  upload is valid. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload#file-upload-notification-configuration-options.
-                            }
-                        },
-                        "tlsCompatibilityMode": bool  # Optional. If True, TLS compatibility
-                          mode is enabled.
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. The resource tags.
-                    },
-                    "type": "str"  # Optional. The resource type.
-                }
         """
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models._models.IotHubDescriptionListResult] = kwargs.pop(  # pylint: disable=protected-access
+            "cls", None
+        )
 
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -8021,11 +2031,13 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
             return _request
 
         def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
+            deserialized = self._deserialize(
+                _models._models.IotHubDescriptionListResult, pipeline_response  # pylint: disable=protected-access
+            )
+            list_of_elem = deserialized.value
             if cls:
                 list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, iter(list_of_elem)
+            return deserialized.next_link or None, iter(list_of_elem)
 
         def get_next(next_link=None):
             _request = prepare_request(next_link)
@@ -8040,570 +2052,31 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
                 if _stream:
                     response.read()  # Load the body in memory and close the socket
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response)
+                error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+                raise HttpResponseError(response=response, model=error)
 
             return pipeline_response
 
         return ItemPaged(get_next, extract_data)
 
     @distributed_trace
-    def list_by_resource_group(self, resource_group_name: str, **kwargs: Any) -> Iterable[JSON]:
-        # pylint: disable=line-too-long
+    def list_by_resource_group(self, resource_group_name: str, **kwargs: Any) -> Iterable["_models.IotHubDescription"]:
         """Get all the IoT hubs in a resource group.
 
         Get all the IoT hubs in a resource group.
 
         :param resource_group_name: The name of the resource group that contains the IoT hub. Required.
         :type resource_group_name: str
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.paging.ItemPaged[JSON]
+        :return: An iterator like instance of IotHubDescription
+        :rtype: ~azure.core.paging.ItemPaged[~iot_hub_client.models.IotHubDescription]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",  # The resource location. Required.
-                    "sku": {
-                        "name": "str",  # The name of the SKU. Required. Known values are:
-                          "F1", "S1", "S2", "S3", "B1", "B2", "B3", "P1", "P2", and "P3".
-                        "capacity": 0,  # Optional. The number of provisioned IoT Hub units.
-                          See:
-                          https://docs.microsoft.com/azure/azure-subscription-service-limits#iot-hub-limits.
-                        "tier": "str"  # Optional. The billing tier for the IoT hub. Known
-                          values are: "Free", "Standard", "Basic", and "Premium".
-                    },
-                    "etag": "str",  # Optional. The Etag field is *not* required. If it is
-                      provided in the response body, it must also be provided as a header per the
-                      normal ETag convention.
-                    "id": "str",  # Optional. The resource identifier.
-                    "identity": {
-                        "principalId": "str",  # Optional. Principal Id.
-                        "tenantId": "str",  # Optional. Tenant Id.
-                        "type": "str",  # Optional. The type of identity used for the
-                          resource. The type 'SystemAssigned,UserAssigned' includes both an implicitly
-                          created identity and a set of user assigned identities. The type 'None' will
-                          remove any identities from the service. Known values are: "SystemAssigned",
-                          "UserAssigned", "SystemAssigned, UserAssigned", and "None".
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",  # Optional. Dictionary of
-                                  :code:`<ArmUserIdentity>`.
-                                "principalId": "str"  # Optional. Dictionary of
-                                  :code:`<ArmUserIdentity>`.
-                            }
-                        }
-                    },
-                    "name": "str",  # Optional. The resource name.
-                    "properties": {
-                        "adrProperties": {
-                            "identityResourceId": "str",  # Optional. The identity used
-                              to manage the ADR namespace from the data plane.
-                            "namespaceResourceId": "str"  # Optional. The identifier of
-                              the Azure Device Registry namespace associated with the P SKU hub.
-                        },
-                        "allowedFqdnList": [
-                            "str"  # Optional. List of allowed FQDNs(Fully Qualified
-                              Domain Name) for egress from Iot Hub.
-                        ],
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",  # The name of the shared access
-                                  policy. Required.
-                                "rights": "str",  # The permissions assigned to the
-                                  shared access policy. Required. Known values are: "RegistryRead",
-                                  "RegistryWrite", "ServiceConnect", "DeviceConnect", "RegistryRead,
-                                  RegistryWrite", "RegistryRead, ServiceConnect", "RegistryRead,
-                                  DeviceConnect", "RegistryWrite, ServiceConnect", "RegistryWrite,
-                                  DeviceConnect", "ServiceConnect, DeviceConnect", "RegistryRead,
-                                  RegistryWrite, ServiceConnect", "RegistryRead, RegistryWrite,
-                                  DeviceConnect", "RegistryRead, ServiceConnect, DeviceConnect",
-                                  "RegistryWrite, ServiceConnect, DeviceConnect", and "RegistryRead,
-                                  RegistryWrite, ServiceConnect, DeviceConnect".
-                                "primaryKey": "str",  # Optional. The primary key.
-                                "secondaryKey": "str"  # Optional. The secondary key.
-                            }
-                        ],
-                        "cloudToDevice": {
-                            "defaultTtlAsIso8601": "1 day, 0:00:00",  # Optional. The
-                              default time to live for cloud-to-device messages in the device queue.
-                              See:
-                              https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                            "feedback": {
-                                "lockDurationAsIso8601": "1 day, 0:00:00",  #
-                                  Optional. The lock duration for the feedback queue. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                                "maxDeliveryCount": 0,  # Optional. The number of
-                                  times the IoT hub attempts to deliver a message on the feedback
-                                  queue. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                                "ttlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which a message is available to consume before it
-                                  is expired by the IoT hub. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                            },
-                            "maxDeliveryCount": 0  # Optional. The max delivery count for
-                              cloud-to-device messages in the device queue. See:
-                              https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#cloud-to-device-messages.
-                        },
-                        "comments": "str",  # Optional. IoT hub comments.
-                        "deviceStreams": {
-                            "streamingEndpoints": [
-                                "str"  # Optional. List of Device Streams Endpoints.
-                            ]
-                        },
-                        "disableDeviceSAS": bool,  # Optional. If true, all device(including
-                          Edge devices but excluding modules) scoped SAS keys cannot be used for
-                          authentication.
-                        "disableLocalAuth": bool,  # Optional. If true, SAS tokens with Iot
-                          hub scoped SAS keys cannot be used for authentication.
-                        "disableModuleSAS": bool,  # Optional. If true, all module scoped SAS
-                          keys cannot be used for authentication.
-                        "enableDataResidency": bool,  # Optional. This property when set to
-                          true, will enable data residency, thus, disabling disaster recovery.
-                        "enableFileUploadNotifications": bool,  # Optional. If True, file
-                          upload notifications are enabled.
-                        "encryption": {
-                            "keySource": "str",  # Optional. The source of the key.
-                            "keyVaultProperties": [
-                                {
-                                    "identity": {
-                                        "userAssignedIdentity": "str"  #
-                                          Optional. The user assigned identity.
-                                    },
-                                    "keyIdentifier": "str"  # Optional. The
-                                      identifier of the key.
-                                }
-                            ]
-                        },
-                        "eventHubEndpoints": {
-                            "str": {
-                                "endpoint": "str",  # Optional. The Event
-                                  Hub-compatible endpoint.
-                                "partitionCount": 0,  # Optional. The number of
-                                  partitions for receiving device-to-cloud messages in the Event
-                                  Hub-compatible endpoint. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#device-to-cloud-messages.
-                                "partitionIds": [
-                                    "str"  # Optional. The partition ids in the
-                                      Event Hub-compatible endpoint.
-                                ],
-                                "path": "str",  # Optional. The Event Hub-compatible
-                                  name.
-                                "retentionTimeInDays": 0  # Optional. The retention
-                                  time for device-to-cloud messages in days. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-messaging#device-to-cloud-messages.
-                            }
-                        },
-                        "features": "str",  # Optional. The capabilities and features enabled
-                          for the IoT hub. Known values are: "None" and "DeviceManagement".
-                        "hostName": "str",  # Optional. The name of the host.
-                        "ipFilterRules": [
-                            {
-                                "action": "str",  # The desired action for requests
-                                  captured by this rule. Required. Known values are: "Accept" and
-                                  "Reject".
-                                "filterName": "str",  # The name of the IP filter
-                                  rule. Required.
-                                "ipMask": "str"  # A string that contains the IP
-                                  address range in CIDR notation for the rule. Required.
-                            }
-                        ],
-                        "ipVersion": "str",  # Optional. This property specifies the IP
-                          Version the hub is currently utilizing. Known values are: "ipv4", "ipv6", and
-                          "ipv4ipv6".
-                        "locations": [
-                            {
-                                "location": "str",  # Optional. The name of the Azure
-                                  region.
-                                "role": "str"  # Optional. The role of the region,
-                                  can be either primary or secondary. The primary region is where the
-                                  IoT hub is currently provisioned. The secondary region is the Azure
-                                  disaster recovery (DR) paired region and also the region where the
-                                  IoT hub can failover to. Known values are: "primary" and "secondary".
-                            }
-                        ],
-                        "messagingEndpoints": {
-                            "str": {
-                                "lockDurationAsIso8601": "1 day, 0:00:00",  #
-                                  Optional. The lock duration. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                                "maxDeliveryCount": 0,  # Optional. The number of
-                                  times the IoT hub attempts to deliver a message. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                                "ttlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which a message is available to consume before it
-                                  is expired by the IoT hub. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload.
-                            }
-                        },
-                        "minTlsVersion": "str",  # Optional. Specifies the minimum TLS
-                          version to support for this hub. Can be set to "1.2" to have clients that use
-                          a TLS version below 1.2 to be rejected.
-                        "networkRuleSets": {
-                            "applyToBuiltInEventHubEndpoint": bool,  # If True, then
-                              Network Rule Set is also applied to BuiltIn EventHub EndPoint of IotHub.
-                              Required.
-                            "ipRules": [
-                                {
-                                    "filterName": "str",  # Name of the IP filter
-                                      rule. Required.
-                                    "ipMask": "str",  # A string that contains
-                                      the IP address range in CIDR notation for the rule. Required.
-                                    "action": "Allow"  # Optional. Default value
-                                      is "Allow". IP Filter Action. "Allow"
-                                }
-                            ],
-                            "defaultAction": "Deny"  # Optional. Default value is "Deny".
-                              Default Action for Network Rule Set. Known values are: "Deny" and
-                              "Allow".
-                        },
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",  # The
-                                          description for the current state of a private endpoint
-                                          connection. Required.
-                                        "status": "str",  # The status of a
-                                          private endpoint connection. Required. Known values are:
-                                          "Pending", "Approved", "Rejected", and "Disconnected".
-                                        "actionsRequired": "str"  # Optional.
-                                          Actions required for a private endpoint connection.
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"  # Optional. The resource
-                                          identifier.
-                                    }
-                                },
-                                "id": "str",  # Optional. The resource identifier.
-                                "name": "str",  # Optional. The resource name.
-                                "type": "str"  # Optional. The resource type.
-                            }
-                        ],
-                        "provisioningState": "str",  # Optional. The provisioning state.
-                        "publicNetworkAccess": "str",  # Optional. Whether requests from
-                          Public Network are allowed. Known values are: "Enabled" and "Disabled".
-                        "restrictOutboundNetworkAccess": bool,  # Optional. If true, egress
-                          from IotHub will be restricted to only the allowed FQDNs that are configured
-                          via allowedFqdnList.
-                        "rootCertificate": {
-                            "enableRootCertificateV2": bool,  # Optional. This property
-                              when set to true, hub will use G2 cert; while it's set to false, hub uses
-                              Baltimore Cert.
-                            "lastUpdatedTimeUtc": "2020-02-20 00:00:00"  # Optional. the
-                              last update time to root certificate flag.
-                        },
-                        "routing": {
-                            "endpoints": {
-                                "cosmosDBSqlContainers": [
-                                    {
-                                        "containerName": "str",  # The name
-                                          of the cosmos DB sql container in the cosmos DB database.
-                                          Required.
-                                        "databaseName": "str",  # The name of
-                                          the cosmos DB database in the cosmos DB account. Required.
-                                        "endpointUri": "str",  # The url of
-                                          the cosmos DB account. It must include the protocol https://.
-                                          Required.
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the cosmos DB
-                                          sql container endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "id": "str",  # Optional. Id of the
-                                          cosmos DB sql container endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "partitionKeyName": "str",  #
-                                          Optional. The name of the partition key associated with this
-                                          cosmos DB sql container if one exists. This is an optional
-                                          parameter.
-                                        "partitionKeyTemplate": "str",  #
-                                          Optional. The template for generating a synthetic partition
-                                          key value for use with this cosmos DB sql container. The
-                                          template must include at least one of the following
-                                          placeholders: {iothub}, {deviceid}, {DD}, {MM}, and {YYYY}.
-                                          Any one placeholder may be specified at most once, but order
-                                          and non-placeholder components are arbitrary. This parameter
-                                          is only required if PartitionKeyName is specified.
-                                        "primaryKey": "str",  # Optional. The
-                                          primary key of the cosmos DB account.
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the cosmos DB account.
-                                        "secondaryKey": "str",  # Optional.
-                                          The secondary key of the cosmos DB account.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the cosmos DB account.
-                                    }
-                                ],
-                                "eventHubs": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the event hub
-                                          endpoint. Known values are: "keyBased" and "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the event hub endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the event hub endpoint. It must include the
-                                          protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Event hub name on the event hub namespace.
-                                        "id": "str",  # Optional. Id of the
-                                          event hub endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the event hub endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the event hub endpoint.
-                                    }
-                                ],
-                                "serviceBusQueues": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. The name need not
-                                          be the same as the actual queue name. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the service bus
-                                          queue endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the service bus queue
-                                          endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the service bus queue endpoint. It must include
-                                          the protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Queue name on the service bus namespace.
-                                        "id": "str",  # Optional. Id of the
-                                          service bus queue endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the service bus queue
-                                          endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the service bus queue
-                                          endpoint.
-                                    }
-                                ],
-                                "serviceBusTopics": [
-                                    {
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types.  The name need
-                                          not be the same as the actual topic name. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the service bus
-                                          topic endpoint. Known values are: "keyBased" and
-                                          "identityBased".
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the service bus topic
-                                          endpoint.
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the service bus topic endpoint. It must include
-                                          the protocol sb://.
-                                        "entityPath": "str",  # Optional.
-                                          Queue name on the service bus topic.
-                                        "id": "str",  # Optional. Id of the
-                                          service bus topic endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the service bus topic
-                                          endpoint.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the service bus topic
-                                          endpoint.
-                                    }
-                                ],
-                                "storageContainers": [
-                                    {
-                                        "containerName": "str",  # The name
-                                          of storage container in the storage account. Required.
-                                        "name": "str",  # The name that
-                                          identifies this endpoint. The name can only include
-                                          alphanumeric characters, periods, underscores, hyphens and
-                                          has a maximum length of 64 characters. The following names
-                                          are reserved:  events, fileNotifications, $default. Endpoint
-                                          names must be unique across endpoint types. Required.
-                                        "authenticationType": "str",  #
-                                          Optional. Method used to authenticate against the storage
-                                          endpoint. Known values are: "keyBased" and "identityBased".
-                                        "batchFrequencyInSeconds": 0,  #
-                                          Optional. Time interval at which blobs are written to
-                                          storage. Value should be between 60 and 720 seconds. Default
-                                          value is 300 seconds.
-                                        "connectionString": "str",  #
-                                          Optional. The connection string of the storage account.
-                                        "encoding": "str",  # Optional.
-                                          Encoding that is used to serialize messages to blobs.
-                                          Supported values are 'avro', 'avrodeflate', and 'JSON'.
-                                          Default value is 'avro'. Known values are: "Avro",
-                                          "AvroDeflate", and "JSON".
-                                        "endpointUri": "str",  # Optional.
-                                          The url of the storage endpoint. It must include the protocol
-                                          https://.
-                                        "fileNameFormat": "str",  # Optional.
-                                          File name format for the blob. Default format is
-                                          {iothub}/{partition}/{YYYY}/{MM}/{DD}/{HH}/{mm}. All
-                                          parameters are mandatory but can be reordered.
-                                        "id": "str",  # Optional. Id of the
-                                          storage container endpoint.
-                                        "identity": {
-                                            "userAssignedIdentity": "str"
-                                              # Optional. The user assigned identity.
-                                        },
-                                        "maxChunkSizeInBytes": 0,  #
-                                          Optional. Maximum number of bytes for each blob written to
-                                          storage. Value should be between 10485760(10MB) and
-                                          524288000(500MB). Default value is 314572800(300MB).
-                                        "resourceGroup": "str",  # Optional.
-                                          The name of the resource group of the storage account.
-                                        "subscriptionId": "str"  # Optional.
-                                          The subscription identifier of the storage account.
-                                    }
-                                ]
-                            },
-                            "enrichments": [
-                                {
-                                    "endpointNames": [
-                                        "str"  # The list of endpoints for
-                                          which the enrichment is applied to the message. Required.
-                                    ],
-                                    "key": "str",  # The key or name for the
-                                      enrichment property. Required.
-                                    "value": "str"  # The value for the
-                                      enrichment property. Required.
-                                }
-                            ],
-                            "fallbackRoute": {
-                                "endpointNames": [
-                                    "str"  # The list of endpoints to which the
-                                      messages that satisfy the condition are routed to. Currently only
-                                      1 endpoint is allowed. Required.
-                                ],
-                                "isEnabled": bool,  # Used to specify whether the
-                                  fallback route is enabled. Required.
-                                "source": "str",  # The source to which the routing
-                                  rule is to be applied to. For example, DeviceMessages. Required.
-                                  Known values are: "Invalid", "DeviceMessages", "TwinChangeEvents",
-                                  "DeviceLifecycleEvents", "DeviceJobLifecycleEvents",
-                                  "DigitalTwinChangeEvents", "DeviceConnectionStateEvents", and
-                                  "MqttBrokerMessages".
-                                "condition": "str",  # Optional. The condition which
-                                  is evaluated in order to apply the fallback route. If the condition
-                                  is not provided it will evaluate to true by default. For grammar,
-                                  See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                                "name": "str"  # Optional. The name of the route. The
-                                  name can only include alphanumeric characters, periods, underscores,
-                                  hyphens, has a maximum length of 64 characters, and must be unique.
-                            },
-                            "routes": [
-                                {
-                                    "endpointNames": [
-                                        "str"  # The list of endpoints to
-                                          which messages that satisfy the condition are routed.
-                                          Currently only one endpoint is allowed. Required.
-                                    ],
-                                    "isEnabled": bool,  # Used to specify whether
-                                      a route is enabled. Required.
-                                    "name": "str",  # The name of the route. The
-                                      name can only include alphanumeric characters, periods,
-                                      underscores, hyphens, has a maximum length of 64 characters, and
-                                      must be unique. Required.
-                                    "source": "str",  # The source that the
-                                      routing rule is to be applied to, such as DeviceMessages.
-                                      Required. Known values are: "Invalid", "DeviceMessages",
-                                      "TwinChangeEvents", "DeviceLifecycleEvents",
-                                      "DeviceJobLifecycleEvents", "DigitalTwinChangeEvents",
-                                      "DeviceConnectionStateEvents", and "MqttBrokerMessages".
-                                    "condition": "str"  # Optional. The condition
-                                      that is evaluated to apply the routing rule. If no condition is
-                                      provided, it evaluates to true by default. For grammar, see:
-                                      https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                                }
-                            ]
-                        },
-                        "state": "str",  # Optional. The hub state.
-                        "storageEndpoints": {
-                            "str": {
-                                "connectionString": "str",  # The connection string
-                                  for the Azure Storage account to which files are uploaded. Required.
-                                "containerName": "str",  # The name of the root
-                                  container where you upload files. The container need not exist but
-                                  should be creatable using the connectionString specified. Required.
-                                "authenticationType": "str",  # Optional. Specifies
-                                  authentication type being used for connecting to the storage account.
-                                  Known values are: "keyBased" and "identityBased".
-                                "identity": {
-                                    "userAssignedIdentity": "str"  # Optional.
-                                      The user assigned identity.
-                                },
-                                "sasTtlAsIso8601": "1 day, 0:00:00"  # Optional. The
-                                  period of time for which the SAS URI generated by IoT Hub for file
-                                  upload is valid. See:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-file-upload#file-upload-notification-configuration-options.
-                            }
-                        },
-                        "tlsCompatibilityMode": bool  # Optional. If True, TLS compatibility
-                          mode is enabled.
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. The resource tags.
-                    },
-                    "type": "str"  # Optional. The resource type.
-                }
         """
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models._models.IotHubDescriptionListResult] = kwargs.pop(  # pylint: disable=protected-access
+            "cls", None
+        )
 
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -8643,11 +2116,13 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
             return _request
 
         def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
+            deserialized = self._deserialize(
+                _models._models.IotHubDescriptionListResult, pipeline_response  # pylint: disable=protected-access
+            )
+            list_of_elem = deserialized.value
             if cls:
                 list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, iter(list_of_elem)
+            return deserialized.next_link or None, iter(list_of_elem)
 
         def get_next(next_link=None):
             _request = prepare_request(next_link)
@@ -8662,14 +2137,15 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
                 if _stream:
                     response.read()  # Load the body in memory and close the socket
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response)
+                error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+                raise HttpResponseError(response=response, model=error)
 
             return pipeline_response
 
         return ItemPaged(get_next, extract_data)
 
     @distributed_trace
-    def get_stats(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> JSON:
+    def get_stats(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> _models.RegistryStatistics:
         """Get the statistics from an IoT hub.
 
         Get the statistics from an IoT hub.
@@ -8678,22 +2154,9 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :type resource_group_name: str
         :param resource_name: The name of the IoT hub. Required.
         :type resource_name: str
-        :return: JSON object
-        :rtype: JSON
+        :return: RegistryStatistics
+        :rtype: ~iot_hub_client.models.RegistryStatistics
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "disabledDeviceCount": 0,  # Optional. The count of disabled devices in the
-                      identity registry.
-                    "enabledDeviceCount": 0,  # Optional. The count of enabled devices in the
-                      identity registry.
-                    "totalDeviceCount": 0  # Optional. The total count of devices in the identity
-                      registry.
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -8706,7 +2169,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.RegistryStatistics] = kwargs.pop("cls", None)
 
         _request = build_iot_hub_resource_get_stats_request(
             resource_group_name=resource_group_name,
@@ -8729,21 +2192,20 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("RegistryStatistics", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @distributed_trace
-    def get_valid_skus(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> Iterable[JSON]:
-        # pylint: disable=line-too-long
+    def get_valid_skus(
+        self, resource_group_name: str, resource_name: str, **kwargs: Any
+    ) -> Iterable["_models.IotHubSkuDescription"]:
         """Get the list of valid SKUs for an IoT hub.
 
         Get the list of valid SKUs for an IoT hub.
@@ -8752,38 +2214,16 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :type resource_group_name: str
         :param resource_name: The name of the IoT hub. Required.
         :type resource_name: str
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.paging.ItemPaged[JSON]
+        :return: An iterator like instance of IotHubSkuDescription
+        :rtype: ~azure.core.paging.ItemPaged[~iot_hub_client.models.IotHubSkuDescription]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "capacity": {
-                        "default": 0,  # Optional. The default number of units.
-                        "maximum": 0,  # Optional. The maximum number of units.
-                        "minimum": 0,  # Optional. The minimum number of units.
-                        "scaleType": "str"  # Optional. The type of the scaling enabled.
-                          Known values are: "Automatic", "Manual", and "None".
-                    },
-                    "sku": {
-                        "name": "str",  # The name of the SKU. Required. Known values are:
-                          "F1", "S1", "S2", "S3", "B1", "B2", "B3", "P1", "P2", and "P3".
-                        "capacity": 0,  # Optional. The number of provisioned IoT Hub units.
-                          See:
-                          https://docs.microsoft.com/azure/azure-subscription-service-limits#iot-hub-limits.
-                        "tier": "str"  # Optional. The billing tier for the IoT hub. Known
-                          values are: "Free", "Standard", "Basic", and "Premium".
-                    },
-                    "resourceType": "str"  # Optional. The type of the resource.
-                }
         """
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models._models.IotHubSkuDescriptionListResult] = kwargs.pop(  # pylint: disable=protected-access
+            "cls", None
+        )
 
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -8824,11 +2264,13 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
             return _request
 
         def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
+            deserialized = self._deserialize(
+                _models._models.IotHubSkuDescriptionListResult, pipeline_response  # pylint: disable=protected-access
+            )
+            list_of_elem = deserialized.value
             if cls:
                 list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, iter(list_of_elem)
+            return deserialized.next_link or None, iter(list_of_elem)
 
         def get_next(next_link=None):
             _request = prepare_request(next_link)
@@ -8843,7 +2285,8 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
                 if _stream:
                     response.read()  # Load the body in memory and close the socket
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response)
+                error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+                raise HttpResponseError(response=response, model=error)
 
             return pipeline_response
 
@@ -8852,7 +2295,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
     @distributed_trace
     def list_event_hub_consumer_groups(
         self, resource_group_name: str, resource_name: str, event_hub_endpoint_name: str, **kwargs: Any
-    ) -> Iterable[JSON]:
+    ) -> Iterable["_models.EventHubConsumerGroupInfo"]:
         """Get a list of the consumer groups in the Event Hub-compatible device-to-cloud endpoint in an
         IoT hub.
 
@@ -8865,28 +2308,16 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :type resource_name: str
         :param event_hub_endpoint_name: The name of the Event Hub-compatible endpoint. Required.
         :type event_hub_endpoint_name: str
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.paging.ItemPaged[JSON]
+        :return: An iterator like instance of EventHubConsumerGroupInfo
+        :rtype: ~azure.core.paging.ItemPaged[~iot_hub_client.models.EventHubConsumerGroupInfo]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "etag": "str",  # Optional. The etag.
-                    "id": "str",  # Optional. The Event Hub-compatible consumer group identifier.
-                    "name": "str",  # Optional. The Event Hub-compatible consumer group name.
-                    "properties": {
-                        "str": {}  # Optional. The tags.
-                    },
-                    "type": "str"  # Optional. the resource type.
-                }
         """
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models._models.EventHubConsumerGroupsListResult] = kwargs.pop(  # pylint: disable=protected-access
+            "cls", None
+        )
 
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -8928,11 +2359,13 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
             return _request
 
         def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
+            deserialized = self._deserialize(
+                _models._models.EventHubConsumerGroupsListResult, pipeline_response  # pylint: disable=protected-access
+            )
+            list_of_elem = deserialized.value
             if cls:
                 list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, iter(list_of_elem)
+            return deserialized.next_link or None, iter(list_of_elem)
 
         def get_next(next_link=None):
             _request = prepare_request(next_link)
@@ -8947,7 +2380,8 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
                 if _stream:
                     response.read()  # Load the body in memory and close the socket
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response)
+                error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+                raise HttpResponseError(response=response, model=error)
 
             return pipeline_response
 
@@ -8956,7 +2390,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
     @distributed_trace
     def get_event_hub_consumer_group(
         self, resource_group_name: str, resource_name: str, event_hub_endpoint_name: str, name: str, **kwargs: Any
-    ) -> JSON:
+    ) -> _models.EventHubConsumerGroupInfo:
         """Get a consumer group from the Event Hub-compatible device-to-cloud endpoint for an IoT hub.
 
         Get a consumer group from the Event Hub-compatible device-to-cloud endpoint for an IoT hub.
@@ -8970,23 +2404,9 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :type event_hub_endpoint_name: str
         :param name: The name of the consumer group to retrieve. Required.
         :type name: str
-        :return: JSON object
-        :rtype: JSON
+        :return: EventHubConsumerGroupInfo
+        :rtype: ~iot_hub_client.models.EventHubConsumerGroupInfo
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "etag": "str",  # Optional. The etag.
-                    "id": "str",  # Optional. The Event Hub-compatible consumer group identifier.
-                    "name": "str",  # Optional. The Event Hub-compatible consumer group name.
-                    "properties": {
-                        "str": {}  # Optional. The tags.
-                    },
-                    "type": "str"  # Optional. the resource type.
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -8999,7 +2419,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.EventHubConsumerGroupInfo] = kwargs.pop("cls", None)
 
         _request = build_iot_hub_resource_get_event_hub_consumer_group_request(
             resource_group_name=resource_group_name,
@@ -9024,17 +2444,15 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("EventHubConsumerGroupInfo", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @overload
     def create_event_hub_consumer_group(
@@ -9043,11 +2461,11 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         resource_name: str,
         event_hub_endpoint_name: str,
         name: str,
-        consumer_group_body: JSON,
+        consumer_group_body: _models.EventHubConsumerGroupBodyDescription,
         *,
         content_type: str = "application/json",
         **kwargs: Any
-    ) -> JSON:
+    ) -> _models.EventHubConsumerGroupInfo:
         """Add a consumer group to an Event Hub-compatible endpoint in an IoT hub.
 
         Add a consumer group to an Event Hub-compatible endpoint in an IoT hub.
@@ -9062,34 +2480,13 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :param name: The name of the consumer group to add. Required.
         :type name: str
         :param consumer_group_body: The consumer group to add. Required.
-        :type consumer_group_body: JSON
+        :type consumer_group_body: ~iot_hub_client.models.EventHubConsumerGroupBodyDescription
         :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
+        :return: EventHubConsumerGroupInfo
+        :rtype: ~iot_hub_client.models.EventHubConsumerGroupInfo
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                consumer_group_body = {
-                    "properties": {
-                        "name": "str"  # EventHub consumer group name. Required.
-                    }
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "etag": "str",  # Optional. The etag.
-                    "id": "str",  # Optional. The Event Hub-compatible consumer group identifier.
-                    "name": "str",  # Optional. The Event Hub-compatible consumer group name.
-                    "properties": {
-                        "str": {}  # Optional. The tags.
-                    },
-                    "type": "str"  # Optional. the resource type.
-                }
         """
 
     @overload
@@ -9103,7 +2500,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         *,
         content_type: str = "application/json",
         **kwargs: Any
-    ) -> JSON:
+    ) -> _models.EventHubConsumerGroupInfo:
         """Add a consumer group to an Event Hub-compatible endpoint in an IoT hub.
 
         Add a consumer group to an Event Hub-compatible endpoint in an IoT hub.
@@ -9122,23 +2519,9 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
+        :return: EventHubConsumerGroupInfo
+        :rtype: ~iot_hub_client.models.EventHubConsumerGroupInfo
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "etag": "str",  # Optional. The etag.
-                    "id": "str",  # Optional. The Event Hub-compatible consumer group identifier.
-                    "name": "str",  # Optional. The Event Hub-compatible consumer group name.
-                    "properties": {
-                        "str": {}  # Optional. The tags.
-                    },
-                    "type": "str"  # Optional. the resource type.
-                }
         """
 
     @distributed_trace
@@ -9148,9 +2531,9 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         resource_name: str,
         event_hub_endpoint_name: str,
         name: str,
-        consumer_group_body: Union[JSON, IO[bytes]],
+        consumer_group_body: Union[_models.EventHubConsumerGroupBodyDescription, IO[bytes]],
         **kwargs: Any
-    ) -> JSON:
+    ) -> _models.EventHubConsumerGroupInfo:
         """Add a consumer group to an Event Hub-compatible endpoint in an IoT hub.
 
         Add a consumer group to an Event Hub-compatible endpoint in an IoT hub.
@@ -9164,33 +2547,13 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :type event_hub_endpoint_name: str
         :param name: The name of the consumer group to add. Required.
         :type name: str
-        :param consumer_group_body: The consumer group to add. Is either a JSON type or a IO[bytes]
-         type. Required.
-        :type consumer_group_body: JSON or IO[bytes]
-        :return: JSON object
-        :rtype: JSON
+        :param consumer_group_body: The consumer group to add. Is either a
+         EventHubConsumerGroupBodyDescription type or a IO[bytes] type. Required.
+        :type consumer_group_body: ~iot_hub_client.models.EventHubConsumerGroupBodyDescription or
+         IO[bytes]
+        :return: EventHubConsumerGroupInfo
+        :rtype: ~iot_hub_client.models.EventHubConsumerGroupInfo
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                consumer_group_body = {
-                    "properties": {
-                        "name": "str"  # EventHub consumer group name. Required.
-                    }
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "etag": "str",  # Optional. The etag.
-                    "id": "str",  # Optional. The Event Hub-compatible consumer group identifier.
-                    "name": "str",  # Optional. The Event Hub-compatible consumer group name.
-                    "properties": {
-                        "str": {}  # Optional. The tags.
-                    },
-                    "type": "str"  # Optional. the resource type.
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -9204,7 +2567,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         _params = kwargs.pop("params", {}) or {}
 
         content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.EventHubConsumerGroupInfo] = kwargs.pop("cls", None)
 
         content_type = content_type or "application/json"
         _json = None
@@ -9212,7 +2575,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         if isinstance(consumer_group_body, (IOBase, bytes)):
             _content = consumer_group_body
         else:
-            _json = consumer_group_body
+            _json = self._serialize.body(consumer_group_body, "EventHubConsumerGroupBodyDescription")
 
         _request = build_iot_hub_resource_create_event_hub_consumer_group_request(
             resource_group_name=resource_group_name,
@@ -9240,17 +2603,15 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("EventHubConsumerGroupInfo", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @distributed_trace
     def delete_event_hub_consumer_group(  # pylint: disable=inconsistent-return-statements
@@ -9309,14 +2670,14 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
         if cls:
             return cls(pipeline_response, None, {})  # type: ignore
 
     @distributed_trace
-    def list_jobs(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> Iterable[JSON]:
-        # pylint: disable=line-too-long
+    def list_jobs(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> Iterable["_models.JobResponse"]:
         """Get a list of all the jobs in an IoT hub. For more information, see:
         https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry.
 
@@ -9327,37 +2688,16 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :type resource_group_name: str
         :param resource_name: The name of the IoT hub. Required.
         :type resource_name: str
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.paging.ItemPaged[JSON]
+        :return: An iterator like instance of JobResponse
+        :rtype: ~azure.core.paging.ItemPaged[~iot_hub_client.models.JobResponse]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "endTimeUtc": "2020-02-20 00:00:00",  # Optional. The time the job stopped
-                      processing.
-                    "failureReason": "str",  # Optional. If status == failed, this string
-                      containing the reason for the failure.
-                    "jobId": "str",  # Optional. The job identifier.
-                    "parentJobId": "str",  # Optional. The job identifier of the parent job, if
-                      any.
-                    "startTimeUtc": "2020-02-20 00:00:00",  # Optional. The start time of the
-                      job.
-                    "status": "str",  # Optional. The status of the job. Known values are:
-                      "unknown", "enqueued", "running", "completed", "failed", and "cancelled".
-                    "statusMessage": "str",  # Optional. The status message for the job.
-                    "type": "str"  # Optional. The type of the job. Known values are: "unknown",
-                      "export", "import", "backup", "readDeviceProperties", "writeDeviceProperties",
-                      "updateDeviceConfiguration", "rebootDevice", "factoryResetDevice", and
-                      "firmwareUpdate".
-                }
         """
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models._models.JobResponseListResult] = kwargs.pop(  # pylint: disable=protected-access
+            "cls", None
+        )
 
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -9398,11 +2738,13 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
             return _request
 
         def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
+            deserialized = self._deserialize(
+                _models._models.JobResponseListResult, pipeline_response  # pylint: disable=protected-access
+            )
+            list_of_elem = deserialized.value
             if cls:
                 list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, iter(list_of_elem)
+            return deserialized.next_link or None, iter(list_of_elem)
 
         def get_next(next_link=None):
             _request = prepare_request(next_link)
@@ -9417,15 +2759,15 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
                 if _stream:
                     response.read()  # Load the body in memory and close the socket
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response)
+                error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+                raise HttpResponseError(response=response, model=error)
 
             return pipeline_response
 
         return ItemPaged(get_next, extract_data)
 
     @distributed_trace
-    def get_job(self, resource_group_name: str, resource_name: str, job_id: str, **kwargs: Any) -> JSON:
-        # pylint: disable=line-too-long
+    def get_job(self, resource_group_name: str, resource_name: str, job_id: str, **kwargs: Any) -> _models.JobResponse:
         """Get the details of a job from an IoT hub. For more information, see:
         https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry.
 
@@ -9438,32 +2780,9 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :type resource_name: str
         :param job_id: The job identifier. Required.
         :type job_id: str
-        :return: JSON object
-        :rtype: JSON
+        :return: JobResponse
+        :rtype: ~iot_hub_client.models.JobResponse
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "endTimeUtc": "2020-02-20 00:00:00",  # Optional. The time the job stopped
-                      processing.
-                    "failureReason": "str",  # Optional. If status == failed, this string
-                      containing the reason for the failure.
-                    "jobId": "str",  # Optional. The job identifier.
-                    "parentJobId": "str",  # Optional. The job identifier of the parent job, if
-                      any.
-                    "startTimeUtc": "2020-02-20 00:00:00",  # Optional. The start time of the
-                      job.
-                    "status": "str",  # Optional. The status of the job. Known values are:
-                      "unknown", "enqueued", "running", "completed", "failed", and "cancelled".
-                    "statusMessage": "str",  # Optional. The status message for the job.
-                    "type": "str"  # Optional. The type of the job. Known values are: "unknown",
-                      "export", "import", "backup", "readDeviceProperties", "writeDeviceProperties",
-                      "updateDeviceConfiguration", "rebootDevice", "factoryResetDevice", and
-                      "firmwareUpdate".
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -9476,7 +2795,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.JobResponse] = kwargs.pop("cls", None)
 
         _request = build_iot_hub_resource_get_job_request(
             resource_group_name=resource_group_name,
@@ -9500,20 +2819,20 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("JobResponse", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @distributed_trace
-    def get_quota_metrics(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> Iterable[JSON]:
+    def get_quota_metrics(
+        self, resource_group_name: str, resource_name: str, **kwargs: Any
+    ) -> Iterable["_models.IotHubQuotaMetricInfo"]:
         """Get the quota metrics for an IoT hub.
 
         Get the quota metrics for an IoT hub.
@@ -9522,24 +2841,16 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :type resource_group_name: str
         :param resource_name: The name of the IoT hub. Required.
         :type resource_name: str
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.paging.ItemPaged[JSON]
+        :return: An iterator like instance of IotHubQuotaMetricInfo
+        :rtype: ~azure.core.paging.ItemPaged[~iot_hub_client.models.IotHubQuotaMetricInfo]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "currentValue": 0,  # Optional. The current value for the quota metric.
-                    "maxValue": 0,  # Optional. The maximum value of the quota metric.
-                    "name": "str"  # Optional. The name of the quota metric.
-                }
         """
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models._models.IotHubQuotaMetricInfoListResult] = kwargs.pop(  # pylint: disable=protected-access
+            "cls", None
+        )
 
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -9580,11 +2891,13 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
             return _request
 
         def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
+            deserialized = self._deserialize(
+                _models._models.IotHubQuotaMetricInfoListResult, pipeline_response  # pylint: disable=protected-access
+            )
+            list_of_elem = deserialized.value
             if cls:
                 list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, iter(list_of_elem)
+            return deserialized.next_link or None, iter(list_of_elem)
 
         def get_next(next_link=None):
             _request = prepare_request(next_link)
@@ -9599,15 +2912,17 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
                 if _stream:
                     response.read()  # Load the body in memory and close the socket
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response)
+                error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+                raise HttpResponseError(response=response, model=error)
 
             return pipeline_response
 
         return ItemPaged(get_next, extract_data)
 
     @distributed_trace
-    def get_endpoint_health(self, resource_group_name: str, iot_hub_name: str, **kwargs: Any) -> Iterable[JSON]:
-        # pylint: disable=line-too-long
+    def get_endpoint_health(
+        self, resource_group_name: str, iot_hub_name: str, **kwargs: Any
+    ) -> Iterable["_models.EndpointHealthData"]:
         """Get the health for routing endpoints.
 
         Get the health for routing endpoints.
@@ -9616,41 +2931,16 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :type resource_group_name: str
         :param iot_hub_name: Required.
         :type iot_hub_name: str
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.paging.ItemPaged[JSON]
+        :return: An iterator like instance of EndpointHealthData
+        :rtype: ~azure.core.paging.ItemPaged[~iot_hub_client.models.EndpointHealthData]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "endpointId": "str",  # Optional. Id of the endpoint.
-                    "healthStatus": "str",  # Optional. Health statuses have following meanings.
-                      The 'healthy' status shows that the endpoint is accepting messages as expected.
-                      The 'unhealthy' status shows that the endpoint is not accepting messages as
-                      expected and IoT Hub is retrying to send data to this endpoint. The status of an
-                      unhealthy endpoint will be updated to healthy when IoT Hub has established an
-                      eventually consistent state of health. The 'dead' status shows that the endpoint
-                      is not accepting messages, after IoT Hub retried sending messages for the retrial
-                      period. See IoT Hub metrics to identify errors and monitor issues with endpoints.
-                      The 'unknown' status shows that the IoT Hub has not established a connection with
-                      the endpoint. No messages have been delivered to or rejected from this endpoint.
-                      Known values are: "unknown", "healthy", "degraded", "unhealthy", and "dead".
-                    "lastKnownError": "str",  # Optional. Last error obtained when a message
-                      failed to be delivered to iot hub.
-                    "lastKnownErrorTime": "2020-02-20 00:00:00",  # Optional. Time at which the
-                      last known error occurred.
-                    "lastSendAttemptTime": "2020-02-20 00:00:00",  # Optional. Last time iot hub
-                      tried to send a message to the endpoint.
-                    "lastSuccessfulSendAttemptTime": "2020-02-20 00:00:00"  # Optional. Last time
-                      iot hub successfully sent a message to the endpoint.
-                }
         """
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models._models.EndpointHealthDataListResult] = kwargs.pop(  # pylint: disable=protected-access
+            "cls", None
+        )
 
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -9691,11 +2981,13 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
             return _request
 
         def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
+            deserialized = self._deserialize(
+                _models._models.EndpointHealthDataListResult, pipeline_response  # pylint: disable=protected-access
+            )
+            list_of_elem = deserialized.value
             if cls:
                 list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, iter(list_of_elem)
+            return deserialized.next_link or None, iter(list_of_elem)
 
         def get_next(next_link=None):
             _request = prepare_request(next_link)
@@ -9710,7 +3002,8 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
                 if _stream:
                     response.read()  # Load the body in memory and close the socket
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response)
+                error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+                raise HttpResponseError(response=response, model=error)
 
             return pipeline_response
 
@@ -9718,44 +3011,27 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
 
     @overload
     def check_name_availability(
-        self, operation_inputs: JSON, *, content_type: str = "application/json", **kwargs: Any
-    ) -> JSON:
+        self, operation_inputs: _models.OperationInputs, *, content_type: str = "application/json", **kwargs: Any
+    ) -> _models.IotHubNameAvailabilityInfo:
         """Check if an IoT hub name is available.
 
         Check if an IoT hub name is available.
 
         :param operation_inputs: Set the name parameter in the OperationInputs structure to the name of
          the IoT hub to check. Required.
-        :type operation_inputs: JSON
+        :type operation_inputs: ~iot_hub_client.models.OperationInputs
         :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
+        :return: IotHubNameAvailabilityInfo
+        :rtype: ~iot_hub_client.models.IotHubNameAvailabilityInfo
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                operation_inputs = {
-                    "name": "str"  # The name of the IoT hub to check. Required.
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "message": "str",  # Optional. The detailed reason message.
-                    "nameAvailable": bool,  # Optional. The value which indicates whether the
-                      provided name is available.
-                    "reason": "str"  # Optional. The reason for unavailability. Known values are:
-                      "Invalid" and "AlreadyExists".
-                }
         """
 
     @overload
     def check_name_availability(
         self, operation_inputs: IO[bytes], *, content_type: str = "application/json", **kwargs: Any
-    ) -> JSON:
+    ) -> _models.IotHubNameAvailabilityInfo:
         """Check if an IoT hub name is available.
 
         Check if an IoT hub name is available.
@@ -9766,52 +3042,25 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
+        :return: IotHubNameAvailabilityInfo
+        :rtype: ~iot_hub_client.models.IotHubNameAvailabilityInfo
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "message": "str",  # Optional. The detailed reason message.
-                    "nameAvailable": bool,  # Optional. The value which indicates whether the
-                      provided name is available.
-                    "reason": "str"  # Optional. The reason for unavailability. Known values are:
-                      "Invalid" and "AlreadyExists".
-                }
         """
 
     @distributed_trace
-    def check_name_availability(self, operation_inputs: Union[JSON, IO[bytes]], **kwargs: Any) -> JSON:
+    def check_name_availability(
+        self, operation_inputs: Union[_models.OperationInputs, IO[bytes]], **kwargs: Any
+    ) -> _models.IotHubNameAvailabilityInfo:
         """Check if an IoT hub name is available.
 
         Check if an IoT hub name is available.
 
         :param operation_inputs: Set the name parameter in the OperationInputs structure to the name of
-         the IoT hub to check. Is either a JSON type or a IO[bytes] type. Required.
-        :type operation_inputs: JSON or IO[bytes]
-        :return: JSON object
-        :rtype: JSON
+         the IoT hub to check. Is either a OperationInputs type or a IO[bytes] type. Required.
+        :type operation_inputs: ~iot_hub_client.models.OperationInputs or IO[bytes]
+        :return: IotHubNameAvailabilityInfo
+        :rtype: ~iot_hub_client.models.IotHubNameAvailabilityInfo
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                operation_inputs = {
-                    "name": "str"  # The name of the IoT hub to check. Required.
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "message": "str",  # Optional. The detailed reason message.
-                    "nameAvailable": bool,  # Optional. The value which indicates whether the
-                      provided name is available.
-                    "reason": "str"  # Optional. The reason for unavailability. Known values are:
-                      "Invalid" and "AlreadyExists".
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -9825,7 +3074,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         _params = kwargs.pop("params", {}) or {}
 
         content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.IotHubNameAvailabilityInfo] = kwargs.pop("cls", None)
 
         content_type = content_type or "application/json"
         _json = None
@@ -9833,7 +3082,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         if isinstance(operation_inputs, (IOBase, bytes)):
             _content = operation_inputs
         else:
-            _json = operation_inputs
+            _json = self._serialize.body(operation_inputs, "OperationInputs")
 
         _request = build_iot_hub_resource_check_name_availability_request(
             subscription_id=self._config.subscription_id,
@@ -9857,29 +3106,26 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("IotHubNameAvailabilityInfo", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @overload
     def test_all_routes(
         self,
         iot_hub_name: str,
         resource_group_name: str,
-        input: JSON,
+        input: _models.TestAllRoutesInput,
         *,
         content_type: str = "application/json",
         **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+    ) -> _models.TestAllRoutesResult:
         """Test all routes.
 
         Test all routes configured in this Iot Hub.
@@ -9889,70 +3135,13 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :param resource_group_name: resource group which Iot Hub belongs to. Required.
         :type resource_group_name: str
         :param input: Input for testing all routes. Required.
-        :type input: JSON
+        :type input: ~iot_hub_client.models.TestAllRoutesInput
         :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
+        :return: TestAllRoutesResult
+        :rtype: ~iot_hub_client.models.TestAllRoutesResult
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                input = {
-                    "message": {
-                        "appProperties": {
-                            "str": "str"  # Optional. App properties.
-                        },
-                        "body": "str",  # Optional. Body of routing message.
-                        "systemProperties": {
-                            "str": "str"  # Optional. System properties.
-                        }
-                    },
-                    "routingSource": "str",  # Optional. Routing source. Known values are:
-                      "Invalid", "DeviceMessages", "TwinChangeEvents", "DeviceLifecycleEvents",
-                      "DeviceJobLifecycleEvents", "DigitalTwinChangeEvents",
-                      "DeviceConnectionStateEvents", and "MqttBrokerMessages".
-                    "twin": {
-                        "properties": {
-                            "desired": {},  # Optional. Twin desired properties.
-                            "reported": {}  # Optional. Twin desired properties.
-                        },
-                        "tags": {}  # Optional. Twin Tags.
-                    }
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "routes": [
-                        {
-                            "properties": {
-                                "endpointNames": [
-                                    "str"  # The list of endpoints to which
-                                      messages that satisfy the condition are routed. Currently only
-                                      one endpoint is allowed. Required.
-                                ],
-                                "isEnabled": bool,  # Used to specify whether a route
-                                  is enabled. Required.
-                                "name": "str",  # The name of the route. The name can
-                                  only include alphanumeric characters, periods, underscores, hyphens,
-                                  has a maximum length of 64 characters, and must be unique. Required.
-                                "source": "str",  # The source that the routing rule
-                                  is to be applied to, such as DeviceMessages. Required. Known values
-                                  are: "Invalid", "DeviceMessages", "TwinChangeEvents",
-                                  "DeviceLifecycleEvents", "DeviceJobLifecycleEvents",
-                                  "DigitalTwinChangeEvents", "DeviceConnectionStateEvents", and
-                                  "MqttBrokerMessages".
-                                "condition": "str"  # Optional. The condition that is
-                                  evaluated to apply the routing rule. If no condition is provided, it
-                                  evaluates to true by default. For grammar, see:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                            }
-                        }
-                    ]
-                }
         """
 
     @overload
@@ -9964,8 +3153,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         *,
         content_type: str = "application/json",
         **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+    ) -> _models.TestAllRoutesResult:
         """Test all routes.
 
         Test all routes configured in this Iot Hub.
@@ -9979,49 +3167,19 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
+        :return: TestAllRoutesResult
+        :rtype: ~iot_hub_client.models.TestAllRoutesResult
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "routes": [
-                        {
-                            "properties": {
-                                "endpointNames": [
-                                    "str"  # The list of endpoints to which
-                                      messages that satisfy the condition are routed. Currently only
-                                      one endpoint is allowed. Required.
-                                ],
-                                "isEnabled": bool,  # Used to specify whether a route
-                                  is enabled. Required.
-                                "name": "str",  # The name of the route. The name can
-                                  only include alphanumeric characters, periods, underscores, hyphens,
-                                  has a maximum length of 64 characters, and must be unique. Required.
-                                "source": "str",  # The source that the routing rule
-                                  is to be applied to, such as DeviceMessages. Required. Known values
-                                  are: "Invalid", "DeviceMessages", "TwinChangeEvents",
-                                  "DeviceLifecycleEvents", "DeviceJobLifecycleEvents",
-                                  "DigitalTwinChangeEvents", "DeviceConnectionStateEvents", and
-                                  "MqttBrokerMessages".
-                                "condition": "str"  # Optional. The condition that is
-                                  evaluated to apply the routing rule. If no condition is provided, it
-                                  evaluates to true by default. For grammar, see:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                            }
-                        }
-                    ]
-                }
         """
 
     @distributed_trace
     def test_all_routes(
-        self, iot_hub_name: str, resource_group_name: str, input: Union[JSON, IO[bytes]], **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+        self,
+        iot_hub_name: str,
+        resource_group_name: str,
+        input: Union[_models.TestAllRoutesInput, IO[bytes]],
+        **kwargs: Any
+    ) -> _models.TestAllRoutesResult:
         """Test all routes.
 
         Test all routes configured in this Iot Hub.
@@ -10030,69 +3188,12 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :type iot_hub_name: str
         :param resource_group_name: resource group which Iot Hub belongs to. Required.
         :type resource_group_name: str
-        :param input: Input for testing all routes. Is either a JSON type or a IO[bytes] type.
-         Required.
-        :type input: JSON or IO[bytes]
-        :return: JSON object
-        :rtype: JSON
+        :param input: Input for testing all routes. Is either a TestAllRoutesInput type or a IO[bytes]
+         type. Required.
+        :type input: ~iot_hub_client.models.TestAllRoutesInput or IO[bytes]
+        :return: TestAllRoutesResult
+        :rtype: ~iot_hub_client.models.TestAllRoutesResult
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                input = {
-                    "message": {
-                        "appProperties": {
-                            "str": "str"  # Optional. App properties.
-                        },
-                        "body": "str",  # Optional. Body of routing message.
-                        "systemProperties": {
-                            "str": "str"  # Optional. System properties.
-                        }
-                    },
-                    "routingSource": "str",  # Optional. Routing source. Known values are:
-                      "Invalid", "DeviceMessages", "TwinChangeEvents", "DeviceLifecycleEvents",
-                      "DeviceJobLifecycleEvents", "DigitalTwinChangeEvents",
-                      "DeviceConnectionStateEvents", and "MqttBrokerMessages".
-                    "twin": {
-                        "properties": {
-                            "desired": {},  # Optional. Twin desired properties.
-                            "reported": {}  # Optional. Twin desired properties.
-                        },
-                        "tags": {}  # Optional. Twin Tags.
-                    }
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "routes": [
-                        {
-                            "properties": {
-                                "endpointNames": [
-                                    "str"  # The list of endpoints to which
-                                      messages that satisfy the condition are routed. Currently only
-                                      one endpoint is allowed. Required.
-                                ],
-                                "isEnabled": bool,  # Used to specify whether a route
-                                  is enabled. Required.
-                                "name": "str",  # The name of the route. The name can
-                                  only include alphanumeric characters, periods, underscores, hyphens,
-                                  has a maximum length of 64 characters, and must be unique. Required.
-                                "source": "str",  # The source that the routing rule
-                                  is to be applied to, such as DeviceMessages. Required. Known values
-                                  are: "Invalid", "DeviceMessages", "TwinChangeEvents",
-                                  "DeviceLifecycleEvents", "DeviceJobLifecycleEvents",
-                                  "DigitalTwinChangeEvents", "DeviceConnectionStateEvents", and
-                                  "MqttBrokerMessages".
-                                "condition": "str"  # Optional. The condition that is
-                                  evaluated to apply the routing rule. If no condition is provided, it
-                                  evaluates to true by default. For grammar, see:
-                                  https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                            }
-                        }
-                    ]
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -10106,7 +3207,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         _params = kwargs.pop("params", {}) or {}
 
         content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.TestAllRoutesResult] = kwargs.pop("cls", None)
 
         content_type = content_type or "application/json"
         _json = None
@@ -10114,7 +3215,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         if isinstance(input, (IOBase, bytes)):
             _content = input
         else:
-            _json = input
+            _json = self._serialize.body(input, "TestAllRoutesInput")
 
         _request = build_iot_hub_resource_test_all_routes_request(
             iot_hub_name=iot_hub_name,
@@ -10140,29 +3241,26 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("TestAllRoutesResult", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @overload
     def test_route(
         self,
         iot_hub_name: str,
         resource_group_name: str,
-        input: JSON,
+        input: _models.TestRouteInput,
         *,
         content_type: str = "application/json",
         **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+    ) -> _models.TestRouteResult:
         """Test the new route.
 
         Test the new route for this Iot Hub.
@@ -10172,86 +3270,13 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :param resource_group_name: resource group which Iot Hub belongs to. Required.
         :type resource_group_name: str
         :param input: Route that needs to be tested. Required.
-        :type input: JSON
+        :type input: ~iot_hub_client.models.TestRouteInput
         :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
+        :return: TestRouteResult
+        :rtype: ~iot_hub_client.models.TestRouteResult
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                input = {
-                    "route": {
-                        "endpointNames": [
-                            "str"  # The list of endpoints to which messages that satisfy
-                              the condition are routed. Currently only one endpoint is allowed.
-                              Required.
-                        ],
-                        "isEnabled": bool,  # Used to specify whether a route is enabled.
-                          Required.
-                        "name": "str",  # The name of the route. The name can only include
-                          alphanumeric characters, periods, underscores, hyphens, has a maximum length
-                          of 64 characters, and must be unique. Required.
-                        "source": "str",  # The source that the routing rule is to be applied
-                          to, such as DeviceMessages. Required. Known values are: "Invalid",
-                          "DeviceMessages", "TwinChangeEvents", "DeviceLifecycleEvents",
-                          "DeviceJobLifecycleEvents", "DigitalTwinChangeEvents",
-                          "DeviceConnectionStateEvents", and "MqttBrokerMessages".
-                        "condition": "str"  # Optional. The condition that is evaluated to
-                          apply the routing rule. If no condition is provided, it evaluates to true by
-                          default. For grammar, see:
-                          https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                    },
-                    "message": {
-                        "appProperties": {
-                            "str": "str"  # Optional. App properties.
-                        },
-                        "body": "str",  # Optional. Body of routing message.
-                        "systemProperties": {
-                            "str": "str"  # Optional. System properties.
-                        }
-                    },
-                    "twin": {
-                        "properties": {
-                            "desired": {},  # Optional. Twin desired properties.
-                            "reported": {}  # Optional. Twin desired properties.
-                        },
-                        "tags": {}  # Optional. Twin Tags.
-                    }
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "details": {
-                        "compilationErrors": [
-                            {
-                                "location": {
-                                    "end": {
-                                        "column": 0,  # Optional. Column
-                                          where the route error happened.
-                                        "line": 0  # Optional. Line where the
-                                          route error happened.
-                                    },
-                                    "start": {
-                                        "column": 0,  # Optional. Column
-                                          where the route error happened.
-                                        "line": 0  # Optional. Line where the
-                                          route error happened.
-                                    }
-                                },
-                                "message": "str",  # Optional. Route error message.
-                                "severity": "str"  # Optional. Severity of the route
-                                  error. Known values are: "error" and "warning".
-                            }
-                        ]
-                    },
-                    "result": "str"  # Optional. Result of testing route. Known values are:
-                      "undefined", "false", and "true".
-                }
         """
 
     @overload
@@ -10263,7 +3288,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         *,
         content_type: str = "application/json",
         **kwargs: Any
-    ) -> JSON:
+    ) -> _models.TestRouteResult:
         """Test the new route.
 
         Test the new route for this Iot Hub.
@@ -10277,48 +3302,19 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
+        :return: TestRouteResult
+        :rtype: ~iot_hub_client.models.TestRouteResult
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "details": {
-                        "compilationErrors": [
-                            {
-                                "location": {
-                                    "end": {
-                                        "column": 0,  # Optional. Column
-                                          where the route error happened.
-                                        "line": 0  # Optional. Line where the
-                                          route error happened.
-                                    },
-                                    "start": {
-                                        "column": 0,  # Optional. Column
-                                          where the route error happened.
-                                        "line": 0  # Optional. Line where the
-                                          route error happened.
-                                    }
-                                },
-                                "message": "str",  # Optional. Route error message.
-                                "severity": "str"  # Optional. Severity of the route
-                                  error. Known values are: "error" and "warning".
-                            }
-                        ]
-                    },
-                    "result": "str"  # Optional. Result of testing route. Known values are:
-                      "undefined", "false", and "true".
-                }
         """
 
     @distributed_trace
     def test_route(
-        self, iot_hub_name: str, resource_group_name: str, input: Union[JSON, IO[bytes]], **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+        self,
+        iot_hub_name: str,
+        resource_group_name: str,
+        input: Union[_models.TestRouteInput, IO[bytes]],
+        **kwargs: Any
+    ) -> _models.TestRouteResult:
         """Test the new route.
 
         Test the new route for this Iot Hub.
@@ -10327,85 +3323,12 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :type iot_hub_name: str
         :param resource_group_name: resource group which Iot Hub belongs to. Required.
         :type resource_group_name: str
-        :param input: Route that needs to be tested. Is either a JSON type or a IO[bytes] type.
-         Required.
-        :type input: JSON or IO[bytes]
-        :return: JSON object
-        :rtype: JSON
+        :param input: Route that needs to be tested. Is either a TestRouteInput type or a IO[bytes]
+         type. Required.
+        :type input: ~iot_hub_client.models.TestRouteInput or IO[bytes]
+        :return: TestRouteResult
+        :rtype: ~iot_hub_client.models.TestRouteResult
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                input = {
-                    "route": {
-                        "endpointNames": [
-                            "str"  # The list of endpoints to which messages that satisfy
-                              the condition are routed. Currently only one endpoint is allowed.
-                              Required.
-                        ],
-                        "isEnabled": bool,  # Used to specify whether a route is enabled.
-                          Required.
-                        "name": "str",  # The name of the route. The name can only include
-                          alphanumeric characters, periods, underscores, hyphens, has a maximum length
-                          of 64 characters, and must be unique. Required.
-                        "source": "str",  # The source that the routing rule is to be applied
-                          to, such as DeviceMessages. Required. Known values are: "Invalid",
-                          "DeviceMessages", "TwinChangeEvents", "DeviceLifecycleEvents",
-                          "DeviceJobLifecycleEvents", "DigitalTwinChangeEvents",
-                          "DeviceConnectionStateEvents", and "MqttBrokerMessages".
-                        "condition": "str"  # Optional. The condition that is evaluated to
-                          apply the routing rule. If no condition is provided, it evaluates to true by
-                          default. For grammar, see:
-                          https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language.
-                    },
-                    "message": {
-                        "appProperties": {
-                            "str": "str"  # Optional. App properties.
-                        },
-                        "body": "str",  # Optional. Body of routing message.
-                        "systemProperties": {
-                            "str": "str"  # Optional. System properties.
-                        }
-                    },
-                    "twin": {
-                        "properties": {
-                            "desired": {},  # Optional. Twin desired properties.
-                            "reported": {}  # Optional. Twin desired properties.
-                        },
-                        "tags": {}  # Optional. Twin Tags.
-                    }
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "details": {
-                        "compilationErrors": [
-                            {
-                                "location": {
-                                    "end": {
-                                        "column": 0,  # Optional. Column
-                                          where the route error happened.
-                                        "line": 0  # Optional. Line where the
-                                          route error happened.
-                                    },
-                                    "start": {
-                                        "column": 0,  # Optional. Column
-                                          where the route error happened.
-                                        "line": 0  # Optional. Line where the
-                                          route error happened.
-                                    }
-                                },
-                                "message": "str",  # Optional. Route error message.
-                                "severity": "str"  # Optional. Severity of the route
-                                  error. Known values are: "error" and "warning".
-                            }
-                        ]
-                    },
-                    "result": "str"  # Optional. Result of testing route. Known values are:
-                      "undefined", "false", and "true".
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -10419,7 +3342,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         _params = kwargs.pop("params", {}) or {}
 
         content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.TestRouteResult] = kwargs.pop("cls", None)
 
         content_type = content_type or "application/json"
         _json = None
@@ -10427,7 +3350,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         if isinstance(input, (IOBase, bytes)):
             _content = input
         else:
-            _json = input
+            _json = self._serialize.body(input, "TestRouteInput")
 
         _request = build_iot_hub_resource_test_route_request(
             iot_hub_name=iot_hub_name,
@@ -10453,21 +3376,20 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("TestRouteResult", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @distributed_trace
-    def list_keys(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> Iterable[JSON]:
-        # pylint: disable=line-too-long
+    def list_keys(
+        self, resource_group_name: str, resource_name: str, **kwargs: Any
+    ) -> Iterable["_models.SharedAccessSignatureAuthorizationRule"]:
         """Get the security metadata for an IoT hub. For more information, see:
         https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-security.
 
@@ -10478,32 +3400,17 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :type resource_group_name: str
         :param resource_name: The name of the IoT hub. Required.
         :type resource_name: str
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.paging.ItemPaged[JSON]
+        :return: An iterator like instance of SharedAccessSignatureAuthorizationRule
+        :rtype:
+         ~azure.core.paging.ItemPaged[~iot_hub_client.models.SharedAccessSignatureAuthorizationRule]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "keyName": "str",  # The name of the shared access policy. Required.
-                    "rights": "str",  # The permissions assigned to the shared access policy.
-                      Required. Known values are: "RegistryRead", "RegistryWrite", "ServiceConnect",
-                      "DeviceConnect", "RegistryRead, RegistryWrite", "RegistryRead, ServiceConnect",
-                      "RegistryRead, DeviceConnect", "RegistryWrite, ServiceConnect", "RegistryWrite,
-                      DeviceConnect", "ServiceConnect, DeviceConnect", "RegistryRead, RegistryWrite,
-                      ServiceConnect", "RegistryRead, RegistryWrite, DeviceConnect", "RegistryRead,
-                      ServiceConnect, DeviceConnect", "RegistryWrite, ServiceConnect, DeviceConnect",
-                      and "RegistryRead, RegistryWrite, ServiceConnect, DeviceConnect".
-                    "primaryKey": "str",  # Optional. The primary key.
-                    "secondaryKey": "str"  # Optional. The secondary key.
-                }
         """
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models._models.SharedAccessSignatureAuthorizationRuleListResult] = kwargs.pop(
+            "cls", None
+        )  # pylint: disable=protected-access
 
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -10544,11 +3451,14 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
             return _request
 
         def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
+            deserialized = self._deserialize(
+                _models._models.SharedAccessSignatureAuthorizationRuleListResult,  # pylint: disable=protected-access
+                pipeline_response,
+            )
+            list_of_elem = deserialized.value
             if cls:
                 list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, iter(list_of_elem)
+            return deserialized.next_link or None, iter(list_of_elem)
 
         def get_next(next_link=None):
             _request = prepare_request(next_link)
@@ -10563,15 +3473,17 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
                 if _stream:
                     response.read()  # Load the body in memory and close the socket
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response)
+                error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+                raise HttpResponseError(response=response, model=error)
 
             return pipeline_response
 
         return ItemPaged(get_next, extract_data)
 
     @distributed_trace
-    def get_keys_for_key_name(self, resource_group_name: str, resource_name: str, key_name: str, **kwargs: Any) -> JSON:
-        # pylint: disable=line-too-long
+    def get_keys_for_key_name(
+        self, resource_group_name: str, resource_name: str, key_name: str, **kwargs: Any
+    ) -> _models.SharedAccessSignatureAuthorizationRule:
         """Get a shared access policy by name from an IoT hub. For more information, see:
         https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-security.
 
@@ -10584,27 +3496,9 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :type resource_name: str
         :param key_name: The name of the shared access policy. Required.
         :type key_name: str
-        :return: JSON object
-        :rtype: JSON
+        :return: SharedAccessSignatureAuthorizationRule
+        :rtype: ~iot_hub_client.models.SharedAccessSignatureAuthorizationRule
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "keyName": "str",  # The name of the shared access policy. Required.
-                    "rights": "str",  # The permissions assigned to the shared access policy.
-                      Required. Known values are: "RegistryRead", "RegistryWrite", "ServiceConnect",
-                      "DeviceConnect", "RegistryRead, RegistryWrite", "RegistryRead, ServiceConnect",
-                      "RegistryRead, DeviceConnect", "RegistryWrite, ServiceConnect", "RegistryWrite,
-                      DeviceConnect", "ServiceConnect, DeviceConnect", "RegistryRead, RegistryWrite,
-                      ServiceConnect", "RegistryRead, RegistryWrite, DeviceConnect", "RegistryRead,
-                      ServiceConnect, DeviceConnect", "RegistryWrite, ServiceConnect, DeviceConnect",
-                      and "RegistryRead, RegistryWrite, ServiceConnect, DeviceConnect".
-                    "primaryKey": "str",  # Optional. The primary key.
-                    "secondaryKey": "str"  # Optional. The secondary key.
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -10617,7 +3511,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.SharedAccessSignatureAuthorizationRule] = kwargs.pop("cls", None)
 
         _request = build_iot_hub_resource_get_keys_for_key_name_request(
             resource_group_name=resource_group_name,
@@ -10641,29 +3535,26 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("SharedAccessSignatureAuthorizationRule", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @overload
     def export_devices(
         self,
         resource_group_name: str,
         resource_name: str,
-        export_devices_parameters: JSON,
+        export_devices_parameters: _models.ExportDevicesRequest,
         *,
         content_type: str = "application/json",
         **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+    ) -> _models.JobResponse:
         """Exports all the device identities in the IoT hub identity registry to an Azure Storage blob
         container. For more information, see:
         https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities.
@@ -10678,58 +3569,13 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :type resource_name: str
         :param export_devices_parameters: The parameters that specify the export devices operation.
          Required.
-        :type export_devices_parameters: JSON
+        :type export_devices_parameters: ~iot_hub_client.models.ExportDevicesRequest
         :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
+        :return: JobResponse
+        :rtype: ~iot_hub_client.models.JobResponse
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                export_devices_parameters = {
-                    "excludeKeys": bool,  # The value indicating whether keys should be excluded
-                      during export. Required.
-                    "exportBlobContainerUri": "str",  # The export blob container URI. Required.
-                    "authenticationType": "str",  # Optional. Specifies authentication type being
-                      used for connecting to the storage account. Known values are: "keyBased" and
-                      "identityBased".
-                    "configurationsBlobName": "str",  # Optional. The name of the blob that will
-                      be created in the provided output blob container. This blob will contain the
-                      exported configurations for the Iot Hub.
-                    "exportBlobName": "str",  # Optional. The name of the blob that will be
-                      created in the provided output blob container. This blob will contain the
-                      exported device registry information for the IoT Hub.
-                    "identity": {
-                        "userAssignedIdentity": "str"  # Optional. The user assigned
-                          identity.
-                    },
-                    "includeConfigurations": bool  # Optional. The value indicating whether
-                      configurations should be exported.
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "endTimeUtc": "2020-02-20 00:00:00",  # Optional. The time the job stopped
-                      processing.
-                    "failureReason": "str",  # Optional. If status == failed, this string
-                      containing the reason for the failure.
-                    "jobId": "str",  # Optional. The job identifier.
-                    "parentJobId": "str",  # Optional. The job identifier of the parent job, if
-                      any.
-                    "startTimeUtc": "2020-02-20 00:00:00",  # Optional. The start time of the
-                      job.
-                    "status": "str",  # Optional. The status of the job. Known values are:
-                      "unknown", "enqueued", "running", "completed", "failed", and "cancelled".
-                    "statusMessage": "str",  # Optional. The status message for the job.
-                    "type": "str"  # Optional. The type of the job. Known values are: "unknown",
-                      "export", "import", "backup", "readDeviceProperties", "writeDeviceProperties",
-                      "updateDeviceConfiguration", "rebootDevice", "factoryResetDevice", and
-                      "firmwareUpdate".
-                }
         """
 
     @overload
@@ -10741,8 +3587,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         *,
         content_type: str = "application/json",
         **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+    ) -> _models.JobResponse:
         """Exports all the device identities in the IoT hub identity registry to an Azure Storage blob
         container. For more information, see:
         https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities.
@@ -10761,32 +3606,9 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
+        :return: JobResponse
+        :rtype: ~iot_hub_client.models.JobResponse
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "endTimeUtc": "2020-02-20 00:00:00",  # Optional. The time the job stopped
-                      processing.
-                    "failureReason": "str",  # Optional. If status == failed, this string
-                      containing the reason for the failure.
-                    "jobId": "str",  # Optional. The job identifier.
-                    "parentJobId": "str",  # Optional. The job identifier of the parent job, if
-                      any.
-                    "startTimeUtc": "2020-02-20 00:00:00",  # Optional. The start time of the
-                      job.
-                    "status": "str",  # Optional. The status of the job. Known values are:
-                      "unknown", "enqueued", "running", "completed", "failed", and "cancelled".
-                    "statusMessage": "str",  # Optional. The status message for the job.
-                    "type": "str"  # Optional. The type of the job. Known values are: "unknown",
-                      "export", "import", "backup", "readDeviceProperties", "writeDeviceProperties",
-                      "updateDeviceConfiguration", "rebootDevice", "factoryResetDevice", and
-                      "firmwareUpdate".
-                }
         """
 
     @distributed_trace
@@ -10794,10 +3616,9 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         self,
         resource_group_name: str,
         resource_name: str,
-        export_devices_parameters: Union[JSON, IO[bytes]],
+        export_devices_parameters: Union[_models.ExportDevicesRequest, IO[bytes]],
         **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+    ) -> _models.JobResponse:
         """Exports all the device identities in the IoT hub identity registry to an Azure Storage blob
         container. For more information, see:
         https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities.
@@ -10811,56 +3632,11 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :param resource_name: The name of the IoT hub. Required.
         :type resource_name: str
         :param export_devices_parameters: The parameters that specify the export devices operation. Is
-         either a JSON type or a IO[bytes] type. Required.
-        :type export_devices_parameters: JSON or IO[bytes]
-        :return: JSON object
-        :rtype: JSON
+         either a ExportDevicesRequest type or a IO[bytes] type. Required.
+        :type export_devices_parameters: ~iot_hub_client.models.ExportDevicesRequest or IO[bytes]
+        :return: JobResponse
+        :rtype: ~iot_hub_client.models.JobResponse
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                export_devices_parameters = {
-                    "excludeKeys": bool,  # The value indicating whether keys should be excluded
-                      during export. Required.
-                    "exportBlobContainerUri": "str",  # The export blob container URI. Required.
-                    "authenticationType": "str",  # Optional. Specifies authentication type being
-                      used for connecting to the storage account. Known values are: "keyBased" and
-                      "identityBased".
-                    "configurationsBlobName": "str",  # Optional. The name of the blob that will
-                      be created in the provided output blob container. This blob will contain the
-                      exported configurations for the Iot Hub.
-                    "exportBlobName": "str",  # Optional. The name of the blob that will be
-                      created in the provided output blob container. This blob will contain the
-                      exported device registry information for the IoT Hub.
-                    "identity": {
-                        "userAssignedIdentity": "str"  # Optional. The user assigned
-                          identity.
-                    },
-                    "includeConfigurations": bool  # Optional. The value indicating whether
-                      configurations should be exported.
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "endTimeUtc": "2020-02-20 00:00:00",  # Optional. The time the job stopped
-                      processing.
-                    "failureReason": "str",  # Optional. If status == failed, this string
-                      containing the reason for the failure.
-                    "jobId": "str",  # Optional. The job identifier.
-                    "parentJobId": "str",  # Optional. The job identifier of the parent job, if
-                      any.
-                    "startTimeUtc": "2020-02-20 00:00:00",  # Optional. The start time of the
-                      job.
-                    "status": "str",  # Optional. The status of the job. Known values are:
-                      "unknown", "enqueued", "running", "completed", "failed", and "cancelled".
-                    "statusMessage": "str",  # Optional. The status message for the job.
-                    "type": "str"  # Optional. The type of the job. Known values are: "unknown",
-                      "export", "import", "backup", "readDeviceProperties", "writeDeviceProperties",
-                      "updateDeviceConfiguration", "rebootDevice", "factoryResetDevice", and
-                      "firmwareUpdate".
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -10874,7 +3650,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         _params = kwargs.pop("params", {}) or {}
 
         content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.JobResponse] = kwargs.pop("cls", None)
 
         content_type = content_type or "application/json"
         _json = None
@@ -10882,7 +3658,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         if isinstance(export_devices_parameters, (IOBase, bytes)):
             _content = export_devices_parameters
         else:
-            _json = export_devices_parameters
+            _json = self._serialize.body(export_devices_parameters, "ExportDevicesRequest")
 
         _request = build_iot_hub_resource_export_devices_request(
             resource_group_name=resource_group_name,
@@ -10908,29 +3684,26 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("JobResponse", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @overload
     def import_devices(
         self,
         resource_group_name: str,
         resource_name: str,
-        import_devices_parameters: JSON,
+        import_devices_parameters: _models.ImportDevicesRequest,
         *,
         content_type: str = "application/json",
         **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+    ) -> _models.JobResponse:
         """Import, update, or delete device identities in the IoT hub identity registry from a blob. For
         more information, see:
         https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities.
@@ -10945,57 +3718,13 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :type resource_name: str
         :param import_devices_parameters: The parameters that specify the import devices operation.
          Required.
-        :type import_devices_parameters: JSON
+        :type import_devices_parameters: ~iot_hub_client.models.ImportDevicesRequest
         :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
+        :return: JobResponse
+        :rtype: ~iot_hub_client.models.JobResponse
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                import_devices_parameters = {
-                    "inputBlobContainerUri": "str",  # The input blob container URI. Required.
-                    "outputBlobContainerUri": "str",  # The output blob container URI. Required.
-                    "authenticationType": "str",  # Optional. Specifies authentication type being
-                      used for connecting to the storage account. Known values are: "keyBased" and
-                      "identityBased".
-                    "configurationsBlobName": "str",  # Optional. The blob name to be used when
-                      importing configurations from the provided input blob container.
-                    "identity": {
-                        "userAssignedIdentity": "str"  # Optional. The user assigned
-                          identity.
-                    },
-                    "includeConfigurations": bool,  # Optional. The value indicating whether
-                      configurations should be imported.
-                    "inputBlobName": "str",  # Optional. The blob name to be used when importing
-                      from the provided input blob container.
-                    "outputBlobName": "str"  # Optional. The blob name to use for storing the
-                      status of the import job.
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "endTimeUtc": "2020-02-20 00:00:00",  # Optional. The time the job stopped
-                      processing.
-                    "failureReason": "str",  # Optional. If status == failed, this string
-                      containing the reason for the failure.
-                    "jobId": "str",  # Optional. The job identifier.
-                    "parentJobId": "str",  # Optional. The job identifier of the parent job, if
-                      any.
-                    "startTimeUtc": "2020-02-20 00:00:00",  # Optional. The start time of the
-                      job.
-                    "status": "str",  # Optional. The status of the job. Known values are:
-                      "unknown", "enqueued", "running", "completed", "failed", and "cancelled".
-                    "statusMessage": "str",  # Optional. The status message for the job.
-                    "type": "str"  # Optional. The type of the job. Known values are: "unknown",
-                      "export", "import", "backup", "readDeviceProperties", "writeDeviceProperties",
-                      "updateDeviceConfiguration", "rebootDevice", "factoryResetDevice", and
-                      "firmwareUpdate".
-                }
         """
 
     @overload
@@ -11007,8 +3736,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         *,
         content_type: str = "application/json",
         **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+    ) -> _models.JobResponse:
         """Import, update, or delete device identities in the IoT hub identity registry from a blob. For
         more information, see:
         https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities.
@@ -11027,32 +3755,9 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
+        :return: JobResponse
+        :rtype: ~iot_hub_client.models.JobResponse
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "endTimeUtc": "2020-02-20 00:00:00",  # Optional. The time the job stopped
-                      processing.
-                    "failureReason": "str",  # Optional. If status == failed, this string
-                      containing the reason for the failure.
-                    "jobId": "str",  # Optional. The job identifier.
-                    "parentJobId": "str",  # Optional. The job identifier of the parent job, if
-                      any.
-                    "startTimeUtc": "2020-02-20 00:00:00",  # Optional. The start time of the
-                      job.
-                    "status": "str",  # Optional. The status of the job. Known values are:
-                      "unknown", "enqueued", "running", "completed", "failed", and "cancelled".
-                    "statusMessage": "str",  # Optional. The status message for the job.
-                    "type": "str"  # Optional. The type of the job. Known values are: "unknown",
-                      "export", "import", "backup", "readDeviceProperties", "writeDeviceProperties",
-                      "updateDeviceConfiguration", "rebootDevice", "factoryResetDevice", and
-                      "firmwareUpdate".
-                }
         """
 
     @distributed_trace
@@ -11060,10 +3765,9 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         self,
         resource_group_name: str,
         resource_name: str,
-        import_devices_parameters: Union[JSON, IO[bytes]],
+        import_devices_parameters: Union[_models.ImportDevicesRequest, IO[bytes]],
         **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+    ) -> _models.JobResponse:
         """Import, update, or delete device identities in the IoT hub identity registry from a blob. For
         more information, see:
         https://docs.microsoft.com/azure/iot-hub/iot-hub-devguide-identity-registry#import-and-export-device-identities.
@@ -11077,55 +3781,11 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         :param resource_name: The name of the IoT hub. Required.
         :type resource_name: str
         :param import_devices_parameters: The parameters that specify the import devices operation. Is
-         either a JSON type or a IO[bytes] type. Required.
-        :type import_devices_parameters: JSON or IO[bytes]
-        :return: JSON object
-        :rtype: JSON
+         either a ImportDevicesRequest type or a IO[bytes] type. Required.
+        :type import_devices_parameters: ~iot_hub_client.models.ImportDevicesRequest or IO[bytes]
+        :return: JobResponse
+        :rtype: ~iot_hub_client.models.JobResponse
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                import_devices_parameters = {
-                    "inputBlobContainerUri": "str",  # The input blob container URI. Required.
-                    "outputBlobContainerUri": "str",  # The output blob container URI. Required.
-                    "authenticationType": "str",  # Optional. Specifies authentication type being
-                      used for connecting to the storage account. Known values are: "keyBased" and
-                      "identityBased".
-                    "configurationsBlobName": "str",  # Optional. The blob name to be used when
-                      importing configurations from the provided input blob container.
-                    "identity": {
-                        "userAssignedIdentity": "str"  # Optional. The user assigned
-                          identity.
-                    },
-                    "includeConfigurations": bool,  # Optional. The value indicating whether
-                      configurations should be imported.
-                    "inputBlobName": "str",  # Optional. The blob name to be used when importing
-                      from the provided input blob container.
-                    "outputBlobName": "str"  # Optional. The blob name to use for storing the
-                      status of the import job.
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "endTimeUtc": "2020-02-20 00:00:00",  # Optional. The time the job stopped
-                      processing.
-                    "failureReason": "str",  # Optional. If status == failed, this string
-                      containing the reason for the failure.
-                    "jobId": "str",  # Optional. The job identifier.
-                    "parentJobId": "str",  # Optional. The job identifier of the parent job, if
-                      any.
-                    "startTimeUtc": "2020-02-20 00:00:00",  # Optional. The start time of the
-                      job.
-                    "status": "str",  # Optional. The status of the job. Known values are:
-                      "unknown", "enqueued", "running", "completed", "failed", and "cancelled".
-                    "statusMessage": "str",  # Optional. The status message for the job.
-                    "type": "str"  # Optional. The type of the job. Known values are: "unknown",
-                      "export", "import", "backup", "readDeviceProperties", "writeDeviceProperties",
-                      "updateDeviceConfiguration", "rebootDevice", "factoryResetDevice", and
-                      "firmwareUpdate".
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -11139,7 +3799,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         _params = kwargs.pop("params", {}) or {}
 
         content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.JobResponse] = kwargs.pop("cls", None)
 
         content_type = content_type or "application/json"
         _json = None
@@ -11147,7 +3807,7 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         if isinstance(import_devices_parameters, (IOBase, bytes)):
             _content = import_devices_parameters
         else:
-            _json = import_devices_parameters
+            _json = self._serialize.body(import_devices_parameters, "ImportDevicesRequest")
 
         _request = build_iot_hub_resource_import_devices_request(
             resource_group_name=resource_group_name,
@@ -11173,17 +3833,15 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("JobResponse", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
 
 class ResourceProviderCommonOperations:
@@ -11196,6 +3854,8 @@ class ResourceProviderCommonOperations:
         :attr:`resource_provider_common` attribute.
     """
 
+    models = _models
+
     def __init__(self, *args, **kwargs):
         input_args = list(args)
         self._client = input_args.pop(0) if input_args else kwargs.pop("client")
@@ -11204,37 +3864,14 @@ class ResourceProviderCommonOperations:
         self._deserialize = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
     @distributed_trace
-    def get_subscription_quota(self, **kwargs: Any) -> JSON:
+    def get_subscription_quota(self, **kwargs: Any) -> _models.UserSubscriptionQuotaListResult:
         """Get the number of iot hubs in the subscription.
 
         Get the number of free and paid iot hubs in the subscription.
 
-        :return: JSON object
-        :rtype: JSON
+        :return: UserSubscriptionQuotaListResult
+        :rtype: ~iot_hub_client.models.UserSubscriptionQuotaListResult
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "nextLink": "str",  # Optional.
-                    "value": [
-                        {
-                            "currentValue": 0,  # Optional. Current number of IotHub
-                              type.
-                            "id": "str",  # Optional. IotHub type id.
-                            "limit": 0,  # Optional. Numerical limit on IotHub type.
-                            "name": {
-                                "localizedValue": "str",  # Optional. Localized value
-                                  of name.
-                                "value": "str"  # Optional. IotHub type.
-                            },
-                            "type": "str",  # Optional. Response type.
-                            "unit": "str"  # Optional. Unit of IotHub type.
-                        }
-                    ]
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -11247,7 +3884,7 @@ class ResourceProviderCommonOperations:
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.UserSubscriptionQuotaListResult] = kwargs.pop("cls", None)
 
         _request = build_resource_provider_common_get_subscription_quota_request(
             subscription_id=self._config.subscription_id,
@@ -11268,17 +3905,15 @@ class ResourceProviderCommonOperations:
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("UserSubscriptionQuotaListResult", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
 
 class CertificatesOperations:
@@ -11291,6 +3926,8 @@ class CertificatesOperations:
         :attr:`certificates` attribute.
     """
 
+    models = _models
+
     def __init__(self, *args, **kwargs):
         input_args = list(args)
         self._client = input_args.pop(0) if input_args else kwargs.pop("client")
@@ -11299,7 +3936,9 @@ class CertificatesOperations:
         self._deserialize = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
     @distributed_trace
-    def list_by_iot_hub(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> JSON:
+    def list_by_iot_hub(
+        self, resource_group_name: str, resource_name: str, **kwargs: Any
+    ) -> _models.CertificateListDescription:
         """Get the certificate list.
 
         Returns the list of certificates.
@@ -11308,42 +3947,9 @@ class CertificatesOperations:
         :type resource_group_name: str
         :param resource_name: The name of the IoT hub. Required.
         :type resource_name: str
-        :return: JSON object
-        :rtype: JSON
+        :return: CertificateListDescription
+        :rtype: ~iot_hub_client.models.CertificateListDescription
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "value": [
-                        {
-                            "etag": "str",  # Optional. The entity tag.
-                            "id": "str",  # Optional. The resource identifier.
-                            "name": "str",  # Optional. The name of the certificate.
-                            "properties": {
-                                "certificate": "str",  # Optional. The certificate
-                                  content.
-                                "created": "2020-02-20 00:00:00",  # Optional. The
-                                  certificate's create date and time.
-                                "expiry": "2020-02-20 00:00:00",  # Optional. The
-                                  certificate's expiration date and time.
-                                "isVerified": bool,  # Optional. Determines whether
-                                  certificate has been verified.
-                                "policyResourceId": "str",  # Optional. The reference
-                                  to policy stored in Azure Device Registry (ADR).
-                                "subject": "str",  # Optional. The certificate's
-                                  subject name.
-                                "thumbprint": "str",  # Optional. The certificate's
-                                  thumbprint.
-                                "updated": "2020-02-20 00:00:00"  # Optional. The
-                                  certificate's last update date and time.
-                            },
-                            "type": "str"  # Optional. The resource type.
-                        }
-                    ]
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -11356,7 +3962,7 @@ class CertificatesOperations:
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.CertificateListDescription] = kwargs.pop("cls", None)
 
         _request = build_certificates_list_by_iot_hub_request(
             resource_group_name=resource_group_name,
@@ -11379,20 +3985,20 @@ class CertificatesOperations:
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("CertificateListDescription", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @distributed_trace
-    def get(self, resource_group_name: str, resource_name: str, certificate_name: str, **kwargs: Any) -> JSON:
+    def get(
+        self, resource_group_name: str, resource_name: str, certificate_name: str, **kwargs: Any
+    ) -> _models.CertificateDescription:
         """Get the certificate.
 
         Returns the certificate.
@@ -11403,35 +4009,9 @@ class CertificatesOperations:
         :type resource_name: str
         :param certificate_name: The name of the certificate. Required.
         :type certificate_name: str
-        :return: JSON object
-        :rtype: JSON
+        :return: CertificateDescription
+        :rtype: ~iot_hub_client.models.CertificateDescription
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "etag": "str",  # Optional. The entity tag.
-                    "id": "str",  # Optional. The resource identifier.
-                    "name": "str",  # Optional. The name of the certificate.
-                    "properties": {
-                        "certificate": "str",  # Optional. The certificate content.
-                        "created": "2020-02-20 00:00:00",  # Optional. The certificate's
-                          create date and time.
-                        "expiry": "2020-02-20 00:00:00",  # Optional. The certificate's
-                          expiration date and time.
-                        "isVerified": bool,  # Optional. Determines whether certificate has
-                          been verified.
-                        "policyResourceId": "str",  # Optional. The reference to policy
-                          stored in Azure Device Registry (ADR).
-                        "subject": "str",  # Optional. The certificate's subject name.
-                        "thumbprint": "str",  # Optional. The certificate's thumbprint.
-                        "updated": "2020-02-20 00:00:00"  # Optional. The certificate's last
-                          update date and time.
-                    },
-                    "type": "str"  # Optional. The resource type.
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -11444,7 +4024,7 @@ class CertificatesOperations:
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.CertificateDescription] = kwargs.pop("cls", None)
 
         _request = build_certificates_get_request(
             resource_group_name=resource_group_name,
@@ -11468,17 +4048,15 @@ class CertificatesOperations:
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("CertificateDescription", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @overload
     def create_or_update(
@@ -11486,13 +4064,13 @@ class CertificatesOperations:
         resource_group_name: str,
         resource_name: str,
         certificate_name: str,
-        certificate_description: JSON,
+        certificate_description: _models.CertificateDescription,
         *,
         content_type: str = "application/json",
         etag: Optional[str] = None,
         match_condition: Optional[MatchConditions] = None,
         **kwargs: Any
-    ) -> JSON:
+    ) -> _models.CertificateDescription:
         """Upload the certificate to the IoT hub.
 
         Adds new or replaces existing certificate.
@@ -11504,7 +4082,7 @@ class CertificatesOperations:
         :param certificate_name: The name of the certificate. Required.
         :type certificate_name: str
         :param certificate_description: The certificate body. Required.
-        :type certificate_description: JSON
+        :type certificate_description: ~iot_hub_client.models.CertificateDescription
         :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
          Default value is "application/json".
         :paramtype content_type: str
@@ -11513,58 +4091,9 @@ class CertificatesOperations:
         :paramtype etag: str
         :keyword match_condition: The match condition to use upon the etag. Default value is None.
         :paramtype match_condition: ~azure.core.MatchConditions
-        :return: JSON object
-        :rtype: JSON
+        :return: CertificateDescription
+        :rtype: ~iot_hub_client.models.CertificateDescription
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                certificate_description = {
-                    "etag": "str",  # Optional. The entity tag.
-                    "id": "str",  # Optional. The resource identifier.
-                    "name": "str",  # Optional. The name of the certificate.
-                    "properties": {
-                        "certificate": "str",  # Optional. The certificate content.
-                        "created": "2020-02-20 00:00:00",  # Optional. The certificate's
-                          create date and time.
-                        "expiry": "2020-02-20 00:00:00",  # Optional. The certificate's
-                          expiration date and time.
-                        "isVerified": bool,  # Optional. Determines whether certificate has
-                          been verified.
-                        "policyResourceId": "str",  # Optional. The reference to policy
-                          stored in Azure Device Registry (ADR).
-                        "subject": "str",  # Optional. The certificate's subject name.
-                        "thumbprint": "str",  # Optional. The certificate's thumbprint.
-                        "updated": "2020-02-20 00:00:00"  # Optional. The certificate's last
-                          update date and time.
-                    },
-                    "type": "str"  # Optional. The resource type.
-                }
-
-                # response body for status code(s): 200, 201
-                response == {
-                    "etag": "str",  # Optional. The entity tag.
-                    "id": "str",  # Optional. The resource identifier.
-                    "name": "str",  # Optional. The name of the certificate.
-                    "properties": {
-                        "certificate": "str",  # Optional. The certificate content.
-                        "created": "2020-02-20 00:00:00",  # Optional. The certificate's
-                          create date and time.
-                        "expiry": "2020-02-20 00:00:00",  # Optional. The certificate's
-                          expiration date and time.
-                        "isVerified": bool,  # Optional. Determines whether certificate has
-                          been verified.
-                        "policyResourceId": "str",  # Optional. The reference to policy
-                          stored in Azure Device Registry (ADR).
-                        "subject": "str",  # Optional. The certificate's subject name.
-                        "thumbprint": "str",  # Optional. The certificate's thumbprint.
-                        "updated": "2020-02-20 00:00:00"  # Optional. The certificate's last
-                          update date and time.
-                    },
-                    "type": "str"  # Optional. The resource type.
-                }
         """
 
     @overload
@@ -11579,7 +4108,7 @@ class CertificatesOperations:
         etag: Optional[str] = None,
         match_condition: Optional[MatchConditions] = None,
         **kwargs: Any
-    ) -> JSON:
+    ) -> _models.CertificateDescription:
         """Upload the certificate to the IoT hub.
 
         Adds new or replaces existing certificate.
@@ -11600,35 +4129,9 @@ class CertificatesOperations:
         :paramtype etag: str
         :keyword match_condition: The match condition to use upon the etag. Default value is None.
         :paramtype match_condition: ~azure.core.MatchConditions
-        :return: JSON object
-        :rtype: JSON
+        :return: CertificateDescription
+        :rtype: ~iot_hub_client.models.CertificateDescription
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200, 201
-                response == {
-                    "etag": "str",  # Optional. The entity tag.
-                    "id": "str",  # Optional. The resource identifier.
-                    "name": "str",  # Optional. The name of the certificate.
-                    "properties": {
-                        "certificate": "str",  # Optional. The certificate content.
-                        "created": "2020-02-20 00:00:00",  # Optional. The certificate's
-                          create date and time.
-                        "expiry": "2020-02-20 00:00:00",  # Optional. The certificate's
-                          expiration date and time.
-                        "isVerified": bool,  # Optional. Determines whether certificate has
-                          been verified.
-                        "policyResourceId": "str",  # Optional. The reference to policy
-                          stored in Azure Device Registry (ADR).
-                        "subject": "str",  # Optional. The certificate's subject name.
-                        "thumbprint": "str",  # Optional. The certificate's thumbprint.
-                        "updated": "2020-02-20 00:00:00"  # Optional. The certificate's last
-                          update date and time.
-                    },
-                    "type": "str"  # Optional. The resource type.
-                }
         """
 
     @distributed_trace
@@ -11637,12 +4140,12 @@ class CertificatesOperations:
         resource_group_name: str,
         resource_name: str,
         certificate_name: str,
-        certificate_description: Union[JSON, IO[bytes]],
+        certificate_description: Union[_models.CertificateDescription, IO[bytes]],
         *,
         etag: Optional[str] = None,
         match_condition: Optional[MatchConditions] = None,
         **kwargs: Any
-    ) -> JSON:
+    ) -> _models.CertificateDescription:
         """Upload the certificate to the IoT hub.
 
         Adds new or replaces existing certificate.
@@ -11653,66 +4156,17 @@ class CertificatesOperations:
         :type resource_name: str
         :param certificate_name: The name of the certificate. Required.
         :type certificate_name: str
-        :param certificate_description: The certificate body. Is either a JSON type or a IO[bytes]
-         type. Required.
-        :type certificate_description: JSON or IO[bytes]
+        :param certificate_description: The certificate body. Is either a CertificateDescription type
+         or a IO[bytes] type. Required.
+        :type certificate_description: ~iot_hub_client.models.CertificateDescription or IO[bytes]
         :keyword etag: check if resource is changed. Set None to skip checking etag. Default value is
          None.
         :paramtype etag: str
         :keyword match_condition: The match condition to use upon the etag. Default value is None.
         :paramtype match_condition: ~azure.core.MatchConditions
-        :return: JSON object
-        :rtype: JSON
+        :return: CertificateDescription
+        :rtype: ~iot_hub_client.models.CertificateDescription
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                certificate_description = {
-                    "etag": "str",  # Optional. The entity tag.
-                    "id": "str",  # Optional. The resource identifier.
-                    "name": "str",  # Optional. The name of the certificate.
-                    "properties": {
-                        "certificate": "str",  # Optional. The certificate content.
-                        "created": "2020-02-20 00:00:00",  # Optional. The certificate's
-                          create date and time.
-                        "expiry": "2020-02-20 00:00:00",  # Optional. The certificate's
-                          expiration date and time.
-                        "isVerified": bool,  # Optional. Determines whether certificate has
-                          been verified.
-                        "policyResourceId": "str",  # Optional. The reference to policy
-                          stored in Azure Device Registry (ADR).
-                        "subject": "str",  # Optional. The certificate's subject name.
-                        "thumbprint": "str",  # Optional. The certificate's thumbprint.
-                        "updated": "2020-02-20 00:00:00"  # Optional. The certificate's last
-                          update date and time.
-                    },
-                    "type": "str"  # Optional. The resource type.
-                }
-
-                # response body for status code(s): 200, 201
-                response == {
-                    "etag": "str",  # Optional. The entity tag.
-                    "id": "str",  # Optional. The resource identifier.
-                    "name": "str",  # Optional. The name of the certificate.
-                    "properties": {
-                        "certificate": "str",  # Optional. The certificate content.
-                        "created": "2020-02-20 00:00:00",  # Optional. The certificate's
-                          create date and time.
-                        "expiry": "2020-02-20 00:00:00",  # Optional. The certificate's
-                          expiration date and time.
-                        "isVerified": bool,  # Optional. Determines whether certificate has
-                          been verified.
-                        "policyResourceId": "str",  # Optional. The reference to policy
-                          stored in Azure Device Registry (ADR).
-                        "subject": "str",  # Optional. The certificate's subject name.
-                        "thumbprint": "str",  # Optional. The certificate's thumbprint.
-                        "updated": "2020-02-20 00:00:00"  # Optional. The certificate's last
-                          update date and time.
-                    },
-                    "type": "str"  # Optional. The resource type.
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -11732,7 +4186,7 @@ class CertificatesOperations:
         _params = kwargs.pop("params", {}) or {}
 
         content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.CertificateDescription] = kwargs.pop("cls", None)
 
         content_type = content_type or "application/json"
         _json = None
@@ -11740,7 +4194,7 @@ class CertificatesOperations:
         if isinstance(certificate_description, (IOBase, bytes)):
             _content = certificate_description
         else:
-            _json = certificate_description
+            _json = self._serialize.body(certificate_description, "CertificateDescription")
 
         _request = build_certificates_create_or_update_request(
             resource_group_name=resource_group_name,
@@ -11769,24 +4223,19 @@ class CertificatesOperations:
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
         if response.status_code == 200:
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("CertificateDescription", pipeline_response)
 
         if response.status_code == 201:
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("CertificateDescription", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @distributed_trace
     def delete(  # pylint: disable=inconsistent-return-statements
@@ -11860,7 +4309,8 @@ class CertificatesOperations:
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
         if cls:
             return cls(pipeline_response, None, {})  # type: ignore
@@ -11875,8 +4325,7 @@ class CertificatesOperations:
         etag: str,
         match_condition: MatchConditions,
         **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+    ) -> _models.CertificateWithNonceDescription:
         """Generate verification code for proof of possession flow.
 
         Generates verification code for proof of possession flow. The verification code will be used to
@@ -11892,37 +4341,9 @@ class CertificatesOperations:
         :paramtype etag: str
         :keyword match_condition: The match condition to use upon the etag. Required.
         :paramtype match_condition: ~azure.core.MatchConditions
-        :return: JSON object
-        :rtype: JSON
+        :return: CertificateWithNonceDescription
+        :rtype: ~iot_hub_client.models.CertificateWithNonceDescription
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "etag": "str",  # Optional. The entity tag.
-                    "id": "str",  # Optional. The resource identifier.
-                    "name": "str",  # Optional. The name of the certificate.
-                    "properties": {
-                        "certificate": "str",  # Optional. The certificate content.
-                        "created": "2020-02-20 00:00:00",  # Optional. The certificate's
-                          create date and time.
-                        "expiry": "2020-02-20 00:00:00",  # Optional. The certificate's
-                          expiration date and time.
-                        "isVerified": bool,  # Optional. Determines whether certificate has
-                          been verified.
-                        "policyResourceId": "str",  # Optional. The reference to policy
-                          stored in Azure Device Registry (ADR).
-                        "subject": "str",  # Optional. The certificate's subject name.
-                        "thumbprint": "str",  # Optional. The certificate's thumbprint.
-                        "updated": "2020-02-20 00:00:00",  # Optional. The certificate's last
-                          update date and time.
-                        "verificationCode": "str"  # Optional. The certificate's verification
-                          code that will be used for proof of possession.
-                    },
-                    "type": "str"  # Optional. The resource type.
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -11941,7 +4362,7 @@ class CertificatesOperations:
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.CertificateWithNonceDescription] = kwargs.pop("cls", None)
 
         _request = build_certificates_generate_verification_code_request(
             resource_group_name=resource_group_name,
@@ -11967,17 +4388,15 @@ class CertificatesOperations:
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("CertificateWithNonceDescription", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @overload
     def verify(
@@ -11985,13 +4404,13 @@ class CertificatesOperations:
         resource_group_name: str,
         resource_name: str,
         certificate_name: str,
-        certificate_verification_body: JSON,
+        certificate_verification_body: _models.CertificateVerificationDescription,
         *,
         etag: str,
         match_condition: MatchConditions,
         content_type: str = "application/json",
         **kwargs: Any
-    ) -> JSON:
+    ) -> _models.CertificateDescription:
         """Verify certificate's private key possession.
 
         Verifies the certificate's private key possession by providing the leaf cert issued by the
@@ -12004,7 +4423,7 @@ class CertificatesOperations:
         :param certificate_name: The name of the certificate. Required.
         :type certificate_name: str
         :param certificate_verification_body: The name of the certificate. Required.
-        :type certificate_verification_body: JSON
+        :type certificate_verification_body: ~iot_hub_client.models.CertificateVerificationDescription
         :keyword etag: check if resource is changed. Set None to skip checking etag. Required.
         :paramtype etag: str
         :keyword match_condition: The match condition to use upon the etag. Required.
@@ -12012,41 +4431,9 @@ class CertificatesOperations:
         :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
+        :return: CertificateDescription
+        :rtype: ~iot_hub_client.models.CertificateDescription
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                certificate_verification_body = {
-                    "certificate": "str"  # Optional. base-64 representation of X509 certificate
-                      .cer file or just .pem file content.
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "etag": "str",  # Optional. The entity tag.
-                    "id": "str",  # Optional. The resource identifier.
-                    "name": "str",  # Optional. The name of the certificate.
-                    "properties": {
-                        "certificate": "str",  # Optional. The certificate content.
-                        "created": "2020-02-20 00:00:00",  # Optional. The certificate's
-                          create date and time.
-                        "expiry": "2020-02-20 00:00:00",  # Optional. The certificate's
-                          expiration date and time.
-                        "isVerified": bool,  # Optional. Determines whether certificate has
-                          been verified.
-                        "policyResourceId": "str",  # Optional. The reference to policy
-                          stored in Azure Device Registry (ADR).
-                        "subject": "str",  # Optional. The certificate's subject name.
-                        "thumbprint": "str",  # Optional. The certificate's thumbprint.
-                        "updated": "2020-02-20 00:00:00"  # Optional. The certificate's last
-                          update date and time.
-                    },
-                    "type": "str"  # Optional. The resource type.
-                }
         """
 
     @overload
@@ -12061,7 +4448,7 @@ class CertificatesOperations:
         match_condition: MatchConditions,
         content_type: str = "application/json",
         **kwargs: Any
-    ) -> JSON:
+    ) -> _models.CertificateDescription:
         """Verify certificate's private key possession.
 
         Verifies the certificate's private key possession by providing the leaf cert issued by the
@@ -12082,35 +4469,9 @@ class CertificatesOperations:
         :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
+        :return: CertificateDescription
+        :rtype: ~iot_hub_client.models.CertificateDescription
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "etag": "str",  # Optional. The entity tag.
-                    "id": "str",  # Optional. The resource identifier.
-                    "name": "str",  # Optional. The name of the certificate.
-                    "properties": {
-                        "certificate": "str",  # Optional. The certificate content.
-                        "created": "2020-02-20 00:00:00",  # Optional. The certificate's
-                          create date and time.
-                        "expiry": "2020-02-20 00:00:00",  # Optional. The certificate's
-                          expiration date and time.
-                        "isVerified": bool,  # Optional. Determines whether certificate has
-                          been verified.
-                        "policyResourceId": "str",  # Optional. The reference to policy
-                          stored in Azure Device Registry (ADR).
-                        "subject": "str",  # Optional. The certificate's subject name.
-                        "thumbprint": "str",  # Optional. The certificate's thumbprint.
-                        "updated": "2020-02-20 00:00:00"  # Optional. The certificate's last
-                          update date and time.
-                    },
-                    "type": "str"  # Optional. The resource type.
-                }
         """
 
     @distributed_trace
@@ -12119,12 +4480,12 @@ class CertificatesOperations:
         resource_group_name: str,
         resource_name: str,
         certificate_name: str,
-        certificate_verification_body: Union[JSON, IO[bytes]],
+        certificate_verification_body: Union[_models.CertificateVerificationDescription, IO[bytes]],
         *,
         etag: str,
         match_condition: MatchConditions,
         **kwargs: Any
-    ) -> JSON:
+    ) -> _models.CertificateDescription:
         """Verify certificate's private key possession.
 
         Verifies the certificate's private key possession by providing the leaf cert issued by the
@@ -12136,48 +4497,17 @@ class CertificatesOperations:
         :type resource_name: str
         :param certificate_name: The name of the certificate. Required.
         :type certificate_name: str
-        :param certificate_verification_body: The name of the certificate. Is either a JSON type or a
-         IO[bytes] type. Required.
-        :type certificate_verification_body: JSON or IO[bytes]
+        :param certificate_verification_body: The name of the certificate. Is either a
+         CertificateVerificationDescription type or a IO[bytes] type. Required.
+        :type certificate_verification_body: ~iot_hub_client.models.CertificateVerificationDescription
+         or IO[bytes]
         :keyword etag: check if resource is changed. Set None to skip checking etag. Required.
         :paramtype etag: str
         :keyword match_condition: The match condition to use upon the etag. Required.
         :paramtype match_condition: ~azure.core.MatchConditions
-        :return: JSON object
-        :rtype: JSON
+        :return: CertificateDescription
+        :rtype: ~iot_hub_client.models.CertificateDescription
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                certificate_verification_body = {
-                    "certificate": "str"  # Optional. base-64 representation of X509 certificate
-                      .cer file or just .pem file content.
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "etag": "str",  # Optional. The entity tag.
-                    "id": "str",  # Optional. The resource identifier.
-                    "name": "str",  # Optional. The name of the certificate.
-                    "properties": {
-                        "certificate": "str",  # Optional. The certificate content.
-                        "created": "2020-02-20 00:00:00",  # Optional. The certificate's
-                          create date and time.
-                        "expiry": "2020-02-20 00:00:00",  # Optional. The certificate's
-                          expiration date and time.
-                        "isVerified": bool,  # Optional. Determines whether certificate has
-                          been verified.
-                        "policyResourceId": "str",  # Optional. The reference to policy
-                          stored in Azure Device Registry (ADR).
-                        "subject": "str",  # Optional. The certificate's subject name.
-                        "thumbprint": "str",  # Optional. The certificate's thumbprint.
-                        "updated": "2020-02-20 00:00:00"  # Optional. The certificate's last
-                          update date and time.
-                    },
-                    "type": "str"  # Optional. The resource type.
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -12197,7 +4527,7 @@ class CertificatesOperations:
         _params = kwargs.pop("params", {}) or {}
 
         content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.CertificateDescription] = kwargs.pop("cls", None)
 
         content_type = content_type or "application/json"
         _json = None
@@ -12205,7 +4535,7 @@ class CertificatesOperations:
         if isinstance(certificate_verification_body, (IOBase, bytes)):
             _content = certificate_verification_body
         else:
-            _json = certificate_verification_body
+            _json = self._serialize.body(certificate_verification_body, "CertificateVerificationDescription")
 
         _request = build_certificates_verify_request(
             resource_group_name=resource_group_name,
@@ -12234,17 +4564,15 @@ class CertificatesOperations:
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("CertificateDescription", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
 
 class IotHubOperations:
@@ -12257,6 +4585,8 @@ class IotHubOperations:
         :attr:`iot_hub` attribute.
     """
 
+    models = _models
+
     def __init__(self, *args, **kwargs):
         input_args = list(args)
         self._client = input_args.pop(0) if input_args else kwargs.pop("client")
@@ -12265,7 +4595,11 @@ class IotHubOperations:
         self._deserialize = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
     def _manual_failover_initial(  # pylint: disable=inconsistent-return-statements
-        self, iot_hub_name: str, resource_group_name: str, failover_input: Union[JSON, IO[bytes]], **kwargs: Any
+        self,
+        iot_hub_name: str,
+        resource_group_name: str,
+        failover_input: Union[_models.FailoverInput, IO[bytes]],
+        **kwargs: Any
     ) -> None:
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -12287,7 +4621,7 @@ class IotHubOperations:
         if isinstance(failover_input, (IOBase, bytes)):
             _content = failover_input
         else:
-            _json = failover_input
+            _json = self._serialize.body(failover_input, "FailoverInput")
 
         _request = build_iot_hub_manual_failover_request(
             iot_hub_name=iot_hub_name,
@@ -12313,7 +4647,8 @@ class IotHubOperations:
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
         response_headers = {}
         if response.status_code == 202:
@@ -12330,7 +4665,7 @@ class IotHubOperations:
         self,
         iot_hub_name: str,
         resource_group_name: str,
-        failover_input: JSON,
+        failover_input: _models.FailoverInput,
         *,
         content_type: str = "application/json",
         **kwargs: Any
@@ -12348,21 +4683,13 @@ class IotHubOperations:
         :param failover_input: Region to failover to. Must be the Azure paired region. Get the value
          from the secondary location in the locations property. To learn more, see
          https://aka.ms/manualfailover/region. Required.
-        :type failover_input: JSON
+        :type failover_input: ~iot_hub_client.models.FailoverInput
         :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
          Default value is "application/json".
         :paramtype content_type: str
         :return: An instance of LROPoller that returns None
         :rtype: ~azure.core.polling.LROPoller[None]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                failover_input = {
-                    "failoverRegion": "str"  # Region the hub will be failed over to. Required.
-                }
         """
 
     @overload
@@ -12399,7 +4726,11 @@ class IotHubOperations:
 
     @distributed_trace
     def begin_manual_failover(
-        self, iot_hub_name: str, resource_group_name: str, failover_input: Union[JSON, IO[bytes]], **kwargs: Any
+        self,
+        iot_hub_name: str,
+        resource_group_name: str,
+        failover_input: Union[_models.FailoverInput, IO[bytes]],
+        **kwargs: Any
     ) -> LROPoller[None]:
         """Manually initiate a failover for the IoT Hub to its secondary region.
 
@@ -12413,19 +4744,12 @@ class IotHubOperations:
         :type resource_group_name: str
         :param failover_input: Region to failover to. Must be the Azure paired region. Get the value
          from the secondary location in the locations property. To learn more, see
-         https://aka.ms/manualfailover/region. Is either a JSON type or a IO[bytes] type. Required.
-        :type failover_input: JSON or IO[bytes]
+         https://aka.ms/manualfailover/region. Is either a FailoverInput type or a IO[bytes] type.
+         Required.
+        :type failover_input: ~iot_hub_client.models.FailoverInput or IO[bytes]
         :return: An instance of LROPoller that returns None
         :rtype: ~azure.core.polling.LROPoller[None]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                failover_input = {
-                    "failoverRegion": "str"  # Region the hub will be failed over to. Required.
-                }
         """
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
@@ -12478,6 +4802,8 @@ class PrivateLinkResourcesOperations:
         :attr:`private_link_resources` attribute.
     """
 
+    models = _models
+
     def __init__(self, *args, **kwargs):
         input_args = list(args)
         self._client = input_args.pop(0) if input_args else kwargs.pop("client")
@@ -12486,7 +4812,7 @@ class PrivateLinkResourcesOperations:
         self._deserialize = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
     @distributed_trace
-    def list(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> JSON:
+    def list(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> _models.PrivateLinkResources:
         """List private link resources.
 
         List private link resources for the given IotHub.
@@ -12495,34 +4821,9 @@ class PrivateLinkResourcesOperations:
         :type resource_group_name: str
         :param resource_name: The name of the IoT hub. Required.
         :type resource_name: str
-        :return: JSON object
-        :rtype: JSON
+        :return: PrivateLinkResources
+        :rtype: ~iot_hub_client.models.PrivateLinkResources
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "value": [
-                        {
-                            "properties": {
-                                "groupId": "str",  # Optional. The group id.
-                                "requiredMembers": [
-                                    "str"  # Optional. The required members for a
-                                      specific group id.
-                                ],
-                                "requiredZoneNames": [
-                                    "str"  # Optional. The required DNS zones for
-                                      a specific group id.
-                                ]
-                            },
-                            "id": "str",  # Optional. The resource identifier.
-                            "name": "str",  # Optional. The resource name.
-                            "type": "str"  # Optional. The resource type.
-                        }
-                    ]
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -12535,7 +4836,7 @@ class PrivateLinkResourcesOperations:
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.PrivateLinkResources] = kwargs.pop("cls", None)
 
         _request = build_private_link_resources_list_request(
             resource_group_name=resource_group_name,
@@ -12558,20 +4859,20 @@ class PrivateLinkResourcesOperations:
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("PrivateLinkResources", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @distributed_trace
-    def get(self, resource_group_name: str, resource_name: str, group_id: str, **kwargs: Any) -> JSON:
+    def get(
+        self, resource_group_name: str, resource_name: str, group_id: str, **kwargs: Any
+    ) -> _models.GroupIdInformation:
         """Get the specified private link resource.
 
         Get the specified private link resource for the given IotHub.
@@ -12582,30 +4883,9 @@ class PrivateLinkResourcesOperations:
         :type resource_name: str
         :param group_id: The name of the private link resource. Required.
         :type group_id: str
-        :return: JSON object
-        :rtype: JSON
+        :return: GroupIdInformation
+        :rtype: ~iot_hub_client.models.GroupIdInformation
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "properties": {
-                        "groupId": "str",  # Optional. The group id.
-                        "requiredMembers": [
-                            "str"  # Optional. The required members for a specific group
-                              id.
-                        ],
-                        "requiredZoneNames": [
-                            "str"  # Optional. The required DNS zones for a specific
-                              group id.
-                        ]
-                    },
-                    "id": "str",  # Optional. The resource identifier.
-                    "name": "str",  # Optional. The resource name.
-                    "type": "str"  # Optional. The resource type.
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -12618,7 +4898,7 @@ class PrivateLinkResourcesOperations:
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.GroupIdInformation] = kwargs.pop("cls", None)
 
         _request = build_private_link_resources_get_request(
             resource_group_name=resource_group_name,
@@ -12642,17 +4922,15 @@ class PrivateLinkResourcesOperations:
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("GroupIdInformation", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
 
 class PrivateEndpointConnectionsOperations:
@@ -12665,6 +4943,8 @@ class PrivateEndpointConnectionsOperations:
         :attr:`private_endpoint_connections` attribute.
     """
 
+    models = _models
+
     def __init__(self, *args, **kwargs):
         input_args = list(args)
         self._client = input_args.pop(0) if input_args else kwargs.pop("client")
@@ -12673,8 +4953,9 @@ class PrivateEndpointConnectionsOperations:
         self._deserialize = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
     @distributed_trace
-    def list(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> List[JSON]:
-        # pylint: disable=line-too-long
+    def list(
+        self, resource_group_name: str, resource_name: str, **kwargs: Any
+    ) -> List[_models.PrivateEndpointConnection]:
         """List private endpoint connections.
 
         List private endpoint connection properties.
@@ -12683,35 +4964,9 @@ class PrivateEndpointConnectionsOperations:
         :type resource_group_name: str
         :param resource_name: The name of the IoT hub. Required.
         :type resource_name: str
-        :return: list of JSON object
-        :rtype: list[JSON]
+        :return: list of PrivateEndpointConnection
+        :rtype: list[~iot_hub_client.models.PrivateEndpointConnection]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == [
-                    {
-                        "properties": {
-                            "privateLinkServiceConnectionState": {
-                                "description": "str",  # The description for the
-                                  current state of a private endpoint connection. Required.
-                                "status": "str",  # The status of a private endpoint
-                                  connection. Required. Known values are: "Pending", "Approved",
-                                  "Rejected", and "Disconnected".
-                                "actionsRequired": "str"  # Optional. Actions
-                                  required for a private endpoint connection.
-                            },
-                            "privateEndpoint": {
-                                "id": "str"  # Optional. The resource identifier.
-                            }
-                        },
-                        "id": "str",  # Optional. The resource identifier.
-                        "name": "str",  # Optional. The resource name.
-                        "type": "str"  # Optional. The resource type.
-                    }
-                ]
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -12724,7 +4979,7 @@ class PrivateEndpointConnectionsOperations:
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
+        cls: ClsType[List[_models.PrivateEndpointConnection]] = kwargs.pop("cls", None)
 
         _request = build_private_endpoint_connections_list_request(
             resource_group_name=resource_group_name,
@@ -12747,23 +5002,20 @@ class PrivateEndpointConnectionsOperations:
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("[PrivateEndpointConnection]", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(List[JSON], deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(List[JSON], deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @distributed_trace
     def get(
         self, resource_group_name: str, resource_name: str, private_endpoint_connection_name: str, **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+    ) -> _models.PrivateEndpointConnection:
         """Get private endpoint connection.
 
         Get private endpoint connection properties.
@@ -12774,33 +5026,9 @@ class PrivateEndpointConnectionsOperations:
         :type resource_name: str
         :param private_endpoint_connection_name: The name of the private endpoint connection. Required.
         :type private_endpoint_connection_name: str
-        :return: JSON object
-        :rtype: JSON
+        :return: PrivateEndpointConnection
+        :rtype: ~iot_hub_client.models.PrivateEndpointConnection
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "properties": {
-                        "privateLinkServiceConnectionState": {
-                            "description": "str",  # The description for the current
-                              state of a private endpoint connection. Required.
-                            "status": "str",  # The status of a private endpoint
-                              connection. Required. Known values are: "Pending", "Approved",
-                              "Rejected", and "Disconnected".
-                            "actionsRequired": "str"  # Optional. Actions required for a
-                              private endpoint connection.
-                        },
-                        "privateEndpoint": {
-                            "id": "str"  # Optional. The resource identifier.
-                        }
-                    },
-                    "id": "str",  # Optional. The resource identifier.
-                    "name": "str",  # Optional. The resource name.
-                    "type": "str"  # Optional. The resource type.
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -12813,7 +5041,7 @@ class PrivateEndpointConnectionsOperations:
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.PrivateEndpointConnection] = kwargs.pop("cls", None)
 
         _request = build_private_endpoint_connections_get_request(
             resource_group_name=resource_group_name,
@@ -12837,26 +5065,24 @@ class PrivateEndpointConnectionsOperations:
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("PrivateEndpointConnection", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     def _update_initial(
         self,
         resource_group_name: str,
         resource_name: str,
         private_endpoint_connection_name: str,
-        private_endpoint_connection: Union[JSON, IO[bytes]],
+        private_endpoint_connection: Union[_models.PrivateEndpointConnection, IO[bytes]],
         **kwargs: Any
-    ) -> JSON:
+    ) -> _models.PrivateEndpointConnection:
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
             404: ResourceNotFoundError,
@@ -12869,7 +5095,7 @@ class PrivateEndpointConnectionsOperations:
         _params = kwargs.pop("params", {}) or {}
 
         content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.PrivateEndpointConnection] = kwargs.pop("cls", None)
 
         content_type = content_type or "application/json"
         _json = None
@@ -12877,7 +5103,7 @@ class PrivateEndpointConnectionsOperations:
         if isinstance(private_endpoint_connection, (IOBase, bytes)):
             _content = private_endpoint_connection
         else:
-            _json = private_endpoint_connection
+            _json = self._serialize.body(private_endpoint_connection, "PrivateEndpointConnection")
 
         _request = build_private_endpoint_connections_update_request(
             resource_group_name=resource_group_name,
@@ -12904,29 +5130,24 @@ class PrivateEndpointConnectionsOperations:
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
         response_headers = {}
         if response.status_code == 200:
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("PrivateEndpointConnection", pipeline_response)
 
         if response.status_code == 201:
             response_headers["Azure-AsyncOperation"] = self._deserialize(
                 "str", response.headers.get("Azure-AsyncOperation")
             )
 
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("PrivateEndpointConnection", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), response_headers)  # type: ignore
+            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @overload
     def begin_update(
@@ -12934,12 +5155,11 @@ class PrivateEndpointConnectionsOperations:
         resource_group_name: str,
         resource_name: str,
         private_endpoint_connection_name: str,
-        private_endpoint_connection: JSON,
+        private_endpoint_connection: _models.PrivateEndpointConnection,
         *,
         content_type: str = "application/json",
         **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
+    ) -> LROPoller[_models.PrivateEndpointConnection]:
         """Update private endpoint connection.
 
         Update the status of a private endpoint connection with the specified name.
@@ -12952,58 +5172,13 @@ class PrivateEndpointConnectionsOperations:
         :type private_endpoint_connection_name: str
         :param private_endpoint_connection: The private endpoint connection with updated properties.
          Required.
-        :type private_endpoint_connection: JSON
+        :type private_endpoint_connection: ~iot_hub_client.models.PrivateEndpointConnection
         :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :return: An instance of LROPoller that returns PrivateEndpointConnection
+        :rtype: ~azure.core.polling.LROPoller[~iot_hub_client.models.PrivateEndpointConnection]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                private_endpoint_connection = {
-                    "properties": {
-                        "privateLinkServiceConnectionState": {
-                            "description": "str",  # The description for the current
-                              state of a private endpoint connection. Required.
-                            "status": "str",  # The status of a private endpoint
-                              connection. Required. Known values are: "Pending", "Approved",
-                              "Rejected", and "Disconnected".
-                            "actionsRequired": "str"  # Optional. Actions required for a
-                              private endpoint connection.
-                        },
-                        "privateEndpoint": {
-                            "id": "str"  # Optional. The resource identifier.
-                        }
-                    },
-                    "id": "str",  # Optional. The resource identifier.
-                    "name": "str",  # Optional. The resource name.
-                    "type": "str"  # Optional. The resource type.
-                }
-
-                # response body for status code(s): 200, 201
-                response == {
-                    "properties": {
-                        "privateLinkServiceConnectionState": {
-                            "description": "str",  # The description for the current
-                              state of a private endpoint connection. Required.
-                            "status": "str",  # The status of a private endpoint
-                              connection. Required. Known values are: "Pending", "Approved",
-                              "Rejected", and "Disconnected".
-                            "actionsRequired": "str"  # Optional. Actions required for a
-                              private endpoint connection.
-                        },
-                        "privateEndpoint": {
-                            "id": "str"  # Optional. The resource identifier.
-                        }
-                    },
-                    "id": "str",  # Optional. The resource identifier.
-                    "name": "str",  # Optional. The resource name.
-                    "type": "str"  # Optional. The resource type.
-                }
         """
 
     @overload
@@ -13016,8 +5191,7 @@ class PrivateEndpointConnectionsOperations:
         *,
         content_type: str = "application/json",
         **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
+    ) -> LROPoller[_models.PrivateEndpointConnection]:
         """Update private endpoint connection.
 
         Update the status of a private endpoint connection with the specified name.
@@ -13034,33 +5208,9 @@ class PrivateEndpointConnectionsOperations:
         :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :return: An instance of LROPoller that returns PrivateEndpointConnection
+        :rtype: ~azure.core.polling.LROPoller[~iot_hub_client.models.PrivateEndpointConnection]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200, 201
-                response == {
-                    "properties": {
-                        "privateLinkServiceConnectionState": {
-                            "description": "str",  # The description for the current
-                              state of a private endpoint connection. Required.
-                            "status": "str",  # The status of a private endpoint
-                              connection. Required. Known values are: "Pending", "Approved",
-                              "Rejected", and "Disconnected".
-                            "actionsRequired": "str"  # Optional. Actions required for a
-                              private endpoint connection.
-                        },
-                        "privateEndpoint": {
-                            "id": "str"  # Optional. The resource identifier.
-                        }
-                    },
-                    "id": "str",  # Optional. The resource identifier.
-                    "name": "str",  # Optional. The resource name.
-                    "type": "str"  # Optional. The resource type.
-                }
         """
 
     @distributed_trace
@@ -13069,10 +5219,9 @@ class PrivateEndpointConnectionsOperations:
         resource_group_name: str,
         resource_name: str,
         private_endpoint_connection_name: str,
-        private_endpoint_connection: Union[JSON, IO[bytes]],
+        private_endpoint_connection: Union[_models.PrivateEndpointConnection, IO[bytes]],
         **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
+    ) -> LROPoller[_models.PrivateEndpointConnection]:
         """Update private endpoint connection.
 
         Update the status of a private endpoint connection with the specified name.
@@ -13084,62 +5233,18 @@ class PrivateEndpointConnectionsOperations:
         :param private_endpoint_connection_name: The name of the private endpoint connection. Required.
         :type private_endpoint_connection_name: str
         :param private_endpoint_connection: The private endpoint connection with updated properties. Is
-         either a JSON type or a IO[bytes] type. Required.
-        :type private_endpoint_connection: JSON or IO[bytes]
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
+         either a PrivateEndpointConnection type or a IO[bytes] type. Required.
+        :type private_endpoint_connection: ~iot_hub_client.models.PrivateEndpointConnection or
+         IO[bytes]
+        :return: An instance of LROPoller that returns PrivateEndpointConnection
+        :rtype: ~azure.core.polling.LROPoller[~iot_hub_client.models.PrivateEndpointConnection]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                private_endpoint_connection = {
-                    "properties": {
-                        "privateLinkServiceConnectionState": {
-                            "description": "str",  # The description for the current
-                              state of a private endpoint connection. Required.
-                            "status": "str",  # The status of a private endpoint
-                              connection. Required. Known values are: "Pending", "Approved",
-                              "Rejected", and "Disconnected".
-                            "actionsRequired": "str"  # Optional. Actions required for a
-                              private endpoint connection.
-                        },
-                        "privateEndpoint": {
-                            "id": "str"  # Optional. The resource identifier.
-                        }
-                    },
-                    "id": "str",  # Optional. The resource identifier.
-                    "name": "str",  # Optional. The resource name.
-                    "type": "str"  # Optional. The resource type.
-                }
-
-                # response body for status code(s): 200, 201
-                response == {
-                    "properties": {
-                        "privateLinkServiceConnectionState": {
-                            "description": "str",  # The description for the current
-                              state of a private endpoint connection. Required.
-                            "status": "str",  # The status of a private endpoint
-                              connection. Required. Known values are: "Pending", "Approved",
-                              "Rejected", and "Disconnected".
-                            "actionsRequired": "str"  # Optional. Actions required for a
-                              private endpoint connection.
-                        },
-                        "privateEndpoint": {
-                            "id": "str"  # Optional. The resource identifier.
-                        }
-                    },
-                    "id": "str",  # Optional. The resource identifier.
-                    "name": "str",  # Optional. The resource name.
-                    "type": "str"  # Optional. The resource type.
-                }
         """
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
         content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.PrivateEndpointConnection] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -13158,11 +5263,7 @@ class PrivateEndpointConnectionsOperations:
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
-            response = pipeline_response.http_response
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("PrivateEndpointConnection", pipeline_response)
             if cls:
                 return cls(pipeline_response, deserialized, {})  # type: ignore
             return deserialized
@@ -13174,17 +5275,19 @@ class PrivateEndpointConnectionsOperations:
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[JSON].from_continuation_token(
+            return LROPoller[_models.PrivateEndpointConnection].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
+        return LROPoller[_models.PrivateEndpointConnection](
+            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
+        )
 
     def _delete_initial(
         self, resource_group_name: str, resource_name: str, private_endpoint_connection_name: str, **kwargs: Any
-    ) -> Optional[JSON]:
+    ) -> Optional[_models.PrivateEndpointConnection]:
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
             404: ResourceNotFoundError,
@@ -13196,7 +5299,7 @@ class PrivateEndpointConnectionsOperations:
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[Optional[JSON]] = kwargs.pop("cls", None)
+        cls: ClsType[Optional[_models.PrivateEndpointConnection]] = kwargs.pop("cls", None)
 
         _request = build_private_endpoint_connections_delete_request(
             resource_group_name=resource_group_name,
@@ -13220,15 +5323,13 @@ class PrivateEndpointConnectionsOperations:
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error)
 
         deserialized = None
         response_headers = {}
         if response.status_code == 200:
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("PrivateEndpointConnection", pipeline_response)
 
         if response.status_code == 202:
             response_headers["Azure-AsyncOperation"] = self._deserialize(
@@ -13236,10 +5337,7 @@ class PrivateEndpointConnectionsOperations:
             )
             response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
 
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("PrivateEndpointConnection", pipeline_response)
 
         if cls:
             return cls(pipeline_response, deserialized, response_headers)  # type: ignore
@@ -13249,8 +5347,7 @@ class PrivateEndpointConnectionsOperations:
     @distributed_trace
     def begin_delete(
         self, resource_group_name: str, resource_name: str, private_endpoint_connection_name: str, **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
+    ) -> LROPoller[_models.PrivateEndpointConnection]:
         """Delete private endpoint connection.
 
         Delete private endpoint connection with the specified name.
@@ -13261,38 +5358,14 @@ class PrivateEndpointConnectionsOperations:
         :type resource_name: str
         :param private_endpoint_connection_name: The name of the private endpoint connection. Required.
         :type private_endpoint_connection_name: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :return: An instance of LROPoller that returns PrivateEndpointConnection
+        :rtype: ~azure.core.polling.LROPoller[~iot_hub_client.models.PrivateEndpointConnection]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200, 202
-                response == {
-                    "properties": {
-                        "privateLinkServiceConnectionState": {
-                            "description": "str",  # The description for the current
-                              state of a private endpoint connection. Required.
-                            "status": "str",  # The status of a private endpoint
-                              connection. Required. Known values are: "Pending", "Approved",
-                              "Rejected", and "Disconnected".
-                            "actionsRequired": "str"  # Optional. Actions required for a
-                              private endpoint connection.
-                        },
-                        "privateEndpoint": {
-                            "id": "str"  # Optional. The resource identifier.
-                        }
-                    },
-                    "id": "str",  # Optional. The resource identifier.
-                    "name": "str",  # Optional. The resource name.
-                    "type": "str"  # Optional. The resource type.
-                }
         """
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.PrivateEndpointConnection] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -13309,11 +5382,7 @@ class PrivateEndpointConnectionsOperations:
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
-            response = pipeline_response.http_response
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("PrivateEndpointConnection", pipeline_response)
             if cls:
                 return cls(pipeline_response, deserialized, {})  # type: ignore
             return deserialized
@@ -13325,10 +5394,12 @@ class PrivateEndpointConnectionsOperations:
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[JSON].from_continuation_token(
+            return LROPoller[_models.PrivateEndpointConnection].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
+        return LROPoller[_models.PrivateEndpointConnection](
+            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
+        )
