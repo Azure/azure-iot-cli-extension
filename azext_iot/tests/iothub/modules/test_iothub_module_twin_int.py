@@ -7,7 +7,6 @@
 import json
 import os
 from pathlib import Path
-from time import sleep
 
 from azext_iot.common.utility import read_file_content
 from azext_iot.tests.iothub import IoTLiveScenarioTest
@@ -20,9 +19,6 @@ CWD = os.path.dirname(os.path.abspath(__file__))
 class TestIoTHubModuleTwin(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTHubModuleTwin, self).__init__(test_case)
-
-        # Ensure role assignment is complete
-        sleep(30)
 
     def test_iothub_module_twin(self):
         for auth_phase in DATAPLANE_AUTH_TYPES:

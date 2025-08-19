@@ -927,7 +927,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         )
 
         # wait for API to catch up before fetching twin
-        sleep(15)
+        sleep(10)
 
         # get device twin
         result = self.cmd(

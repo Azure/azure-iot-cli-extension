@@ -29,7 +29,7 @@ parameters:
     default: 6
   - name: num_reruns
     type: number
-    default: 0  # TODO: set to 2 once we have stable tests
+    default: 2
   - name: reruns_delay
     type: number
     default: 60
