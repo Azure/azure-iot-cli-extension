@@ -161,6 +161,7 @@ def iot_dps_device_enrollment_create(
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
+        attestation = None
         if attestation_type == AttestationType.tpm.value:
             if not endorsement_key:
                 raise RequiredArgumentMissingError("Endorsement key [--endorsement-key] is required")
@@ -464,6 +465,7 @@ def iot_dps_device_enrollment_group_create(
         resolver = SdkResolver(target=target)
         sdk = resolver.get_sdk(SdkType.dps_sdk)
 
+        attestation = None
         if not certificate_path and not secondary_certificate_path:
             if not root_ca_name and not secondary_root_ca_name:
                 attestation = AttestationMechanism(
@@ -911,17 +913,25 @@ def _get_initial_twin(initial_twin_tags=None, initial_twin_properties=None):
 def _get_updated_inital_twin(
     enrollment_record, initial_twin_tags=None, initial_twin_properties=None
 ):
-    if initial_twin_properties != "" and not initial_twin_tags:
-        if hasattr(enrollment_record, "initial_twin"):
-            if hasattr(enrollment_record.initial_twin, "tags"):
-                initial_twin_tags = enrollment_record.initial_twin.tags
-    if initial_twin_properties != "" and not initial_twin_properties:
-        if hasattr(enrollment_record, "initial_twin"):
-            if hasattr(enrollment_record.initial_twin, "properties"):
-                if hasattr(enrollment_record.initial_twin.properties, "desired"):
-                    initial_twin_properties = (
-                        enrollment_record.initial_twin.properties.desired
-                    )
+    # in both cases, we want to grab the original tags and properties
+    # if the parameters are not provided. The user should be able to
+    # empty out tags/properties by passing in an empty string.
+    if (
+        initial_twin_tags is None
+        and hasattr(enrollment_record, "initial_twin")
+        and hasattr(enrollment_record.initial_twin, "tags")
+    ):
+        initial_twin_tags = enrollment_record.initial_twin.tags.as_dict()
+
+    if (
+        initial_twin_properties is None
+        and hasattr(enrollment_record, "initial_twin")
+        and hasattr(enrollment_record.initial_twin, "properties")
+        and hasattr(enrollment_record.initial_twin.properties, "desired")
+    ):
+        initial_twin_properties = (
+            enrollment_record.initial_twin.properties.desired.as_dict()
+        )
     return _get_initial_twin(initial_twin_tags, initial_twin_properties)
 
 

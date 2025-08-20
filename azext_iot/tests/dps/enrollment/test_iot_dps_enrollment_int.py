@@ -101,8 +101,8 @@ def test_dps_enrollment_tpm_lifecycle(provisioned_iot_dps_module):
         assert update_enrollment["attestation"]["type"] == attestation_type
         assert update_enrollment["deviceId"] == device_id
         assert update_enrollment["iotHubs"] == [hub_hostname]
-        assert update_enrollment["initialTwin"]["tags"]
-        assert update_enrollment["initialTwin"]["properties"]["desired"]
+        assert update_enrollment["initialTwin"]["tags"] == generic_dict
+        assert update_enrollment["initialTwin"]["properties"]["desired"] == generic_dict
         assert update_enrollment["optionalDeviceInformation"]
         assert update_enrollment["provisioningStatus"] == EntityStatusType.disabled.value
         assert update_enrollment["registrationId"] == enrollment_id
@@ -197,8 +197,8 @@ def test_dps_enrollment_x509_lifecycle(provisioned_iot_dps_module):
         assert update_enrollment["attestation"]["x509"]["clientCertificates"]["primary"] is None
         assert update_enrollment["deviceId"] == device_id
         assert update_enrollment["iotHubs"] == [hub_hostname]
-        assert update_enrollment["initialTwin"]["tags"]
-        assert update_enrollment["initialTwin"]["properties"]["desired"]
+        assert update_enrollment["initialTwin"]["tags"] == generic_dict
+        assert update_enrollment["initialTwin"]["properties"]["desired"] == generic_dict
         assert update_enrollment["optionalDeviceInformation"] == generic_dict
         assert update_enrollment["provisioningStatus"] == EntityStatusType.disabled.value
         assert update_enrollment["registrationId"] == enrollment_id
@@ -299,8 +299,8 @@ def test_dps_enrollment_symmetrickey_lifecycle(provisioned_iot_dps_module):
         assert update_enrollment["customAllocationDefinition"]["apiVersion"] == API_VERSION
         assert update_enrollment["deviceId"] == device_id
         assert update_enrollment["iotHubs"] == [hub_hostname]
-        assert update_enrollment["initialTwin"]["tags"]
-        assert update_enrollment["initialTwin"]["properties"]["desired"]
+        assert update_enrollment["initialTwin"]["tags"] == generic_dict
+        assert update_enrollment["initialTwin"]["properties"]["desired"] == generic_dict
         assert update_enrollment["optionalDeviceInformation"] == generic_dict
         assert update_enrollment["provisioningStatus"] == EntityStatusType.disabled.value
         assert update_enrollment["registrationId"] == enrollment_id

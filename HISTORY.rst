@@ -9,6 +9,8 @@ Release History
 **General updates**
 
 * `az iot hub monitor-events` now supports free SKU IoT Hubs when control plane access is available.
+* Moved `az iot hub devicestream` commands into the extension.
+* Fixed a bug in `az iot dps enrollment update` and `az iot dps enrollment-group update` where the `--initial-twin-tags` and `--initial-twin-properties` parameters were not being set correctly.
 
 
 0.26.0
