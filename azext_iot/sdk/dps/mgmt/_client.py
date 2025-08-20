@@ -12,6 +12,7 @@ from azure.core.rest import HttpRequest, HttpResponse
 from azure.mgmt.core import ARMPipelineClient
 from azure.mgmt.core.policies import ARMAutoResourceProviderRegistrationPolicy
 
+from . import models as _models
 from ._configuration import IotDpsClientConfiguration
 from ._serialization import Deserializer, Serializer
 from .operations import DpsCertificateOperations, IotDpsResourceOperations, Operations
@@ -71,8 +72,10 @@ class IotDpsClient:  # pylint: disable=client-accepts-api-version-keyword
             ]
         self._client: ARMPipelineClient = ARMPipelineClient(base_url=endpoint, policies=_policies, **kwargs)
 
-        self._serialize = Serializer()
-        self._deserialize = Deserializer()
+        client_models = {k: v for k, v in _models._models.__dict__.items() if isinstance(v, type)}
+        client_models.update({k: v for k, v in _models.__dict__.items() if isinstance(v, type)})
+        self._serialize = Serializer(client_models)
+        self._deserialize = Deserializer(client_models)
         self._serialize.client_side_validation = False
         self.operations = Operations(self._client, self._config, self._serialize, self._deserialize)
         self.iot_dps_resource = IotDpsResourceOperations(self._client, self._config, self._serialize, self._deserialize)

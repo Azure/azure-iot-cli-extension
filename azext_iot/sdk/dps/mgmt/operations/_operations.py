@@ -29,6 +29,7 @@ from azure.core.utils import case_insensitive_dict
 from azure.mgmt.core.exceptions import ARMErrorFormat
 from azure.mgmt.core.polling.arm_polling import ARMPolling
 
+from .. import models as _models
 from .._serialization import Serializer
 from .._vendor import prep_if_match, prep_if_none_match
 
@@ -36,7 +37,6 @@ if sys.version_info >= (3, 9):
     from collections.abc import MutableMapping
 else:
     from typing import MutableMapping  # type: ignore  # pylint: disable=ungrouped-imports
-JSON = MutableMapping[str, Any]  # pylint: disable=unsubscriptable-object
 T = TypeVar("T")
 ClsType = Optional[Callable[[PipelineResponse[HttpRequest, HttpResponse], T, Dict[str, Any]], Any]]
 
@@ -739,7 +739,7 @@ def build_dps_certificate_delete_request(
     certificate_name1: Optional[str] = None,
     certificate_raw_bytes: Optional[bytes] = None,
     certificate_is_verified: Optional[bool] = None,
-    certificate_purpose: Optional[str] = None,
+    certificate_purpose: Optional[Union[str, _models.CertificatePurpose]] = None,
     certificate_created: Optional[datetime.datetime] = None,
     certificate_last_updated: Optional[datetime.datetime] = None,
     certificate_has_private_key: Optional[bool] = None,
@@ -813,7 +813,7 @@ def build_dps_certificate_generate_verification_code_request(  # pylint: disable
     certificate_name1: Optional[str] = None,
     certificate_raw_bytes: Optional[bytes] = None,
     certificate_is_verified: Optional[bool] = None,
-    certificate_purpose: Optional[str] = None,
+    certificate_purpose: Optional[Union[str, _models.CertificatePurpose]] = None,
     certificate_created: Optional[datetime.datetime] = None,
     certificate_last_updated: Optional[datetime.datetime] = None,
     certificate_has_private_key: Optional[bool] = None,
@@ -887,7 +887,7 @@ def build_dps_certificate_verify_certificate_request(  # pylint: disable=name-to
     certificate_name1: Optional[str] = None,
     certificate_raw_bytes: Optional[bytes] = None,
     certificate_is_verified: Optional[bool] = None,
-    certificate_purpose: Optional[str] = None,
+    certificate_purpose: Optional[Union[str, _models.CertificatePurpose]] = None,
     certificate_created: Optional[datetime.datetime] = None,
     certificate_last_updated: Optional[datetime.datetime] = None,
     certificate_has_private_key: Optional[bool] = None,
@@ -963,6 +963,8 @@ class Operations:
         :attr:`operations` attribute.
     """
 
+    models = _models
+
     def __init__(self, *args, **kwargs):
         input_args = list(args)
         self._client = input_args.pop(0) if input_args else kwargs.pop("client")
@@ -971,30 +973,17 @@ class Operations:
         self._deserialize = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
     @distributed_trace
-    def list(self, **kwargs: Any) -> Iterable[JSON]:
+    def list(self, **kwargs: Any) -> Iterable["_models.Operation"]:
         """List the operations for the provider.
 
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.paging.ItemPaged[JSON]
+        :return: An iterator like instance of Operation
+        :rtype: ~azure.core.paging.ItemPaged[~iot_dps_client.models.Operation]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "display": {
-                        "operation": "str",  # Optional. Name of the operation.
-                        "provider": "str",  # Optional. Service provider: Microsoft Devices.
-                        "resource": "str"  # Optional. Resource Type: ProvisioningServices.
-                    },
-                    "name": "str"  # Optional. The name of the operation.
-                }
         """
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models._models.OperationListResult] = kwargs.pop("cls", None)  # pylint: disable=protected-access
 
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -1032,11 +1021,13 @@ class Operations:
             return _request
 
         def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
+            deserialized = self._deserialize(
+                _models._models.OperationListResult, pipeline_response  # pylint: disable=protected-access
+            )
+            list_of_elem = deserialized.value
             if cls:
                 list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, iter(list_of_elem)
+            return deserialized.next_link or None, iter(list_of_elem)
 
         def get_next(next_link=None):
             _request = prepare_request(next_link)
@@ -1051,7 +1042,8 @@ class Operations:
                 if _stream:
                     response.read()  # Load the body in memory and close the socket
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+                error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -1068,6 +1060,8 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         :attr:`iot_dps_resource` attribute.
     """
 
+    models = _models
+
     def __init__(self, *args, **kwargs):
         input_args = list(args)
         self._client = input_args.pop(0) if input_args else kwargs.pop("client")
@@ -1077,46 +1071,27 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
 
     @overload
     def check_provisioning_service_name_availability(  # pylint: disable=name-too-long
-        self, arguments: JSON, *, content_type: str = "application/json", **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+        self, arguments: _models.OperationInputs, *, content_type: str = "application/json", **kwargs: Any
+    ) -> _models.NameAvailabilityInfo:
         """Check if a provisioning service name is available.
 
         Check if a provisioning service name is available. This will validate if the name is
         syntactically valid and if the name is usable.
 
         :param arguments: The request body. Required.
-        :type arguments: JSON
+        :type arguments: ~iot_dps_client.models.OperationInputs
         :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
+        :return: NameAvailabilityInfo
+        :rtype: ~iot_dps_client.models.NameAvailabilityInfo
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                arguments = {
-                    "name": "str"  # The name of the Provisioning Service to check. Required.
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "message": "str",  # Optional. message containing a detailed reason name is
-                      unavailable.
-                    "nameAvailable": bool,  # Optional. specifies if a name is available or not.
-                    "reason": "str"  # Optional. specifies the reason a name is unavailable.
-                      Known values are: "Invalid" and "AlreadyExists".
-                }
         """
 
     @overload
     def check_provisioning_service_name_availability(  # pylint: disable=name-too-long
         self, arguments: IO[bytes], *, content_type: str = "application/json", **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+    ) -> _models.NameAvailabilityInfo:
         """Check if a provisioning service name is available.
 
         Check if a provisioning service name is available. This will validate if the name is
@@ -1127,55 +1102,26 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
+        :return: NameAvailabilityInfo
+        :rtype: ~iot_dps_client.models.NameAvailabilityInfo
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "message": "str",  # Optional. message containing a detailed reason name is
-                      unavailable.
-                    "nameAvailable": bool,  # Optional. specifies if a name is available or not.
-                    "reason": "str"  # Optional. specifies the reason a name is unavailable.
-                      Known values are: "Invalid" and "AlreadyExists".
-                }
         """
 
     @distributed_trace
     def check_provisioning_service_name_availability(  # pylint: disable=name-too-long
-        self, arguments: Union[JSON, IO[bytes]], **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+        self, arguments: Union[_models.OperationInputs, IO[bytes]], **kwargs: Any
+    ) -> _models.NameAvailabilityInfo:
         """Check if a provisioning service name is available.
 
         Check if a provisioning service name is available. This will validate if the name is
         syntactically valid and if the name is usable.
 
-        :param arguments: The request body. Is either a JSON type or a IO[bytes] type. Required.
-        :type arguments: JSON or IO[bytes]
-        :return: JSON object
-        :rtype: JSON
+        :param arguments: The request body. Is either a OperationInputs type or a IO[bytes] type.
+         Required.
+        :type arguments: ~iot_dps_client.models.OperationInputs or IO[bytes]
+        :return: NameAvailabilityInfo
+        :rtype: ~iot_dps_client.models.NameAvailabilityInfo
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                arguments = {
-                    "name": "str"  # The name of the Provisioning Service to check. Required.
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "message": "str",  # Optional. message containing a detailed reason name is
-                      unavailable.
-                    "nameAvailable": bool,  # Optional. specifies if a name is available or not.
-                    "reason": "str"  # Optional. specifies the reason a name is unavailable.
-                      Known values are: "Invalid" and "AlreadyExists".
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -1189,7 +1135,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         _params = kwargs.pop("params", {}) or {}
 
         content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.NameAvailabilityInfo] = kwargs.pop("cls", None)
 
         content_type = content_type or "application/json"
         _json = None
@@ -1197,7 +1143,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         if isinstance(arguments, (IOBase, bytes)):
             _content = arguments
         else:
-            _json = arguments
+            _json = self._serialize.body(arguments, "OperationInputs")
 
         _request = build_iot_dps_resource_check_provisioning_service_name_availability_request(
             subscription_id=self._config.subscription_id,
@@ -1221,211 +1167,30 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("NameAvailabilityInfo", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @distributed_trace
-    def list_by_subscription(self, **kwargs: Any) -> Iterable[JSON]:
-        # pylint: disable=line-too-long
+    def list_by_subscription(self, **kwargs: Any) -> Iterable["_models.ProvisioningServiceDescription"]:
         """List all the provisioning services for a given subscription id.
 
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.paging.ItemPaged[JSON]
+        :return: An iterator like instance of ProvisioningServiceDescription
+        :rtype: ~azure.core.paging.ItemPaged[~iot_dps_client.models.ProvisioningServiceDescription]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "properties": {
-                        "allocationPolicy": "str",  # Optional. Allocation policy to be used
-                          by this provisioning service. Known values are: "Hashed", "GeoLatency", and
-                          "Static".
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",  # Name of the key. Required.
-                                "rights": "str",  # Rights that this key has.
-                                  Required. Known values are: "ServiceConfig", "EnrollmentRead",
-                                  "EnrollmentWrite", "DeviceConnect", "RegistrationStatusRead", and
-                                  "RegistrationStatusWrite".
-                                "primaryKey": "str",  # Optional. Primary SAS key
-                                  value.
-                                "secondaryKey": "str"  # Optional. Secondary SAS key
-                                  value.
-                            }
-                        ],
-                        "deviceProvisioningHostName": "str",  # Optional. Device endpoint for
-                          this provisioning service.
-                        "deviceRegistryNamespace": {
-                            "authenticationType": "str",  # Device Registry Namespace MI
-                              authentication type: UserAssigned, SystemAssigned. Required. Known values
-                              are: "UserAssigned" and "SystemAssigned".
-                            "resourceId": "str",  # The ARM resource ID of the Device
-                              Registry namespace. Required.
-                            "selectedUserAssignedIdentityResourceId": "str"  # Optional.
-                              The selected user-assigned identity resource Id associated with Device
-                              Registry namespace. This is required when authenticationType is
-                              UserAssigned.
-                        },
-                        "enableDataResidency": bool,  # Optional. Optional. Indicates if the
-                          DPS instance has Data Residency enabled, removing the cross geo-pair disaster
-                          recovery.
-                        "idScope": "str",  # Optional. Unique identifier of this provisioning
-                          service.
-                        "iotHubs": [
-                            {
-                                "connectionString": "str",  # Connection string of
-                                  the IoT hub. Required.
-                                "location": "str",  # ARM region of the IoT hub.
-                                  Required.
-                                "allocationWeight": 0,  # Optional. weight to apply
-                                  for a given iot h.
-                                "applyAllocationPolicy": bool,  # Optional. flag for
-                                  applying allocationPolicy or not for a given iot hub.
-                                "name": "str"  # Optional. Host name of the IoT hub.
-                            }
-                        ],
-                        "ipFilterRules": [
-                            {
-                                "action": "str",  # The desired action for requests
-                                  captured by this rule. Required. Known values are: "Accept" and
-                                  "Reject".
-                                "filterName": "str",  # The name of the IP filter
-                                  rule. Required.
-                                "ipMask": "str",  # A string that contains the IP
-                                  address range in CIDR notation for the rule. Required.
-                                "target": "str"  # Optional. Target for requests
-                                  captured by this rule. Known values are: "all", "serviceApi", and
-                                  "deviceApi".
-                            }
-                        ],
-                        "portalOperationsHostName": "str",  # Optional. Portal endpoint to
-                          enable CORS for this provisioning service.
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",  # The
-                                          description for the current state of a private endpoint
-                                          connection. Required.
-                                        "status": "str",  # The status of a
-                                          private endpoint connection. Required. Known values are:
-                                          "Pending", "Approved", "Rejected", and "Disconnected".
-                                        "actionsRequired": "str"  # Optional.
-                                          Actions required for a private endpoint connection.
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"  # Optional. The resource
-                                          identifier.
-                                    }
-                                },
-                                "id": "str",  # Optional. Fully qualified resource ID
-                                  for the resource. Ex -
-                                  /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                                "name": "str",  # Optional. The name of the resource.
-                                "systemData": {
-                                    "createdAt": "2020-02-20 00:00:00",  #
-                                      Optional. The timestamp of resource creation (UTC).
-                                    "createdBy": "str",  # Optional. The identity
-                                      that created the resource.
-                                    "createdByType": "str",  # Optional. The type
-                                      of identity that created the resource. Known values are: "User",
-                                      "Application", "ManagedIdentity", and "Key".
-                                    "lastModifiedAt": "2020-02-20 00:00:00",  #
-                                      Optional. The timestamp of resource last modification (UTC).
-                                    "lastModifiedBy": "str",  # Optional. The
-                                      identity that last modified the resource.
-                                    "lastModifiedByType": "str"  # Optional. The
-                                      type of identity that last modified the resource. Known values
-                                      are: "User", "Application", "ManagedIdentity", and "Key".
-                                },
-                                "type": "str"  # Optional. The type of the resource.
-                                  E.g. "Microsoft.Compute/virtualMachines" or
-                                  "Microsoft.Storage/storageAccounts".
-                            }
-                        ],
-                        "provisioningState": "str",  # Optional. The ARM provisioning state
-                          of the provisioning service.
-                        "publicNetworkAccess": "str",  # Optional. Whether requests from
-                          Public Network are allowed. Known values are: "Enabled" and "Disabled".
-                        "serviceOperationsHostName": "str",  # Optional. Service endpoint for
-                          provisioning service.
-                        "state": "str"  # Optional. Current state of the provisioning
-                          service. Known values are: "Activating", "Active", "Deleting", "Deleted",
-                          "ActivationFailed", "DeletionFailed", "Transitioning", "Suspending",
-                          "Suspended", "Resuming", "FailingOver", and "FailoverFailed".
-                    },
-                    "sku": {
-                        "capacity": 0,  # Optional. The number of units to provision.
-                        "name": "str",  # Optional. Sku name. "S1"
-                        "tier": "str"  # Optional. Pricing tier name of the provisioning
-                          service.
-                    },
-                    "etag": "str",  # Optional. The Etag field is *not* required. If it is
-                      provided in the response body, it must also be provided as a header per the
-                      normal ETag convention.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "identity": {
-                        "type": "str",  # Type of managed service identity (where both
-                          SystemAssigned and UserAssigned types are allowed). Required. Known values
-                          are: "None", "SystemAssigned", "UserAssigned", and
-                          "SystemAssigned,UserAssigned".
-                        "principalId": "str",  # Optional. The service principal ID of the
-                          system assigned identity. This property will only be provided for a system
-                          assigned identity.
-                        "tenantId": "str",  # Optional. The tenant ID of the system assigned
-                          identity. This property will only be provided for a system assigned identity.
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",  # Optional. The client ID of the
-                                  assigned identity.
-                                "principalId": "str"  # Optional. The principal ID of
-                                  the assigned identity.
-                            }
-                        }
-                    },
-                    "name": "str",  # Optional. The name of the resource.
-                    "resourcegroup": "str",  # Optional. The resource group of the resource.
-                    "subscriptionid": "str",  # Optional. The subscription id of the resource.
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
         """
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models._models.ProvisioningServiceDescriptionListResult] = kwargs.pop(
+            "cls", None
+        )  # pylint: disable=protected-access
 
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -1464,11 +1229,14 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
             return _request
 
         def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
+            deserialized = self._deserialize(
+                _models._models.ProvisioningServiceDescriptionListResult,  # pylint: disable=protected-access
+                pipeline_response,
+            )
+            list_of_elem = deserialized.value
             if cls:
                 list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, iter(list_of_elem)
+            return deserialized.next_link or None, iter(list_of_elem)
 
         def get_next(next_link=None):
             _request = prepare_request(next_link)
@@ -1483,208 +1251,32 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
                 if _stream:
                     response.read()  # Load the body in memory and close the socket
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+                error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
             return pipeline_response
 
         return ItemPaged(get_next, extract_data)
 
     @distributed_trace
-    def list_by_resource_group(self, resource_group_name: str, **kwargs: Any) -> Iterable[JSON]:
-        # pylint: disable=line-too-long
+    def list_by_resource_group(
+        self, resource_group_name: str, **kwargs: Any
+    ) -> Iterable["_models.ProvisioningServiceDescription"]:
         """Get a list of all provisioning services in the given resource group.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.paging.ItemPaged[JSON]
+        :return: An iterator like instance of ProvisioningServiceDescription
+        :rtype: ~azure.core.paging.ItemPaged[~iot_dps_client.models.ProvisioningServiceDescription]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "properties": {
-                        "allocationPolicy": "str",  # Optional. Allocation policy to be used
-                          by this provisioning service. Known values are: "Hashed", "GeoLatency", and
-                          "Static".
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",  # Name of the key. Required.
-                                "rights": "str",  # Rights that this key has.
-                                  Required. Known values are: "ServiceConfig", "EnrollmentRead",
-                                  "EnrollmentWrite", "DeviceConnect", "RegistrationStatusRead", and
-                                  "RegistrationStatusWrite".
-                                "primaryKey": "str",  # Optional. Primary SAS key
-                                  value.
-                                "secondaryKey": "str"  # Optional. Secondary SAS key
-                                  value.
-                            }
-                        ],
-                        "deviceProvisioningHostName": "str",  # Optional. Device endpoint for
-                          this provisioning service.
-                        "deviceRegistryNamespace": {
-                            "authenticationType": "str",  # Device Registry Namespace MI
-                              authentication type: UserAssigned, SystemAssigned. Required. Known values
-                              are: "UserAssigned" and "SystemAssigned".
-                            "resourceId": "str",  # The ARM resource ID of the Device
-                              Registry namespace. Required.
-                            "selectedUserAssignedIdentityResourceId": "str"  # Optional.
-                              The selected user-assigned identity resource Id associated with Device
-                              Registry namespace. This is required when authenticationType is
-                              UserAssigned.
-                        },
-                        "enableDataResidency": bool,  # Optional. Optional. Indicates if the
-                          DPS instance has Data Residency enabled, removing the cross geo-pair disaster
-                          recovery.
-                        "idScope": "str",  # Optional. Unique identifier of this provisioning
-                          service.
-                        "iotHubs": [
-                            {
-                                "connectionString": "str",  # Connection string of
-                                  the IoT hub. Required.
-                                "location": "str",  # ARM region of the IoT hub.
-                                  Required.
-                                "allocationWeight": 0,  # Optional. weight to apply
-                                  for a given iot h.
-                                "applyAllocationPolicy": bool,  # Optional. flag for
-                                  applying allocationPolicy or not for a given iot hub.
-                                "name": "str"  # Optional. Host name of the IoT hub.
-                            }
-                        ],
-                        "ipFilterRules": [
-                            {
-                                "action": "str",  # The desired action for requests
-                                  captured by this rule. Required. Known values are: "Accept" and
-                                  "Reject".
-                                "filterName": "str",  # The name of the IP filter
-                                  rule. Required.
-                                "ipMask": "str",  # A string that contains the IP
-                                  address range in CIDR notation for the rule. Required.
-                                "target": "str"  # Optional. Target for requests
-                                  captured by this rule. Known values are: "all", "serviceApi", and
-                                  "deviceApi".
-                            }
-                        ],
-                        "portalOperationsHostName": "str",  # Optional. Portal endpoint to
-                          enable CORS for this provisioning service.
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",  # The
-                                          description for the current state of a private endpoint
-                                          connection. Required.
-                                        "status": "str",  # The status of a
-                                          private endpoint connection. Required. Known values are:
-                                          "Pending", "Approved", "Rejected", and "Disconnected".
-                                        "actionsRequired": "str"  # Optional.
-                                          Actions required for a private endpoint connection.
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"  # Optional. The resource
-                                          identifier.
-                                    }
-                                },
-                                "id": "str",  # Optional. Fully qualified resource ID
-                                  for the resource. Ex -
-                                  /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                                "name": "str",  # Optional. The name of the resource.
-                                "systemData": {
-                                    "createdAt": "2020-02-20 00:00:00",  #
-                                      Optional. The timestamp of resource creation (UTC).
-                                    "createdBy": "str",  # Optional. The identity
-                                      that created the resource.
-                                    "createdByType": "str",  # Optional. The type
-                                      of identity that created the resource. Known values are: "User",
-                                      "Application", "ManagedIdentity", and "Key".
-                                    "lastModifiedAt": "2020-02-20 00:00:00",  #
-                                      Optional. The timestamp of resource last modification (UTC).
-                                    "lastModifiedBy": "str",  # Optional. The
-                                      identity that last modified the resource.
-                                    "lastModifiedByType": "str"  # Optional. The
-                                      type of identity that last modified the resource. Known values
-                                      are: "User", "Application", "ManagedIdentity", and "Key".
-                                },
-                                "type": "str"  # Optional. The type of the resource.
-                                  E.g. "Microsoft.Compute/virtualMachines" or
-                                  "Microsoft.Storage/storageAccounts".
-                            }
-                        ],
-                        "provisioningState": "str",  # Optional. The ARM provisioning state
-                          of the provisioning service.
-                        "publicNetworkAccess": "str",  # Optional. Whether requests from
-                          Public Network are allowed. Known values are: "Enabled" and "Disabled".
-                        "serviceOperationsHostName": "str",  # Optional. Service endpoint for
-                          provisioning service.
-                        "state": "str"  # Optional. Current state of the provisioning
-                          service. Known values are: "Activating", "Active", "Deleting", "Deleted",
-                          "ActivationFailed", "DeletionFailed", "Transitioning", "Suspending",
-                          "Suspended", "Resuming", "FailingOver", and "FailoverFailed".
-                    },
-                    "sku": {
-                        "capacity": 0,  # Optional. The number of units to provision.
-                        "name": "str",  # Optional. Sku name. "S1"
-                        "tier": "str"  # Optional. Pricing tier name of the provisioning
-                          service.
-                    },
-                    "etag": "str",  # Optional. The Etag field is *not* required. If it is
-                      provided in the response body, it must also be provided as a header per the
-                      normal ETag convention.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "identity": {
-                        "type": "str",  # Type of managed service identity (where both
-                          SystemAssigned and UserAssigned types are allowed). Required. Known values
-                          are: "None", "SystemAssigned", "UserAssigned", and
-                          "SystemAssigned,UserAssigned".
-                        "principalId": "str",  # Optional. The service principal ID of the
-                          system assigned identity. This property will only be provided for a system
-                          assigned identity.
-                        "tenantId": "str",  # Optional. The tenant ID of the system assigned
-                          identity. This property will only be provided for a system assigned identity.
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",  # Optional. The client ID of the
-                                  assigned identity.
-                                "principalId": "str"  # Optional. The principal ID of
-                                  the assigned identity.
-                            }
-                        }
-                    },
-                    "name": "str",  # Optional. The name of the resource.
-                    "resourcegroup": "str",  # Optional. The resource group of the resource.
-                    "subscriptionid": "str",  # Optional. The subscription id of the resource.
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
         """
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models._models.ProvisioningServiceDescriptionListResult] = kwargs.pop(
+            "cls", None
+        )  # pylint: disable=protected-access
 
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -1724,11 +1316,14 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
             return _request
 
         def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
+            deserialized = self._deserialize(
+                _models._models.ProvisioningServiceDescriptionListResult,  # pylint: disable=protected-access
+                pipeline_response,
+            )
+            list_of_elem = deserialized.value
             if cls:
                 list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, iter(list_of_elem)
+            return deserialized.next_link or None, iter(list_of_elem)
 
         def get_next(next_link=None):
             _request = prepare_request(next_link)
@@ -1743,15 +1338,17 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
                 if _stream:
                     response.read()  # Load the body in memory and close the socket
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+                error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
             return pipeline_response
 
         return ItemPaged(get_next, extract_data)
 
     @distributed_trace
-    def get(self, resource_group_name: str, provisioning_service_name: str, **kwargs: Any) -> JSON:
-        # pylint: disable=line-too-long
+    def get(
+        self, resource_group_name: str, provisioning_service_name: str, **kwargs: Any
+    ) -> _models.ProvisioningServiceDescription:
         """Get the metadata of the provisioning service without SAS keys.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -1759,189 +1356,9 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         :type resource_group_name: str
         :param provisioning_service_name: Name of the provisioning service to retrieve. Required.
         :type provisioning_service_name: str
-        :return: JSON object
-        :rtype: JSON
+        :return: ProvisioningServiceDescription
+        :rtype: ~iot_dps_client.models.ProvisioningServiceDescription
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "properties": {
-                        "allocationPolicy": "str",  # Optional. Allocation policy to be used
-                          by this provisioning service. Known values are: "Hashed", "GeoLatency", and
-                          "Static".
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",  # Name of the key. Required.
-                                "rights": "str",  # Rights that this key has.
-                                  Required. Known values are: "ServiceConfig", "EnrollmentRead",
-                                  "EnrollmentWrite", "DeviceConnect", "RegistrationStatusRead", and
-                                  "RegistrationStatusWrite".
-                                "primaryKey": "str",  # Optional. Primary SAS key
-                                  value.
-                                "secondaryKey": "str"  # Optional. Secondary SAS key
-                                  value.
-                            }
-                        ],
-                        "deviceProvisioningHostName": "str",  # Optional. Device endpoint for
-                          this provisioning service.
-                        "deviceRegistryNamespace": {
-                            "authenticationType": "str",  # Device Registry Namespace MI
-                              authentication type: UserAssigned, SystemAssigned. Required. Known values
-                              are: "UserAssigned" and "SystemAssigned".
-                            "resourceId": "str",  # The ARM resource ID of the Device
-                              Registry namespace. Required.
-                            "selectedUserAssignedIdentityResourceId": "str"  # Optional.
-                              The selected user-assigned identity resource Id associated with Device
-                              Registry namespace. This is required when authenticationType is
-                              UserAssigned.
-                        },
-                        "enableDataResidency": bool,  # Optional. Optional. Indicates if the
-                          DPS instance has Data Residency enabled, removing the cross geo-pair disaster
-                          recovery.
-                        "idScope": "str",  # Optional. Unique identifier of this provisioning
-                          service.
-                        "iotHubs": [
-                            {
-                                "connectionString": "str",  # Connection string of
-                                  the IoT hub. Required.
-                                "location": "str",  # ARM region of the IoT hub.
-                                  Required.
-                                "allocationWeight": 0,  # Optional. weight to apply
-                                  for a given iot h.
-                                "applyAllocationPolicy": bool,  # Optional. flag for
-                                  applying allocationPolicy or not for a given iot hub.
-                                "name": "str"  # Optional. Host name of the IoT hub.
-                            }
-                        ],
-                        "ipFilterRules": [
-                            {
-                                "action": "str",  # The desired action for requests
-                                  captured by this rule. Required. Known values are: "Accept" and
-                                  "Reject".
-                                "filterName": "str",  # The name of the IP filter
-                                  rule. Required.
-                                "ipMask": "str",  # A string that contains the IP
-                                  address range in CIDR notation for the rule. Required.
-                                "target": "str"  # Optional. Target for requests
-                                  captured by this rule. Known values are: "all", "serviceApi", and
-                                  "deviceApi".
-                            }
-                        ],
-                        "portalOperationsHostName": "str",  # Optional. Portal endpoint to
-                          enable CORS for this provisioning service.
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",  # The
-                                          description for the current state of a private endpoint
-                                          connection. Required.
-                                        "status": "str",  # The status of a
-                                          private endpoint connection. Required. Known values are:
-                                          "Pending", "Approved", "Rejected", and "Disconnected".
-                                        "actionsRequired": "str"  # Optional.
-                                          Actions required for a private endpoint connection.
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"  # Optional. The resource
-                                          identifier.
-                                    }
-                                },
-                                "id": "str",  # Optional. Fully qualified resource ID
-                                  for the resource. Ex -
-                                  /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                                "name": "str",  # Optional. The name of the resource.
-                                "systemData": {
-                                    "createdAt": "2020-02-20 00:00:00",  #
-                                      Optional. The timestamp of resource creation (UTC).
-                                    "createdBy": "str",  # Optional. The identity
-                                      that created the resource.
-                                    "createdByType": "str",  # Optional. The type
-                                      of identity that created the resource. Known values are: "User",
-                                      "Application", "ManagedIdentity", and "Key".
-                                    "lastModifiedAt": "2020-02-20 00:00:00",  #
-                                      Optional. The timestamp of resource last modification (UTC).
-                                    "lastModifiedBy": "str",  # Optional. The
-                                      identity that last modified the resource.
-                                    "lastModifiedByType": "str"  # Optional. The
-                                      type of identity that last modified the resource. Known values
-                                      are: "User", "Application", "ManagedIdentity", and "Key".
-                                },
-                                "type": "str"  # Optional. The type of the resource.
-                                  E.g. "Microsoft.Compute/virtualMachines" or
-                                  "Microsoft.Storage/storageAccounts".
-                            }
-                        ],
-                        "provisioningState": "str",  # Optional. The ARM provisioning state
-                          of the provisioning service.
-                        "publicNetworkAccess": "str",  # Optional. Whether requests from
-                          Public Network are allowed. Known values are: "Enabled" and "Disabled".
-                        "serviceOperationsHostName": "str",  # Optional. Service endpoint for
-                          provisioning service.
-                        "state": "str"  # Optional. Current state of the provisioning
-                          service. Known values are: "Activating", "Active", "Deleting", "Deleted",
-                          "ActivationFailed", "DeletionFailed", "Transitioning", "Suspending",
-                          "Suspended", "Resuming", "FailingOver", and "FailoverFailed".
-                    },
-                    "sku": {
-                        "capacity": 0,  # Optional. The number of units to provision.
-                        "name": "str",  # Optional. Sku name. "S1"
-                        "tier": "str"  # Optional. Pricing tier name of the provisioning
-                          service.
-                    },
-                    "etag": "str",  # Optional. The Etag field is *not* required. If it is
-                      provided in the response body, it must also be provided as a header per the
-                      normal ETag convention.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "identity": {
-                        "type": "str",  # Type of managed service identity (where both
-                          SystemAssigned and UserAssigned types are allowed). Required. Known values
-                          are: "None", "SystemAssigned", "UserAssigned", and
-                          "SystemAssigned,UserAssigned".
-                        "principalId": "str",  # Optional. The service principal ID of the
-                          system assigned identity. This property will only be provided for a system
-                          assigned identity.
-                        "tenantId": "str",  # Optional. The tenant ID of the system assigned
-                          identity. This property will only be provided for a system assigned identity.
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",  # Optional. The client ID of the
-                                  assigned identity.
-                                "principalId": "str"  # Optional. The principal ID of
-                                  the assigned identity.
-                            }
-                        }
-                    },
-                    "name": "str",  # Optional. The name of the resource.
-                    "resourcegroup": "str",  # Optional. The resource group of the resource.
-                    "subscriptionid": "str",  # Optional. The subscription id of the resource.
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -1954,7 +1371,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.ProvisioningServiceDescription] = kwargs.pop("cls", None)
 
         _request = build_iot_dps_resource_get_request(
             resource_group_name=resource_group_name,
@@ -1977,25 +1394,23 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("ProvisioningServiceDescription", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     def _create_or_update_initial(
         self,
         resource_group_name: str,
         provisioning_service_name: str,
-        iot_dps_description: Union[JSON, IO[bytes]],
+        iot_dps_description: Union[_models.ProvisioningServiceDescription, IO[bytes]],
         **kwargs: Any
-    ) -> JSON:
+    ) -> _models.ProvisioningServiceDescription:
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
             404: ResourceNotFoundError,
@@ -2008,7 +1423,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         _params = kwargs.pop("params", {}) or {}
 
         content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.ProvisioningServiceDescription] = kwargs.pop("cls", None)
 
         content_type = content_type or "application/json"
         _json = None
@@ -2016,7 +1431,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         if isinstance(iot_dps_description, (IOBase, bytes)):
             _content = iot_dps_description
         else:
-            _json = iot_dps_description
+            _json = self._serialize.body(iot_dps_description, "ProvisioningServiceDescription")
 
         _request = build_iot_dps_resource_create_or_update_request(
             resource_group_name=resource_group_name,
@@ -2042,40 +1457,34 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 200:
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("ProvisioningServiceDescription", pipeline_response)
 
         if response.status_code == 201:
             response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
             response_headers["Retry-After"] = self._deserialize("int", response.headers.get("Retry-After"))
 
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("ProvisioningServiceDescription", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), response_headers)  # type: ignore
+            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @overload
     def begin_create_or_update(
         self,
         resource_group_name: str,
         provisioning_service_name: str,
-        iot_dps_description: JSON,
+        iot_dps_description: _models.ProvisioningServiceDescription,
         *,
         content_type: str = "application/json",
         **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
+    ) -> LROPoller[_models.ProvisioningServiceDescription]:
         """Create or update the metadata of the provisioning service. The usual pattern to modify a
         property is to retrieve the provisioning service metadata and security metadata, and then
         combine them with the modified values in a new body to update the provisioning service.
@@ -2087,370 +1496,13 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         :type provisioning_service_name: str
         :param iot_dps_description: Description of the provisioning service to create or update.
          Required.
-        :type iot_dps_description: JSON
+        :type iot_dps_description: ~iot_dps_client.models.ProvisioningServiceDescription
         :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :return: An instance of LROPoller that returns ProvisioningServiceDescription
+        :rtype: ~azure.core.polling.LROPoller[~iot_dps_client.models.ProvisioningServiceDescription]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                iot_dps_description = {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "properties": {
-                        "allocationPolicy": "str",  # Optional. Allocation policy to be used
-                          by this provisioning service. Known values are: "Hashed", "GeoLatency", and
-                          "Static".
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",  # Name of the key. Required.
-                                "rights": "str",  # Rights that this key has.
-                                  Required. Known values are: "ServiceConfig", "EnrollmentRead",
-                                  "EnrollmentWrite", "DeviceConnect", "RegistrationStatusRead", and
-                                  "RegistrationStatusWrite".
-                                "primaryKey": "str",  # Optional. Primary SAS key
-                                  value.
-                                "secondaryKey": "str"  # Optional. Secondary SAS key
-                                  value.
-                            }
-                        ],
-                        "deviceProvisioningHostName": "str",  # Optional. Device endpoint for
-                          this provisioning service.
-                        "deviceRegistryNamespace": {
-                            "authenticationType": "str",  # Device Registry Namespace MI
-                              authentication type: UserAssigned, SystemAssigned. Required. Known values
-                              are: "UserAssigned" and "SystemAssigned".
-                            "resourceId": "str",  # The ARM resource ID of the Device
-                              Registry namespace. Required.
-                            "selectedUserAssignedIdentityResourceId": "str"  # Optional.
-                              The selected user-assigned identity resource Id associated with Device
-                              Registry namespace. This is required when authenticationType is
-                              UserAssigned.
-                        },
-                        "enableDataResidency": bool,  # Optional. Optional. Indicates if the
-                          DPS instance has Data Residency enabled, removing the cross geo-pair disaster
-                          recovery.
-                        "idScope": "str",  # Optional. Unique identifier of this provisioning
-                          service.
-                        "iotHubs": [
-                            {
-                                "connectionString": "str",  # Connection string of
-                                  the IoT hub. Required.
-                                "location": "str",  # ARM region of the IoT hub.
-                                  Required.
-                                "allocationWeight": 0,  # Optional. weight to apply
-                                  for a given iot h.
-                                "applyAllocationPolicy": bool,  # Optional. flag for
-                                  applying allocationPolicy or not for a given iot hub.
-                                "name": "str"  # Optional. Host name of the IoT hub.
-                            }
-                        ],
-                        "ipFilterRules": [
-                            {
-                                "action": "str",  # The desired action for requests
-                                  captured by this rule. Required. Known values are: "Accept" and
-                                  "Reject".
-                                "filterName": "str",  # The name of the IP filter
-                                  rule. Required.
-                                "ipMask": "str",  # A string that contains the IP
-                                  address range in CIDR notation for the rule. Required.
-                                "target": "str"  # Optional. Target for requests
-                                  captured by this rule. Known values are: "all", "serviceApi", and
-                                  "deviceApi".
-                            }
-                        ],
-                        "portalOperationsHostName": "str",  # Optional. Portal endpoint to
-                          enable CORS for this provisioning service.
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",  # The
-                                          description for the current state of a private endpoint
-                                          connection. Required.
-                                        "status": "str",  # The status of a
-                                          private endpoint connection. Required. Known values are:
-                                          "Pending", "Approved", "Rejected", and "Disconnected".
-                                        "actionsRequired": "str"  # Optional.
-                                          Actions required for a private endpoint connection.
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"  # Optional. The resource
-                                          identifier.
-                                    }
-                                },
-                                "id": "str",  # Optional. Fully qualified resource ID
-                                  for the resource. Ex -
-                                  /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                                "name": "str",  # Optional. The name of the resource.
-                                "systemData": {
-                                    "createdAt": "2020-02-20 00:00:00",  #
-                                      Optional. The timestamp of resource creation (UTC).
-                                    "createdBy": "str",  # Optional. The identity
-                                      that created the resource.
-                                    "createdByType": "str",  # Optional. The type
-                                      of identity that created the resource. Known values are: "User",
-                                      "Application", "ManagedIdentity", and "Key".
-                                    "lastModifiedAt": "2020-02-20 00:00:00",  #
-                                      Optional. The timestamp of resource last modification (UTC).
-                                    "lastModifiedBy": "str",  # Optional. The
-                                      identity that last modified the resource.
-                                    "lastModifiedByType": "str"  # Optional. The
-                                      type of identity that last modified the resource. Known values
-                                      are: "User", "Application", "ManagedIdentity", and "Key".
-                                },
-                                "type": "str"  # Optional. The type of the resource.
-                                  E.g. "Microsoft.Compute/virtualMachines" or
-                                  "Microsoft.Storage/storageAccounts".
-                            }
-                        ],
-                        "provisioningState": "str",  # Optional. The ARM provisioning state
-                          of the provisioning service.
-                        "publicNetworkAccess": "str",  # Optional. Whether requests from
-                          Public Network are allowed. Known values are: "Enabled" and "Disabled".
-                        "serviceOperationsHostName": "str",  # Optional. Service endpoint for
-                          provisioning service.
-                        "state": "str"  # Optional. Current state of the provisioning
-                          service. Known values are: "Activating", "Active", "Deleting", "Deleted",
-                          "ActivationFailed", "DeletionFailed", "Transitioning", "Suspending",
-                          "Suspended", "Resuming", "FailingOver", and "FailoverFailed".
-                    },
-                    "sku": {
-                        "capacity": 0,  # Optional. The number of units to provision.
-                        "name": "str",  # Optional. Sku name. "S1"
-                        "tier": "str"  # Optional. Pricing tier name of the provisioning
-                          service.
-                    },
-                    "etag": "str",  # Optional. The Etag field is *not* required. If it is
-                      provided in the response body, it must also be provided as a header per the
-                      normal ETag convention.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "identity": {
-                        "type": "str",  # Type of managed service identity (where both
-                          SystemAssigned and UserAssigned types are allowed). Required. Known values
-                          are: "None", "SystemAssigned", "UserAssigned", and
-                          "SystemAssigned,UserAssigned".
-                        "principalId": "str",  # Optional. The service principal ID of the
-                          system assigned identity. This property will only be provided for a system
-                          assigned identity.
-                        "tenantId": "str",  # Optional. The tenant ID of the system assigned
-                          identity. This property will only be provided for a system assigned identity.
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",  # Optional. The client ID of the
-                                  assigned identity.
-                                "principalId": "str"  # Optional. The principal ID of
-                                  the assigned identity.
-                            }
-                        }
-                    },
-                    "name": "str",  # Optional. The name of the resource.
-                    "resourcegroup": "str",  # Optional. The resource group of the resource.
-                    "subscriptionid": "str",  # Optional. The subscription id of the resource.
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-
-                # response body for status code(s): 200, 201
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "properties": {
-                        "allocationPolicy": "str",  # Optional. Allocation policy to be used
-                          by this provisioning service. Known values are: "Hashed", "GeoLatency", and
-                          "Static".
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",  # Name of the key. Required.
-                                "rights": "str",  # Rights that this key has.
-                                  Required. Known values are: "ServiceConfig", "EnrollmentRead",
-                                  "EnrollmentWrite", "DeviceConnect", "RegistrationStatusRead", and
-                                  "RegistrationStatusWrite".
-                                "primaryKey": "str",  # Optional. Primary SAS key
-                                  value.
-                                "secondaryKey": "str"  # Optional. Secondary SAS key
-                                  value.
-                            }
-                        ],
-                        "deviceProvisioningHostName": "str",  # Optional. Device endpoint for
-                          this provisioning service.
-                        "deviceRegistryNamespace": {
-                            "authenticationType": "str",  # Device Registry Namespace MI
-                              authentication type: UserAssigned, SystemAssigned. Required. Known values
-                              are: "UserAssigned" and "SystemAssigned".
-                            "resourceId": "str",  # The ARM resource ID of the Device
-                              Registry namespace. Required.
-                            "selectedUserAssignedIdentityResourceId": "str"  # Optional.
-                              The selected user-assigned identity resource Id associated with Device
-                              Registry namespace. This is required when authenticationType is
-                              UserAssigned.
-                        },
-                        "enableDataResidency": bool,  # Optional. Optional. Indicates if the
-                          DPS instance has Data Residency enabled, removing the cross geo-pair disaster
-                          recovery.
-                        "idScope": "str",  # Optional. Unique identifier of this provisioning
-                          service.
-                        "iotHubs": [
-                            {
-                                "connectionString": "str",  # Connection string of
-                                  the IoT hub. Required.
-                                "location": "str",  # ARM region of the IoT hub.
-                                  Required.
-                                "allocationWeight": 0,  # Optional. weight to apply
-                                  for a given iot h.
-                                "applyAllocationPolicy": bool,  # Optional. flag for
-                                  applying allocationPolicy or not for a given iot hub.
-                                "name": "str"  # Optional. Host name of the IoT hub.
-                            }
-                        ],
-                        "ipFilterRules": [
-                            {
-                                "action": "str",  # The desired action for requests
-                                  captured by this rule. Required. Known values are: "Accept" and
-                                  "Reject".
-                                "filterName": "str",  # The name of the IP filter
-                                  rule. Required.
-                                "ipMask": "str",  # A string that contains the IP
-                                  address range in CIDR notation for the rule. Required.
-                                "target": "str"  # Optional. Target for requests
-                                  captured by this rule. Known values are: "all", "serviceApi", and
-                                  "deviceApi".
-                            }
-                        ],
-                        "portalOperationsHostName": "str",  # Optional. Portal endpoint to
-                          enable CORS for this provisioning service.
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",  # The
-                                          description for the current state of a private endpoint
-                                          connection. Required.
-                                        "status": "str",  # The status of a
-                                          private endpoint connection. Required. Known values are:
-                                          "Pending", "Approved", "Rejected", and "Disconnected".
-                                        "actionsRequired": "str"  # Optional.
-                                          Actions required for a private endpoint connection.
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"  # Optional. The resource
-                                          identifier.
-                                    }
-                                },
-                                "id": "str",  # Optional. Fully qualified resource ID
-                                  for the resource. Ex -
-                                  /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                                "name": "str",  # Optional. The name of the resource.
-                                "systemData": {
-                                    "createdAt": "2020-02-20 00:00:00",  #
-                                      Optional. The timestamp of resource creation (UTC).
-                                    "createdBy": "str",  # Optional. The identity
-                                      that created the resource.
-                                    "createdByType": "str",  # Optional. The type
-                                      of identity that created the resource. Known values are: "User",
-                                      "Application", "ManagedIdentity", and "Key".
-                                    "lastModifiedAt": "2020-02-20 00:00:00",  #
-                                      Optional. The timestamp of resource last modification (UTC).
-                                    "lastModifiedBy": "str",  # Optional. The
-                                      identity that last modified the resource.
-                                    "lastModifiedByType": "str"  # Optional. The
-                                      type of identity that last modified the resource. Known values
-                                      are: "User", "Application", "ManagedIdentity", and "Key".
-                                },
-                                "type": "str"  # Optional. The type of the resource.
-                                  E.g. "Microsoft.Compute/virtualMachines" or
-                                  "Microsoft.Storage/storageAccounts".
-                            }
-                        ],
-                        "provisioningState": "str",  # Optional. The ARM provisioning state
-                          of the provisioning service.
-                        "publicNetworkAccess": "str",  # Optional. Whether requests from
-                          Public Network are allowed. Known values are: "Enabled" and "Disabled".
-                        "serviceOperationsHostName": "str",  # Optional. Service endpoint for
-                          provisioning service.
-                        "state": "str"  # Optional. Current state of the provisioning
-                          service. Known values are: "Activating", "Active", "Deleting", "Deleted",
-                          "ActivationFailed", "DeletionFailed", "Transitioning", "Suspending",
-                          "Suspended", "Resuming", "FailingOver", and "FailoverFailed".
-                    },
-                    "sku": {
-                        "capacity": 0,  # Optional. The number of units to provision.
-                        "name": "str",  # Optional. Sku name. "S1"
-                        "tier": "str"  # Optional. Pricing tier name of the provisioning
-                          service.
-                    },
-                    "etag": "str",  # Optional. The Etag field is *not* required. If it is
-                      provided in the response body, it must also be provided as a header per the
-                      normal ETag convention.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "identity": {
-                        "type": "str",  # Type of managed service identity (where both
-                          SystemAssigned and UserAssigned types are allowed). Required. Known values
-                          are: "None", "SystemAssigned", "UserAssigned", and
-                          "SystemAssigned,UserAssigned".
-                        "principalId": "str",  # Optional. The service principal ID of the
-                          system assigned identity. This property will only be provided for a system
-                          assigned identity.
-                        "tenantId": "str",  # Optional. The tenant ID of the system assigned
-                          identity. This property will only be provided for a system assigned identity.
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",  # Optional. The client ID of the
-                                  assigned identity.
-                                "principalId": "str"  # Optional. The principal ID of
-                                  the assigned identity.
-                            }
-                        }
-                    },
-                    "name": "str",  # Optional. The name of the resource.
-                    "resourcegroup": "str",  # Optional. The resource group of the resource.
-                    "subscriptionid": "str",  # Optional. The subscription id of the resource.
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
         """
 
     @overload
@@ -2462,8 +1514,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         *,
         content_type: str = "application/json",
         **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
+    ) -> LROPoller[_models.ProvisioningServiceDescription]:
         """Create or update the metadata of the provisioning service. The usual pattern to modify a
         property is to retrieve the provisioning service metadata and security metadata, and then
         combine them with the modified values in a new body to update the provisioning service.
@@ -2479,189 +1530,9 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :return: An instance of LROPoller that returns ProvisioningServiceDescription
+        :rtype: ~azure.core.polling.LROPoller[~iot_dps_client.models.ProvisioningServiceDescription]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200, 201
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "properties": {
-                        "allocationPolicy": "str",  # Optional. Allocation policy to be used
-                          by this provisioning service. Known values are: "Hashed", "GeoLatency", and
-                          "Static".
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",  # Name of the key. Required.
-                                "rights": "str",  # Rights that this key has.
-                                  Required. Known values are: "ServiceConfig", "EnrollmentRead",
-                                  "EnrollmentWrite", "DeviceConnect", "RegistrationStatusRead", and
-                                  "RegistrationStatusWrite".
-                                "primaryKey": "str",  # Optional. Primary SAS key
-                                  value.
-                                "secondaryKey": "str"  # Optional. Secondary SAS key
-                                  value.
-                            }
-                        ],
-                        "deviceProvisioningHostName": "str",  # Optional. Device endpoint for
-                          this provisioning service.
-                        "deviceRegistryNamespace": {
-                            "authenticationType": "str",  # Device Registry Namespace MI
-                              authentication type: UserAssigned, SystemAssigned. Required. Known values
-                              are: "UserAssigned" and "SystemAssigned".
-                            "resourceId": "str",  # The ARM resource ID of the Device
-                              Registry namespace. Required.
-                            "selectedUserAssignedIdentityResourceId": "str"  # Optional.
-                              The selected user-assigned identity resource Id associated with Device
-                              Registry namespace. This is required when authenticationType is
-                              UserAssigned.
-                        },
-                        "enableDataResidency": bool,  # Optional. Optional. Indicates if the
-                          DPS instance has Data Residency enabled, removing the cross geo-pair disaster
-                          recovery.
-                        "idScope": "str",  # Optional. Unique identifier of this provisioning
-                          service.
-                        "iotHubs": [
-                            {
-                                "connectionString": "str",  # Connection string of
-                                  the IoT hub. Required.
-                                "location": "str",  # ARM region of the IoT hub.
-                                  Required.
-                                "allocationWeight": 0,  # Optional. weight to apply
-                                  for a given iot h.
-                                "applyAllocationPolicy": bool,  # Optional. flag for
-                                  applying allocationPolicy or not for a given iot hub.
-                                "name": "str"  # Optional. Host name of the IoT hub.
-                            }
-                        ],
-                        "ipFilterRules": [
-                            {
-                                "action": "str",  # The desired action for requests
-                                  captured by this rule. Required. Known values are: "Accept" and
-                                  "Reject".
-                                "filterName": "str",  # The name of the IP filter
-                                  rule. Required.
-                                "ipMask": "str",  # A string that contains the IP
-                                  address range in CIDR notation for the rule. Required.
-                                "target": "str"  # Optional. Target for requests
-                                  captured by this rule. Known values are: "all", "serviceApi", and
-                                  "deviceApi".
-                            }
-                        ],
-                        "portalOperationsHostName": "str",  # Optional. Portal endpoint to
-                          enable CORS for this provisioning service.
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",  # The
-                                          description for the current state of a private endpoint
-                                          connection. Required.
-                                        "status": "str",  # The status of a
-                                          private endpoint connection. Required. Known values are:
-                                          "Pending", "Approved", "Rejected", and "Disconnected".
-                                        "actionsRequired": "str"  # Optional.
-                                          Actions required for a private endpoint connection.
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"  # Optional. The resource
-                                          identifier.
-                                    }
-                                },
-                                "id": "str",  # Optional. Fully qualified resource ID
-                                  for the resource. Ex -
-                                  /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                                "name": "str",  # Optional. The name of the resource.
-                                "systemData": {
-                                    "createdAt": "2020-02-20 00:00:00",  #
-                                      Optional. The timestamp of resource creation (UTC).
-                                    "createdBy": "str",  # Optional. The identity
-                                      that created the resource.
-                                    "createdByType": "str",  # Optional. The type
-                                      of identity that created the resource. Known values are: "User",
-                                      "Application", "ManagedIdentity", and "Key".
-                                    "lastModifiedAt": "2020-02-20 00:00:00",  #
-                                      Optional. The timestamp of resource last modification (UTC).
-                                    "lastModifiedBy": "str",  # Optional. The
-                                      identity that last modified the resource.
-                                    "lastModifiedByType": "str"  # Optional. The
-                                      type of identity that last modified the resource. Known values
-                                      are: "User", "Application", "ManagedIdentity", and "Key".
-                                },
-                                "type": "str"  # Optional. The type of the resource.
-                                  E.g. "Microsoft.Compute/virtualMachines" or
-                                  "Microsoft.Storage/storageAccounts".
-                            }
-                        ],
-                        "provisioningState": "str",  # Optional. The ARM provisioning state
-                          of the provisioning service.
-                        "publicNetworkAccess": "str",  # Optional. Whether requests from
-                          Public Network are allowed. Known values are: "Enabled" and "Disabled".
-                        "serviceOperationsHostName": "str",  # Optional. Service endpoint for
-                          provisioning service.
-                        "state": "str"  # Optional. Current state of the provisioning
-                          service. Known values are: "Activating", "Active", "Deleting", "Deleted",
-                          "ActivationFailed", "DeletionFailed", "Transitioning", "Suspending",
-                          "Suspended", "Resuming", "FailingOver", and "FailoverFailed".
-                    },
-                    "sku": {
-                        "capacity": 0,  # Optional. The number of units to provision.
-                        "name": "str",  # Optional. Sku name. "S1"
-                        "tier": "str"  # Optional. Pricing tier name of the provisioning
-                          service.
-                    },
-                    "etag": "str",  # Optional. The Etag field is *not* required. If it is
-                      provided in the response body, it must also be provided as a header per the
-                      normal ETag convention.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "identity": {
-                        "type": "str",  # Type of managed service identity (where both
-                          SystemAssigned and UserAssigned types are allowed). Required. Known values
-                          are: "None", "SystemAssigned", "UserAssigned", and
-                          "SystemAssigned,UserAssigned".
-                        "principalId": "str",  # Optional. The service principal ID of the
-                          system assigned identity. This property will only be provided for a system
-                          assigned identity.
-                        "tenantId": "str",  # Optional. The tenant ID of the system assigned
-                          identity. This property will only be provided for a system assigned identity.
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",  # Optional. The client ID of the
-                                  assigned identity.
-                                "principalId": "str"  # Optional. The principal ID of
-                                  the assigned identity.
-                            }
-                        }
-                    },
-                    "name": "str",  # Optional. The name of the resource.
-                    "resourcegroup": "str",  # Optional. The resource group of the resource.
-                    "subscriptionid": "str",  # Optional. The subscription id of the resource.
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
         """
 
     @distributed_trace
@@ -2669,10 +1540,9 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         self,
         resource_group_name: str,
         provisioning_service_name: str,
-        iot_dps_description: Union[JSON, IO[bytes]],
+        iot_dps_description: Union[_models.ProvisioningServiceDescription, IO[bytes]],
         **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
+    ) -> LROPoller[_models.ProvisioningServiceDescription]:
         """Create or update the metadata of the provisioning service. The usual pattern to modify a
         property is to retrieve the provisioning service metadata and security metadata, and then
         combine them with the modified values in a new body to update the provisioning service.
@@ -2683,374 +1553,17 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         :param provisioning_service_name: Name of the provisioning service to retrieve. Required.
         :type provisioning_service_name: str
         :param iot_dps_description: Description of the provisioning service to create or update. Is
-         either a JSON type or a IO[bytes] type. Required.
-        :type iot_dps_description: JSON or IO[bytes]
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
+         either a ProvisioningServiceDescription type or a IO[bytes] type. Required.
+        :type iot_dps_description: ~iot_dps_client.models.ProvisioningServiceDescription or IO[bytes]
+        :return: An instance of LROPoller that returns ProvisioningServiceDescription
+        :rtype: ~azure.core.polling.LROPoller[~iot_dps_client.models.ProvisioningServiceDescription]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                iot_dps_description = {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "properties": {
-                        "allocationPolicy": "str",  # Optional. Allocation policy to be used
-                          by this provisioning service. Known values are: "Hashed", "GeoLatency", and
-                          "Static".
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",  # Name of the key. Required.
-                                "rights": "str",  # Rights that this key has.
-                                  Required. Known values are: "ServiceConfig", "EnrollmentRead",
-                                  "EnrollmentWrite", "DeviceConnect", "RegistrationStatusRead", and
-                                  "RegistrationStatusWrite".
-                                "primaryKey": "str",  # Optional. Primary SAS key
-                                  value.
-                                "secondaryKey": "str"  # Optional. Secondary SAS key
-                                  value.
-                            }
-                        ],
-                        "deviceProvisioningHostName": "str",  # Optional. Device endpoint for
-                          this provisioning service.
-                        "deviceRegistryNamespace": {
-                            "authenticationType": "str",  # Device Registry Namespace MI
-                              authentication type: UserAssigned, SystemAssigned. Required. Known values
-                              are: "UserAssigned" and "SystemAssigned".
-                            "resourceId": "str",  # The ARM resource ID of the Device
-                              Registry namespace. Required.
-                            "selectedUserAssignedIdentityResourceId": "str"  # Optional.
-                              The selected user-assigned identity resource Id associated with Device
-                              Registry namespace. This is required when authenticationType is
-                              UserAssigned.
-                        },
-                        "enableDataResidency": bool,  # Optional. Optional. Indicates if the
-                          DPS instance has Data Residency enabled, removing the cross geo-pair disaster
-                          recovery.
-                        "idScope": "str",  # Optional. Unique identifier of this provisioning
-                          service.
-                        "iotHubs": [
-                            {
-                                "connectionString": "str",  # Connection string of
-                                  the IoT hub. Required.
-                                "location": "str",  # ARM region of the IoT hub.
-                                  Required.
-                                "allocationWeight": 0,  # Optional. weight to apply
-                                  for a given iot h.
-                                "applyAllocationPolicy": bool,  # Optional. flag for
-                                  applying allocationPolicy or not for a given iot hub.
-                                "name": "str"  # Optional. Host name of the IoT hub.
-                            }
-                        ],
-                        "ipFilterRules": [
-                            {
-                                "action": "str",  # The desired action for requests
-                                  captured by this rule. Required. Known values are: "Accept" and
-                                  "Reject".
-                                "filterName": "str",  # The name of the IP filter
-                                  rule. Required.
-                                "ipMask": "str",  # A string that contains the IP
-                                  address range in CIDR notation for the rule. Required.
-                                "target": "str"  # Optional. Target for requests
-                                  captured by this rule. Known values are: "all", "serviceApi", and
-                                  "deviceApi".
-                            }
-                        ],
-                        "portalOperationsHostName": "str",  # Optional. Portal endpoint to
-                          enable CORS for this provisioning service.
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",  # The
-                                          description for the current state of a private endpoint
-                                          connection. Required.
-                                        "status": "str",  # The status of a
-                                          private endpoint connection. Required. Known values are:
-                                          "Pending", "Approved", "Rejected", and "Disconnected".
-                                        "actionsRequired": "str"  # Optional.
-                                          Actions required for a private endpoint connection.
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"  # Optional. The resource
-                                          identifier.
-                                    }
-                                },
-                                "id": "str",  # Optional. Fully qualified resource ID
-                                  for the resource. Ex -
-                                  /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                                "name": "str",  # Optional. The name of the resource.
-                                "systemData": {
-                                    "createdAt": "2020-02-20 00:00:00",  #
-                                      Optional. The timestamp of resource creation (UTC).
-                                    "createdBy": "str",  # Optional. The identity
-                                      that created the resource.
-                                    "createdByType": "str",  # Optional. The type
-                                      of identity that created the resource. Known values are: "User",
-                                      "Application", "ManagedIdentity", and "Key".
-                                    "lastModifiedAt": "2020-02-20 00:00:00",  #
-                                      Optional. The timestamp of resource last modification (UTC).
-                                    "lastModifiedBy": "str",  # Optional. The
-                                      identity that last modified the resource.
-                                    "lastModifiedByType": "str"  # Optional. The
-                                      type of identity that last modified the resource. Known values
-                                      are: "User", "Application", "ManagedIdentity", and "Key".
-                                },
-                                "type": "str"  # Optional. The type of the resource.
-                                  E.g. "Microsoft.Compute/virtualMachines" or
-                                  "Microsoft.Storage/storageAccounts".
-                            }
-                        ],
-                        "provisioningState": "str",  # Optional. The ARM provisioning state
-                          of the provisioning service.
-                        "publicNetworkAccess": "str",  # Optional. Whether requests from
-                          Public Network are allowed. Known values are: "Enabled" and "Disabled".
-                        "serviceOperationsHostName": "str",  # Optional. Service endpoint for
-                          provisioning service.
-                        "state": "str"  # Optional. Current state of the provisioning
-                          service. Known values are: "Activating", "Active", "Deleting", "Deleted",
-                          "ActivationFailed", "DeletionFailed", "Transitioning", "Suspending",
-                          "Suspended", "Resuming", "FailingOver", and "FailoverFailed".
-                    },
-                    "sku": {
-                        "capacity": 0,  # Optional. The number of units to provision.
-                        "name": "str",  # Optional. Sku name. "S1"
-                        "tier": "str"  # Optional. Pricing tier name of the provisioning
-                          service.
-                    },
-                    "etag": "str",  # Optional. The Etag field is *not* required. If it is
-                      provided in the response body, it must also be provided as a header per the
-                      normal ETag convention.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "identity": {
-                        "type": "str",  # Type of managed service identity (where both
-                          SystemAssigned and UserAssigned types are allowed). Required. Known values
-                          are: "None", "SystemAssigned", "UserAssigned", and
-                          "SystemAssigned,UserAssigned".
-                        "principalId": "str",  # Optional. The service principal ID of the
-                          system assigned identity. This property will only be provided for a system
-                          assigned identity.
-                        "tenantId": "str",  # Optional. The tenant ID of the system assigned
-                          identity. This property will only be provided for a system assigned identity.
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",  # Optional. The client ID of the
-                                  assigned identity.
-                                "principalId": "str"  # Optional. The principal ID of
-                                  the assigned identity.
-                            }
-                        }
-                    },
-                    "name": "str",  # Optional. The name of the resource.
-                    "resourcegroup": "str",  # Optional. The resource group of the resource.
-                    "subscriptionid": "str",  # Optional. The subscription id of the resource.
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-
-                # response body for status code(s): 200, 201
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "properties": {
-                        "allocationPolicy": "str",  # Optional. Allocation policy to be used
-                          by this provisioning service. Known values are: "Hashed", "GeoLatency", and
-                          "Static".
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",  # Name of the key. Required.
-                                "rights": "str",  # Rights that this key has.
-                                  Required. Known values are: "ServiceConfig", "EnrollmentRead",
-                                  "EnrollmentWrite", "DeviceConnect", "RegistrationStatusRead", and
-                                  "RegistrationStatusWrite".
-                                "primaryKey": "str",  # Optional. Primary SAS key
-                                  value.
-                                "secondaryKey": "str"  # Optional. Secondary SAS key
-                                  value.
-                            }
-                        ],
-                        "deviceProvisioningHostName": "str",  # Optional. Device endpoint for
-                          this provisioning service.
-                        "deviceRegistryNamespace": {
-                            "authenticationType": "str",  # Device Registry Namespace MI
-                              authentication type: UserAssigned, SystemAssigned. Required. Known values
-                              are: "UserAssigned" and "SystemAssigned".
-                            "resourceId": "str",  # The ARM resource ID of the Device
-                              Registry namespace. Required.
-                            "selectedUserAssignedIdentityResourceId": "str"  # Optional.
-                              The selected user-assigned identity resource Id associated with Device
-                              Registry namespace. This is required when authenticationType is
-                              UserAssigned.
-                        },
-                        "enableDataResidency": bool,  # Optional. Optional. Indicates if the
-                          DPS instance has Data Residency enabled, removing the cross geo-pair disaster
-                          recovery.
-                        "idScope": "str",  # Optional. Unique identifier of this provisioning
-                          service.
-                        "iotHubs": [
-                            {
-                                "connectionString": "str",  # Connection string of
-                                  the IoT hub. Required.
-                                "location": "str",  # ARM region of the IoT hub.
-                                  Required.
-                                "allocationWeight": 0,  # Optional. weight to apply
-                                  for a given iot h.
-                                "applyAllocationPolicy": bool,  # Optional. flag for
-                                  applying allocationPolicy or not for a given iot hub.
-                                "name": "str"  # Optional. Host name of the IoT hub.
-                            }
-                        ],
-                        "ipFilterRules": [
-                            {
-                                "action": "str",  # The desired action for requests
-                                  captured by this rule. Required. Known values are: "Accept" and
-                                  "Reject".
-                                "filterName": "str",  # The name of the IP filter
-                                  rule. Required.
-                                "ipMask": "str",  # A string that contains the IP
-                                  address range in CIDR notation for the rule. Required.
-                                "target": "str"  # Optional. Target for requests
-                                  captured by this rule. Known values are: "all", "serviceApi", and
-                                  "deviceApi".
-                            }
-                        ],
-                        "portalOperationsHostName": "str",  # Optional. Portal endpoint to
-                          enable CORS for this provisioning service.
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",  # The
-                                          description for the current state of a private endpoint
-                                          connection. Required.
-                                        "status": "str",  # The status of a
-                                          private endpoint connection. Required. Known values are:
-                                          "Pending", "Approved", "Rejected", and "Disconnected".
-                                        "actionsRequired": "str"  # Optional.
-                                          Actions required for a private endpoint connection.
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"  # Optional. The resource
-                                          identifier.
-                                    }
-                                },
-                                "id": "str",  # Optional. Fully qualified resource ID
-                                  for the resource. Ex -
-                                  /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                                "name": "str",  # Optional. The name of the resource.
-                                "systemData": {
-                                    "createdAt": "2020-02-20 00:00:00",  #
-                                      Optional. The timestamp of resource creation (UTC).
-                                    "createdBy": "str",  # Optional. The identity
-                                      that created the resource.
-                                    "createdByType": "str",  # Optional. The type
-                                      of identity that created the resource. Known values are: "User",
-                                      "Application", "ManagedIdentity", and "Key".
-                                    "lastModifiedAt": "2020-02-20 00:00:00",  #
-                                      Optional. The timestamp of resource last modification (UTC).
-                                    "lastModifiedBy": "str",  # Optional. The
-                                      identity that last modified the resource.
-                                    "lastModifiedByType": "str"  # Optional. The
-                                      type of identity that last modified the resource. Known values
-                                      are: "User", "Application", "ManagedIdentity", and "Key".
-                                },
-                                "type": "str"  # Optional. The type of the resource.
-                                  E.g. "Microsoft.Compute/virtualMachines" or
-                                  "Microsoft.Storage/storageAccounts".
-                            }
-                        ],
-                        "provisioningState": "str",  # Optional. The ARM provisioning state
-                          of the provisioning service.
-                        "publicNetworkAccess": "str",  # Optional. Whether requests from
-                          Public Network are allowed. Known values are: "Enabled" and "Disabled".
-                        "serviceOperationsHostName": "str",  # Optional. Service endpoint for
-                          provisioning service.
-                        "state": "str"  # Optional. Current state of the provisioning
-                          service. Known values are: "Activating", "Active", "Deleting", "Deleted",
-                          "ActivationFailed", "DeletionFailed", "Transitioning", "Suspending",
-                          "Suspended", "Resuming", "FailingOver", and "FailoverFailed".
-                    },
-                    "sku": {
-                        "capacity": 0,  # Optional. The number of units to provision.
-                        "name": "str",  # Optional. Sku name. "S1"
-                        "tier": "str"  # Optional. Pricing tier name of the provisioning
-                          service.
-                    },
-                    "etag": "str",  # Optional. The Etag field is *not* required. If it is
-                      provided in the response body, it must also be provided as a header per the
-                      normal ETag convention.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "identity": {
-                        "type": "str",  # Type of managed service identity (where both
-                          SystemAssigned and UserAssigned types are allowed). Required. Known values
-                          are: "None", "SystemAssigned", "UserAssigned", and
-                          "SystemAssigned,UserAssigned".
-                        "principalId": "str",  # Optional. The service principal ID of the
-                          system assigned identity. This property will only be provided for a system
-                          assigned identity.
-                        "tenantId": "str",  # Optional. The tenant ID of the system assigned
-                          identity. This property will only be provided for a system assigned identity.
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",  # Optional. The client ID of the
-                                  assigned identity.
-                                "principalId": "str"  # Optional. The principal ID of
-                                  the assigned identity.
-                            }
-                        }
-                    },
-                    "name": "str",  # Optional. The name of the resource.
-                    "resourcegroup": "str",  # Optional. The resource group of the resource.
-                    "subscriptionid": "str",  # Optional. The subscription id of the resource.
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
         """
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
         content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.ProvisioningServiceDescription] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -3068,11 +1581,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
-            response = pipeline_response.http_response
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("ProvisioningServiceDescription", pipeline_response)
             if cls:
                 return cls(pipeline_response, deserialized, {})  # type: ignore
             return deserialized
@@ -3086,21 +1595,23 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[JSON].from_continuation_token(
+            return LROPoller[_models.ProvisioningServiceDescription].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
+        return LROPoller[_models.ProvisioningServiceDescription](
+            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
+        )
 
     def _update_initial(
         self,
         resource_group_name: str,
         provisioning_service_name: str,
-        provisioning_service_tags: Union[JSON, IO[bytes]],
+        provisioning_service_tags: Union[_models.TagsResource, IO[bytes]],
         **kwargs: Any
-    ) -> JSON:
+    ) -> _models.ProvisioningServiceDescription:
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
             404: ResourceNotFoundError,
@@ -3113,7 +1624,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         _params = kwargs.pop("params", {}) or {}
 
         content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.ProvisioningServiceDescription] = kwargs.pop("cls", None)
 
         content_type = content_type or "application/json"
         _json = None
@@ -3121,7 +1632,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         if isinstance(provisioning_service_tags, (IOBase, bytes)):
             _content = provisioning_service_tags
         else:
-            _json = provisioning_service_tags
+            _json = self._serialize.body(provisioning_service_tags, "TagsResource")
 
         _request = build_iot_dps_resource_update_request(
             resource_group_name=resource_group_name,
@@ -3147,32 +1658,29 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorResponse, pipeline_response)
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
         response_headers = {}
         response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("ProvisioningServiceDescription", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), response_headers)  # type: ignore
+            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @overload
     def begin_update(
         self,
         resource_group_name: str,
         provisioning_service_name: str,
-        provisioning_service_tags: JSON,
+        provisioning_service_tags: _models.TagsResource,
         *,
         content_type: str = "application/json",
         **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
+    ) -> LROPoller[_models.ProvisioningServiceDescription]:
         """Update an existing provisioning service's tags. to update other fields use the CreateOrUpdate
         method.
 
@@ -3183,200 +1691,13 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         :type provisioning_service_name: str
         :param provisioning_service_tags: Updated tag information to set into the provisioning service
          instance. Required.
-        :type provisioning_service_tags: JSON
+        :type provisioning_service_tags: ~iot_dps_client.models.TagsResource
         :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :return: An instance of LROPoller that returns ProvisioningServiceDescription
+        :rtype: ~azure.core.polling.LROPoller[~iot_dps_client.models.ProvisioningServiceDescription]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                provisioning_service_tags = {
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    }
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "properties": {
-                        "allocationPolicy": "str",  # Optional. Allocation policy to be used
-                          by this provisioning service. Known values are: "Hashed", "GeoLatency", and
-                          "Static".
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",  # Name of the key. Required.
-                                "rights": "str",  # Rights that this key has.
-                                  Required. Known values are: "ServiceConfig", "EnrollmentRead",
-                                  "EnrollmentWrite", "DeviceConnect", "RegistrationStatusRead", and
-                                  "RegistrationStatusWrite".
-                                "primaryKey": "str",  # Optional. Primary SAS key
-                                  value.
-                                "secondaryKey": "str"  # Optional. Secondary SAS key
-                                  value.
-                            }
-                        ],
-                        "deviceProvisioningHostName": "str",  # Optional. Device endpoint for
-                          this provisioning service.
-                        "deviceRegistryNamespace": {
-                            "authenticationType": "str",  # Device Registry Namespace MI
-                              authentication type: UserAssigned, SystemAssigned. Required. Known values
-                              are: "UserAssigned" and "SystemAssigned".
-                            "resourceId": "str",  # The ARM resource ID of the Device
-                              Registry namespace. Required.
-                            "selectedUserAssignedIdentityResourceId": "str"  # Optional.
-                              The selected user-assigned identity resource Id associated with Device
-                              Registry namespace. This is required when authenticationType is
-                              UserAssigned.
-                        },
-                        "enableDataResidency": bool,  # Optional. Optional. Indicates if the
-                          DPS instance has Data Residency enabled, removing the cross geo-pair disaster
-                          recovery.
-                        "idScope": "str",  # Optional. Unique identifier of this provisioning
-                          service.
-                        "iotHubs": [
-                            {
-                                "connectionString": "str",  # Connection string of
-                                  the IoT hub. Required.
-                                "location": "str",  # ARM region of the IoT hub.
-                                  Required.
-                                "allocationWeight": 0,  # Optional. weight to apply
-                                  for a given iot h.
-                                "applyAllocationPolicy": bool,  # Optional. flag for
-                                  applying allocationPolicy or not for a given iot hub.
-                                "name": "str"  # Optional. Host name of the IoT hub.
-                            }
-                        ],
-                        "ipFilterRules": [
-                            {
-                                "action": "str",  # The desired action for requests
-                                  captured by this rule. Required. Known values are: "Accept" and
-                                  "Reject".
-                                "filterName": "str",  # The name of the IP filter
-                                  rule. Required.
-                                "ipMask": "str",  # A string that contains the IP
-                                  address range in CIDR notation for the rule. Required.
-                                "target": "str"  # Optional. Target for requests
-                                  captured by this rule. Known values are: "all", "serviceApi", and
-                                  "deviceApi".
-                            }
-                        ],
-                        "portalOperationsHostName": "str",  # Optional. Portal endpoint to
-                          enable CORS for this provisioning service.
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",  # The
-                                          description for the current state of a private endpoint
-                                          connection. Required.
-                                        "status": "str",  # The status of a
-                                          private endpoint connection. Required. Known values are:
-                                          "Pending", "Approved", "Rejected", and "Disconnected".
-                                        "actionsRequired": "str"  # Optional.
-                                          Actions required for a private endpoint connection.
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"  # Optional. The resource
-                                          identifier.
-                                    }
-                                },
-                                "id": "str",  # Optional. Fully qualified resource ID
-                                  for the resource. Ex -
-                                  /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                                "name": "str",  # Optional. The name of the resource.
-                                "systemData": {
-                                    "createdAt": "2020-02-20 00:00:00",  #
-                                      Optional. The timestamp of resource creation (UTC).
-                                    "createdBy": "str",  # Optional. The identity
-                                      that created the resource.
-                                    "createdByType": "str",  # Optional. The type
-                                      of identity that created the resource. Known values are: "User",
-                                      "Application", "ManagedIdentity", and "Key".
-                                    "lastModifiedAt": "2020-02-20 00:00:00",  #
-                                      Optional. The timestamp of resource last modification (UTC).
-                                    "lastModifiedBy": "str",  # Optional. The
-                                      identity that last modified the resource.
-                                    "lastModifiedByType": "str"  # Optional. The
-                                      type of identity that last modified the resource. Known values
-                                      are: "User", "Application", "ManagedIdentity", and "Key".
-                                },
-                                "type": "str"  # Optional. The type of the resource.
-                                  E.g. "Microsoft.Compute/virtualMachines" or
-                                  "Microsoft.Storage/storageAccounts".
-                            }
-                        ],
-                        "provisioningState": "str",  # Optional. The ARM provisioning state
-                          of the provisioning service.
-                        "publicNetworkAccess": "str",  # Optional. Whether requests from
-                          Public Network are allowed. Known values are: "Enabled" and "Disabled".
-                        "serviceOperationsHostName": "str",  # Optional. Service endpoint for
-                          provisioning service.
-                        "state": "str"  # Optional. Current state of the provisioning
-                          service. Known values are: "Activating", "Active", "Deleting", "Deleted",
-                          "ActivationFailed", "DeletionFailed", "Transitioning", "Suspending",
-                          "Suspended", "Resuming", "FailingOver", and "FailoverFailed".
-                    },
-                    "sku": {
-                        "capacity": 0,  # Optional. The number of units to provision.
-                        "name": "str",  # Optional. Sku name. "S1"
-                        "tier": "str"  # Optional. Pricing tier name of the provisioning
-                          service.
-                    },
-                    "etag": "str",  # Optional. The Etag field is *not* required. If it is
-                      provided in the response body, it must also be provided as a header per the
-                      normal ETag convention.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "identity": {
-                        "type": "str",  # Type of managed service identity (where both
-                          SystemAssigned and UserAssigned types are allowed). Required. Known values
-                          are: "None", "SystemAssigned", "UserAssigned", and
-                          "SystemAssigned,UserAssigned".
-                        "principalId": "str",  # Optional. The service principal ID of the
-                          system assigned identity. This property will only be provided for a system
-                          assigned identity.
-                        "tenantId": "str",  # Optional. The tenant ID of the system assigned
-                          identity. This property will only be provided for a system assigned identity.
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",  # Optional. The client ID of the
-                                  assigned identity.
-                                "principalId": "str"  # Optional. The principal ID of
-                                  the assigned identity.
-                            }
-                        }
-                    },
-                    "name": "str",  # Optional. The name of the resource.
-                    "resourcegroup": "str",  # Optional. The resource group of the resource.
-                    "subscriptionid": "str",  # Optional. The subscription id of the resource.
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
         """
 
     @overload
@@ -3388,8 +1709,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         *,
         content_type: str = "application/json",
         **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
+    ) -> LROPoller[_models.ProvisioningServiceDescription]:
         """Update an existing provisioning service's tags. to update other fields use the CreateOrUpdate
         method.
 
@@ -3404,189 +1724,9 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :return: An instance of LROPoller that returns ProvisioningServiceDescription
+        :rtype: ~azure.core.polling.LROPoller[~iot_dps_client.models.ProvisioningServiceDescription]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "properties": {
-                        "allocationPolicy": "str",  # Optional. Allocation policy to be used
-                          by this provisioning service. Known values are: "Hashed", "GeoLatency", and
-                          "Static".
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",  # Name of the key. Required.
-                                "rights": "str",  # Rights that this key has.
-                                  Required. Known values are: "ServiceConfig", "EnrollmentRead",
-                                  "EnrollmentWrite", "DeviceConnect", "RegistrationStatusRead", and
-                                  "RegistrationStatusWrite".
-                                "primaryKey": "str",  # Optional. Primary SAS key
-                                  value.
-                                "secondaryKey": "str"  # Optional. Secondary SAS key
-                                  value.
-                            }
-                        ],
-                        "deviceProvisioningHostName": "str",  # Optional. Device endpoint for
-                          this provisioning service.
-                        "deviceRegistryNamespace": {
-                            "authenticationType": "str",  # Device Registry Namespace MI
-                              authentication type: UserAssigned, SystemAssigned. Required. Known values
-                              are: "UserAssigned" and "SystemAssigned".
-                            "resourceId": "str",  # The ARM resource ID of the Device
-                              Registry namespace. Required.
-                            "selectedUserAssignedIdentityResourceId": "str"  # Optional.
-                              The selected user-assigned identity resource Id associated with Device
-                              Registry namespace. This is required when authenticationType is
-                              UserAssigned.
-                        },
-                        "enableDataResidency": bool,  # Optional. Optional. Indicates if the
-                          DPS instance has Data Residency enabled, removing the cross geo-pair disaster
-                          recovery.
-                        "idScope": "str",  # Optional. Unique identifier of this provisioning
-                          service.
-                        "iotHubs": [
-                            {
-                                "connectionString": "str",  # Connection string of
-                                  the IoT hub. Required.
-                                "location": "str",  # ARM region of the IoT hub.
-                                  Required.
-                                "allocationWeight": 0,  # Optional. weight to apply
-                                  for a given iot h.
-                                "applyAllocationPolicy": bool,  # Optional. flag for
-                                  applying allocationPolicy or not for a given iot hub.
-                                "name": "str"  # Optional. Host name of the IoT hub.
-                            }
-                        ],
-                        "ipFilterRules": [
-                            {
-                                "action": "str",  # The desired action for requests
-                                  captured by this rule. Required. Known values are: "Accept" and
-                                  "Reject".
-                                "filterName": "str",  # The name of the IP filter
-                                  rule. Required.
-                                "ipMask": "str",  # A string that contains the IP
-                                  address range in CIDR notation for the rule. Required.
-                                "target": "str"  # Optional. Target for requests
-                                  captured by this rule. Known values are: "all", "serviceApi", and
-                                  "deviceApi".
-                            }
-                        ],
-                        "portalOperationsHostName": "str",  # Optional. Portal endpoint to
-                          enable CORS for this provisioning service.
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",  # The
-                                          description for the current state of a private endpoint
-                                          connection. Required.
-                                        "status": "str",  # The status of a
-                                          private endpoint connection. Required. Known values are:
-                                          "Pending", "Approved", "Rejected", and "Disconnected".
-                                        "actionsRequired": "str"  # Optional.
-                                          Actions required for a private endpoint connection.
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"  # Optional. The resource
-                                          identifier.
-                                    }
-                                },
-                                "id": "str",  # Optional. Fully qualified resource ID
-                                  for the resource. Ex -
-                                  /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                                "name": "str",  # Optional. The name of the resource.
-                                "systemData": {
-                                    "createdAt": "2020-02-20 00:00:00",  #
-                                      Optional. The timestamp of resource creation (UTC).
-                                    "createdBy": "str",  # Optional. The identity
-                                      that created the resource.
-                                    "createdByType": "str",  # Optional. The type
-                                      of identity that created the resource. Known values are: "User",
-                                      "Application", "ManagedIdentity", and "Key".
-                                    "lastModifiedAt": "2020-02-20 00:00:00",  #
-                                      Optional. The timestamp of resource last modification (UTC).
-                                    "lastModifiedBy": "str",  # Optional. The
-                                      identity that last modified the resource.
-                                    "lastModifiedByType": "str"  # Optional. The
-                                      type of identity that last modified the resource. Known values
-                                      are: "User", "Application", "ManagedIdentity", and "Key".
-                                },
-                                "type": "str"  # Optional. The type of the resource.
-                                  E.g. "Microsoft.Compute/virtualMachines" or
-                                  "Microsoft.Storage/storageAccounts".
-                            }
-                        ],
-                        "provisioningState": "str",  # Optional. The ARM provisioning state
-                          of the provisioning service.
-                        "publicNetworkAccess": "str",  # Optional. Whether requests from
-                          Public Network are allowed. Known values are: "Enabled" and "Disabled".
-                        "serviceOperationsHostName": "str",  # Optional. Service endpoint for
-                          provisioning service.
-                        "state": "str"  # Optional. Current state of the provisioning
-                          service. Known values are: "Activating", "Active", "Deleting", "Deleted",
-                          "ActivationFailed", "DeletionFailed", "Transitioning", "Suspending",
-                          "Suspended", "Resuming", "FailingOver", and "FailoverFailed".
-                    },
-                    "sku": {
-                        "capacity": 0,  # Optional. The number of units to provision.
-                        "name": "str",  # Optional. Sku name. "S1"
-                        "tier": "str"  # Optional. Pricing tier name of the provisioning
-                          service.
-                    },
-                    "etag": "str",  # Optional. The Etag field is *not* required. If it is
-                      provided in the response body, it must also be provided as a header per the
-                      normal ETag convention.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "identity": {
-                        "type": "str",  # Type of managed service identity (where both
-                          SystemAssigned and UserAssigned types are allowed). Required. Known values
-                          are: "None", "SystemAssigned", "UserAssigned", and
-                          "SystemAssigned,UserAssigned".
-                        "principalId": "str",  # Optional. The service principal ID of the
-                          system assigned identity. This property will only be provided for a system
-                          assigned identity.
-                        "tenantId": "str",  # Optional. The tenant ID of the system assigned
-                          identity. This property will only be provided for a system assigned identity.
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",  # Optional. The client ID of the
-                                  assigned identity.
-                                "principalId": "str"  # Optional. The principal ID of
-                                  the assigned identity.
-                            }
-                        }
-                    },
-                    "name": "str",  # Optional. The name of the resource.
-                    "resourcegroup": "str",  # Optional. The resource group of the resource.
-                    "subscriptionid": "str",  # Optional. The subscription id of the resource.
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
         """
 
     @distributed_trace
@@ -3594,10 +1734,9 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         self,
         resource_group_name: str,
         provisioning_service_name: str,
-        provisioning_service_tags: Union[JSON, IO[bytes]],
+        provisioning_service_tags: Union[_models.TagsResource, IO[bytes]],
         **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
+    ) -> LROPoller[_models.ProvisioningServiceDescription]:
         """Update an existing provisioning service's tags. to update other fields use the CreateOrUpdate
         method.
 
@@ -3607,204 +1746,17 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         :param provisioning_service_name: Name of the provisioning service to retrieve. Required.
         :type provisioning_service_name: str
         :param provisioning_service_tags: Updated tag information to set into the provisioning service
-         instance. Is either a JSON type or a IO[bytes] type. Required.
-        :type provisioning_service_tags: JSON or IO[bytes]
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
+         instance. Is either a TagsResource type or a IO[bytes] type. Required.
+        :type provisioning_service_tags: ~iot_dps_client.models.TagsResource or IO[bytes]
+        :return: An instance of LROPoller that returns ProvisioningServiceDescription
+        :rtype: ~azure.core.polling.LROPoller[~iot_dps_client.models.ProvisioningServiceDescription]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                provisioning_service_tags = {
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    }
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "properties": {
-                        "allocationPolicy": "str",  # Optional. Allocation policy to be used
-                          by this provisioning service. Known values are: "Hashed", "GeoLatency", and
-                          "Static".
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",  # Name of the key. Required.
-                                "rights": "str",  # Rights that this key has.
-                                  Required. Known values are: "ServiceConfig", "EnrollmentRead",
-                                  "EnrollmentWrite", "DeviceConnect", "RegistrationStatusRead", and
-                                  "RegistrationStatusWrite".
-                                "primaryKey": "str",  # Optional. Primary SAS key
-                                  value.
-                                "secondaryKey": "str"  # Optional. Secondary SAS key
-                                  value.
-                            }
-                        ],
-                        "deviceProvisioningHostName": "str",  # Optional. Device endpoint for
-                          this provisioning service.
-                        "deviceRegistryNamespace": {
-                            "authenticationType": "str",  # Device Registry Namespace MI
-                              authentication type: UserAssigned, SystemAssigned. Required. Known values
-                              are: "UserAssigned" and "SystemAssigned".
-                            "resourceId": "str",  # The ARM resource ID of the Device
-                              Registry namespace. Required.
-                            "selectedUserAssignedIdentityResourceId": "str"  # Optional.
-                              The selected user-assigned identity resource Id associated with Device
-                              Registry namespace. This is required when authenticationType is
-                              UserAssigned.
-                        },
-                        "enableDataResidency": bool,  # Optional. Optional. Indicates if the
-                          DPS instance has Data Residency enabled, removing the cross geo-pair disaster
-                          recovery.
-                        "idScope": "str",  # Optional. Unique identifier of this provisioning
-                          service.
-                        "iotHubs": [
-                            {
-                                "connectionString": "str",  # Connection string of
-                                  the IoT hub. Required.
-                                "location": "str",  # ARM region of the IoT hub.
-                                  Required.
-                                "allocationWeight": 0,  # Optional. weight to apply
-                                  for a given iot h.
-                                "applyAllocationPolicy": bool,  # Optional. flag for
-                                  applying allocationPolicy or not for a given iot hub.
-                                "name": "str"  # Optional. Host name of the IoT hub.
-                            }
-                        ],
-                        "ipFilterRules": [
-                            {
-                                "action": "str",  # The desired action for requests
-                                  captured by this rule. Required. Known values are: "Accept" and
-                                  "Reject".
-                                "filterName": "str",  # The name of the IP filter
-                                  rule. Required.
-                                "ipMask": "str",  # A string that contains the IP
-                                  address range in CIDR notation for the rule. Required.
-                                "target": "str"  # Optional. Target for requests
-                                  captured by this rule. Known values are: "all", "serviceApi", and
-                                  "deviceApi".
-                            }
-                        ],
-                        "portalOperationsHostName": "str",  # Optional. Portal endpoint to
-                          enable CORS for this provisioning service.
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",  # The
-                                          description for the current state of a private endpoint
-                                          connection. Required.
-                                        "status": "str",  # The status of a
-                                          private endpoint connection. Required. Known values are:
-                                          "Pending", "Approved", "Rejected", and "Disconnected".
-                                        "actionsRequired": "str"  # Optional.
-                                          Actions required for a private endpoint connection.
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"  # Optional. The resource
-                                          identifier.
-                                    }
-                                },
-                                "id": "str",  # Optional. Fully qualified resource ID
-                                  for the resource. Ex -
-                                  /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                                "name": "str",  # Optional. The name of the resource.
-                                "systemData": {
-                                    "createdAt": "2020-02-20 00:00:00",  #
-                                      Optional. The timestamp of resource creation (UTC).
-                                    "createdBy": "str",  # Optional. The identity
-                                      that created the resource.
-                                    "createdByType": "str",  # Optional. The type
-                                      of identity that created the resource. Known values are: "User",
-                                      "Application", "ManagedIdentity", and "Key".
-                                    "lastModifiedAt": "2020-02-20 00:00:00",  #
-                                      Optional. The timestamp of resource last modification (UTC).
-                                    "lastModifiedBy": "str",  # Optional. The
-                                      identity that last modified the resource.
-                                    "lastModifiedByType": "str"  # Optional. The
-                                      type of identity that last modified the resource. Known values
-                                      are: "User", "Application", "ManagedIdentity", and "Key".
-                                },
-                                "type": "str"  # Optional. The type of the resource.
-                                  E.g. "Microsoft.Compute/virtualMachines" or
-                                  "Microsoft.Storage/storageAccounts".
-                            }
-                        ],
-                        "provisioningState": "str",  # Optional. The ARM provisioning state
-                          of the provisioning service.
-                        "publicNetworkAccess": "str",  # Optional. Whether requests from
-                          Public Network are allowed. Known values are: "Enabled" and "Disabled".
-                        "serviceOperationsHostName": "str",  # Optional. Service endpoint for
-                          provisioning service.
-                        "state": "str"  # Optional. Current state of the provisioning
-                          service. Known values are: "Activating", "Active", "Deleting", "Deleted",
-                          "ActivationFailed", "DeletionFailed", "Transitioning", "Suspending",
-                          "Suspended", "Resuming", "FailingOver", and "FailoverFailed".
-                    },
-                    "sku": {
-                        "capacity": 0,  # Optional. The number of units to provision.
-                        "name": "str",  # Optional. Sku name. "S1"
-                        "tier": "str"  # Optional. Pricing tier name of the provisioning
-                          service.
-                    },
-                    "etag": "str",  # Optional. The Etag field is *not* required. If it is
-                      provided in the response body, it must also be provided as a header per the
-                      normal ETag convention.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "identity": {
-                        "type": "str",  # Type of managed service identity (where both
-                          SystemAssigned and UserAssigned types are allowed). Required. Known values
-                          are: "None", "SystemAssigned", "UserAssigned", and
-                          "SystemAssigned,UserAssigned".
-                        "principalId": "str",  # Optional. The service principal ID of the
-                          system assigned identity. This property will only be provided for a system
-                          assigned identity.
-                        "tenantId": "str",  # Optional. The tenant ID of the system assigned
-                          identity. This property will only be provided for a system assigned identity.
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",  # Optional. The client ID of the
-                                  assigned identity.
-                                "principalId": "str"  # Optional. The principal ID of
-                                  the assigned identity.
-                            }
-                        }
-                    },
-                    "name": "str",  # Optional. The name of the resource.
-                    "resourcegroup": "str",  # Optional. The resource group of the resource.
-                    "subscriptionid": "str",  # Optional. The subscription id of the resource.
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
         """
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
         content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.ProvisioningServiceDescription] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -3826,10 +1778,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
             response = pipeline_response.http_response
             response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
 
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("ProvisioningServiceDescription", pipeline_response)
             if cls:
                 return cls(pipeline_response, deserialized, response_headers)  # type: ignore
             return deserialized
@@ -3843,13 +1792,15 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[JSON].from_continuation_token(
+            return LROPoller[_models.ProvisioningServiceDescription].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
+        return LROPoller[_models.ProvisioningServiceDescription](
+            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
+        )
 
     def _delete_initial(  # pylint: disable=inconsistent-return-statements
         self, resource_group_name: str, provisioning_service_name: str, **kwargs: Any
@@ -3888,7 +1839,8 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -3953,8 +1905,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
     @distributed_trace
     def list_keys_for_key_name(
         self, resource_group_name: str, provisioning_service_name: str, key_name: str, **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+    ) -> _models.SharedAccessSignatureAuthorizationRuleAccessRightsDescription:
         """List primary and secondary keys for a specific key name.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -3964,22 +1915,9 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         :type provisioning_service_name: str
         :param key_name: Logical key name to get key-values for. Required.
         :type key_name: str
-        :return: JSON object
-        :rtype: JSON
+        :return: SharedAccessSignatureAuthorizationRuleAccessRightsDescription
+        :rtype: ~iot_dps_client.models.SharedAccessSignatureAuthorizationRuleAccessRightsDescription
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "keyName": "str",  # Name of the key. Required.
-                    "rights": "str",  # Rights that this key has. Required. Known values are:
-                      "ServiceConfig", "EnrollmentRead", "EnrollmentWrite", "DeviceConnect",
-                      "RegistrationStatusRead", and "RegistrationStatusWrite".
-                    "primaryKey": "str",  # Optional. Primary SAS key value.
-                    "secondaryKey": "str"  # Optional. Secondary SAS key value.
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -3992,7 +1930,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.SharedAccessSignatureAuthorizationRuleAccessRightsDescription] = kwargs.pop("cls", None)
 
         _request = build_iot_dps_resource_list_keys_for_key_name_request(
             resource_group_name=resource_group_name,
@@ -4016,21 +1954,22 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize(
+            "SharedAccessSignatureAuthorizationRuleAccessRightsDescription", pipeline_response
+        )
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @distributed_trace
-    def list_keys(self, resource_group_name: str, provisioning_service_name: str, **kwargs: Any) -> Iterable[JSON]:
-        # pylint: disable=line-too-long
+    def list_keys(
+        self, resource_group_name: str, provisioning_service_name: str, **kwargs: Any
+    ) -> Iterable["_models.SharedAccessSignatureAuthorizationRuleAccessRightsDescription"]:
         """List the primary and secondary keys for a provisioning service.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -4038,27 +1977,18 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         :type resource_group_name: str
         :param provisioning_service_name: Name of the provisioning service to retrieve. Required.
         :type provisioning_service_name: str
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.paging.ItemPaged[JSON]
+        :return: An iterator like instance of
+         SharedAccessSignatureAuthorizationRuleAccessRightsDescription
+        :rtype:
+         ~azure.core.paging.ItemPaged[~iot_dps_client.models.SharedAccessSignatureAuthorizationRuleAccessRightsDescription]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "keyName": "str",  # Name of the key. Required.
-                    "rights": "str",  # Rights that this key has. Required. Known values are:
-                      "ServiceConfig", "EnrollmentRead", "EnrollmentWrite", "DeviceConnect",
-                      "RegistrationStatusRead", and "RegistrationStatusWrite".
-                    "primaryKey": "str",  # Optional. Primary SAS key value.
-                    "secondaryKey": "str"  # Optional. Secondary SAS key value.
-                }
         """
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models._models.SharedAccessSignatureAuthorizationRuleListResult] = kwargs.pop(
+            "cls", None
+        )  # pylint: disable=protected-access
 
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -4099,11 +2029,14 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
             return _request
 
         def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
+            deserialized = self._deserialize(
+                _models._models.SharedAccessSignatureAuthorizationRuleListResult,  # pylint: disable=protected-access
+                pipeline_response,
+            )
+            list_of_elem = deserialized.value
             if cls:
                 list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, iter(list_of_elem)
+            return deserialized.next_link or None, iter(list_of_elem)
 
         def get_next(next_link=None):
             _request = prepare_request(next_link)
@@ -4118,7 +2051,8 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
                 if _stream:
                     response.read()  # Load the body in memory and close the socket
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+                error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -4133,7 +2067,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         *,
         asyncinfo: str = "true",
         **kwargs: Any
-    ) -> JSON:
+    ) -> _models.AsyncOperationResult:
         """Gets the status of a long running operation, such as create, update or delete a provisioning
         service.
 
@@ -4148,22 +2082,9 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         :keyword asyncinfo: Async header used to poll on the status of the operation, obtained while
          creating the long running operation. Default value is "true".
         :paramtype asyncinfo: str
-        :return: JSON object
-        :rtype: JSON
+        :return: AsyncOperationResult
+        :rtype: ~iot_dps_client.models.AsyncOperationResult
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "error": {
-                        "code": "str",  # Optional. standard error code.
-                        "details": "str",  # Optional. detailed summary of error.
-                        "message": "str"  # Optional. standard error description.
-                    },
-                    "status": "str"  # Optional. current status of a long running operation.
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -4176,7 +2097,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.AsyncOperationResult] = kwargs.pop("cls", None)
 
         _request = build_iot_dps_resource_get_operation_result_request(
             resource_group_name=resource_group_name,
@@ -4201,23 +2122,20 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("AsyncOperationResult", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @distributed_trace
     def list_private_endpoint_connections(
         self, resource_group_name: str, resource_name: str, **kwargs: Any
-    ) -> List[JSON]:
-        # pylint: disable=line-too-long
+    ) -> List[_models.PrivateEndpointConnection]:
         """List private endpoint connection properties.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -4225,54 +2143,9 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         :type resource_group_name: str
         :param resource_name: Name of the provisioning service to retrieve. Required.
         :type resource_name: str
-        :return: list of JSON object
-        :rtype: list[JSON]
+        :return: list of PrivateEndpointConnection
+        :rtype: list[~iot_dps_client.models.PrivateEndpointConnection]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == [
-                    {
-                        "properties": {
-                            "privateLinkServiceConnectionState": {
-                                "description": "str",  # The description for the
-                                  current state of a private endpoint connection. Required.
-                                "status": "str",  # The status of a private endpoint
-                                  connection. Required. Known values are: "Pending", "Approved",
-                                  "Rejected", and "Disconnected".
-                                "actionsRequired": "str"  # Optional. Actions
-                                  required for a private endpoint connection.
-                            },
-                            "privateEndpoint": {
-                                "id": "str"  # Optional. The resource identifier.
-                            }
-                        },
-                        "id": "str",  # Optional. Fully qualified resource ID for the
-                          resource. Ex -
-                          /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                        "name": "str",  # Optional. The name of the resource.
-                        "systemData": {
-                            "createdAt": "2020-02-20 00:00:00",  # Optional. The
-                              timestamp of resource creation (UTC).
-                            "createdBy": "str",  # Optional. The identity that created
-                              the resource.
-                            "createdByType": "str",  # Optional. The type of identity
-                              that created the resource. Known values are: "User", "Application",
-                              "ManagedIdentity", and "Key".
-                            "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The
-                              timestamp of resource last modification (UTC).
-                            "lastModifiedBy": "str",  # Optional. The identity that last
-                              modified the resource.
-                            "lastModifiedByType": "str"  # Optional. The type of identity
-                              that last modified the resource. Known values are: "User", "Application",
-                              "ManagedIdentity", and "Key".
-                        },
-                        "type": "str"  # Optional. The type of the resource. E.g.
-                          "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                    }
-                ]
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -4285,7 +2158,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
+        cls: ClsType[List[_models.PrivateEndpointConnection]] = kwargs.pop("cls", None)
 
         _request = build_iot_dps_resource_list_private_endpoint_connections_request(
             resource_group_name=resource_group_name,
@@ -4308,23 +2181,20 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("[PrivateEndpointConnection]", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(List[JSON], deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(List[JSON], deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @distributed_trace
     def get_private_endpoint_connection(
         self, resource_group_name: str, resource_name: str, private_endpoint_connection_name: str, **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+    ) -> _models.PrivateEndpointConnection:
         """Get private endpoint connection properties.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -4334,51 +2204,9 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         :type resource_name: str
         :param private_endpoint_connection_name: The name of the private endpoint connection. Required.
         :type private_endpoint_connection_name: str
-        :return: JSON object
-        :rtype: JSON
+        :return: PrivateEndpointConnection
+        :rtype: ~iot_dps_client.models.PrivateEndpointConnection
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "properties": {
-                        "privateLinkServiceConnectionState": {
-                            "description": "str",  # The description for the current
-                              state of a private endpoint connection. Required.
-                            "status": "str",  # The status of a private endpoint
-                              connection. Required. Known values are: "Pending", "Approved",
-                              "Rejected", and "Disconnected".
-                            "actionsRequired": "str"  # Optional. Actions required for a
-                              private endpoint connection.
-                        },
-                        "privateEndpoint": {
-                            "id": "str"  # Optional. The resource identifier.
-                        }
-                    },
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "name": "str",  # Optional. The name of the resource.
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -4391,7 +2219,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.PrivateEndpointConnection] = kwargs.pop("cls", None)
 
         _request = build_iot_dps_resource_get_private_endpoint_connection_request(
             resource_group_name=resource_group_name,
@@ -4415,26 +2243,24 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("PrivateEndpointConnection", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     def _create_or_update_private_endpoint_connection_initial(  # pylint: disable=name-too-long
         self,
         resource_group_name: str,
         resource_name: str,
         private_endpoint_connection_name: str,
-        private_endpoint_connection: Union[JSON, IO[bytes]],
+        private_endpoint_connection: Union[_models.PrivateEndpointConnection, IO[bytes]],
         **kwargs: Any
-    ) -> JSON:
+    ) -> _models.PrivateEndpointConnection:
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
             404: ResourceNotFoundError,
@@ -4447,7 +2273,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         _params = kwargs.pop("params", {}) or {}
 
         content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.PrivateEndpointConnection] = kwargs.pop("cls", None)
 
         content_type = content_type or "application/json"
         _json = None
@@ -4455,7 +2281,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         if isinstance(private_endpoint_connection, (IOBase, bytes)):
             _content = private_endpoint_connection
         else:
-            _json = private_endpoint_connection
+            _json = self._serialize.body(private_endpoint_connection, "PrivateEndpointConnection")
 
         _request = build_iot_dps_resource_create_or_update_private_endpoint_connection_request(
             resource_group_name=resource_group_name,
@@ -4482,28 +2308,23 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 200:
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("PrivateEndpointConnection", pipeline_response)
 
         if response.status_code == 201:
             response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
             response_headers["Retry-After"] = self._deserialize("int", response.headers.get("Retry-After"))
 
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("PrivateEndpointConnection", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), response_headers)  # type: ignore
+            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @overload
     def begin_create_or_update_private_endpoint_connection(  # pylint: disable=name-too-long
@@ -4511,12 +2332,11 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         resource_group_name: str,
         resource_name: str,
         private_endpoint_connection_name: str,
-        private_endpoint_connection: JSON,
+        private_endpoint_connection: _models.PrivateEndpointConnection,
         *,
         content_type: str = "application/json",
         **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
+    ) -> LROPoller[_models.PrivateEndpointConnection]:
         """Create or update the status of a private endpoint connection with the specified name.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -4528,94 +2348,13 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         :type private_endpoint_connection_name: str
         :param private_endpoint_connection: The private endpoint connection with updated properties.
          Required.
-        :type private_endpoint_connection: JSON
+        :type private_endpoint_connection: ~iot_dps_client.models.PrivateEndpointConnection
         :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :return: An instance of LROPoller that returns PrivateEndpointConnection
+        :rtype: ~azure.core.polling.LROPoller[~iot_dps_client.models.PrivateEndpointConnection]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                private_endpoint_connection = {
-                    "properties": {
-                        "privateLinkServiceConnectionState": {
-                            "description": "str",  # The description for the current
-                              state of a private endpoint connection. Required.
-                            "status": "str",  # The status of a private endpoint
-                              connection. Required. Known values are: "Pending", "Approved",
-                              "Rejected", and "Disconnected".
-                            "actionsRequired": "str"  # Optional. Actions required for a
-                              private endpoint connection.
-                        },
-                        "privateEndpoint": {
-                            "id": "str"  # Optional. The resource identifier.
-                        }
-                    },
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "name": "str",  # Optional. The name of the resource.
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-
-                # response body for status code(s): 200, 201
-                response == {
-                    "properties": {
-                        "privateLinkServiceConnectionState": {
-                            "description": "str",  # The description for the current
-                              state of a private endpoint connection. Required.
-                            "status": "str",  # The status of a private endpoint
-                              connection. Required. Known values are: "Pending", "Approved",
-                              "Rejected", and "Disconnected".
-                            "actionsRequired": "str"  # Optional. Actions required for a
-                              private endpoint connection.
-                        },
-                        "privateEndpoint": {
-                            "id": "str"  # Optional. The resource identifier.
-                        }
-                    },
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "name": "str",  # Optional. The name of the resource.
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
         """
 
     @overload
@@ -4628,8 +2367,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         *,
         content_type: str = "application/json",
         **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
+    ) -> LROPoller[_models.PrivateEndpointConnection]:
         """Create or update the status of a private endpoint connection with the specified name.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -4645,51 +2383,9 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :return: An instance of LROPoller that returns PrivateEndpointConnection
+        :rtype: ~azure.core.polling.LROPoller[~iot_dps_client.models.PrivateEndpointConnection]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200, 201
-                response == {
-                    "properties": {
-                        "privateLinkServiceConnectionState": {
-                            "description": "str",  # The description for the current
-                              state of a private endpoint connection. Required.
-                            "status": "str",  # The status of a private endpoint
-                              connection. Required. Known values are: "Pending", "Approved",
-                              "Rejected", and "Disconnected".
-                            "actionsRequired": "str"  # Optional. Actions required for a
-                              private endpoint connection.
-                        },
-                        "privateEndpoint": {
-                            "id": "str"  # Optional. The resource identifier.
-                        }
-                    },
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "name": "str",  # Optional. The name of the resource.
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
         """
 
     @distributed_trace
@@ -4698,10 +2394,9 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         resource_group_name: str,
         resource_name: str,
         private_endpoint_connection_name: str,
-        private_endpoint_connection: Union[JSON, IO[bytes]],
+        private_endpoint_connection: Union[_models.PrivateEndpointConnection, IO[bytes]],
         **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
+    ) -> LROPoller[_models.PrivateEndpointConnection]:
         """Create or update the status of a private endpoint connection with the specified name.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -4712,98 +2407,18 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         :param private_endpoint_connection_name: The name of the private endpoint connection. Required.
         :type private_endpoint_connection_name: str
         :param private_endpoint_connection: The private endpoint connection with updated properties. Is
-         either a JSON type or a IO[bytes] type. Required.
-        :type private_endpoint_connection: JSON or IO[bytes]
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
+         either a PrivateEndpointConnection type or a IO[bytes] type. Required.
+        :type private_endpoint_connection: ~iot_dps_client.models.PrivateEndpointConnection or
+         IO[bytes]
+        :return: An instance of LROPoller that returns PrivateEndpointConnection
+        :rtype: ~azure.core.polling.LROPoller[~iot_dps_client.models.PrivateEndpointConnection]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                private_endpoint_connection = {
-                    "properties": {
-                        "privateLinkServiceConnectionState": {
-                            "description": "str",  # The description for the current
-                              state of a private endpoint connection. Required.
-                            "status": "str",  # The status of a private endpoint
-                              connection. Required. Known values are: "Pending", "Approved",
-                              "Rejected", and "Disconnected".
-                            "actionsRequired": "str"  # Optional. Actions required for a
-                              private endpoint connection.
-                        },
-                        "privateEndpoint": {
-                            "id": "str"  # Optional. The resource identifier.
-                        }
-                    },
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "name": "str",  # Optional. The name of the resource.
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-
-                # response body for status code(s): 200, 201
-                response == {
-                    "properties": {
-                        "privateLinkServiceConnectionState": {
-                            "description": "str",  # The description for the current
-                              state of a private endpoint connection. Required.
-                            "status": "str",  # The status of a private endpoint
-                              connection. Required. Known values are: "Pending", "Approved",
-                              "Rejected", and "Disconnected".
-                            "actionsRequired": "str"  # Optional. Actions required for a
-                              private endpoint connection.
-                        },
-                        "privateEndpoint": {
-                            "id": "str"  # Optional. The resource identifier.
-                        }
-                    },
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "name": "str",  # Optional. The name of the resource.
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
         """
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
         content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.PrivateEndpointConnection] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -4822,11 +2437,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
-            response = pipeline_response.http_response
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("PrivateEndpointConnection", pipeline_response)
             if cls:
                 return cls(pipeline_response, deserialized, {})  # type: ignore
             return deserialized
@@ -4840,17 +2451,19 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[JSON].from_continuation_token(
+            return LROPoller[_models.PrivateEndpointConnection].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
+        return LROPoller[_models.PrivateEndpointConnection](
+            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
+        )
 
     def _delete_private_endpoint_connection_initial(  # pylint: disable=name-too-long
         self, resource_group_name: str, resource_name: str, private_endpoint_connection_name: str, **kwargs: Any
-    ) -> Optional[JSON]:
+    ) -> Optional[_models.PrivateEndpointConnection]:
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
             404: ResourceNotFoundError,
@@ -4862,7 +2475,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[Optional[JSON]] = kwargs.pop("cls", None)
+        cls: ClsType[Optional[_models.PrivateEndpointConnection]] = kwargs.pop("cls", None)
 
         _request = build_iot_dps_resource_delete_private_endpoint_connection_request(
             resource_group_name=resource_group_name,
@@ -4886,24 +2499,19 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
         deserialized = None
         response_headers = {}
         if response.status_code == 200:
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("PrivateEndpointConnection", pipeline_response)
 
         if response.status_code == 202:
             response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
             response_headers["Retry-After"] = self._deserialize("int", response.headers.get("Retry-After"))
 
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("PrivateEndpointConnection", pipeline_response)
 
         if cls:
             return cls(pipeline_response, deserialized, response_headers)  # type: ignore
@@ -4913,8 +2521,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
     @distributed_trace
     def begin_delete_private_endpoint_connection(
         self, resource_group_name: str, resource_name: str, private_endpoint_connection_name: str, **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
+    ) -> LROPoller[_models.PrivateEndpointConnection]:
         """Delete private endpoint connection with the specified name.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -4924,56 +2531,14 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         :type resource_name: str
         :param private_endpoint_connection_name: The name of the private endpoint connection. Required.
         :type private_endpoint_connection_name: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :return: An instance of LROPoller that returns PrivateEndpointConnection
+        :rtype: ~azure.core.polling.LROPoller[~iot_dps_client.models.PrivateEndpointConnection]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200, 202
-                response == {
-                    "properties": {
-                        "privateLinkServiceConnectionState": {
-                            "description": "str",  # The description for the current
-                              state of a private endpoint connection. Required.
-                            "status": "str",  # The status of a private endpoint
-                              connection. Required. Known values are: "Pending", "Approved",
-                              "Rejected", and "Disconnected".
-                            "actionsRequired": "str"  # Optional. Actions required for a
-                              private endpoint connection.
-                        },
-                        "privateEndpoint": {
-                            "id": "str"  # Optional. The resource identifier.
-                        }
-                    },
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "name": "str",  # Optional. The name of the resource.
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
         """
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.PrivateEndpointConnection] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -4990,11 +2555,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
-            response = pipeline_response.http_response
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
+            deserialized = self._deserialize("PrivateEndpointConnection", pipeline_response)
             if cls:
                 return cls(pipeline_response, deserialized, {})  # type: ignore
             return deserialized
@@ -5008,17 +2569,20 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[JSON].from_continuation_token(
+            return LROPoller[_models.PrivateEndpointConnection].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
+        return LROPoller[_models.PrivateEndpointConnection](
+            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
+        )
 
     @distributed_trace
-    def list_private_link_resources(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> JSON:
-        # pylint: disable=line-too-long
+    def list_private_link_resources(
+        self, resource_group_name: str, resource_name: str, **kwargs: Any
+    ) -> _models.PrivateLinkResources:
         """List private link resources for the given provisioning service.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -5026,54 +2590,9 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         :type resource_group_name: str
         :param resource_name: Name of the provisioning service to retrieve. Required.
         :type resource_name: str
-        :return: JSON object
-        :rtype: JSON
+        :return: PrivateLinkResources
+        :rtype: ~iot_dps_client.models.PrivateLinkResources
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "value": [
-                        {
-                            "properties": {
-                                "groupId": "str",  # Optional. The group id.
-                                "requiredMembers": [
-                                    "str"  # Optional. The required members for a
-                                      specific group id.
-                                ],
-                                "requiredZoneNames": [
-                                    "str"  # Optional. The required DNS zones for
-                                      a specific group id.
-                                ]
-                            },
-                            "id": "str",  # Optional. Fully qualified resource ID for the
-                              resource. Ex -
-                              /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                            "name": "str",  # Optional. The name of the resource.
-                            "systemData": {
-                                "createdAt": "2020-02-20 00:00:00",  # Optional. The
-                                  timestamp of resource creation (UTC).
-                                "createdBy": "str",  # Optional. The identity that
-                                  created the resource.
-                                "createdByType": "str",  # Optional. The type of
-                                  identity that created the resource. Known values are: "User",
-                                  "Application", "ManagedIdentity", and "Key".
-                                "lastModifiedAt": "2020-02-20 00:00:00",  # Optional.
-                                  The timestamp of resource last modification (UTC).
-                                "lastModifiedBy": "str",  # Optional. The identity
-                                  that last modified the resource.
-                                "lastModifiedByType": "str"  # Optional. The type of
-                                  identity that last modified the resource. Known values are: "User",
-                                  "Application", "ManagedIdentity", and "Key".
-                            },
-                            "type": "str"  # Optional. The type of the resource. E.g.
-                              "Microsoft.Compute/virtualMachines" or
-                              "Microsoft.Storage/storageAccounts".
-                        }
-                    ]
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -5086,7 +2605,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.PrivateLinkResources] = kwargs.pop("cls", None)
 
         _request = build_iot_dps_resource_list_private_link_resources_request(
             resource_group_name=resource_group_name,
@@ -5109,23 +2628,20 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("PrivateLinkResources", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @distributed_trace
     def get_private_link_resources(
         self, resource_group_name: str, resource_name: str, group_id: str, **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+    ) -> _models.GroupIdInformation:
         """Get the specified private link resource for the given provisioning service.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -5135,48 +2651,9 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         :type resource_name: str
         :param group_id: The name of the private link resource. Required.
         :type group_id: str
-        :return: JSON object
-        :rtype: JSON
+        :return: GroupIdInformation
+        :rtype: ~iot_dps_client.models.GroupIdInformation
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "properties": {
-                        "groupId": "str",  # Optional. The group id.
-                        "requiredMembers": [
-                            "str"  # Optional. The required members for a specific group
-                              id.
-                        ],
-                        "requiredZoneNames": [
-                            "str"  # Optional. The required DNS zones for a specific
-                              group id.
-                        ]
-                    },
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "name": "str",  # Optional. The name of the resource.
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -5189,7 +2666,7 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.GroupIdInformation] = kwargs.pop("cls", None)
 
         _request = build_iot_dps_resource_get_private_link_resources_request(
             resource_group_name=resource_group_name,
@@ -5213,22 +2690,20 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("GroupIdInformation", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @distributed_trace
     def list_valid_skus(
         self, resource_group_name: str, provisioning_service_name: str, **kwargs: Any
-    ) -> Iterable[JSON]:
+    ) -> Iterable["_models.IotDpsSkuDefinition"]:
         """Gets the list of valid SKUs and tiers for a provisioning service.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -5236,22 +2711,16 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
         :type resource_group_name: str
         :param provisioning_service_name: Name of the provisioning service to retrieve. Required.
         :type provisioning_service_name: str
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.paging.ItemPaged[JSON]
+        :return: An iterator like instance of IotDpsSkuDefinition
+        :rtype: ~azure.core.paging.ItemPaged[~iot_dps_client.models.IotDpsSkuDefinition]
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "name": "str"  # Optional. Sku name. "S1"
-                }
         """
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models._models.IotDpsSkuDefinitionListResult] = kwargs.pop(  # pylint: disable=protected-access
+            "cls", None
+        )
 
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -5292,11 +2761,13 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
             return _request
 
         def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
+            deserialized = self._deserialize(
+                _models._models.IotDpsSkuDefinitionListResult, pipeline_response  # pylint: disable=protected-access
+            )
+            list_of_elem = deserialized.value
             if cls:
                 list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, iter(list_of_elem)
+            return deserialized.next_link or None, iter(list_of_elem)
 
         def get_next(next_link=None):
             _request = prepare_request(next_link)
@@ -5311,7 +2782,8 @@ class IotDpsResourceOperations:  # pylint: disable=too-many-public-methods
                 if _stream:
                     response.read()  # Load the body in memory and close the socket
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+                error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -5328,6 +2800,8 @@ class DpsCertificateOperations:
         :attr:`dps_certificate` attribute.
     """
 
+    models = _models
+
     def __init__(self, *args, **kwargs):
         input_args = list(args)
         self._client = input_args.pop(0) if input_args else kwargs.pop("client")
@@ -5336,8 +2810,9 @@ class DpsCertificateOperations:
         self._deserialize = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
     @distributed_trace
-    def list(self, resource_group_name: str, provisioning_service_name: str, **kwargs: Any) -> JSON:
-        # pylint: disable=line-too-long
+    def list(
+        self, resource_group_name: str, provisioning_service_name: str, **kwargs: Any
+    ) -> _models.CertificateListDescription:
         """Get all the certificates tied to the provisioning service.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -5345,61 +2820,9 @@ class DpsCertificateOperations:
         :type resource_group_name: str
         :param provisioning_service_name: Name of the provisioning service to retrieve. Required.
         :type provisioning_service_name: str
-        :return: JSON object
-        :rtype: JSON
+        :return: CertificateListDescription
+        :rtype: ~iot_dps_client.models.CertificateListDescription
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "value": [
-                        {
-                            "etag": "str",  # Optional. The entity tag.
-                            "id": "str",  # Optional. Fully qualified resource ID for the
-                              resource. Ex -
-                              /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                            "name": "str",  # Optional. The name of the resource.
-                            "properties": {
-                                "certificate": bytes("bytes", encoding="utf-8"),  #
-                                  Optional. base-64 representation of X509 certificate .cer file or
-                                  just .pem file content.
-                                "created": "str",  # Optional. The certificate's
-                                  creation date and time.
-                                "expiry": "str",  # Optional. The certificate's
-                                  expiration date and time.
-                                "isVerified": bool,  # Optional. Determines whether
-                                  certificate has been verified.
-                                "subject": "str",  # Optional. The certificate's
-                                  subject name.
-                                "thumbprint": "str",  # Optional. The certificate's
-                                  thumbprint.
-                                "updated": "str"  # Optional. The certificate's last
-                                  update date and time.
-                            },
-                            "systemData": {
-                                "createdAt": "2020-02-20 00:00:00",  # Optional. The
-                                  timestamp of resource creation (UTC).
-                                "createdBy": "str",  # Optional. The identity that
-                                  created the resource.
-                                "createdByType": "str",  # Optional. The type of
-                                  identity that created the resource. Known values are: "User",
-                                  "Application", "ManagedIdentity", and "Key".
-                                "lastModifiedAt": "2020-02-20 00:00:00",  # Optional.
-                                  The timestamp of resource last modification (UTC).
-                                "lastModifiedBy": "str",  # Optional. The identity
-                                  that last modified the resource.
-                                "lastModifiedByType": "str"  # Optional. The type of
-                                  identity that last modified the resource. Known values are: "User",
-                                  "Application", "ManagedIdentity", and "Key".
-                            },
-                            "type": "str"  # Optional. The type of the resource. E.g.
-                              "Microsoft.Compute/virtualMachines" or
-                              "Microsoft.Storage/storageAccounts".
-                        }
-                    ]
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -5412,7 +2835,7 @@ class DpsCertificateOperations:
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.CertificateListDescription] = kwargs.pop("cls", None)
 
         _request = build_dps_certificate_list_request(
             resource_group_name=resource_group_name,
@@ -5435,17 +2858,15 @@ class DpsCertificateOperations:
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("CertificateListDescription", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @distributed_trace
     def get(
@@ -5457,8 +2878,7 @@ class DpsCertificateOperations:
         etag: Optional[str] = None,
         match_condition: Optional[MatchConditions] = None,
         **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+    ) -> _models.CertificateResponse:
         """Get the certificate from the provisioning service.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -5473,52 +2893,9 @@ class DpsCertificateOperations:
         :paramtype etag: str
         :keyword match_condition: The match condition to use upon the etag. Default value is None.
         :paramtype match_condition: ~azure.core.MatchConditions
-        :return: JSON object
-        :rtype: JSON
+        :return: CertificateResponse
+        :rtype: ~iot_dps_client.models.CertificateResponse
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "etag": "str",  # Optional. The entity tag.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "certificate": bytes("bytes", encoding="utf-8"),  # Optional. base-64
-                          representation of X509 certificate .cer file or just .pem file content.
-                        "created": "str",  # Optional. The certificate's creation date and
-                          time.
-                        "expiry": "str",  # Optional. The certificate's expiration date and
-                          time.
-                        "isVerified": bool,  # Optional. Determines whether certificate has
-                          been verified.
-                        "subject": "str",  # Optional. The certificate's subject name.
-                        "thumbprint": "str",  # Optional. The certificate's thumbprint.
-                        "updated": "str"  # Optional. The certificate's last update date and
-                          time.
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -5537,7 +2914,7 @@ class DpsCertificateOperations:
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.CertificateResponse] = kwargs.pop("cls", None)
 
         _request = build_dps_certificate_get_request(
             resource_group_name=resource_group_name,
@@ -5563,17 +2940,15 @@ class DpsCertificateOperations:
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("CertificateResponse", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @overload
     def create_or_update(
@@ -5581,14 +2956,13 @@ class DpsCertificateOperations:
         resource_group_name: str,
         provisioning_service_name: str,
         certificate_name: str,
-        certificate_description: JSON,
+        certificate_description: _models.CertificateResponse,
         *,
         content_type: str = "application/json",
         etag: Optional[str] = None,
         match_condition: Optional[MatchConditions] = None,
         **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+    ) -> _models.CertificateResponse:
         """Add new certificate or update an existing certificate.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -5599,7 +2973,7 @@ class DpsCertificateOperations:
         :param certificate_name: Name of the certificate to retrieve. Required.
         :type certificate_name: str
         :param certificate_description: The certificate body. Required.
-        :type certificate_description: JSON
+        :type certificate_description: ~iot_dps_client.models.CertificateResponse
         :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
          Default value is "application/json".
         :paramtype content_type: str
@@ -5608,92 +2982,9 @@ class DpsCertificateOperations:
         :paramtype etag: str
         :keyword match_condition: The match condition to use upon the etag. Default value is None.
         :paramtype match_condition: ~azure.core.MatchConditions
-        :return: JSON object
-        :rtype: JSON
+        :return: CertificateResponse
+        :rtype: ~iot_dps_client.models.CertificateResponse
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                certificate_description = {
-                    "etag": "str",  # Optional. The entity tag.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "certificate": bytes("bytes", encoding="utf-8"),  # Optional. base-64
-                          representation of X509 certificate .cer file or just .pem file content.
-                        "created": "str",  # Optional. The certificate's creation date and
-                          time.
-                        "expiry": "str",  # Optional. The certificate's expiration date and
-                          time.
-                        "isVerified": bool,  # Optional. Determines whether certificate has
-                          been verified.
-                        "subject": "str",  # Optional. The certificate's subject name.
-                        "thumbprint": "str",  # Optional. The certificate's thumbprint.
-                        "updated": "str"  # Optional. The certificate's last update date and
-                          time.
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "etag": "str",  # Optional. The entity tag.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "certificate": bytes("bytes", encoding="utf-8"),  # Optional. base-64
-                          representation of X509 certificate .cer file or just .pem file content.
-                        "created": "str",  # Optional. The certificate's creation date and
-                          time.
-                        "expiry": "str",  # Optional. The certificate's expiration date and
-                          time.
-                        "isVerified": bool,  # Optional. Determines whether certificate has
-                          been verified.
-                        "subject": "str",  # Optional. The certificate's subject name.
-                        "thumbprint": "str",  # Optional. The certificate's thumbprint.
-                        "updated": "str"  # Optional. The certificate's last update date and
-                          time.
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
         """
 
     @overload
@@ -5708,8 +2999,7 @@ class DpsCertificateOperations:
         etag: Optional[str] = None,
         match_condition: Optional[MatchConditions] = None,
         **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+    ) -> _models.CertificateResponse:
         """Add new certificate or update an existing certificate.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -5729,52 +3019,9 @@ class DpsCertificateOperations:
         :paramtype etag: str
         :keyword match_condition: The match condition to use upon the etag. Default value is None.
         :paramtype match_condition: ~azure.core.MatchConditions
-        :return: JSON object
-        :rtype: JSON
+        :return: CertificateResponse
+        :rtype: ~iot_dps_client.models.CertificateResponse
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "etag": "str",  # Optional. The entity tag.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "certificate": bytes("bytes", encoding="utf-8"),  # Optional. base-64
-                          representation of X509 certificate .cer file or just .pem file content.
-                        "created": "str",  # Optional. The certificate's creation date and
-                          time.
-                        "expiry": "str",  # Optional. The certificate's expiration date and
-                          time.
-                        "isVerified": bool,  # Optional. Determines whether certificate has
-                          been verified.
-                        "subject": "str",  # Optional. The certificate's subject name.
-                        "thumbprint": "str",  # Optional. The certificate's thumbprint.
-                        "updated": "str"  # Optional. The certificate's last update date and
-                          time.
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
         """
 
     @distributed_trace
@@ -5783,13 +3030,12 @@ class DpsCertificateOperations:
         resource_group_name: str,
         provisioning_service_name: str,
         certificate_name: str,
-        certificate_description: Union[JSON, IO[bytes]],
+        certificate_description: Union[_models.CertificateResponse, IO[bytes]],
         *,
         etag: Optional[str] = None,
         match_condition: Optional[MatchConditions] = None,
         **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+    ) -> _models.CertificateResponse:
         """Add new certificate or update an existing certificate.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -5799,100 +3045,17 @@ class DpsCertificateOperations:
         :type provisioning_service_name: str
         :param certificate_name: Name of the certificate to retrieve. Required.
         :type certificate_name: str
-        :param certificate_description: The certificate body. Is either a JSON type or a IO[bytes]
-         type. Required.
-        :type certificate_description: JSON or IO[bytes]
+        :param certificate_description: The certificate body. Is either a CertificateResponse type or a
+         IO[bytes] type. Required.
+        :type certificate_description: ~iot_dps_client.models.CertificateResponse or IO[bytes]
         :keyword etag: check if resource is changed. Set None to skip checking etag. Default value is
          None.
         :paramtype etag: str
         :keyword match_condition: The match condition to use upon the etag. Default value is None.
         :paramtype match_condition: ~azure.core.MatchConditions
-        :return: JSON object
-        :rtype: JSON
+        :return: CertificateResponse
+        :rtype: ~iot_dps_client.models.CertificateResponse
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                certificate_description = {
-                    "etag": "str",  # Optional. The entity tag.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "certificate": bytes("bytes", encoding="utf-8"),  # Optional. base-64
-                          representation of X509 certificate .cer file or just .pem file content.
-                        "created": "str",  # Optional. The certificate's creation date and
-                          time.
-                        "expiry": "str",  # Optional. The certificate's expiration date and
-                          time.
-                        "isVerified": bool,  # Optional. Determines whether certificate has
-                          been verified.
-                        "subject": "str",  # Optional. The certificate's subject name.
-                        "thumbprint": "str",  # Optional. The certificate's thumbprint.
-                        "updated": "str"  # Optional. The certificate's last update date and
-                          time.
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "etag": "str",  # Optional. The entity tag.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "certificate": bytes("bytes", encoding="utf-8"),  # Optional. base-64
-                          representation of X509 certificate .cer file or just .pem file content.
-                        "created": "str",  # Optional. The certificate's creation date and
-                          time.
-                        "expiry": "str",  # Optional. The certificate's expiration date and
-                          time.
-                        "isVerified": bool,  # Optional. Determines whether certificate has
-                          been verified.
-                        "subject": "str",  # Optional. The certificate's subject name.
-                        "thumbprint": "str",  # Optional. The certificate's thumbprint.
-                        "updated": "str"  # Optional. The certificate's last update date and
-                          time.
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -5912,7 +3075,7 @@ class DpsCertificateOperations:
         _params = kwargs.pop("params", {}) or {}
 
         content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.CertificateResponse] = kwargs.pop("cls", None)
 
         content_type = content_type or "application/json"
         _json = None
@@ -5920,7 +3083,7 @@ class DpsCertificateOperations:
         if isinstance(certificate_description, (IOBase, bytes)):
             _content = certificate_description
         else:
-            _json = certificate_description
+            _json = self._serialize.body(certificate_description, "CertificateResponse")
 
         _request = build_dps_certificate_create_or_update_request(
             resource_group_name=resource_group_name,
@@ -5949,17 +3112,15 @@ class DpsCertificateOperations:
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("CertificateResponse", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @distributed_trace
     def delete(  # pylint: disable=inconsistent-return-statements
@@ -5973,7 +3134,7 @@ class DpsCertificateOperations:
         certificate_name1: Optional[str] = None,
         certificate_raw_bytes: Optional[bytes] = None,
         certificate_is_verified: Optional[bool] = None,
-        certificate_purpose: Optional[str] = None,
+        certificate_purpose: Optional[Union[str, _models.CertificatePurpose]] = None,
         certificate_created: Optional[datetime.datetime] = None,
         certificate_last_updated: Optional[datetime.datetime] = None,
         certificate_has_private_key: Optional[bool] = None,
@@ -6003,7 +3164,7 @@ class DpsCertificateOperations:
         :paramtype certificate_is_verified: bool
         :keyword certificate_purpose: A description that mentions the purpose of the certificate. Known
          values are: "clientAuthentication" and "serverAuthentication". Default value is None.
-        :paramtype certificate_purpose: str
+        :paramtype certificate_purpose: str or ~iot_dps_client.models.CertificatePurpose
         :keyword certificate_created: Time the certificate is created. Default value is None.
         :paramtype certificate_created: ~datetime.datetime
         :keyword certificate_last_updated: Certificate last updated time. Default value is None.
@@ -6069,7 +3230,8 @@ class DpsCertificateOperations:
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
         if cls:
             return cls(pipeline_response, None, {})  # type: ignore
@@ -6086,14 +3248,13 @@ class DpsCertificateOperations:
         certificate_name1: Optional[str] = None,
         certificate_raw_bytes: Optional[bytes] = None,
         certificate_is_verified: Optional[bool] = None,
-        certificate_purpose: Optional[str] = None,
+        certificate_purpose: Optional[Union[str, _models.CertificatePurpose]] = None,
         certificate_created: Optional[datetime.datetime] = None,
         certificate_last_updated: Optional[datetime.datetime] = None,
         certificate_has_private_key: Optional[bool] = None,
         certificate_nonce: Optional[str] = None,
         **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+    ) -> _models.VerificationCodeResponse:
         """Generate verification code for Proof of Possession.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -6116,7 +3277,7 @@ class DpsCertificateOperations:
         :paramtype certificate_is_verified: bool
         :keyword certificate_purpose: Description mentioning the purpose of the certificate. Known
          values are: "clientAuthentication" and "serverAuthentication". Default value is None.
-        :paramtype certificate_purpose: str
+        :paramtype certificate_purpose: str or ~iot_dps_client.models.CertificatePurpose
         :keyword certificate_created: Time the certificate is created. Default value is None.
         :paramtype certificate_created: ~datetime.datetime
         :keyword certificate_last_updated: Certificate last updated time. Default value is None.
@@ -6127,32 +3288,9 @@ class DpsCertificateOperations:
         :keyword certificate_nonce: Random number generated to indicate Proof of Possession. Default
          value is None.
         :paramtype certificate_nonce: str
-        :return: JSON object
-        :rtype: JSON
+        :return: VerificationCodeResponse
+        :rtype: ~iot_dps_client.models.VerificationCodeResponse
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "etag": "str",  # Optional. Request etag.
-                    "id": "str",  # Optional. The resource identifier.
-                    "name": "str",  # Optional. Name of certificate.
-                    "properties": {
-                        "certificate": bytes("bytes", encoding="utf-8"),  # Optional. base-64
-                          representation of X509 certificate .cer file or just .pem file content.
-                        "created": "str",  # Optional. Certificate created time.
-                        "expiry": "str",  # Optional. Code expiry.
-                        "isVerified": bool,  # Optional. Indicate if the certificate is
-                          verified by owner of private key.
-                        "subject": "str",  # Optional. Certificate subject.
-                        "thumbprint": "str",  # Optional. Certificate thumbprint.
-                        "updated": "str",  # Optional. Certificate updated time.
-                        "verificationCode": "str"  # Optional. Verification code.
-                    },
-                    "type": "str"  # Optional. The resource type.
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -6171,7 +3309,7 @@ class DpsCertificateOperations:
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.VerificationCodeResponse] = kwargs.pop("cls", None)
 
         _request = build_dps_certificate_generate_verification_code_request(
             resource_group_name=resource_group_name,
@@ -6205,17 +3343,15 @@ class DpsCertificateOperations:
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("VerificationCodeResponse", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @overload
     def verify_certificate(
@@ -6223,22 +3359,21 @@ class DpsCertificateOperations:
         resource_group_name: str,
         provisioning_service_name: str,
         certificate_name: str,
-        request: JSON,
+        request: _models.VerificationCodeRequest,
         *,
         etag: str,
         match_condition: MatchConditions,
         certificate_name1: Optional[str] = None,
         certificate_raw_bytes: Optional[bytes] = None,
         certificate_is_verified: Optional[bool] = None,
-        certificate_purpose: Optional[str] = None,
+        certificate_purpose: Optional[Union[str, _models.CertificatePurpose]] = None,
         certificate_created: Optional[datetime.datetime] = None,
         certificate_last_updated: Optional[datetime.datetime] = None,
         certificate_has_private_key: Optional[bool] = None,
         certificate_nonce: Optional[str] = None,
         content_type: str = "application/json",
         **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+    ) -> _models.CertificateResponse:
         """Verifies the certificate's private key possession by providing the leaf cert issued by the
         verifying pre uploaded certificate.
 
@@ -6250,7 +3385,7 @@ class DpsCertificateOperations:
         :param certificate_name: Name of the certificate to retrieve. Required.
         :type certificate_name: str
         :param request: The name of the certificate. Required.
-        :type request: JSON
+        :type request: ~iot_dps_client.models.VerificationCodeRequest
         :keyword etag: check if resource is changed. Set None to skip checking etag. Required.
         :paramtype etag: str
         :keyword match_condition: The match condition to use upon the etag. Required.
@@ -6264,7 +3399,7 @@ class DpsCertificateOperations:
         :paramtype certificate_is_verified: bool
         :keyword certificate_purpose: Describe the purpose of the certificate. Known values are:
          "clientAuthentication" and "serverAuthentication". Default value is None.
-        :paramtype certificate_purpose: str
+        :paramtype certificate_purpose: str or ~iot_dps_client.models.CertificatePurpose
         :keyword certificate_created: Time the certificate is created. Default value is None.
         :paramtype certificate_created: ~datetime.datetime
         :keyword certificate_last_updated: Certificate last updated time. Default value is None.
@@ -6278,58 +3413,9 @@ class DpsCertificateOperations:
         :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
+        :return: CertificateResponse
+        :rtype: ~iot_dps_client.models.CertificateResponse
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                request = {
-                    "certificate": "str"  # Optional. base-64 representation of X509 certificate
-                      .cer file or just .pem file content.
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "etag": "str",  # Optional. The entity tag.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "certificate": bytes("bytes", encoding="utf-8"),  # Optional. base-64
-                          representation of X509 certificate .cer file or just .pem file content.
-                        "created": "str",  # Optional. The certificate's creation date and
-                          time.
-                        "expiry": "str",  # Optional. The certificate's expiration date and
-                          time.
-                        "isVerified": bool,  # Optional. Determines whether certificate has
-                          been verified.
-                        "subject": "str",  # Optional. The certificate's subject name.
-                        "thumbprint": "str",  # Optional. The certificate's thumbprint.
-                        "updated": "str"  # Optional. The certificate's last update date and
-                          time.
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
         """
 
     @overload
@@ -6345,15 +3431,14 @@ class DpsCertificateOperations:
         certificate_name1: Optional[str] = None,
         certificate_raw_bytes: Optional[bytes] = None,
         certificate_is_verified: Optional[bool] = None,
-        certificate_purpose: Optional[str] = None,
+        certificate_purpose: Optional[Union[str, _models.CertificatePurpose]] = None,
         certificate_created: Optional[datetime.datetime] = None,
         certificate_last_updated: Optional[datetime.datetime] = None,
         certificate_has_private_key: Optional[bool] = None,
         certificate_nonce: Optional[str] = None,
         content_type: str = "application/json",
         **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+    ) -> _models.CertificateResponse:
         """Verifies the certificate's private key possession by providing the leaf cert issued by the
         verifying pre uploaded certificate.
 
@@ -6379,7 +3464,7 @@ class DpsCertificateOperations:
         :paramtype certificate_is_verified: bool
         :keyword certificate_purpose: Describe the purpose of the certificate. Known values are:
          "clientAuthentication" and "serverAuthentication". Default value is None.
-        :paramtype certificate_purpose: str
+        :paramtype certificate_purpose: str or ~iot_dps_client.models.CertificatePurpose
         :keyword certificate_created: Time the certificate is created. Default value is None.
         :paramtype certificate_created: ~datetime.datetime
         :keyword certificate_last_updated: Certificate last updated time. Default value is None.
@@ -6393,52 +3478,9 @@ class DpsCertificateOperations:
         :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
          Default value is "application/json".
         :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
+        :return: CertificateResponse
+        :rtype: ~iot_dps_client.models.CertificateResponse
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "etag": "str",  # Optional. The entity tag.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "certificate": bytes("bytes", encoding="utf-8"),  # Optional. base-64
-                          representation of X509 certificate .cer file or just .pem file content.
-                        "created": "str",  # Optional. The certificate's creation date and
-                          time.
-                        "expiry": "str",  # Optional. The certificate's expiration date and
-                          time.
-                        "isVerified": bool,  # Optional. Determines whether certificate has
-                          been verified.
-                        "subject": "str",  # Optional. The certificate's subject name.
-                        "thumbprint": "str",  # Optional. The certificate's thumbprint.
-                        "updated": "str"  # Optional. The certificate's last update date and
-                          time.
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
         """
 
     @distributed_trace
@@ -6447,21 +3489,20 @@ class DpsCertificateOperations:
         resource_group_name: str,
         provisioning_service_name: str,
         certificate_name: str,
-        request: Union[JSON, IO[bytes]],
+        request: Union[_models.VerificationCodeRequest, IO[bytes]],
         *,
         etag: str,
         match_condition: MatchConditions,
         certificate_name1: Optional[str] = None,
         certificate_raw_bytes: Optional[bytes] = None,
         certificate_is_verified: Optional[bool] = None,
-        certificate_purpose: Optional[str] = None,
+        certificate_purpose: Optional[Union[str, _models.CertificatePurpose]] = None,
         certificate_created: Optional[datetime.datetime] = None,
         certificate_last_updated: Optional[datetime.datetime] = None,
         certificate_has_private_key: Optional[bool] = None,
         certificate_nonce: Optional[str] = None,
         **kwargs: Any
-    ) -> JSON:
-        # pylint: disable=line-too-long
+    ) -> _models.CertificateResponse:
         """Verifies the certificate's private key possession by providing the leaf cert issued by the
         verifying pre uploaded certificate.
 
@@ -6472,9 +3513,9 @@ class DpsCertificateOperations:
         :type provisioning_service_name: str
         :param certificate_name: Name of the certificate to retrieve. Required.
         :type certificate_name: str
-        :param request: The name of the certificate. Is either a JSON type or a IO[bytes] type.
-         Required.
-        :type request: JSON or IO[bytes]
+        :param request: The name of the certificate. Is either a VerificationCodeRequest type or a
+         IO[bytes] type. Required.
+        :type request: ~iot_dps_client.models.VerificationCodeRequest or IO[bytes]
         :keyword etag: check if resource is changed. Set None to skip checking etag. Required.
         :paramtype etag: str
         :keyword match_condition: The match condition to use upon the etag. Required.
@@ -6488,7 +3529,7 @@ class DpsCertificateOperations:
         :paramtype certificate_is_verified: bool
         :keyword certificate_purpose: Describe the purpose of the certificate. Known values are:
          "clientAuthentication" and "serverAuthentication". Default value is None.
-        :paramtype certificate_purpose: str
+        :paramtype certificate_purpose: str or ~iot_dps_client.models.CertificatePurpose
         :keyword certificate_created: Time the certificate is created. Default value is None.
         :paramtype certificate_created: ~datetime.datetime
         :keyword certificate_last_updated: Certificate last updated time. Default value is None.
@@ -6499,58 +3540,9 @@ class DpsCertificateOperations:
         :keyword certificate_nonce: Random number generated to indicate Proof of Possession. Default
          value is None.
         :paramtype certificate_nonce: str
-        :return: JSON object
-        :rtype: JSON
+        :return: CertificateResponse
+        :rtype: ~iot_dps_client.models.CertificateResponse
         :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                request = {
-                    "certificate": "str"  # Optional. base-64 representation of X509 certificate
-                      .cer file or just .pem file content.
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "etag": "str",  # Optional. The entity tag.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. Ex -
-                      /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}.
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "certificate": bytes("bytes", encoding="utf-8"),  # Optional. base-64
-                          representation of X509 certificate .cer file or just .pem file content.
-                        "created": "str",  # Optional. The certificate's creation date and
-                          time.
-                        "expiry": "str",  # Optional. The certificate's expiration date and
-                          time.
-                        "isVerified": bool,  # Optional. Determines whether certificate has
-                          been verified.
-                        "subject": "str",  # Optional. The certificate's subject name.
-                        "thumbprint": "str",  # Optional. The certificate's thumbprint.
-                        "updated": "str"  # Optional. The certificate's last update date and
-                          time.
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
         """
         error_map: MutableMapping[int, Type[HttpResponseError]] = {
             401: ClientAuthenticationError,
@@ -6570,7 +3562,7 @@ class DpsCertificateOperations:
         _params = kwargs.pop("params", {}) or {}
 
         content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_models.CertificateResponse] = kwargs.pop("cls", None)
 
         content_type = content_type or "application/json"
         _json = None
@@ -6578,7 +3570,7 @@ class DpsCertificateOperations:
         if isinstance(request, (IOBase, bytes)):
             _content = request
         else:
-            _json = request
+            _json = self._serialize.body(request, "VerificationCodeRequest")
 
         _request = build_dps_certificate_verify_certificate_request(
             resource_group_name=resource_group_name,
@@ -6615,14 +3607,12 @@ class DpsCertificateOperations:
             if _stream:
                 response.read()  # Load the body in memory and close the socket
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(_models.ErrorDetails, pipeline_response)
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
+        deserialized = self._deserialize("CertificateResponse", pipeline_response)
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
