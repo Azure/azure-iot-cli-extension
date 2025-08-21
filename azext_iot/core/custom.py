@@ -1,18 +1,23 @@
+# coding=utf-8
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-# pylint: disable=no-self-use,no-member,line-too-long,too-few-public-methods,too-many-lines,too-many-arguments,too-many-locals
-
+# pylint: disable=no-member,line-too-long,too-few-public-methods,too-many-lines,too-many-arguments,too-many-locals
+# TODO - CMS Preview - Remove / fix linting
+# flake8: noqa
 import json
 import re
+from datetime import timedelta
 from enum import Enum
+from typing import List, Optional
 from knack.log import get_logger
 from knack.util import CLIError
 from azure.core.exceptions import HttpResponseError
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
     BadRequestError,
+    CLIInternalError,
     InvalidArgumentValueError,
     RequiredArgumentMissingError,
     ResourceNotFoundError,
@@ -22,11 +27,12 @@ from azure.cli.core.commands import LongRunningOperation
 from azure.cli.core.util import sdk_no_wait
 from azure.cli.core.profiles._shared import AZURE_API_PROFILES, ResourceType
 
-from azure.mgmt.iothub.models import (IotHubSku,
+from azext_iot.sdk.iothub.mgmt.models import (IotHubSku,
                                       AccessRights,
+                                      AdrProperties,
                                       ArmIdentity,
                                       CertificateDescription,
-                                      CertificateProperties,
+                                      CertificateProperties as IotHubCertificateProperties,
                                       CertificateVerificationDescription,
                                       CloudToDeviceProperties,
                                       IotHubDescription,
@@ -53,7 +59,7 @@ from azure.mgmt.iothub.models import (IotHubSku,
                                       TestAllRoutesInput)
 
 
-from azure.mgmt.iothubprovisioningservices.models import (CertificateBodyDescription,
+from azext_iot.sdk.dps.mgmt.models import (CertificateProperties as DPSCertificateProperties,
                                                           ProvisioningServiceDescription,
                                                           IotDpsPropertiesDescription,
                                                           IotHubDefinitionDescription,
@@ -61,16 +67,25 @@ from azure.mgmt.iothubprovisioningservices.models import (CertificateBodyDescrip
                                                           IotDpsSku,
                                                           OperationInputs as DpsOperationInputs,
                                                           SharedAccessSignatureAuthorizationRuleAccessRightsDescription,
-                                                          VerificationCodeRequest)
+                                                          VerificationCodeRequest,
+                                                          DeviceRegistryNamespaceDescription,
+                                                          DeviceRegistryNamespaceAuthenticationType,
+                                                          ManagedServiceIdentity,
+                                                          ManagedServiceIdentityType,
+                                                          UserAssignedIdentity)
 
 
 from azure.mgmt.iotcentral.models import (AppSkuInfo,
                                           App)
-from azure.cli.command_modules.iot._constants import SYSTEM_ASSIGNED_IDENTITY
-from azure.cli.command_modules.iot.shared import EndpointType, EncodingFormat, RenewKeyType, AuthenticationType, IdentityType
+
+# Azure CLI core imports
+from azure.cli.command_modules.iot.shared import EndpointType, EncodingFormat, RenewKeyType, IdentityType
 from azure.cli.command_modules.iot._client_factory import resource_service_factory
 from azure.cli.command_modules.iot._client_factory import iot_hub_service_factory
 from azure.cli.command_modules.iot._utils import open_certificate
+
+from azext_iot.common.shared import AuthenticationType
+from azext_iot.iothub.common import SYSTEM_ASSIGNED_IDENTITY
 
 
 logger = get_logger(__name__)
@@ -78,6 +93,9 @@ logger = get_logger(__name__)
 # Identity types
 SYSTEM_ASSIGNED = 'SystemAssigned'
 NONE_IDENTITY = 'None'
+
+# Premium SKUs for P-tier hub functionality
+HUB_PREMIUM_SKUS = [IotHubSku.P1.value, IotHubSku.P2.value, IotHubSku.P3.value]
 
 
 # CUSTOM TYPE
@@ -109,31 +127,91 @@ def iot_dps_list(client, resource_group_name=None):
 def iot_dps_get(client, dps_name, resource_group_name=None):
     if resource_group_name is None:
         return _get_iot_dps_by_name(client, dps_name, resource_group_name)
-    return client.iot_dps_resource.get(dps_name, resource_group_name)
+    return client.iot_dps_resource.get(provisioning_service_name=dps_name, resource_group_name=resource_group_name)
 
 
-def iot_dps_create(cmd, client, dps_name, resource_group_name, location=None, sku=IotDpsSku.s1.value, unit=1, tags=None, enable_data_residency=None):
+def iot_dps_create(
+    cmd,
+    client,
+    dps_name,
+    resource_group_name,
+    location=None,
+    sku=IotDpsSku.s1.value,
+    unit=1,
+    tags=None,
+    enable_data_residency=None,
+    adr_ns_id=None,
+    adr_ns_identity_id=None,
+    mi_system_assigned=None,
+    mi_user_assigned=None,
+):
+    """
+    Create a DPS instance with support for Device Registry namespace.
+    This is an enhanced version of the Azure CLI core command with additional features.
+    """
     cli_ctx = cmd.cli_ctx
     _check_dps_name_availability(client.iot_dps_resource, dps_name)
     location = _ensure_location(cli_ctx, resource_group_name, location)
     dps_property = IotDpsPropertiesDescription(enable_data_residency=enable_data_residency)
-    dps_description = ProvisioningServiceDescription(location=location,
-                                                     properties=dps_property,
-                                                     sku=IotDpsSkuInfo(name=sku, capacity=unit),
-                                                     tags=tags)
+
+    # TODO - CMS Preview - DPS ADR properties
+    if adr_ns_id:
+        dps_property.device_registry_namespace = _configure_adr_namespace(
+            existing_namespace=None,
+            adr_ns_id=adr_ns_id,
+            adr_ns_identity_id=adr_ns_identity_id
+        )
+    elif adr_ns_identity_id:
+        # Error if identity provided without namespace ID
+        raise RequiredArgumentMissingError(
+            "Device Registry namespace id (--ns-resource-id) is required when specifying namespace user identity."
+        )
+
+    dps_description = IotDpsPropertiesDescription(
+        location=location,
+        properties=dps_property,
+        sku=IotDpsSkuInfo(name=sku, capacity=unit),
+        tags=tags,
+    )
+
+    if mi_system_assigned is not None or mi_user_assigned:
+        dps_description.identity = _construct_identity_info(mi_system_assigned, mi_user_assigned)
+
     return client.iot_dps_resource.begin_create_or_update(resource_group_name, dps_name, dps_description)
 
 
-def iot_dps_update(client, dps_name, parameters, resource_group_name=None, tags=None):
+def iot_dps_update(
+    client,
+    dps_name,
+    parameters,
+    resource_group_name=None,
+    tags=None,
+    adr_ns_id=None,
+    adr_ns_identity_id=None,
+    mi_system_assigned=None,
+    mi_user_assigned=None,
+):
     resource_group_name = _ensure_dps_resource_group_name(client, resource_group_name, dps_name)
     if tags is not None:
         parameters.tags = tags
+
+    # Update ADR namespace configuration if provided
+    if adr_ns_id or adr_ns_identity_id:
+        parameters.properties.device_registry_namespace = _configure_adr_namespace(
+            parameters.properties.device_registry_namespace,
+            adr_ns_id,
+            adr_ns_identity_id
+        )
+
+    if mi_system_assigned is not None or mi_user_assigned:
+        parameters.identity = _construct_identity_info(mi_system_assigned, mi_user_assigned)
+
     return client.iot_dps_resource.begin_create_or_update(resource_group_name, dps_name, parameters)
 
 
 def iot_dps_delete(client, dps_name, resource_group_name=None):
     resource_group_name = _ensure_dps_resource_group_name(client, resource_group_name, dps_name)
-    return client.iot_dps_resource.begin_delete(dps_name, resource_group_name)
+    return client.iot_dps_resource.begin_delete(resource_group_name, dps_name)
 
 
 # DPS policy methods
@@ -372,7 +450,7 @@ def iot_dps_certificate_create(client, dps_name, certificate_name, certificate_p
     certificate = open_certificate(certificate_path)
     if not certificate:
         raise CLIError("Error uploading certificate '{0}'.".format(certificate_path))
-    cert_description = CertificateBodyDescription(certificate=certificate, is_verified=is_verified)
+    cert_description = DPSCertificateProperties(certificate=certificate, is_verified=is_verified)
     return client.dps_certificate.create_or_update(resource_group_name, dps_name, certificate_name, cert_description)
 
 
@@ -384,7 +462,7 @@ def iot_dps_certificate_update(client, dps_name, certificate_name, certificate_p
             certificate = open_certificate(certificate_path)
             if not certificate:
                 raise CLIError("Error uploading certificate '{0}'.".format(certificate_path))
-            cert_description = CertificateBodyDescription(certificate=certificate, is_verified=is_verified)
+            cert_description = DPSCertificateProperties(certificate=certificate, is_verified=is_verified)
             return client.dps_certificate.create_or_update(resource_group_name, dps_name, certificate_name, cert_description, etag)
     raise CLIError("Certificate '{0}' does not exist. Use 'iot dps certificate create' to create a new certificate."
                    .format(certificate_name))
@@ -431,7 +509,7 @@ def iot_hub_certificate_create(client, hub_name, certificate_name, certificate_p
     certificate = open_certificate(certificate_path)
     if not certificate:
         raise CLIError("Error uploading certificate '{0}'.".format(certificate_path))
-    cert_properties = CertificateProperties(certificate=certificate, is_verified=is_verified)
+    cert_properties = IotHubCertificateProperties(certificate=certificate, is_verified=is_verified)
 
     if AZURE_API_PROFILES["latest"][ResourceType.MGMT_IOTHUB] in client.profile.label:
         cert_description = CertificateDescription(properties=cert_properties)
@@ -447,7 +525,7 @@ def iot_hub_certificate_update(client, hub_name, certificate_name, certificate_p
             certificate = open_certificate(certificate_path)
             if not certificate:
                 raise CLIError("Error uploading certificate '{0}'.".format(certificate_path))
-            cert_properties = CertificateProperties(certificate=certificate, is_verified=is_verified)
+            cert_properties = IotHubCertificateProperties(certificate=certificate, is_verified=is_verified)
 
             if AZURE_API_PROFILES["latest"][ResourceType.MGMT_IOTHUB] in client.profile.label:
                 cert_description = CertificateDescription(properties=cert_properties)
@@ -477,36 +555,47 @@ def iot_hub_certificate_verify(client, hub_name, certificate_name, certificate_p
 
 
 # pylint: disable=too-many-statements
-def iot_hub_create(cmd, client, hub_name, resource_group_name, location=None,
-                   sku=IotHubSku.s1.value,
-                   unit=1,
-                   partition_count=4,
-                   retention_day=1,
-                   c2d_ttl=1,
-                   c2d_max_delivery_count=10,
-                   disable_local_auth=None,
-                   disable_device_sas=None,
-                   disable_module_sas=None,
-                   enable_data_residency=None,
-                   feedback_lock_duration=5,
-                   feedback_ttl=1,
-                   feedback_max_delivery_count=10,
-                   enable_fileupload_notifications=False,
-                   fileupload_notification_lock_duration=5,
-                   fileupload_notification_max_delivery_count=10,
-                   fileupload_notification_ttl=1,
-                   fileupload_storage_connectionstring=None,
-                   fileupload_storage_container_name=None,
-                   fileupload_sas_ttl=1,
-                   fileupload_storage_authentication_type=None,
-                   fileupload_storage_identity=None,
-                   min_tls_version=None,
-                   tags=None,
-                   system_identity=None,
-                   user_identities=None,
-                   identity_role=None,
-                   identity_scopes=None):
-    from datetime import timedelta
+def iot_hub_create(
+    cmd,
+    client,
+    hub_name,
+    resource_group_name,
+    location=None,
+    sku=IotHubSku.S1.value,
+    unit=1,
+    partition_count=4,
+    retention_day=1,
+    c2d_ttl=1,
+    c2d_max_delivery_count=10,
+    disable_local_auth=None,
+    disable_device_sas=None,
+    disable_module_sas=None,
+    enable_data_residency=None,
+    feedback_lock_duration=5,
+    feedback_ttl=1,
+    feedback_max_delivery_count=10,
+    enable_fileupload_notifications=False,
+    fileupload_notification_lock_duration=5,
+    fileupload_notification_max_delivery_count=10,
+    fileupload_notification_ttl=1,
+    fileupload_storage_connectionstring=None,
+    fileupload_storage_container_name=None,
+    fileupload_sas_ttl=1,
+    fileupload_storage_authentication_type=None,
+    fileupload_storage_identity=None,
+    min_tls_version=None,
+    tags=None,
+    system_identity=None,
+    user_identities=None,
+    identity_role=None,
+    identity_scopes=None,
+    adr_ns_id=None,
+    adr_ns_identity_id=None,
+):
+    """
+    Create an IoT Hub with support for P-tier SKUs and ADR properties.
+    This is an enhanced version of the Azure CLI core command with additional features.
+    """
     cli_ctx = cmd.cli_ctx
     if enable_fileupload_notifications:
         if not fileupload_storage_connectionstring or not fileupload_storage_container_name:
@@ -566,6 +655,9 @@ def iot_hub_create(cmd, client, hub_name, resource_group_name, location=None,
                                   disable_module_sas=disable_module_sas)
     properties.enable_file_upload_notifications = enable_fileupload_notifications
 
+    # TODO - CMS Preview - Hub Create ADR property validation
+    _validate_and_set_adr_properties(properties, sku, adr_ns_id, adr_ns_identity_id)
+
     hub_description = IotHubDescription(location=location,
                                         sku=sku,
                                         properties=properties,
@@ -615,34 +707,38 @@ def iot_hub_list(client, resource_group_name=None):
 
 
 def update_iot_hub_custom(instance,
-                          sku=None,
-                          unit=None,
-                          retention_day=None,
-                          c2d_ttl=None,
-                          c2d_max_delivery_count=None,
-                          disable_local_auth=None,
-                          disable_device_sas=None,
-                          disable_module_sas=None,
-                          feedback_lock_duration=None,
-                          feedback_ttl=None,
-                          feedback_max_delivery_count=None,
-                          enable_fileupload_notifications=None,
-                          fileupload_notification_lock_duration=None,
-                          fileupload_notification_max_delivery_count=None,
-                          fileupload_notification_ttl=None,
-                          fileupload_storage_connectionstring=None,
-                          fileupload_storage_container_name=None,
-                          fileupload_sas_ttl=None,
-                          fileupload_storage_authentication_type=None,
-                          fileupload_storage_container_uri=None,
-                          fileupload_storage_identity=None,
-                          min_tls_version=None,
-                          tags=None):
-    from datetime import timedelta
+    sku=None,
+    unit=None,
+    retention_day=None,
+    c2d_ttl=None,
+    c2d_max_delivery_count=None,
+    disable_local_auth=None,
+    disable_device_sas=None,
+    disable_module_sas=None,
+    feedback_lock_duration=None,
+    feedback_ttl=None,
+    feedback_max_delivery_count=None,
+    enable_fileupload_notifications=None,
+    fileupload_notification_lock_duration=None,
+    fileupload_notification_max_delivery_count=None,
+    fileupload_notification_ttl=None,
+    fileupload_storage_connectionstring=None,
+    fileupload_storage_container_name=None,
+    fileupload_sas_ttl=None,
+    fileupload_storage_authentication_type=None,
+    fileupload_storage_container_uri=None,
+    fileupload_storage_identity=None,
+    min_tls_version=None,
+    tags=None,
+    # TODO - CMS Preview - Hub cannot update namespace resource ID
+    adr_ns_identity_id=None,
+):
+    """
+    Update an IoT Hub with support for P-tier SKUs and ADR properties.
+    This is an enhanced version of the Azure CLI core command with additional features.
+    """
     if tags is not None:
         instance.tags = tags
-    if sku is not None:
-        instance.sku.name = sku
     if unit is not None:
         instance.sku.capacity = unit
     if retention_day is not None:
@@ -704,6 +800,29 @@ def update_iot_hub_custom(instance,
         disable_device_sas=disable_device_sas,
         disable_module_sas=disable_module_sas
     )
+
+    # TODO - CMS Preview - Prevent p-tier SKU change
+    existing_sku_name = instance.sku.name
+    final_sku_name = sku or existing_sku_name
+
+    is_existing_p_tier = existing_sku_name in HUB_PREMIUM_SKUS
+    is_final_p_tier = final_sku_name in HUB_PREMIUM_SKUS
+
+    if sku and (is_existing_p_tier ^ is_final_p_tier):
+        raise InvalidArgumentValueError(
+            f"Cannot change IoT Hub SKU from {existing_sku_name} to {final_sku_name}."
+        )
+
+    # TODO - CMS Preview - Test updating only UAMI with/without existing namespace id
+    adr_namespace_resource_id = instance.adr_properties.namespace_resource_id if instance.adr_properties else None
+    _validate_and_set_adr_properties(
+        instance=instance,
+        sku=final_sku_name,
+        adr_namespace_resource_id=adr_namespace_resource_id,
+        adr_identity_resource_id=adr_ns_identity_id,
+    )
+    if sku is not None:
+        instance.sku.name = sku
     return instance
 
 
@@ -1224,11 +1343,11 @@ def iot_hub_manual_failover(cmd, client, hub_name, resource_group_name=None, no_
 def _get_iot_hub_by_name(client, hub_name):
     all_hubs = iot_hub_list(client)
     if all_hubs is None:
-        raise CLIError("No IoT Hub found in current subscription.")
+        raise CLIInternalError("No IoT Hub found in current subscription.")
     try:
         target_hub = next(x for x in all_hubs if hub_name.lower() == x.name.lower())
     except StopIteration:
-        raise CLIError("No IoT Hub found with name {} in current subscription.".format(hub_name))
+        raise CLIInternalError("No IoT Hub found with name {} in current subscription.".format(hub_name))
     return target_hub
 
 
@@ -1282,11 +1401,11 @@ def _is_linked_hub_existed(hubs, hub_name):
 def _get_iot_dps_by_name(client, dps_name, resource_group=None):
     all_dps = iot_dps_list(client, resource_group)
     if all_dps is None:
-        raise CLIError("No DPS found in current subscription.")
+        raise CLIInternalError("No DPS found in current subscription.")
     try:
         target_dps = next(x for x in all_dps if dps_name.lower() == x.name.lower())
     except StopIteration:
-        raise CLIError("No DPS found with name {} in current subscription.".format(dps_name))
+        raise CLIInternalError("No DPS found with name {} in current subscription.".format(dps_name))
     return target_dps
 
 
@@ -1299,7 +1418,7 @@ def _ensure_dps_resource_group_name(client, resource_group_name, dps_name):
 def _check_dps_name_availability(iot_dps_resource, dps_name):
     name_availability = iot_dps_resource.check_provisioning_service_name_availability(DpsOperationInputs(name=dps_name))
     if name_availability is not None and not name_availability.name_available:
-        raise CLIError(name_availability.message)
+        raise BadRequestError(name_availability.message)
 
 
 def _convert_rights_to_access_rights(right_list):
@@ -1683,3 +1802,151 @@ def _build_identity(system=False, identities=None):
         identity.user_assigned_identities = {i: {} for i in user_identities}  # pylint: disable=not-an-iterable
 
     return identity
+
+
+# TODO - CMS Preview - New methods
+# TODO - CMS Preview - Hub ADR property validation logic
+def _validate_and_set_adr_properties(instance: IotHubProperties, sku: str, adr_namespace_resource_id: str, adr_identity_resource_id: str):
+    """Validate and set Azure Device Registry properties for IoT Hub."""
+
+    if sku in HUB_PREMIUM_SKUS:
+        # P-tier hubs require both ADR properties
+        if not (adr_namespace_resource_id and adr_identity_resource_id):
+            raise RequiredArgumentMissingError(
+                "P-tier IoT Hubs require both ADR namespace resource ID (--adr-ns-id) and ADR identity resource ID (--adr-identity-id)."
+            )
+        instance.adr_properties = AdrProperties(
+            namespace_resource_id=adr_namespace_resource_id,
+            identity_resource_id=adr_identity_resource_id,
+        )
+    else:
+        # Non-P-tier hubs cannot have ADR properties
+        if adr_namespace_resource_id or adr_identity_resource_id:
+            raise InvalidArgumentValueError(
+                "ADR properties are only supported for P-tier IoT Hub SKUs."
+            )
+
+
+def _configure_adr_namespace(
+    existing_namespace: Optional[DeviceRegistryNamespaceDescription] = None,
+    adr_ns_id: Optional[str] = None,
+    adr_ns_identity_id: Optional[str] = None
+) -> DeviceRegistryNamespaceDescription:
+    # Create new namespace object if it doesn't exist
+    if not existing_namespace:
+        # namespace id is required when creating a new object
+        if not adr_ns_id:
+            raise RequiredArgumentMissingError(
+                "Device Registry namespace id (--ns-resource-id) is required when specifying namespace user identity."
+            )
+        adr_namespace_obj = DeviceRegistryNamespaceDescription(
+            resource_id=adr_ns_id, 
+            authentication_type=DeviceRegistryNamespaceAuthenticationType.SYSTEM_ASSIGNED.value
+        )
+    else:
+        adr_namespace_obj = existing_namespace
+
+    # Update namespace resource ID if provided
+    if adr_ns_id:
+        adr_namespace_obj.resource_id = adr_ns_id
+
+    # Update user identity ID if provided
+    if adr_ns_identity_id:
+        adr_namespace_obj.selected_user_assigned_identity_resource_id = adr_ns_identity_id
+
+    # Determine correct authentication type based on whether user identity is set
+    if adr_namespace_obj.selected_user_assigned_identity_resource_id:
+        adr_namespace_obj.authentication_type = DeviceRegistryNamespaceAuthenticationType.USER_ASSIGNED.value
+    else:
+        adr_namespace_obj.authentication_type = DeviceRegistryNamespaceAuthenticationType.SYSTEM_ASSIGNED.value
+
+    return adr_namespace_obj
+
+
+def _construct_identity_info(enable_system_identity, user_identities) -> ManagedServiceIdentity | None:
+    identity = None
+    if enable_system_identity and user_identities:
+        identity_type = ManagedServiceIdentityType.SYSTEM_ASSIGNED_USER_ASSIGNED
+    elif enable_system_identity:
+        identity_type = ManagedServiceIdentityType.SYSTEM_ASSIGNED
+    elif user_identities:
+        identity_type = ManagedServiceIdentityType.USER_ASSIGNED
+    else:
+        return identity
+
+    user_identities_dict = {}
+    if user_identities:
+        for identity_id in user_identities:
+            user_identities_dict[identity_id] = UserAssignedIdentity()
+
+    identity = ManagedServiceIdentity(
+        type=identity_type,
+        user_assigned_identities=user_identities_dict if user_identities else None
+    )
+    return identity
+
+
+# DPS Identity management functions
+def dps_identity_assign(client, dps_name: str, resource_group_name:Optional[str]=None,
+                        system_assigned:Optional[bool]=None, user_assigned:Optional[List[str]]=None):
+    resource_group_name = _ensure_dps_resource_group_name(client, resource_group_name, dps_name)
+    dps = client.iot_dps_resource.get(resource_group_name, dps_name)
+    
+    if system_assigned is None and user_assigned is None:
+        raise RequiredArgumentMissingError("Specify --system-assigned and/or --user-assigned")
+
+    existing_identity = dps.identity
+    enable_system = system_assigned or (existing_identity and existing_identity.type in [
+        ManagedServiceIdentityType.SYSTEM_ASSIGNED, 
+        ManagedServiceIdentityType.SYSTEM_ASSIGNED_USER_ASSIGNED
+    ])
+    
+    existing_user_identities = []
+    if existing_identity and existing_identity.user_assigned_identities:
+        existing_user_identities = list(existing_identity.user_assigned_identities.keys())
+    
+    new_user_identities = user_assigned or []
+    all_user_identities = list(set(existing_user_identities + new_user_identities))
+    
+    dps.identity = _construct_identity_info(enable_system, all_user_identities if all_user_identities else None)
+    
+    return client.iot_dps_resource.begin_create_or_update(resource_group_name, dps_name, dps)
+
+
+def dps_identity_remove(client, dps_name: str, resource_group_name:Optional[str]=None,
+                        system_assigned:Optional[bool]=None, user_assigned:Optional[List[str]]=None):
+    resource_group_name = _ensure_dps_resource_group_name(client, resource_group_name, dps_name)
+    dps = client.iot_dps_resource.get(resource_group_name, dps_name)
+    
+    if system_assigned is None and user_assigned is None:
+        raise RequiredArgumentMissingError("Specify --system-assigned and/or --user-assigned")
+
+    existing_identity = dps.identity
+    if not existing_identity:
+        return dps
+
+    enable_system = False
+    if existing_identity.type in [ManagedServiceIdentityType.SYSTEM_ASSIGNED, ManagedServiceIdentityType.SYSTEM_ASSIGNED_USER_ASSIGNED]:
+        enable_system = not system_assigned
+
+    existing_user_identities = []
+    if existing_identity.user_assigned_identities:
+        existing_user_identities = list(existing_identity.user_assigned_identities.keys())
+
+    if user_assigned:
+        for identity_id in user_assigned:
+            if identity_id in existing_user_identities:
+                existing_user_identities.remove(identity_id)
+
+    if not enable_system and not existing_user_identities:
+        dps.identity = ManagedServiceIdentity(type=ManagedServiceIdentityType.NONE)
+    else:
+        dps.identity = _construct_identity_info(enable_system, existing_user_identities if existing_user_identities else None)
+
+    return client.iot_dps_resource.begin_create_or_update(resource_group_name, dps_name, dps)
+
+
+def dps_identity_show(client, dps_name: str, resource_group_name:Optional[str]=None) -> ManagedServiceIdentity:
+    resource_group_name = _ensure_dps_resource_group_name(client, resource_group_name, dps_name)
+    dps = client.iot_dps_resource.get(resource_group_name, dps_name)
+    return dps.identity
