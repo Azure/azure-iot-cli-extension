@@ -63,6 +63,7 @@ class IoTExtCommandsLoader(AzCommandsLoader):
         load_core_arguments(self, command)
         load_adr_management_arguments(self, command)
 
+
 COMMAND_LOADER_CLS = IoTExtCommandsLoader
 
 __version__ = VERSION
