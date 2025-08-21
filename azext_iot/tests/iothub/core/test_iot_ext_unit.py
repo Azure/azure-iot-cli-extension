@@ -863,7 +863,7 @@ class TestDeviceTwinList:
         assert headers["x-ms-max-item-count"] == str(top)
 
     @pytest.mark.parametrize("top", [-2, 0])
-    def test_device_list_invalid_args(self, fixture_cmd, top):
+    def test_device_list_invalid_args(self, fixture_cmd, fixture_ghcs, top):
         with pytest.raises(CLIError):
             subject.iot_device_twin_list(
                 cmd=fixture_cmd, hub_name_or_hostname=mock_target["entity"], top=top

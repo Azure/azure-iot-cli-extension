@@ -385,7 +385,9 @@ def discovery_client(mocked_response):
 
     mocked_response.add_callback(
         responses.GET,
-        re.compile(r"https://management.azure.com/subscriptions/(.*)/providers/Microsoft.DeviceUpdate/accounts"),
+        re.compile(
+            r"https://([a-z0-9]+\.)?management.azure.com/subscriptions/(.*)/providers/Microsoft.DeviceUpdate/accounts"
+        ),
         callback=discovery_callback,
     )
 

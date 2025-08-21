@@ -8,6 +8,7 @@ import json
 import os
 from typing import Dict, List, Optional
 
+from azure.core import MatchConditions
 from azure.cli.core.azclierror import (AzCLIError, BadRequestError,
                                        FileOperationError,
                                        MutuallyExclusiveArgumentError,
@@ -1005,8 +1006,15 @@ class StateProvider(IoTHubProvider):
         # serialize strips name and etag - use as_dict instead
         certificates = cert_client.list_by_iot_hub(self.rg, self.hub_name).as_dict()
 
+        # TODO - need to support SDKs with/without match_condition argument
         for cert in tqdm(certificates["value"], desc=usr_msgs.DELETE_CERT_DESC, ascii=" #"):
-            cert_client.delete(self.rg, self.hub_name, cert["name"], cert["etag"])
+            cert_client.delete(
+                resource_group_name=self.rg,
+                resource_name=self.hub_name,
+                certificate_name=cert["name"],
+                etag=cert["etag"],
+                match_condition=MatchConditions.IfNotModified
+            )
 
     def delete_all_configs(self):
         """Delete all configs if possible."""
