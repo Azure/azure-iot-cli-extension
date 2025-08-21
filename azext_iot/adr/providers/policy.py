@@ -1,0 +1,171 @@
+# coding=utf-8
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See License.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
+from typing import Dict, Optional
+from knack.log import get_logger
+from azext_iot.adr.providers.base import ADRProvider
+
+
+logger = get_logger(__name__)
+
+
+class PolicyProvider(ADRProvider):
+    def __init__(self, cmd):
+        super(PolicyProvider, self).__init__(cmd)
+
+    def create(
+        self,
+        policy_name: str,
+        namespace_name: str,
+        resource_group_name: str,
+        location: Optional[str] = None,
+        tags: Optional[Dict[str, str]] = None,
+        certificate_key_type: Optional[str] = None,
+        certificate_subject: Optional[str] = None,
+        certificate_validity_days: Optional[int] = None,
+    ):
+        """Create a policy for an ADR namespace."""
+        if not location:
+            location = self._ensure_location(self.cmd.cli_ctx, resource_group_name, location)
+
+        policy_resource = {"location": location}
+
+        if tags:
+            policy_resource["tags"] = tags
+
+        # Build certificate configuration
+        properties = {}
+
+        if certificate_key_type or certificate_subject or certificate_validity_days:
+            certificate_config = {}
+
+            if certificate_key_type or certificate_subject:
+                ca_config = {}
+                if certificate_key_type:
+                    ca_config["keyType"] = certificate_key_type
+                if certificate_subject:
+                    ca_config["subject"] = certificate_subject
+                certificate_config["certificateAuthorityConfiguration"] = ca_config
+
+            if certificate_validity_days:
+                certificate_config["leafCertificateConfiguration"] = {"validityPeriodInDays": certificate_validity_days}
+
+            properties["certificate"] = certificate_config
+
+        if properties:
+            policy_resource["properties"] = properties
+
+        try:
+            logger.info(
+                "Creating policy '%s' for ADR namespace '%s' in resource group '%s'",
+                policy_name,
+                namespace_name,
+                resource_group_name,
+            )
+            result = self.client.policies.begin_create_or_update(
+                resource_group_name=resource_group_name,
+                namespace_name=namespace_name,
+                policy_name=policy_name,
+                resource=policy_resource,
+            )
+
+            logger.info("Successfully created policy '%s'", policy_name)
+            return result
+
+        except Exception as e:
+            logger.error("Failed to create policy: %s", str(e))
+            raise
+
+    def show(self, policy_name: str, namespace_name: str, resource_group_name: str):
+        """Show a policy for an ADR namespace."""
+        try:
+            return self.client.policies.get(
+                resource_group_name=resource_group_name,
+                namespace_name=namespace_name,
+                policy_name=policy_name,
+            )
+        except Exception as e:
+            logger.error("Failed to get policy: %s", str(e))
+            raise
+
+    def list(self, namespace_name: str, resource_group_name: Optional[str] = None):
+        """List policies for ADR namespaces."""
+        try:
+            if resource_group_name:
+                return list(
+                    self.client.policies.list_by_resource_group(
+                        resource_group_name=resource_group_name,
+                        namespace_name=namespace_name,
+                    )
+                )
+            else:
+                return list(self.client.policies.list_by_subscription(namespace_name=namespace_name))
+        except Exception as e:
+            logger.error("Failed to list policies: %s", str(e))
+            raise
+
+    def delete(self, policy_name: str, namespace_name: str, resource_group_name: str):
+        """Delete a policy for an ADR namespace."""
+        try:
+            logger.info(
+                "Deleting policy '%s' for ADR namespace '%s' from resource group '%s'",
+                policy_name,
+                namespace_name,
+                resource_group_name,
+            )
+            return self.client.policies.begin_delete(
+                resource_group_name=resource_group_name,
+                namespace_name=namespace_name,
+                policy_name=policy_name,
+            )
+        except Exception as e:
+            logger.error("Failed to delete policy: %s", str(e))
+            raise
+
+    def update(
+        self,
+        policy_name: str,
+        namespace_name: str,
+        resource_group_name: str,
+        certificate_key_type: Optional[str] = None,
+        certificate_subject: Optional[str] = None,
+        certificate_validity_days: Optional[int] = None,
+    ):
+        """Update a policy for an ADR namespace."""
+        update_payload = {}
+
+        properties = {}
+        if certificate_key_type or certificate_subject or certificate_validity_days:
+            properties["certificate"] = {}
+            if certificate_key_type or certificate_subject:
+                ca_config = {}
+                if certificate_key_type:
+                    ca_config["keyType"] = certificate_key_type
+                if certificate_subject:
+                    ca_config["subject"] = certificate_subject
+                properties["certificate"]["certificateAuthorityConfiguration"] = ca_config
+            if certificate_validity_days:
+                properties["certificate"]["leafCertificateConfiguration"] = {
+                    "validityPeriodInDays": certificate_validity_days
+                }
+        if properties:
+            update_payload["properties"] = properties
+        try:
+            logger.info(
+                "Updating policy '%s' for ADR namespace '%s' in resource group '%s'",
+                policy_name,
+                namespace_name,
+                resource_group_name,
+            )
+            return self.client.policies.begin_update(
+                resource_group_name=resource_group_name,
+                namespace_name=namespace_name,
+                policy_name=policy_name,
+                properties=update_payload,
+            )
+        except Exception as e:
+            logger.error("Failed to update policy: %s", str(e))
+            raise

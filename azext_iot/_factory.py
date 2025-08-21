@@ -9,7 +9,7 @@ Factory functions for IoT Hub and Device Provisioning Service.
 """
 
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
-from azext_iot.common.auth import IoTOAuth
+from azext_iot.common.auth import IoTOAuth, get_aad_token
 from azext_iot.common.shared import SdkType, AuthenticationTypeDataplane
 from azext_iot.constants import (
     USER_AGENT,
@@ -23,7 +23,36 @@ __all__ = [
     "CloudError",
     "iot_hub_service_factory",
     "iot_service_provisioning_factory",
+    # TODO - CMS Preview - ADR MGMT SDK
+    "adr_service_factory",
 ]
+
+
+# TODO - CMS Preview - figure out why we need a new implementation of SDK Auth
+class CliTokenCredential:
+    """TokenCredential implementation using Azure CLI authentication."""
+
+    def __init__(self, cli_ctx):
+        self.cli_ctx = cli_ctx
+
+    def get_token(self, *scopes, **kwargs):
+        """Get an access token for the given scopes."""
+        from types import SimpleNamespace
+
+        token_info = get_aad_token(self.cli_ctx)
+
+        # TODO - CMS Preview - find out why this is needed too :(
+        # Convert expiresOn to Unix timestamp if it's a string
+        expires_on = token_info.get("expiresOn")
+        if isinstance(expires_on, str):
+            try:
+                from datetime import datetime
+                dt = datetime.fromisoformat(expires_on.replace("Z", "+00:00"))
+                expires_on = dt.timestamp()
+            except (ValueError, TypeError):
+                raise ValueError("Invalid expiresOn format: {}".format(expires_on))
+
+        return SimpleNamespace(token=token_info["accessToken"], expires_on=expires_on)
 
 
 def iot_hub_service_factory(cli_ctx, *_):
@@ -35,13 +64,26 @@ def iot_hub_service_factory(cli_ctx, *_):
         *_ : all other args ignored.
 
     Returns:
-        service_client (IoTHubClient): operational resource for
+        service_client (IotHubClient): operational resource for
             working with IoT Hub Service.
     """
-    from azure.cli.core.commands.client_factory import get_mgmt_service_client
-    from azure.cli.core.profiles import ResourceType
+    from azure.cli.core.commands.client_factory import get_subscription_id
 
-    return get_mgmt_service_client(cli_ctx, ResourceType.MGMT_IOTHUB)
+    from azext_iot.sdk.iothub.mgmt import IotHubClient
+
+    # Get subscription ID and credentials from CLI context
+    subscription_id = get_subscription_id(cli_ctx)
+
+    # Use custom TokenCredential implementation
+    credential = CliTokenCredential(cli_ctx)
+    return IotHubClient(
+        subscription_id=subscription_id, credential=credential, endpoint=cli_ctx.cloud.endpoints.resource_manager
+    )
+
+    # TODO - CMS Preview - Original implementation (uncomment when official SDK is released):
+    # from azure.cli.core.commands.client_factory import get_mgmt_service_client
+    # from azure.cli.core.profiles import ResourceType
+    # return get_mgmt_service_client(cli_ctx, ResourceType.MGMT_IOTHUB)
 
 
 def iot_service_provisioning_factory(cli_ctx, *_):
@@ -56,10 +98,53 @@ def iot_service_provisioning_factory(cli_ctx, *_):
         service_client (IotDpsClient): operational resource for
             working with IoT Hub Device Provisioning Service.
     """
-    from azure.cli.core.commands.client_factory import get_mgmt_service_client
-    from azure.cli.core.profiles import ResourceType
+    from azure.cli.core.commands.client_factory import get_subscription_id
 
-    return get_mgmt_service_client(cli_ctx, ResourceType.MGMT_IOTDPS)
+    from azext_iot.sdk.dps.mgmt import IotDpsClient
+
+    # Get subscription ID and credentials from CLI context
+    subscription_id = get_subscription_id(cli_ctx)
+
+    # Use custom TokenCredential implementation
+    credential = CliTokenCredential(cli_ctx)
+
+    return IotDpsClient(
+        subscription_id=subscription_id, credential=credential, endpoint=cli_ctx.cloud.endpoints.resource_manager
+    )
+
+    # TODO - CMS Preview - Original implementation (uncomment when official SDK is released):
+    # from azure.cli.core.commands.client_factory import get_mgmt_service_client
+    # from azure.cli.core.profiles import ResourceType
+
+    # return get_mgmt_service_client(cli_ctx, ResourceType.MGMT_IOTDPS)
+
+
+# TODO - CMS Preview - ADR MGMT SDK
+def adr_service_factory(cli_ctx, *_):
+    """
+    Factory for importing deps and getting service client resources.
+
+    Args:
+        cli_ctx (knack.cli.CLI): CLI context.
+        *_ : all other args ignored.
+
+    Returns:
+        service_client (DeviceRegistryManagementService): operational resource for
+            working with Azure Device Registry Service.
+    """
+    from azure.cli.core.commands.client_factory import get_subscription_id
+
+    from azext_iot.sdk.deviceregistry.mgmt import DeviceRegistryManagementService
+
+    # Get subscription ID and credentials from CLI context
+    subscription_id = get_subscription_id(cli_ctx)
+
+    # Use custom TokenCredential implementation
+    credential = CliTokenCredential(cli_ctx)
+
+    return DeviceRegistryManagementService(
+        subscription_id=subscription_id, credential=credential, endpoint=cli_ctx.cloud.endpoints.resource_manager
+    )
 
 
 class SdkResolver(object):
