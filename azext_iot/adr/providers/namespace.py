@@ -6,9 +6,9 @@
 
 from typing import Dict, Optional
 from knack.log import get_logger
+from time import sleep
 from azext_iot.adr.common import IdentityType
 from azext_iot.adr.providers.base import ADRProvider
-from azext_iot.adr.providers.rbac import RbacProvider
 
 
 logger = get_logger(__name__)
@@ -64,20 +64,20 @@ class NamespaceProvider(ADRProvider):
                 resource=namespace_resource,
             ).result()
 
-            namespace_principal_id = namespace_result.get("identity", {}).get("principalId")
             # TODO - CMS Preview - what is up with these create responses?
             if not namespace_result.get("resourceGroup"):
                 namespace_result["resourceGroup"] = resource_group_name
 
             # TODO - CMS Preview - role assignments disabled
             # try:
+            # namespace_principal_id = namespace_result.get("identity", {}).get("principalId")
             logger.info("Skipping ADR-IoT Hub integration roles...")
 
-                # if namespace_principal_id:
-                #     rbac_provider = RbacProvider(self.cmd)
-                #     rbac_provider.configure_adr_user_identity_and_rbac(namespace=namespace_result)
-                # else:
-                #     logger.warning("Namespace principal ID not found, skipping role assignments")
+            #   if namespace_principal_id:
+            #       rbac_provider = RbacProvider(self.cmd)
+            #       rbac_provider.configure_adr_user_identity_and_rbac(namespace=namespace_result)
+            #   else:
+            #       logger.warning("Namespace principal ID not found, skipping role assignments")
 
             # except Exception as role_error:
             #     logger.warning(f"Failed to setup ADR-IoT Hub integration roles: {role_error}")
@@ -96,8 +96,8 @@ class NamespaceProvider(ADRProvider):
 
             # TODO - CMS Preview - Create policy by default
             if not no_credential and not no_policy:
-                # TODO - CMS Preview - temporary sleep to ensure credential is fully provisioned before policy creation - investigate poller
-                import time; time.sleep(10)
+                # TODO - CMS Preview - temporary sleep to ensure credential is provisioned before policy - investigate poller
+                sleep(10)
                 from azext_iot.adr.providers.policy import PolicyProvider
                 policy_provider = PolicyProvider(self.cmd)
                 policy_provider.create(

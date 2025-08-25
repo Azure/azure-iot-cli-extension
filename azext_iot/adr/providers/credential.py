@@ -26,9 +26,9 @@ class CredentialProvider(ADRProvider):
     ):
         """Create credential for an ADR namespace."""
         if not location:
-             # TODO - CMS Preview - fetch location from the existing namespace
-             namespace = self.client.namespaces.get(resource_group_name=resource_group_name, namespace_name=namespace_name)
-             location = namespace.get("location")
+            # TODO - CMS Preview - fetch location from the existing namespace
+            namespace = self.client.namespaces.get(resource_group_name=resource_group_name, namespace_name=namespace_name)
+            location = namespace.get("location")
         # fallback to RG location
         location = self._ensure_location(self.cmd.cli_ctx, resource_group_name, location)
 
