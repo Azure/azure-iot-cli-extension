@@ -8,6 +8,7 @@ import json
 from typing import Optional, Dict
 
 from azext_iot.common.embedded_cli import EmbeddedCLI
+from azure.core.exceptions import ResourceExistsError
 from knack.log import get_logger
 from azure.cli.core.azclierror import CLIInternalError, AzureResponseError
 from azure.cli.core.commands.client_factory import get_subscription_id
@@ -15,6 +16,8 @@ from azure.cli.core.commands.client_factory import get_subscription_id
 logger = get_logger(__name__)
 
 # Constants for ADR RBAC operations
+# TODO - CMS Preview - fetch this as a per-tenant value.
+IOT_HUB_APP_ID = "89d10474-74af-4874-99a7-c23c2f643083"
 IOT_HUB_RP_APP_ID = "0aab4033-4ad9-4b0b-9934-542334eceffb"
 ADR_CUSTOM_ROLE_NAME = "ADR Integration Role"
 USER_IDENTITY_NAME = "{namespace}-user-identity"
@@ -49,12 +52,18 @@ class RbacProvider(object):
             "--assignee-principal-type ServicePrincipal --scope '{}'".format(role, principal_id, scope)
         )
 
-        role_op = self.cli.invoke(role_command)
-        if not role_op.success():
-            logger.error(f"Failed to assign role: {role_op.get_error()}")
-            return False
+        try:
+            role_op = self.cli.invoke(role_command, capture_stderr=True)
+            if not role_op.success():
+                logger.error(f"Failed to assign role: {role_op.get_error()}")
+                return False
 
-        logger.debug(f"Successfully assigned role '{role}' to principal '{principal_id}'")
+            logger.debug(f"Successfully assigned role '{role}' to principal '{principal_id}'")
+        except Exception as e:
+            if isinstance(e, ResourceExistsError):
+                logger.warning(f"Role assignment already exists: {e}")
+                return True
+            return False
         return True
 
     def create_user_identity(self, identity_name: str, resource_group_name: str, location: str) -> Dict:
@@ -149,7 +158,7 @@ class RbacProvider(object):
             "AssignableScopes": [f"/subscriptions/{self.subscription_id}/resourceGroups/{resource_group_name}"],
         }
 
-    # ADR custom permission configuration entry point
+    # TODO - CMS Preview - This is no longer in use, delete later when sure no ADR RBAC is needed
     def configure_adr_user_identity_and_rbac(
         self,
         namespace: Dict,

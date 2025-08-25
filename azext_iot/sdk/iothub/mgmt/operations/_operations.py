@@ -3084,10 +3084,11 @@ class IotHubResourceOperations:  # pylint: disable=too-many-public-methods
         else:
             _json = self._serialize.body(operation_inputs, "OperationInputs")
 
+        # TODO - CMS Preview - Not working in current API-version
         _request = build_iot_hub_resource_check_name_availability_request(
             subscription_id=self._config.subscription_id,
             content_type=content_type,
-            api_version=self._config.api_version,
+            api_version="2025-05-01-preview",  # self._config.api_version,
             json=_json,
             content=_content,
             headers=_headers,

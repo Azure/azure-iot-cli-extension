@@ -167,7 +167,7 @@ def iot_dps_create(
             "Device Registry namespace id (--ns-resource-id) is required when specifying namespace user identity."
         )
 
-    dps_description = IotDpsPropertiesDescription(
+    dps_description = ProvisioningServiceDescription(
         location=location,
         properties=dps_property,
         sku=IotDpsSkuInfo(name=sku, capacity=unit),
@@ -656,7 +656,12 @@ def iot_hub_create(
     properties.enable_file_upload_notifications = enable_fileupload_notifications
 
     # TODO - CMS Preview - Hub Create ADR property validation
-    _validate_and_set_adr_properties(properties, sku, adr_ns_id, adr_ns_identity_id)
+    _validate_and_set_adr_properties(
+        instance=properties,
+        sku=sku.name,
+        adr_namespace_resource_id=adr_ns_id,
+        adr_identity_resource_id=adr_ns_identity_id
+    )
 
     hub_description = IotHubDescription(location=location,
                                         sku=sku,
@@ -693,6 +698,7 @@ def iot_hub_get(cmd, client, hub_name, resource_group_name=None):
         return _get_iot_hub_by_name(client, hub_name)
     if not _ensure_resource_group_existence(cli_ctx, resource_group_name):
         raise CLIError("Resource group '{0}' could not be found.".format(resource_group_name))
+    # TODO - CMS Preview - this is broken right now for current API version
     name_availability = client.iot_hub_resource.check_name_availability(OperationInputs(name=hub_name))
     if name_availability is not None and name_availability.name_available:
         raise CLIError("An IotHub '{0}' under resource group '{1}' was not found."
@@ -1806,7 +1812,12 @@ def _build_identity(system=False, identities=None):
 
 # TODO - CMS Preview - New methods
 # TODO - CMS Preview - Hub ADR property validation logic
-def _validate_and_set_adr_properties(instance: IotHubProperties, sku: str, adr_namespace_resource_id: str, adr_identity_resource_id: str):
+def _validate_and_set_adr_properties(
+    instance: IotHubProperties,
+    sku: str,
+    adr_namespace_resource_id: Optional[str] = None,
+    adr_identity_resource_id: Optional[str] = None,
+):
     """Validate and set Azure Device Registry properties for IoT Hub."""
 
     if sku in HUB_PREMIUM_SKUS:

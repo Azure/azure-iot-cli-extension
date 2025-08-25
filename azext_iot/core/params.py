@@ -25,6 +25,19 @@ def load_core_arguments(self, _):
             options_list=["--ns-identity-id"],
             help="Managed identity resource ID for Device Registry namespace.",
         )
+        c.argument(
+            "system_identity",
+            arg_type=get_three_state_flag(),
+            options_list=["--mi-system-assigned"],
+            help="Enable system-assigned managed identity for this IoT hub.",
+        )
+        c.argument(
+            "user_identities",
+            nargs="*",
+            options_list=["--mi-user-assigned"],
+            help="Enable user-assigned managed identities for this IoT hub. "
+            "Accepts space-separated list of identity resource IDs.",
+        )
 
     # TODO - CMS Preview - DPS params
     with self.argument_context("iot dps") as c:
@@ -80,4 +93,12 @@ def load_core_arguments(self, _):
             options_list=["--user", "--user-assigned"],
             help="Remove user-assigned managed identities from this provisioning service. "
             "Accepts space-separated list of identity resource IDs.",
+        )
+    # TODO - CMS Preview - sort out -n / --hub-name / --dps-name
+    with self.argument_context("iot dps linked-hub") as context:
+        context.argument(
+            "hub_name",
+            options_list=["--hub-name"],
+            help="IoT Hub name to link to DPS.",
+            arg_group="IoT Hub Identifier"
         )

@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from typing import Optional
 from knack.log import get_logger
 from azext_iot._factory import adr_service_factory
 
@@ -18,7 +19,7 @@ class ADRProvider(object):
         self.cmd = cmd
         self.client = adr_service_factory(cmd.cli_ctx)
 
-    def _ensure_location(self, cli_ctx, resource_group_name, location):
+    def _ensure_location(self, cli_ctx, resource_group_name: str, location: Optional[str] = None):
         """Ensure location is specified, default to resource group location if not provided."""
         if location:
             return location

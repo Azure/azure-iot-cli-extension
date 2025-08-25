@@ -55,8 +55,7 @@ class PolicyProvider(ADRProvider):
 
             properties["certificate"] = certificate_config
 
-        if properties:
-            policy_resource["properties"] = properties
+        policy_resource["properties"] = properties
 
         try:
             logger.info(

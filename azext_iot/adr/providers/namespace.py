@@ -69,22 +69,22 @@ class NamespaceProvider(ADRProvider):
             if not namespace_result.get("resourceGroup"):
                 namespace_result["resourceGroup"] = resource_group_name
 
-            # Setup ADR-IoT Hub integration with custom role and assignments
-            try:
-                logger.info("Setting up ADR-IoT Hub integration roles...")
+            # TODO - CMS Preview - role assignments disabled
+            # try:
+            logger.info("Skipping ADR-IoT Hub integration roles...")
 
-                if namespace_principal_id:
-                    rbac_provider = RbacProvider(self.cmd)
-                    rbac_provider.configure_adr_user_identity_and_rbac(namespace=namespace_result)
-                else:
-                    logger.warning("Namespace principal ID not found, skipping role assignments")
+                # if namespace_principal_id:
+                #     rbac_provider = RbacProvider(self.cmd)
+                #     rbac_provider.configure_adr_user_identity_and_rbac(namespace=namespace_result)
+                # else:
+                #     logger.warning("Namespace principal ID not found, skipping role assignments")
 
-            except Exception as role_error:
-                logger.warning(f"Failed to setup ADR-IoT Hub integration roles: {role_error}")
-                logger.warning("ADR namespace created but IoT Hub integration may require manual role setup")
+            # except Exception as role_error:
+            #     logger.warning(f"Failed to setup ADR-IoT Hub integration roles: {role_error}")
+            #     logger.warning("ADR namespace created but IoT Hub integration may require manual role setup")
 
             # TODO - CMS Preview - capture / log errors for credential and policy creation
-            # Create credentials by default
+            # TODO - CMS Preview - Create credentials by default
             if not no_credential:
                 from azext_iot.adr.providers.credential import CredentialProvider
                 credential_provider = CredentialProvider(self.cmd)
@@ -92,10 +92,12 @@ class NamespaceProvider(ADRProvider):
                     namespace_name=namespace_name,
                     resource_group_name=resource_group_name,
                     location=location,
-                )
+                ).result()
 
-            # Create policy by default
+            # TODO - CMS Preview - Create policy by default
             if not no_credential and not no_policy:
+                # TODO - CMS Preview - temporary sleep to ensure credential is fully provisioned before policy creation - investigate poller
+                import time; time.sleep(10)
                 from azext_iot.adr.providers.policy import PolicyProvider
                 policy_provider = PolicyProvider(self.cmd)
                 policy_provider.create(
@@ -106,7 +108,7 @@ class NamespaceProvider(ADRProvider):
                     certificate_key_type=certificate_key_type,
                     certificate_subject=certificate_subject,
                     certificate_validity_days=certificate_validity_days,
-                )
+                ).result()
 
             logger.info("Successfully created ADR namespace '%s'", namespace_name)
             return namespace_result
