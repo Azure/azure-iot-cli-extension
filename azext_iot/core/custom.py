@@ -24,6 +24,7 @@ from azure.cli.core.azclierror import (
     UnclassifiedUserFault
 )
 from azure.cli.core.commands import LongRunningOperation
+from azure.cli.core.commands.arm import assign_identity
 from azure.cli.core.util import sdk_no_wait
 from azure.cli.core.profiles._shared import AZURE_API_PROFILES, ResourceType
 
@@ -73,8 +74,6 @@ from azext_iot.sdk.dps.mgmt.models import (CertificateProperties as DPSCertifica
                                                           ManagedServiceIdentity,
                                                           ManagedServiceIdentityType,
                                                           UserAssignedIdentity)
-
-
 from azure.mgmt.iotcentral.models import (AppSkuInfo,
                                           App)
 
@@ -94,8 +93,21 @@ logger = get_logger(__name__)
 SYSTEM_ASSIGNED = 'SystemAssigned'
 NONE_IDENTITY = 'None'
 
+
+# TODO - CMS Preview - Core Common/Consts
 # Premium SKUs for P-tier hub functionality
 HUB_PREMIUM_SKUS = [IotHubSku.P1.value, IotHubSku.P2.value, IotHubSku.P3.value]
+
+# Roles that ADR needs assigned against Hub on create
+ADR_NS_IDENTITY_ROLES_FOR_HUB = ["Contributor", "IoT Hub Registry Contributor"]
+
+# ADR role assignment error message
+ADR_ROLE_ASSIGN_ERROR_MSG = (
+    "You may need to manually assign the following roles from the ADR namespace's system identity to this hub "
+    f"for credential sync to work properly: {','.join(ADR_NS_IDENTITY_ROLES_FOR_HUB)}"
+)
+
+ADR_CONFIGURE_ROLES_ERROR_MSG = "Unable to configure role assignments for credential sync."
 
 
 # CUSTOM TYPE
@@ -674,7 +686,6 @@ def iot_hub_create(
 
     def identity_assignment(lro):
         try:
-            from azure.cli.core.commands.arm import assign_identity
             instance = lro.resource().as_dict()
             identity = instance.get("identity")
             if identity:
@@ -686,9 +697,24 @@ def iot_hub_create(
         except HttpResponseError as e:
             raise e
 
+    def adr_role_assignment(lro):
+        """Set up role assignments between ADR namespace and IoT Hub after hub creation."""
+        try:
+            instance = lro.resource().as_dict()
+            hub_resource_id = instance.get("id")
+            if hub_resource_id:
+                _setup_adr_role_assignments(cmd, adr_ns_id, hub_resource_id)
+            else:
+                # this is bad
+                raise CLIError(f"Could not fetch IoT Hub resource ID after creation. {ADR_ROLE_ASSIGN_ERROR_MSG}")
+        except HttpResponseError as e:
+            logger.warning(f"ADR role assignment failed: {str(e)}. {ADR_ROLE_ASSIGN_ERROR_MSG}")
+
     create = client.iot_hub_resource.begin_create_or_update(resource_group_name, hub_name, hub_description)
     if identity_role and identity_scopes:
         create.add_done_callback(identity_assignment)
+    if adr_ns_id:
+        create.add_done_callback(adr_role_assignment)
     return create
 
 
@@ -941,7 +967,6 @@ def iot_hub_identity_assign(cmd, client, hub_name, system_identity=None, user_id
     if not system_identity and not user_identities:
         raise RequiredArgumentMissingError('No identities provided to assign. Please provide system (--system) or user-assigned identities (--user).')
     if identity_role and identity_scopes:
-        from azure.cli.core.commands.arm import assign_identity
         for scope in identity_scopes:
             hub = assign_identity(cmd.cli_ctx, getter, setter, identity_role=identity_role, identity_scope=scope)
         return hub.identity
@@ -1836,6 +1861,62 @@ def _validate_and_set_adr_properties(
             raise InvalidArgumentValueError(
                 "ADR properties are only supported for P-tier IoT Hub SKUs."
             )
+
+
+def _setup_adr_role_assignments(cmd, namespace_id: str, hub_id: str) -> None:
+    """
+    Set up role assignments between ADR namespace system-assigned identity and IoT Hub.
+    
+    Args:
+        cmd: Azure CLI command context
+        namespace_id: ADR namespace resource ID
+        hub_id: IoT Hub resource ID
+    """
+    try:
+        from msrestazure.tools import parse_resource_id
+        from azext_iot.adr.providers.namespace import NamespaceProvider
+        
+        # Parse the ADR namespace resource ID
+        parsed_adr_id = parse_resource_id(namespace_id)
+        ns_rg = parsed_adr_id.get('resource_group')
+        ns_name = parsed_adr_id.get('name')
+        
+        if not ns_rg or not ns_name:
+            logger.warning(f"Failed to parse ADR namespace resource ID. {ADR_CONFIGURE_ROLES_ERROR_MSG}")
+            return
+        
+        # Set up namespace provider
+        namespace_provider = NamespaceProvider(cmd)
+        namespace_details = namespace_provider.show(ns_name, ns_rg)
+    
+        identity = namespace_details.get("identity", {})
+        principal_id = identity.get("principalId")
+        
+        if not principal_id:
+            logger.warning(f"ADR namespace does not have a system-assigned identity. {ADR_CONFIGURE_ROLES_ERROR_MSG}")
+            return
+
+        # Assign roles
+        has_error = False
+        for role in ADR_NS_IDENTITY_ROLES_FOR_HUB:
+            try:
+                assign_identity(
+                    cmd.cli_ctx,
+                    lambda: namespace_details, 
+                    lambda ns: namespace_details,
+                    identity_role=role, 
+                    identity_scope=hub_id
+                )
+                logger.info(f"Successfully assigned '{role}' role to ADR namespace on IoT Hub")
+            except Exception as role_error:
+                has_error = True
+                logger.warning(f"Failed to assign '{role}' role: {str(role_error)}")
+        
+        if has_error:
+            logger.warning(f"Failed to configure some role assignments.\n{ADR_ROLE_ASSIGN_ERROR_MSG}")
+            
+    except Exception as e:
+        logger.warning(f"Failed to set up ADR role assignments: {str(e)}.\n{ADR_ROLE_ASSIGN_ERROR_MSG}")
 
 
 def _configure_adr_namespace(
