@@ -13,6 +13,7 @@ from azure.identity import AzureCliCredential
 from knack.log import get_logger
 from msrestazure.azure_exceptions import CloudError
 
+from azext_iot.common.auth import IoTOAuth
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import AuthenticationTypeDataplane, SdkType
 from azext_iot.constants import IOTDPS_RESOURCE_ID, IOTHUB_RESOURCE_ID, USER_AGENT

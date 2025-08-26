@@ -4,7 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from time import sleep
 from typing import Dict, Optional
 
 from knack.log import get_logger
@@ -65,8 +64,7 @@ class NamespaceProvider(ADRProvider):
                 namespace_result["resourceGroup"] = resource_group_name
 
             if not no_credential:
-                from azext_iot.adr.providers.credential import \
-                    CredentialProvider
+                from azext_iot.adr.providers.credential import CredentialProvider
 
                 credential_provider = CredentialProvider(self.cmd)
                 credential_provider.create(

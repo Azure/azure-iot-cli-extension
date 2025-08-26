@@ -93,7 +93,6 @@ class PolicyProvider(ADRProvider):
             policy_name=policy_name,
         )
 
-
     def update(
         self,
         policy_name: str,
