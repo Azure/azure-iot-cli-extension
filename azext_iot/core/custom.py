@@ -1875,23 +1875,23 @@ def _setup_adr_role_assignments(cmd, namespace_id: str, hub_id: str) -> None:
     try:
         from msrestazure.tools import parse_resource_id
         from azext_iot.adr.providers.namespace import NamespaceProvider
-        
+
         # Parse the ADR namespace resource ID
         parsed_adr_id = parse_resource_id(namespace_id)
         ns_rg = parsed_adr_id.get('resource_group')
         ns_name = parsed_adr_id.get('name')
-        
+
         if not ns_rg or not ns_name:
             logger.warning(f"Failed to parse ADR namespace resource ID. {ADR_CONFIGURE_ROLES_ERROR_MSG}")
             return
-        
+
         # Set up namespace provider
         namespace_provider = NamespaceProvider(cmd)
         namespace_details = namespace_provider.show(ns_name, ns_rg)
-    
+
         identity = namespace_details.get("identity", {})
         principal_id = identity.get("principalId")
-        
+
         if not principal_id:
             logger.warning(f"ADR namespace does not have a system-assigned identity. {ADR_CONFIGURE_ROLES_ERROR_MSG}")
             return
@@ -1900,10 +1900,16 @@ def _setup_adr_role_assignments(cmd, namespace_id: str, hub_id: str) -> None:
         has_error = False
         for role in ADR_NS_IDENTITY_ROLES_FOR_HUB:
             try:
+                # assign_identity needs the resource identity as an object, not a dict
+                from types import SimpleNamespace
+
+                ns_obj = SimpleNamespace(
+                    identity=SimpleNamespace(principal_id=namespace_details.get("identity", {}).get("principalId"))
+                )
                 assign_identity(
                     cmd.cli_ctx,
-                    lambda: namespace_details, 
-                    lambda ns: namespace_details,
+                    lambda: ns_obj, 
+                    lambda ns: ns_obj,
                     identity_role=role, 
                     identity_scope=hub_id
                 )
@@ -1911,10 +1917,10 @@ def _setup_adr_role_assignments(cmd, namespace_id: str, hub_id: str) -> None:
             except Exception as role_error:
                 has_error = True
                 logger.warning(f"Failed to assign '{role}' role: {str(role_error)}")
-        
+
         if has_error:
             logger.warning(f"Failed to configure some role assignments.\n{ADR_ROLE_ASSIGN_ERROR_MSG}")
-            
+
     except Exception as e:
         logger.warning(f"Failed to set up ADR role assignments: {str(e)}.\n{ADR_ROLE_ASSIGN_ERROR_MSG}")
 
