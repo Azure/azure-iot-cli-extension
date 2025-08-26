@@ -8,15 +8,18 @@
 Factory functions for IoT Hub and Device Provisioning Service.
 """
 
-from azext_iot.common.sas_token_auth import SasTokenAuthentication
-from azext_iot.common.auth import IoTOAuth, get_aad_token
-from azext_iot.common.shared import SdkType, AuthenticationTypeDataplane
-from azext_iot.constants import (
-    USER_AGENT,
-    IOTHUB_RESOURCE_ID,
-    IOTDPS_RESOURCE_ID
-)
+from azure.core.pipeline.policies import UserAgentPolicy
+from azure.identity import AzureCliCredential
+from knack.log import get_logger
 from msrestazure.azure_exceptions import CloudError
+
+from azext_iot.common.sas_token_auth import SasTokenAuthentication
+from azext_iot.common.shared import AuthenticationTypeDataplane, SdkType
+from azext_iot.constants import IOTDPS_RESOURCE_ID, IOTHUB_RESOURCE_ID, USER_AGENT
+
+AZURE_CLI_CREDENTIAL = AzureCliCredential()
+
+logger = get_logger(__name__)
 
 __all__ = [
     "SdkResolver",
@@ -28,31 +31,20 @@ __all__ = [
 ]
 
 
-# TODO - CMS Preview - figure out why we need a new implementation of SDK Auth
-class CliTokenCredential:
-    """TokenCredential implementation using Azure CLI authentication."""
+def _get_default_logging_policy():
+    """
+    Get default HTTP logging policy for Azure clients.
+    Following the pattern from the new edge module.
+    """
+    from azure.core.pipeline.policies import HttpLoggingPolicy
 
-    def __init__(self, cli_ctx):
-        self.cli_ctx = cli_ctx
+    http_logging_policy = HttpLoggingPolicy(logger=logger)
+    http_logging_policy.allowed_query_params.add("api-version")
+    http_logging_policy.allowed_query_params.add("$filter")
+    http_logging_policy.allowed_query_params.add("$expand")
+    http_logging_policy.allowed_header_names.add("x-ms-correlation-request-id")
 
-    def get_token(self, *scopes, **kwargs):
-        """Get an access token for the given scopes."""
-        from types import SimpleNamespace
-
-        token_info = get_aad_token(self.cli_ctx)
-
-        # TODO - CMS Preview - find out why this is needed too :(
-        # Convert expiresOn to Unix timestamp if it's a string
-        expires_on = token_info.get("expiresOn")
-        if isinstance(expires_on, str):
-            try:
-                from datetime import datetime
-                dt = datetime.fromisoformat(expires_on.replace("Z", "+00:00"))
-                expires_on = dt.timestamp()
-            except (ValueError, TypeError):
-                raise ValueError("Invalid expiresOn format: {}".format(expires_on))
-
-        return SimpleNamespace(token=token_info["accessToken"], expires_on=expires_on)
+    return http_logging_policy
 
 
 def iot_hub_service_factory(cli_ctx, *_):
@@ -71,13 +63,14 @@ def iot_hub_service_factory(cli_ctx, *_):
 
     from azext_iot.sdk.iothub.mgmt import IotHubClient
 
-    # Get subscription ID and credentials from CLI context
     subscription_id = get_subscription_id(cli_ctx)
 
-    # Use custom TokenCredential implementation
-    credential = CliTokenCredential(cli_ctx)
     return IotHubClient(
-        subscription_id=subscription_id, credential=credential, endpoint=cli_ctx.cloud.endpoints.resource_manager
+        credential=AZURE_CLI_CREDENTIAL,
+        subscription_id=subscription_id,
+        endpoint=cli_ctx.cloud.endpoints.resource_manager,
+        user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
+        http_logging_policy=_get_default_logging_policy(),
     )
 
     # TODO - CMS Preview - Original implementation (uncomment when official SDK is released):
@@ -102,20 +95,19 @@ def iot_service_provisioning_factory(cli_ctx, *_):
 
     from azext_iot.sdk.dps.mgmt import IotDpsClient
 
-    # Get subscription ID and credentials from CLI context
     subscription_id = get_subscription_id(cli_ctx)
 
-    # Use custom TokenCredential implementation
-    credential = CliTokenCredential(cli_ctx)
-
     return IotDpsClient(
-        subscription_id=subscription_id, credential=credential, endpoint=cli_ctx.cloud.endpoints.resource_manager
+        credential=AZURE_CLI_CREDENTIAL,
+        subscription_id=subscription_id,
+        endpoint=cli_ctx.cloud.endpoints.resource_manager,
+        user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
+        http_logging_policy=_get_default_logging_policy(),
     )
 
     # TODO - CMS Preview - Original implementation (uncomment when official SDK is released):
     # from azure.cli.core.commands.client_factory import get_mgmt_service_client
     # from azure.cli.core.profiles import ResourceType
-
     # return get_mgmt_service_client(cli_ctx, ResourceType.MGMT_IOTDPS)
 
 
@@ -136,14 +128,14 @@ def adr_service_factory(cli_ctx, *_):
 
     from azext_iot.sdk.deviceregistry.mgmt import DeviceRegistryManagementService
 
-    # Get subscription ID and credentials from CLI context
     subscription_id = get_subscription_id(cli_ctx)
 
-    # Use custom TokenCredential implementation
-    credential = CliTokenCredential(cli_ctx)
-
     return DeviceRegistryManagementService(
-        subscription_id=subscription_id, credential=credential, endpoint=cli_ctx.cloud.endpoints.resource_manager
+        credential=AZURE_CLI_CREDENTIAL,
+        subscription_id=subscription_id,
+        endpoint=cli_ctx.cloud.endpoints.resource_manager,
+        user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
+        http_logging_policy=_get_default_logging_policy(),
     )
 
 
@@ -194,10 +186,7 @@ class SdkResolver(object):
         if self.auth_override:
             credentials = self.auth_override
         elif self.target["policy"] == AuthenticationTypeDataplane.login.value:
-            credentials = IoTOAuth(
-                cli_ctx=self.target["cmd"].cli_ctx,
-                resource_id=IOTHUB_RESOURCE_ID
-            )
+            credentials = IoTOAuth(cli_ctx=self.target["cmd"].cli_ctx, resource_id=IOTHUB_RESOURCE_ID)
         else:
             credentials = SasTokenAuthentication(
                 uri=self.sas_uri,
@@ -215,10 +204,7 @@ class SdkResolver(object):
         if self.auth_override:
             credentials = self.auth_override
         elif self.target["policy"] == AuthenticationTypeDataplane.login.value:
-            credentials = IoTOAuth(
-                cli_ctx=self.target["cmd"].cli_ctx,
-                resource_id=IOTDPS_RESOURCE_ID
-            )
+            credentials = IoTOAuth(cli_ctx=self.target["cmd"].cli_ctx, resource_id=IOTDPS_RESOURCE_ID)
         else:
             credentials = SasTokenAuthentication(
                 uri=self.sas_uri,
@@ -226,6 +212,4 @@ class SdkResolver(object):
                 shared_access_key=self.target["primarykey"],
             )
 
-        return ProvisioningServiceClient(
-            credentials=credentials, base_url=self.endpoint
-        )
+        return ProvisioningServiceClient(credentials=credentials, base_url=self.endpoint)
