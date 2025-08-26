@@ -27,7 +27,9 @@ class CredentialProvider(ADRProvider):
         """Create credential for an ADR namespace."""
         if not location:
             # TODO - CMS Preview - fetch location from the existing namespace
-            namespace = self.client.namespaces.get(resource_group_name=resource_group_name, namespace_name=namespace_name)
+            namespace = self.client.namespaces.get(
+                resource_group_name=resource_group_name, namespace_name=namespace_name
+            )
             location = namespace.get("location")
         # fallback to RG location
         location = self._ensure_location(self.cmd.cli_ctx, resource_group_name, location)
@@ -37,59 +39,24 @@ class CredentialProvider(ADRProvider):
         if tags:
             credentials_resource["tags"] = tags
 
-        try:
-            logger.info(
-                "Creating credential for ADR namespace '%s' in resource group '%s'",
-                namespace_name,
-                resource_group_name,
-            )
-            result = self.client.credentials.begin_create_or_update(
-                resource_group_name=resource_group_name,
-                namespace_name=namespace_name,
-                resource=credentials_resource,
-            )
-
-            logger.info("Successfully created credentials for ADR namespace '%s'", namespace_name)
-            return result
-
-        except Exception as e:
-            logger.error("Failed to create credentials: %s", str(e))
-            raise
+        return self.client.credentials.begin_create_or_update(
+            resource_group_name=resource_group_name,
+            namespace_name=namespace_name,
+            resource=credentials_resource,
+        )
 
     def show(self, namespace_name: str, resource_group_name: str):
         """Show credentials for an ADR namespace."""
-        try:
-            return self.client.credentials.get(resource_group_name=resource_group_name, namespace_name=namespace_name)
-        except Exception as e:
-            logger.error("Failed to get credentials: %s", str(e))
-            raise
+        return self.client.credentials.get(resource_group_name=resource_group_name, namespace_name=namespace_name)
 
     def delete(self, namespace_name: str, resource_group_name: str):
         """Delete credentials for an ADR namespace."""
-        try:
-            logger.info(
-                "Deleting credentials for ADR namespace '%s' from resource group '%s'",
-                namespace_name,
-                resource_group_name,
-            )
-            return self.client.credentials.begin_delete(
-                resource_group_name=resource_group_name, namespace_name=namespace_name
-            )
-        except Exception as e:
-            logger.error("Failed to delete credentials: %s", str(e))
-            raise
+        return self.client.credentials.begin_delete(
+            resource_group_name=resource_group_name, namespace_name=namespace_name
+        )
 
     def synchronize(self, namespace_name: str, resource_group_name: str):
         """Synchronize credentials for an ADR namespace."""
-        try:
-            logger.info(
-                "Synchronizing credentials for ADR namespace '%s' in resource group '%s'",
-                namespace_name,
-                resource_group_name,
-            )
-            return self.client.credentials.begin_synchronize(
-                resource_group_name=resource_group_name, namespace_name=namespace_name
-            )
-        except Exception as e:
-            logger.error("Failed to synchronize credentials: %s", str(e))
-            raise
+        return self.client.credentials.begin_synchronize(
+            resource_group_name=resource_group_name, namespace_name=namespace_name
+        )

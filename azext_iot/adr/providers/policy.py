@@ -57,72 +57,42 @@ class PolicyProvider(ADRProvider):
 
         policy_resource["properties"] = properties
 
-        try:
-            logger.info(
-                "Creating policy '%s' for ADR namespace '%s' in resource group '%s'",
-                policy_name,
-                namespace_name,
-                resource_group_name,
-            )
-            result = self.client.policies.begin_create_or_update(
-                resource_group_name=resource_group_name,
-                namespace_name=namespace_name,
-                policy_name=policy_name,
-                resource=policy_resource,
-            )
-
-            logger.info("Successfully created policy '%s'", policy_name)
-            return result
-
-        except Exception as e:
-            logger.error("Failed to create policy: %s", str(e))
-            raise
+        return self.client.policies.begin_create_or_update(
+            resource_group_name=resource_group_name,
+            namespace_name=namespace_name,
+            policy_name=policy_name,
+            resource=policy_resource,
+        )
 
     def show(self, policy_name: str, namespace_name: str, resource_group_name: str):
         """Show a policy for an ADR namespace."""
-        try:
-            return self.client.policies.get(
-                resource_group_name=resource_group_name,
-                namespace_name=namespace_name,
-                policy_name=policy_name,
-            )
-        except Exception as e:
-            logger.error("Failed to get policy: %s", str(e))
-            raise
+        return self.client.policies.get(
+            resource_group_name=resource_group_name,
+            namespace_name=namespace_name,
+            policy_name=policy_name,
+        )
 
     def list(self, namespace_name: str, resource_group_name: Optional[str] = None):
         """List policies for ADR namespaces."""
-        try:
-            if resource_group_name:
-                return list(
-                    self.client.policies.list_by_resource_group(
-                        resource_group_name=resource_group_name,
-                        namespace_name=namespace_name,
-                    )
+        if resource_group_name:
+            return list(
+                self.client.policies.list_by_resource_group(
+                    resource_group_name=resource_group_name,
+                    namespace_name=namespace_name,
                 )
-            else:
-                return list(self.client.policies.list_by_subscription(namespace_name=namespace_name))
-        except Exception as e:
-            logger.error("Failed to list policies: %s", str(e))
-            raise
+            )
+        else:
+            return list(self.client.policies.list_by_subscription(namespace_name=namespace_name))
 
     def delete(self, policy_name: str, namespace_name: str, resource_group_name: str):
         """Delete a policy for an ADR namespace."""
-        try:
-            logger.info(
-                "Deleting policy '%s' for ADR namespace '%s' from resource group '%s'",
-                policy_name,
-                namespace_name,
-                resource_group_name,
-            )
-            return self.client.policies.begin_delete(
-                resource_group_name=resource_group_name,
-                namespace_name=namespace_name,
-                policy_name=policy_name,
-            )
-        except Exception as e:
-            logger.error("Failed to delete policy: %s", str(e))
-            raise
+
+        return self.client.policies.begin_delete(
+            resource_group_name=resource_group_name,
+            namespace_name=namespace_name,
+            policy_name=policy_name,
+        )
+
 
     def update(
         self,
@@ -152,19 +122,9 @@ class PolicyProvider(ADRProvider):
                 }
         if properties:
             update_payload["properties"] = properties
-        try:
-            logger.info(
-                "Updating policy '%s' for ADR namespace '%s' in resource group '%s'",
-                policy_name,
-                namespace_name,
-                resource_group_name,
-            )
-            return self.client.policies.begin_update(
-                resource_group_name=resource_group_name,
-                namespace_name=namespace_name,
-                policy_name=policy_name,
-                properties=update_payload,
-            )
-        except Exception as e:
-            logger.error("Failed to update policy: %s", str(e))
-            raise
+        return self.client.policies.begin_update(
+            resource_group_name=resource_group_name,
+            namespace_name=namespace_name,
+            policy_name=policy_name,
+            properties=update_payload,
+        )

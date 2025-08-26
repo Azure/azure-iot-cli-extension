@@ -32,7 +32,7 @@ def load_adr_help():
   type: command
   short-summary: Create a Device Registry namespace.
   long-summary: |
-    By default, a namespace is created with a system-assigned managed identity, a default credential, and a default credential policy.
+    By default, a namespace is created with a system-assigned managed identity, as well as a credential and credential policy - both named 'default'
   examples:
     - name: Create a basic Device Registry namespace (with system assigned identity, credential, and policy)
       text: az iot adr ns create -n myNamespace -g myResourceGroup

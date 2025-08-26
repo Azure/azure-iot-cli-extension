@@ -4,16 +4,18 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import Dict, Optional
-from knack.log import get_logger
 from time import sleep
+from typing import Dict, Optional
+
+from knack.log import get_logger
+
 from azext_iot.adr.common import IdentityType
 from azext_iot.adr.providers.base import ADRProvider
-
 
 logger = get_logger(__name__)
 
 
+# TODO - CMS Preview - Rich / progress notifications on long-running namespace create with credential and policy
 class NamespaceProvider(ADRProvider):
     def __init__(self, cmd):
         super(NamespaceProvider, self).__init__(cmd)
@@ -35,7 +37,6 @@ class NamespaceProvider(ADRProvider):
         if not location:
             location = self._ensure_location(self.cmd.cli_ctx, resource_group_name, location)
 
-        # Build the namespace resource
         namespace_resource = {"location": location}
 
         # TODO - CMS Preview - default system assigned identity
@@ -50,55 +51,35 @@ class NamespaceProvider(ADRProvider):
         if properties:
             namespace_resource["properties"] = properties
 
-        try:
-            logger.info(
-                "Creating ADR namespace '%s' in resource group '%s'",
-                namespace_name,
-                resource_group_name,
-            )
-            # TODO - CMS Preview - create_or_replace - should we check for existence first?
-            # Create the namespace
-            namespace_result = self.client.namespaces.begin_create_or_replace(
-                resource_group_name=resource_group_name,
-                namespace_name=namespace_name,
-                resource=namespace_resource,
-            ).result()
+        # TODO - CMS Preview - create_or_replace - should we check for existence first?
+        namespace_result = self.client.namespaces.begin_create_or_replace(
+            resource_group_name=resource_group_name,
+            namespace_name=namespace_name,
+            resource=namespace_resource,
+        ).result()
+        logger.info(f"Created device registry namespace `{namespace_name}`")
 
+        try:
             # TODO - CMS Preview - what is up with these create responses?
             if not namespace_result.get("resourceGroup"):
                 namespace_result["resourceGroup"] = resource_group_name
 
-            # TODO - CMS Preview - role assignments disabled
-            # try:
-            # namespace_principal_id = namespace_result.get("identity", {}).get("principalId")
-            logger.info("Skipping ADR-IoT Hub integration roles...")
-
-            #   if namespace_principal_id:
-            #       rbac_provider = RbacProvider(self.cmd)
-            #       rbac_provider.configure_adr_user_identity_and_rbac(namespace=namespace_result)
-            #   else:
-            #       logger.warning("Namespace principal ID not found, skipping role assignments")
-
-            # except Exception as role_error:
-            #     logger.warning(f"Failed to setup ADR-IoT Hub integration roles: {role_error}")
-            #     logger.warning("ADR namespace created but IoT Hub integration may require manual role setup")
-
-            # TODO - CMS Preview - capture / log errors for credential and policy creation
-            # TODO - CMS Preview - Create credentials by default
             if not no_credential:
-                from azext_iot.adr.providers.credential import CredentialProvider
+                from azext_iot.adr.providers.credential import \
+                    CredentialProvider
+
                 credential_provider = CredentialProvider(self.cmd)
                 credential_provider.create(
                     namespace_name=namespace_name,
                     resource_group_name=resource_group_name,
                     location=location,
                 ).result()
+                logger.info("Created default namespace credential")
 
             # TODO - CMS Preview - Create policy by default
             if not no_credential and not no_policy:
-                # TODO - CMS Preview - temporary sleep to ensure credential is provisioned before policy - investigate poller
-                sleep(10)
                 from azext_iot.adr.providers.policy import PolicyProvider
+
                 policy_provider = PolicyProvider(self.cmd)
                 policy_provider.create(
                     policy_name=policy_name,
@@ -109,45 +90,29 @@ class NamespaceProvider(ADRProvider):
                     certificate_subject=certificate_subject,
                     certificate_validity_days=certificate_validity_days,
                 ).result()
-
-            logger.info("Successfully created ADR namespace '%s'", namespace_name)
-            return namespace_result
-
+                logger.info(f"Created namespace credential policy '{policy_name}'")
         except Exception as e:
-            logger.error("Failed to create ADR namespace: %s", str(e))
-            raise
+            logger.error("Error creating namespace credentials or policy: %s", str(e))
+
+        return namespace_result
 
     def show(self, namespace_name: str, resource_group_name: str):
         """Show details of an ADR namespace."""
-        try:
-            return self.client.namespaces.get(resource_group_name=resource_group_name, namespace_name=namespace_name)
-        except Exception as e:
-            logger.error("Failed to get ADR namespace: %s", str(e))
-            raise
+        return self.client.namespaces.get(resource_group_name=resource_group_name, namespace_name=namespace_name)
 
     def list(self, resource_group_name: Optional[str] = None):
         """List ADR namespaces."""
-        try:
-            if resource_group_name:
-                return list(self.client.namespaces.list_by_resource_group(resource_group_name=resource_group_name))
-            else:
-                return list(self.client.namespaces.list_by_subscription())
-        except Exception as e:
-            logger.error("Failed to list ADR namespaces: %s", str(e))
-            raise
+        if resource_group_name:
+            return list(self.client.namespaces.list_by_resource_group(resource_group_name=resource_group_name))
+        else:
+            return list(self.client.namespaces.list_by_subscription())
 
     def delete(self, namespace_name: str, resource_group_name: str):
         """Delete an ADR namespace."""
-        try:
-            logger.info(
-                "Deleting ADR namespace '%s' from resource group '%s'",
-                namespace_name,
-                resource_group_name,
-            )
-            return self.client.namespaces.begin_delete(resource_group_name=resource_group_name, namespace_name=namespace_name)
-        except Exception as e:
-            logger.error("Failed to delete ADR namespace: %s", str(e))
-            raise
+
+        return self.client.namespaces.begin_delete(
+            resource_group_name=resource_group_name, namespace_name=namespace_name
+        )
 
     def update(
         self,
@@ -162,17 +127,8 @@ class NamespaceProvider(ADRProvider):
 
         # TODO - CMS Preview - support messaging endpoints update
 
-        try:
-            logger.info(
-                "Updating ADR namespace '%s' in resource group '%s'",
-                namespace_name,
-                resource_group_name,
-            )
-            return self.client.namespaces.begin_update(
-                resource_group_name=resource_group_name,
-                namespace_name=namespace_name,
-                properties=properties,
-            )
-        except Exception as e:
-            logger.error("Failed to update ADR namespace: %s", str(e))
-            raise
+        return self.client.namespaces.begin_update(
+            resource_group_name=resource_group_name,
+            namespace_name=namespace_name,
+            properties=properties,
+        )
