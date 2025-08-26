@@ -7,14 +7,15 @@
 from typing import Dict, Optional
 
 from knack.log import get_logger
+from rich.console import Console
 
 from azext_iot.adr.common import IdentityType
 from azext_iot.adr.providers.base import ADRProvider
 
+console = Console()
 logger = get_logger(__name__)
 
 
-# TODO - CMS Preview - Rich / progress notifications on long-running namespace create with credential and policy
 class NamespaceProvider(ADRProvider):
     def __init__(self, cmd):
         super(NamespaceProvider, self).__init__(cmd)
@@ -51,12 +52,13 @@ class NamespaceProvider(ADRProvider):
             namespace_resource["properties"] = properties
 
         # TODO - CMS Preview - create_or_replace - should we check for existence first?
-        namespace_result = self.client.namespaces.begin_create_or_replace(
-            resource_group_name=resource_group_name,
-            namespace_name=namespace_name,
-            resource=namespace_resource,
-        ).result()
-        logger.info(f"Created device registry namespace `{namespace_name}`")
+        with console.status(f"Creating namespace {namespace_name}..."):
+            namespace_result = self.client.namespaces.begin_create_or_replace(
+                resource_group_name=resource_group_name,
+                namespace_name=namespace_name,
+                resource=namespace_resource,
+            ).result()
+            logger.info(f"Created device registry namespace `{namespace_name}`")
 
         try:
             # TODO - CMS Preview - what is up with these create responses?
@@ -67,28 +69,30 @@ class NamespaceProvider(ADRProvider):
                 from azext_iot.adr.providers.credential import CredentialProvider
 
                 credential_provider = CredentialProvider(self.cmd)
-                credential_provider.create(
-                    namespace_name=namespace_name,
-                    resource_group_name=resource_group_name,
-                    location=location,
-                ).result()
-                logger.info("Created default namespace credential")
+                with console.status(f"Creating default credential for namespace {namespace_name}..."):
+                    credential_provider.create(
+                        namespace_name=namespace_name,
+                        resource_group_name=resource_group_name,
+                        location=location,
+                    ).result()
+                    logger.info("Created default namespace credential")
 
             # TODO - CMS Preview - Create policy by default
             if not no_credential and not no_policy:
                 from azext_iot.adr.providers.policy import PolicyProvider
 
                 policy_provider = PolicyProvider(self.cmd)
-                policy_provider.create(
-                    policy_name=policy_name,
-                    namespace_name=namespace_name,
-                    resource_group_name=resource_group_name,
-                    location=location,
-                    certificate_key_type=certificate_key_type,
-                    certificate_subject=certificate_subject,
-                    certificate_validity_days=certificate_validity_days,
-                ).result()
-                logger.info(f"Created namespace credential policy '{policy_name}'")
+                with console.status(f"Creating credential policy '{policy_name}' for namespace {namespace_name}..."):
+                    policy_provider.create(
+                        policy_name=policy_name,
+                        namespace_name=namespace_name,
+                        resource_group_name=resource_group_name,
+                        location=location,
+                        certificate_key_type=certificate_key_type,
+                        certificate_subject=certificate_subject,
+                        certificate_validity_days=certificate_validity_days,
+                    ).result()
+                    logger.info(f"Created namespace credential policy '{policy_name}'")
         except Exception as e:
             logger.error("Error creating namespace credentials or policy: %s", str(e))
 
@@ -108,9 +112,10 @@ class NamespaceProvider(ADRProvider):
     def delete(self, namespace_name: str, resource_group_name: str):
         """Delete an ADR namespace."""
 
-        return self.client.namespaces.begin_delete(
-            resource_group_name=resource_group_name, namespace_name=namespace_name
-        )
+        with console.status(f"Deleting namespace {namespace_name}..."):
+            return self.client.namespaces.begin_delete(
+                resource_group_name=resource_group_name, namespace_name=namespace_name
+            )
 
     def update(
         self,
@@ -125,8 +130,9 @@ class NamespaceProvider(ADRProvider):
 
         # TODO - CMS Preview - support messaging endpoints update
 
-        return self.client.namespaces.begin_update(
-            resource_group_name=resource_group_name,
-            namespace_name=namespace_name,
-            properties=properties,
-        )
+        with console.status(f"Updating namespace {namespace_name}..."):
+            return self.client.namespaces.begin_update(
+                resource_group_name=resource_group_name,
+                namespace_name=namespace_name,
+                properties=properties,
+            )

@@ -56,7 +56,8 @@ DEPENDENCIES = [
     "tomli-w~=1.0",
     "tqdm~=4.62",
     "treelib~=1.6",
-    "packaging>=23.2"
+    "packaging>=23.2",
+    "rich>=13.6,<14.0"
 ]
 EXTRAS = {"uamqp": ["uamqp>=1.2,<=1.6.8"]}
 
