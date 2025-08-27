@@ -74,17 +74,17 @@ from azext_iot.sdk.dps.mgmt.models import (CertificateProperties as DPSCertifica
                                                           ManagedServiceIdentity,
                                                           ManagedServiceIdentityType,
                                                           UserAssignedIdentity)
+from azext_iot._factory import iot_hub_service_factory
+from azext_iot.common.shared import AuthenticationType
+from azext_iot.iothub.common import SYSTEM_ASSIGNED_IDENTITY
+
 from azure.mgmt.iotcentral.models import (AppSkuInfo,
                                           App)
 
 # Azure CLI core imports
 from azure.cli.command_modules.iot.shared import EndpointType, EncodingFormat, RenewKeyType, IdentityType
 from azure.cli.command_modules.iot._client_factory import resource_service_factory
-from azure.cli.command_modules.iot._client_factory import iot_hub_service_factory
 from azure.cli.command_modules.iot._utils import open_certificate
-
-from azext_iot.common.shared import AuthenticationType
-from azext_iot.iothub.common import SYSTEM_ASSIGNED_IDENTITY
 
 
 logger = get_logger(__name__)

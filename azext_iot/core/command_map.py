@@ -160,9 +160,9 @@ def load_core_commands(self, _):
     with self.command_group(
         "iot dps identity", command_type=core_ops, client_factory=iot_service_provisioning_factory
     ) as cmd_group:
-        cmd_group.command("assign", "assign_identity")
-        cmd_group.command("remove", "remove_identity")
-        cmd_group.show_command("show", "show_identity")
+        cmd_group.command("assign", "dps_identity_assign")
+        cmd_group.command("remove", "dps_identity_remove")
+        cmd_group.show_command("show", "dps_identity_show")
 
         # iot dps linked-hub commands
     with self.command_group('iot dps linked-hub', command_type=core_ops, client_factory=iot_service_provisioning_factory) as g:
