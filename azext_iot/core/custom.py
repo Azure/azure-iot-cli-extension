@@ -168,7 +168,7 @@ def iot_dps_create(
 
     # TODO - CMS Preview - DPS ADR properties
     if adr_ns_id:
-        dps_property.device_registry_namespace = _configure_adr_namespace(
+        dps_property.device_registry_namespace = _build_dps_adr_properties(
             existing_namespace=None,
             adr_ns_id=adr_ns_id,
             adr_ns_identity_id=adr_ns_identity_id
@@ -209,7 +209,7 @@ def iot_dps_update(
 
     # Update ADR namespace configuration if provided
     if adr_ns_id or adr_ns_identity_id:
-        parameters.properties.device_registry_namespace = _configure_adr_namespace(
+        parameters.properties.device_registry_namespace = _build_dps_adr_properties(
             parameters.properties.device_registry_namespace,
             adr_ns_id,
             adr_ns_identity_id
@@ -1925,7 +1925,7 @@ def _setup_adr_role_assignments(cmd, namespace_id: str, hub_id: str) -> None:
         logger.warning(f"Failed to set up ADR role assignments: {str(e)}.\n{ADR_ROLE_ASSIGN_ERROR_MSG}")
 
 
-def _configure_adr_namespace(
+def _build_dps_adr_properties(
     existing_namespace: Optional[DeviceRegistryNamespaceDescription] = None,
     adr_ns_id: Optional[str] = None,
     adr_ns_identity_id: Optional[str] = None
@@ -1935,28 +1935,34 @@ def _configure_adr_namespace(
         # namespace id is required when creating a new object
         if not adr_ns_id:
             raise RequiredArgumentMissingError(
-                "Device Registry namespace id (--ns-resource-id) is required when specifying namespace user identity."
+                "Device Registry namespace resource ID (--ns-resource-id) is required."
             )
         adr_namespace_obj = DeviceRegistryNamespaceDescription(
             resource_id=adr_ns_id, 
             authentication_type=DeviceRegistryNamespaceAuthenticationType.SYSTEM_ASSIGNED.value
         )
+        # Set user identity and authentication type if provided
+        if adr_ns_identity_id:
+            adr_namespace_obj.selected_user_assigned_identity_resource_id = adr_ns_identity_id
+            adr_namespace_obj.authentication_type = DeviceRegistryNamespaceAuthenticationType.USER_ASSIGNED.value
     else:
+        # If resource ID is explicitly set to empty, remove all properties
+        if adr_ns_id is not None and not adr_ns_id:
+            return None
         adr_namespace_obj = existing_namespace
 
-    # Update namespace resource ID if provided
-    if adr_ns_id:
-        adr_namespace_obj.resource_id = adr_ns_id
+        # Update resource ID if provided
+        if adr_ns_id:
+            adr_namespace_obj.resource_id = adr_ns_id
 
-    # Update user identity ID if provided
-    if adr_ns_identity_id:
-        adr_namespace_obj.selected_user_assigned_identity_resource_id = adr_ns_identity_id
-
-    # Determine correct authentication type based on whether user identity is set
-    if adr_namespace_obj.selected_user_assigned_identity_resource_id:
-        adr_namespace_obj.authentication_type = DeviceRegistryNamespaceAuthenticationType.USER_ASSIGNED.value
-    else:
-        adr_namespace_obj.authentication_type = DeviceRegistryNamespaceAuthenticationType.SYSTEM_ASSIGNED.value
+        # Update user identity ID if provided
+        if adr_ns_identity_id is not None:
+            if adr_ns_identity_id:
+                adr_namespace_obj.selected_user_assigned_identity_resource_id = adr_ns_identity_id
+                adr_namespace_obj.authentication_type = DeviceRegistryNamespaceAuthenticationType.USER_ASSIGNED.value
+            else:
+                adr_namespace_obj.selected_user_assigned_identity_resource_id = None
+                adr_namespace_obj.authentication_type = DeviceRegistryNamespaceAuthenticationType.SYSTEM_ASSIGNED.value
 
     return adr_namespace_obj
 
