@@ -58,10 +58,9 @@ class NamespaceProvider(ADRProvider):
                 namespace_name=namespace_name,
                 resource=namespace_resource,
             ).result()
-            logger.info(f"Created device registry namespace `{namespace_name}`")
 
         try:
-            # TODO - CMS Preview - what is up with these create responses?
+            # TODO - CMS Preview - create response does not include resource group
             if not namespace_result.get("resourceGroup"):
                 namespace_result["resourceGroup"] = resource_group_name
 
@@ -75,7 +74,6 @@ class NamespaceProvider(ADRProvider):
                         resource_group_name=resource_group_name,
                         location=location,
                     ).result()
-                    logger.info("Created default namespace credential")
 
             # TODO - CMS Preview - Create policy by default
             if not no_credential and not no_policy:
@@ -92,7 +90,6 @@ class NamespaceProvider(ADRProvider):
                         certificate_subject=certificate_subject,
                         certificate_validity_days=certificate_validity_days,
                     ).result()
-                    logger.info(f"Created namespace credential policy '{policy_name}'")
         except Exception as e:
             logger.error("Error creating namespace credentials or policy: %s", str(e))
 
@@ -115,7 +112,7 @@ class NamespaceProvider(ADRProvider):
         with console.status(f"Deleting namespace {namespace_name}..."):
             return self.client.namespaces.begin_delete(
                 resource_group_name=resource_group_name, namespace_name=namespace_name
-            )
+            ).result()
 
     def update(
         self,

@@ -9,7 +9,6 @@ from unittest.mock import Mock, patch
 from azext_iot.adr.providers.namespace import NamespaceProvider
 from azext_iot.adr.providers.credential import CredentialProvider
 from azext_iot.adr.providers.policy import PolicyProvider
-from azext_iot.adr.providers.rbac import RbacProvider
 
 
 class TestADRIntegration(object):
@@ -37,14 +36,18 @@ class TestADRIntegration(object):
         mock_client.namespaces.begin_delete.return_value = Mock()
         mock_client.namespaces.list_by_resource_group.return_value = []
 
-        # Mock credentials operations
-        mock_client.credentials.begin_create_or_update.return_value = {"name": "default", "location": "eastus"}
+        # Mock credentials operations - return LRO objects with result() method
+        mock_credential_lro = Mock()
+        mock_credential_lro.result.return_value = {"name": "default", "location": "eastus"}
+        mock_client.credentials.begin_create_or_update.return_value = mock_credential_lro
         mock_client.credentials.get.return_value = {"name": "default", "properties": {"status": "active"}}
         mock_client.credentials.begin_delete.return_value = Mock()
         mock_client.credentials.begin_synchronize.return_value = Mock()
 
-        # Mock policies operations
-        mock_client.policies.begin_create_or_update.return_value = {"name": "test-policy", "location": "eastus"}
+        # Mock policies operations - return LRO objects with result() method
+        mock_policy_lro = Mock()
+        mock_policy_lro.result.return_value = {"name": "test-policy", "location": "eastus"}
+        mock_client.policies.begin_create_or_update.return_value = mock_policy_lro
         mock_client.policies.get.return_value = {
             "name": "test-policy",
             "properties": {"certificate": {"status": "active"}},
@@ -54,22 +57,8 @@ class TestADRIntegration(object):
 
         return mock_client
 
-    @pytest.fixture()
-    def fixture_rbac_cli(self):
-        """Mock EmbeddedCLI for RBAC operations."""
-        mock_cli = Mock()
-
-        # Mock successful operations
-        mock_operation = Mock()
-        mock_operation.success.return_value = True
-        mock_operation.as_json.return_value = {"id": "test-id", "principalId": "test-principal"}
-        mock_operation.get_error.return_value = ""
-
-        mock_cli.invoke.return_value = mock_operation
-        return mock_cli
-
-    def test_complete_adr_namespace_creation_workflow(self, fixture_cmd, fixture_adr_client, fixture_rbac_cli):
-        """Test complete ADR namespace creation including credentials, policies, and RBAC."""
+    def test_complete_adr_namespace_creation_workflow(self, fixture_cmd, fixture_adr_client):
+        """Test complete ADR namespace creation, with credential and policy"""
         namespace_name = "integration-test-namespace"
 
         # Update the mock to return the expected namespace name
@@ -84,9 +73,7 @@ class TestADRIntegration(object):
             "resourceGroup": "integration-test-rg",
         }
 
-        with patch("azext_iot.adr.providers.base.adr_service_factory", return_value=fixture_adr_client), patch(
-            "azext_iot.adr.providers.rbac.EmbeddedCLI", return_value=fixture_rbac_cli
-        ), patch("azext_iot.adr.providers.rbac.get_subscription_id", return_value="test-subscription"):
+        with patch("azext_iot.adr.providers.base.adr_service_factory", return_value=fixture_adr_client):
 
             namespace_provider = NamespaceProvider(fixture_cmd)
 
@@ -123,21 +110,20 @@ class TestADRIntegration(object):
             # Assert policy creation was called
             fixture_adr_client.policies.begin_create_or_update.assert_called_once()
 
-            # TODO - better checks for RBAC lifecycle
-            assert fixture_rbac_cli.invoke.call_count >= 1  # At least some RBAC calls were made
-
     def test_adr_credential_lifecycle(self, fixture_cmd, fixture_adr_client):
         """Test complete credential lifecycle: create, show, sync, delete."""
         with patch("azext_iot.adr.providers.base.adr_service_factory", return_value=fixture_adr_client):
             credential_provider = CredentialProvider(fixture_cmd)
 
-            # Test create
-            create_result = credential_provider.create(
+            # Test create - should return LRO object
+            create_lro = credential_provider.create(
                 namespace_name="test-namespace",
                 resource_group_name="test-rg",
                 location="eastus",
                 tags={"lifecycle": "test"},
             )
+            # Get the actual result from the LRO
+            create_result = create_lro.result()
             assert create_result["name"] == "default"
             fixture_adr_client.credentials.begin_create_or_update.assert_called_once()
 
@@ -161,8 +147,8 @@ class TestADRIntegration(object):
         with patch("azext_iot.adr.providers.base.adr_service_factory", return_value=fixture_adr_client):
             policy_provider = PolicyProvider(fixture_cmd)
 
-            # Test create with certificate configuration
-            create_result = policy_provider.create(
+            # Test create with certificate configuration - should return LRO object
+            create_lro = policy_provider.create(
                 policy_name="lifecycle-policy",
                 namespace_name="test-namespace",
                 resource_group_name="test-rg",
@@ -171,6 +157,8 @@ class TestADRIntegration(object):
                 certificate_subject="CN=lifecycle.test.com",
                 certificate_validity_days=365,
             )
+            # Get the actual result from the LRO
+            create_result = create_lro.result()
             assert create_result["name"] == "test-policy"
             fixture_adr_client.policies.begin_create_or_update.assert_called_once()
 
@@ -195,73 +183,6 @@ class TestADRIntegration(object):
             assert delete_result is not None
             fixture_adr_client.policies.begin_delete.assert_called_once()
 
-    def test_adr_rbac_configuration(self, fixture_cmd, fixture_rbac_cli):
-        """Test ADR RBAC configuration workflow."""
-        namespace = {
-            "id": "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.DeviceRegistry/namespaces/rbac-test",
-            "name": "rbac-test",
-            "location": "eastus",
-            "resourceGroup": "test-rg",
-            "identity": {"principalId": "namespace-principal-id"},
-        }
-
-        # Mock successful role and identity operations
-        mock_role_list_operation = Mock()
-        mock_role_list_operation.success.return_value = True
-        mock_role_list_operation.as_json.return_value = [
-            {"id": "custom-role-id", "name": "ADR Integration Role"}
-        ]  # Return as list
-
-        mock_role_create_operation = Mock()
-        mock_role_create_operation.success.return_value = True
-        mock_role_create_operation.as_json.return_value = {"id": "custom-role-id", "name": "ADR Integration Role"}
-
-        mock_identity_operation = Mock()
-        mock_identity_operation.success.return_value = True
-        mock_identity_operation.as_json.return_value = {"principalId": "user-identity-principal"}
-
-        def cli_side_effect(command):
-            if "role definition list" in command:
-                return mock_role_list_operation
-            elif "role definition" in command and "create" in command:
-                return mock_role_create_operation
-            elif "identity create" in command:
-                return mock_identity_operation
-            else:
-                # Role assignments
-                mock_assign_op = Mock()
-                mock_assign_op.success.return_value = True
-                return mock_assign_op
-
-        fixture_rbac_cli.invoke.side_effect = cli_side_effect
-
-        with patch("azext_iot.adr.providers.rbac.get_subscription_id", return_value="test-subscription"):
-            rbac_provider = RbacProvider(fixture_cmd)
-            rbac_provider.cli = fixture_rbac_cli
-
-            # Act
-            rbac_provider.configure_adr_user_identity_and_rbac(namespace)
-
-            # Assert
-            # Should have called: role definition operations, identity create, and multiple role assignments
-            assert fixture_rbac_cli.invoke.call_count >= 6
-
-            # Verify role definition creation/update
-            role_calls = [call for call in fixture_rbac_cli.invoke.call_args_list if "role definition" in call[0][0]]
-            assert len(role_calls) >= 1
-
-            # Verify identity creation
-            identity_calls = [
-                call for call in fixture_rbac_cli.invoke.call_args_list if "identity create" in call[0][0]
-            ]
-            assert len(identity_calls) == 1
-
-            # Verify role assignments
-            assignment_calls = [
-                call for call in fixture_rbac_cli.invoke.call_args_list if "role assignment create" in call[0][0]
-            ]
-            assert len(assignment_calls) >= 4  # Custom role + Contributor role for user identity + IoT Hub RP
-
     @pytest.mark.parametrize(
         "no_credential, no_policy, expected_credential_calls, expected_policy_calls",
         [
@@ -275,16 +196,13 @@ class TestADRIntegration(object):
         self,
         fixture_cmd,
         fixture_adr_client,
-        fixture_rbac_cli,
         no_credential,
         no_policy,
         expected_credential_calls,
         expected_policy_calls,
     ):
         """Test namespace creation with different credential and policy options."""
-        with patch("azext_iot.adr.providers.base.adr_service_factory", return_value=fixture_adr_client), patch(
-            "azext_iot.adr.providers.rbac.EmbeddedCLI", return_value=fixture_rbac_cli
-        ), patch("azext_iot.adr.providers.rbac.get_subscription_id", return_value="test-subscription"):
+        with patch("azext_iot.adr.providers.base.adr_service_factory", return_value=fixture_adr_client):
 
             namespace_provider = NamespaceProvider(fixture_cmd)
             namespace_provider.create(

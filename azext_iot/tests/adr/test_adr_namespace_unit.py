@@ -75,15 +75,13 @@ class TestNamespaceProvider(object):
         # Mock credential and policy providers
         with patch("azext_iot.adr.providers.credential.CredentialProvider") as mock_credential_provider_class, patch(
             "azext_iot.adr.providers.policy.PolicyProvider"
-        ) as mock_policy_provider_class, patch("azext_iot.adr.providers.rbac.RbacProvider") as mock_rbac_provider_class:
+        ) as mock_policy_provider_class:
 
             mock_credential_provider = Mock()
             mock_policy_provider = Mock()
-            mock_rbac_provider = Mock()
 
             mock_credential_provider_class.return_value = mock_credential_provider
             mock_policy_provider_class.return_value = mock_policy_provider
-            mock_rbac_provider_class.return_value = mock_rbac_provider
 
             # Mock location fallback if needed
             if not location:
@@ -135,14 +133,6 @@ class TestNamespaceProvider(object):
 
         assert call_args[1]["resource"]["location"] == expected_resource["location"]
         assert call_args[1]["resource"]["identity"] == expected_resource["identity"]
-
-        # Verify RBAC setup - allow for exception handling
-        if mock_rbac_provider.configure_adr_user_identity_and_rbac.call_count > 0:
-            mock_rbac_provider.configure_adr_user_identity_and_rbac.assert_called_with(namespace=mock_namespace_result)
-        else:
-            # RBAC setup failed due to exception, which is expected in test environment
-            # The test logs should show the warning about failed role setup
-            pass
 
         # Verify credential and policy creation based on flags
         if not no_credential:
