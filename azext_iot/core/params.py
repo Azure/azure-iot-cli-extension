@@ -5,15 +5,21 @@
 # --------------------------------------------------------------------------------------------
 
 """
-Parameter definitions for IoT Hub and DPS management commands.
+Parameter definitions for new IoT Hub and DPS management commands.
+These will be added to CLI Core
 """
 
 from azure.cli.core.commands.parameters import get_three_state_flag
 
+from azext_iot.core._params import load_arguments
+
 
 def load_core_arguments(self, _):
 
-    # TODO - CMS Preview - IoT Hub  params
+    # TODO - CMS Preview - load default CLI Core args
+    load_arguments(self, _)
+
+    # IoT Hub ADR params
     with self.argument_context("iot hub") as c:
         c.argument(
             "adr_ns_id",
@@ -25,21 +31,8 @@ def load_core_arguments(self, _):
             options_list=["--ns-identity-id"],
             help="Managed identity resource ID for Device Registry namespace.",
         )
-        c.argument(
-            "system_identity",
-            arg_type=get_three_state_flag(),
-            options_list=["--mi-system-assigned"],
-            help="Enable system-assigned managed identity for this IoT hub.",
-        )
-        c.argument(
-            "user_identities",
-            nargs="*",
-            options_list=["--mi-user-assigned"],
-            help="Enable user-assigned managed identities for this IoT hub. "
-            "Accepts space-separated list of identity resource IDs.",
-        )
 
-    # TODO - CMS Preview - DPS params
+    # DPS create / update ADR and identity params
     with self.argument_context("iot dps") as c:
         c.argument(
             "adr_ns_id",
@@ -49,7 +42,7 @@ def load_core_arguments(self, _):
         c.argument(
             "adr_ns_identity_id",
             options_list=["--ns-identity-id"],
-            help="Managed identity resource ID for Device Registry namespace."
+            help="Managed identity resource ID for Device Registry namespace.",
         )
         c.argument(
             "mi_system_assigned",
@@ -65,6 +58,7 @@ def load_core_arguments(self, _):
             "Accepts space-separated list of identity resource IDs.",
         )
 
+    # DPS identity assignment params
     with self.argument_context("iot dps identity assign") as c:
         c.argument(
             "system_assigned",
@@ -80,6 +74,7 @@ def load_core_arguments(self, _):
             "Accepts space-separated list of identity resource IDs.",
         )
 
+    # DPS identity removal params
     with self.argument_context("iot dps identity remove") as c:
         c.argument(
             "system_assigned",
@@ -93,12 +88,4 @@ def load_core_arguments(self, _):
             options_list=["--user", "--user-assigned"],
             help="Remove user-assigned managed identities from this provisioning service. "
             "Accepts space-separated list of identity resource IDs.",
-        )
-    # TODO - CMS Preview - sort out -n / --hub-name / --dps-name
-    with self.argument_context("iot dps linked-hub") as context:
-        context.argument(
-            "hub_name",
-            options_list=["--hub-name"],
-            help="IoT Hub name to link to DPS.",
-            arg_group="IoT Hub Identifier"
         )
