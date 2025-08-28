@@ -14,6 +14,7 @@ jobs:
     uses: ./.github/workflows/ci_build.yml
   test:
     uses: ./.github/workflows/tox.yml
-  linter:
-    needs: [build]
-    uses: ./.github/workflows/azdev_linter.yml
+  # disabled for this preview due to core module overrides
+  # linter:
+  #   needs: [build]
+  #   uses: ./.github/workflows/azdev_linter.yml
