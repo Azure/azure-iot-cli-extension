@@ -1967,7 +1967,7 @@ def _build_dps_adr_properties(
     return adr_namespace_obj
 
 
-def _construct_identity_info(enable_system_identity, user_identities) -> ManagedServiceIdentity | None:
+def _construct_identity_info(enable_system_identity, user_identities) -> Optional[ManagedServiceIdentity]:
     identity = None
     if enable_system_identity and user_identities:
         identity_type = ManagedServiceIdentityType.SYSTEM_ASSIGNED_USER_ASSIGNED
