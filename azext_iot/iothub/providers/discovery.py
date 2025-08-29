@@ -85,7 +85,7 @@ class IotHubDiscovery(BaseDiscovery):
         target["primarykey"] = policy.primary_key
         target["secondarykey"] = policy.secondary_key
         target["subscription"] = self.sub_id
-        target["resourcegroup"] = resource.additional_properties.get("resourcegroup")
+        target["resourcegroup"] = getattr(resource, 'resourcegroup', None) or resource.additional_properties.get("resourcegroup")
         target["location"] = resource.location
         target["sku_tier"] = resource.sku.tier.value if isinstance(resource.sku.tier, (Enum, EnumMeta)) else resource.sku.tier
 

@@ -309,7 +309,7 @@ class BaseDiscovery(ABC):
         resource = self.find_resource(resource_name=resource_name, rg=resource_group_name)
         key_type = kwargs.get("key_type", "primary")
         policy_name = kwargs.get("policy_name", "auto")
-        rg = resource.additional_properties.get("resourcegroup")
+        rg = getattr(resource, "resourcegroup", None) or resource.additional_properties.get("resourcegroup")
 
         resource_policy = self.find_policy(
             resource_name=resource.name, rg=rg, policy_name=policy_name,
@@ -339,12 +339,11 @@ class BaseDiscovery(ABC):
         if resources:
             for resource in resources:
                 try:
+                    resource_group_name = getattr(
+                        resource, "resourcegroup", None
+                    ) or resource.additional_properties.get("resourcegroup")
                     targets.append(
-                        self.get_target(
-                            resource_name=resource.name,
-                            resource_group_name=resource.additional_properties.get("resourcegroup"),
-                            **kwargs
-                        )
+                        self.get_target(resource_name=resource.name, resource_group_name=resource_group_name, **kwargs)
                     )
                 except (HttpResponseError, ResourceNotFoundError) as e:
                     logger.warning("Could not access %s. %s", resource.name, e)

@@ -70,10 +70,10 @@ iot hub module-twin update:
 iot hub state migrate:
   parameters:
     orig_resource_group_name:
-      rule exclusions:
+      rule_exclusions:
       - parameter_should_not_end_in_resource_group
     resource_group_name:
-      rule exclusions:
+      rule_exclusions:
       - parameter_should_not_end_in_resource_group
 iot hub message-endpoint create cosmosdb-container:
   parameters:
@@ -238,3 +238,41 @@ iot central device twin update:
 iot du update:
   rule_exclusions:
     - require_wait_command_if_no_wait
+
+# DPS command parameter naming exclusions
+iot dps linked-hub create:
+  parameters:
+    apply_allocation_policy:
+      rule_exclusions:
+      - option_length_too_long
+    hub_resource_group:
+      rule_exclusions:
+      - parameter_should_not_end_in_resource_group
+iot dps linked-hub update:
+  parameters:
+    apply_allocation_policy:
+      rule_exclusions:
+      - option_length_too_long
+iot hub certificate list:
+  rule_exclusions:
+  - no_ids_for_list_commands
+iot hub consumer-group list:
+  rule_exclusions:
+  - no_ids_for_list_commands
+iot hub message-enrichment list:
+  rule_exclusions:
+  - no_ids_for_list_commands
+iot hub policy list:
+  rule_exclusions:
+  - no_ids_for_list_commands
+iot hub route list:
+  rule_exclusions:
+  - no_ids_for_list_commands
+iot hub routing-endpoint create:
+  parameters:
+    endpoint_resource_group:
+      rule_exclusions:
+      - parameter_should_not_end_in_resource_group
+iot hub routing-endpoint list:
+  rule_exclusions:
+  - no_ids_for_list_commands

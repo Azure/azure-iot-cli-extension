@@ -38,10 +38,6 @@ def load_adr_help():
   examples:
     - name: Create a basic Device Registry namespace (with system assigned identity, credential, and policy)
       text: az iot adr ns create -n myNamespace -g myResourceGroup
-    - name: Create a Device Registry namespace and assign a role to the system-assigned identity
-      text: >
-        az iot adr ns create -n myNamespace -g myResourceGroup --role "Contributor"
-        --scopes myResourceId anotherResourceId
     - name: Create a Device Registry namespace with custom credential policy properties
       text: >
         az iot adr ns create -n myNamespace -g myResourceGroup --policy-name myPolicy
@@ -169,7 +165,7 @@ def load_adr_help():
   short-summary: Show a policy for a Device Registry namespace.
   examples:
     - name: Show policy details
-      text: az iot adr ns policy show -p myPolicy --ns myNamespace -g myResourceGroup
+      text: az iot adr ns policy show -n myPolicy --ns myNamespace -g myResourceGroup
   """
 
     helps[
@@ -189,7 +185,7 @@ def load_adr_help():
   short-summary: Delete a policy for a Device Registry namespace.
   examples:
     - name: Delete a policy
-      text: az iot adr ns policy delete -p myPolicy --ns myNamespace -g myResourceGroup
+      text: az iot adr ns policy delete -n myPolicy --ns myNamespace -g myResourceGroup
   """
 
     helps[
@@ -199,7 +195,7 @@ def load_adr_help():
   short-summary: Update a policy for a Device Registry namespace.
   examples:
     - name: Update certificate validity period
-      text: az iot adr ns policy update -p myPolicy --cert-validity-days 10 --ns myNamespace -g myResourceGroup
+      text: az iot adr ns policy update -n myPolicy --cert-validity-days 10 --ns myNamespace -g myResourceGroup
     - name: Update certificate subject
-      text: az iot adr ns policy update -p myPolicy --cert-subject "CN=NewDevices" --ns myNamespace -g myResourceGroup
+      text: az iot adr ns policy update -n myPolicy --cert-subject "CN=NewDevices" --ns myNamespace -g myResourceGroup
   """
