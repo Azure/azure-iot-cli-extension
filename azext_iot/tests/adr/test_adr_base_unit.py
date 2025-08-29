@@ -9,18 +9,33 @@ from unittest.mock import Mock, patch
 from azext_iot.adr.providers.base import ADRProvider
 
 
-@pytest.mark.parametrize("resource_group,location", [("test-rg", "westus2")])
+@pytest.mark.parametrize("resource_group,location", [("test-rg", "eastus"), ("test-rg", None)])
 def test_ensure_location_with_provided_location(fixture_adr_provider, fixture_cmd, resource_group, location):
     """Test _ensure_location when location is provided."""
 
-    result = fixture_adr_provider._ensure_location(fixture_cmd.cli_ctx, resource_group, location)
-    assert result == location
+    if location is None:
+        # Mock the resource client when location is None
+        with patch("azure.cli.core.commands.client_factory.get_mgmt_service_client") as mock_get_client:
+            mock_resource_client = Mock()
+            mock_rg = Mock()
+            mock_rg.location = "westus2"  # fallback location
+            mock_resource_client.resource_groups.get.return_value = mock_rg
+            mock_get_client.return_value = mock_resource_client
+
+            result = fixture_adr_provider._ensure_location(fixture_cmd.cli_ctx, resource_group, location)
+            assert result == "westus2"
+            mock_get_client.assert_called_once()
+            mock_resource_client.resource_groups.get.assert_called_once_with(resource_group)
+    else:
+        # When location is provided, it should return immediately
+        result = fixture_adr_provider._ensure_location(fixture_cmd.cli_ctx, resource_group, location)
+        assert result == location
 
 
-@pytest.mark.parametrize("resource_group,location,fallback_location", [("test-rg", None, "westus2")])
-def test_ensure_location_with_fallback(
-    fixture_adr_provider, fixture_cmd, resource_group, location, fallback_location
-):
+@pytest.mark.parametrize(
+    "resource_group,location,fallback_location", [("test-rg", None, "westus2"), (None, None, None)]
+)
+def test_ensure_location_with_fallback(fixture_adr_provider, fixture_cmd, resource_group, location, fallback_location):
     """Test _ensure_location when location is None and needs fallback."""
 
     with patch("azure.cli.core.commands.client_factory.get_mgmt_service_client") as mock_get_client:
