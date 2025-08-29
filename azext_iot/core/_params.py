@@ -41,7 +41,7 @@ hub_name_type = CLIArgumentType(
     help='IoT Hub name.')
 
 dps_name_type = CLIArgumentType(
-    options_list=['--dps-name'],
+    options_list=['--dps-name', '--name'],
     completer=get_resource_name_completion_list('Microsoft.Devices/ProvisioningServices'),
     help='IoT Hub Device Provisioning Service name')
 
@@ -61,7 +61,7 @@ system_assigned_type = CLIArgumentType(
 def load_arguments(self, _):  # pylint: disable=too-many-statements
     # Arguments for IoT DPS
     with self.argument_context('iot dps') as c:
-        c.argument('dps_name', dps_name_type, options_list=['--name', '-n'], id_part='name')
+        c.argument('dps_name', dps_name_type, id_part='name')
         c.argument('tags', tags_type)
 
     with self.argument_context('iot dps create') as c:

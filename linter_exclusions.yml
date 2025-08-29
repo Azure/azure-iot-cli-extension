@@ -276,3 +276,49 @@ iot hub routing-endpoint create:
 iot hub routing-endpoint list:
   rule_exclusions:
   - no_ids_for_list_commands
+
+
+# TODO - CMS Preview - fix these
+# Wait command exclusions for commands with --no-wait
+iot dps linked-hub:
+  rule_exclusions:
+    - require_wait_command_if_no_wait
+iot dps policy:
+  rule_exclusions:
+    - require_wait_command_if_no_wait
+iot hub policy:
+  rule_exclusions:
+    - require_wait_command_if_no_wait
+iot hub:
+  rule_exclusions:
+    - require_wait_command_if_no_wait
+
+# Additional list commands that legitimately use --ids parameter
+iot dps enrollment list:
+  rule_exclusions:
+    - no_ids_for_list_commands
+iot dps enrollment-group list:
+  rule_exclusions:
+    - no_ids_for_list_commands
+iot dps enrollment-group registration list:
+  rule_exclusions:
+    - no_ids_for_list_commands
+iot dps registration list:
+  rule_exclusions:
+    - no_ids_for_list_commands
+iot hub message-endpoint list:
+  rule_exclusions:
+    - no_ids_for_list_commands
+iot hub message-route list:
+  rule_exclusions:
+    - no_ids_for_list_commands
+
+# ADR policy update command with default values
+iot adr ns policy update:
+  parameters:
+    certificate_key_type:
+      rule_exclusions:
+        - no_parameter_defaults_for_update_commands
+    certificate_validity_days:
+      rule_exclusions:
+        - no_parameter_defaults_for_update_commands

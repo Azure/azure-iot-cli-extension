@@ -121,7 +121,7 @@ az role assignment create --assignee $ADR_PRINCIPAL_ID --role "IoT Hub Registry 
 
 ### Step 4: Create DPS with ADR Integration
 ```bash
-az iot dps create --dps-name $DPS_NAME --resource-group $RESOURCE_GROUP --location $LOCATION --mi-user-assigned $UAMI_RESOURCE_ID --ns-resource-id $NAMESPACE_RESOURCE_ID --ns-identity-id $UAMI_RESOURCE_ID
+az iot dps create --name $DPS_NAME --resource-group $RESOURCE_GROUP --location $LOCATION --mi-user-assigned $UAMI_RESOURCE_ID --ns-resource-id $NAMESPACE_RESOURCE_ID --ns-identity-id $UAMI_RESOURCE_ID
 ```
 *Verify: DPS has correct identity and ADR properties configured*
 
