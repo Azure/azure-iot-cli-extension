@@ -29,7 +29,7 @@ def load_core_arguments(self, _):
         c.argument(
             "adr_ns_identity_id",
             options_list=["--ns-identity-id"],
-            help="Managed identity resource ID for Device Registry namespace.",
+            help="User-managed identity resource ID to access Device Registry namespace.",
         )
 
     # DPS create / update ADR and identity params
@@ -42,7 +42,7 @@ def load_core_arguments(self, _):
         c.argument(
             "adr_ns_identity_id",
             options_list=["--ns-identity-id"],
-            help="Managed identity resource ID for Device Registry namespace.",
+            help="User-managed identity resource ID to access Device Registry namespace.",
         )
         c.argument(
             "mi_system_assigned",
