@@ -1919,7 +1919,7 @@ def _setup_adr_role_assignments(cmd, namespace_id: str, hub_id: str) -> None:
                 logger.warning(f"Failed to assign '{role}' role: {str(role_error)}")
 
         if failed_roles:
-            logger.warning(f"Failed to configure some role assignments. "
+            logger.warning("Failed to configure some role assignments. "
                 "Please run the following commands to ensure your ADR namespace has permissions to this IoT Hub:"
             )
             for role in failed_roles:

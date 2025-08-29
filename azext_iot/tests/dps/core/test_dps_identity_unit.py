@@ -27,8 +27,9 @@ resource_group = generate_generic_id()
 
 
 # Test data
-user_identity_1 = f"/subscriptions/{generate_generic_id()}/resourceGroups/{resource_group}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/{generate_generic_id()}"
-user_identity_2 = f"/subscriptions/{generate_generic_id()}/resourceGroups/{resource_group}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/{generate_generic_id()}"
+rg_id = f"/subscriptions/{generate_generic_id()}/resourceGroups/{resource_group}"
+user_identity_1 = f"{rg_id}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/{generate_generic_id()}"
+user_identity_2 = f"{rg_id}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/{generate_generic_id()}"
 
 
 class TestDPSIdentityAssign(object):
@@ -61,7 +62,7 @@ class TestDPSIdentityAssign(object):
         # Verify the DPS identity was set correctly
         if not system_assigned and not user_assigned:
             # no identity to set
-            assert mock_dps.identity == None
+            assert mock_dps.identity is None
         else:
             assert mock_dps.identity.type == expected_type
 
@@ -95,7 +96,7 @@ class TestDPSIdentityAssign(object):
         mock_dps = Mock()
 
         # Existing identity
-        existing_user_id = "/subscriptions/test/resourceGroups/test/providers/Microsoft.ManagedIdentity/userAssignedIdentities/existing-identity"
+        existing_user_id = f"{rg_id}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/existing-identity"
         existing_identity = ManagedServiceIdentity(
             type=ManagedServiceIdentityType.USER_ASSIGNED,
             user_assigned_identities={existing_user_id: UserAssignedIdentity()},
@@ -105,7 +106,7 @@ class TestDPSIdentityAssign(object):
         mock_client.iot_dps_resource.begin_create_or_update.return_value = Mock()
 
         # Add new identity
-        new_user_id = "/subscriptions/test/resourceGroups/test/providers/Microsoft.ManagedIdentity/userAssignedIdentities/new-identity"
+        new_user_id = f"{rg_id}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/new-identity"
 
         dps_identity_assign(mock_client, dps_name="test-dps", user_assigned=[new_user_id])
 
@@ -143,8 +144,8 @@ class TestDPSIdentityRemove(object):
         mock_dps = Mock()
 
         # Set up existing user identities
-        user_id_to_remove = "/subscriptions/test/resourceGroups/test/providers/Microsoft.ManagedIdentity/userAssignedIdentities/remove-identity"
-        user_id_to_keep = "/subscriptions/test/resourceGroups/test/providers/Microsoft.ManagedIdentity/userAssignedIdentities/keep-identity"
+        user_id_to_remove = f"{rg_id}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/remove-identity"
+        user_id_to_keep = f"{rg_id}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/keep-identity"
         existing_identity = ManagedServiceIdentity(
             type=ManagedServiceIdentityType.USER_ASSIGNED,
             user_assigned_identities={
@@ -171,7 +172,7 @@ class TestDPSIdentityRemove(object):
         mock_dps = Mock()
 
         # Existing identities
-        user_id = "/subscriptions/test/resourceGroups/test/providers/Microsoft.ManagedIdentity/userAssignedIdentities/test-identity"
+        user_id = f"{rg_id}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/test-identity"
         existing_identity = ManagedServiceIdentity(
             type=ManagedServiceIdentityType.SYSTEM_ASSIGNED_USER_ASSIGNED,
             user_assigned_identities={user_id: UserAssignedIdentity()},

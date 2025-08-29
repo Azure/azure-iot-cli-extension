@@ -49,6 +49,7 @@ def test_create_credential(fixture_credential_provider, namespace_name, resource
     if tags:
         assert called_with["resource"]["tags"] == expected_resource["tags"]
 
+
 def test_show_credential(fixture_credential_provider):
     """Test successful credential show."""
     expected_credential = {"name": "default", "location": "eastus", "properties": {"status": "active"}}
@@ -61,6 +62,7 @@ def test_show_credential(fixture_credential_provider):
         resource_group_name="test-rg", namespace_name="test-namespace"
     )
 
+
 def test_delete_credential(fixture_credential_provider):
     """Test successful credential deletion."""
     mock_delete_result = Mock()
@@ -72,6 +74,7 @@ def test_delete_credential(fixture_credential_provider):
     fixture_credential_provider.client.credentials.begin_delete.assert_called_once_with(
         resource_group_name="test-rg", namespace_name="test-namespace"
     )
+
 
 def test_synchronize_credential(fixture_credential_provider):
     """Test successful credential synchronization."""

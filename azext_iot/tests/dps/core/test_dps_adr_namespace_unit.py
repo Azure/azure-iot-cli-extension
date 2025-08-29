@@ -13,8 +13,9 @@ from azext_iot.tests.generators import generate_generic_id
 from azext_iot.core.custom import _build_dps_adr_properties
 
 # Test constants
-namespace_id = f"/subscriptions/{generate_generic_id()}/resourceGroups/test-rg/providers/Microsoft.DeviceRegistry/namespaces/test-namespace"
-identity_id = f"/subscriptions/{generate_generic_id()}/resourceGroups/test-rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/test-identity"
+rg_id = f"/subscriptions/{generate_generic_id()}/resourceGroups/test-rg"
+namespace_id = f"{rg_id}/providers/Microsoft.DeviceRegistry/namespaces/test-namespace"
+identity_id = f"{rg_id}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/test-identity"
 
 
 mock_existing_adr_properties = DeviceRegistryNamespaceDescription(
@@ -41,7 +42,7 @@ class TestBuildDPSADRProperties(object):
                 )
             assert "Device Registry namespace resource ID (--ns-resource-id) is required" in str(exc_info.value)
             return
-        
+
         # Clear property scenario (existing namespace in get, user passed empty string for ns_id)
         if existing_namespace is not None and adr_ns_id == "":
             result = _build_dps_adr_properties(
@@ -55,7 +56,6 @@ class TestBuildDPSADRProperties(object):
         )
 
         assert result is not None
-
 
         has_user_identity = adr_ns_identity_id and adr_ns_identity_id != ""
 
@@ -90,4 +90,7 @@ class TestBuildDPSADRProperties(object):
             else:
                 # No identity change
                 assert result.authentication_type == existing_namespace.authentication_type
-                assert result.selected_user_assigned_identity_resource_id == existing_namespace.selected_user_assigned_identity_resource_id
+                assert (
+                    result.selected_user_assigned_identity_resource_id
+                    == existing_namespace.selected_user_assigned_identity_resource_id
+                )

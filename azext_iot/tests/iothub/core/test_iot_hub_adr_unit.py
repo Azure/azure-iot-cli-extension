@@ -7,7 +7,7 @@
 from unittest.mock import Mock, patch
 
 import pytest
-from azure.cli.core.azclierror import InvalidArgumentValueError, RequiredArgumentMissingError
+from azure.cli.core.azclierror import InvalidArgumentValueError, RequiredArgumentMissingError, CLIInternalError
 
 from azext_iot.core.custom import (
     ADR_NS_IDENTITY_ROLES_FOR_HUB,
@@ -99,6 +99,7 @@ class TestSetupADRRoleAssignments(object):
 
         mock_principal_id = generate_generic_id()
         mock_rg = generate_generic_id()
+        mock_rg_id = f"/subscriptions/test/resourceGroups/{mock_rg}"
         mock_namespace = generate_generic_id()
 
         # Mock parse_resource_id
@@ -114,8 +115,8 @@ class TestSetupADRRoleAssignments(object):
 
         mock_cmd = Mock()
         mock_cmd.cli_ctx = Mock()  # Add CLI context
-        namespace_id = f"/subscriptions/test/resourceGroups/{mock_rg}/providers/Microsoft.DeviceRegistry/namespaces/{mock_namespace}"
-        hub_id = f"/subscriptions/test/resourceGroups/{mock_rg}/providers/Microsoft.Devices/IotHubs/test-hub"
+        namespace_id = f"{mock_rg_id}/providers/Microsoft.DeviceRegistry/namespaces/{mock_namespace}"
+        hub_id = f"{mock_rg_id}/providers/Microsoft.Devices/IotHubs/test-hub"
 
         _setup_adr_role_assignments(mock_cmd, namespace_id, hub_id)
 
@@ -125,26 +126,26 @@ class TestSetupADRRoleAssignments(object):
 
         # Verify assign_identity was called for each role
         assert mock_assign_identity.call_count == len(ADR_NS_IDENTITY_ROLES_FOR_HUB)
-        
+
         # Verify assign_identity was called with correct parameters for each role
         for call, role in zip(mock_assign_identity.call_args_list, ADR_NS_IDENTITY_ROLES_FOR_HUB):
             # Check positional arguments
             args, kwargs = call
             assert args[0] == mock_cmd.cli_ctx  # CLI context
-            
+
             # Test that getter and setter functions return objects with correct principal_id
             getter_func = args[1]
             setter_func = args[2]
-            
+
             getter_result = getter_func()
             assert getter_result.identity.principal_id == mock_principal_id
-            
+
             setter_result = setter_func(getter_result)
             assert setter_result.identity.principal_id == mock_principal_id
-            
+
             # Check keyword arguments
-            assert kwargs['identity_role'] == role
-            assert kwargs['identity_scope'] == hub_id
+            assert kwargs["identity_role"] == role
+            assert kwargs["identity_scope"] == hub_id
 
     @patch("azext_iot.core.custom.logger")
     @patch("msrestazure.tools.parse_resource_id")
@@ -174,6 +175,7 @@ class TestSetupADRRoleAssignments(object):
         mock_rg = generate_generic_id()
         mock_namespace = generate_generic_id()
         mock_parse_resource_id.return_value = {"resource_group": mock_rg, "name": mock_namespace}
+        mock_rg_id = f"/subscriptions/test/resourceGroups/{mock_rg}"
 
         # Mock namespace provider to return identity without principal ID
         mock_namespace_provider = Mock()
@@ -181,8 +183,8 @@ class TestSetupADRRoleAssignments(object):
         mock_namespace_provider.show.return_value = {"identity": {}}
 
         mock_cmd = Mock()
-        namespace_id = f"/subscriptions/test/resourceGroups/{mock_rg}/providers/Microsoft.DeviceRegistry/namespaces/{mock_namespace}"
-        hub_id = f"/subscriptions/test/resourceGroups/{mock_rg}/providers/Microsoft.Devices/IotHubs/test-hub"
+        namespace_id = f"{mock_rg_id}/providers/Microsoft.DeviceRegistry/namespaces/{mock_namespace}"
+        hub_id = f"{mock_rg_id}/providers/Microsoft.Devices/IotHubs/test-hub"
 
         _setup_adr_role_assignments(mock_cmd, namespace_id, hub_id)
 
@@ -211,7 +213,7 @@ class TestSetupADRRoleAssignments(object):
         def assign_identity_side_effect(*args, **kwargs):
             # Fail for the first role (Contributor), succeed for others
             if mock_assign_identity.call_count == 1:
-                raise Exception("Role assignment failed")
+                raise CLIInternalError("Role assignment failed")
             return None
 
         mock_assign_identity.side_effect = assign_identity_side_effect
@@ -227,17 +229,15 @@ class TestSetupADRRoleAssignments(object):
 
         # Verify specific warnings for failed role and command suggestions
         warning_calls = mock_logger.warning.call_args_list
-        
+
         # Should have one warning for the specific role failure
-        contributor_failures = [
-            call for call in warning_calls 
-            if "Failed to assign 'Contributor' role:" in str(call)
-        ]
+        contributor_failures = [call for call in warning_calls if "Failed to assign 'Contributor' role:" in str(call)]
         assert len(contributor_failures) == 1
 
         # Should have warnings showing command to run for failed roles
         contributor_help = [
-            call for call in warning_calls 
+            call
+            for call in warning_calls
             if "az role assignment create --assignee 'test-principal-id' --role 'Contributor'" in str(call)
         ]
         assert len(contributor_help) == 1

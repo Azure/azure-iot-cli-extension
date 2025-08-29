@@ -65,7 +65,7 @@ def test_create_policy(
             # Mock namespace.get to return location
             mock_namespace = {"location": "eastus"}
             fixture_policy_provider.client.namespaces.get.return_value = mock_namespace
-            
+
             # Act
             result = fixture_policy_provider.create(
                 policy_name=policy_name,

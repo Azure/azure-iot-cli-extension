@@ -28,61 +28,44 @@ def test_create_namespace(
     location,
     tags,
     no_credential,
-        no_policy,
-        policy_name,
-        cert_key_type,
-        cert_subject,
-        cert_validity_days,
-    ):
-        """Test successful namespace creation."""
-        mock_namespace_result = {
-            "id": (
-                f"/subscriptions/test-sub/resourceGroups/{resource_group_name}/"
-                f"providers/Microsoft.DeviceRegistry/namespaces/{namespace_name}"
-            ),
-            "name": namespace_name,
-            "type": "Microsoft.DeviceRegistry/namespaces",
-            "location": location or "eastus",
-            "identity": {"principalId": "test-principal-id", "type": "SystemAssigned"},
-            "resourceGroup": resource_group_name,
-        }
+    no_policy,
+    policy_name,
+    cert_key_type,
+    cert_subject,
+    cert_validity_days,
+):
+    """Test successful namespace creation."""
+    mock_namespace_result = {
+        "id": (
+            f"/subscriptions/test-sub/resourceGroups/{resource_group_name}/"
+            f"providers/Microsoft.DeviceRegistry/namespaces/{namespace_name}"
+        ),
+        "name": namespace_name,
+        "type": "Microsoft.DeviceRegistry/namespaces",
+        "location": location or "eastus",
+        "identity": {"principalId": "test-principal-id", "type": "SystemAssigned"},
+        "resourceGroup": resource_group_name,
+    }
 
-        # Set up the mock namespace result properly
-        mock_poller = Mock()
-        mock_poller.result.return_value = mock_namespace_result
-        fixture_namespace_provider.client.namespaces.begin_create_or_replace.return_value = mock_poller
+    # Set up the mock namespace result properly
+    mock_poller = Mock()
+    mock_poller.result.return_value = mock_namespace_result
+    fixture_namespace_provider.client.namespaces.begin_create_or_replace.return_value = mock_poller
 
-        # Mock credential and policy providers
-        with patch("azext_iot.adr.providers.credential.CredentialProvider") as mock_credential_provider_class, patch(
-            "azext_iot.adr.providers.policy.PolicyProvider"
-        ) as mock_policy_provider_class:
+    # Mock credential and policy providers
+    with patch("azext_iot.adr.providers.credential.CredentialProvider") as mock_credential_provider_class, patch(
+        "azext_iot.adr.providers.policy.PolicyProvider"
+    ) as mock_policy_provider_class:
 
-            mock_credential_provider = Mock()
-            mock_policy_provider = Mock()
+        mock_credential_provider = Mock()
+        mock_policy_provider = Mock()
 
-            mock_credential_provider_class.return_value = mock_credential_provider
-            mock_policy_provider_class.return_value = mock_policy_provider
+        mock_credential_provider_class.return_value = mock_credential_provider
+        mock_policy_provider_class.return_value = mock_policy_provider
 
-            # Mock location fallback if needed
-            if not location:
-                with patch.object(
-                    fixture_namespace_provider, "_ensure_location", return_value="eastus"
-                ) as mock_location:
-                    result = fixture_namespace_provider.create(
-                        namespace_name=namespace_name,
-                        resource_group_name=resource_group_name,
-                        location=location,
-                        tags=tags,
-                        no_credential=no_credential,
-                        no_policy=no_policy,
-                        policy_name=policy_name,
-                        certificate_key_type=cert_key_type,
-                        certificate_subject=cert_subject,
-                        certificate_validity_days=cert_validity_days,
-                    )
-                    # Verify location fallback was called
-                    mock_location.assert_called_once()
-            else:
+        # Mock location fallback if needed
+        if not location:
+            with patch.object(fixture_namespace_provider, "_ensure_location", return_value="eastus") as mock_location:
                 result = fixture_namespace_provider.create(
                     namespace_name=namespace_name,
                     resource_group_name=resource_group_name,
@@ -95,37 +78,52 @@ def test_create_namespace(
                     certificate_subject=cert_subject,
                     certificate_validity_days=cert_validity_days,
                 )
-        assert result["name"] == namespace_name
-        assert result["resourceGroup"] == resource_group_name
-
-        # Verify namespace creation call
-        fixture_namespace_provider.client.namespaces.begin_create_or_replace.assert_called_once()
-        call_args = fixture_namespace_provider.client.namespaces.begin_create_or_replace.call_args
-
-        assert call_args[1]["resource_group_name"] == resource_group_name
-        assert call_args[1]["namespace_name"] == namespace_name
-
-        expected_resource = {"location": location or "eastus", "identity": {"type": IdentityType.system_assigned.value}}
-        if tags:
-            expected_resource["tags"] = tags
-
-        assert call_args[1]["resource"]["location"] == expected_resource["location"]
-        assert call_args[1]["resource"]["identity"] == expected_resource["identity"]
-
-        # Verify credential and policy creation based on flags
-        if not no_credential:
-            mock_credential_provider.create.assert_called_once_with(
+                # Verify location fallback was called
+                mock_location.assert_called_once()
+        else:
+            result = fixture_namespace_provider.create(
                 namespace_name=namespace_name,
                 resource_group_name=resource_group_name,
-                location=location or "eastus",
+                location=location,
+                tags=tags,
+                no_credential=no_credential,
+                no_policy=no_policy,
+                policy_name=policy_name,
+                certificate_key_type=cert_key_type,
+                certificate_subject=cert_subject,
+                certificate_validity_days=cert_validity_days,
             )
-        else:
-            mock_credential_provider.create.assert_not_called()
+    assert result["name"] == namespace_name
+    assert result["resourceGroup"] == resource_group_name
 
-        if not no_credential and not no_policy:
-            mock_policy_provider.create.assert_called_once()
-        else:
-            mock_policy_provider.create.assert_not_called()
+    # Verify namespace creation call
+    fixture_namespace_provider.client.namespaces.begin_create_or_replace.assert_called_once()
+    call_args = fixture_namespace_provider.client.namespaces.begin_create_or_replace.call_args
+
+    assert call_args[1]["resource_group_name"] == resource_group_name
+    assert call_args[1]["namespace_name"] == namespace_name
+
+    expected_resource = {"location": location or "eastus", "identity": {"type": IdentityType.system_assigned.value}}
+    if tags:
+        expected_resource["tags"] = tags
+
+    assert call_args[1]["resource"]["location"] == expected_resource["location"]
+    assert call_args[1]["resource"]["identity"] == expected_resource["identity"]
+
+    # Verify credential and policy creation based on flags
+    if not no_credential:
+        mock_credential_provider.create.assert_called_once_with(
+            namespace_name=namespace_name,
+            resource_group_name=resource_group_name,
+            location=location or "eastus",
+        )
+    else:
+        mock_credential_provider.create.assert_not_called()
+
+    if not no_credential and not no_policy:
+        mock_policy_provider.create.assert_called_once()
+    else:
+        mock_policy_provider.create.assert_not_called()
 
 
 def test_show_namespace(fixture_namespace_provider):
