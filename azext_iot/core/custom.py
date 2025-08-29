@@ -1897,14 +1897,14 @@ def _setup_adr_role_assignments(cmd, namespace_id: str, hub_id: str) -> None:
             return
 
         # Assign roles
-        has_error = False
+        failed_roles = []
         for role in ADR_NS_IDENTITY_ROLES_FOR_HUB:
             try:
                 # assign_identity needs the resource identity as an object, not a dict
                 from types import SimpleNamespace
 
                 ns_obj = SimpleNamespace(
-                    identity=SimpleNamespace(principal_id=namespace_details.get("identity", {}).get("principalId"))
+                    identity=SimpleNamespace(principal_id=principal_id)
                 )
                 assign_identity(
                     cmd.cli_ctx,
@@ -1915,11 +1915,15 @@ def _setup_adr_role_assignments(cmd, namespace_id: str, hub_id: str) -> None:
                 )
                 logger.info(f"Successfully assigned '{role}' role to ADR namespace on IoT Hub")
             except Exception as role_error:
-                has_error = True
+                failed_roles.append(role)
                 logger.warning(f"Failed to assign '{role}' role: {str(role_error)}")
 
-        if has_error:
-            logger.warning(f"Failed to configure some role assignments.\n{ADR_ROLE_ASSIGN_ERROR_MSG}")
+        if failed_roles:
+            logger.warning(f"Failed to configure some role assignments. "
+                "Please run the following commands to ensure your ADR namespace has permissions to this IoT Hub:"
+            )
+            for role in failed_roles:
+                logger.warning(f"az role assignment create --assignee '{principal_id}' --role '{role}' --scope '{hub_id}'")
 
     except Exception as e:
         logger.warning(f"Failed to set up ADR role assignments: {str(e)}.\n{ADR_ROLE_ASSIGN_ERROR_MSG}")

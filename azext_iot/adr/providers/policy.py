@@ -29,7 +29,13 @@ class PolicyProvider(ADRProvider):
     ):
         """Create a policy for an ADR namespace."""
         if not location:
-            location = self._ensure_location(self.cmd.cli_ctx, resource_group_name, location)
+            # TODO - CMS Preview - fetch location from the existing namespace
+            namespace = self.client.namespaces.get(
+                resource_group_name=resource_group_name, namespace_name=namespace_name
+            )
+            location = namespace.get("location")
+        # fallback to RG location
+        location = self._ensure_location(self.cmd.cli_ctx, resource_group_name, location)
 
         policy_resource = {"location": location}
 
@@ -98,12 +104,15 @@ class PolicyProvider(ADRProvider):
         policy_name: str,
         namespace_name: str,
         resource_group_name: str,
+        tags: Optional[Dict[str, str]] = None,
         certificate_key_type: Optional[str] = None,
         certificate_subject: Optional[str] = None,
         certificate_validity_days: Optional[int] = None,
     ):
         """Update a policy for an ADR namespace."""
         update_payload = {}
+        if tags:
+            update_payload["tags"] = tags
 
         properties = {}
         if certificate_key_type or certificate_subject or certificate_validity_days:
@@ -121,6 +130,11 @@ class PolicyProvider(ADRProvider):
                 }
         if properties:
             update_payload["properties"] = properties
+
+        # return if nothing to update
+        if not update_payload:
+            return
+
         return self.client.policies.begin_update(
             resource_group_name=resource_group_name,
             namespace_name=namespace_name,

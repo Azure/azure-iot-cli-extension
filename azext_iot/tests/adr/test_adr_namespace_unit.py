@@ -6,48 +6,28 @@
 
 import pytest
 from unittest.mock import Mock, patch
-from azext_iot.adr.providers.namespace import NamespaceProvider
 from azext_iot.adr.common import IdentityType
 
 
-class TestNamespaceProvider(object):
-    """Test NamespaceProvider class methods."""
-
-    @pytest.fixture()
-    def fixture_cmd(self):
-        mock_cmd = Mock()
-        mock_cmd.cli_ctx = Mock()
-        return mock_cmd
-
-    @pytest.fixture()
-    def fixture_namespace_provider(self, fixture_cmd):
-        with patch("azext_iot.adr.providers.base.adr_service_factory") as mock_factory:
-            mock_client = Mock()
-            mock_factory.return_value = mock_client
-            provider = NamespaceProvider(fixture_cmd)
-            provider.client = mock_client
-            return provider
-
-    @pytest.mark.parametrize(
-        (
-            "namespace_name, resource_group_name, location, tags, no_credential, "
-            "no_policy, policy_name, cert_key_type, cert_subject, cert_validity_days"
-        ),
-        [
-            ("test-namespace", "test-rg", "eastus", None, False, False, None, None, None, None),
-            ("test-namespace", "test-rg", None, {"env": "test"}, False, False, None, "RSA", "CN=test", 365),
-            ("test-namespace", "test-rg", "westus", None, True, True, "test-policy", None, None, None),
-        ],
-    )
-    def test_create_namespace(
-        self,
-        fixture_namespace_provider,
-        fixture_cmd,
-        namespace_name,
-        resource_group_name,
-        location,
-        tags,
-        no_credential,
+@pytest.mark.parametrize(
+    (
+        "namespace_name, resource_group_name, location, tags, no_credential, "
+        "no_policy, policy_name, cert_key_type, cert_subject, cert_validity_days"
+    ),
+    [
+        ("test-namespace", "test-rg", "eastus", None, False, False, None, None, None, None),
+        ("test-namespace", "test-rg", None, {"env": "test"}, False, False, None, "RSA", "CN=test", 365),
+        ("test-namespace", "test-rg", "westus", None, True, True, "test-policy", None, None, None),
+    ],
+)
+def test_create_namespace(
+    fixture_namespace_provider,
+    fixture_cmd,
+    namespace_name,
+    resource_group_name,
+    location,
+    tags,
+    no_credential,
         no_policy,
         policy_name,
         cert_key_type,
@@ -88,7 +68,6 @@ class TestNamespaceProvider(object):
                 with patch.object(
                     fixture_namespace_provider, "_ensure_location", return_value="eastus"
                 ) as mock_location:
-                    # Act
                     result = fixture_namespace_provider.create(
                         namespace_name=namespace_name,
                         resource_group_name=resource_group_name,
@@ -104,7 +83,6 @@ class TestNamespaceProvider(object):
                     # Verify location fallback was called
                     mock_location.assert_called_once()
             else:
-                # Act
                 result = fixture_namespace_provider.create(
                     namespace_name=namespace_name,
                     resource_group_name=resource_group_name,
@@ -116,7 +94,7 @@ class TestNamespaceProvider(object):
                     certificate_key_type=cert_key_type,
                     certificate_subject=cert_subject,
                     certificate_validity_days=cert_validity_days,
-                )  # Assert
+                )
         assert result["name"] == namespace_name
         assert result["resourceGroup"] == resource_group_name
 
@@ -149,84 +127,89 @@ class TestNamespaceProvider(object):
         else:
             mock_policy_provider.create.assert_not_called()
 
-    def test_show_namespace(self, fixture_namespace_provider):
-        """Test successful namespace show."""
-        expected_namespace = {"name": "test-namespace", "location": "eastus"}
-        fixture_namespace_provider.client.namespaces.get.return_value = expected_namespace
 
-        result = fixture_namespace_provider.show(namespace_name="test-namespace", resource_group_name="test-rg")
+def test_show_namespace(fixture_namespace_provider):
+    """Test successful namespace show."""
+    expected_namespace = {"name": "test-namespace", "location": "eastus"}
+    fixture_namespace_provider.client.namespaces.get.return_value = expected_namespace
 
-        assert result == expected_namespace
-        fixture_namespace_provider.client.namespaces.get.assert_called_once_with(
-            resource_group_name="test-rg", namespace_name="test-namespace"
-        )
+    result = fixture_namespace_provider.show(namespace_name="test-namespace", resource_group_name="test-rg")
 
-    def test_delete_namespace(self, fixture_namespace_provider):
-        """Test successful namespace deletion."""
-        fixture_namespace_provider.client.namespaces.begin_delete.return_value = Mock()
-
-        result = fixture_namespace_provider.delete(namespace_name="test-namespace", resource_group_name="test-rg")
-
-        assert result is not None
-        fixture_namespace_provider.client.namespaces.begin_delete.assert_called_once_with(
-            resource_group_name="test-rg", namespace_name="test-namespace"
-        )
-
-    def test_list_namespaces_by_resource_group(self, fixture_namespace_provider):
-        """Test successful namespace listing by resource group."""
-        expected_namespaces = [
-            {"name": "namespace1", "location": "eastus"},
-            {"name": "namespace2", "location": "westus"},
-        ]
-        fixture_namespace_provider.client.namespaces.list_by_resource_group.return_value = expected_namespaces
-
-        result = fixture_namespace_provider.list(resource_group_name="test-rg")
-
-        assert result == expected_namespaces
-        fixture_namespace_provider.client.namespaces.list_by_resource_group.assert_called_once_with(
-            resource_group_name="test-rg"
-        )
-
-    def test_list_namespaces_by_subscription(self, fixture_namespace_provider):
-        """Test successful namespace listing by subscription."""
-        expected_namespaces = [
-            {"name": "namespace1", "location": "eastus"},
-            {"name": "namespace2", "location": "westus"},
-        ]
-        fixture_namespace_provider.client.namespaces.list_by_subscription.return_value = expected_namespaces
-
-        result = fixture_namespace_provider.list()
-
-        assert result == expected_namespaces
-        fixture_namespace_provider.client.namespaces.list_by_subscription.assert_called_once()
-
-    @pytest.mark.parametrize(
-        "namespace_name, resource_group_name, tags",
-        [
-            ("test-namespace", "test-rg", {"env": "production"}),
-            ("prod-namespace", "prod-rg", {"team": "platform", "env": "prod"}),
-            ("update-namespace", "update-rg", None),  # Test with no tags
-        ],
+    assert result == expected_namespace
+    fixture_namespace_provider.client.namespaces.get.assert_called_once_with(
+        resource_group_name="test-rg", namespace_name="test-namespace"
     )
-    def test_update_namespace(self, fixture_namespace_provider, namespace_name, resource_group_name, tags):
-        """Test successful namespace update."""
-        mock_update_result = Mock()
-        fixture_namespace_provider.client.namespaces.begin_update.return_value = mock_update_result
 
-        result = fixture_namespace_provider.update(
-            namespace_name=namespace_name, resource_group_name=resource_group_name, tags=tags
-        )
 
-        assert result == mock_update_result
-        fixture_namespace_provider.client.namespaces.begin_update.assert_called_once()
+def test_delete_namespace(fixture_namespace_provider):
+    """Test successful namespace deletion."""
+    fixture_namespace_provider.client.namespaces.begin_delete.return_value = Mock()
 
-        call_args = fixture_namespace_provider.client.namespaces.begin_update.call_args
-        assert call_args[1]["resource_group_name"] == resource_group_name
-        assert call_args[1]["namespace_name"] == namespace_name
+    result = fixture_namespace_provider.delete(namespace_name="test-namespace", resource_group_name="test-rg")
 
-        properties = call_args[1]["properties"]
-        if tags is not None:
-            assert properties["tags"] == tags
-        else:
-            # Should be empty dict when no tags provided
-            assert properties == {}
+    assert result is not None
+    fixture_namespace_provider.client.namespaces.begin_delete.assert_called_once_with(
+        resource_group_name="test-rg", namespace_name="test-namespace"
+    )
+
+
+def test_list_namespaces_by_resource_group(fixture_namespace_provider):
+    """Test successful namespace listing by resource group."""
+    expected_namespaces = [
+        {"name": "namespace1", "location": "eastus"},
+        {"name": "namespace2", "location": "westus"},
+    ]
+    fixture_namespace_provider.client.namespaces.list_by_resource_group.return_value = expected_namespaces
+
+    result = fixture_namespace_provider.list(resource_group_name="test-rg")
+
+    assert result == expected_namespaces
+    fixture_namespace_provider.client.namespaces.list_by_resource_group.assert_called_once_with(
+        resource_group_name="test-rg"
+    )
+
+
+def test_list_namespaces_by_subscription(fixture_namespace_provider):
+    """Test successful namespace listing by subscription."""
+    expected_namespaces = [
+        {"name": "namespace1", "location": "eastus"},
+        {"name": "namespace2", "location": "westus"},
+    ]
+    fixture_namespace_provider.client.namespaces.list_by_subscription.return_value = expected_namespaces
+
+    result = fixture_namespace_provider.list()
+
+    assert result == expected_namespaces
+    fixture_namespace_provider.client.namespaces.list_by_subscription.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "namespace_name, resource_group_name, tags",
+    [
+        ("test-namespace", "test-rg", {"env": "production"}),
+        ("prod-namespace", "prod-rg", {"team": "platform", "env": "prod"}),
+        ("update-namespace", "update-rg", None),  # Test with no tags
+    ],
+)
+def test_update_namespace(fixture_namespace_provider, namespace_name, resource_group_name, tags):
+    """Test successful namespace update."""
+    mock_update_result = Mock()
+    fixture_namespace_provider.client.namespaces.begin_update.return_value = mock_update_result
+
+    result = fixture_namespace_provider.update(
+        namespace_name=namespace_name, resource_group_name=resource_group_name, tags=tags
+    )
+
+    assert result == mock_update_result
+    fixture_namespace_provider.client.namespaces.begin_update.assert_called_once()
+
+    call_args = fixture_namespace_provider.client.namespaces.begin_update.call_args
+    assert call_args[1]["resource_group_name"] == resource_group_name
+    assert call_args[1]["namespace_name"] == namespace_name
+
+    properties = call_args[1]["properties"]
+    if tags is not None:
+        assert properties["tags"] == tags
+    else:
+        # Should be empty dict when no tags provided
+        assert properties == {}

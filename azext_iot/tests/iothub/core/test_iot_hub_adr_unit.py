@@ -209,7 +209,7 @@ class TestSetupADRRoleAssignments(object):
 
         # Mock assign_identity to fail for some roles
         def assign_identity_side_effect(*args, **kwargs):
-            # Fail for the first role, succeed for others
+            # Fail for the first role (Contributor), succeed for others
             if mock_assign_identity.call_count == 1:
                 raise Exception("Role assignment failed")
             return None
@@ -225,13 +225,22 @@ class TestSetupADRRoleAssignments(object):
 
         _setup_adr_role_assignments(mock_cmd, namespace_id, hub_id)
 
-        # Verify warning was logged for the failure
-        warning_calls = [
-            call
-            for call in mock_logger.warning.call_args_list
-            if "Failed to configure some role assignments" in str(call)
+        # Verify specific warnings for failed role and command suggestions
+        warning_calls = mock_logger.warning.call_args_list
+        
+        # Should have one warning for the specific role failure
+        contributor_failures = [
+            call for call in warning_calls 
+            if "Failed to assign 'Contributor' role:" in str(call)
         ]
-        assert len(warning_calls) >= 1
+        assert len(contributor_failures) == 1
+
+        # Should have warnings showing command to run for failed roles
+        contributor_help = [
+            call for call in warning_calls 
+            if "az role assignment create --assignee 'test-principal-id' --role 'Contributor'" in str(call)
+        ]
+        assert len(contributor_help) == 1
 
     @patch("azext_iot.core.custom.logger")
     @patch("msrestazure.tools.parse_resource_id")

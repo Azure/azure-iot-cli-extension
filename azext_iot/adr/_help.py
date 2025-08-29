@@ -32,7 +32,9 @@ def load_adr_help():
   type: command
   short-summary: Create a Device Registry namespace.
   long-summary: |
-    By default, a namespace is created with a system-assigned managed identity, as well as a credential and credential policy - both named 'default'
+    By default, a namespace is created with a system-assigned managed identity, as well as a credential and credential policy - both named 'default'.
+    The policy name can be customized with the --policy-name argument, but the 'default' credential name cannot be changed.
+    To skip creating both of these child resources, use `--no-credential`. To only skip policy creation, use `--no-policy`.
   examples:
     - name: Create a basic Device Registry namespace (with system assigned identity, credential, and policy)
       text: az iot adr ns create -n myNamespace -g myResourceGroup
@@ -44,6 +46,8 @@ def load_adr_help():
       text: >
         az iot adr ns create -n myNamespace -g myResourceGroup --policy-name myPolicy
         --cert-key-type ECC --cert-subject "CN=MyDevices" --cert-validity-days 60
+    - name: Create a Device Registry namespace with no credential (and therefore no policy)
+      text: az iot adr ns create -n myNamespace -g myResourceGroup --no-credential
   """
 
     helps[

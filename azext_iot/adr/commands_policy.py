@@ -52,7 +52,7 @@ def adr_policy_show(cmd, policy_name: str, namespace_name: str, resource_group_n
     )
 
 
-def adr_policy_list(cmd, namespace_name: str, resource_group_name: Optional[str] = None):
+def adr_policy_list(cmd, namespace_name: str, resource_group_name: str):
     """List policies for ADR namespaces."""
 
     provider = PolicyProvider(cmd)
@@ -73,6 +73,7 @@ def adr_policy_update(
     policy_name: str,
     namespace_name: str,
     resource_group_name: str,
+    tags: Optional[Dict[str, str]] = None,
     certificate_key_type: Optional[str] = None,
     certificate_subject: Optional[str] = None,
     certificate_validity_days: Optional[int] = None,
@@ -84,6 +85,7 @@ def adr_policy_update(
         policy_name=policy_name,
         namespace_name=namespace_name,
         resource_group_name=resource_group_name,
+        tags=tags,
         certificate_key_type=certificate_key_type,
         certificate_subject=certificate_subject,
         certificate_validity_days=certificate_validity_days,

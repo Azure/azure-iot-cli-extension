@@ -21,7 +21,6 @@ def adr_credential_create(
     cmd,
     namespace_name: str,
     resource_group_name: str,
-    location: Optional[str] = None,
     tags: Optional[Dict[str, str]] = None,
 ):
     """Create credentials for an ADR namespace."""
@@ -30,7 +29,6 @@ def adr_credential_create(
     return provider.create(
         namespace_name=namespace_name,
         resource_group_name=resource_group_name,
-        location=location,
         tags=tags,
     )
 
