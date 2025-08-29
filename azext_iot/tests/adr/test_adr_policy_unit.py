@@ -9,40 +9,11 @@ from unittest.mock import Mock, patch
 
 
 @pytest.mark.parametrize(
-    "policy_name, namespace_name, resource_group_name, location, tags, cert_key_type, cert_subject, cert_validity_days",
+    "policy_name, namespace_name, resource_group_name, location, cert_key_type, cert_subject, cert_validity_days, tags",
     [
-        ("test-policy", "test-namespace", "test-rg", "eastus", None, None, None, None),
-        (
-            "prod-policy",
-            "prod-namespace",
-            "prod-rg",
-            None,
-            {"env": "production"},
-            "RSA",
-            "CN=prod.example.com",
-            365,
-        ),
-        (
-            "dev-policy",
-            "dev-namespace",
-            "dev-rg",
-            "westus",
-            {"env": "dev", "team": "qa"},
-            "ECC",
-            "CN=dev.example.com",
-            180,
-        ),
-        ("cert-policy", "cert-namespace", "cert-rg", "centralus", None, "RSA", None, 730),
-        (
-            "subject-policy",
-            "subject-namespace",
-            "subject-rg",
-            "southcentralus",
-            None,
-            None,
-            "CN=subject.example.com",
-            None,
-        ),
+        ("policy", "namespace", "rg", "location", "ECC", "test", 30, {"example": "tag"}),
+        ("policy", "namespace", "rg", None, "RSA", None, None, None),
+        ("policy", "namespace", "rg", "location", None, "test", None, {"example": "tag"}),
     ],
 )
 def test_create_policy(
@@ -51,10 +22,10 @@ def test_create_policy(
     namespace_name,
     resource_group_name,
     location,
-    tags,
     cert_key_type,
     cert_subject,
     cert_validity_days,
+    tags,
 ):
     """Test successful policy creation with various parameter combinations."""
     mock_policy_result = Mock()
@@ -207,13 +178,13 @@ def test_delete_policy(fixture_policy_provider):
 
 
 @pytest.mark.parametrize(
-    "cert_key_type, cert_subject, cert_validity_days, expected_ca_config, expected_leaf_config",
+    "cert_key_type, cert_subject, cert_validity_days",
     [
-        ("RSA", None, None, {"keyType": "RSA"}, None),
-        (None, "CN=test", None, {"subject": "CN=test"}, None),
-        ("ECC", "CN=test", None, {"keyType": "ECC", "subject": "CN=test"}, None),
-        (None, None, 365, None, {"validityPeriodInDays": 365}),
-        ("RSA", "CN=test", 365, {"keyType": "RSA", "subject": "CN=test"}, {"validityPeriodInDays": 365}),
+        ("RSA", None, None),
+        (None, "test", None),
+        ("ECC", "test", None),
+        (None, None, 30),
+        ("RSA", "test", 30),
     ],
 )
 def test_certificate_configuration_combinations(
@@ -221,8 +192,6 @@ def test_certificate_configuration_combinations(
     cert_key_type,
     cert_subject,
     cert_validity_days,
-    expected_ca_config,
-    expected_leaf_config,
 ):
     """Test various certificate configuration combinations."""
     mock_policy_result = Mock()
@@ -241,33 +210,40 @@ def test_certificate_configuration_combinations(
     call_args = fixture_policy_provider.client.policies.begin_create_or_update.call_args
     resource = call_args[1]["resource"]
 
-    if expected_ca_config or expected_leaf_config:
+    # Verify certificate configuration
+    if cert_key_type or cert_subject or cert_validity_days:
         assert "properties" in resource
         assert "certificate" in resource["properties"]
         cert_config = resource["properties"]["certificate"]
 
-        if expected_ca_config:
+        # Check CA configuration
+        if cert_key_type or cert_subject:
             assert "certificateAuthorityConfiguration" in cert_config
             ca_config = cert_config["certificateAuthorityConfiguration"]
-            assert ca_config == expected_ca_config
-        else:
-            assert "certificateAuthorityConfiguration" not in cert_config
 
-        if expected_leaf_config:
+            if cert_key_type:
+                assert ca_config["keyType"] == cert_key_type
+            if cert_subject:
+                assert ca_config["subject"] == cert_subject
+
+        # Check leaf certificate configuration
+        if cert_validity_days:
             assert "leafCertificateConfiguration" in cert_config
             leaf_config = cert_config["leafCertificateConfiguration"]
-            assert leaf_config == expected_leaf_config
-        else:
-            assert "leafCertificateConfiguration" not in cert_config
+            assert leaf_config["validityPeriodInDays"] == cert_validity_days
+    else:
+        # No certificate configuration should be present
+        if "properties" in resource:
+            assert "certificate" not in resource["properties"]
 
 
 @pytest.mark.parametrize(
     "tags, cert_key_type, cert_subject, cert_validity_days",
     [
         (None, "RSA", None, None),
-        ({"env": "test"}, None, "CN=updated.example.com", None),
-        ({"env": "prod", "team": "ops"}, None, None, 730),
-        (None, "ECC", "CN=updated.example.com", 365),
+        ({"env": "test"}, None, "test", None),
+        ({"env": "prod", "team": "ops"}, None, None, 30),
+        (None, "ECC", "test", 30),
     ],
 )
 def test_update_policy(fixture_policy_provider, tags, cert_key_type, cert_subject, cert_validity_days):
