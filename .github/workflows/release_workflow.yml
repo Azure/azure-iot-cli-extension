@@ -25,6 +25,7 @@ jobs:
       # needed to write security info to repository
       security-events: write
       contents: read
+      actions: read
     uses: ./.github/workflows/security_checks.yml
     with:
       continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
