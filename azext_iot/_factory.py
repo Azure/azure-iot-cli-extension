@@ -8,15 +8,19 @@
 Factory functions for IoT Hub and Device Provisioning Service.
 """
 
-from azure.core.pipeline.policies import UserAgentPolicy
-from azure.identity import AzureCliCredential
 from knack.log import get_logger
 from msrestazure.azure_exceptions import CloudError
 
 from azext_iot.common.auth import IoTOAuth
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import AuthenticationTypeDataplane, SdkType
+from azext_iot.common.utility import ensure_azure_namespace_path
 from azext_iot.constants import IOTDPS_RESOURCE_ID, IOTHUB_RESOURCE_ID, USER_AGENT
+
+ensure_azure_namespace_path()
+
+from azure.core.pipeline.policies import HttpLoggingPolicy, UserAgentPolicy
+from azure.identity import AzureCliCredential
 
 AZURE_CLI_CREDENTIAL = AzureCliCredential()
 
@@ -37,7 +41,6 @@ def _get_default_logging_policy():
     Get default HTTP logging policy for Azure clients.
     Following the pattern from the new edge module.
     """
-    from azure.core.pipeline.policies import HttpLoggingPolicy
 
     http_logging_policy = HttpLoggingPolicy(logger=logger)
     http_logging_policy.allowed_query_params.add("api-version")
