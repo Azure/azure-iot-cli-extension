@@ -976,6 +976,7 @@ def load_arguments(self, _):
             "Required if --dps-name is not provided.",
             arg_group="Device Provisioning Service Identifier"
         )
+        # TODO - CMS Preview - Hack to quiet the linter
         context.argument(
             "dps_name",
             options_list=["--dps-name", "--name", "-n"],
