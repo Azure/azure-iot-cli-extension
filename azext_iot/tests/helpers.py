@@ -165,6 +165,7 @@ def get_agent_public_ip():
     """
     Poke the Wikipedia website to get Public IP.
     """
+    # TODO: use a different website since Wikipedia changed it's headers
     import requests
     return requests.head("https://www.wikipedia.org").headers["X-Client-IP"]
 

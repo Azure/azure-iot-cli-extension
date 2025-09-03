@@ -15,7 +15,7 @@ from knack.log import get_logger
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.certops import create_self_signed_certificate
-from azext_iot.tests.helpers import assign_role_assignment, clean_up_iothub_device_config, get_closest_marker, get_agent_public_ip
+from azext_iot.tests.helpers import assign_role_assignment, clean_up_iothub_device_config, get_closest_marker
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 
 logger = get_logger(__name__)
@@ -215,18 +215,18 @@ def setup_hub_controlplane_states(
     if os.path.isfile(cert_file):
         os.remove(cert_file)
 
-    # add ip filter rule - make sure to add public ip address so dataplane isn't screwed up
-    public_ip = get_agent_public_ip()
-    cli.invoke(
-        f"resource update --name {hub_name} -g {hub_rg} --resource-type "
-        "\"Microsoft.Devices/IotHubs\" --set properties.networkRuleSets='{}'"
-    )
-    cli.invoke(
-        f"resource update --name {hub_name} -g {hub_rg} --resource-type Microsoft.Devices/IotHubs "
-        "--add properties.networkRuleSets.ipRules '{\"action\":\"Allow\",\"filterName\":\"Trusted\",\"ipMask\":\""
-        f"{public_ip}"
-        "\"}'"
-    )
+    # # add ip filter rule - make sure to add public ip address so dataplane isn't screwed up
+    # public_ip = get_agent_public_ip()
+    # cli.invoke(
+    #     f"resource update --name {hub_name} -g {hub_rg} --resource-type "
+    #     "\"Microsoft.Devices/IotHubs\" --set properties.networkRuleSets='{}'"
+    # )
+    # cli.invoke(
+    #     f"resource update --name {hub_name} -g {hub_rg} --resource-type Microsoft.Devices/IotHubs "
+    #     "--add properties.networkRuleSets.ipRules '{\"action\":\"Allow\",\"filterName\":\"Trusted\",\"ipMask\":\""
+    #     f"{public_ip}"
+    #     "\"}'"
+    # )
     yield provisioned_iot_hubs_with_storage_user_module
 
 
