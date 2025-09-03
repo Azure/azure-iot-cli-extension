@@ -47,14 +47,13 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
                 ),
                 checks=[
                     self.check("jobId", self.job_ids[0]),
-                    # TODO: some properties from the result are missing now. Need to double check with service
-                    # self.check("queryCondition", query_condition),
+                    self.check("queryCondition", query_condition),
                     self.check("status", "completed"),
-                    # self.check("updateTwin.etag", "*"),
-                    # self.check(
-                    #     "updateTwin.tags",
-                    #     json.loads(self.kwargs["twin_patch_tags"])["tags"],
-                    # ),
+                    self.check("updateTwin.etag", "*"),
+                    self.check(
+                        "updateTwin.tags",
+                        json.loads(self.kwargs["twin_patch_tags"])["tags"],
+                    ),
                     self.check("type", "scheduleUpdateTwin"),
                 ],
             )
@@ -82,13 +81,13 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
                 ),
                 checks=[
                     self.check("jobId", self.job_ids[1]),
-                    # self.check("queryCondition", query_condition),
+                    self.check("queryCondition", query_condition),
                     self.check("status", "completed"),
-                    # self.check("updateTwin.etag", "*"),
-                    # self.check(
-                    #     "updateTwin.properties",
-                    #     json.loads(self.kwargs["twin_patch_props"])["properties"],
-                    # ),
+                    self.check("updateTwin.etag", "*"),
+                    self.check(
+                        "updateTwin.properties",
+                        json.loads(self.kwargs["twin_patch_props"])["properties"],
+                    ),
                     self.check("type", "scheduleUpdateTwin"),
                 ],
             )
