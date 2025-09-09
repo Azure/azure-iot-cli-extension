@@ -1121,6 +1121,12 @@ def load_arguments(self, _):
             options_list=["--device-information", "--info"],
             help="Optional device information.",
         )
+        context.argument(
+            "credential_policy_name",
+            options_list=["--credential-policy-name", "--credential-policy"],
+            help="ADR Namespace Credential Policy Name.",
+            arg_group="ADR Credential Policy"
+        )
 
     with self.argument_context("iot dps enrollment create") as context:
         context.argument(
@@ -1226,6 +1232,12 @@ def load_arguments(self, _):
             "registration_id",
             options_list=["--registration-id", "--rid"],
             help="ID of device registration."
+        )
+        context.argument(
+            "credential_policy_name",
+            options_list=["--credential-policy-name", "--credential-policy"],
+            help="ADR Namespace Credential Policy Name.",
+            arg_group="ADR Credential Policy"
         )
 
     with self.argument_context("iot dps enrollment-group show") as context:

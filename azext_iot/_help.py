@@ -1135,6 +1135,10 @@ helps[
         az iot dps enrollment create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --attestation-type symmetrickey --allocation-policy custom
         --webhook-url {webhook_url} --api-version {api_version}
+    - name: Create an enrollment with a custom ADR Namespace Credential Policy specified.
+      text: >
+        az iot dps enrollment create -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --allocation-policy hashed --credential-policy-name {policy_name}
 """
 
 helps[
@@ -1185,6 +1189,11 @@ helps[
         az iot dps enrollment update -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --initial-twin-properties "{'location':{'region':'USA'}}"
         --initial-twin-tags "{'version1':'2'}" --device-information "{'color':'red'}"
+    - name: Update enrollment '{enrollment_id}' in the Azure IoT Device Provisioning Service '{dps_name}'
+            to use a custom ADR Namespace Credential Policy.
+      text: >
+        az iot dps enrollment update -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --credential-policy-name {my_policy}
 """
 
 helps[
@@ -1288,7 +1297,10 @@ helps[
         az iot dps enrollment-group create -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --allocation-policy custom --webhook-url {webhook_url}
         --api-version {api_version}
-
+    - name: Create an enrollment group with a custom Device Registry Namespace Credential Policy specified.
+      text: >
+        az iot dps enrollment-group create -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --allocation-policy hashed --credential-policy-name {policy_name}
 """
 
 helps[
@@ -1326,6 +1338,11 @@ helps[
       text: >
         az iot dps enrollment-group update -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --primary-key {new_primary_key} --etag AAAAAAAAAAA=
+    - name: Update enrollment group '{enrollment_id}' in the Azure IoT Device Provisioning Service '{dps_name}'
+            to use a custom ADR Namespace Credential Policy.
+      text: >
+        az iot dps enrollment update -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --credential-policy-name {my_policy}
 """
 
 helps[
