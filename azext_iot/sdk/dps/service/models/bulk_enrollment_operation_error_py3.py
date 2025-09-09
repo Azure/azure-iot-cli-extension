@@ -30,9 +30,9 @@ class BulkEnrollmentOperationError(Model):
     """
 
     _validation = {
-        'registration_id': {'required': True},
+        'registration_id': {'required': True, 'min_length': 1},
         'error_code': {'required': True},
-        'error_status': {'required': True},
+        'error_status': {'required': True, 'min_length': 1},
     }
 
     _attribute_map = {

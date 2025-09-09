@@ -15,9 +15,9 @@ from msrest.serialization import Model
 class InitialTwin(Model):
     """Initial device twin. Contains a subset of the properties of Twin.
 
-    :param tags: Twin tags.
+    :param tags:
     :type tags: ~dps.models.TwinCollection
-    :param properties: Twin desired properties.
+    :param properties:
     :type properties: ~dps.models.InitialTwinProperties
     """
 

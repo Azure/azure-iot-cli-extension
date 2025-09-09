@@ -26,9 +26,9 @@ class BulkEnrollmentGroupOperationError(Model):
     """
 
     _validation = {
-        'enrollment_group_id': {'required': True},
+        'enrollment_group_id': {'required': True, 'min_length': 1},
         'error_code': {'required': True},
-        'error_status': {'required': True},
+        'error_status': {'required': True, 'min_length': 1},
     }
 
     _attribute_map = {

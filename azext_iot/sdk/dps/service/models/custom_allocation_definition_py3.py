@@ -27,8 +27,8 @@ class CustomAllocationDefinition(Model):
     """
 
     _validation = {
-        'webhook_url': {'required': True},
-        'api_version': {'required': True},
+        'webhook_url': {'required': True, 'min_length': 1},
+        'api_version': {'required': True, 'min_length': 1},
     }
 
     _attribute_map = {

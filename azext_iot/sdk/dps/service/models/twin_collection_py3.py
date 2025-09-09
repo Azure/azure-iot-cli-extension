@@ -22,13 +22,13 @@ class TwinCollection(Model):
     :type version: long
     :param count: Number of properties in the TwinCollection
     :type count: int
-    :param metadata: Metadata for the TwinCollection
+    :param metadata:
     :type metadata: ~dps.models.Metadata
     """
 
     _attribute_map = {
         'additional_properties': {'key': '', 'type': '{object}'},
-        'version': {'key': 'version', 'type': 'object'},  # TODO 'long' -> 'object': rest API spec is not accurate. More than int is supported.
+        'version': {'key': 'version', 'type': 'long'},
         'count': {'key': 'count', 'type': 'int'},
         'metadata': {'key': 'metadata', 'type': 'Metadata'},
     }

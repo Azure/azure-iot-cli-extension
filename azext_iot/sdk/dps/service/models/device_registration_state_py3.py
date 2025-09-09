@@ -54,8 +54,7 @@ class DeviceRegistrationState(Model):
     :vartype last_updated_date_time_utc: datetime
     :ivar etag: The entity tag associated with the resource.
     :vartype etag: str
-    :ivar payload: Custom allocation payload returned from the webhook to the
-     device.
+    :ivar payload:
     :vartype payload: object
     """
 

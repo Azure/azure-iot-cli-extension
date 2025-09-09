@@ -22,21 +22,23 @@ class EnrollmentGroup(Model):
 
     :param enrollment_group_id: Required. Enrollment Group ID.
     :type enrollment_group_id: str
-    :param attestation: Required. Attestation method used by the device.
+    :param attestation: Required.
     :type attestation: ~dps.models.AttestationMechanism
-    :param capabilities: Capabilities of the device.
+    :param capabilities:
     :type capabilities: ~dps.models.DeviceCapabilities
     :param iot_hub_host_name: The Iot Hub host name.
     :type iot_hub_host_name: str
-    :param initial_twin: Initial device twin.
+    :param credential_policy_name: Linked Azure Device Registry credential
+     policy name (optional).
+    :type credential_policy_name: str
+    :param initial_twin:
     :type initial_twin: ~dps.models.InitialTwin
     :param etag: The entity tag associated with the resource.
     :type etag: str
     :param provisioning_status: The provisioning status. Possible values
      include: 'enabled', 'disabled'. Default value: "enabled" .
     :type provisioning_status: str or ~dps.models.enum
-    :param reprovision_policy: The behavior when a device is re-provisioned to
-     an IoT hub.
+    :param reprovision_policy:
     :type reprovision_policy: ~dps.models.ReprovisionPolicy
     :ivar created_date_time_utc: The DateTime this resource was created.
     :vartype created_date_time_utc: datetime
@@ -62,13 +64,13 @@ class EnrollmentGroup(Model):
      resource can be allocated to. Must be a subset of tenant level list of IoT
      hubs.
     :type iot_hubs: list[str]
-    :param custom_allocation_definition: This tells DPS which webhook to call
-     when using custom allocation.
-    :type custom_allocation_definition: ~dps.models.CustomAllocationDefinition
+    :param custom_allocation_definition:
+    :type custom_allocation_definition:
+     ~dps.models.CustomAllocationDefinition
     """
 
     _validation = {
-        'enrollment_group_id': {'required': True},
+        'enrollment_group_id': {'required': True, 'min_length': 1},
         'attestation': {'required': True},
         'created_date_time_utc': {'readonly': True},
         'last_updated_date_time_utc': {'readonly': True},
@@ -79,6 +81,7 @@ class EnrollmentGroup(Model):
         'attestation': {'key': 'attestation', 'type': 'AttestationMechanism'},
         'capabilities': {'key': 'capabilities', 'type': 'DeviceCapabilities'},
         'iot_hub_host_name': {'key': 'iotHubHostName', 'type': 'str'},
+        'credential_policy_name': {'key': 'credentialPolicyName', 'type': 'str'},
         'initial_twin': {'key': 'initialTwin', 'type': 'InitialTwin'},
         'etag': {'key': 'etag', 'type': 'str'},
         'provisioning_status': {'key': 'provisioningStatus', 'type': 'str'},
@@ -90,12 +93,13 @@ class EnrollmentGroup(Model):
         'custom_allocation_definition': {'key': 'customAllocationDefinition', 'type': 'CustomAllocationDefinition'},
     }
 
-    def __init__(self, *, enrollment_group_id: str, attestation, capabilities=None, iot_hub_host_name: str=None, initial_twin=None, etag: str=None, provisioning_status="enabled", reprovision_policy=None, allocation_policy=None, iot_hubs=None, custom_allocation_definition=None, **kwargs) -> None:
+    def __init__(self, *, enrollment_group_id: str, attestation, capabilities=None, iot_hub_host_name: str=None, credential_policy_name: str=None, initial_twin=None, etag: str=None, provisioning_status="enabled", reprovision_policy=None, allocation_policy=None, iot_hubs=None, custom_allocation_definition=None, **kwargs) -> None:
         super(EnrollmentGroup, self).__init__(**kwargs)
         self.enrollment_group_id = enrollment_group_id
         self.attestation = attestation
         self.capabilities = capabilities
         self.iot_hub_host_name = iot_hub_host_name
+        self.credential_policy_name = credential_policy_name
         self.initial_twin = initial_twin
         self.etag = etag
         self.provisioning_status = provisioning_status

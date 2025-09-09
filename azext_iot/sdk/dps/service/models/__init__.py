@@ -9,10 +9,6 @@
 # regenerated.
 # --------------------------------------------------------------------------
 
-from .provisioning_service_error_details_py3 import ProvisioningServiceErrorDetails, ProvisioningServiceErrorDetailsException
-from .device_registration_state_py3 import DeviceRegistrationState
-from .metadata_py3 import Metadata
-from .twin_collection_py3 import TwinCollection
 from .tpm_attestation_py3 import TpmAttestation
 from .x509_certificate_info_py3 import X509CertificateInfo
 from .x509_certificate_with_info_py3 import X509CertificateWithInfo
@@ -22,26 +18,26 @@ from .x509_attestation_py3 import X509Attestation
 from .symmetric_key_attestation_py3 import SymmetricKeyAttestation
 from .attestation_mechanism_py3 import AttestationMechanism
 from .device_capabilities_py3 import DeviceCapabilities
+from .metadata_py3 import Metadata
+from .twin_collection_py3 import TwinCollection
 from .initial_twin_properties_py3 import InitialTwinProperties
 from .initial_twin_py3 import InitialTwin
 from .reprovision_policy_py3 import ReprovisionPolicy
 from .custom_allocation_definition_py3 import CustomAllocationDefinition
-from .individual_enrollment_py3 import IndividualEnrollment
 from .enrollment_group_py3 import EnrollmentGroup
-from .query_specification_py3 import QuerySpecification
-from .bulk_enrollment_operation_py3 import BulkEnrollmentOperation
-from .bulk_enrollment_operation_error_py3 import BulkEnrollmentOperationError
-from .bulk_enrollment_operation_result_py3 import BulkEnrollmentOperationResult
 from .bulk_enrollment_group_operation_py3 import BulkEnrollmentGroupOperation
 from .bulk_enrollment_group_operation_error_py3 import BulkEnrollmentGroupOperationError
 from .bulk_enrollment_group_operation_result_py3 import BulkEnrollmentGroupOperationResult
+from .device_registration_state_py3 import DeviceRegistrationState
+from .individual_enrollment_py3 import IndividualEnrollment
+from .bulk_enrollment_operation_py3 import BulkEnrollmentOperation
+from .bulk_enrollment_operation_error_py3 import BulkEnrollmentOperationError
+from .bulk_enrollment_operation_result_py3 import BulkEnrollmentOperationResult
+from .provisioning_service_error_details_py3 import ProvisioningServiceErrorDetails, ProvisioningServiceErrorDetailsException
+from .query_specification_py3 import QuerySpecification
 
 
 __all__ = [
-    'ProvisioningServiceErrorDetails', 'ProvisioningServiceErrorDetailsException',
-    'DeviceRegistrationState',
-    'Metadata',
-    'TwinCollection',
     'TpmAttestation',
     'X509CertificateInfo',
     'X509CertificateWithInfo',
@@ -51,17 +47,22 @@ __all__ = [
     'SymmetricKeyAttestation',
     'AttestationMechanism',
     'DeviceCapabilities',
+    'Metadata',
+    'TwinCollection',
     'InitialTwinProperties',
     'InitialTwin',
     'ReprovisionPolicy',
     'CustomAllocationDefinition',
-    'IndividualEnrollment',
     'EnrollmentGroup',
-    'QuerySpecification',
-    'BulkEnrollmentOperation',
-    'BulkEnrollmentOperationError',
-    'BulkEnrollmentOperationResult',
     'BulkEnrollmentGroupOperation',
     'BulkEnrollmentGroupOperationError',
     'BulkEnrollmentGroupOperationResult',
+    'DeviceRegistrationState',
+    'IndividualEnrollment',
+    'BulkEnrollmentOperation',
+    'BulkEnrollmentOperationError',
+    'BulkEnrollmentOperationResult',
+    'ProvisioningServiceErrorDetails',
+    'ProvisioningServiceErrorDetailsException',
+    'QuerySpecification',
 ]

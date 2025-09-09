@@ -20,11 +20,11 @@ class AttestationMechanism(Model):
     :param type: Required. Attestation Type. Possible values include: 'none',
      'tpm', 'x509', 'symmetricKey'
     :type type: str or ~dps.models.enum
-    :param tpm: TPM attestation method.
+    :param tpm:
     :type tpm: ~dps.models.TpmAttestation
-    :param x509: X509 attestation method.
+    :param x509:
     :type x509: ~dps.models.X509Attestation
-    :param symmetric_key: Symmetric Key attestation method.
+    :param symmetric_key:
     :type symmetric_key: ~dps.models.SymmetricKeyAttestation
     """
 
