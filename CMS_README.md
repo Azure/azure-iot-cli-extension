@@ -4,14 +4,20 @@
 
 This document provides step-by-step guidance for testing end-to-end control-plane resource setup to enable Certificate Management scenarios between ADR/IoTHub/DPS.
 
-## CLI Installation
+## CLI Extension Installation
 
-[todo] instructions for downloading extension from dist
+Download the extension `.whl` file from [this link](https://github.com/Azure/digital-ops-cms-tools/releases/download/v0.0.30-dev1/azure_iot-0.0.30.dev1-py3-none-any.whl)
 
+**Please do not change the file name of `azure_iot-0.0.30.dev1-py3-none-any.whl`**
 
 ```bash
 az extension remove --name azure-iot --yes
-az extension add --source ./path/to/azure-iot.whl --yes
+az extension add --source ./azure_iot-0.0.30.dev1-py3-none-any.whl --yes
+```
+
+Validate your extension `azure-iot` has version `0.0.30.dev1`:
+```bash
+ az extension show --name azure-iot -o table
 ```
 
 ## Prerequisites
@@ -168,7 +174,7 @@ az iot adr ns policy list --namespace $NAMESPACE_NAME --resource-group $RESOURCE
 az iot adr ns policy show --policy-name "default" --namespace $NAMESPACE_NAME --resource-group $RESOURCE_GROUP
 
 # Create custom policy
-az iot adr ns policy create --policy-name "custom-policy" --namespace $NAMESPACE_NAME --resource-group $RESOURCE_GROUP --certificate-key-type "ECC" --certificate-subject "CN=TestDevice"
+az iot adr ns policy create --policy-name "custom-policy" --namespace $NAMESPACE_NAME --resource-group $RESOURCE_GROUP --cert-key-type "ECC" --cert-subject "CN=TestDevice"
 ```
 
 ## Cleanup
