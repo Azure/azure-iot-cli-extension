@@ -6,9 +6,11 @@
 
 from typing import Dict, Optional
 from knack.log import get_logger
+from rich.console import Console
 from azext_iot.adr.providers.base import ADRProvider
+from azext_iot.common.utility import wait_for_terminal_state
 
-
+console = Console()
 logger = get_logger(__name__)
 
 
@@ -26,6 +28,7 @@ class PolicyProvider(ADRProvider):
         certificate_key_type: Optional[str] = None,
         certificate_subject: Optional[str] = None,
         certificate_validity_days: Optional[int] = None,
+        **kwargs
     ):
         """Create a policy for an ADR namespace."""
         if not location:
@@ -63,12 +66,14 @@ class PolicyProvider(ADRProvider):
 
         policy_resource["properties"] = properties
 
-        return self.client.policies.begin_create_or_update(
-            resource_group_name=resource_group_name,
-            namespace_name=namespace_name,
-            policy_name=policy_name,
-            resource=policy_resource,
-        )
+        with console.status(f"Creating policy '{policy_name}' for namespace {namespace_name}..."):
+            poller = self.client.policies.begin_create_or_update(
+                resource_group_name=resource_group_name,
+                namespace_name=namespace_name,
+                policy_name=policy_name,
+                resource=policy_resource,
+            )
+            return wait_for_terminal_state(poller, **kwargs)
 
     def show(self, policy_name: str, namespace_name: str, resource_group_name: str):
         """Show a policy for an ADR namespace."""
@@ -90,14 +95,16 @@ class PolicyProvider(ADRProvider):
         else:
             return list(self.client.policies.list_by_subscription(namespace_name=namespace_name))
 
-    def delete(self, policy_name: str, namespace_name: str, resource_group_name: str):
+    def delete(self, policy_name: str, namespace_name: str, resource_group_name: str, **kwargs):
         """Delete a policy for an ADR namespace."""
 
-        return self.client.policies.begin_delete(
-            resource_group_name=resource_group_name,
-            namespace_name=namespace_name,
-            policy_name=policy_name,
-        )
+        with console.status(f"Deleting policy '{policy_name}' from namespace {namespace_name}..."):
+            poller = self.client.policies.begin_delete(
+                resource_group_name=resource_group_name,
+                namespace_name=namespace_name,
+                policy_name=policy_name,
+            )
+            return wait_for_terminal_state(poller, **kwargs)
 
     def update(
         self,
@@ -107,6 +114,7 @@ class PolicyProvider(ADRProvider):
         tags: Optional[Dict[str, str]] = None,
         certificate_subject: Optional[str] = None,
         certificate_validity_days: Optional[int] = None,
+        **kwargs
     ):
         """Update a policy for an ADR namespace."""
         update_payload = {}
@@ -132,9 +140,11 @@ class PolicyProvider(ADRProvider):
         if not update_payload:
             return
 
-        return self.client.policies.begin_update(
-            resource_group_name=resource_group_name,
-            namespace_name=namespace_name,
-            policy_name=policy_name,
-            properties=update_payload,
-        )
+        with console.status(f"Updating policy '{policy_name}' for namespace {namespace_name}..."):
+            poller = self.client.policies.begin_update(
+                resource_group_name=resource_group_name,
+                namespace_name=namespace_name,
+                policy_name=policy_name,
+                properties=update_payload,
+            )
+            return wait_for_terminal_state(poller, **kwargs)

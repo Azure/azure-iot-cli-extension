@@ -16,10 +16,11 @@ from unittest.mock import Mock, patch
         ("another-ns", "another-rg", "westus", {"project": "iot"}),
     ],
 )
-def test_create_credential(fixture_credential_provider, namespace_name, resource_group_name, location, tags):
+def test_create_credential(fixture_credential_provider, mock_poller, namespace_name, resource_group_name, location, tags):
     """Test successful credential creation."""
     mock_credential_result = Mock()
-    fixture_credential_provider.client.credentials.begin_create_or_update.return_value = mock_credential_result
+    poller = mock_poller(mock_credential_result)
+    fixture_credential_provider.client.credentials.begin_create_or_update.return_value = poller
 
     if not location:
         with patch.object(fixture_credential_provider, "_ensure_location", return_value="eastus") as mock_location:
@@ -63,10 +64,11 @@ def test_show_credential(fixture_credential_provider):
     )
 
 
-def test_delete_credential(fixture_credential_provider):
+def test_delete_credential(fixture_credential_provider, mock_poller):
     """Test successful credential deletion."""
     mock_delete_result = Mock()
-    fixture_credential_provider.client.credentials.begin_delete.return_value = mock_delete_result
+    poller = mock_poller(mock_delete_result)
+    fixture_credential_provider.client.credentials.begin_delete.return_value = poller
 
     result = fixture_credential_provider.delete(namespace_name="test-namespace", resource_group_name="test-rg")
 
@@ -76,10 +78,12 @@ def test_delete_credential(fixture_credential_provider):
     )
 
 
-def test_synchronize_credential(fixture_credential_provider):
+def test_synchronize_credential(fixture_credential_provider, mock_poller):
     """Test successful credential synchronization."""
     mock_sync_result = Mock()
-    fixture_credential_provider.client.credentials.begin_synchronize.return_value = mock_sync_result
+    poller = mock_poller(mock_sync_result)
+    poller.status.return_value = "Succeeded"
+    fixture_credential_provider.client.credentials.begin_synchronize.return_value = poller
 
     result = fixture_credential_provider.synchronize(namespace_name="test-namespace", resource_group_name="test-rg")
 

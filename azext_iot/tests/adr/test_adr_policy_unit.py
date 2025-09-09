@@ -18,6 +18,7 @@ from unittest.mock import Mock, patch
 )
 def test_create_policy(
     fixture_policy_provider,
+    mock_poller,
     policy_name,
     namespace_name,
     resource_group_name,
@@ -29,7 +30,8 @@ def test_create_policy(
 ):
     """Test successful policy creation with various parameter combinations."""
     mock_policy_result = Mock()
-    fixture_policy_provider.client.policies.begin_create_or_update.return_value = mock_policy_result
+    poller = mock_poller(mock_policy_result)
+    fixture_policy_provider.client.policies.begin_create_or_update.return_value = poller
 
     if not location:
         with patch.object(fixture_policy_provider, "_ensure_location", return_value="eastus") as mock_location:
@@ -162,10 +164,11 @@ def test_list_policies_by_subscription(fixture_policy_provider):
     )
 
 
-def test_delete_policy(fixture_policy_provider):
+def test_delete_policy(fixture_policy_provider, mock_poller):
     """Test successful policy deletion."""
     mock_delete_result = Mock()
-    fixture_policy_provider.client.policies.begin_delete.return_value = mock_delete_result
+    poller = mock_poller(mock_delete_result)
+    fixture_policy_provider.client.policies.begin_delete.return_value = poller
 
     result = fixture_policy_provider.delete(
         policy_name="test-policy", namespace_name="test-namespace", resource_group_name="test-rg"
@@ -238,28 +241,34 @@ def test_certificate_configuration_combinations(
 
 
 @pytest.mark.parametrize(
-    "tags, cert_key_type, cert_subject, cert_validity_days",
+    "tags, cert_subject, cert_validity_days",
     [
-        (None, "RSA", None, None),
-        ({"env": "test"}, None, "test", None),
-        ({"env": "prod", "team": "ops"}, None, None, 30),
-        (None, "ECC", "test", 30),
+        (None, None, None),
+        ({"env": "test"}, "test", None),
+        ({"env": "prod", "team": "ops"}, None, 30),
+        (None, "test", 30),
     ],
 )
-def test_update_policy(fixture_policy_provider, tags, cert_key_type, cert_subject, cert_validity_days):
+def test_update_policy(fixture_policy_provider, mock_poller, tags, cert_subject, cert_validity_days):
     """Test successful policy update."""
     mock_update_result = Mock()
-    fixture_policy_provider.client.policies.begin_update.return_value = mock_update_result
+    poller = mock_poller(mock_update_result)
+    fixture_policy_provider.client.policies.begin_update.return_value = poller
 
     result = fixture_policy_provider.update(
         policy_name="test-policy",
         namespace_name="test-namespace",
         resource_group_name="test-rg",
         tags=tags,
-        certificate_key_type=cert_key_type,
         certificate_subject=cert_subject,
         certificate_validity_days=cert_validity_days,
     )
+
+    # If no changes, the method returns early with None
+    if not tags and not cert_subject and not cert_validity_days:
+        assert result is None
+        fixture_policy_provider.client.policies.begin_update.assert_not_called()
+        return
 
     assert result == mock_update_result
     fixture_policy_provider.client.policies.begin_update.assert_called_once()
@@ -279,16 +288,13 @@ def test_update_policy(fixture_policy_provider, tags, cert_key_type, cert_subjec
         assert "tags" not in properties or properties["tags"] is None
 
     # Verify certificate configuration based on parameters
-    if cert_key_type or cert_subject or cert_validity_days:
+    if cert_subject or cert_validity_days:
         assert "properties" in properties
         cert_props = properties["properties"].get("certificate", {})
 
-        if cert_key_type or cert_subject:
+        if cert_subject:
             ca_config = cert_props.get("certificateAuthorityConfiguration", {})
-            if cert_key_type:
-                assert ca_config["keyType"] == cert_key_type
-            if cert_subject:
-                assert ca_config["subject"] == cert_subject
+            assert ca_config["subject"] == cert_subject
 
         if cert_validity_days:
             leaf_config = cert_props.get("leafCertificateConfiguration", {})

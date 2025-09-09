@@ -11,6 +11,7 @@ from rich.console import Console
 
 from azext_iot.adr.common import IdentityType
 from azext_iot.adr.providers.base import ADRProvider
+from azext_iot.common.utility import wait_for_terminal_state
 
 console = Console()
 logger = get_logger(__name__)
@@ -32,6 +33,7 @@ class NamespaceProvider(ADRProvider):
         certificate_key_type: Optional[str] = None,
         certificate_subject: Optional[str] = None,
         certificate_validity_days: Optional[int] = None,
+        **kwargs
     ):
         """Create an ADR namespace."""
         if not location:
@@ -53,11 +55,12 @@ class NamespaceProvider(ADRProvider):
 
         # TODO - CMS Preview - create_or_replace - should we check for existence first?
         with console.status(f"Creating namespace {namespace_name}..."):
-            namespace_result = self.client.namespaces.begin_create_or_replace(
+            poller = self.client.namespaces.begin_create_or_replace(
                 resource_group_name=resource_group_name,
                 namespace_name=namespace_name,
                 resource=namespace_resource,
-            ).result()
+            )
+            namespace_result = wait_for_terminal_state(poller, **kwargs)
 
         try:
             # TODO - CMS Preview - create response does not include resource group
@@ -68,28 +71,28 @@ class NamespaceProvider(ADRProvider):
                 from azext_iot.adr.providers.credential import CredentialProvider
 
                 credential_provider = CredentialProvider(self.cmd)
-                with console.status(f"Creating default credential for namespace {namespace_name}..."):
-                    credential_provider.create(
-                        namespace_name=namespace_name,
-                        resource_group_name=resource_group_name,
-                        location=location,
-                    ).result()
+                credential_provider.create(
+                    namespace_name=namespace_name,
+                    resource_group_name=resource_group_name,
+                    location=location,
+                    **kwargs
+                )
 
             # TODO - CMS Preview - Create policy by default
             if not no_credential and not no_policy:
                 from azext_iot.adr.providers.policy import PolicyProvider
 
                 policy_provider = PolicyProvider(self.cmd)
-                with console.status(f"Creating credential policy '{policy_name}' for namespace {namespace_name}..."):
-                    policy_provider.create(
-                        policy_name=policy_name,
-                        namespace_name=namespace_name,
-                        resource_group_name=resource_group_name,
-                        location=location,
-                        certificate_key_type=certificate_key_type,
-                        certificate_subject=certificate_subject,
-                        certificate_validity_days=certificate_validity_days,
-                    ).result()
+                policy_provider.create(
+                    policy_name=policy_name,
+                    namespace_name=namespace_name,
+                    resource_group_name=resource_group_name,
+                    location=location,
+                    certificate_key_type=certificate_key_type,
+                    certificate_subject=certificate_subject,
+                    certificate_validity_days=certificate_validity_days,
+                    **kwargs
+                )
         except Exception as e:
             logger.error("Error creating namespace credentials or policy: %s", str(e))
 
@@ -106,19 +109,21 @@ class NamespaceProvider(ADRProvider):
         else:
             return list(self.client.namespaces.list_by_subscription())
 
-    def delete(self, namespace_name: str, resource_group_name: str):
+    def delete(self, namespace_name: str, resource_group_name: str, **kwargs):
         """Delete an ADR namespace."""
 
         with console.status(f"Deleting namespace {namespace_name}..."):
-            return self.client.namespaces.begin_delete(
+            poller = self.client.namespaces.begin_delete(
                 resource_group_name=resource_group_name, namespace_name=namespace_name
-            ).result()
+            )
+            return wait_for_terminal_state(poller, **kwargs)
 
     def update(
         self,
         namespace_name: str,
         resource_group_name: str,
         tags: Optional[Dict[str, str]] = None,
+        **kwargs
     ):
         """Update an ADR namespace."""
         properties = {}
@@ -128,8 +133,9 @@ class NamespaceProvider(ADRProvider):
         # TODO - CMS Preview - support messaging endpoints update
 
         with console.status(f"Updating namespace {namespace_name}..."):
-            return self.client.namespaces.begin_update(
+            poller = self.client.namespaces.begin_update(
                 resource_group_name=resource_group_name,
                 namespace_name=namespace_name,
                 properties=properties,
             )
+            return wait_for_terminal_state(poller, **kwargs)

@@ -12,6 +12,32 @@ from azext_iot.adr.providers.namespace import NamespaceProvider
 from azext_iot.adr.providers.policy import PolicyProvider
 
 
+@pytest.fixture(autouse=True)
+def mock_wait_for_terminal_state(monkeypatch):
+    """Mock wait_for_terminal_state to avoid sleeping in tests."""
+
+    def fast_wait(poller, **kwargs):
+        """Return poller result immediately without sleeping."""
+        return poller.result()
+
+    # Patch the function in all provider modules
+    monkeypatch.setattr("azext_iot.adr.providers.namespace.wait_for_terminal_state", fast_wait)
+    monkeypatch.setattr("azext_iot.adr.providers.credential.wait_for_terminal_state", fast_wait)
+    monkeypatch.setattr("azext_iot.adr.providers.policy.wait_for_terminal_state", fast_wait)
+
+
+@pytest.fixture()
+def mock_poller():
+    """Create a mock LRO poller for testing."""
+
+    def _create_mock_poller(result_value=None):
+        poller = Mock()
+        poller.result.return_value = result_value or Mock()
+        return poller
+
+    return _create_mock_poller
+
+
 @pytest.fixture()
 def fixture_adr_provider(fixture_cmd):
     """Base ADR provider fixture for testing."""
