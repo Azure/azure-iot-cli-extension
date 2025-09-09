@@ -82,14 +82,13 @@ def load_adr_management_arguments(self, _):
             options_list=["--namespace", "--ns"],
             help="Name of the Device Registry namespace.",
         )
-        context.argument("policy_name", options_list=["--name", "-n"], help="Name of the policy.")
+        # TODO - CMS Preview - (-n for standard naming convention, --pn to match adr ns create)
+        context.argument(
+            "policy_name", options_list=["--policy-name", "--pn", "--name", "-n"], help="Name of the policy."
+        )
 
     # Policy create arguments can be used on ns policy create/update or ns create
-    for cmd in [
-        "iot adr ns policy create",
-        "iot adr ns policy update",
-        "iot adr ns create"
-    ]:
+    for cmd in ["iot adr ns policy create", "iot adr ns policy update", "iot adr ns create"]:
         with self.argument_context(cmd) as context:
             context.argument(
                 "certificate_key_type",

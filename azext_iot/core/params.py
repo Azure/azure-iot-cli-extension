@@ -32,6 +32,26 @@ def load_core_arguments(self, _):
             help="User-managed identity resource ID to access Device Registry namespace.",
         )
 
+    # IoT Hub create - namespace role assignment customization
+    with self.argument_context("iot hub create") as context:
+        context.argument(
+            "skip_ns_role_assignments",
+            options_list=["--skip-ns-ra"],
+            arg_group="ADR Namespace Role Assignment",
+            arg_type=get_three_state_flag(),
+            help="Used to skip ADR Namespace role assignment after IoT hub creation. "
+            "Only applicable to P-Tier IoT Hubs."
+        )
+
+        context.argument(
+            "custom_ns_role_id",
+            options_list=["--custom-ns-role-id"],
+            arg_group="ADR Namespace Role Assignment",
+            help="Fully qualified role definition Id to apply to ADR Namespace, in the following format: "
+            "/subscriptions/{subscriptionId}/providers/Microsoft.Authorization/roleDefinitions/{roleId}. "
+            "Only applicable to P-Tier IoT Hubs.",
+        )
+
     # DPS create / update ADR and identity params
     with self.argument_context("iot dps") as c:
         c.argument(

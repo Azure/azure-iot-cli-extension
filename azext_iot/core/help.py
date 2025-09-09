@@ -22,6 +22,14 @@ def patch_core_help():
     text: >
         az iot hub create --resource-group MyResourceGroup --name MyHub --sku P1 --ns-resource-id NamespaceResourceId
         --ns-identity-id UserIdentityResourceId
+  - name: Create a Premium-tier IoT Hub with Device Registry namespace properties and custom role assignment.
+    text: >
+        az iot hub create --resource-group MyResourceGroup --name MyHub --sku P1 --ns-resource-id NamespaceResourceId
+        --ns-identity-id UserIdentityResourceId --custom-ns-role-id RoleResourceId
+  - name: Create a Premium-tier IoT Hub with Device Registry namespace properties and skip role assignment.
+    text: >
+        az iot hub create --resource-group MyResourceGroup --name MyHub --sku P1 --ns-resource-id NamespaceResourceId
+        --ns-identity-id UserIdentityResourceId --skip-ns-ra
 """
 
     # add DPS create examples for ADR properties

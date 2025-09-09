@@ -603,6 +603,8 @@ def iot_hub_create(
     identity_scopes=None,
     adr_ns_id=None,
     adr_ns_identity_id=None,
+    skip_ns_role_assignments: Optional[bool] = None,
+    custom_ns_role_id: Optional[str] = None,
 ):
     """
     Create an IoT Hub with support for P-tier SKUs and ADR properties.
@@ -703,7 +705,7 @@ def iot_hub_create(
             instance = lro.resource().as_dict()
             hub_resource_id = instance.get("id")
             if hub_resource_id:
-                _setup_adr_role_assignments(cmd, adr_ns_id, hub_resource_id)
+                _setup_adr_role_assignments(cmd, adr_ns_id, hub_resource_id, custom_ns_role_id)
             else:
                 # this is bad
                 raise CLIError(f"Could not fetch IoT Hub resource ID after creation. {ADR_ROLE_ASSIGN_ERROR_MSG}")
@@ -713,7 +715,7 @@ def iot_hub_create(
     create = client.iot_hub_resource.begin_create_or_update(resource_group_name, hub_name, hub_description)
     if identity_role and identity_scopes:
         create.add_done_callback(identity_assignment)
-    if adr_ns_id:
+    if adr_ns_id and not skip_ns_role_assignments:
         create.add_done_callback(adr_role_assignment)
     return create
 
@@ -724,7 +726,6 @@ def iot_hub_get(cmd, client, hub_name, resource_group_name=None):
         return _get_iot_hub_by_name(client, hub_name)
     if not _ensure_resource_group_existence(cli_ctx, resource_group_name):
         raise CLIError("Resource group '{0}' could not be found.".format(resource_group_name))
-    # TODO - CMS Preview - this is broken right now for current API version
     name_availability = client.iot_hub_resource.check_name_availability(OperationInputs(name=hub_name))
     if name_availability is not None and name_availability.name_available:
         raise CLIError("An IotHub '{0}' under resource group '{1}' was not found."
@@ -1863,7 +1864,7 @@ def _validate_and_set_adr_properties(
             )
 
 
-def _setup_adr_role_assignments(cmd, namespace_id: str, hub_id: str) -> None:
+def _setup_adr_role_assignments(cmd, namespace_id: str, hub_id: str, custom_role_id: Optional[str] = None) -> None:
     """
     Set up role assignments between ADR namespace system-assigned identity and IoT Hub.
     
@@ -1871,6 +1872,7 @@ def _setup_adr_role_assignments(cmd, namespace_id: str, hub_id: str) -> None:
         cmd: Azure CLI command context
         namespace_id: ADR namespace resource ID
         hub_id: IoT Hub resource ID
+        custom_role_id: Custom role definition ID to use instead of default roles
     """
     try:
         from msrestazure.tools import parse_resource_id
@@ -1896,9 +1898,17 @@ def _setup_adr_role_assignments(cmd, namespace_id: str, hub_id: str) -> None:
             logger.warning(f"ADR namespace does not have a system-assigned identity. {ADR_CONFIGURE_ROLES_ERROR_MSG}")
             return
 
+        # Determine which roles to assign
+        roles_to_assign = []
+        if custom_role_id:
+            logger.info(f"Assigning custom role ID '{custom_role_id}' to ADR namespace.")
+            roles_to_assign = [custom_role_id]
+        if not roles_to_assign:
+            roles_to_assign = ADR_NS_IDENTITY_ROLES_FOR_HUB
+
         # Assign roles
         failed_roles = []
-        for role in ADR_NS_IDENTITY_ROLES_FOR_HUB:
+        for role in roles_to_assign:
             try:
                 # assign_identity needs the resource identity as an object, not a dict
                 from types import SimpleNamespace
@@ -1906,6 +1916,7 @@ def _setup_adr_role_assignments(cmd, namespace_id: str, hub_id: str) -> None:
                 ns_obj = SimpleNamespace(
                     identity=SimpleNamespace(principal_id=principal_id)
                 )
+                # accepts a role name or role ID
                 assign_identity(
                     cmd.cli_ctx,
                     lambda: ns_obj, 

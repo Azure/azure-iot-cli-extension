@@ -105,7 +105,6 @@ class PolicyProvider(ADRProvider):
         namespace_name: str,
         resource_group_name: str,
         tags: Optional[Dict[str, str]] = None,
-        certificate_key_type: Optional[str] = None,
         certificate_subject: Optional[str] = None,
         certificate_validity_days: Optional[int] = None,
     ):
@@ -115,12 +114,10 @@ class PolicyProvider(ADRProvider):
             update_payload["tags"] = tags
 
         properties = {}
-        if certificate_key_type or certificate_subject or certificate_validity_days:
+        if certificate_subject or certificate_validity_days:
             properties["certificate"] = {}
-            if certificate_key_type or certificate_subject:
+            if certificate_subject:
                 ca_config = {}
-                if certificate_key_type:
-                    ca_config["keyType"] = certificate_key_type
                 if certificate_subject:
                     ca_config["subject"] = certificate_subject
                 properties["certificate"]["certificateAuthorityConfiguration"] = ca_config
