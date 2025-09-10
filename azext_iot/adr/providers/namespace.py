@@ -61,21 +61,24 @@ class NamespaceProvider(ADRProvider):
             )
             namespace_result = wait_for_terminal_state(poller, **kwargs)
 
-        try:
-            # TODO - CMS Preview - create response does not include resource group
-            if not namespace_result.get("resourceGroup"):
-                namespace_result["resourceGroup"] = resource_group_name
+        # TODO - CMS Preview - create response does not include resource group
+        if not namespace_result.get("resourceGroup"):
+            namespace_result["resourceGroup"] = resource_group_name
 
-            if not no_credential:
+        if not no_credential:
+            try:
                 from azext_iot.adr.providers.credential import CredentialProvider
 
                 credential_provider = CredentialProvider(self.cmd)
                 credential_provider.create(
                     namespace_name=namespace_name, resource_group_name=resource_group_name, location=location, **kwargs
                 )
+            except Exception as e:
+                logger.error("Error creating default namespace credential: %s", str(e))
 
-            # TODO - CMS Preview - Create policy by default
-            if not no_credential and not no_policy:
+        # TODO - CMS Preview - Create policy by default
+        if not no_credential and not no_policy:
+            try:
                 from azext_iot.adr.providers.policy import PolicyProvider
 
                 policy_provider = PolicyProvider(self.cmd)
@@ -89,8 +92,8 @@ class NamespaceProvider(ADRProvider):
                     certificate_validity_days=certificate_validity_days,
                     **kwargs,
                 )
-        except Exception as e:
-            logger.error("Error creating namespace credentials or policy: %s", str(e))
+            except Exception as e:
+                logger.error("Error creating credential policy: %s", str(e))
 
         return namespace_result
 
