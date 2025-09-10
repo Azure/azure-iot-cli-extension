@@ -85,22 +85,17 @@ def test_delete_credential(fixture_credential_provider, mock_poller):
     )
 
 
-@pytest.mark.parametrize(
-    "status, should_warn",
-    [
-        ("Succeeded", False),
-        ("Failed", True),
-    ],
-)
-def test_synchronize_credential(fixture_credential_provider, mock_poller, caplog, status, should_warn):
+@pytest.mark.parametrize("status", [ "Succeeded", "Failed"])
+def test_synchronize_credential(fixture_credential_provider, mock_poller, status):
     """Test credential synchronization"""
     mock_sync_result = Mock()
     poller = mock_poller(mock_sync_result)
     poller.status = Mock(return_value=status)
     fixture_credential_provider.client.credentials.begin_synchronize.return_value = poller
 
-    # Mock console.print to capture success messages
-    with patch("azext_iot.adr.providers.credential.console.print") as mock_console_print:
+    with patch("azext_iot.adr.providers.credential.console.print") as mock_console_print, \
+         patch("azext_iot.adr.providers.credential.logger.warning") as mock_logger_warning:
+        
         result = fixture_credential_provider.synchronize(namespace_name="test-namespace", resource_group_name="test-rg")
 
     assert result == mock_sync_result
@@ -108,9 +103,12 @@ def test_synchronize_credential(fixture_credential_provider, mock_poller, caplog
         resource_group_name="test-rg", namespace_name="test-namespace"
     )
 
-    if should_warn:
-        assert f"Synchronization completed with a status of: '{status}'" in caplog.text
+    if status != 'Succeeded':
+        # Verify warning was logged
+        mock_logger_warning.assert_called_once_with(f"Synchronization completed with a status of: '{status}'")
     else:
+        # Verify success message was printed to console
         mock_console_print.assert_called_once_with(
-            "Successfully synchronized credentials for namespace 'test-namespace'", style="green"
+            "Successfully synchronized credentials for namespace 'test-namespace'", 
+            style="green"
         )
