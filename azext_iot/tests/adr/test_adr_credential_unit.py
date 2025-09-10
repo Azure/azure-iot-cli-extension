@@ -23,15 +23,23 @@ def test_create_credential(fixture_credential_provider, mock_poller, namespace_n
     fixture_credential_provider.client.credentials.begin_create_or_update.return_value = poller
 
     if not location:
-        with patch.object(fixture_credential_provider, "_ensure_location", return_value="eastus") as mock_location:
-            result = fixture_credential_provider.create(
-                namespace_name=namespace_name, resource_group_name=resource_group_name, location=location, tags=tags
-            )
-            mock_location.assert_called_once()
+        mock_namespace_location = "namespace_location"
+        mock_namespace = {"location": mock_namespace_location}
+        fixture_credential_provider.client.namespaces.get.return_value = mock_namespace
+        
+        result = fixture_credential_provider.create(
+            namespace_name=namespace_name, resource_group_name=resource_group_name, location=location, tags=tags
+        )
+        # Verify namespace get for location
+        fixture_credential_provider.client.namespaces.get.assert_called_once_with(
+            resource_group_name=resource_group_name, namespace_name=namespace_name
+        )
+        expected_location = mock_namespace_location
     else:
         result = fixture_credential_provider.create(
             namespace_name=namespace_name, resource_group_name=resource_group_name, location=location, tags=tags
         )
+        expected_location = location
 
     assert result == mock_credential_result
 
@@ -42,13 +50,10 @@ def test_create_credential(fixture_credential_provider, mock_poller, namespace_n
     assert called_with["resource_group_name"] == resource_group_name
     assert called_with["namespace_name"] == namespace_name
 
-    expected_resource = {"location": location or "eastus"}
+    # Verify the credential was created with the correct location
+    assert called_with["resource"]["location"] == expected_location
     if tags:
-        expected_resource["tags"] = tags
-
-    assert called_with["resource"]["location"] == expected_resource["location"]
-    if tags:
-        assert called_with["resource"]["tags"] == expected_resource["tags"]
+        assert called_with["resource"]["tags"] == tags
 
 
 def test_show_credential(fixture_credential_provider):

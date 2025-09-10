@@ -34,27 +34,26 @@ def test_create_policy(
     fixture_policy_provider.client.policies.begin_create_or_update.return_value = poller
 
     if not location:
-        with patch.object(fixture_policy_provider, "_ensure_location", return_value="eastus") as mock_location:
-            # Mock namespace.get to return location
-            mock_namespace = {"location": "eastus"}
-            fixture_policy_provider.client.namespaces.get.return_value = mock_namespace
+        # Mock namespace.get to return location
+        mock_namespace_location = "namespace_location"
+        mock_namespace = {"location": mock_namespace_location}
+        fixture_policy_provider.client.namespaces.get.return_value = mock_namespace
 
-            # Act
-            result = fixture_policy_provider.create(
-                policy_name=policy_name,
-                namespace_name=namespace_name,
-                resource_group_name=resource_group_name,
-                location=location,
-                tags=tags,
-                certificate_key_type=cert_key_type,
-                certificate_subject=cert_subject,
-                certificate_validity_days=cert_validity_days,
-            )
-            # Assert namespace get and location fallback was called
-            fixture_policy_provider.client.namespaces.get.assert_called_once_with(
-                resource_group_name=resource_group_name, namespace_name=namespace_name
-            )
-            mock_location.assert_called_once()
+        result = fixture_policy_provider.create(
+            policy_name=policy_name,
+            namespace_name=namespace_name,
+            resource_group_name=resource_group_name,
+            location=location,
+            tags=tags,
+            certificate_key_type=cert_key_type,
+            certificate_subject=cert_subject,
+            certificate_validity_days=cert_validity_days,
+        )
+        # Verify namespace get for location
+        fixture_policy_provider.client.namespaces.get.assert_called_once_with(
+            resource_group_name=resource_group_name, namespace_name=namespace_name
+        )
+        expected_location = mock_namespace_location
     else:
         # Act
         result = fixture_policy_provider.create(
@@ -67,6 +66,7 @@ def test_create_policy(
             certificate_subject=cert_subject,
             certificate_validity_days=cert_validity_days,
         )
+        expected_location = location
 
     assert result == mock_policy_result
 
@@ -80,7 +80,7 @@ def test_create_policy(
 
     # Verify resource structure
     resource = call_args[1]["resource"]
-    expected_location = location or "eastus"
+    # Verify the policy was created with the correct location
     assert resource["location"] == expected_location
 
     if tags:
