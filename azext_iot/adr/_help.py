@@ -131,9 +131,10 @@ def load_adr_help():
         "iot adr ns credential sync"
     ] = """
   type: command
-  short-summary: Synchronize a Device Registry namespace credential.
+  short-summary: Synchronize Device Registry credentials to linked Iot Hubs
+  long-summary: This will create or update an ADR managed certificate in IoT Hubs linked to this Device Registry Namespace.
   examples:
-    - name: Synchronize a namespace credential
+    - name: Synchronize a namespace credential certificate to linked IoT Hubs
       text: az iot adr ns credential sync --ns myNamespace -g myResourceGroup
   """
 
