@@ -16,7 +16,9 @@ from unittest.mock import Mock, patch
         ("another-ns", "another-rg", "westus", {"project": "iot"}),
     ],
 )
-def test_create_credential(fixture_credential_provider, mock_poller, namespace_name, resource_group_name, location, tags):
+def test_create_credential(
+    fixture_credential_provider, mock_poller, namespace_name, resource_group_name, location, tags
+):
     """Test successful credential creation."""
     mock_credential_result = Mock()
     poller = mock_poller(mock_credential_result)
@@ -26,7 +28,7 @@ def test_create_credential(fixture_credential_provider, mock_poller, namespace_n
         mock_namespace_location = "namespace_location"
         mock_namespace = {"location": mock_namespace_location}
         fixture_credential_provider.client.namespaces.get.return_value = mock_namespace
-        
+
         result = fixture_credential_provider.create(
             namespace_name=namespace_name, resource_group_name=resource_group_name, location=location, tags=tags
         )
@@ -83,16 +85,32 @@ def test_delete_credential(fixture_credential_provider, mock_poller):
     )
 
 
-def test_synchronize_credential(fixture_credential_provider, mock_poller):
-    """Test successful credential synchronization."""
+@pytest.mark.parametrize(
+    "status, should_warn",
+    [
+        ("Succeeded", False),
+        ("Failed", True),
+    ],
+)
+def test_synchronize_credential(fixture_credential_provider, mock_poller, caplog, status, should_warn):
+    """Test credential synchronization"""
     mock_sync_result = Mock()
     poller = mock_poller(mock_sync_result)
-    poller.status.return_value = "Succeeded"
+    poller.status = Mock(return_value=status)
     fixture_credential_provider.client.credentials.begin_synchronize.return_value = poller
 
-    result = fixture_credential_provider.synchronize(namespace_name="test-namespace", resource_group_name="test-rg")
+    # Mock console.print to capture success messages
+    with patch("azext_iot.adr.providers.credential.console.print") as mock_console_print:
+        result = fixture_credential_provider.synchronize(namespace_name="test-namespace", resource_group_name="test-rg")
 
     assert result == mock_sync_result
     fixture_credential_provider.client.credentials.begin_synchronize.assert_called_once_with(
         resource_group_name="test-rg", namespace_name="test-namespace"
     )
+
+    if should_warn:
+        assert f"Synchronization completed with a status of: '{status}'" in caplog.text
+    else:
+        mock_console_print.assert_called_once_with(
+            "Successfully synchronized credentials for namespace 'test-namespace'", style="green"
+        )

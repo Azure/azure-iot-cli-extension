@@ -75,5 +75,5 @@ class CredentialProvider(ADRProvider):
             if poller_status == "Succeeded":
                 console.print(f"Successfully synchronized credentials for namespace '{namespace_name}'", style="green")
             else:
-                console.print(f"Synchronization completed with a status of: '{poller_status}'", style="yellow")
-        return result
+                logger.warning(f"Synchronization completed with a status of: '{poller_status}'")
+            return result

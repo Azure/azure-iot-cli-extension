@@ -9,47 +9,30 @@ from unittest.mock import Mock, patch
 from azext_iot.adr.providers.base import ADRProvider
 
 
-@pytest.mark.parametrize("resource_group,location", [("test-rg", "eastus"), ("test-rg", None)])
-def test_ensure_location_with_provided_location(fixture_adr_provider, fixture_cmd, resource_group, location):
-    """Test _ensure_location when location is provided."""
+@pytest.mark.parametrize("input_location", ["location", None])
+def test_ensure_location(fixture_adr_provider, fixture_cmd, input_location):
+    """Test _ensure_location behavior with various input combinations."""
+    resource_group = "test-resource-group"
+    fallback_location = "resource-group-location"
 
-    if location is None:
-        # Mock the resource client when location is None
+    if input_location is None:
+        # Mock the resource client when location lookup is needed
         with patch("azure.cli.core.commands.client_factory.get_mgmt_service_client") as mock_get_client:
             mock_resource_client = Mock()
             mock_rg = Mock()
-            mock_rg.location = "westus2"  # fallback location
+            mock_rg.location = fallback_location
             mock_resource_client.resource_groups.get.return_value = mock_rg
             mock_get_client.return_value = mock_resource_client
 
-            result = fixture_adr_provider._ensure_location(fixture_cmd.cli_ctx, resource_group, location)
-            assert result == "westus2"
+            result = fixture_adr_provider._ensure_location(fixture_cmd.cli_ctx, resource_group, input_location)
+
+            assert result == fallback_location
             mock_get_client.assert_called_once()
             mock_resource_client.resource_groups.get.assert_called_once_with(resource_group)
     else:
-        # When location is provided, it should return immediately
-        result = fixture_adr_provider._ensure_location(fixture_cmd.cli_ctx, resource_group, location)
-        assert result == location
-
-
-@pytest.mark.parametrize(
-    "resource_group,location,fallback_location", [("test-rg", None, "westus2"), (None, None, None)]
-)
-def test_ensure_location_with_fallback(fixture_adr_provider, fixture_cmd, resource_group, location, fallback_location):
-    """Test _ensure_location when location is None and needs fallback."""
-
-    with patch("azure.cli.core.commands.client_factory.get_mgmt_service_client") as mock_get_client:
-        mock_resource_client = Mock()
-        mock_rg = Mock()
-        mock_rg.location = fallback_location
-        mock_resource_client.resource_groups.get.return_value = mock_rg
-        mock_get_client.return_value = mock_resource_client
-
-        result = fixture_adr_provider._ensure_location(fixture_cmd.cli_ctx, resource_group, location)
-
-        assert result == fallback_location
-        mock_get_client.assert_called_once()
-        mock_resource_client.resource_groups.get.assert_called_once_with(resource_group)
+        # When location is provided, it should return immediately without any mocking needed
+        result = fixture_adr_provider._ensure_location(fixture_cmd.cli_ctx, resource_group, input_location)
+        assert result == input_location
 
 
 def test_provider_initialization(fixture_cmd):
