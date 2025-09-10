@@ -4,10 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""
-Azure Device Registry (ADR) policy command implementations.
-"""
-
 from typing import Dict, Optional
 
 from knack.log import get_logger
@@ -28,8 +24,6 @@ def adr_policy_create(
     certificate_subject: Optional[str] = None,
     certificate_validity_days: Optional[int] = None,
 ):
-    """Create a policy for an ADR namespace."""
-
     provider = PolicyProvider(cmd)
     return provider.create(
         policy_name=policy_name,
@@ -44,8 +38,6 @@ def adr_policy_create(
 
 
 def adr_policy_show(cmd, policy_name: str, namespace_name: str, resource_group_name: str):
-    """Show a policy for an ADR namespace."""
-
     provider = PolicyProvider(cmd)
     return provider.show(
         policy_name=policy_name, namespace_name=namespace_name, resource_group_name=resource_group_name
@@ -53,15 +45,11 @@ def adr_policy_show(cmd, policy_name: str, namespace_name: str, resource_group_n
 
 
 def adr_policy_list(cmd, namespace_name: str, resource_group_name: str):
-    """List policies for ADR namespaces."""
-
     provider = PolicyProvider(cmd)
     return provider.list(namespace_name=namespace_name, resource_group_name=resource_group_name)
 
 
 def adr_policy_delete(cmd, policy_name: str, namespace_name: str, resource_group_name: str):
-    """Delete a policy for an ADR namespace."""
-
     provider = PolicyProvider(cmd)
     return provider.delete(
         policy_name=policy_name, namespace_name=namespace_name, resource_group_name=resource_group_name
@@ -78,8 +66,6 @@ def adr_policy_update(
     certificate_subject: Optional[str] = None,
     certificate_validity_days: Optional[int] = None,
 ):
-    """Update a policy for an ADR namespace."""
-
     provider = PolicyProvider(cmd)
     return provider.update(
         policy_name=policy_name,

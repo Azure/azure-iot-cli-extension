@@ -5,9 +5,10 @@
 # --------------------------------------------------------------------------------------------
 
 from typing import Optional
-from knack.log import get_logger
-from azext_iot._factory import adr_service_factory
 
+from knack.log import get_logger
+
+from azext_iot._factory import adr_service_factory
 
 __all__ = ["ADRProvider"]
 
@@ -20,7 +21,6 @@ class ADRProvider(object):
         self.client = adr_service_factory(cmd.cli_ctx)
 
     def _ensure_location(self, cli_ctx, resource_group_name: str, location: Optional[str] = None):
-        """Ensure location is specified, default to resource group location if not provided."""
         if location:
             return location
 

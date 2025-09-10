@@ -31,7 +31,6 @@ class CredentialProvider(ADRProvider):
         tags: Optional[Dict[str, str]] = None,
         **kwargs
     ):
-        """Create credential for an ADR namespace."""
         if not location:
             # TODO - CMS Preview - fetch location from the existing namespace
             namespace = self.client.namespaces.get(
@@ -55,11 +54,9 @@ class CredentialProvider(ADRProvider):
             return wait_for_terminal_state(poller, **kwargs)
 
     def show(self, namespace_name: str, resource_group_name: str):
-        """Show credentials for an ADR namespace."""
         return self.client.credentials.get(resource_group_name=resource_group_name, namespace_name=namespace_name)
 
     def delete(self, namespace_name: str, resource_group_name: str, **kwargs):
-        """Delete credentials for an ADR namespace."""
         with console.status(f"Deleting credentials for namespace {namespace_name}..."):
             poller = self.client.credentials.begin_delete(
                 resource_group_name=resource_group_name, namespace_name=namespace_name
@@ -67,7 +64,6 @@ class CredentialProvider(ADRProvider):
             return wait_for_terminal_state(poller, **kwargs)
 
     def synchronize(self, namespace_name: str, resource_group_name: str, **kwargs):
-        """Synchronize credentials for an ADR namespace."""
         with console.status(f"Synchronizing credentials for namespace {namespace_name}..."):
             poller: LROPoller = self.client.credentials.begin_synchronize(
                 resource_group_name=resource_group_name, namespace_name=namespace_name

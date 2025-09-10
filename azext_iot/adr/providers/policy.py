@@ -28,9 +28,8 @@ class PolicyProvider(ADRProvider):
         certificate_key_type: Optional[str] = None,
         certificate_subject: Optional[str] = None,
         certificate_validity_days: Optional[int] = None,
-        **kwargs
+        **kwargs,
     ):
-        """Create a policy for an ADR namespace."""
         if not location:
             # TODO - CMS Preview - fetch location from the existing namespace
             namespace = self.client.namespaces.get(
@@ -76,7 +75,6 @@ class PolicyProvider(ADRProvider):
             return wait_for_terminal_state(poller, **kwargs)
 
     def show(self, policy_name: str, namespace_name: str, resource_group_name: str):
-        """Show a policy for an ADR namespace."""
         return self.client.policies.get(
             resource_group_name=resource_group_name,
             namespace_name=namespace_name,
@@ -84,7 +82,6 @@ class PolicyProvider(ADRProvider):
         )
 
     def list(self, namespace_name: str, resource_group_name: Optional[str] = None):
-        """List policies for ADR namespaces."""
         if resource_group_name:
             return list(
                 self.client.policies.list_by_resource_group(
@@ -96,8 +93,6 @@ class PolicyProvider(ADRProvider):
             return list(self.client.policies.list_by_subscription(namespace_name=namespace_name))
 
     def delete(self, policy_name: str, namespace_name: str, resource_group_name: str, **kwargs):
-        """Delete a policy for an ADR namespace."""
-
         with console.status(f"Deleting policy '{policy_name}' from namespace {namespace_name}..."):
             poller = self.client.policies.begin_delete(
                 resource_group_name=resource_group_name,
@@ -114,9 +109,8 @@ class PolicyProvider(ADRProvider):
         tags: Optional[Dict[str, str]] = None,
         certificate_subject: Optional[str] = None,
         certificate_validity_days: Optional[int] = None,
-        **kwargs
+        **kwargs,
     ):
-        """Update a policy for an ADR namespace."""
         update_payload = {}
         if tags:
             update_payload["tags"] = tags

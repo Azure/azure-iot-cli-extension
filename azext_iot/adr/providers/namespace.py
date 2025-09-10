@@ -33,9 +33,8 @@ class NamespaceProvider(ADRProvider):
         certificate_key_type: Optional[str] = None,
         certificate_subject: Optional[str] = None,
         certificate_validity_days: Optional[int] = None,
-        **kwargs
+        **kwargs,
     ):
-        """Create an ADR namespace."""
         if not location:
             location = self._ensure_location(self.cmd.cli_ctx, resource_group_name, location)
 
@@ -72,10 +71,7 @@ class NamespaceProvider(ADRProvider):
 
                 credential_provider = CredentialProvider(self.cmd)
                 credential_provider.create(
-                    namespace_name=namespace_name,
-                    resource_group_name=resource_group_name,
-                    location=location,
-                    **kwargs
+                    namespace_name=namespace_name, resource_group_name=resource_group_name, location=location, **kwargs
                 )
 
             # TODO - CMS Preview - Create policy by default
@@ -91,7 +87,7 @@ class NamespaceProvider(ADRProvider):
                     certificate_key_type=certificate_key_type,
                     certificate_subject=certificate_subject,
                     certificate_validity_days=certificate_validity_days,
-                    **kwargs
+                    **kwargs,
                 )
         except Exception as e:
             logger.error("Error creating namespace credentials or policy: %s", str(e))
@@ -99,33 +95,22 @@ class NamespaceProvider(ADRProvider):
         return namespace_result
 
     def show(self, namespace_name: str, resource_group_name: str):
-        """Show details of an ADR namespace."""
         return self.client.namespaces.get(resource_group_name=resource_group_name, namespace_name=namespace_name)
 
     def list(self, resource_group_name: Optional[str] = None):
-        """List ADR namespaces."""
         if resource_group_name:
             return list(self.client.namespaces.list_by_resource_group(resource_group_name=resource_group_name))
         else:
             return list(self.client.namespaces.list_by_subscription())
 
     def delete(self, namespace_name: str, resource_group_name: str, **kwargs):
-        """Delete an ADR namespace."""
-
         with console.status(f"Deleting namespace {namespace_name}..."):
             poller = self.client.namespaces.begin_delete(
                 resource_group_name=resource_group_name, namespace_name=namespace_name
             )
             return wait_for_terminal_state(poller, **kwargs)
 
-    def update(
-        self,
-        namespace_name: str,
-        resource_group_name: str,
-        tags: Optional[Dict[str, str]] = None,
-        **kwargs
-    ):
-        """Update an ADR namespace."""
+    def update(self, namespace_name: str, resource_group_name: str, tags: Optional[Dict[str, str]] = None, **kwargs):
         properties = {}
         if tags is not None:
             properties["tags"] = tags

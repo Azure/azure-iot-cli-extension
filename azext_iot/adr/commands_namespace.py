@@ -4,10 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""
-Azure Device Registry (ADR) namespace command implementations.
-"""
-
 from typing import Dict, Optional
 
 from knack.log import get_logger
@@ -30,8 +26,6 @@ def adr_namespace_create(
     certificate_subject: Optional[str] = None,
     certificate_validity_days: Optional[int] = None,
 ):
-    """Create an ADR namespace."""
-
     provider = NamespaceProvider(cmd)
     return provider.create(
         namespace_name=namespace_name,
@@ -48,37 +42,20 @@ def adr_namespace_create(
 
 
 def adr_namespace_show(cmd, namespace_name: str, resource_group_name: str):
-    """Show details of an ADR namespace."""
-
     provider = NamespaceProvider(cmd)
     return provider.show(namespace_name=namespace_name, resource_group_name=resource_group_name)
 
 
 def adr_namespace_list(cmd, resource_group_name: Optional[str] = None):
-    """List ADR namespaces."""
-
     provider = NamespaceProvider(cmd)
     return provider.list(resource_group_name=resource_group_name)
 
 
 def adr_namespace_delete(cmd, namespace_name: str, resource_group_name: str):
-    """Delete an ADR namespace."""
-
     provider = NamespaceProvider(cmd)
     return provider.delete(namespace_name=namespace_name, resource_group_name=resource_group_name)
 
 
-def adr_namespace_update(
-    cmd,
-    namespace_name: str,
-    resource_group_name: str,
-    tags: Optional[Dict[str, str]] = None,
-):
-    """Update an ADR namespace."""
-
+def adr_namespace_update(cmd, namespace_name: str, resource_group_name: str, tags: Optional[Dict[str, str]] = None):
     provider = NamespaceProvider(cmd)
-    return provider.update(
-        namespace_name=namespace_name,
-        resource_group_name=resource_group_name,
-        tags=tags,
-    )
+    return provider.update(namespace_name=namespace_name, resource_group_name=resource_group_name, tags=tags)
