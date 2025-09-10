@@ -1138,7 +1138,7 @@ helps[
     - name: Create an enrollment with a custom ADR Namespace Credential Policy specified.
       text: >
         az iot dps enrollment create -g {resource_group_name} --dps-name {dps_name}
-        --enrollment-id {enrollment_id} --allocation-policy hashed --credential-policy-name {policy_name}
+        --enrollment-id {enrollment_id} --attestation-type symmetrickey --credential-policy-name {policy_name}
 """
 
 helps[
@@ -1341,7 +1341,7 @@ helps[
     - name: Update enrollment group '{enrollment_id}' in the Azure IoT Device Provisioning Service '{dps_name}'
             to use a custom ADR Namespace Credential Policy.
       text: >
-        az iot dps enrollment update -g {resource_group_name} --dps-name {dps_name}
+        az iot dps enrollment-group update -g {resource_group_name} --dps-name {dps_name}
         --enrollment-id {enrollment_id} --credential-policy-name {my_policy}
 """
 
