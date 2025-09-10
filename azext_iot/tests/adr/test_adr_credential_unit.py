@@ -85,7 +85,7 @@ def test_delete_credential(fixture_credential_provider, mock_poller):
     )
 
 
-@pytest.mark.parametrize("status", [ "Succeeded", "Failed"])
+@pytest.mark.parametrize("status", ["Succeeded", "Failed"])
 def test_synchronize_credential(fixture_credential_provider, mock_poller, status):
     """Test credential synchronization"""
     mock_sync_result = Mock()
@@ -93,9 +93,10 @@ def test_synchronize_credential(fixture_credential_provider, mock_poller, status
     poller.status = Mock(return_value=status)
     fixture_credential_provider.client.credentials.begin_synchronize.return_value = poller
 
-    with patch("azext_iot.adr.providers.credential.console.print") as mock_console_print, \
-         patch("azext_iot.adr.providers.credential.logger.warning") as mock_logger_warning:
-        
+    with patch("azext_iot.adr.providers.credential.console.print") as mock_console_print, patch(
+        "azext_iot.adr.providers.credential.logger.warning"
+    ) as mock_logger_warning:
+
         result = fixture_credential_provider.synchronize(namespace_name="test-namespace", resource_group_name="test-rg")
 
     assert result == mock_sync_result
@@ -103,12 +104,11 @@ def test_synchronize_credential(fixture_credential_provider, mock_poller, status
         resource_group_name="test-rg", namespace_name="test-namespace"
     )
 
-    if status != 'Succeeded':
+    if status != "Succeeded":
         # Verify warning was logged
         mock_logger_warning.assert_called_once_with(f"Synchronization completed with a status of: '{status}'")
     else:
         # Verify success message was printed to console
         mock_console_print.assert_called_once_with(
-            "Successfully synchronized credentials for namespace 'test-namespace'", 
-            style="green"
+            "Successfully synchronized credentials for namespace 'test-namespace'", style="green"
         )
