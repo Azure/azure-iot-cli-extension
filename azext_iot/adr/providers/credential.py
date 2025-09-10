@@ -10,6 +10,7 @@ from knack.log import get_logger
 from rich.console import Console
 
 from azext_iot.adr.providers.base import ADRProvider
+from azure.cli.core.azclierror import AzureResponseError
 from azext_iot.common.utility import wait_for_terminal_state
 
 if TYPE_CHECKING:
@@ -29,17 +30,18 @@ class CredentialProvider(ADRProvider):
         resource_group_name: str,
         location: Optional[str] = None,
         tags: Optional[Dict[str, str]] = None,
-        **kwargs
+        **kwargs,
     ):
         if not location:
-            # TODO - CMS Preview - fetch location from the existing namespace
             namespace = self.client.namespaces.get(
                 resource_group_name=resource_group_name, namespace_name=namespace_name
             )
             location = namespace.get("location")
-        # fallback to RG location
-        location = self._ensure_location(self.cmd.cli_ctx, resource_group_name, location)
-
+        if not location:
+            raise AzureResponseError(
+                "Error attempting to determine location from parent Namespace: "
+                "Namespace does not contain a location property."
+            )
         credentials_resource = {"location": location}
 
         if tags:
