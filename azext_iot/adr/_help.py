@@ -151,12 +151,12 @@ def load_adr_help():
   type: command
   short-summary: Create a policy for a Device Registry namespace.
   examples:
-    - name: Create a basic policy
+    - name: Create a basic policy with a default subject, certificate type (ECC), and validity (30 days).
       text: az iot adr ns policy create -n myPolicy --ns myNamespace -g myResourceGroup
-    - name: Create a policy with custom certificate inputs
+    - name: Create a policy with custom name and certificate inputs.
       text: |
           az iot adr ns policy create -n myPolicy --ns myNamespace -g myResourceGroup
-          --cert-key-type ECC --cert-validity-days 30 --cert-subject "CN=MyDevices"
+          --cert-key-type RSA --cert-validity-days 15 --cert-subject "CN=MyDevices"
   """
 
     helps[
