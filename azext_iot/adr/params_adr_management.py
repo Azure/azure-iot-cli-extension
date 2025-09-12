@@ -32,7 +32,7 @@ def load_adr_management_arguments(self, _):
         context.argument("resource_group_name", arg_type=resource_group_name_type)
         context.argument(
             "namespace_name",
-            options_list=["--namespace", "-n"],
+            options_list=["--namespace", "--name", "-n"],
             help="Name of the Device Registry namespace.",
         )
         context.argument(
