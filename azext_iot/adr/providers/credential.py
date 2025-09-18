@@ -28,15 +28,13 @@ class CredentialProvider(ADRProvider):
         self,
         namespace_name: str,
         resource_group_name: str,
-        location: Optional[str] = None,
         tags: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
-        if not location:
-            namespace = self.client.namespaces.get(
-                resource_group_name=resource_group_name, namespace_name=namespace_name
-            )
-            location = namespace.get("location")
+        namespace = self.client.namespaces.get(
+            resource_group_name=resource_group_name, namespace_name=namespace_name
+        )
+        location = namespace.get("location")
         if not location:
             raise AzureResponseError(
                 "Error attempting to determine location from parent Namespace: "

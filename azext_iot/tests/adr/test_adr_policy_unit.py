@@ -9,64 +9,67 @@ from unittest.mock import Mock
 
 
 @pytest.mark.parametrize(
-    "policy_name, namespace_name, resource_group_name, location, cert_key_type, cert_subject, cert_validity_days, tags",
+    "test_params",
     [
-        ("policy", "namespace", "rg", "location", "ECC", "test", 30, {"example": "tag"}),
-        ("policy", "namespace", "rg", None, "RSA", None, None, None),
-        ("policy", "namespace", "rg", "location", None, "test", None, {"example": "tag"}),
+        {
+            "policy_name": "policy",
+            "namespace_name": "namespace", 
+            "resource_group_name": "rg",
+            "cert_key_type": "ECC",
+            "cert_subject": "test", 
+            "cert_validity_days": 30,
+            "tags": {"example": "tag"}
+        },
+        {
+            "policy_name": "policy",
+            "namespace_name": "namespace", 
+            "resource_group_name": "rg",
+            "cert_key_type": "RSA",
+            "cert_subject": None, 
+            "cert_validity_days": None,
+            "tags": None
+        },
+        {
+            "policy_name": "policy",
+            "namespace_name": "namespace", 
+            "resource_group_name": "rg",
+            "cert_key_type": None,
+            "cert_subject": "test", 
+            "cert_validity_days": None,
+            "tags": {"example": "tag"}
+        },
     ],
 )
 def test_create_policy(
     fixture_policy_provider,
     mock_poller,
-    policy_name,
-    namespace_name,
-    resource_group_name,
-    location,
-    cert_key_type,
-    cert_subject,
-    cert_validity_days,
-    tags,
+    test_params,
 ):
     """Test successful policy creation with various parameter combinations."""
     mock_policy_result = Mock()
     poller = mock_poller(mock_policy_result)
     fixture_policy_provider.client.policies.begin_create_or_update.return_value = poller
 
-    if not location:
-        # Mock namespace.get to return location
-        mock_namespace_location = "namespace_location"
-        mock_namespace = {"location": mock_namespace_location}
-        fixture_policy_provider.client.namespaces.get.return_value = mock_namespace
+    # Mock namespace.get to return location
+    mock_namespace_location = "namespace_location"
+    mock_namespace = {"location": mock_namespace_location}
+    fixture_policy_provider.client.namespaces.get.return_value = mock_namespace
 
-        result = fixture_policy_provider.create(
-            policy_name=policy_name,
-            namespace_name=namespace_name,
-            resource_group_name=resource_group_name,
-            location=location,
-            tags=tags,
-            certificate_key_type=cert_key_type,
-            certificate_subject=cert_subject,
-            certificate_validity_days=cert_validity_days,
-        )
-        # Verify namespace get for location
-        fixture_policy_provider.client.namespaces.get.assert_called_once_with(
-            resource_group_name=resource_group_name, namespace_name=namespace_name
-        )
-        expected_location = mock_namespace_location
-    else:
-        # Act
-        result = fixture_policy_provider.create(
-            policy_name=policy_name,
-            namespace_name=namespace_name,
-            resource_group_name=resource_group_name,
-            location=location,
-            tags=tags,
-            certificate_key_type=cert_key_type,
-            certificate_subject=cert_subject,
-            certificate_validity_days=cert_validity_days,
-        )
-        expected_location = location
+    result = fixture_policy_provider.create(
+        policy_name=test_params["policy_name"],
+        namespace_name=test_params["namespace_name"],
+        resource_group_name=test_params["resource_group_name"],
+        tags=test_params["tags"],
+        certificate_key_type=test_params["cert_key_type"],
+        certificate_subject=test_params["cert_subject"],
+        certificate_validity_days=test_params["cert_validity_days"],
+    )
+    
+    # Verify namespace get for location
+    fixture_policy_provider.client.namespaces.get.assert_called_once_with(
+        resource_group_name=test_params["resource_group_name"], namespace_name=test_params["namespace_name"]
+    )
+    expected_location = mock_namespace_location
 
     assert result == mock_policy_result
 
@@ -74,21 +77,25 @@ def test_create_policy(
     fixture_policy_provider.client.policies.begin_create_or_update.assert_called_once()
     call_args = fixture_policy_provider.client.policies.begin_create_or_update.call_args
 
-    assert call_args[1]["resource_group_name"] == resource_group_name
-    assert call_args[1]["namespace_name"] == namespace_name
-    assert call_args[1]["policy_name"] == policy_name
+    assert call_args[1]["resource_group_name"] == test_params["resource_group_name"]
+    assert call_args[1]["namespace_name"] == test_params["namespace_name"]
+    assert call_args[1]["policy_name"] == test_params["policy_name"]
 
     # Verify resource structure
     resource = call_args[1]["resource"]
     # Verify the policy was created with the correct location
     assert resource["location"] == expected_location
 
-    if tags:
-        assert resource["tags"] == tags
+    if test_params["tags"]:
+        assert resource["tags"] == test_params["tags"]
     else:
         assert "tags" not in resource
 
     # Verify certificate configuration
+    cert_key_type = test_params["cert_key_type"]
+    cert_subject = test_params["cert_subject"]
+    cert_validity_days = test_params["cert_validity_days"]
+    
     if cert_key_type or cert_subject or cert_validity_days:
         assert "properties" in resource
         assert "certificate" in resource["properties"]
@@ -181,37 +188,43 @@ def test_delete_policy(fixture_policy_provider, mock_poller):
 
 
 @pytest.mark.parametrize(
-    "cert_key_type, cert_subject, cert_validity_days",
+    "cert_params",
     [
-        ("RSA", None, None),
-        (None, "test", None),
-        ("ECC", "test", None),
-        (None, None, 30),
-        ("RSA", "test", 30),
+        {"cert_key_type": "RSA", "cert_subject": None, "cert_validity_days": None},
+        {"cert_key_type": None, "cert_subject": "test", "cert_validity_days": None},
+        {"cert_key_type": "ECC", "cert_subject": "test", "cert_validity_days": None},
+        {"cert_key_type": None, "cert_subject": None, "cert_validity_days": 30},
+        {"cert_key_type": "RSA", "cert_subject": "test", "cert_validity_days": 30},
     ],
 )
 def test_certificate_configuration_combinations(
     fixture_policy_provider,
-    cert_key_type,
-    cert_subject,
-    cert_validity_days,
+    cert_params,
 ):
     """Test various certificate configuration combinations."""
     mock_policy_result = Mock()
     fixture_policy_provider.client.policies.begin_create_or_update.return_value = mock_policy_result
 
+    # Mock namespace.get to return location
+    mock_namespace = {"location": "eastus"}
+    fixture_policy_provider.client.namespaces.get.return_value = mock_namespace
+
     fixture_policy_provider.create(
         policy_name="cert-test-policy",
         namespace_name="test-namespace",
         resource_group_name="test-rg",
-        location="eastus",
-        certificate_key_type=cert_key_type,
-        certificate_subject=cert_subject,
-        certificate_validity_days=cert_validity_days,
+        certificate_key_type=cert_params["cert_key_type"],
+        certificate_subject=cert_params["cert_subject"],
+        certificate_validity_days=cert_params["cert_validity_days"],
     )
 
     call_args = fixture_policy_provider.client.policies.begin_create_or_update.call_args
     resource = call_args[1]["resource"]
+
+    # Extract cert params for easier reading
+    cert_key_type = cert_params["cert_key_type"]
+    cert_subject = cert_params["cert_subject"]
+    cert_validity_days = cert_params["cert_validity_days"]
 
     # Verify certificate configuration
     if cert_key_type or cert_subject or cert_validity_days:
@@ -241,19 +254,24 @@ def test_certificate_configuration_combinations(
 
 
 @pytest.mark.parametrize(
-    "tags, cert_subject, cert_validity_days",
+    "update_params",
     [
-        (None, None, None),
-        ({"env": "test"}, "test", None),
-        ({"env": "prod", "team": "ops"}, None, 30),
-        (None, "test", 30),
+        {"tags": None, "cert_subject": None, "cert_validity_days": None},
+        {"tags": {"env": "test"}, "cert_subject": "test", "cert_validity_days": None},
+        {"tags": {"env": "prod", "team": "ops"}, "cert_subject": None, "cert_validity_days": 30},
+        {"tags": None, "cert_subject": "test", "cert_validity_days": 30},
     ],
 )
-def test_update_policy(fixture_policy_provider, mock_poller, tags, cert_subject, cert_validity_days):
+def test_update_policy(fixture_policy_provider, mock_poller, update_params):
     """Test successful policy update."""
     mock_update_result = Mock()
     poller = mock_poller(mock_update_result)
     fixture_policy_provider.client.policies.begin_update.return_value = poller
+
+    # Extract params for easier reading
+    tags = update_params["tags"]
+    cert_subject = update_params["cert_subject"]
+    cert_validity_days = update_params["cert_validity_days"]
 
     result = fixture_policy_provider.update(
         policy_name="test-policy",

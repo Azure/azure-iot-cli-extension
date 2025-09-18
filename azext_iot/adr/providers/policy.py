@@ -26,18 +26,16 @@ class PolicyProvider(ADRProvider):
         policy_name: str,
         namespace_name: str,
         resource_group_name: str,
-        location: Optional[str] = None,
         tags: Optional[Dict[str, str]] = None,
         certificate_key_type: Optional[str] = None,
         certificate_subject: Optional[str] = None,
         certificate_validity_days: Optional[int] = None,
         **kwargs,
     ):
-        if not location:
-            namespace = self.client.namespaces.get(
-                resource_group_name=resource_group_name, namespace_name=namespace_name
-            )
-            location = namespace.get("location")
+        namespace = self.client.namespaces.get(
+            resource_group_name=resource_group_name, namespace_name=namespace_name
+        )
+        location = namespace.get("location")
         if not location:
             raise AzureResponseError(
                 "Error attempting to determine location from parent Namespace: "

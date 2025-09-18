@@ -35,15 +35,15 @@ def load_adr_management_arguments(self, _):
             options_list=["--namespace", "--name", "-n"],
             help="Name of the Device Registry namespace.",
         )
+        context.argument("tags", arg_type=tags_type)
+
+    # Namespace create arguments
+    with self.argument_context("iot adr ns create") as context:
         context.argument(
             "location",
             arg_type=get_location_type(self.cli_ctx),
             validator=get_default_location_from_resource_group,
         )
-        context.argument("tags", arg_type=tags_type)
-
-    # Namespace create arguments
-    with self.argument_context("iot adr ns create") as context:
         # TODO - CMS Preview - opt-out for credential and policy
         context.argument(
             "no_credential",

@@ -71,7 +71,7 @@ class NamespaceProvider(ADRProvider):
 
                 credential_provider = CredentialProvider(self.cmd)
                 credential_provider.create(
-                    namespace_name=namespace_name, resource_group_name=resource_group_name, location=location, **kwargs
+                    namespace_name=namespace_name, resource_group_name=resource_group_name, **kwargs
                 )
             except Exception as e:
                 logger.error("Error creating default namespace credential: %s", str(e))
@@ -86,7 +86,6 @@ class NamespaceProvider(ADRProvider):
                     policy_name=policy_name,
                     namespace_name=namespace_name,
                     resource_group_name=resource_group_name,
-                    location=location,
                     certificate_key_type=certificate_key_type,
                     certificate_subject=certificate_subject,
                     certificate_validity_days=certificate_validity_days,
