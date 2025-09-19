@@ -19,6 +19,7 @@ from unittest.mock import Mock
             "cert_subject": "test",
             "cert_validity_days": 30,
             "tags": {"example": "tag"},
+            "location": None,
         },
         {
             "policy_name": "policy",
@@ -28,6 +29,7 @@ from unittest.mock import Mock
             "cert_subject": None,
             "cert_validity_days": None,
             "tags": None,
+            "location": None,
         },
         {
             "policy_name": "policy",
@@ -37,6 +39,27 @@ from unittest.mock import Mock
             "cert_subject": "test",
             "cert_validity_days": None,
             "tags": {"example": "tag"},
+            "location": None,
+        },
+        {
+            "policy_name": "policy",
+            "namespace_name": "namespace",
+            "resource_group_name": "rg",
+            "cert_key_type": "ECC",
+            "cert_subject": "test",
+            "cert_validity_days": 30,
+            "tags": {"example": "tag"},
+            "location": "westus",
+        },
+        {
+            "policy_name": "policy",
+            "namespace_name": "namespace",
+            "resource_group_name": "rg",
+            "cert_key_type": "RSA",
+            "cert_subject": None,
+            "cert_validity_days": None,
+            "tags": None,
+            "location": "eastus",
         },
     ],
 )
@@ -59,17 +82,23 @@ def test_create_policy(
         policy_name=test_params["policy_name"],
         namespace_name=test_params["namespace_name"],
         resource_group_name=test_params["resource_group_name"],
+        location=test_params["location"],
         tags=test_params["tags"],
         certificate_key_type=test_params["cert_key_type"],
         certificate_subject=test_params["cert_subject"],
         certificate_validity_days=test_params["cert_validity_days"],
     )
 
-    # Verify namespace get for location
-    fixture_policy_provider.client.namespaces.get.assert_called_once_with(
-        resource_group_name=test_params["resource_group_name"], namespace_name=test_params["namespace_name"]
-    )
-    expected_location = mock_namespace_location
+    if test_params["location"]:
+        # Verify namespace get was NOT called when location is provided
+        fixture_policy_provider.client.namespaces.get.assert_not_called()
+        expected_location = test_params["location"]
+    else:
+        # Verify namespace get for location
+        fixture_policy_provider.client.namespaces.get.assert_called_once_with(
+            resource_group_name=test_params["resource_group_name"], namespace_name=test_params["namespace_name"]
+        )
+        expected_location = mock_namespace_location
 
     assert result == mock_policy_result
 

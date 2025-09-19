@@ -123,6 +123,7 @@ def test_create_namespace(
             fixture_credential_provider.create.assert_called_once_with(
                 namespace_name=namespace_name,
                 resource_group_name=resource_group_name,
+                location=fallback_location,
             )
 
             if not no_policy:
@@ -131,6 +132,7 @@ def test_create_namespace(
                     policy_name=policy_name,
                     namespace_name=namespace_name,
                     resource_group_name=resource_group_name,
+                    location=fallback_location,
                     certificate_key_type=cert_key_type,
                     certificate_subject=cert_subject,
                     certificate_validity_days=cert_validity_days,

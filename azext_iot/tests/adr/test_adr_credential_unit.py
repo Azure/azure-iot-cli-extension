@@ -9,15 +9,17 @@ from unittest.mock import Mock, patch
 
 
 @pytest.mark.parametrize(
-    "namespace_name, resource_group_name, tags",
+    "namespace_name, resource_group_name, tags, location",
     [
-        ("test-namespace", "test-rg", None),
-        ("test-namespace", "test-rg", {"env": "test", "team": "devops"}),
-        ("another-ns", "another-rg", {"project": "iot"}),
+        ("test-namespace", "test-rg", None, None),
+        ("test-namespace", "test-rg", {"env": "test", "team": "devops"}, None),
+        ("another-ns", "another-rg", {"project": "iot"}, None),
+        ("test-namespace", "test-rg", None, "westus"),
+        ("test-namespace", "test-rg", {"env": "test"}, "eastus"),
     ],
 )
 def test_create_credential(
-    fixture_credential_provider, mock_poller, namespace_name, resource_group_name, tags
+    fixture_credential_provider, mock_poller, namespace_name, resource_group_name, tags, location
 ):
     """Test successful credential creation."""
     mock_credential_result = Mock()
@@ -30,13 +32,19 @@ def test_create_credential(
     fixture_credential_provider.client.namespaces.get.return_value = mock_namespace
 
     result = fixture_credential_provider.create(
-        namespace_name=namespace_name, resource_group_name=resource_group_name, tags=tags
+        namespace_name=namespace_name, resource_group_name=resource_group_name, location=location, tags=tags
     )
-    # Verify namespace get for location
-    fixture_credential_provider.client.namespaces.get.assert_called_once_with(
-        resource_group_name=resource_group_name, namespace_name=namespace_name
-    )
-    expected_location = mock_namespace_location
+    
+    if location:
+        # Verify namespace get was NOT called when location is provided
+        fixture_credential_provider.client.namespaces.get.assert_not_called()
+        expected_location = location
+    else:
+        # Verify namespace get for location
+        fixture_credential_provider.client.namespaces.get.assert_called_once_with(
+            resource_group_name=resource_group_name, namespace_name=namespace_name
+        )
+        expected_location = mock_namespace_location
 
     assert result == mock_credential_result
 

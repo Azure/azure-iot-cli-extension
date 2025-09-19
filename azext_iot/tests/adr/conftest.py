@@ -95,3 +95,27 @@ def fixture_policy_provider(fixture_cmd):
         provider = PolicyProvider(fixture_cmd)
         provider.client = mock_client
         return provider
+
+
+def generate_adr_namespace_name() -> str:
+    return f"testadr{generate_generic_id()[:8]}"
+
+
+def generate_hub_name() -> str:
+    return f"testhub{generate_generic_id()[:8]}"
+
+
+def generate_dps_name() -> str:
+    return f"testdps{generate_generic_id()[:8]}"
+
+
+def generate_identity_name() -> str:
+    return f"testuami{generate_generic_id()[:8]}"
+
+
+def generate_device_id() -> str:
+    return f"testdev{generate_generic_id()[:8]}"
+
+
+def generate_enrollment_group_id() -> str:
+    return f"testgroup{generate_generic_id()[:8]}"
