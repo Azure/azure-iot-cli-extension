@@ -109,7 +109,8 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
             else:
                 # When specifying assignee type, use --assignee-object-id instead of --assignee
                 assignment = self.cmd(
-                    f"role assignment create --assignee-object-id '{assignee_id}' --role '{role}' --scope '{scope}' --assignee-principal-type '{assignee_type}'"
+                    f"role assignment create --assignee-object-id '{assignee_id}' --role '{role}' "
+                    f"--scope '{scope}' --assignee-principal-type '{assignee_type}'"
                 ).get_output_in_json()
 
             assignment_id = assignment.get("id", "unknown")
@@ -265,7 +266,10 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
             assert "subject" in ca_config
 
             # TODO: Re-enable when service issues are resolved
-            # assert custom_policy["properties"]["certificate"]["certificateAuthorityConfiguration"]["subject"] == CUSTOM_CERT_SUBJECT
+            # assert (
+            #     custom_policy["properties"]["certificate"]["certificateAuthorityConfiguration"]["subject"]
+            #     == CUSTOM_CERT_SUBJECT
+            # )
 
             # Create IoT Hub with ADR integration
             hub = self.cmd(
@@ -382,7 +386,11 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
             cert_list = certificates.get("value", [])
             assert len(cert_list) == 1
 
-            custom_policy_resource_id = f"/subscriptions/{subscription_id}/resourceGroups/{rg}/providers/Microsoft.DeviceRegistry/namespaces/{namespace_name}/credentials/default/policies/{credential_policy_name}"
+            custom_policy_resource_id = (
+                f"/subscriptions/{subscription_id}/resourceGroups/{rg}/providers/"
+                f"Microsoft.DeviceRegistry/namespaces/{namespace_name}/credentials/"
+                f"default/policies/{credential_policy_name}"
+            )
 
             # Validate custom policy certificate properties
             custom_policy_cert = cert_list[0]

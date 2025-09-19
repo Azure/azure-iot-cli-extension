@@ -13,30 +13,30 @@ from unittest.mock import Mock
     [
         {
             "policy_name": "policy",
-            "namespace_name": "namespace", 
+            "namespace_name": "namespace",
             "resource_group_name": "rg",
             "cert_key_type": "ECC",
-            "cert_subject": "test", 
+            "cert_subject": "test",
             "cert_validity_days": 30,
-            "tags": {"example": "tag"}
+            "tags": {"example": "tag"},
         },
         {
             "policy_name": "policy",
-            "namespace_name": "namespace", 
+            "namespace_name": "namespace",
             "resource_group_name": "rg",
             "cert_key_type": "RSA",
-            "cert_subject": None, 
+            "cert_subject": None,
             "cert_validity_days": None,
-            "tags": None
+            "tags": None,
         },
         {
             "policy_name": "policy",
-            "namespace_name": "namespace", 
+            "namespace_name": "namespace",
             "resource_group_name": "rg",
             "cert_key_type": None,
-            "cert_subject": "test", 
+            "cert_subject": "test",
             "cert_validity_days": None,
-            "tags": {"example": "tag"}
+            "tags": {"example": "tag"},
         },
     ],
 )
@@ -64,7 +64,7 @@ def test_create_policy(
         certificate_subject=test_params["cert_subject"],
         certificate_validity_days=test_params["cert_validity_days"],
     )
-    
+
     # Verify namespace get for location
     fixture_policy_provider.client.namespaces.get.assert_called_once_with(
         resource_group_name=test_params["resource_group_name"], namespace_name=test_params["namespace_name"]
@@ -95,7 +95,7 @@ def test_create_policy(
     cert_key_type = test_params["cert_key_type"]
     cert_subject = test_params["cert_subject"]
     cert_validity_days = test_params["cert_validity_days"]
-    
+
     if cert_key_type or cert_subject or cert_validity_days:
         assert "properties" in resource
         assert "certificate" in resource["properties"]
