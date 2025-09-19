@@ -156,7 +156,7 @@ def load_adr_help():
     - name: Create a policy with custom name and certificate inputs.
       text: |
           az iot adr ns policy create -n myPolicy --ns myNamespace -g myResourceGroup
-          --cert-key-type RSA --cert-validity-days 15 --cert-subject "CN=MyDevices"
+          --cert-key-type ECC --cert-validity-days 15 --cert-subject "CN=MyDevices"
   """
 
     helps[
