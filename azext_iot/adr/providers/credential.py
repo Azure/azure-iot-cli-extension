@@ -42,7 +42,7 @@ class CredentialProvider(ADRProvider):
                     "Error attempting to determine location from parent Namespace: "
                     "Namespace does not contain a location property."
                 )
-        
+
         credentials_resource = {"location": location}
 
         if tags:

@@ -34,7 +34,7 @@ def test_create_credential(
     result = fixture_credential_provider.create(
         namespace_name=namespace_name, resource_group_name=resource_group_name, location=location, tags=tags
     )
-    
+
     if location:
         # Verify namespace get was NOT called when location is provided
         fixture_credential_provider.client.namespaces.get.assert_not_called()
