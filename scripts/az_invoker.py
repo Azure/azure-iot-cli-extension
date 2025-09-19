@@ -1,6 +1,7 @@
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
-# Licensed under the MIT License. See License.txt in the project root for license information.
+# Private distribution for preview customers
+# Governed by license terms at https://aka.ms/iothub-certmgmt-privprev-license
 # --------------------------------------------------------------------------------------------
 
 from knack.invocation import CommandInvoker
