@@ -4,12 +4,27 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import pytest
 from unittest.mock import Mock, patch
+
+import pytest
+
 from azext_iot.adr.providers.base import ADRProvider
 from azext_iot.adr.providers.credential import CredentialProvider
 from azext_iot.adr.providers.namespace import NamespaceProvider
 from azext_iot.adr.providers.policy import PolicyProvider
+from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests.settings import DynamoSettings
+
+# Integration test constants
+REQUIRED_TEST_ENV_VARS = ["azext_iot_testrg"]
+settings = DynamoSettings(req_env_set=REQUIRED_TEST_ENV_VARS)
+TEST_RG = settings.env.azext_iot_testrg
+
+# Test constants for integration tests
+CUSTOM_POLICY_NAME = "custompolicy"
+CUSTOM_CERT_VALIDITY_DAYS = 15
+CUSTOM_CERT_KEY_TYPE = "ECC"
+CUSTOM_CERT_SUBJECT = "CN=test-device"
 
 
 @pytest.fixture(autouse=True)
