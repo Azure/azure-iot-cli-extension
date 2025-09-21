@@ -51,6 +51,10 @@ from azext_iot.sdk.dps.service.models import (
 logger = get_logger(__name__)
 
 
+def _get_dps_resource_group(dps):
+    return getattr(dps, "resourcegroup", None) or dps.additional_properties.get("resourcegroup")
+
+
 # DPS Enrollments
 
 
@@ -774,6 +778,7 @@ def iot_dps_connection_string_show(
         for dps in dps:
             if dps.properties.state == IoTDPSStateType.Active.value:
                 try:
+                    dps_resource_group = _get_dps_resource_group(dps)
                     connection_strings.append(
                         {
                             "name": dps.name,
@@ -785,13 +790,14 @@ def iot_dps_connection_string_show(
                 except Exception:
                     logger.warning(
                         f"Warning: The DPS {dps.name} in resource group "
-                        + f"{dps.additional_properties['resourcegroup']} does "
+                        + f"{dps_resource_group} does "
                         + f"not have the target policy {policy_name}."
                     )
             else:
+                dps_resource_group = _get_dps_resource_group(dps)
                 logger.warning(
                     f"Warning: The DPS {dps.name} in resource group "
-                    + f"{dps.additional_properties['resourcegroup']} is skipped "
+                    + f"{dps_resource_group} is skipped "
                     + "because the DPS is not active."
                 )
         return connection_strings
@@ -808,14 +814,15 @@ def _get_dps_connection_string(
     discovery, dps, policy_name, key_type, show_all
 ):
     policies = []
+    dps_resource_group = _get_dps_resource_group(dps)
     if show_all:
         policies.extend(
-            discovery.get_policies(dps.name, dps.additional_properties["resourcegroup"])
+            discovery.get_policies(dps.name, dps_resource_group)
         )
     else:
         policies.append(
             discovery.find_policy(
-                dps.name, dps.additional_properties["resourcegroup"], policy_name
+                dps.name, dps_resource_group, policy_name
             )
         )
 

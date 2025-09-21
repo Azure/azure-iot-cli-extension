@@ -1093,6 +1093,11 @@ def load_arguments(self, _):
 
     with self.argument_context("iot dps connection-string") as context:
         context.argument(
+            "dps_name",
+            options_list=["--dps-name", "--name", "-n"],
+            help="IoT Hub Device Provisioning Service name."
+        )
+        context.argument(
             "show_all",
             options_list=["--show-all", "--all"],
             help="Show all shared access policies for the respective DPS.",

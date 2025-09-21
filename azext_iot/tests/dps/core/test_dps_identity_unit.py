@@ -212,7 +212,9 @@ class TestDPSIdentityRemove(object):
         result = dps_identity_show(mock_client, dps_name="test-dps", resource_group_name="test-rg")
 
         assert result == expected_identity
-        mock_client.iot_dps_resource.get.assert_called_once_with("test-rg", "test-dps")
+        mock_client.iot_dps_resource.get.assert_called_once_with(
+            resource_group_name="test-rg", provisioning_service_name="test-dps"
+        )
 
 
 class TestConstructIdentityInfo(object):

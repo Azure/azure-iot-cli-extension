@@ -384,7 +384,7 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
 
             # Validate certificate sync results
             cert_list = certificates.get("value", [])
-            assert len(cert_list) == 1
+            assert len(cert_list) == 2  # default policy + custom policy
 
             custom_policy_resource_id = (
                 f"/subscriptions/{subscription_id}/resourceGroups/{rg}/providers/"
@@ -392,10 +392,31 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
                 f"default/policies/{credential_policy_name}"
             )
 
+            default_policy_resource_id = (
+                f"/subscriptions/{subscription_id}/resourceGroups/{rg}/providers/"
+                f"Microsoft.DeviceRegistry/namespaces/{namespace_name}/credentials/"
+                f"default/policies/default"
+            )
+
+            # Find certificates by policy resource ID
+            custom_policy_cert = None
+            default_policy_cert = None
+
+            for cert in cert_list:
+                if cert["properties"]["PolicyResourceId"] == custom_policy_resource_id:
+                    custom_policy_cert = cert
+                elif cert["properties"]["PolicyResourceId"] == default_policy_resource_id:
+                    default_policy_cert = cert
+
             # Validate custom policy certificate properties
-            custom_policy_cert = cert_list[0]
+            assert custom_policy_cert is not None, "Custom policy certificate not found"
             cert_props = custom_policy_cert["properties"]
             assert cert_props["PolicyResourceId"] == custom_policy_resource_id
+
+            # Validate default policy certificate properties
+            assert default_policy_cert is not None, "Default policy certificate not found"
+            default_cert_props = default_policy_cert["properties"]
+            assert default_cert_props["PolicyResourceId"] == default_policy_resource_id
 
         finally:
             # Cleanup all resources
