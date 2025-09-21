@@ -28,7 +28,6 @@ from azure.cli.core.azclierror import (
 from azure.cli.core.commands import LongRunningOperation
 from azure.cli.core.commands.arm import assign_identity
 from azure.cli.core.util import sdk_no_wait
-from azure.cli.core.profiles._shared import AZURE_API_PROFILES, ResourceType
 
 from azext_iot.sdk.iothub.mgmt.models import (IotHubSku,
                                       AccessRights,
