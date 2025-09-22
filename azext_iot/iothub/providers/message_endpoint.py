@@ -230,7 +230,7 @@ class MessageEndpoint(IoTHubProvider):
                 self.hub_resource.additional_properties["resourcegroup"],
                 self.hub_resource.name,
                 self.hub_resource,
-                if_match=self.hub_resource.etag
+                etag=self.hub_resource.etag
             )
         except HttpResponseError as e:
             handle_service_exception(e)
@@ -347,7 +347,7 @@ class MessageEndpoint(IoTHubProvider):
             self.hub_resource.additional_properties["resourcegroup"],
             self.hub_resource.name,
             self.hub_resource,
-            if_match=self.hub_resource.etag
+            etag=self.hub_resource.etag
         )
 
     def _connection_string_retrieval_args_check(
@@ -552,7 +552,7 @@ class MessageEndpoint(IoTHubProvider):
                 self.hub_resource.additional_properties["resourcegroup"],
                 self.hub_resource.name,
                 self.hub_resource,
-                if_match=self.hub_resource.etag
+                etag=self.hub_resource.etag
             )
         except HttpResponseError as e:
             handle_service_exception(e)
