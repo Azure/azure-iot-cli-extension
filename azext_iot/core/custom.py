@@ -12,10 +12,7 @@ import re
 from datetime import timedelta
 from enum import Enum
 from typing import List, Optional
-from knack.log import get_logger
-from knack.util import CLIError
-from azure.core import MatchConditions
-from azure.core.exceptions import HttpResponseError
+
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
     BadRequestError,
@@ -27,90 +24,79 @@ from azure.cli.core.azclierror import (
 )
 from azure.cli.core.commands import LongRunningOperation
 from azure.cli.core.commands.arm import assign_identity
-from azure.cli.core.util import sdk_no_wait
+from azure.core import MatchConditions
+from azure.core.exceptions import HttpResponseError
+from knack.log import get_logger
+from knack.util import CLIError
 
-from azext_iot.sdk.iothub.mgmt.models import (IotHubSku,
-                                      AccessRights,
-                                      AdrProperties,
-                                      ArmIdentity,
-                                      CertificateDescription,
-                                      CertificateProperties as IotHubCertificateProperties,
-                                      CertificateVerificationDescription,
-                                      CloudToDeviceProperties,
-                                      IotHubDescription,
-                                      IotHubSkuInfo,
-                                      SharedAccessSignatureAuthorizationRule,
-                                      IotHubProperties,
-                                      EventHubProperties,
-                                      EventHubConsumerGroupBodyDescription,
-                                      EventHubConsumerGroupName,
-                                      FailoverInput,
-                                      FeedbackProperties,
-                                      ManagedIdentity,
-                                      MessagingEndpointProperties,
-                                      OperationInputs,
-                                      EnrichmentProperties,
-                                      RoutingEventHubProperties,
-                                      RoutingServiceBusQueueEndpointProperties,
-                                      RoutingServiceBusTopicEndpointProperties,
-                                      RoutingStorageContainerProperties,
-                                      RouteProperties,
-                                      RoutingMessage,
-                                      StorageEndpointProperties,
-                                      TestRouteInput,
-                                      TestAllRoutesInput)
-
-
-from azext_iot.sdk.dps.mgmt.models import (CertificateProperties as DPSCertificateProperties,
-                                                          ProvisioningServiceDescription,
-                                                          IotDpsPropertiesDescription,
-                                                          IotHubDefinitionDescription,
-                                                          IotDpsSkuInfo,
-                                                          IotDpsSku,
-                                                          OperationInputs as DpsOperationInputs,
-                                                          SharedAccessSignatureAuthorizationRuleAccessRightsDescription,
-                                                          VerificationCodeRequest,
-                                                          DeviceRegistryNamespaceDescription,
-                                                          DeviceRegistryNamespaceAuthenticationType,
-                                                          ManagedServiceIdentity,
-                                                          ManagedServiceIdentityType,
-                                                          UserAssignedIdentity)
-from azext_iot._factory import iot_hub_service_factory
+from azext_iot._factory import iot_hub_service_factory, resource_service_factory
+from azext_iot.common.certops import open_certificate
 from azext_iot.common.shared import AuthenticationType
+from azext_iot.core.shared import (
+    ADR_CONFIGURE_ROLES_ERROR_MSG,
+    ADR_NS_IDENTITY_ROLES_FOR_HUB,
+    ADR_ROLE_ASSIGN_ERROR_MSG,
+    HUB_PREMIUM_SKUS,
+    EncodingFormat,
+    EndpointType,
+    IdentityType,
+    RenewKeyType,
+)
 from azext_iot.iothub.common import SYSTEM_ASSIGNED_IDENTITY
-from azext_iot.operations.dps import _get_dps_resource_group
-
-from azure.mgmt.iotcentral.models import (AppSkuInfo,
-                                          App)
-
-# Azure CLI core imports
-from azure.cli.command_modules.iot.shared import EndpointType, EncodingFormat, RenewKeyType, IdentityType
-from azure.cli.command_modules.iot._client_factory import resource_service_factory
-from azure.cli.command_modules.iot._utils import open_certificate
-
+from azext_iot.sdk.dps.mgmt.models import (
+    CertificateProperties as DPSCertificateProperties,
+    DeviceRegistryNamespaceAuthenticationType,
+    DeviceRegistryNamespaceDescription,
+    IotDpsPropertiesDescription,
+    IotDpsSku,
+    IotDpsSkuInfo,
+    IotHubDefinitionDescription,
+    ManagedServiceIdentity,
+    ManagedServiceIdentityType,
+    OperationInputs as DpsOperationInputs,
+    ProvisioningServiceDescription,
+    SharedAccessSignatureAuthorizationRuleAccessRightsDescription,
+    UserAssignedIdentity,
+    VerificationCodeRequest,
+)
+from azext_iot.sdk.iothub.mgmt.models import (
+    AccessRights,
+    AdrProperties,
+    ArmIdentity,
+    CertificateDescription,
+    CertificateProperties as IotHubCertificateProperties,
+    CertificateVerificationDescription,
+    CloudToDeviceProperties,
+    EnrichmentProperties,
+    EventHubConsumerGroupBodyDescription,
+    EventHubConsumerGroupName,
+    EventHubProperties,
+    FailoverInput,
+    FeedbackProperties,
+    IotHubDescription,
+    IotHubProperties,
+    IotHubSku,
+    IotHubSkuInfo,
+    ManagedIdentity,
+    MessagingEndpointProperties,
+    OperationInputs,
+    RouteProperties,
+    RoutingEventHubProperties,
+    RoutingMessage,
+    RoutingServiceBusQueueEndpointProperties,
+    RoutingServiceBusTopicEndpointProperties,
+    RoutingStorageContainerProperties,
+    SharedAccessSignatureAuthorizationRule,
+    StorageEndpointProperties,
+    TestAllRoutesInput,
+    TestRouteInput,
+)
 
 logger = get_logger(__name__)
 
 # Identity types
 SYSTEM_ASSIGNED = 'SystemAssigned'
 NONE_IDENTITY = 'None'
-
-
-# TODO - CMS Preview - Core Common/Consts
-# Premium SKUs for P-tier hub functionality
-HUB_PREMIUM_SKUS = [IotHubSku.P1.value, IotHubSku.P2.value, IotHubSku.P3.value]
-
-# Roles that ADR needs assigned against Hub on create
-ADR_NS_IDENTITY_ROLES_FOR_HUB = ["Contributor", "IoT Hub Registry Contributor"]
-
-# ADR role assignment error message
-ADR_ROLE_ASSIGN_ERROR_MSG = (
-    "You may need to manually assign the following roles from the ADR namespace's system identity to this hub "
-    f"for credential sync to work properly: {','.join(ADR_NS_IDENTITY_ROLES_FOR_HUB)}"
-)
-
-ADR_CONFIGURE_ROLES_ERROR_MSG = "Unable to configure role assignments for credential sync."
-
 
 # CUSTOM TYPE
 class KeyType(Enum):
@@ -739,10 +725,6 @@ def iot_hub_create(
     skip_ns_role_assignments: Optional[bool] = None,
     custom_ns_role_id: Optional[str] = None,
 ):
-    """
-    Create an IoT Hub with support for P-tier SKUs and ADR properties.
-    This is an enhanced version of the Azure CLI core command with additional features.
-    """
     cli_ctx = cmd.cli_ctx
     if enable_fileupload_notifications:
         if not fileupload_storage_connectionstring or not fileupload_storage_container_name:
@@ -838,7 +820,7 @@ def iot_hub_create(
             instance = lro.resource().as_dict()
             hub_resource_id = instance.get("id")
             if hub_resource_id:
-                _setup_adr_role_assignments(cmd, adr_ns_id, hub_resource_id, custom_ns_role_id)
+                _setup_adr_hub_role_assignments(cmd, adr_ns_id, hub_resource_id, custom_ns_role_id)
             else:
                 # this is bad
                 raise CLIError(f"Could not fetch IoT Hub resource ID after creation. {ADR_ROLE_ASSIGN_ERROR_MSG}")
@@ -898,13 +880,8 @@ def update_iot_hub_custom(instance,
     fileupload_storage_identity=None,
     min_tls_version=None,
     tags=None,
-    # TODO - CMS Preview - Hub cannot update namespace resource ID
     adr_ns_identity_id=None,
 ):
-    """
-    Update an IoT Hub with support for P-tier SKUs and ADR properties.
-    This is an enhanced version of the Azure CLI core command with additional features.
-    """
     if tags is not None:
         instance.tags = tags
     if unit is not None:
@@ -969,7 +946,7 @@ def update_iot_hub_custom(instance,
         disable_module_sas=disable_module_sas
     )
 
-    # TODO - CMS Preview - Prevent p-tier SKU change
+    # TODO - CMS Preview - Prevent premium SKU change
     existing_sku_name = instance.sku.name
     final_sku_name = sku or existing_sku_name
 
@@ -981,7 +958,6 @@ def update_iot_hub_custom(instance,
             f"Cannot change IoT Hub SKU from {existing_sku_name} to {final_sku_name}."
         )
 
-    # TODO - CMS Preview - Test updating only UAMI with/without existing namespace id
     adr_namespace_resource_id = instance.adr_properties.namespace_resource_id if instance.adr_properties else None
     _validate_and_set_adr_properties(
         instance=instance,
@@ -1712,71 +1688,6 @@ def _delete_routing_endpoints(endpoint_name, endpoint_type, endpoints):
     return endpoints
 
 
-def iot_central_app_create(
-        cmd, client, app_name, resource_group_name, subdomain, sku="ST2",
-        location=None, template=None, display_name=None, no_wait=False, mi_system_assigned=False
-):
-    cli_ctx = cmd.cli_ctx
-    location = _ensure_location(cli_ctx, resource_group_name, location)
-    display_name = _ensure_display_name(app_name, display_name)
-    appSku = AppSkuInfo(name=sku)
-    appid = {"type": "SystemAssigned"} if mi_system_assigned else None
-
-    app = App(subdomain=subdomain,
-              location=location,
-              display_name=display_name,
-              sku=appSku,
-              template=template,
-              identity=appid)
-
-    return sdk_no_wait(no_wait, client.apps.begin_create_or_update, resource_group_name, app_name, app)
-
-
-def iot_central_app_get(client, app_name, resource_group_name=None):
-    if resource_group_name is None:
-        return _get_iot_central_app_by_name(client, app_name)
-    return client.apps.get(resource_group_name, app_name)
-
-
-def iot_central_app_delete(client, app_name, resource_group_name, no_wait=False):
-    return sdk_no_wait(no_wait, client.apps.begin_delete, resource_group_name, app_name)
-
-
-def iot_central_app_list(client, resource_group_name=None):
-    if resource_group_name is None:
-        return client.apps.list_by_subscription()
-    return client.apps.list_by_resource_group(resource_group_name)
-
-
-def iot_central_app_update(client, app_name, parameters, resource_group_name):
-    return client.apps.begin_create_or_update(resource_group_name, app_name, parameters)
-
-
-def iot_central_app_assign_identity(client, app_name, system_assigned=False, resource_group_name=None):
-    app = iot_central_app_get(client, app_name, resource_group_name)
-
-    if system_assigned:
-        app.identity.type = SYSTEM_ASSIGNED
-
-    poller = iot_central_app_update(client, app_name, app, resource_group_name)
-    return poller.result().identity
-
-
-def iot_central_app_remove_identity(client, app_name, system_assigned=False, resource_group_name=None):
-    app = iot_central_app_get(client, app_name, resource_group_name)
-
-    if system_assigned and (app.identity.type.upper() == SYSTEM_ASSIGNED.upper()):
-        app.identity.type = NONE_IDENTITY
-
-    poller = iot_central_app_update(client, app_name, app, resource_group_name)
-    return poller.result().identity
-
-
-def iot_central_app_show_identity(client, app_name, resource_group_name=None):
-    app = iot_central_app_get(client, app_name, resource_group_name)
-    return app.identity
-
-
 def _ensure_location(cli_ctx, resource_group_name, location):
     """Check to see if a location was provided. If not,
         fall back to the resource group location.
@@ -1788,184 +1699,6 @@ def _ensure_location(cli_ctx, resource_group_name, location):
         resource_group_client = resource_service_factory(cli_ctx).resource_groups
         return resource_group_client.get(resource_group_name).location
     return location
-
-
-def _ensure_display_name(app_name, display_name):
-    if not display_name or display_name.isspace():
-        return app_name
-    return display_name
-
-
-def _get_iot_central_app_by_name(client, app_name):
-    """Search the current subscription for an app with the given name.
-    :param object client: IoTCentralClient
-    :param str app_name: App name to search for
-    """
-    all_apps = iot_central_app_list(client)
-    if all_apps is None:
-        raise CLIError(
-            "No IoT Central application found in current subscription.")
-    try:
-        target_app = next(
-            x for x in all_apps if app_name.lower() == x.name.lower())
-    except StopIteration:
-        raise CLIError(
-            "No IoT Central application found with name {} in current subscription.".format(app_name))
-    return target_app
-
-
-def get_private_link_resource(client, name=None, connection_id=None, resource_group_name=None, group_id=None):
-
-    if resource_group_name and name and group_id:
-        return client.private_links.get(resource_group_name=resource_group_name,
-                                        resource_name=name,
-                                        group_id=group_id)
-    if connection_id:
-        id_list = connection_id.split('/')
-        resource_group_name = id_list[id_list.index('resourceGroups') + 1]
-        name = id_list[id_list.index('iotApps') + 1]
-        group_id = id_list[id_list.index('privateLinkResources') + 1]
-        return client.private_links.get(resource_group_name=resource_group_name,
-                                        resource_name=name,
-                                        group_id=group_id)
-
-    raise RequiredArgumentMissingError(
-        "Must provide private link resource ID or resource name, resource group, and group id.")
-
-
-def list_private_link_resource(client, app_name=None, connection_id=None, resource_group_name=None, source_type=None):
-    if app_name and resource_group_name and source_type:
-        if source_type.lower() != 'microsoft.iotcentral/iotapps':
-            raise InvalidArgumentValueError(
-                "Resource type must be Microsoft.IoTCentral/iotApps")
-    elif connection_id:
-        id_list = connection_id.split('/')
-        if id_list[id_list.index('providers') + 1].lower() != 'microsoft.iotcentral':
-            raise InvalidArgumentValueError(
-                "Type must be Microsoft.IoTCentral/iotApps")
-        resource_group_name = id_list[id_list.index('resourceGroups') + 1]
-        app_name = id_list[id_list.index('iotApps') + 1]
-    else:
-        raise RequiredArgumentMissingError(
-            "Must provide private endpoint connection resource ID or resource name, resource group, and resource type.")
-    return client.private_links.list(resource_group_name, app_name)
-
-
-def show_private_endpoint_connection(client, resource_group_name=None, connection_id=None, account_name=None, private_endpoint_connection_name=None):
-
-    return get_private_endpoint_connection(client=client,
-                                           resource_group_name=resource_group_name,
-                                           connection_id=connection_id,
-                                           account_name=account_name,
-                                           private_endpoint_connection_name=private_endpoint_connection_name,
-                                           return_args=False)
-
-
-def list_private_endpoint_connection(client, resource_group_name=None, connection_id=None, account_name=None):
-    if connection_id:
-        id_list = connection_id.split('/')
-        if id_list[id_list.index('providers') + 1].lower() != 'microsoft.iotcentral':
-            raise InvalidArgumentValueError(
-                "Type must be Microsoft.IoTCentral/iotApps")
-        resource_group_name = id_list[id_list.index('resourceGroups') + 1]
-        account_name = id_list[id_list.index('iotApps') + 1]
-
-    if resource_group_name is None or account_name is None:
-        raise RequiredArgumentMissingError(
-            "Must provide private endpoint connection resource ID or resource name, resource group, and resource type.")
-
-    return client.private_endpoint_connections.list(resource_group_name, account_name)
-
-
-def get_private_endpoint_connection(client, resource_group_name=None, connection_id=None, account_name=None, private_endpoint_connection_name=None, return_args=False):
-
-    if resource_group_name and account_name and private_endpoint_connection_name:
-        output = client.private_endpoint_connections.get(resource_group_name=resource_group_name,
-                                                         resource_name=account_name,
-                                                         private_endpoint_connection_name=private_endpoint_connection_name)
-        if return_args is False:
-            return output
-        return [output, resource_group_name, account_name, private_endpoint_connection_name]
-    if connection_id:
-        id_list = connection_id.split('/')
-        resource_group_name = id_list[id_list.index('resourceGroups') + 1]
-        account_name = id_list[id_list.index('iotApps') + 1]
-        private_endpoint_connection_name = id_list[id_list.index('privateEndpointConnections') + 1]
-        output = client.private_endpoint_connections.get(resource_group_name=resource_group_name,
-                                                         resource_name=account_name,
-                                                         private_endpoint_connection_name=private_endpoint_connection_name)
-        if return_args is False:
-            return output
-        return [output, resource_group_name, account_name, private_endpoint_connection_name]
-    raise RequiredArgumentMissingError(
-        "Account name, resource group, and private endpoint connection name are required unless id is specified.")
-
-
-def _update_private_endpoint_connection_status(client, resource_group_name, account_name, connection_id, private_endpoint_connection_name, is_approved=True, description=None):  # pylint: disable=unused-argument
-    getInfoArr = get_private_endpoint_connection(client,
-                                                 resource_group_name=resource_group_name,
-                                                 connection_id=connection_id,
-                                                 account_name=account_name,
-                                                 private_endpoint_connection_name=private_endpoint_connection_name,
-                                                 return_args=True)
-    private_endpoint_connection = getInfoArr[0]
-    rg = getInfoArr[1]
-    acc_name = getInfoArr[2]
-    pec_name = getInfoArr[3]
-    old_status = private_endpoint_connection.private_link_service_connection_state.status
-    new_status = "Approved" if is_approved else "Rejected"
-    private_endpoint_connection.private_link_service_connection_state.status = new_status
-    private_endpoint_connection.private_link_service_connection_state.description = description
-    try:
-        return client.private_endpoint_connections.begin_create(resource_group_name=rg,
-                                                                resource_name=acc_name,
-                                                                private_endpoint_connection=private_endpoint_connection,
-                                                                private_endpoint_connection_name=pec_name)
-    except HttpResponseError as ex:
-        if ex.response.status_code == 400:
-            if new_status == "Approved" and old_status == "Rejected":
-                raise CLIError(ex.response, "You cannot approve the connection request after rejection. Please create "
-                                            "a new connection for approval.")
-            if new_status == "Approved" and old_status == "Approved":
-                raise CLIError(ex.response, "Your connection is already approved. No need to approve again.")
-        raise ex
-
-
-def approve_private_endpoint_connection(client, resource_group_name=None, account_name=None, private_endpoint_connection_name=None, connection_id=None, description=None):
-    return _update_private_endpoint_connection_status(client,
-                                                      resource_group_name=resource_group_name,
-                                                      account_name=account_name,
-                                                      connection_id=connection_id,
-                                                      private_endpoint_connection_name=private_endpoint_connection_name,
-                                                      description=description)
-
-
-def reject_private_endpoint_connection(client, resource_group_name=None, account_name=None, private_endpoint_connection_name=None, connection_id=None, description=None):
-    return _update_private_endpoint_connection_status(client,
-                                                      resource_group_name=resource_group_name,
-                                                      account_name=account_name,
-                                                      connection_id=connection_id,
-                                                      is_approved=False,
-                                                      private_endpoint_connection_name=private_endpoint_connection_name,
-                                                      description=description)
-
-
-def delete_private_endpoint_connection(client, resource_group_name=None, account_name=None, private_endpoint_connection_name=None, connection_id=None):
-
-    getInfoArr = get_private_endpoint_connection(client,
-                                                 resource_group_name=resource_group_name,
-                                                 connection_id=connection_id,
-                                                 account_name=account_name,
-                                                 private_endpoint_connection_name=private_endpoint_connection_name,
-                                                 return_args=True)
-    rg = getInfoArr[1]
-    acc_name = getInfoArr[2]
-    pec_name = getInfoArr[3]
-    # private_endpoint_connection.private_link_service_connection_state.status = new_status
-    # private_endpoint_connection.private_link_service_connection_state.description = description
-    return client.private_endpoint_connections.begin_delete(resource_group_name=rg,
-                                                            resource_name=acc_name,
-                                                            private_endpoint_connection_name=pec_name)
 
 
 def _process_fileupload_args(
@@ -2056,7 +1789,6 @@ def _build_identity(system=False, identities=None):
     return identity
 
 
-# TODO - CMS Preview - New methods
 # TODO - CMS Preview - Hub ADR property validation logic
 def _validate_and_set_adr_properties(
     instance: IotHubProperties,
@@ -2084,7 +1816,7 @@ def _validate_and_set_adr_properties(
             )
 
 
-def _setup_adr_role_assignments(cmd, namespace_id: str, hub_id: str, custom_role_id: Optional[str] = None) -> None:
+def _setup_adr_hub_role_assignments(cmd, namespace_id: str, hub_id: str, custom_role_id: Optional[str] = None) -> None:
     """
     Set up role assignments between ADR namespace system-assigned identity and IoT Hub.
     
@@ -2096,6 +1828,7 @@ def _setup_adr_role_assignments(cmd, namespace_id: str, hub_id: str, custom_role
     """
     try:
         from msrestazure.tools import parse_resource_id
+
         from azext_iot.adr.providers.namespace import NamespaceProvider
 
         # Parse the ADR namespace resource ID

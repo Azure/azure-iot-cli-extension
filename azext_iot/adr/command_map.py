@@ -5,11 +5,6 @@
 # Governed by license terms at https://aka.ms/iothub-certmgmt-privprev-license
 # --------------------------------------------------------------------------------------------
 
-# TODO - CMS Preview - ADR management commands
-"""
-Command map for Azure Device Registry (ADR) namespace commands.
-"""
-
 from azure.cli.core.commands import CliCommandType
 
 from azext_iot._factory import adr_service_factory
@@ -31,7 +26,6 @@ adr_policy_ops = CliCommandType(
 
 
 def load_adr_commands(self, _):
-    """Load ADR namespace commands."""
     # Namespace commands
     with self.command_group("iot adr ns", command_type=adr_namespace_ops) as cmd_group:
         cmd_group.command("create", "adr_namespace_create")

@@ -41,7 +41,7 @@ class NamespaceProvider(ADRProvider):
 
         namespace_resource = {"location": location}
 
-        # TODO - CMS Preview - default system assigned identity
+        # TODO - CMS Preview - default system assigned identity, credential, policy
         namespace_resource["identity"] = {"type": IdentityType.system_assigned.value}
 
         if tags:
@@ -53,7 +53,6 @@ class NamespaceProvider(ADRProvider):
         if properties:
             namespace_resource["properties"] = properties
 
-        # TODO - CMS Preview - create_or_replace - should we check for existence first?
         with console.status(f"Creating namespace {namespace_name}..."):
             poller = self.client.namespaces.begin_create_or_replace(
                 resource_group_name=resource_group_name,
@@ -77,7 +76,6 @@ class NamespaceProvider(ADRProvider):
             except Exception as e:
                 logger.error("Error creating default namespace credential: %s", str(e))
 
-        # TODO - CMS Preview - Create policy by default
         if not no_credential and not no_policy:
             try:
                 from azext_iot.adr.providers.policy import PolicyProvider

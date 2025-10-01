@@ -32,7 +32,6 @@ __all__ = [
     "CloudError",
     "iot_hub_service_factory",
     "iot_service_provisioning_factory",
-    # TODO - CMS Preview - ADR MGMT SDK
     "adr_service_factory",
 ]
 
@@ -78,11 +77,6 @@ def iot_hub_service_factory(cli_ctx, *_):
         http_logging_policy=_get_default_logging_policy(),
     )
 
-    # TODO - CMS Preview - Original implementation (uncomment when official SDK is released):
-    # from azure.cli.core.commands.client_factory import get_mgmt_service_client
-    # from azure.cli.core.profiles import ResourceType
-    # return get_mgmt_service_client(cli_ctx, ResourceType.MGMT_IOTHUB)
-
 
 def iot_service_provisioning_factory(cli_ctx, *_):
     """
@@ -110,13 +104,7 @@ def iot_service_provisioning_factory(cli_ctx, *_):
         http_logging_policy=_get_default_logging_policy(),
     )
 
-    # TODO - CMS Preview - Original implementation (uncomment when official SDK is released):
-    # from azure.cli.core.commands.client_factory import get_mgmt_service_client
-    # from azure.cli.core.profiles import ResourceType
-    # return get_mgmt_service_client(cli_ctx, ResourceType.MGMT_IOTDPS)
 
-
-# TODO - CMS Preview - ADR MGMT SDK
 def adr_service_factory(cli_ctx, *_):
     """
     Factory for importing deps and getting service client resources.
@@ -142,6 +130,13 @@ def adr_service_factory(cli_ctx, *_):
         user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
         http_logging_policy=_get_default_logging_policy(),
     )
+
+
+def resource_service_factory(cli_ctx, **_):
+    from azure.cli.core.commands.client_factory import get_mgmt_service_client
+    from azure.cli.core.profiles import ResourceType
+
+    return get_mgmt_service_client(cli_ctx, ResourceType.MGMT_RESOURCE_RESOURCES)
 
 
 class SdkResolver(object):

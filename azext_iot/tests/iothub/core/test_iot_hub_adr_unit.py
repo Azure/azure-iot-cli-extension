@@ -12,7 +12,7 @@ from azure.cli.core.azclierror import InvalidArgumentValueError, RequiredArgumen
 
 from azext_iot.core.custom import (
     ADR_NS_IDENTITY_ROLES_FOR_HUB,
-    _setup_adr_role_assignments,
+    _setup_adr_hub_role_assignments,
     _validate_and_set_adr_properties,
 )
 from azext_iot.sdk.iothub.mgmt.models import AdrProperties, IotHubProperties
@@ -93,7 +93,7 @@ class TestSetupADRRoleAssignments(object):
     @patch("azext_iot.core.custom.assign_identity")
     @patch("azext_iot.adr.providers.namespace.NamespaceProvider")
     @patch("msrestazure.tools.parse_resource_id")
-    def test_setup_adr_role_assignments_success(
+    def test_setup_hub_adr_role_assignments_success(
         self, mock_parse_resource_id, mock_namespace_provider_class, mock_assign_identity, mock_logger
     ):
         """Test successful role assignment setup."""
@@ -119,7 +119,7 @@ class TestSetupADRRoleAssignments(object):
         namespace_id = f"{mock_rg_id}/providers/Microsoft.DeviceRegistry/namespaces/{mock_namespace}"
         hub_id = f"{mock_rg_id}/providers/Microsoft.Devices/IotHubs/test-hub"
 
-        _setup_adr_role_assignments(mock_cmd, namespace_id, hub_id)
+        _setup_adr_hub_role_assignments(mock_cmd, namespace_id, hub_id)
 
         # Verify the namespace provider was created and called correctly
         mock_namespace_provider_class.assert_called_once_with(mock_cmd)
@@ -150,7 +150,7 @@ class TestSetupADRRoleAssignments(object):
 
     @patch("azext_iot.core.custom.logger")
     @patch("msrestazure.tools.parse_resource_id")
-    def test_setup_adr_role_assignments_parse_error(self, mock_parse_resource_id, mock_logger):
+    def test_setup_hub_adr_role_assignments_parse_error(self, mock_parse_resource_id, mock_logger):
         """Test role assignment setup with parse error."""
         # Mock parse_resource_id to return incomplete data
         mock_parse_resource_id.return_value = {"resource_group": None, "name": "test-namespace"}
@@ -159,7 +159,7 @@ class TestSetupADRRoleAssignments(object):
         namespace_id = "/invalid/resource/id"
         hub_id = "/subscriptions/test/resourceGroups/test-rg/providers/Microsoft.Devices/IotHubs/test-hub"
 
-        _setup_adr_role_assignments(mock_cmd, namespace_id, hub_id)
+        _setup_adr_hub_role_assignments(mock_cmd, namespace_id, hub_id)
 
         # Verify warning was logged
         mock_logger.warning.assert_called_once()
@@ -168,7 +168,7 @@ class TestSetupADRRoleAssignments(object):
     @patch("azext_iot.core.custom.logger")
     @patch("azext_iot.adr.providers.namespace.NamespaceProvider")
     @patch("msrestazure.tools.parse_resource_id")
-    def test_setup_adr_role_assignments_no_principal_id(
+    def test_setup_hub_adr_role_assignments_no_principal_id(
         self, mock_parse_resource_id, mock_namespace_provider_class, mock_logger
     ):
         """Test role assignment setup when namespace has no principal ID."""
@@ -187,7 +187,7 @@ class TestSetupADRRoleAssignments(object):
         namespace_id = f"{mock_rg_id}/providers/Microsoft.DeviceRegistry/namespaces/{mock_namespace}"
         hub_id = f"{mock_rg_id}/providers/Microsoft.Devices/IotHubs/test-hub"
 
-        _setup_adr_role_assignments(mock_cmd, namespace_id, hub_id)
+        _setup_adr_hub_role_assignments(mock_cmd, namespace_id, hub_id)
 
         # Verify warning was logged
         mock_logger.warning.assert_called_once()
@@ -197,7 +197,7 @@ class TestSetupADRRoleAssignments(object):
     @patch("azext_iot.core.custom.assign_identity")
     @patch("azext_iot.adr.providers.namespace.NamespaceProvider")
     @patch("msrestazure.tools.parse_resource_id")
-    def test_setup_adr_role_assignments_partial_failure(
+    def test_setup_hub_adr_role_assignments_partial_failure(
         self, mock_parse_resource_id, mock_namespace_provider_class, mock_assign_identity, mock_logger
     ):
         """Test role assignment setup with partial failures."""
@@ -226,7 +226,7 @@ class TestSetupADRRoleAssignments(object):
         )
         hub_id = "/subscriptions/test/resourceGroups/test-rg/providers/Microsoft.Devices/IotHubs/test-hub"
 
-        _setup_adr_role_assignments(mock_cmd, namespace_id, hub_id)
+        _setup_adr_hub_role_assignments(mock_cmd, namespace_id, hub_id)
 
         # Verify specific warnings for failed role and command suggestions
         warning_calls = mock_logger.warning.call_args_list
@@ -245,7 +245,7 @@ class TestSetupADRRoleAssignments(object):
 
     @patch("azext_iot.core.custom.logger")
     @patch("msrestazure.tools.parse_resource_id")
-    def test_setup_adr_role_assignments_general_exception(self, mock_parse_resource_id, mock_logger):
+    def test_setup_hub_adr_role_assignments_general_exception(self, mock_parse_resource_id, mock_logger):
         """Test role assignment setup with general exception."""
         # Mock parse_resource_id to raise an exception
         mock_parse_resource_id.side_effect = Exception("General error")
@@ -256,7 +256,7 @@ class TestSetupADRRoleAssignments(object):
         )
         hub_id = "/subscriptions/test/resourceGroups/test-rg/providers/Microsoft.Devices/IotHubs/test-hub"
 
-        _setup_adr_role_assignments(mock_cmd, namespace_id, hub_id)
+        _setup_adr_hub_role_assignments(mock_cmd, namespace_id, hub_id)
 
         # Verify warning was logged
         mock_logger.warning.assert_called_once()

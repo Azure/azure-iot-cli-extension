@@ -46,10 +46,6 @@ dps_name_type = CLIArgumentType(
     completer=get_resource_name_completion_list('Microsoft.Devices/ProvisioningServices'),
     help='IoT Hub Device Provisioning Service name')
 
-app_name_type = CLIArgumentType(
-    completer=get_resource_name_completion_list('Microsoft.IoTCentral/IoTApps'),
-    help='IoT Central application name.')
-
 mi_system_assigned_type = CLIArgumentType(
     options_list=['--mi-system-assigned'],
     help='Provide this flag to use system assigned identity.')

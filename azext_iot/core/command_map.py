@@ -57,7 +57,7 @@ def load_core_commands(self, _):
     """
     Load CLI commands for both IoT Hub and DPS management
     """
-    # TODO - CMS Preview - IoT Hub management commands (core override)
+    # iot hub commands
     with self.command_group(
         "iot hub", command_type=core_ops, client_factory=iot_hub_service_factory
     ) as cmd_group:
@@ -72,7 +72,6 @@ def load_core_commands(self, _):
         cmd_group.command("delete", "iot_hub_delete")
         cmd_group.show_command("show", "iot_hub_get")
         cmd_group.command("list", "iot_hub_list")
-        # from core
         cmd_group.command('list-skus', 'iot_hub_sku_list')
         cmd_group.command('show-quota-metrics', 'iot_hub_get_quota_metrics')
         cmd_group.command('show-stats', 'iot_hub_get_stats')
@@ -143,7 +142,7 @@ def load_core_commands(self, _):
         g.command('update', 'iot_hub_route_update', transform=RouteUpdateResultTransform(self.cli_ctx))
         g.command('test', 'iot_hub_route_test')
 
-    # TODO - CMS Preview - DPS management commands (core override)
+    # iot dps commands
     with self.command_group(
         "iot dps", command_type=core_ops, client_factory=iot_service_provisioning_factory
     ) as cmd_group:
@@ -158,6 +157,7 @@ def load_core_commands(self, _):
         cmd_group.command("delete", "iot_dps_delete")
         cmd_group.command("list", "iot_dps_list")
 
+    # iot dps identity commands
     with self.command_group(
         "iot dps identity", command_type=core_ops, client_factory=iot_service_provisioning_factory
     ) as cmd_group:
@@ -165,7 +165,7 @@ def load_core_commands(self, _):
         cmd_group.command("remove", "dps_identity_remove")
         cmd_group.show_command("show", "dps_identity_show")
 
-        # iot dps linked-hub commands
+    # iot dps linked-hub commands
     with self.command_group('iot dps linked-hub', command_type=core_ops, client_factory=iot_service_provisioning_factory) as g:
         g.command('list', 'iot_dps_linked_hub_list')
         g.show_command('show', 'iot_dps_linked_hub_get')

@@ -1,0 +1,100 @@
+# coding=utf-8
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Private distribution for preview customers
+# Governed by license terms at https://aka.ms/iothub-certmgmt-privprev-license
+# --------------------------------------------------------------------------------------------
+
+"""
+shared: Define shared data types(enums).
+
+"""
+
+from enum import Enum
+
+from azext_iot.sdk.iothub.mgmt.models._enums import IotHubSku
+
+
+# pylint: disable=too-few-public-methods
+class EndpointType(Enum):
+    """
+    Type of the routing endpoint.
+    """
+
+    EventHub = "eventhub"
+    ServiceBusQueue = "servicebusqueue"
+    ServiceBusTopic = "servicebustopic"
+    AzureStorageContainer = "azurestoragecontainer"
+
+
+# pylint: disable=too-few-public-methods
+class RouteSourceType(Enum):
+    """
+    Type of the route source.
+    """
+
+    Invalid = "invalid"
+    DeviceMessages = "devicemessages"
+    TwinChangeEvents = "twinchangeevents"
+    DeviceLifecycleEvents = "devicelifecycleevents"
+    DeviceJobLifecycleEvents = "devicejoblifecycleevents"
+    DigitalTwinChangeEvents = "digitaltwinchangeevents"
+    DeviceConnectionStateEvents = "deviceconnectionstateevents"
+
+
+# pylint: disable=too-few-public-methods
+class EncodingFormat(Enum):
+    """
+    Type of the encoding format for the container.
+    """
+
+    JSON = "json"
+    AVRO = "avro"
+
+
+# pylint: disable=too-few-public-methods
+class RenewKeyType(Enum):
+    """
+    Type of the RegenerateKey for the authorization policy.
+    """
+
+    Primary = "primary"
+    Secondary = "secondary"
+    Swap = "swap"
+
+
+# pylint: disable=too-few-public-methods
+class AuthenticationType(Enum):
+    """
+    Type of the Authentication for the routing endpoint.
+    """
+
+    KeyBased = "keyBased"
+    IdentityBased = "identityBased"
+
+
+# pylint: disable=too-few-public-methods
+class IdentityType(Enum):
+    """
+    Type of managed identity for the IoT Hub.
+    """
+
+    system_assigned = "SystemAssigned"
+    user_assigned = "UserAssigned"
+    system_assigned_user_assigned = "SystemAssigned, UserAssigned"
+    none = "None"
+
+
+# Premium SKUs for P-tier hub functionality
+HUB_PREMIUM_SKUS = [IotHubSku.P1.value, IotHubSku.P2.value, IotHubSku.P3.value]
+
+# Roles that ADR needs assigned against Hub on create
+ADR_NS_IDENTITY_ROLES_FOR_HUB = ["Contributor", "IoT Hub Registry Contributor"]
+
+# ADR role assignment error message
+ADR_ROLE_ASSIGN_ERROR_MSG = (
+    "You may need to manually assign the following roles from the ADR namespace's system identity to this hub "
+    f"for credential sync to work properly: {','.join(ADR_NS_IDENTITY_ROLES_FOR_HUB)}"
+)
+
+ADR_CONFIGURE_ROLES_ERROR_MSG = "Unable to configure role assignments for credential sync."

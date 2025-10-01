@@ -10,7 +10,7 @@ from azure.cli.core.commands import CliCommandType
 from azext_iot.constants import VERSION
 import azext_iot._help  # noqa: F401
 
-# TODO - CMS Preview imports / command types
+# TODO - CMS Preview - imports / command types
 from azext_iot.core.command_map import load_core_commands
 from azext_iot.adr.command_map import load_adr_commands
 from azext_iot.core.params import load_core_arguments
