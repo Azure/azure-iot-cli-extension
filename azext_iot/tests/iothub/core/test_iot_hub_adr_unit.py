@@ -15,7 +15,7 @@ from azext_iot.core.custom import (
     _setup_adr_hub_role_assignments,
     _validate_and_set_adr_properties,
 )
-from azext_iot.sdk.iothub.mgmt.models import AdrProperties, IotHubProperties
+from azext_iot.sdk.iothub.mgmt.models import DeviceRegistry, IotHubProperties
 from azext_iot.tests.generators import generate_generic_id
 
 # Test constants
@@ -35,32 +35,32 @@ hub_id = f"{rg_id}/providers/Microsoft.Devices/IotHubs/{hub}"
 
 @pytest.mark.parametrize("namespace_id", [namespace_id, None, ""])
 @pytest.mark.parametrize("identity_id", [identity_id, None, ""])
-@pytest.mark.parametrize("sku", ["P1", "S1"])
+@pytest.mark.parametrize("sku", ["GEN2", "S1"])
 @pytest.mark.parametrize(
     "existing_properties",
     [
         # existing properties
-        AdrProperties(namespace_resource_id="existing_namespace_id", identity_resource_id="existing_identity_id"),
+        DeviceRegistry(namespace_resource_id="existing_namespace_id", identity_resource_id="existing_identity_id"),
         None,
     ],
 )
 def test_validate_and_set_adr_properties(namespace_id, identity_id, sku, existing_properties):
     """Test ADR properties validation."""
     instance = Mock(spec=IotHubProperties)
-    instance.adr_properties = existing_properties
+    instance.device_registry = existing_properties
 
     # Test behavior based on SKU type and parameters
-    if sku == "P1":  # P-tier SKU
+    if sku == "GEN2":  # Generation2 SKU
         if namespace_id and identity_id:
-            # Valid P-tier configuration
+            # Valid Gen2 configuration
             _validate_and_set_adr_properties(
                 instance=instance, sku=sku, adr_namespace_resource_id=namespace_id, adr_identity_resource_id=identity_id
             )
-            assert instance.adr_properties is not None
-            assert instance.adr_properties.namespace_resource_id == namespace_id
-            assert instance.adr_properties.identity_resource_id == identity_id
+            assert instance.device_registry is not None
+            assert instance.device_registry.namespace_resource_id == namespace_id
+            assert instance.device_registry.identity_resource_id == identity_id
         else:
-            # P-tier SKU missing required parameters - should raise error
+            # Generation2 SKU missing required parameters - should raise error
             with pytest.raises(RequiredArgumentMissingError) as exc_info:
                 _validate_and_set_adr_properties(
                     instance=instance,
@@ -68,10 +68,10 @@ def test_validate_and_set_adr_properties(namespace_id, identity_id, sku, existin
                     adr_namespace_resource_id=namespace_id,
                     adr_identity_resource_id=identity_id,
                 )
-            assert "P-tier IoT Hubs require both ADR namespace resource ID" in str(exc_info.value)
+            assert "Generation2 IoT Hubs require both ADR namespace resource ID" in str(exc_info.value)
     else:
         if namespace_id or identity_id:
-            # Non-P-tier SKU with ADR parameters
+            # Non-Generation2 SKU with ADR parameters
             with pytest.raises(InvalidArgumentValueError) as exc_info:
                 _validate_and_set_adr_properties(
                     instance=instance,
@@ -79,13 +79,13 @@ def test_validate_and_set_adr_properties(namespace_id, identity_id, sku, existin
                     adr_namespace_resource_id=namespace_id,
                     adr_identity_resource_id=identity_id,
                 )
-            assert "ADR properties are only supported for P-tier IoT Hub SKUs" in str(exc_info.value)
+            assert "ADR properties are only supported for Generation2 IoT Hub SKUs" in str(exc_info.value)
         else:
             _validate_and_set_adr_properties(
                 instance=instance, sku=sku, adr_namespace_resource_id=namespace_id, adr_identity_resource_id=identity_id
             )
             # Verify properties remain unchanged
-            assert instance.adr_properties == existing_properties
+            assert instance.device_registry == existing_properties
 
 
 class TestSetupADRRoleAssignments(object):

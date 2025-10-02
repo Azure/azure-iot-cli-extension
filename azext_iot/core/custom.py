@@ -36,7 +36,6 @@ from azext_iot.core.shared import (
     ADR_CONFIGURE_ROLES_ERROR_MSG,
     ADR_NS_IDENTITY_ROLES_FOR_HUB,
     ADR_ROLE_ASSIGN_ERROR_MSG,
-    HUB_PREMIUM_SKUS,
     EncodingFormat,
     EndpointType,
     IdentityType,
@@ -61,7 +60,7 @@ from azext_iot.sdk.dps.mgmt.models import (
 )
 from azext_iot.sdk.iothub.mgmt.models import (
     AccessRights,
-    AdrProperties,
+    DeviceRegistry,
     ArmIdentity,
     CertificateDescription,
     CertificateProperties as IotHubCertificateProperties,
@@ -946,19 +945,19 @@ def update_iot_hub_custom(instance,
         disable_module_sas=disable_module_sas
     )
 
-    # TODO - CMS Preview - Prevent premium SKU change
+    # TODO - CMS Preview - Prevent Generation2 SKU change
     existing_sku_name = instance.sku.name
     final_sku_name = sku or existing_sku_name
 
-    is_existing_p_tier = existing_sku_name in HUB_PREMIUM_SKUS
-    is_final_p_tier = final_sku_name in HUB_PREMIUM_SKUS
+    is_existing_gen2 = existing_sku_name == IotHubSku.GEN2.value
+    is_final_gen2 = final_sku_name == IotHubSku.GEN2.value
 
-    if sku and (is_existing_p_tier ^ is_final_p_tier):
+    if sku and (is_existing_gen2 ^ is_final_gen2):
         raise InvalidArgumentValueError(
             f"Cannot change IoT Hub SKU from {existing_sku_name} to {final_sku_name}."
         )
 
-    adr_namespace_resource_id = instance.adr_properties.namespace_resource_id if instance.adr_properties else None
+    adr_namespace_resource_id = instance.device_registry.namespace_resource_id if instance.device_registry else None
     _validate_and_set_adr_properties(
         instance=instance,
         sku=final_sku_name,
@@ -1798,21 +1797,21 @@ def _validate_and_set_adr_properties(
 ):
     """Validate and set Azure Device Registry properties for IoT Hub."""
 
-    if sku in HUB_PREMIUM_SKUS:
-        # P-tier hubs require both ADR properties
+    if sku == IotHubSku.GEN2.value:
+        # Generation2 hubs require both ADR properties
         if not (adr_namespace_resource_id and adr_identity_resource_id):
             raise RequiredArgumentMissingError(
-                "P-tier IoT Hubs require both ADR namespace resource ID (--adr-ns-id) and ADR identity resource ID (--adr-identity-id)."
+                "Generation2 IoT Hubs require both ADR namespace resource ID (--adr-ns-id) and ADR identity resource ID (--adr-identity-id)."
             )
-        instance.adr_properties = AdrProperties(
+        instance.device_registry = DeviceRegistry(
             namespace_resource_id=adr_namespace_resource_id,
             identity_resource_id=adr_identity_resource_id,
         )
     else:
-        # Non-P-tier hubs cannot have ADR properties
+        # Non-Generation2 hubs cannot have ADR properties
         if adr_namespace_resource_id or adr_identity_resource_id:
             raise InvalidArgumentValueError(
-                "ADR properties are only supported for P-tier IoT Hub SKUs."
+                "ADR properties are only supported for Generation2 IoT Hub SKUs."
             )
 
 

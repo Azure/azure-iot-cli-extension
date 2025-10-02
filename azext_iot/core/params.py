@@ -41,7 +41,7 @@ def load_core_arguments(self, _):
             arg_group="ADR Namespace Role Assignment",
             arg_type=get_three_state_flag(),
             help="Used to skip ADR Namespace role assignment after IoT hub creation. "
-            "Only applicable to P-Tier IoT Hubs."
+            "Only applicable to Gen2 IoT Hubs."
         )
 
         context.argument(
@@ -50,7 +50,7 @@ def load_core_arguments(self, _):
             arg_group="ADR Namespace Role Assignment",
             help="Fully qualified role definition Id to apply to ADR Namespace, in the following format: "
             "/subscriptions/{subscriptionId}/providers/Microsoft.Authorization/roleDefinitions/{roleId}. "
-            "Only applicable to P-Tier IoT Hubs.",
+            "Only applicable to Gen2 IoT Hubs.",
         )
 
     # DPS create / update ADR and identity params

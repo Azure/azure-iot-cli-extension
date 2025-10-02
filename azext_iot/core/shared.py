@@ -12,8 +12,6 @@ shared: Define shared data types(enums).
 
 from enum import Enum
 
-from azext_iot.sdk.iothub.mgmt.models._enums import IotHubSku
-
 
 # pylint: disable=too-few-public-methods
 class EndpointType(Enum):
@@ -84,9 +82,6 @@ class IdentityType(Enum):
     system_assigned_user_assigned = "SystemAssigned, UserAssigned"
     none = "None"
 
-
-# Premium SKUs for P-tier hub functionality
-HUB_PREMIUM_SKUS = [IotHubSku.P1.value, IotHubSku.P2.value, IotHubSku.P3.value]
 
 # Roles that ADR needs assigned against Hub on create
 ADR_NS_IDENTITY_ROLES_FOR_HUB = ["Contributor", "IoT Hub Registry Contributor"]

@@ -107,7 +107,7 @@ az role assignment create --assignee $UAMI_PRINCIPAL_ID --role "$CUSTOM_ROLE_NAM
 
 ### Step 3: Create IoT Hub with ADR Integration
 ```bash
-az iot hub create --name $HUB_NAME --resource-group $RESOURCE_GROUP --location $LOCATION --sku P1 --mi-user-assigned $UAMI_RESOURCE_ID --ns-resource-id $NAMESPACE_RESOURCE_ID --ns-identity-id $UAMI_RESOURCE_ID
+az iot hub create --name $HUB_NAME --resource-group $RESOURCE_GROUP --location $LOCATION --sku GEN2 --mi-user-assigned $UAMI_RESOURCE_ID --ns-resource-id $NAMESPACE_RESOURCE_ID --ns-identity-id $UAMI_RESOURCE_ID
 ```
 *Verify: Hub has correct identity and ADR properties configured*
 

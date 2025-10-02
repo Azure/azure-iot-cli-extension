@@ -19,17 +19,17 @@ def patch_core_help():
         helps[
             "iot hub create"
         ] += """
-  - name: Create a Premium-tier IoT Hub with Device Registry namespace properties.
+  - name: Create a Generation2 IoT Hub with Device Registry namespace properties.
     text: >
-        az iot hub create --resource-group MyResourceGroup --name MyHub --sku P1 --ns-resource-id NamespaceResourceId
+        az iot hub create --resource-group MyResourceGroup --name MyHub --sku GEN2 --ns-resource-id NamespaceResourceId
         --ns-identity-id UserIdentityResourceId
-  - name: Create a Premium-tier IoT Hub with Device Registry namespace properties and custom role assignment.
+  - name: Create a Generation2 IoT Hub with Device Registry namespace properties and custom role assignment.
     text: >
-        az iot hub create --resource-group MyResourceGroup --name MyHub --sku P1 --ns-resource-id NamespaceResourceId
+        az iot hub create --resource-group MyResourceGroup --name MyHub --sku GEN2 --ns-resource-id NamespaceResourceId
         --ns-identity-id UserIdentityResourceId --custom-ns-role-id RoleResourceId
-  - name: Create a Premium-tier IoT Hub with Device Registry namespace properties and skip role assignment.
+  - name: Create a Generation2 IoT Hub with Device Registry namespace properties and skip role assignment.
     text: >
-        az iot hub create --resource-group MyResourceGroup --name MyHub --sku P1 --ns-resource-id NamespaceResourceId
+        az iot hub create --resource-group MyResourceGroup --name MyHub --sku GEN2 --ns-resource-id NamespaceResourceId
         --ns-identity-id UserIdentityResourceId --skip-ns-ra
 """
 

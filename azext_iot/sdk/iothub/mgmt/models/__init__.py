@@ -7,7 +7,6 @@
 # Changes may cause incorrect behavior and will be lost if the code is regenerated.
 # --------------------------------------------------------------------------
 
-from ._models import AdrProperties
 from ._models import ArmIdentity
 from ._models import ArmUserIdentity
 from ._models import CertificateBodyDescription
@@ -18,6 +17,7 @@ from ._models import CertificatePropertiesWithNonce
 from ._models import CertificateVerificationDescription
 from ._models import CertificateWithNonceDescription
 from ._models import CloudToDeviceProperties
+from ._models import DeviceRegistry
 from ._models import EncryptionPropertiesDescription
 from ._models import EndpointHealthData
 from ._models import EnrichmentProperties
@@ -116,7 +116,6 @@ from ._patch import *  # pylint: disable=unused-wildcard-import
 from ._patch import patch_sdk as _patch_sdk
 
 __all__ = [
-    "AdrProperties",
     "ArmIdentity",
     "ArmUserIdentity",
     "CertificateBodyDescription",
@@ -127,6 +126,7 @@ __all__ = [
     "CertificateVerificationDescription",
     "CertificateWithNonceDescription",
     "CloudToDeviceProperties",
+    "DeviceRegistry",
     "EncryptionPropertiesDescription",
     "EndpointHealthData",
     "EnrichmentProperties",

@@ -117,9 +117,7 @@ class IotHubSku(str, Enum, metaclass=CaseInsensitiveEnumMeta):
     B1 = "B1"
     B2 = "B2"
     B3 = "B3"
-    P1 = "P1"
-    P2 = "P2"
-    P3 = "P3"
+    GEN2 = "GEN2"
 
 
 class IotHubSkuTier(str, Enum, metaclass=CaseInsensitiveEnumMeta):
@@ -128,7 +126,7 @@ class IotHubSkuTier(str, Enum, metaclass=CaseInsensitiveEnumMeta):
     FREE = "Free"
     STANDARD = "Standard"
     BASIC = "Basic"
-    PREMIUM = "Premium"
+    GENERATION2 = "Generation2"
 
 
 class IpFilterActionType(str, Enum, metaclass=CaseInsensitiveEnumMeta):

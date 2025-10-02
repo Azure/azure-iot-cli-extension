@@ -25,37 +25,6 @@ if TYPE_CHECKING:
 JSON = MutableMapping[str, Any]  # pylint: disable=unsubscriptable-object
 
 
-class AdrProperties(_serialization.Model):
-    """Represents properties related to the Azure Device Registry (ADR).
-
-    :ivar namespace_resource_id: The identifier of the Azure Device Registry namespace associated
-     with the P SKU hub.
-    :vartype namespace_resource_id: str
-    :ivar identity_resource_id: The identity used to manage the ADR namespace from the data plane.
-    :vartype identity_resource_id: str
-    """
-
-    _attribute_map = {
-        "namespace_resource_id": {"key": "namespaceResourceId", "type": "str"},
-        "identity_resource_id": {"key": "identityResourceId", "type": "str"},
-    }
-
-    def __init__(
-        self, *, namespace_resource_id: Optional[str] = None, identity_resource_id: Optional[str] = None, **kwargs: Any
-    ) -> None:
-        """
-        :keyword namespace_resource_id: The identifier of the Azure Device Registry namespace
-         associated with the P SKU hub.
-        :paramtype namespace_resource_id: str
-        :keyword identity_resource_id: The identity used to manage the ADR namespace from the data
-         plane.
-        :paramtype identity_resource_id: str
-        """
-        super().__init__(**kwargs)
-        self.namespace_resource_id = namespace_resource_id
-        self.identity_resource_id = identity_resource_id
-
-
 class ArmIdentity(_serialization.Model):
     """ArmIdentity.
 
@@ -486,6 +455,37 @@ class CloudToDeviceProperties(_serialization.Model):
         self.max_delivery_count = max_delivery_count
         self.default_ttl_as_iso8601 = default_ttl_as_iso8601
         self.feedback = feedback
+
+
+class DeviceRegistry(_serialization.Model):
+    """Represents properties related to the Azure Device Registry (ADR).
+
+    :ivar namespace_resource_id: The identifier of the Azure Device Registry namespace associated
+     with the GEN2 SKU hub.
+    :vartype namespace_resource_id: str
+    :ivar identity_resource_id: The identity used to manage the ADR namespace from the data plane.
+    :vartype identity_resource_id: str
+    """
+
+    _attribute_map = {
+        "namespace_resource_id": {"key": "namespaceResourceId", "type": "str"},
+        "identity_resource_id": {"key": "identityResourceId", "type": "str"},
+    }
+
+    def __init__(
+        self, *, namespace_resource_id: Optional[str] = None, identity_resource_id: Optional[str] = None, **kwargs: Any
+    ) -> None:
+        """
+        :keyword namespace_resource_id: The identifier of the Azure Device Registry namespace
+         associated with the GEN2 SKU hub.
+        :paramtype namespace_resource_id: str
+        :keyword identity_resource_id: The identity used to manage the ADR namespace from the data
+         plane.
+        :paramtype identity_resource_id: str
+        """
+        super().__init__(**kwargs)
+        self.namespace_resource_id = namespace_resource_id
+        self.identity_resource_id = identity_resource_id
 
 
 class EncryptionPropertiesDescription(_serialization.Model):
@@ -1612,8 +1612,6 @@ class IotHubProperties(_serialization.Model):  # pylint: disable=too-many-instan
     :ivar min_tls_version: Specifies the minimum TLS version to support for this hub. Can be set to
      "1.2" to have clients that use a TLS version below 1.2 to be rejected.
     :vartype min_tls_version: str
-    :ivar tls_compatibility_mode: If True, TLS compatibility mode is enabled.
-    :vartype tls_compatibility_mode: bool
     :ivar private_endpoint_connections: Private endpoint connections created on this IotHub.
     :vartype private_endpoint_connections: list[~iothub.mgmt.models.PrivateEndpointConnection]
     :ivar provisioning_state: The provisioning state.
@@ -1661,8 +1659,8 @@ class IotHubProperties(_serialization.Model):  # pylint: disable=too-many-instan
     :ivar ip_version: This property specifies the IP Version the hub is currently utilizing. Known
      values are: "ipv4", "ipv6", and "ipv4ipv6".
     :vartype ip_version: str or ~iothub.mgmt.models.IpVersion
-    :ivar adr_properties: Represents properties related to the Azure Device Registry (ADR).
-    :vartype adr_properties: ~iothub.mgmt.models.AdrProperties
+    :ivar device_registry: Represents properties related to the Azure Device Registry (ADR).
+    :vartype device_registry: ~iothub.mgmt.models.DeviceRegistry
     """
 
     _validation = {
@@ -1683,7 +1681,6 @@ class IotHubProperties(_serialization.Model):  # pylint: disable=too-many-instan
         "ip_filter_rules": {"key": "ipFilterRules", "type": "[IpFilterRule]"},
         "network_rule_sets": {"key": "networkRuleSets", "type": "NetworkRuleSetProperties"},
         "min_tls_version": {"key": "minTlsVersion", "type": "str"},
-        "tls_compatibility_mode": {"key": "tlsCompatibilityMode", "type": "bool"},
         "private_endpoint_connections": {"key": "privateEndpointConnections", "type": "[PrivateEndpointConnection]"},
         "provisioning_state": {"key": "provisioningState", "type": "str"},
         "state": {"key": "state", "type": "str"},
@@ -1702,7 +1699,7 @@ class IotHubProperties(_serialization.Model):  # pylint: disable=too-many-instan
         "enable_data_residency": {"key": "enableDataResidency", "type": "bool"},
         "root_certificate": {"key": "rootCertificate", "type": "RootCertificateProperties"},
         "ip_version": {"key": "ipVersion", "type": "str"},
-        "adr_properties": {"key": "adrProperties", "type": "AdrProperties"},
+        "device_registry": {"key": "deviceRegistry", "type": "DeviceRegistry"},
     }
 
     def __init__(  # pylint: disable=too-many-locals
@@ -1718,7 +1715,6 @@ class IotHubProperties(_serialization.Model):  # pylint: disable=too-many-instan
         ip_filter_rules: Optional[List["_models.IpFilterRule"]] = None,
         network_rule_sets: Optional["_models.NetworkRuleSetProperties"] = None,
         min_tls_version: Optional[str] = None,
-        tls_compatibility_mode: Optional[bool] = None,
         private_endpoint_connections: Optional[List["_models.PrivateEndpointConnection"]] = None,
         event_hub_endpoints: Optional[Dict[str, "_models.EventHubProperties"]] = None,
         routing: Optional["_models.RoutingProperties"] = None,
@@ -1733,7 +1729,7 @@ class IotHubProperties(_serialization.Model):  # pylint: disable=too-many-instan
         enable_data_residency: Optional[bool] = None,
         root_certificate: Optional["_models.RootCertificateProperties"] = None,
         ip_version: Optional[Union[str, "_models.IpVersion"]] = None,
-        adr_properties: Optional["_models.AdrProperties"] = None,
+        device_registry: Optional["_models.DeviceRegistry"] = None,
         **kwargs: Any
     ) -> None:
         """
@@ -1766,8 +1762,6 @@ class IotHubProperties(_serialization.Model):  # pylint: disable=too-many-instan
         :keyword min_tls_version: Specifies the minimum TLS version to support for this hub. Can be set
          to "1.2" to have clients that use a TLS version below 1.2 to be rejected.
         :paramtype min_tls_version: str
-        :keyword tls_compatibility_mode: If True, TLS compatibility mode is enabled.
-        :paramtype tls_compatibility_mode: bool
         :keyword private_endpoint_connections: Private endpoint connections created on this IotHub.
         :paramtype private_endpoint_connections: list[~iothub.mgmt.models.PrivateEndpointConnection]
         :keyword event_hub_endpoints: The Event Hub-compatible endpoint properties. The only possible
@@ -1807,8 +1801,8 @@ class IotHubProperties(_serialization.Model):  # pylint: disable=too-many-instan
         :keyword ip_version: This property specifies the IP Version the hub is currently utilizing.
          Known values are: "ipv4", "ipv6", and "ipv4ipv6".
         :paramtype ip_version: str or ~iothub.mgmt.models.IpVersion
-        :keyword adr_properties: Represents properties related to the Azure Device Registry (ADR).
-        :paramtype adr_properties: ~iothub.mgmt.models.AdrProperties
+        :keyword device_registry: Represents properties related to the Azure Device Registry (ADR).
+        :paramtype device_registry: ~iothub.mgmt.models.DeviceRegistry
         """
         super().__init__(**kwargs)
         self.authorization_policies = authorization_policies
@@ -1821,7 +1815,6 @@ class IotHubProperties(_serialization.Model):  # pylint: disable=too-many-instan
         self.ip_filter_rules = ip_filter_rules
         self.network_rule_sets = network_rule_sets
         self.min_tls_version = min_tls_version
-        self.tls_compatibility_mode = tls_compatibility_mode
         self.private_endpoint_connections = private_endpoint_connections
         self.provisioning_state = None
         self.state = None
@@ -1840,7 +1833,7 @@ class IotHubProperties(_serialization.Model):  # pylint: disable=too-many-instan
         self.enable_data_residency = enable_data_residency
         self.root_certificate = root_certificate
         self.ip_version = ip_version
-        self.adr_properties = adr_properties
+        self.device_registry = device_registry
 
 
 class IotHubPropertiesDeviceStreams(_serialization.Model):
@@ -2004,10 +1997,10 @@ class IotHubSkuInfo(_serialization.Model):
     All required parameters must be populated in order to send to server.
 
     :ivar name: The name of the SKU. Required. Known values are: "F1", "S1", "S2", "S3", "B1",
-     "B2", "B3", "P1", "P2", and "P3".
+     "B2", "B3", and "GEN2".
     :vartype name: str or ~iothub.mgmt.models.IotHubSku
     :ivar tier: The billing tier for the IoT hub. Known values are: "Free", "Standard", "Basic",
-     and "Premium".
+     and "Generation2".
     :vartype tier: str or ~iothub.mgmt.models.IotHubSkuTier
     :ivar capacity: The number of provisioned IoT Hub units. See:
      https://docs.microsoft.com/azure/azure-subscription-service-limits#iot-hub-limits.
@@ -2028,7 +2021,7 @@ class IotHubSkuInfo(_serialization.Model):
     def __init__(self, *, name: Union[str, "_models.IotHubSku"], capacity: Optional[int] = None, **kwargs: Any) -> None:
         """
         :keyword name: The name of the SKU. Required. Known values are: "F1", "S1", "S2", "S3", "B1",
-         "B2", "B3", "P1", "P2", and "P3".
+         "B2", "B3", and "GEN2".
         :paramtype name: str or ~iothub.mgmt.models.IotHubSku
         :keyword capacity: The number of provisioned IoT Hub units. See:
          https://docs.microsoft.com/azure/azure-subscription-service-limits#iot-hub-limits.

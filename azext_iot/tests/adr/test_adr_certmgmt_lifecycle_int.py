@@ -273,7 +273,7 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
 
             # Create IoT Hub with ADR integration
             hub = self.cmd(
-                f"iot hub create -n {hub_name} -g {rg} --sku P1 --location {TEST_LOCATION} "
+                f"iot hub create -n {hub_name} -g {rg} --sku GEN2 --location {TEST_LOCATION} "
                 f"--mi-user-assigned {identity_resource_id} "
                 f"--ns-resource-id {adr_resource_id} "
                 f"--ns-identity-id {identity_resource_id}"
@@ -286,8 +286,8 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
             hub_show = self.cmd(f"iot hub show -n {hub_name} -g {rg}").get_output_in_json()
 
             # Validate ADR integration is properly configured
-            assert "adrProperties" in hub_show["properties"]
-            adr_props = hub_show["properties"]["adrProperties"]
+            assert "deviceRegistry" in hub_show["properties"]
+            adr_props = hub_show["properties"]["deviceRegistry"]
             assert adr_props["identityResourceId"] == identity_resource_id
             assert adr_props["namespaceResourceId"] == adr_resource_id
 
