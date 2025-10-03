@@ -119,11 +119,11 @@ def adr_service_factory(cli_ctx, *_):
     """
     from azure.cli.core.commands.client_factory import get_subscription_id
 
-    from azext_iot.sdk.deviceregistry.mgmt import DeviceRegistryManagementService
+    from azext_iot.sdk.deviceregistry.mgmt import DeviceRegistryMgmtClient
 
     subscription_id = get_subscription_id(cli_ctx)
 
-    return DeviceRegistryManagementService(
+    return DeviceRegistryMgmtClient(
         credential=AZURE_CLI_CREDENTIAL,
         subscription_id=subscription_id,
         endpoint=cli_ctx.cloud.endpoints.resource_manager,

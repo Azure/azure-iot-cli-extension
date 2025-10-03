@@ -15,7 +15,7 @@ from azure.core.rest import HttpRequest, HttpResponse
 from azure.mgmt.core import ARMPipelineClient
 from azure.mgmt.core.policies import ARMAutoResourceProviderRegistrationPolicy
 
-from ._configuration import DeviceRegistryManagementServiceConfiguration
+from ._configuration import DeviceRegistryMgmtClientConfiguration
 from ._serialization import Deserializer, Serializer
 from .operations import (
     AssetEndpointProfilesOperations,
@@ -40,13 +40,14 @@ if TYPE_CHECKING:
     from azure.core.credentials import TokenCredential
 
 
-class DeviceRegistryManagementService:  # pylint: disable=client-accepts-api-version-keyword,too-many-instance-attributes
-    """DeviceRegistry Resource Provider management API.
+class DeviceRegistryMgmtClient:  # pylint: disable=client-accepts-api-version-keyword,too-many-instance-attributes
+    """Microsoft.DeviceRegistry Resource Provider management API.
 
     :ivar operations: Operations operations
     :vartype operations: deviceregistry.mgmt.operations.Operations
     :ivar asset_endpoint_profiles: AssetEndpointProfilesOperations operations
-    :vartype asset_endpoint_profiles: deviceregistry.mgmt.operations.AssetEndpointProfilesOperations
+    :vartype asset_endpoint_profiles:
+     deviceregistry.mgmt.operations.AssetEndpointProfilesOperations
     :ivar assets: AssetsOperations operations
     :vartype assets: deviceregistry.mgmt.operations.AssetsOperations
     :ivar billing_containers: BillingContainersOperations operations
@@ -55,14 +56,14 @@ class DeviceRegistryManagementService:  # pylint: disable=client-accepts-api-ver
     :vartype operation_status: deviceregistry.mgmt.operations.OperationStatusOperations
     :ivar namespaces: NamespacesOperations operations
     :vartype namespaces: deviceregistry.mgmt.operations.NamespacesOperations
-    :ivar credentials: CredentialsOperations operations
-    :vartype credentials: deviceregistry.mgmt.operations.CredentialsOperations
-    :ivar policies: PoliciesOperations operations
-    :vartype policies: deviceregistry.mgmt.operations.PoliciesOperations
     :ivar schema_registries: SchemaRegistriesOperations operations
     :vartype schema_registries: deviceregistry.mgmt.operations.SchemaRegistriesOperations
     :ivar namespace_assets: NamespaceAssetsOperations operations
     :vartype namespace_assets: deviceregistry.mgmt.operations.NamespaceAssetsOperations
+    :ivar credentials: CredentialsOperations operations
+    :vartype credentials: deviceregistry.mgmt.operations.CredentialsOperations
+    :ivar policies: PoliciesOperations operations
+    :vartype policies: deviceregistry.mgmt.operations.PoliciesOperations
     :ivar namespace_devices: NamespaceDevicesOperations operations
     :vartype namespace_devices: deviceregistry.mgmt.operations.NamespaceDevicesOperations
     :ivar namespace_discovered_assets: NamespaceDiscoveredAssetsOperations operations
@@ -81,7 +82,7 @@ class DeviceRegistryManagementService:  # pylint: disable=client-accepts-api-ver
     :type subscription_id: str
     :param endpoint: Service URL. Default value is "https://management.azure.com".
     :type endpoint: str
-    :keyword api_version: Api Version. Default value is "2025-08-01-preview". Note that overriding
+    :keyword api_version: Api Version. Default value is "2025-11-01-preview". Note that overriding
      this default value may result in unsupported behavior.
     :paramtype api_version: str
     :keyword int polling_interval: Default waiting time between two polls for LRO operations if no
@@ -95,7 +96,7 @@ class DeviceRegistryManagementService:  # pylint: disable=client-accepts-api-ver
         endpoint: str = "https://management.azure.com",
         **kwargs: Any
     ) -> None:
-        self._config = DeviceRegistryManagementServiceConfiguration(
+        self._config = DeviceRegistryMgmtClientConfiguration(
             credential=credential, subscription_id=subscription_id, **kwargs
         )
         _policies = kwargs.pop("policies", None)
@@ -133,14 +134,14 @@ class DeviceRegistryManagementService:  # pylint: disable=client-accepts-api-ver
             self._client, self._config, self._serialize, self._deserialize
         )
         self.namespaces = NamespacesOperations(self._client, self._config, self._serialize, self._deserialize)
-        self.credentials = CredentialsOperations(self._client, self._config, self._serialize, self._deserialize)
-        self.policies = PoliciesOperations(self._client, self._config, self._serialize, self._deserialize)
         self.schema_registries = SchemaRegistriesOperations(
             self._client, self._config, self._serialize, self._deserialize
         )
         self.namespace_assets = NamespaceAssetsOperations(
             self._client, self._config, self._serialize, self._deserialize
         )
+        self.credentials = CredentialsOperations(self._client, self._config, self._serialize, self._deserialize)
+        self.policies = PoliciesOperations(self._client, self._config, self._serialize, self._deserialize)
         self.namespace_devices = NamespaceDevicesOperations(
             self._client, self._config, self._serialize, self._deserialize
         )
@@ -178,7 +179,7 @@ class DeviceRegistryManagementService:  # pylint: disable=client-accepts-api-ver
     def close(self) -> None:
         self._client.close()
 
-    def __enter__(self) -> "DeviceRegistryManagementService":
+    def __enter__(self) -> "DeviceRegistryMgmtClient":
         self._client.__enter__()
         return self
 

@@ -47,7 +47,7 @@ def build_operations_list_request(**kwargs: Any) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -68,7 +68,7 @@ def build_asset_endpoint_profiles_list_by_subscription_request(  # pylint: disab
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -94,7 +94,7 @@ def build_asset_endpoint_profiles_list_by_resource_group_request(  # pylint: dis
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -123,7 +123,7 @@ def build_asset_endpoint_profiles_get_request(  # pylint: disable=name-too-long
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -161,7 +161,7 @@ def build_asset_endpoint_profiles_create_or_replace_request(  # pylint: disable=
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -201,7 +201,7 @@ def build_asset_endpoint_profiles_update_request(  # pylint: disable=name-too-lo
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -240,7 +240,7 @@ def build_asset_endpoint_profiles_delete_request(  # pylint: disable=name-too-lo
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -277,7 +277,7 @@ def build_assets_list_by_subscription_request(  # pylint: disable=name-too-long
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -303,11 +303,13 @@ def build_assets_list_by_resource_group_request(  # pylint: disable=name-too-lon
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
-    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/assets"
+    _url = (
+        "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/assets"
+    )
     path_format_arguments = {
         "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
         "resourceGroupName": _SERIALIZER.url(
@@ -332,7 +334,7 @@ def build_assets_get_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -365,7 +367,7 @@ def build_assets_create_or_replace_request(
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -400,7 +402,7 @@ def build_assets_update_request(
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -434,7 +436,7 @@ def build_assets_delete_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -466,7 +468,7 @@ def build_billing_containers_list_by_subscription_request(  # pylint: disable=na
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -492,7 +494,7 @@ def build_billing_containers_get_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -526,7 +528,7 @@ def build_operation_status_get_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -554,7 +556,7 @@ def build_namespaces_list_by_subscription_request(  # pylint: disable=name-too-l
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -580,13 +582,11 @@ def build_namespaces_list_by_resource_group_request(  # pylint: disable=name-too
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
-    _url = (
-        "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces"
-    )
+    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces"
     path_format_arguments = {
         "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
         "resourceGroupName": _SERIALIZER.url(
@@ -611,7 +611,7 @@ def build_namespaces_get_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -649,7 +649,7 @@ def build_namespaces_create_or_replace_request(  # pylint: disable=name-too-long
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -689,7 +689,7 @@ def build_namespaces_update_request(
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -728,7 +728,7 @@ def build_namespaces_delete_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -766,7 +766,7 @@ def build_namespaces_migrate_request(
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -799,555 +799,13 @@ def build_namespaces_migrate_request(
     return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, **kwargs)
 
 
-def build_credentials_list_by_subscription_request(  # pylint: disable=name-too-long
-    namespace_name: str, subscription_id: str, **kwargs: Any
-) -> HttpRequest:
-    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
-
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
-    accept = _headers.pop("Accept", "application/json")
-
-    # Construct URL
-    _url = "/subscriptions/{subscriptionId}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/credentials"
-    path_format_arguments = {
-        "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
-        "namespaceName": _SERIALIZER.url(
-            "namespace_name",
-            namespace_name,
-            "str",
-            max_length=64,
-            min_length=3,
-            pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
-        ),
-    }
-
-    _url: str = _url.format(**path_format_arguments)  # type: ignore
-
-    # Construct parameters
-    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
-
-    # Construct headers
-    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
-
-    return HttpRequest(method="GET", url=_url, params=_params, headers=_headers, **kwargs)
-
-
-def build_credentials_list_by_resource_group_request(  # pylint: disable=name-too-long
-    resource_group_name: str, namespace_name: str, subscription_id: str, **kwargs: Any
-) -> HttpRequest:
-    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
-
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
-    accept = _headers.pop("Accept", "application/json")
-
-    # Construct URL
-    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/credentials"  # pylint: disable=line-too-long
-    path_format_arguments = {
-        "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
-        "resourceGroupName": _SERIALIZER.url(
-            "resource_group_name", resource_group_name, "str", max_length=90, min_length=1
-        ),
-        "namespaceName": _SERIALIZER.url(
-            "namespace_name",
-            namespace_name,
-            "str",
-            max_length=64,
-            min_length=3,
-            pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
-        ),
-    }
-
-    _url: str = _url.format(**path_format_arguments)  # type: ignore
-
-    # Construct parameters
-    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
-
-    # Construct headers
-    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
-
-    return HttpRequest(method="GET", url=_url, params=_params, headers=_headers, **kwargs)
-
-
-def build_credentials_get_request(
-    resource_group_name: str, namespace_name: str, subscription_id: str, **kwargs: Any
-) -> HttpRequest:
-    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
-
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
-    accept = _headers.pop("Accept", "application/json")
-
-    # Construct URL
-    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/credentials/default"  # pylint: disable=line-too-long
-    path_format_arguments = {
-        "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
-        "resourceGroupName": _SERIALIZER.url(
-            "resource_group_name", resource_group_name, "str", max_length=90, min_length=1
-        ),
-        "namespaceName": _SERIALIZER.url(
-            "namespace_name",
-            namespace_name,
-            "str",
-            max_length=64,
-            min_length=3,
-            pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
-        ),
-    }
-
-    _url: str = _url.format(**path_format_arguments)  # type: ignore
-
-    # Construct parameters
-    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
-
-    # Construct headers
-    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
-
-    return HttpRequest(method="GET", url=_url, params=_params, headers=_headers, **kwargs)
-
-
-def build_credentials_create_or_update_request(  # pylint: disable=name-too-long
-    resource_group_name: str, namespace_name: str, subscription_id: str, **kwargs: Any
-) -> HttpRequest:
-    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
-
-    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
-    accept = _headers.pop("Accept", "application/json")
-
-    # Construct URL
-    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/credentials/default"  # pylint: disable=line-too-long
-    path_format_arguments = {
-        "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
-        "resourceGroupName": _SERIALIZER.url(
-            "resource_group_name", resource_group_name, "str", max_length=90, min_length=1
-        ),
-        "namespaceName": _SERIALIZER.url(
-            "namespace_name",
-            namespace_name,
-            "str",
-            max_length=64,
-            min_length=3,
-            pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
-        ),
-    }
-
-    _url: str = _url.format(**path_format_arguments)  # type: ignore
-
-    # Construct parameters
-    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
-
-    # Construct headers
-    if content_type is not None:
-        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
-    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
-
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
-
-
-def build_credentials_update_request(
-    resource_group_name: str, namespace_name: str, subscription_id: str, **kwargs: Any
-) -> HttpRequest:
-    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
-
-    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
-    accept = _headers.pop("Accept", "application/json")
-
-    # Construct URL
-    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/credentials/default"  # pylint: disable=line-too-long
-    path_format_arguments = {
-        "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
-        "resourceGroupName": _SERIALIZER.url(
-            "resource_group_name", resource_group_name, "str", max_length=90, min_length=1
-        ),
-        "namespaceName": _SERIALIZER.url(
-            "namespace_name",
-            namespace_name,
-            "str",
-            max_length=64,
-            min_length=3,
-            pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
-        ),
-    }
-
-    _url: str = _url.format(**path_format_arguments)  # type: ignore
-
-    # Construct parameters
-    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
-
-    # Construct headers
-    if content_type is not None:
-        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
-    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
-
-    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, **kwargs)
-
-
-def build_credentials_delete_request(
-    resource_group_name: str, namespace_name: str, subscription_id: str, **kwargs: Any
-) -> HttpRequest:
-    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
-
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
-    accept = _headers.pop("Accept", "application/json")
-
-    # Construct URL
-    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/credentials/default"  # pylint: disable=line-too-long
-    path_format_arguments = {
-        "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
-        "resourceGroupName": _SERIALIZER.url(
-            "resource_group_name", resource_group_name, "str", max_length=90, min_length=1
-        ),
-        "namespaceName": _SERIALIZER.url(
-            "namespace_name",
-            namespace_name,
-            "str",
-            max_length=64,
-            min_length=3,
-            pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
-        ),
-    }
-
-    _url: str = _url.format(**path_format_arguments)  # type: ignore
-
-    # Construct parameters
-    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
-
-    # Construct headers
-    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
-
-    return HttpRequest(method="DELETE", url=_url, params=_params, headers=_headers, **kwargs)
-
-
-def build_credentials_synchronize_request(
-    resource_group_name: str, namespace_name: str, subscription_id: str, **kwargs: Any
-) -> HttpRequest:
-    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
-
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
-    accept = _headers.pop("Accept", "application/json")
-
-    # Construct URL
-    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/credentials/default/synchronize"  # pylint: disable=line-too-long
-    path_format_arguments = {
-        "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
-        "resourceGroupName": _SERIALIZER.url(
-            "resource_group_name", resource_group_name, "str", max_length=90, min_length=1
-        ),
-        "namespaceName": _SERIALIZER.url(
-            "namespace_name",
-            namespace_name,
-            "str",
-            max_length=64,
-            min_length=3,
-            pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
-        ),
-    }
-
-    _url: str = _url.format(**path_format_arguments)  # type: ignore
-
-    # Construct parameters
-    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
-
-    # Construct headers
-    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
-
-    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, **kwargs)
-
-
-def build_policies_list_by_subscription_request(  # pylint: disable=name-too-long
-    namespace_name: str, subscription_id: str, **kwargs: Any
-) -> HttpRequest:
-    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
-
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
-    accept = _headers.pop("Accept", "application/json")
-
-    # Construct URL
-    _url = "/subscriptions/{subscriptionId}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/credentials/default/policies"  # pylint: disable=line-too-long
-    path_format_arguments = {
-        "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
-        "namespaceName": _SERIALIZER.url(
-            "namespace_name",
-            namespace_name,
-            "str",
-            max_length=64,
-            min_length=3,
-            pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
-        ),
-    }
-
-    _url: str = _url.format(**path_format_arguments)  # type: ignore
-
-    # Construct parameters
-    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
-
-    # Construct headers
-    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
-
-    return HttpRequest(method="GET", url=_url, params=_params, headers=_headers, **kwargs)
-
-
-def build_policies_list_by_resource_group_request(  # pylint: disable=name-too-long
-    resource_group_name: str, namespace_name: str, subscription_id: str, **kwargs: Any
-) -> HttpRequest:
-    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
-
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
-    accept = _headers.pop("Accept", "application/json")
-
-    # Construct URL
-    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/credentials/default/policies"  # pylint: disable=line-too-long
-    path_format_arguments = {
-        "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
-        "resourceGroupName": _SERIALIZER.url(
-            "resource_group_name", resource_group_name, "str", max_length=90, min_length=1
-        ),
-        "namespaceName": _SERIALIZER.url(
-            "namespace_name",
-            namespace_name,
-            "str",
-            max_length=64,
-            min_length=3,
-            pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
-        ),
-    }
-
-    _url: str = _url.format(**path_format_arguments)  # type: ignore
-
-    # Construct parameters
-    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
-
-    # Construct headers
-    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
-
-    return HttpRequest(method="GET", url=_url, params=_params, headers=_headers, **kwargs)
-
-
-def build_policies_get_request(
-    resource_group_name: str, namespace_name: str, policy_name: str, subscription_id: str, **kwargs: Any
-) -> HttpRequest:
-    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
-
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
-    accept = _headers.pop("Accept", "application/json")
-
-    # Construct URL
-    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/credentials/default/policies/{policyName}"  # pylint: disable=line-too-long
-    path_format_arguments = {
-        "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
-        "resourceGroupName": _SERIALIZER.url(
-            "resource_group_name", resource_group_name, "str", max_length=90, min_length=1
-        ),
-        "namespaceName": _SERIALIZER.url(
-            "namespace_name",
-            namespace_name,
-            "str",
-            max_length=64,
-            min_length=3,
-            pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
-        ),
-        "policyName": _SERIALIZER.url(
-            "policy_name", policy_name, "str", max_length=63, min_length=3, pattern=r"^[0-9a-zA-Z][a-zA-Z0-9-]*$"
-        ),
-    }
-
-    _url: str = _url.format(**path_format_arguments)  # type: ignore
-
-    # Construct parameters
-    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
-
-    # Construct headers
-    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
-
-    return HttpRequest(method="GET", url=_url, params=_params, headers=_headers, **kwargs)
-
-
-def build_policies_create_or_update_request(
-    resource_group_name: str, namespace_name: str, policy_name: str, subscription_id: str, **kwargs: Any
-) -> HttpRequest:
-    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
-
-    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
-    accept = _headers.pop("Accept", "application/json")
-
-    # Construct URL
-    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/credentials/default/policies/{policyName}"  # pylint: disable=line-too-long
-    path_format_arguments = {
-        "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
-        "resourceGroupName": _SERIALIZER.url(
-            "resource_group_name", resource_group_name, "str", max_length=90, min_length=1
-        ),
-        "namespaceName": _SERIALIZER.url(
-            "namespace_name",
-            namespace_name,
-            "str",
-            max_length=64,
-            min_length=3,
-            pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
-        ),
-        "policyName": _SERIALIZER.url(
-            "policy_name", policy_name, "str", max_length=63, min_length=3, pattern=r"^[0-9a-zA-Z][a-zA-Z0-9-]*$"
-        ),
-    }
-
-    _url: str = _url.format(**path_format_arguments)  # type: ignore
-
-    # Construct parameters
-    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
-
-    # Construct headers
-    if content_type is not None:
-        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
-    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
-
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
-
-
-def build_policies_update_request(
-    resource_group_name: str, namespace_name: str, policy_name: str, subscription_id: str, **kwargs: Any
-) -> HttpRequest:
-    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
-
-    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
-    accept = _headers.pop("Accept", "application/json")
-
-    # Construct URL
-    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/credentials/default/policies/{policyName}"  # pylint: disable=line-too-long
-    path_format_arguments = {
-        "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
-        "resourceGroupName": _SERIALIZER.url(
-            "resource_group_name", resource_group_name, "str", max_length=90, min_length=1
-        ),
-        "namespaceName": _SERIALIZER.url(
-            "namespace_name",
-            namespace_name,
-            "str",
-            max_length=64,
-            min_length=3,
-            pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
-        ),
-        "policyName": _SERIALIZER.url(
-            "policy_name", policy_name, "str", max_length=63, min_length=3, pattern=r"^[0-9a-zA-Z][a-zA-Z0-9-]*$"
-        ),
-    }
-
-    _url: str = _url.format(**path_format_arguments)  # type: ignore
-
-    # Construct parameters
-    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
-
-    # Construct headers
-    if content_type is not None:
-        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
-    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
-
-    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, **kwargs)
-
-
-def build_policies_delete_request(
-    resource_group_name: str, namespace_name: str, policy_name: str, subscription_id: str, **kwargs: Any
-) -> HttpRequest:
-    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
-
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
-    accept = _headers.pop("Accept", "application/json")
-
-    # Construct URL
-    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/credentials/default/policies/{policyName}"  # pylint: disable=line-too-long
-    path_format_arguments = {
-        "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
-        "resourceGroupName": _SERIALIZER.url(
-            "resource_group_name", resource_group_name, "str", max_length=90, min_length=1
-        ),
-        "namespaceName": _SERIALIZER.url(
-            "namespace_name",
-            namespace_name,
-            "str",
-            max_length=64,
-            min_length=3,
-            pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
-        ),
-        "policyName": _SERIALIZER.url(
-            "policy_name", policy_name, "str", max_length=63, min_length=3, pattern=r"^[0-9a-zA-Z][a-zA-Z0-9-]*$"
-        ),
-    }
-
-    _url: str = _url.format(**path_format_arguments)  # type: ignore
-
-    # Construct parameters
-    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
-
-    # Construct headers
-    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
-
-    return HttpRequest(method="DELETE", url=_url, params=_params, headers=_headers, **kwargs)
-
-
-def build_policies_revoke_device_request(
-    resource_group_name: str, namespace_name: str, policy_name: str, subscription_id: str, **kwargs: Any
-) -> HttpRequest:
-    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
-
-    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
-    accept = _headers.pop("Accept", "application/json")
-
-    # Construct URL
-    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/credentials/default/policies/{policyName}/revokeDevice"  # pylint: disable=line-too-long
-    path_format_arguments = {
-        "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
-        "resourceGroupName": _SERIALIZER.url(
-            "resource_group_name", resource_group_name, "str", max_length=90, min_length=1
-        ),
-        "namespaceName": _SERIALIZER.url(
-            "namespace_name",
-            namespace_name,
-            "str",
-            max_length=64,
-            min_length=3,
-            pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
-        ),
-        "policyName": _SERIALIZER.url(
-            "policy_name", policy_name, "str", max_length=63, min_length=3, pattern=r"^[0-9a-zA-Z][a-zA-Z0-9-]*$"
-        ),
-    }
-
-    _url: str = _url.format(**path_format_arguments)  # type: ignore
-
-    # Construct parameters
-    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
-
-    # Construct headers
-    if content_type is not None:
-        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
-    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
-
-    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, **kwargs)
-
-
 def build_schema_registries_list_by_subscription_request(  # pylint: disable=name-too-long
     subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -1373,7 +831,7 @@ def build_schema_registries_list_by_resource_group_request(  # pylint: disable=n
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -1402,7 +860,7 @@ def build_schema_registries_get_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -1440,7 +898,7 @@ def build_schema_registries_create_or_replace_request(  # pylint: disable=name-t
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -1480,7 +938,7 @@ def build_schema_registries_update_request(
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -1519,7 +977,7 @@ def build_schema_registries_delete_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -1556,7 +1014,7 @@ def build_namespace_assets_list_by_resource_group_request(  # pylint: disable=na
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -1593,7 +1051,7 @@ def build_namespace_assets_get_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -1634,7 +1092,7 @@ def build_namespace_assets_create_or_replace_request(  # pylint: disable=name-to
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -1677,7 +1135,7 @@ def build_namespace_assets_update_request(
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -1719,7 +1177,7 @@ def build_namespace_assets_delete_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -1753,13 +1211,444 @@ def build_namespace_assets_delete_request(
     return HttpRequest(method="DELETE", url=_url, params=_params, headers=_headers, **kwargs)
 
 
+def build_credentials_list_by_resource_group_request(  # pylint: disable=name-too-long
+    resource_group_name: str, namespace_name: str, subscription_id: str, **kwargs: Any
+) -> HttpRequest:
+    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
+
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
+    accept = _headers.pop("Accept", "application/json")
+
+    # Construct URL
+    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/credentials"  # pylint: disable=line-too-long
+    path_format_arguments = {
+        "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
+        "resourceGroupName": _SERIALIZER.url(
+            "resource_group_name", resource_group_name, "str", max_length=90, min_length=1
+        ),
+        "namespaceName": _SERIALIZER.url(
+            "namespace_name",
+            namespace_name,
+            "str",
+            max_length=64,
+            min_length=3,
+            pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+        ),
+    }
+
+    _url: str = _url.format(**path_format_arguments)  # type: ignore
+
+    # Construct parameters
+    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
+
+    # Construct headers
+    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
+
+    return HttpRequest(method="GET", url=_url, params=_params, headers=_headers, **kwargs)
+
+
+def build_credentials_get_request(
+    resource_group_name: str, namespace_name: str, subscription_id: str, **kwargs: Any
+) -> HttpRequest:
+    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
+
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
+    accept = _headers.pop("Accept", "application/json")
+
+    # Construct URL
+    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/credentials/default"  # pylint: disable=line-too-long
+    path_format_arguments = {
+        "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
+        "resourceGroupName": _SERIALIZER.url(
+            "resource_group_name", resource_group_name, "str", max_length=90, min_length=1
+        ),
+        "namespaceName": _SERIALIZER.url(
+            "namespace_name",
+            namespace_name,
+            "str",
+            max_length=64,
+            min_length=3,
+            pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+        ),
+    }
+
+    _url: str = _url.format(**path_format_arguments)  # type: ignore
+
+    # Construct parameters
+    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
+
+    # Construct headers
+    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
+
+    return HttpRequest(method="GET", url=_url, params=_params, headers=_headers, **kwargs)
+
+
+def build_credentials_create_or_update_request(  # pylint: disable=name-too-long
+    resource_group_name: str, namespace_name: str, subscription_id: str, **kwargs: Any
+) -> HttpRequest:
+    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
+
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
+    accept = _headers.pop("Accept", "application/json")
+
+    # Construct URL
+    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/credentials/default"  # pylint: disable=line-too-long
+    path_format_arguments = {
+        "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
+        "resourceGroupName": _SERIALIZER.url(
+            "resource_group_name", resource_group_name, "str", max_length=90, min_length=1
+        ),
+        "namespaceName": _SERIALIZER.url(
+            "namespace_name",
+            namespace_name,
+            "str",
+            max_length=64,
+            min_length=3,
+            pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+        ),
+    }
+
+    _url: str = _url.format(**path_format_arguments)  # type: ignore
+
+    # Construct parameters
+    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
+
+    # Construct headers
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
+
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
+
+
+def build_credentials_update_request(
+    resource_group_name: str, namespace_name: str, subscription_id: str, **kwargs: Any
+) -> HttpRequest:
+    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
+
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
+    accept = _headers.pop("Accept", "application/json")
+
+    # Construct URL
+    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/credentials/default"  # pylint: disable=line-too-long
+    path_format_arguments = {
+        "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
+        "resourceGroupName": _SERIALIZER.url(
+            "resource_group_name", resource_group_name, "str", max_length=90, min_length=1
+        ),
+        "namespaceName": _SERIALIZER.url(
+            "namespace_name",
+            namespace_name,
+            "str",
+            max_length=64,
+            min_length=3,
+            pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+        ),
+    }
+
+    _url: str = _url.format(**path_format_arguments)  # type: ignore
+
+    # Construct parameters
+    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
+
+    # Construct headers
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
+
+    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, **kwargs)
+
+
+def build_credentials_delete_request(
+    resource_group_name: str, namespace_name: str, subscription_id: str, **kwargs: Any
+) -> HttpRequest:
+    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
+
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
+    accept = _headers.pop("Accept", "application/json")
+
+    # Construct URL
+    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/credentials/default"  # pylint: disable=line-too-long
+    path_format_arguments = {
+        "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
+        "resourceGroupName": _SERIALIZER.url(
+            "resource_group_name", resource_group_name, "str", max_length=90, min_length=1
+        ),
+        "namespaceName": _SERIALIZER.url(
+            "namespace_name",
+            namespace_name,
+            "str",
+            max_length=64,
+            min_length=3,
+            pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+        ),
+    }
+
+    _url: str = _url.format(**path_format_arguments)  # type: ignore
+
+    # Construct parameters
+    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
+
+    # Construct headers
+    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
+
+    return HttpRequest(method="DELETE", url=_url, params=_params, headers=_headers, **kwargs)
+
+
+def build_credentials_synchronize_request(
+    resource_group_name: str, namespace_name: str, subscription_id: str, **kwargs: Any
+) -> HttpRequest:
+    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
+
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
+    accept = _headers.pop("Accept", "application/json")
+
+    # Construct URL
+    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/credentials/default/synchronize"  # pylint: disable=line-too-long
+    path_format_arguments = {
+        "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
+        "resourceGroupName": _SERIALIZER.url(
+            "resource_group_name", resource_group_name, "str", max_length=90, min_length=1
+        ),
+        "namespaceName": _SERIALIZER.url(
+            "namespace_name",
+            namespace_name,
+            "str",
+            max_length=64,
+            min_length=3,
+            pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+        ),
+    }
+
+    _url: str = _url.format(**path_format_arguments)  # type: ignore
+
+    # Construct parameters
+    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
+
+    # Construct headers
+    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
+
+    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, **kwargs)
+
+
+def build_policies_list_by_resource_group_request(  # pylint: disable=name-too-long
+    resource_group_name: str, namespace_name: str, subscription_id: str, **kwargs: Any
+) -> HttpRequest:
+    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
+
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
+    accept = _headers.pop("Accept", "application/json")
+
+    # Construct URL
+    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/credentials/default/policies"  # pylint: disable=line-too-long
+    path_format_arguments = {
+        "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
+        "resourceGroupName": _SERIALIZER.url(
+            "resource_group_name", resource_group_name, "str", max_length=90, min_length=1
+        ),
+        "namespaceName": _SERIALIZER.url(
+            "namespace_name",
+            namespace_name,
+            "str",
+            max_length=64,
+            min_length=3,
+            pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+        ),
+    }
+
+    _url: str = _url.format(**path_format_arguments)  # type: ignore
+
+    # Construct parameters
+    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
+
+    # Construct headers
+    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
+
+    return HttpRequest(method="GET", url=_url, params=_params, headers=_headers, **kwargs)
+
+
+def build_policies_get_request(
+    resource_group_name: str, namespace_name: str, policy_name: str, subscription_id: str, **kwargs: Any
+) -> HttpRequest:
+    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
+
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
+    accept = _headers.pop("Accept", "application/json")
+
+    # Construct URL
+    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/credentials/default/policies/{policyName}"  # pylint: disable=line-too-long
+    path_format_arguments = {
+        "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
+        "resourceGroupName": _SERIALIZER.url(
+            "resource_group_name", resource_group_name, "str", max_length=90, min_length=1
+        ),
+        "namespaceName": _SERIALIZER.url(
+            "namespace_name",
+            namespace_name,
+            "str",
+            max_length=64,
+            min_length=3,
+            pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+        ),
+        "policyName": _SERIALIZER.url(
+            "policy_name", policy_name, "str", max_length=63, min_length=3, pattern=r"^[0-9a-zA-Z][a-zA-Z0-9-]*$"
+        ),
+    }
+
+    _url: str = _url.format(**path_format_arguments)  # type: ignore
+
+    # Construct parameters
+    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
+
+    # Construct headers
+    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
+
+    return HttpRequest(method="GET", url=_url, params=_params, headers=_headers, **kwargs)
+
+
+def build_policies_create_or_update_request(
+    resource_group_name: str, namespace_name: str, policy_name: str, subscription_id: str, **kwargs: Any
+) -> HttpRequest:
+    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
+
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
+    accept = _headers.pop("Accept", "application/json")
+
+    # Construct URL
+    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/credentials/default/policies/{policyName}"  # pylint: disable=line-too-long
+    path_format_arguments = {
+        "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
+        "resourceGroupName": _SERIALIZER.url(
+            "resource_group_name", resource_group_name, "str", max_length=90, min_length=1
+        ),
+        "namespaceName": _SERIALIZER.url(
+            "namespace_name",
+            namespace_name,
+            "str",
+            max_length=64,
+            min_length=3,
+            pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+        ),
+        "policyName": _SERIALIZER.url(
+            "policy_name", policy_name, "str", max_length=63, min_length=3, pattern=r"^[0-9a-zA-Z][a-zA-Z0-9-]*$"
+        ),
+    }
+
+    _url: str = _url.format(**path_format_arguments)  # type: ignore
+
+    # Construct parameters
+    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
+
+    # Construct headers
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
+
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
+
+
+def build_policies_update_request(
+    resource_group_name: str, namespace_name: str, policy_name: str, subscription_id: str, **kwargs: Any
+) -> HttpRequest:
+    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
+
+    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
+    accept = _headers.pop("Accept", "application/json")
+
+    # Construct URL
+    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/credentials/default/policies/{policyName}"  # pylint: disable=line-too-long
+    path_format_arguments = {
+        "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
+        "resourceGroupName": _SERIALIZER.url(
+            "resource_group_name", resource_group_name, "str", max_length=90, min_length=1
+        ),
+        "namespaceName": _SERIALIZER.url(
+            "namespace_name",
+            namespace_name,
+            "str",
+            max_length=64,
+            min_length=3,
+            pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+        ),
+        "policyName": _SERIALIZER.url(
+            "policy_name", policy_name, "str", max_length=63, min_length=3, pattern=r"^[0-9a-zA-Z][a-zA-Z0-9-]*$"
+        ),
+    }
+
+    _url: str = _url.format(**path_format_arguments)  # type: ignore
+
+    # Construct parameters
+    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
+
+    # Construct headers
+    if content_type is not None:
+        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
+
+    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, **kwargs)
+
+
+def build_policies_delete_request(
+    resource_group_name: str, namespace_name: str, policy_name: str, subscription_id: str, **kwargs: Any
+) -> HttpRequest:
+    _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+    _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
+
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
+    accept = _headers.pop("Accept", "application/json")
+
+    # Construct URL
+    _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.DeviceRegistry/namespaces/{namespaceName}/credentials/default/policies/{policyName}"  # pylint: disable=line-too-long
+    path_format_arguments = {
+        "subscriptionId": _SERIALIZER.url("subscription_id", subscription_id, "str"),
+        "resourceGroupName": _SERIALIZER.url(
+            "resource_group_name", resource_group_name, "str", max_length=90, min_length=1
+        ),
+        "namespaceName": _SERIALIZER.url(
+            "namespace_name",
+            namespace_name,
+            "str",
+            max_length=64,
+            min_length=3,
+            pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+        ),
+        "policyName": _SERIALIZER.url(
+            "policy_name", policy_name, "str", max_length=63, min_length=3, pattern=r"^[0-9a-zA-Z][a-zA-Z0-9-]*$"
+        ),
+    }
+
+    _url: str = _url.format(**path_format_arguments)  # type: ignore
+
+    # Construct parameters
+    _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
+
+    # Construct headers
+    _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
+
+    return HttpRequest(method="DELETE", url=_url, params=_params, headers=_headers, **kwargs)
+
+
 def build_namespace_devices_list_by_resource_group_request(  # pylint: disable=name-too-long
     resource_group_name: str, namespace_name: str, subscription_id: str, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -1796,7 +1685,7 @@ def build_namespace_devices_get_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -1837,7 +1726,7 @@ def build_namespace_devices_create_or_replace_request(  # pylint: disable=name-t
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -1880,7 +1769,7 @@ def build_namespace_devices_update_request(
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -1922,7 +1811,7 @@ def build_namespace_devices_delete_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -1962,7 +1851,7 @@ def build_namespace_discovered_assets_list_by_resource_group_request(  # pylint:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -1999,7 +1888,7 @@ def build_namespace_discovered_assets_get_request(  # pylint: disable=name-too-l
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -2045,7 +1934,7 @@ def build_namespace_discovered_assets_create_or_replace_request(  # pylint: disa
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -2093,7 +1982,7 @@ def build_namespace_discovered_assets_update_request(  # pylint: disable=name-to
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -2140,7 +2029,7 @@ def build_namespace_discovered_assets_delete_request(  # pylint: disable=name-to
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -2185,7 +2074,7 @@ def build_namespace_discovered_devices_list_by_resource_group_request(  # pylint
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -2222,7 +2111,7 @@ def build_namespace_discovered_devices_get_request(  # pylint: disable=name-too-
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -2268,7 +2157,7 @@ def build_namespace_discovered_devices_create_or_replace_request(  # pylint: dis
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -2316,7 +2205,7 @@ def build_namespace_discovered_devices_update_request(  # pylint: disable=name-t
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -2363,7 +2252,7 @@ def build_namespace_discovered_devices_delete_request(  # pylint: disable=name-t
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -2408,7 +2297,7 @@ def build_schemas_list_by_schema_registry_request(  # pylint: disable=name-too-l
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -2445,7 +2334,7 @@ def build_schemas_get_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -2486,7 +2375,7 @@ def build_schemas_create_or_replace_request(
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -2528,7 +2417,7 @@ def build_schemas_delete_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -2568,7 +2457,7 @@ def build_schema_versions_list_by_schema_request(  # pylint: disable=name-too-lo
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -2613,7 +2502,7 @@ def build_schema_versions_get_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -2662,7 +2551,7 @@ def build_schema_versions_create_or_replace_request(  # pylint: disable=name-too
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
     content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -2712,7 +2601,7 @@ def build_schema_versions_delete_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-08-01-preview"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2025-11-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -2755,7 +2644,7 @@ class Operations:
         **DO NOT** instantiate this class directly.
 
         Instead, you should access the following operations through
-        :class:`~aziotops.mgmt.PrivateDeviceRegistryManagementService`'s
+        :class:`~deviceregistry.mgmt.DeviceRegistryMgmtClient`'s
         :attr:`operations` attribute.
     """
 
@@ -2879,7 +2768,7 @@ class AssetEndpointProfilesOperations:
         **DO NOT** instantiate this class directly.
 
         Instead, you should access the following operations through
-        :class:`~aziotops.mgmt.PrivateDeviceRegistryManagementService`'s
+        :class:`~deviceregistry.mgmt.DeviceRegistryMgmtClient`'s
         :attr:`asset_endpoint_profiles` attribute.
     """
 
@@ -4595,7 +4484,7 @@ class AssetsOperations:
         **DO NOT** instantiate this class directly.
 
         Instead, you should access the following operations through
-        :class:`~aziotops.mgmt.PrivateDeviceRegistryManagementService`'s
+        :class:`~deviceregistry.mgmt.DeviceRegistryMgmtClient`'s
         :attr:`assets` attribute.
     """
 
@@ -4652,10 +4541,10 @@ class AssetsOperations:
                                           configuration for the data point. For OPC UA, this could
                                           include configuration like, publishingInterval,
                                           samplingInterval, and queueSize.
-                                        "observabilityMode": "str"  #
-                                          Optional. An indication of how the data point should be
-                                          mapped to OpenTelemetry. Known values are: "None", "Counter",
-                                          "Gauge", "Histogram", and "Log".
+                                        "observabilityMode": "None"  #
+                                          Optional. Default value is "None". An indication of how the
+                                          data point should be mapped to OpenTelemetry. Known values
+                                          are: "None", "Counter", "Gauge", "Histogram", and "Log".
                                     }
                                 ],
                                 "datasetConfiguration": "str",  # Optional.
@@ -4706,9 +4595,9 @@ class AssetsOperations:
                                   JSON that contains connector-specific configuration for the event.
                                   For OPC UA, this could include configuration like,
                                   publishingInterval, samplingInterval, and queueSize.
-                                "observabilityMode": "str",  # Optional. An
-                                  indication of how the event should be mapped to OpenTelemetry. Known
-                                  values are: "None" and "Log".
+                                "observabilityMode": "None",  # Optional. Default
+                                  value is "None". An indication of how the event should be mapped to
+                                  OpenTelemetry. Known values are: "None" and "Log".
                                 "topic": {
                                     "path": "str",  # The topic path for messages
                                       published to an MQTT broker. Required.
@@ -4924,10 +4813,10 @@ class AssetsOperations:
                                           configuration for the data point. For OPC UA, this could
                                           include configuration like, publishingInterval,
                                           samplingInterval, and queueSize.
-                                        "observabilityMode": "str"  #
-                                          Optional. An indication of how the data point should be
-                                          mapped to OpenTelemetry. Known values are: "None", "Counter",
-                                          "Gauge", "Histogram", and "Log".
+                                        "observabilityMode": "None"  #
+                                          Optional. Default value is "None". An indication of how the
+                                          data point should be mapped to OpenTelemetry. Known values
+                                          are: "None", "Counter", "Gauge", "Histogram", and "Log".
                                     }
                                 ],
                                 "datasetConfiguration": "str",  # Optional.
@@ -4978,9 +4867,9 @@ class AssetsOperations:
                                   JSON that contains connector-specific configuration for the event.
                                   For OPC UA, this could include configuration like,
                                   publishingInterval, samplingInterval, and queueSize.
-                                "observabilityMode": "str",  # Optional. An
-                                  indication of how the event should be mapped to OpenTelemetry. Known
-                                  values are: "None" and "Log".
+                                "observabilityMode": "None",  # Optional. Default
+                                  value is "None". An indication of how the event should be mapped to
+                                  OpenTelemetry. Known values are: "None" and "Log".
                                 "topic": {
                                     "path": "str",  # The topic path for messages
                                       published to an MQTT broker. Required.
@@ -5199,10 +5088,10 @@ class AssetsOperations:
                                           configuration for the data point. For OPC UA, this could
                                           include configuration like, publishingInterval,
                                           samplingInterval, and queueSize.
-                                        "observabilityMode": "str"  #
-                                          Optional. An indication of how the data point should be
-                                          mapped to OpenTelemetry. Known values are: "None", "Counter",
-                                          "Gauge", "Histogram", and "Log".
+                                        "observabilityMode": "None"  #
+                                          Optional. Default value is "None". An indication of how the
+                                          data point should be mapped to OpenTelemetry. Known values
+                                          are: "None", "Counter", "Gauge", "Histogram", and "Log".
                                     }
                                 ],
                                 "datasetConfiguration": "str",  # Optional.
@@ -5253,9 +5142,9 @@ class AssetsOperations:
                                   JSON that contains connector-specific configuration for the event.
                                   For OPC UA, this could include configuration like,
                                   publishingInterval, samplingInterval, and queueSize.
-                                "observabilityMode": "str",  # Optional. An
-                                  indication of how the event should be mapped to OpenTelemetry. Known
-                                  values are: "None" and "Log".
+                                "observabilityMode": "None",  # Optional. Default
+                                  value is "None". An indication of how the event should be mapped to
+                                  OpenTelemetry. Known values are: "None" and "Log".
                                 "topic": {
                                     "path": "str",  # The topic path for messages
                                       published to an MQTT broker. Required.
@@ -5539,10 +5428,10 @@ class AssetsOperations:
                                           configuration for the data point. For OPC UA, this could
                                           include configuration like, publishingInterval,
                                           samplingInterval, and queueSize.
-                                        "observabilityMode": "str"  #
-                                          Optional. An indication of how the data point should be
-                                          mapped to OpenTelemetry. Known values are: "None", "Counter",
-                                          "Gauge", "Histogram", and "Log".
+                                        "observabilityMode": "None"  #
+                                          Optional. Default value is "None". An indication of how the
+                                          data point should be mapped to OpenTelemetry. Known values
+                                          are: "None", "Counter", "Gauge", "Histogram", and "Log".
                                     }
                                 ],
                                 "datasetConfiguration": "str",  # Optional.
@@ -5593,9 +5482,9 @@ class AssetsOperations:
                                   JSON that contains connector-specific configuration for the event.
                                   For OPC UA, this could include configuration like,
                                   publishingInterval, samplingInterval, and queueSize.
-                                "observabilityMode": "str",  # Optional. An
-                                  indication of how the event should be mapped to OpenTelemetry. Known
-                                  values are: "None" and "Log".
+                                "observabilityMode": "None",  # Optional. Default
+                                  value is "None". An indication of how the event should be mapped to
+                                  OpenTelemetry. Known values are: "None" and "Log".
                                 "topic": {
                                     "path": "str",  # The topic path for messages
                                       published to an MQTT broker. Required.
@@ -5729,10 +5618,10 @@ class AssetsOperations:
                                           configuration for the data point. For OPC UA, this could
                                           include configuration like, publishingInterval,
                                           samplingInterval, and queueSize.
-                                        "observabilityMode": "str"  #
-                                          Optional. An indication of how the data point should be
-                                          mapped to OpenTelemetry. Known values are: "None", "Counter",
-                                          "Gauge", "Histogram", and "Log".
+                                        "observabilityMode": "None"  #
+                                          Optional. Default value is "None". An indication of how the
+                                          data point should be mapped to OpenTelemetry. Known values
+                                          are: "None", "Counter", "Gauge", "Histogram", and "Log".
                                     }
                                 ],
                                 "datasetConfiguration": "str",  # Optional.
@@ -5783,9 +5672,9 @@ class AssetsOperations:
                                   JSON that contains connector-specific configuration for the event.
                                   For OPC UA, this could include configuration like,
                                   publishingInterval, samplingInterval, and queueSize.
-                                "observabilityMode": "str",  # Optional. An
-                                  indication of how the event should be mapped to OpenTelemetry. Known
-                                  values are: "None" and "Log".
+                                "observabilityMode": "None",  # Optional. Default
+                                  value is "None". An indication of how the event should be mapped to
+                                  OpenTelemetry. Known values are: "None" and "Log".
                                 "topic": {
                                     "path": "str",  # The topic path for messages
                                       published to an MQTT broker. Required.
@@ -5950,10 +5839,10 @@ class AssetsOperations:
                                           configuration for the data point. For OPC UA, this could
                                           include configuration like, publishingInterval,
                                           samplingInterval, and queueSize.
-                                        "observabilityMode": "str"  #
-                                          Optional. An indication of how the data point should be
-                                          mapped to OpenTelemetry. Known values are: "None", "Counter",
-                                          "Gauge", "Histogram", and "Log".
+                                        "observabilityMode": "None"  #
+                                          Optional. Default value is "None". An indication of how the
+                                          data point should be mapped to OpenTelemetry. Known values
+                                          are: "None", "Counter", "Gauge", "Histogram", and "Log".
                                     }
                                 ],
                                 "datasetConfiguration": "str",  # Optional.
@@ -6004,9 +5893,9 @@ class AssetsOperations:
                                   JSON that contains connector-specific configuration for the event.
                                   For OPC UA, this could include configuration like,
                                   publishingInterval, samplingInterval, and queueSize.
-                                "observabilityMode": "str",  # Optional. An
-                                  indication of how the event should be mapped to OpenTelemetry. Known
-                                  values are: "None" and "Log".
+                                "observabilityMode": "None",  # Optional. Default
+                                  value is "None". An indication of how the event should be mapped to
+                                  OpenTelemetry. Known values are: "None" and "Log".
                                 "topic": {
                                     "path": "str",  # The topic path for messages
                                       published to an MQTT broker. Required.
@@ -6163,10 +6052,10 @@ class AssetsOperations:
                                           configuration for the data point. For OPC UA, this could
                                           include configuration like, publishingInterval,
                                           samplingInterval, and queueSize.
-                                        "observabilityMode": "str"  #
-                                          Optional. An indication of how the data point should be
-                                          mapped to OpenTelemetry. Known values are: "None", "Counter",
-                                          "Gauge", "Histogram", and "Log".
+                                        "observabilityMode": "None"  #
+                                          Optional. Default value is "None". An indication of how the
+                                          data point should be mapped to OpenTelemetry. Known values
+                                          are: "None", "Counter", "Gauge", "Histogram", and "Log".
                                     }
                                 ],
                                 "datasetConfiguration": "str",  # Optional.
@@ -6217,9 +6106,9 @@ class AssetsOperations:
                                   JSON that contains connector-specific configuration for the event.
                                   For OPC UA, this could include configuration like,
                                   publishingInterval, samplingInterval, and queueSize.
-                                "observabilityMode": "str",  # Optional. An
-                                  indication of how the event should be mapped to OpenTelemetry. Known
-                                  values are: "None" and "Log".
+                                "observabilityMode": "None",  # Optional. Default
+                                  value is "None". An indication of how the event should be mapped to
+                                  OpenTelemetry. Known values are: "None" and "Log".
                                 "topic": {
                                     "path": "str",  # The topic path for messages
                                       published to an MQTT broker. Required.
@@ -6353,10 +6242,10 @@ class AssetsOperations:
                                           configuration for the data point. For OPC UA, this could
                                           include configuration like, publishingInterval,
                                           samplingInterval, and queueSize.
-                                        "observabilityMode": "str"  #
-                                          Optional. An indication of how the data point should be
-                                          mapped to OpenTelemetry. Known values are: "None", "Counter",
-                                          "Gauge", "Histogram", and "Log".
+                                        "observabilityMode": "None"  #
+                                          Optional. Default value is "None". An indication of how the
+                                          data point should be mapped to OpenTelemetry. Known values
+                                          are: "None", "Counter", "Gauge", "Histogram", and "Log".
                                     }
                                 ],
                                 "datasetConfiguration": "str",  # Optional.
@@ -6407,9 +6296,9 @@ class AssetsOperations:
                                   JSON that contains connector-specific configuration for the event.
                                   For OPC UA, this could include configuration like,
                                   publishingInterval, samplingInterval, and queueSize.
-                                "observabilityMode": "str",  # Optional. An
-                                  indication of how the event should be mapped to OpenTelemetry. Known
-                                  values are: "None" and "Log".
+                                "observabilityMode": "None",  # Optional. Default
+                                  value is "None". An indication of how the event should be mapped to
+                                  OpenTelemetry. Known values are: "None" and "Log".
                                 "topic": {
                                     "path": "str",  # The topic path for messages
                                       published to an MQTT broker. Required.
@@ -6677,10 +6566,10 @@ class AssetsOperations:
                                           configuration for the data point. For OPC UA, this could
                                           include configuration like, publishingInterval,
                                           samplingInterval, and queueSize.
-                                        "observabilityMode": "str"  #
-                                          Optional. An indication of how the data point should be
-                                          mapped to OpenTelemetry. Known values are: "None", "Counter",
-                                          "Gauge", "Histogram", and "Log".
+                                        "observabilityMode": "None"  #
+                                          Optional. Default value is "None". An indication of how the
+                                          data point should be mapped to OpenTelemetry. Known values
+                                          are: "None", "Counter", "Gauge", "Histogram", and "Log".
                                     }
                                 ],
                                 "datasetConfiguration": "str",  # Optional.
@@ -6726,9 +6615,9 @@ class AssetsOperations:
                                   JSON that contains connector-specific configuration for the event.
                                   For OPC UA, this could include configuration like,
                                   publishingInterval, samplingInterval, and queueSize.
-                                "observabilityMode": "str",  # Optional. An
-                                  indication of how the event should be mapped to OpenTelemetry. Known
-                                  values are: "None" and "Log".
+                                "observabilityMode": "None",  # Optional. Default
+                                  value is "None". An indication of how the event should be mapped to
+                                  OpenTelemetry. Known values are: "None" and "Log".
                                 "topic": {
                                     "path": "str",  # The topic path for messages
                                       published to an MQTT broker. Required.
@@ -6787,10 +6676,10 @@ class AssetsOperations:
                                           configuration for the data point. For OPC UA, this could
                                           include configuration like, publishingInterval,
                                           samplingInterval, and queueSize.
-                                        "observabilityMode": "str"  #
-                                          Optional. An indication of how the data point should be
-                                          mapped to OpenTelemetry. Known values are: "None", "Counter",
-                                          "Gauge", "Histogram", and "Log".
+                                        "observabilityMode": "None"  #
+                                          Optional. Default value is "None". An indication of how the
+                                          data point should be mapped to OpenTelemetry. Known values
+                                          are: "None", "Counter", "Gauge", "Histogram", and "Log".
                                     }
                                 ],
                                 "datasetConfiguration": "str",  # Optional.
@@ -6841,9 +6730,9 @@ class AssetsOperations:
                                   JSON that contains connector-specific configuration for the event.
                                   For OPC UA, this could include configuration like,
                                   publishingInterval, samplingInterval, and queueSize.
-                                "observabilityMode": "str",  # Optional. An
-                                  indication of how the event should be mapped to OpenTelemetry. Known
-                                  values are: "None" and "Log".
+                                "observabilityMode": "None",  # Optional. Default
+                                  value is "None". An indication of how the event should be mapped to
+                                  OpenTelemetry. Known values are: "None" and "Log".
                                 "topic": {
                                     "path": "str",  # The topic path for messages
                                       published to an MQTT broker. Required.
@@ -7008,10 +6897,10 @@ class AssetsOperations:
                                           configuration for the data point. For OPC UA, this could
                                           include configuration like, publishingInterval,
                                           samplingInterval, and queueSize.
-                                        "observabilityMode": "str"  #
-                                          Optional. An indication of how the data point should be
-                                          mapped to OpenTelemetry. Known values are: "None", "Counter",
-                                          "Gauge", "Histogram", and "Log".
+                                        "observabilityMode": "None"  #
+                                          Optional. Default value is "None". An indication of how the
+                                          data point should be mapped to OpenTelemetry. Known values
+                                          are: "None", "Counter", "Gauge", "Histogram", and "Log".
                                     }
                                 ],
                                 "datasetConfiguration": "str",  # Optional.
@@ -7062,9 +6951,9 @@ class AssetsOperations:
                                   JSON that contains connector-specific configuration for the event.
                                   For OPC UA, this could include configuration like,
                                   publishingInterval, samplingInterval, and queueSize.
-                                "observabilityMode": "str",  # Optional. An
-                                  indication of how the event should be mapped to OpenTelemetry. Known
-                                  values are: "None" and "Log".
+                                "observabilityMode": "None",  # Optional. Default
+                                  value is "None". An indication of how the event should be mapped to
+                                  OpenTelemetry. Known values are: "None" and "Log".
                                 "topic": {
                                     "path": "str",  # The topic path for messages
                                       published to an MQTT broker. Required.
@@ -7209,10 +7098,10 @@ class AssetsOperations:
                                           configuration for the data point. For OPC UA, this could
                                           include configuration like, publishingInterval,
                                           samplingInterval, and queueSize.
-                                        "observabilityMode": "str"  #
-                                          Optional. An indication of how the data point should be
-                                          mapped to OpenTelemetry. Known values are: "None", "Counter",
-                                          "Gauge", "Histogram", and "Log".
+                                        "observabilityMode": "None"  #
+                                          Optional. Default value is "None". An indication of how the
+                                          data point should be mapped to OpenTelemetry. Known values
+                                          are: "None", "Counter", "Gauge", "Histogram", and "Log".
                                     }
                                 ],
                                 "datasetConfiguration": "str",  # Optional.
@@ -7258,9 +7147,9 @@ class AssetsOperations:
                                   JSON that contains connector-specific configuration for the event.
                                   For OPC UA, this could include configuration like,
                                   publishingInterval, samplingInterval, and queueSize.
-                                "observabilityMode": "str",  # Optional. An
-                                  indication of how the event should be mapped to OpenTelemetry. Known
-                                  values are: "None" and "Log".
+                                "observabilityMode": "None",  # Optional. Default
+                                  value is "None". An indication of how the event should be mapped to
+                                  OpenTelemetry. Known values are: "None" and "Log".
                                 "topic": {
                                     "path": "str",  # The topic path for messages
                                       published to an MQTT broker. Required.
@@ -7319,10 +7208,10 @@ class AssetsOperations:
                                           configuration for the data point. For OPC UA, this could
                                           include configuration like, publishingInterval,
                                           samplingInterval, and queueSize.
-                                        "observabilityMode": "str"  #
-                                          Optional. An indication of how the data point should be
-                                          mapped to OpenTelemetry. Known values are: "None", "Counter",
-                                          "Gauge", "Histogram", and "Log".
+                                        "observabilityMode": "None"  #
+                                          Optional. Default value is "None". An indication of how the
+                                          data point should be mapped to OpenTelemetry. Known values
+                                          are: "None", "Counter", "Gauge", "Histogram", and "Log".
                                     }
                                 ],
                                 "datasetConfiguration": "str",  # Optional.
@@ -7373,9 +7262,9 @@ class AssetsOperations:
                                   JSON that contains connector-specific configuration for the event.
                                   For OPC UA, this could include configuration like,
                                   publishingInterval, samplingInterval, and queueSize.
-                                "observabilityMode": "str",  # Optional. An
-                                  indication of how the event should be mapped to OpenTelemetry. Known
-                                  values are: "None" and "Log".
+                                "observabilityMode": "None",  # Optional. Default
+                                  value is "None". An indication of how the event should be mapped to
+                                  OpenTelemetry. Known values are: "None" and "Log".
                                 "topic": {
                                     "path": "str",  # The topic path for messages
                                       published to an MQTT broker. Required.
@@ -7629,7 +7518,7 @@ class BillingContainersOperations:
         **DO NOT** instantiate this class directly.
 
         Instead, you should access the following operations through
-        :class:`~aziotops.mgmt.PrivateDeviceRegistryManagementService`'s
+        :class:`~deviceregistry.mgmt.DeviceRegistryMgmtClient`'s
         :attr:`billing_containers` attribute.
     """
 
@@ -7847,7 +7736,7 @@ class OperationStatusOperations:
         **DO NOT** instantiate this class directly.
 
         Instead, you should access the following operations through
-        :class:`~aziotops.mgmt.PrivateDeviceRegistryManagementService`'s
+        :class:`~deviceregistry.mgmt.DeviceRegistryMgmtClient`'s
         :attr:`operation_status` attribute.
     """
 
@@ -7958,7 +7847,7 @@ class NamespacesOperations:
         **DO NOT** instantiate this class directly.
 
         Instead, you should access the following operations through
-        :class:`~aziotops.mgmt.PrivateDeviceRegistryManagementService`'s
+        :class:`~deviceregistry.mgmt.DeviceRegistryMgmtClient`'s
         :attr:`namespaces` attribute.
     """
 
@@ -8003,9 +7892,9 @@ class NamespacesOperations:
                                     "address": "str",  # The endpoint address to
                                       connect to. Required.
                                     "endpointType": "str",  # Optional. Type of
-                                      connection used for endpoint.
-                                    "resourceId": "str"  # Optional. The complete
-                                      ARM resourceId for the messaging endpoint.
+                                      connection used for messaging endpoint.
+                                    "resourceId": "str"  # Optional. The
+                                      messaging endpoint Azure resource Id.
                                 }
                             }
                         },
@@ -8013,7 +7902,7 @@ class NamespacesOperations:
                           resource. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
                           and "Deleting".
                         "uuid": "str"  # Optional. Globally unique, immutable, non-reusable
-                          id.
+                          ID.
                     },
                     "systemData": {
                         "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
@@ -8142,9 +8031,9 @@ class NamespacesOperations:
                                     "address": "str",  # The endpoint address to
                                       connect to. Required.
                                     "endpointType": "str",  # Optional. Type of
-                                      connection used for endpoint.
-                                    "resourceId": "str"  # Optional. The complete
-                                      ARM resourceId for the messaging endpoint.
+                                      connection used for messaging endpoint.
+                                    "resourceId": "str"  # Optional. The
+                                      messaging endpoint Azure resource Id.
                                 }
                             }
                         },
@@ -8152,7 +8041,7 @@ class NamespacesOperations:
                           resource. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
                           and "Deleting".
                         "uuid": "str"  # Optional. Globally unique, immutable, non-reusable
-                          id.
+                          ID.
                     },
                     "systemData": {
                         "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
@@ -8253,7 +8142,7 @@ class NamespacesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
         :return: JSON object
         :rtype: JSON
@@ -8284,9 +8173,9 @@ class NamespacesOperations:
                                     "address": "str",  # The endpoint address to
                                       connect to. Required.
                                     "endpointType": "str",  # Optional. Type of
-                                      connection used for endpoint.
-                                    "resourceId": "str"  # Optional. The complete
-                                      ARM resourceId for the messaging endpoint.
+                                      connection used for messaging endpoint.
+                                    "resourceId": "str"  # Optional. The
+                                      messaging endpoint Azure resource Id.
                                 }
                             }
                         },
@@ -8294,7 +8183,7 @@ class NamespacesOperations:
                           resource. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
                           and "Deleting".
                         "uuid": "str"  # Optional. Globally unique, immutable, non-reusable
-                          id.
+                          ID.
                     },
                     "systemData": {
                         "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
@@ -8455,7 +8344,7 @@ class NamespacesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
         :param resource: Resource create parameters. Required.
         :type resource: JSON
@@ -8491,9 +8380,9 @@ class NamespacesOperations:
                                     "address": "str",  # The endpoint address to
                                       connect to. Required.
                                     "endpointType": "str",  # Optional. Type of
-                                      connection used for endpoint.
-                                    "resourceId": "str"  # Optional. The complete
-                                      ARM resourceId for the messaging endpoint.
+                                      connection used for messaging endpoint.
+                                    "resourceId": "str"  # Optional. The
+                                      messaging endpoint Azure resource Id.
                                 }
                             }
                         },
@@ -8501,7 +8390,7 @@ class NamespacesOperations:
                           resource. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
                           and "Deleting".
                         "uuid": "str"  # Optional. Globally unique, immutable, non-reusable
-                          id.
+                          ID.
                     },
                     "systemData": {
                         "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
@@ -8548,9 +8437,9 @@ class NamespacesOperations:
                                     "address": "str",  # The endpoint address to
                                       connect to. Required.
                                     "endpointType": "str",  # Optional. Type of
-                                      connection used for endpoint.
-                                    "resourceId": "str"  # Optional. The complete
-                                      ARM resourceId for the messaging endpoint.
+                                      connection used for messaging endpoint.
+                                    "resourceId": "str"  # Optional. The
+                                      messaging endpoint Azure resource Id.
                                 }
                             }
                         },
@@ -8558,7 +8447,7 @@ class NamespacesOperations:
                           resource. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
                           and "Deleting".
                         "uuid": "str"  # Optional. Globally unique, immutable, non-reusable
-                          id.
+                          ID.
                     },
                     "systemData": {
                         "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
@@ -8600,7 +8489,7 @@ class NamespacesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
         :param resource: Resource create parameters. Required.
         :type resource: IO[bytes]
@@ -8636,9 +8525,9 @@ class NamespacesOperations:
                                     "address": "str",  # The endpoint address to
                                       connect to. Required.
                                     "endpointType": "str",  # Optional. Type of
-                                      connection used for endpoint.
-                                    "resourceId": "str"  # Optional. The complete
-                                      ARM resourceId for the messaging endpoint.
+                                      connection used for messaging endpoint.
+                                    "resourceId": "str"  # Optional. The
+                                      messaging endpoint Azure resource Id.
                                 }
                             }
                         },
@@ -8646,7 +8535,7 @@ class NamespacesOperations:
                           resource. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
                           and "Deleting".
                         "uuid": "str"  # Optional. Globally unique, immutable, non-reusable
-                          id.
+                          ID.
                     },
                     "systemData": {
                         "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
@@ -8682,7 +8571,7 @@ class NamespacesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
         :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
          Required.
@@ -8716,9 +8605,9 @@ class NamespacesOperations:
                                     "address": "str",  # The endpoint address to
                                       connect to. Required.
                                     "endpointType": "str",  # Optional. Type of
-                                      connection used for endpoint.
-                                    "resourceId": "str"  # Optional. The complete
-                                      ARM resourceId for the messaging endpoint.
+                                      connection used for messaging endpoint.
+                                    "resourceId": "str"  # Optional. The
+                                      messaging endpoint Azure resource Id.
                                 }
                             }
                         },
@@ -8726,7 +8615,7 @@ class NamespacesOperations:
                           resource. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
                           and "Deleting".
                         "uuid": "str"  # Optional. Globally unique, immutable, non-reusable
-                          id.
+                          ID.
                     },
                     "systemData": {
                         "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
@@ -8773,9 +8662,9 @@ class NamespacesOperations:
                                     "address": "str",  # The endpoint address to
                                       connect to. Required.
                                     "endpointType": "str",  # Optional. Type of
-                                      connection used for endpoint.
-                                    "resourceId": "str"  # Optional. The complete
-                                      ARM resourceId for the messaging endpoint.
+                                      connection used for messaging endpoint.
+                                    "resourceId": "str"  # Optional. The
+                                      messaging endpoint Azure resource Id.
                                 }
                             }
                         },
@@ -8783,7 +8672,7 @@ class NamespacesOperations:
                           resource. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
                           and "Deleting".
                         "uuid": "str"  # Optional. Globally unique, immutable, non-reusable
-                          id.
+                          ID.
                     },
                     "systemData": {
                         "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
@@ -8940,7 +8829,7 @@ class NamespacesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
         :param properties: The resource properties to be updated. Required.
         :type properties: JSON
@@ -8956,13 +8845,15 @@ class NamespacesOperations:
 
                 # JSON input template you can fill out and use as your body input.
                 properties = {
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
                     "identity": {
-                        "type": "str"  # Optional. The type of managed identity assigned to
-                          this resource. Known values are: "None" and "SystemAssigned".
+                        "type": "str",  # Type of managed service identity (either system
+                          assigned, or none). Required. Known values are: "None" and "SystemAssigned".
+                        "principalId": "str",  # Optional. The service principal ID of the
+                          system assigned identity. This property will only be provided for a system
+                          assigned identity.
+                        "tenantId": "str"  # Optional. The tenant ID of the system assigned
+                          identity. This property will only be provided for a system assigned identity.
                     },
-                    "name": "str",  # Optional. The name of the resource.
                     "properties": {
                         "messaging": {
                             "endpoints": {
@@ -8970,39 +8861,16 @@ class NamespacesOperations:
                                     "address": "str",  # The endpoint address to
                                       connect to. Required.
                                     "endpointType": "str",  # Optional. Type of
-                                      connection used for endpoint.
-                                    "resourceId": "str"  # Optional. The complete
-                                      ARM resourceId for the messaging endpoint.
+                                      connection used for messaging endpoint.
+                                    "resourceId": "str"  # Optional. The
+                                      messaging endpoint Azure resource Id.
                                 }
                             }
-                        },
-                        "provisioningState": "str",  # Optional. Provisioning state of the
-                          resource. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                        "uuid": "str"  # Optional. Globally unique, immutable, non-reusable
-                          id.
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
+                        }
                     },
                     "tags": {
                         "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
+                    }
                 }
 
                 # response body for status code(s): 200
@@ -9027,9 +8895,9 @@ class NamespacesOperations:
                                     "address": "str",  # The endpoint address to
                                       connect to. Required.
                                     "endpointType": "str",  # Optional. Type of
-                                      connection used for endpoint.
-                                    "resourceId": "str"  # Optional. The complete
-                                      ARM resourceId for the messaging endpoint.
+                                      connection used for messaging endpoint.
+                                    "resourceId": "str"  # Optional. The
+                                      messaging endpoint Azure resource Id.
                                 }
                             }
                         },
@@ -9037,7 +8905,7 @@ class NamespacesOperations:
                           resource. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
                           and "Deleting".
                         "uuid": "str"  # Optional. Globally unique, immutable, non-reusable
-                          id.
+                          ID.
                     },
                     "systemData": {
                         "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
@@ -9079,7 +8947,7 @@ class NamespacesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
         :param properties: The resource properties to be updated. Required.
         :type properties: IO[bytes]
@@ -9115,9 +8983,9 @@ class NamespacesOperations:
                                     "address": "str",  # The endpoint address to
                                       connect to. Required.
                                     "endpointType": "str",  # Optional. Type of
-                                      connection used for endpoint.
-                                    "resourceId": "str"  # Optional. The complete
-                                      ARM resourceId for the messaging endpoint.
+                                      connection used for messaging endpoint.
+                                    "resourceId": "str"  # Optional. The
+                                      messaging endpoint Azure resource Id.
                                 }
                             }
                         },
@@ -9125,7 +8993,7 @@ class NamespacesOperations:
                           resource. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
                           and "Deleting".
                         "uuid": "str"  # Optional. Globally unique, immutable, non-reusable
-                          id.
+                          ID.
                     },
                     "systemData": {
                         "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
@@ -9161,7 +9029,7 @@ class NamespacesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
         :param properties: The resource properties to be updated. Is either a JSON type or a IO[bytes]
          type. Required.
@@ -9175,13 +9043,15 @@ class NamespacesOperations:
 
                 # JSON input template you can fill out and use as your body input.
                 properties = {
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
                     "identity": {
-                        "type": "str"  # Optional. The type of managed identity assigned to
-                          this resource. Known values are: "None" and "SystemAssigned".
+                        "type": "str",  # Type of managed service identity (either system
+                          assigned, or none). Required. Known values are: "None" and "SystemAssigned".
+                        "principalId": "str",  # Optional. The service principal ID of the
+                          system assigned identity. This property will only be provided for a system
+                          assigned identity.
+                        "tenantId": "str"  # Optional. The tenant ID of the system assigned
+                          identity. This property will only be provided for a system assigned identity.
                     },
-                    "name": "str",  # Optional. The name of the resource.
                     "properties": {
                         "messaging": {
                             "endpoints": {
@@ -9189,39 +9059,16 @@ class NamespacesOperations:
                                     "address": "str",  # The endpoint address to
                                       connect to. Required.
                                     "endpointType": "str",  # Optional. Type of
-                                      connection used for endpoint.
-                                    "resourceId": "str"  # Optional. The complete
-                                      ARM resourceId for the messaging endpoint.
+                                      connection used for messaging endpoint.
+                                    "resourceId": "str"  # Optional. The
+                                      messaging endpoint Azure resource Id.
                                 }
                             }
-                        },
-                        "provisioningState": "str",  # Optional. Provisioning state of the
-                          resource. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                        "uuid": "str"  # Optional. Globally unique, immutable, non-reusable
-                          id.
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
+                        }
                     },
                     "tags": {
                         "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
+                    }
                 }
 
                 # response body for status code(s): 200
@@ -9246,9 +9093,9 @@ class NamespacesOperations:
                                     "address": "str",  # The endpoint address to
                                       connect to. Required.
                                     "endpointType": "str",  # Optional. Type of
-                                      connection used for endpoint.
-                                    "resourceId": "str"  # Optional. The complete
-                                      ARM resourceId for the messaging endpoint.
+                                      connection used for messaging endpoint.
+                                    "resourceId": "str"  # Optional. The
+                                      messaging endpoint Azure resource Id.
                                 }
                             }
                         },
@@ -9256,7 +9103,7 @@ class NamespacesOperations:
                           resource. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
                           and "Deleting".
                         "uuid": "str"  # Optional. Globally unique, immutable, non-reusable
-                          id.
+                          ID.
                     },
                     "systemData": {
                         "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
@@ -9383,7 +9230,7 @@ class NamespacesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
         :return: An instance of LROPoller that returns None
         :rtype: ~azure.core.polling.LROPoller[None]
@@ -9510,12 +9357,12 @@ class NamespacesOperations:
         **kwargs: Any
     ) -> LROPoller[JSON]:
         # pylint: disable=line-too-long
-        """A long-running resource action.
+        """Migrate the resources into Namespace.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
         :param body: The content of the action request. Required.
         :type body: JSON
@@ -9585,12 +9432,12 @@ class NamespacesOperations:
         **kwargs: Any
     ) -> LROPoller[JSON]:
         # pylint: disable=line-too-long
-        """A long-running resource action.
+        """Migrate the resources into Namespace.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
         :param body: The content of the action request. Required.
         :type body: IO[bytes]
@@ -9645,12 +9492,12 @@ class NamespacesOperations:
         self, resource_group_name: str, namespace_name: str, body: Union[JSON, IO[bytes]], **kwargs: Any
     ) -> LROPoller[JSON]:
         # pylint: disable=line-too-long
-        """A long-running resource action.
+        """Migrate the resources into Namespace.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
         :param body: The content of the action request. Is either a JSON type or a IO[bytes] type.
          Required.
@@ -9755,2900 +9602,13 @@ class NamespacesOperations:
         return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
 
-class CredentialsOperations:
-    """
-    .. warning::
-        **DO NOT** instantiate this class directly.
-
-        Instead, you should access the following operations through
-        :class:`~aziotops.mgmt.PrivateDeviceRegistryManagementService`'s
-        :attr:`credentials` attribute.
-    """
-
-    def __init__(self, *args, **kwargs):
-        input_args = list(args)
-        self._client = input_args.pop(0) if input_args else kwargs.pop("client")
-        self._config = input_args.pop(0) if input_args else kwargs.pop("config")
-        self._serialize = input_args.pop(0) if input_args else kwargs.pop("serializer")
-        self._deserialize = input_args.pop(0) if input_args else kwargs.pop("deserializer")
-
-    @distributed_trace
-    def list_by_subscription(self, namespace_name: str, **kwargs: Any) -> Iterable[JSON]:
-        # pylint: disable=line-too-long
-        """List Credential resources by subscription ID.
-
-        :param namespace_name: Namespace name parameter. Required.
-        :type namespace_name: str
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.paging.ItemPaged[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "provisioningState": "str"  # Optional. The status of the last
-                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-        """
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        error_map: MutableMapping[int, Type[HttpResponseError]] = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        def prepare_request(next_link=None):
-            if not next_link:
-
-                _request = build_credentials_list_by_subscription_request(
-                    namespace_name=namespace_name,
-                    subscription_id=self._config.subscription_id,
-                    api_version=self._config.api_version,
-                    headers=_headers,
-                    params=_params,
-                )
-                _request.url = self._client.format_url(_request.url)
-
-            else:
-                # make call to next link with the client's api-version
-                _parsed_next_link = urllib.parse.urlparse(next_link)
-                _next_request_params = case_insensitive_dict(
-                    {
-                        key: [urllib.parse.quote(v) for v in value]
-                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
-                    }
-                )
-                _next_request_params["api-version"] = self._config.api_version
-                _request = HttpRequest(
-                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
-                )
-                _request.url = self._client.format_url(_request.url)
-
-            return _request
-
-        def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
-            if cls:
-                list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, iter(list_of_elem)
-
-        def get_next(next_link=None):
-            _request = prepare_request(next_link)
-
-            _stream = False
-            pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
-                _request, stream=_stream, **kwargs
-            )
-            response = pipeline_response.http_response
-
-            if response.status_code not in [200]:
-                if _stream:
-                    response.read()  # Load the body in memory and close the socket
-                map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
-
-            return pipeline_response
-
-        return ItemPaged(get_next, extract_data)
-
-    @distributed_trace
-    def list_by_resource_group(self, resource_group_name: str, namespace_name: str, **kwargs: Any) -> Iterable[JSON]:
-        # pylint: disable=line-too-long
-        """List Credential resources by Namespace.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
-        :type namespace_name: str
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.paging.ItemPaged[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "provisioningState": "str"  # Optional. The status of the last
-                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-        """
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        error_map: MutableMapping[int, Type[HttpResponseError]] = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        def prepare_request(next_link=None):
-            if not next_link:
-
-                _request = build_credentials_list_by_resource_group_request(
-                    resource_group_name=resource_group_name,
-                    namespace_name=namespace_name,
-                    subscription_id=self._config.subscription_id,
-                    api_version=self._config.api_version,
-                    headers=_headers,
-                    params=_params,
-                )
-                _request.url = self._client.format_url(_request.url)
-
-            else:
-                # make call to next link with the client's api-version
-                _parsed_next_link = urllib.parse.urlparse(next_link)
-                _next_request_params = case_insensitive_dict(
-                    {
-                        key: [urllib.parse.quote(v) for v in value]
-                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
-                    }
-                )
-                _next_request_params["api-version"] = self._config.api_version
-                _request = HttpRequest(
-                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
-                )
-                _request.url = self._client.format_url(_request.url)
-
-            return _request
-
-        def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
-            if cls:
-                list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, iter(list_of_elem)
-
-        def get_next(next_link=None):
-            _request = prepare_request(next_link)
-
-            _stream = False
-            pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
-                _request, stream=_stream, **kwargs
-            )
-            response = pipeline_response.http_response
-
-            if response.status_code not in [200]:
-                if _stream:
-                    response.read()  # Load the body in memory and close the socket
-                map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
-
-            return pipeline_response
-
-        return ItemPaged(get_next, extract_data)
-
-    @distributed_trace
-    def get(self, resource_group_name: str, namespace_name: str, **kwargs: Any) -> JSON:
-        # pylint: disable=line-too-long
-        """Get a Credential.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
-        :type namespace_name: str
-        :return: JSON object
-        :rtype: JSON
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "provisioningState": "str"  # Optional. The status of the last
-                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-        """
-        error_map: MutableMapping[int, Type[HttpResponseError]] = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        _request = build_credentials_get_request(
-            resource_group_name=resource_group_name,
-            namespace_name=namespace_name,
-            subscription_id=self._config.subscription_id,
-            api_version=self._config.api_version,
-            headers=_headers,
-            params=_params,
-        )
-        _request.url = self._client.format_url(_request.url)
-
-        _stream = False
-        pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
-            _request, stream=_stream, **kwargs
-        )
-
-        response = pipeline_response.http_response
-
-        if response.status_code not in [200]:
-            if _stream:
-                response.read()  # Load the body in memory and close the socket
-            map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
-
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
-
-        if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
-
-        return cast(JSON, deserialized)  # type: ignore
-
-    def _create_or_update_initial(
-        self, resource_group_name: str, namespace_name: str, resource: Union[JSON, IO[bytes]], **kwargs: Any
-    ) -> JSON:
-        error_map: MutableMapping[int, Type[HttpResponseError]] = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-        _params = kwargs.pop("params", {}) or {}
-
-        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        content_type = content_type or "application/json"
-        _json = None
-        _content = None
-        if isinstance(resource, (IOBase, bytes)):
-            _content = resource
-        else:
-            _json = resource
-
-        _request = build_credentials_create_or_update_request(
-            resource_group_name=resource_group_name,
-            namespace_name=namespace_name,
-            subscription_id=self._config.subscription_id,
-            content_type=content_type,
-            api_version=self._config.api_version,
-            json=_json,
-            content=_content,
-            headers=_headers,
-            params=_params,
-        )
-        _request.url = self._client.format_url(_request.url)
-
-        _stream = False
-        pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
-            _request, stream=_stream, **kwargs
-        )
-
-        response = pipeline_response.http_response
-
-        if response.status_code not in [200, 201]:
-            if _stream:
-                response.read()  # Load the body in memory and close the socket
-            map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
-
-        response_headers = {}
-        if response.status_code == 200:
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
-
-        if response.status_code == 201:
-            response_headers["Azure-AsyncOperation"] = self._deserialize(
-                "str", response.headers.get("Azure-AsyncOperation")
-            )
-            response_headers["Retry-After"] = self._deserialize("int", response.headers.get("Retry-After"))
-
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
-
-        if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), response_headers)  # type: ignore
-
-        return cast(JSON, deserialized)  # type: ignore
-
-    @overload
-    def begin_create_or_update(
-        self,
-        resource_group_name: str,
-        namespace_name: str,
-        resource: JSON,
-        *,
-        content_type: str = "application/json",
-        **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
-        """Create a Credential.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
-        :type namespace_name: str
-        :param resource: Resource create parameters. Required.
-        :type resource: JSON
-        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                resource = {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "provisioningState": "str"  # Optional. The status of the last
-                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-
-                # response body for status code(s): 200, 201
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "provisioningState": "str"  # Optional. The status of the last
-                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-        """
-
-    @overload
-    def begin_create_or_update(
-        self,
-        resource_group_name: str,
-        namespace_name: str,
-        resource: IO[bytes],
-        *,
-        content_type: str = "application/json",
-        **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
-        """Create a Credential.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
-        :type namespace_name: str
-        :param resource: Resource create parameters. Required.
-        :type resource: IO[bytes]
-        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200, 201
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "provisioningState": "str"  # Optional. The status of the last
-                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-        """
-
-    @distributed_trace
-    def begin_create_or_update(
-        self, resource_group_name: str, namespace_name: str, resource: Union[JSON, IO[bytes]], **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
-        """Create a Credential.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
-        :type namespace_name: str
-        :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
-         Required.
-        :type resource: JSON or IO[bytes]
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                resource = {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "provisioningState": "str"  # Optional. The status of the last
-                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-
-                # response body for status code(s): 200, 201
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "provisioningState": "str"  # Optional. The status of the last
-                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-        """
-        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-        _params = kwargs.pop("params", {}) or {}
-
-        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-        polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
-        lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
-        cont_token: Optional[str] = kwargs.pop("continuation_token", None)
-        if cont_token is None:
-            raw_result = self._create_or_update_initial(
-                resource_group_name=resource_group_name,
-                namespace_name=namespace_name,
-                resource=resource,
-                content_type=content_type,
-                cls=lambda x, y, z: x,
-                headers=_headers,
-                params=_params,
-                **kwargs
-            )
-        kwargs.pop("error_map", None)
-
-        def get_long_running_output(pipeline_response):
-            response = pipeline_response.http_response
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
-            if cls:
-                return cls(pipeline_response, deserialized, {})  # type: ignore
-            return deserialized
-
-        if polling is True:
-            polling_method: PollingMethod = cast(
-                PollingMethod, ARMPolling(lro_delay, lro_options={"final-state-via": "azure-async-operation"}, **kwargs)
-            )
-        elif polling is False:
-            polling_method = cast(PollingMethod, NoPolling())
-        else:
-            polling_method = polling
-        if cont_token:
-            return LROPoller[JSON].from_continuation_token(
-                polling_method=polling_method,
-                continuation_token=cont_token,
-                client=self._client,
-                deserialization_callback=get_long_running_output,
-            )
-        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
-
-    def _update_initial(
-        self, resource_group_name: str, namespace_name: str, properties: Union[JSON, IO[bytes]], **kwargs: Any
-    ) -> Optional[JSON]:
-        error_map: MutableMapping[int, Type[HttpResponseError]] = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-        _params = kwargs.pop("params", {}) or {}
-
-        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[Optional[JSON]] = kwargs.pop("cls", None)
-
-        content_type = content_type or "application/json"
-        _json = None
-        _content = None
-        if isinstance(properties, (IOBase, bytes)):
-            _content = properties
-        else:
-            _json = properties
-
-        _request = build_credentials_update_request(
-            resource_group_name=resource_group_name,
-            namespace_name=namespace_name,
-            subscription_id=self._config.subscription_id,
-            content_type=content_type,
-            api_version=self._config.api_version,
-            json=_json,
-            content=_content,
-            headers=_headers,
-            params=_params,
-        )
-        _request.url = self._client.format_url(_request.url)
-
-        _stream = False
-        pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
-            _request, stream=_stream, **kwargs
-        )
-
-        response = pipeline_response.http_response
-
-        if response.status_code not in [200, 202]:
-            if _stream:
-                response.read()  # Load the body in memory and close the socket
-            map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
-
-        deserialized = None
-        response_headers = {}
-        if response.status_code == 200:
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
-
-        if response.status_code == 202:
-            response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
-            response_headers["Retry-After"] = self._deserialize("int", response.headers.get("Retry-After"))
-
-        if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
-
-        return deserialized  # type: ignore
-
-    @overload
-    def begin_update(
-        self,
-        resource_group_name: str,
-        namespace_name: str,
-        properties: JSON,
-        *,
-        content_type: str = "application/json",
-        **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
-        """Update a Credential.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
-        :type namespace_name: str
-        :param properties: The resource properties to be updated. Required.
-        :type properties: JSON
-        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                properties = {
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "provisioningState": "str"  # Optional. The status of the last
-                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "provisioningState": "str"  # Optional. The status of the last
-                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-        """
-
-    @overload
-    def begin_update(
-        self,
-        resource_group_name: str,
-        namespace_name: str,
-        properties: IO[bytes],
-        *,
-        content_type: str = "application/json",
-        **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
-        """Update a Credential.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
-        :type namespace_name: str
-        :param properties: The resource properties to be updated. Required.
-        :type properties: IO[bytes]
-        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "provisioningState": "str"  # Optional. The status of the last
-                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-        """
-
-    @distributed_trace
-    def begin_update(
-        self, resource_group_name: str, namespace_name: str, properties: Union[JSON, IO[bytes]], **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
-        """Update a Credential.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
-        :type namespace_name: str
-        :param properties: The resource properties to be updated. Is either a JSON type or a IO[bytes]
-         type. Required.
-        :type properties: JSON or IO[bytes]
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                properties = {
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "provisioningState": "str"  # Optional. The status of the last
-                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "provisioningState": "str"  # Optional. The status of the last
-                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-        """
-        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-        _params = kwargs.pop("params", {}) or {}
-
-        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-        polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
-        lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
-        cont_token: Optional[str] = kwargs.pop("continuation_token", None)
-        if cont_token is None:
-            raw_result = self._update_initial(
-                resource_group_name=resource_group_name,
-                namespace_name=namespace_name,
-                properties=properties,
-                content_type=content_type,
-                cls=lambda x, y, z: x,
-                headers=_headers,
-                params=_params,
-                **kwargs
-            )
-        kwargs.pop("error_map", None)
-
-        def get_long_running_output(pipeline_response):
-            response = pipeline_response.http_response
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
-            if cls:
-                return cls(pipeline_response, deserialized, {})  # type: ignore
-            return deserialized
-
-        if polling is True:
-            polling_method: PollingMethod = cast(
-                PollingMethod, ARMPolling(lro_delay, lro_options={"final-state-via": "location"}, **kwargs)
-            )
-        elif polling is False:
-            polling_method = cast(PollingMethod, NoPolling())
-        else:
-            polling_method = polling
-        if cont_token:
-            return LROPoller[JSON].from_continuation_token(
-                polling_method=polling_method,
-                continuation_token=cont_token,
-                client=self._client,
-                deserialization_callback=get_long_running_output,
-            )
-        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
-
-    def _delete_initial(  # pylint: disable=inconsistent-return-statements
-        self, resource_group_name: str, namespace_name: str, **kwargs: Any
-    ) -> None:
-        error_map: MutableMapping[int, Type[HttpResponseError]] = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[None] = kwargs.pop("cls", None)
-
-        _request = build_credentials_delete_request(
-            resource_group_name=resource_group_name,
-            namespace_name=namespace_name,
-            subscription_id=self._config.subscription_id,
-            api_version=self._config.api_version,
-            headers=_headers,
-            params=_params,
-        )
-        _request.url = self._client.format_url(_request.url)
-
-        _stream = False
-        pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
-            _request, stream=_stream, **kwargs
-        )
-
-        response = pipeline_response.http_response
-
-        if response.status_code not in [202, 204]:
-            if _stream:
-                response.read()  # Load the body in memory and close the socket
-            map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
-
-        response_headers = {}
-        if response.status_code == 202:
-            response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
-            response_headers["Retry-After"] = self._deserialize("int", response.headers.get("Retry-After"))
-
-        if cls:
-            return cls(pipeline_response, None, response_headers)  # type: ignore
-
-    @distributed_trace
-    def begin_delete(self, resource_group_name: str, namespace_name: str, **kwargs: Any) -> LROPoller[None]:
-        """Delete a Credential.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
-        :type namespace_name: str
-        :return: An instance of LROPoller that returns None
-        :rtype: ~azure.core.polling.LROPoller[None]
-        :raises ~azure.core.exceptions.HttpResponseError:
-        """
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[None] = kwargs.pop("cls", None)
-        polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
-        lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
-        cont_token: Optional[str] = kwargs.pop("continuation_token", None)
-        if cont_token is None:
-            raw_result = self._delete_initial(  # type: ignore
-                resource_group_name=resource_group_name,
-                namespace_name=namespace_name,
-                cls=lambda x, y, z: x,
-                headers=_headers,
-                params=_params,
-                **kwargs
-            )
-        kwargs.pop("error_map", None)
-
-        def get_long_running_output(pipeline_response):  # pylint: disable=inconsistent-return-statements
-            if cls:
-                return cls(pipeline_response, None, {})  # type: ignore
-
-        if polling is True:
-            polling_method: PollingMethod = cast(
-                PollingMethod, ARMPolling(lro_delay, lro_options={"final-state-via": "location"}, **kwargs)
-            )
-        elif polling is False:
-            polling_method = cast(PollingMethod, NoPolling())
-        else:
-            polling_method = polling
-        if cont_token:
-            return LROPoller[None].from_continuation_token(
-                polling_method=polling_method,
-                continuation_token=cont_token,
-                client=self._client,
-                deserialization_callback=get_long_running_output,
-            )
-        return LROPoller[None](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
-
-    def _synchronize_initial(  # pylint: disable=inconsistent-return-statements
-        self, resource_group_name: str, namespace_name: str, **kwargs: Any
-    ) -> None:
-        error_map: MutableMapping[int, Type[HttpResponseError]] = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[None] = kwargs.pop("cls", None)
-
-        _request = build_credentials_synchronize_request(
-            resource_group_name=resource_group_name,
-            namespace_name=namespace_name,
-            subscription_id=self._config.subscription_id,
-            api_version=self._config.api_version,
-            headers=_headers,
-            params=_params,
-        )
-        _request.url = self._client.format_url(_request.url)
-
-        _stream = False
-        pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
-            _request, stream=_stream, **kwargs
-        )
-
-        response = pipeline_response.http_response
-
-        if response.status_code not in [202]:
-            if _stream:
-                response.read()  # Load the body in memory and close the socket
-            map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
-
-        response_headers = {}
-        response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
-        response_headers["Retry-After"] = self._deserialize("int", response.headers.get("Retry-After"))
-
-        if cls:
-            return cls(pipeline_response, None, response_headers)  # type: ignore
-
-    @distributed_trace
-    def begin_synchronize(self, resource_group_name: str, namespace_name: str, **kwargs: Any) -> LROPoller[None]:
-        """A long-running resource action.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
-        :type namespace_name: str
-        :return: An instance of LROPoller that returns None
-        :rtype: ~azure.core.polling.LROPoller[None]
-        :raises ~azure.core.exceptions.HttpResponseError:
-        """
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[None] = kwargs.pop("cls", None)
-        polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
-        lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
-        cont_token: Optional[str] = kwargs.pop("continuation_token", None)
-        if cont_token is None:
-            raw_result = self._synchronize_initial(  # type: ignore
-                resource_group_name=resource_group_name,
-                namespace_name=namespace_name,
-                cls=lambda x, y, z: x,
-                headers=_headers,
-                params=_params,
-                **kwargs
-            )
-        kwargs.pop("error_map", None)
-
-        def get_long_running_output(pipeline_response):  # pylint: disable=inconsistent-return-statements
-            if cls:
-                return cls(pipeline_response, None, {})  # type: ignore
-
-        if polling is True:
-            polling_method: PollingMethod = cast(
-                PollingMethod, ARMPolling(lro_delay, lro_options={"final-state-via": "location"}, **kwargs)
-            )
-        elif polling is False:
-            polling_method = cast(PollingMethod, NoPolling())
-        else:
-            polling_method = polling
-        if cont_token:
-            return LROPoller[None].from_continuation_token(
-                polling_method=polling_method,
-                continuation_token=cont_token,
-                client=self._client,
-                deserialization_callback=get_long_running_output,
-            )
-        return LROPoller[None](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
-
-
-class PoliciesOperations:
-    """
-    .. warning::
-        **DO NOT** instantiate this class directly.
-
-        Instead, you should access the following operations through
-        :class:`~aziotops.mgmt.PrivateDeviceRegistryManagementService`'s
-        :attr:`policies` attribute.
-    """
-
-    def __init__(self, *args, **kwargs):
-        input_args = list(args)
-        self._client = input_args.pop(0) if input_args else kwargs.pop("client")
-        self._config = input_args.pop(0) if input_args else kwargs.pop("config")
-        self._serialize = input_args.pop(0) if input_args else kwargs.pop("serializer")
-        self._deserialize = input_args.pop(0) if input_args else kwargs.pop("deserializer")
-
-    @distributed_trace
-    def list_by_subscription(self, namespace_name: str, **kwargs: Any) -> Iterable[JSON]:
-        # pylint: disable=line-too-long
-        """List Policy resources by subscription ID.
-
-        :param namespace_name: Namespace name parameter. Required.
-        :type namespace_name: str
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.paging.ItemPaged[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "certificate": {
-                            "certificateAuthorityConfiguration": {
-                                "keyType": "str",  # Crypto type: RSA or EC.
-                                  Required. "ECC"
-                                "subject": "str",  # Optional. Certificate subject.
-                                "validityNotAfter": "2020-02-20 00:00:00",  #
-                                  Optional. Certificate is valid not after this date. Format ISO8601.
-                                  Generated based on validity period.
-                                "validityNotBefore": "2020-02-20 00:00:00"  #
-                                  Optional. Certificate is valid not before this date. Format ISO8601.
-                                  Generated based on on validity period.
-                            },
-                            "leafCertificateConfiguration": {
-                                "validityPeriodInDays": 0  # The validity period in
-                                  days. Required.
-                            }
-                        },
-                        "provisioningState": "str"  # Optional. The status of the last
-                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-        """
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        error_map: MutableMapping[int, Type[HttpResponseError]] = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        def prepare_request(next_link=None):
-            if not next_link:
-
-                _request = build_policies_list_by_subscription_request(
-                    namespace_name=namespace_name,
-                    subscription_id=self._config.subscription_id,
-                    api_version=self._config.api_version,
-                    headers=_headers,
-                    params=_params,
-                )
-                _request.url = self._client.format_url(_request.url)
-
-            else:
-                # make call to next link with the client's api-version
-                _parsed_next_link = urllib.parse.urlparse(next_link)
-                _next_request_params = case_insensitive_dict(
-                    {
-                        key: [urllib.parse.quote(v) for v in value]
-                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
-                    }
-                )
-                _next_request_params["api-version"] = self._config.api_version
-                _request = HttpRequest(
-                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
-                )
-                _request.url = self._client.format_url(_request.url)
-
-            return _request
-
-        def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
-            if cls:
-                list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, iter(list_of_elem)
-
-        def get_next(next_link=None):
-            _request = prepare_request(next_link)
-
-            _stream = False
-            pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
-                _request, stream=_stream, **kwargs
-            )
-            response = pipeline_response.http_response
-
-            if response.status_code not in [200]:
-                if _stream:
-                    response.read()  # Load the body in memory and close the socket
-                map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
-
-            return pipeline_response
-
-        return ItemPaged(get_next, extract_data)
-
-    @distributed_trace
-    def list_by_resource_group(self, resource_group_name: str, namespace_name: str, **kwargs: Any) -> Iterable[JSON]:
-        # pylint: disable=line-too-long
-        """List Policy resources by Credential.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
-        :type namespace_name: str
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.paging.ItemPaged[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "certificate": {
-                            "certificateAuthorityConfiguration": {
-                                "keyType": "str",  # Crypto type: RSA or EC.
-                                  Required. "ECC"
-                                "subject": "str",  # Optional. Certificate subject.
-                                "validityNotAfter": "2020-02-20 00:00:00",  #
-                                  Optional. Certificate is valid not after this date. Format ISO8601.
-                                  Generated based on validity period.
-                                "validityNotBefore": "2020-02-20 00:00:00"  #
-                                  Optional. Certificate is valid not before this date. Format ISO8601.
-                                  Generated based on on validity period.
-                            },
-                            "leafCertificateConfiguration": {
-                                "validityPeriodInDays": 0  # The validity period in
-                                  days. Required.
-                            }
-                        },
-                        "provisioningState": "str"  # Optional. The status of the last
-                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-        """
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        error_map: MutableMapping[int, Type[HttpResponseError]] = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        def prepare_request(next_link=None):
-            if not next_link:
-
-                _request = build_policies_list_by_resource_group_request(
-                    resource_group_name=resource_group_name,
-                    namespace_name=namespace_name,
-                    subscription_id=self._config.subscription_id,
-                    api_version=self._config.api_version,
-                    headers=_headers,
-                    params=_params,
-                )
-                _request.url = self._client.format_url(_request.url)
-
-            else:
-                # make call to next link with the client's api-version
-                _parsed_next_link = urllib.parse.urlparse(next_link)
-                _next_request_params = case_insensitive_dict(
-                    {
-                        key: [urllib.parse.quote(v) for v in value]
-                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
-                    }
-                )
-                _next_request_params["api-version"] = self._config.api_version
-                _request = HttpRequest(
-                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
-                )
-                _request.url = self._client.format_url(_request.url)
-
-            return _request
-
-        def extract_data(pipeline_response):
-            deserialized = pipeline_response.http_response.json()
-            list_of_elem = deserialized["value"]
-            if cls:
-                list_of_elem = cls(list_of_elem)  # type: ignore
-            return deserialized.get("nextLink") or None, iter(list_of_elem)
-
-        def get_next(next_link=None):
-            _request = prepare_request(next_link)
-
-            _stream = False
-            pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
-                _request, stream=_stream, **kwargs
-            )
-            response = pipeline_response.http_response
-
-            if response.status_code not in [200]:
-                if _stream:
-                    response.read()  # Load the body in memory and close the socket
-                map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
-
-            return pipeline_response
-
-        return ItemPaged(get_next, extract_data)
-
-    @distributed_trace
-    def get(self, resource_group_name: str, namespace_name: str, policy_name: str, **kwargs: Any) -> JSON:
-        # pylint: disable=line-too-long
-        """Get a Policy.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
-        :type namespace_name: str
-        :param policy_name: The name of the Policy tracked resource. Required.
-        :type policy_name: str
-        :return: JSON object
-        :rtype: JSON
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "certificate": {
-                            "certificateAuthorityConfiguration": {
-                                "keyType": "str",  # Crypto type: RSA or EC.
-                                  Required. "ECC"
-                                "subject": "str",  # Optional. Certificate subject.
-                                "validityNotAfter": "2020-02-20 00:00:00",  #
-                                  Optional. Certificate is valid not after this date. Format ISO8601.
-                                  Generated based on validity period.
-                                "validityNotBefore": "2020-02-20 00:00:00"  #
-                                  Optional. Certificate is valid not before this date. Format ISO8601.
-                                  Generated based on on validity period.
-                            },
-                            "leafCertificateConfiguration": {
-                                "validityPeriodInDays": 0  # The validity period in
-                                  days. Required.
-                            }
-                        },
-                        "provisioningState": "str"  # Optional. The status of the last
-                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-        """
-        error_map: MutableMapping[int, Type[HttpResponseError]] = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        _request = build_policies_get_request(
-            resource_group_name=resource_group_name,
-            namespace_name=namespace_name,
-            policy_name=policy_name,
-            subscription_id=self._config.subscription_id,
-            api_version=self._config.api_version,
-            headers=_headers,
-            params=_params,
-        )
-        _request.url = self._client.format_url(_request.url)
-
-        _stream = False
-        pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
-            _request, stream=_stream, **kwargs
-        )
-
-        response = pipeline_response.http_response
-
-        if response.status_code not in [200]:
-            if _stream:
-                response.read()  # Load the body in memory and close the socket
-            map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
-
-        if response.content:
-            deserialized = response.json()
-        else:
-            deserialized = None
-
-        if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
-
-        return cast(JSON, deserialized)  # type: ignore
-
-    def _create_or_update_initial(
-        self,
-        resource_group_name: str,
-        namespace_name: str,
-        policy_name: str,
-        resource: Union[JSON, IO[bytes]],
-        **kwargs: Any
-    ) -> JSON:
-        error_map: MutableMapping[int, Type[HttpResponseError]] = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-        _params = kwargs.pop("params", {}) or {}
-
-        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-
-        content_type = content_type or "application/json"
-        _json = None
-        _content = None
-        if isinstance(resource, (IOBase, bytes)):
-            _content = resource
-        else:
-            _json = resource
-
-        _request = build_policies_create_or_update_request(
-            resource_group_name=resource_group_name,
-            namespace_name=namespace_name,
-            policy_name=policy_name,
-            subscription_id=self._config.subscription_id,
-            content_type=content_type,
-            api_version=self._config.api_version,
-            json=_json,
-            content=_content,
-            headers=_headers,
-            params=_params,
-        )
-        _request.url = self._client.format_url(_request.url)
-
-        _stream = False
-        pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
-            _request, stream=_stream, **kwargs
-        )
-
-        response = pipeline_response.http_response
-
-        if response.status_code not in [200, 201]:
-            if _stream:
-                response.read()  # Load the body in memory and close the socket
-            map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
-
-        response_headers = {}
-        if response.status_code == 200:
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
-
-        if response.status_code == 201:
-            response_headers["Azure-AsyncOperation"] = self._deserialize(
-                "str", response.headers.get("Azure-AsyncOperation")
-            )
-            response_headers["Retry-After"] = self._deserialize("int", response.headers.get("Retry-After"))
-
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
-
-        if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), response_headers)  # type: ignore
-
-        return cast(JSON, deserialized)  # type: ignore
-
-    @overload
-    def begin_create_or_update(
-        self,
-        resource_group_name: str,
-        namespace_name: str,
-        policy_name: str,
-        resource: JSON,
-        *,
-        content_type: str = "application/json",
-        **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
-        """Create a Policy.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
-        :type namespace_name: str
-        :param policy_name: The name of the Policy tracked resource. Required.
-        :type policy_name: str
-        :param resource: Resource create parameters. Required.
-        :type resource: JSON
-        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                resource = {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "certificate": {
-                            "certificateAuthorityConfiguration": {
-                                "keyType": "str",  # Crypto type: RSA or EC.
-                                  Required. "ECC"
-                                "subject": "str",  # Optional. Certificate subject.
-                                "validityNotAfter": "2020-02-20 00:00:00",  #
-                                  Optional. Certificate is valid not after this date. Format ISO8601.
-                                  Generated based on validity period.
-                                "validityNotBefore": "2020-02-20 00:00:00"  #
-                                  Optional. Certificate is valid not before this date. Format ISO8601.
-                                  Generated based on on validity period.
-                            },
-                            "leafCertificateConfiguration": {
-                                "validityPeriodInDays": 0  # The validity period in
-                                  days. Required.
-                            }
-                        },
-                        "provisioningState": "str"  # Optional. The status of the last
-                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-
-                # response body for status code(s): 200, 201
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "certificate": {
-                            "certificateAuthorityConfiguration": {
-                                "keyType": "str",  # Crypto type: RSA or EC.
-                                  Required. "ECC"
-                                "subject": "str",  # Optional. Certificate subject.
-                                "validityNotAfter": "2020-02-20 00:00:00",  #
-                                  Optional. Certificate is valid not after this date. Format ISO8601.
-                                  Generated based on validity period.
-                                "validityNotBefore": "2020-02-20 00:00:00"  #
-                                  Optional. Certificate is valid not before this date. Format ISO8601.
-                                  Generated based on on validity period.
-                            },
-                            "leafCertificateConfiguration": {
-                                "validityPeriodInDays": 0  # The validity period in
-                                  days. Required.
-                            }
-                        },
-                        "provisioningState": "str"  # Optional. The status of the last
-                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-        """
-
-    @overload
-    def begin_create_or_update(
-        self,
-        resource_group_name: str,
-        namespace_name: str,
-        policy_name: str,
-        resource: IO[bytes],
-        *,
-        content_type: str = "application/json",
-        **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
-        """Create a Policy.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
-        :type namespace_name: str
-        :param policy_name: The name of the Policy tracked resource. Required.
-        :type policy_name: str
-        :param resource: Resource create parameters. Required.
-        :type resource: IO[bytes]
-        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200, 201
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "certificate": {
-                            "certificateAuthorityConfiguration": {
-                                "keyType": "str",  # Crypto type: RSA or EC.
-                                  Required. "ECC"
-                                "subject": "str",  # Optional. Certificate subject.
-                                "validityNotAfter": "2020-02-20 00:00:00",  #
-                                  Optional. Certificate is valid not after this date. Format ISO8601.
-                                  Generated based on validity period.
-                                "validityNotBefore": "2020-02-20 00:00:00"  #
-                                  Optional. Certificate is valid not before this date. Format ISO8601.
-                                  Generated based on on validity period.
-                            },
-                            "leafCertificateConfiguration": {
-                                "validityPeriodInDays": 0  # The validity period in
-                                  days. Required.
-                            }
-                        },
-                        "provisioningState": "str"  # Optional. The status of the last
-                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-        """
-
-    @distributed_trace
-    def begin_create_or_update(
-        self,
-        resource_group_name: str,
-        namespace_name: str,
-        policy_name: str,
-        resource: Union[JSON, IO[bytes]],
-        **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
-        """Create a Policy.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
-        :type namespace_name: str
-        :param policy_name: The name of the Policy tracked resource. Required.
-        :type policy_name: str
-        :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
-         Required.
-        :type resource: JSON or IO[bytes]
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                resource = {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "certificate": {
-                            "certificateAuthorityConfiguration": {
-                                "keyType": "str",  # Crypto type: RSA or EC.
-                                  Required. "ECC"
-                                "subject": "str",  # Optional. Certificate subject.
-                                "validityNotAfter": "2020-02-20 00:00:00",  #
-                                  Optional. Certificate is valid not after this date. Format ISO8601.
-                                  Generated based on validity period.
-                                "validityNotBefore": "2020-02-20 00:00:00"  #
-                                  Optional. Certificate is valid not before this date. Format ISO8601.
-                                  Generated based on on validity period.
-                            },
-                            "leafCertificateConfiguration": {
-                                "validityPeriodInDays": 0  # The validity period in
-                                  days. Required.
-                            }
-                        },
-                        "provisioningState": "str"  # Optional. The status of the last
-                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-
-                # response body for status code(s): 200, 201
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "certificate": {
-                            "certificateAuthorityConfiguration": {
-                                "keyType": "str",  # Crypto type: RSA or EC.
-                                  Required. "ECC"
-                                "subject": "str",  # Optional. Certificate subject.
-                                "validityNotAfter": "2020-02-20 00:00:00",  #
-                                  Optional. Certificate is valid not after this date. Format ISO8601.
-                                  Generated based on validity period.
-                                "validityNotBefore": "2020-02-20 00:00:00"  #
-                                  Optional. Certificate is valid not before this date. Format ISO8601.
-                                  Generated based on on validity period.
-                            },
-                            "leafCertificateConfiguration": {
-                                "validityPeriodInDays": 0  # The validity period in
-                                  days. Required.
-                            }
-                        },
-                        "provisioningState": "str"  # Optional. The status of the last
-                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-        """
-        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-        _params = kwargs.pop("params", {}) or {}
-
-        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-        polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
-        lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
-        cont_token: Optional[str] = kwargs.pop("continuation_token", None)
-        if cont_token is None:
-            raw_result = self._create_or_update_initial(
-                resource_group_name=resource_group_name,
-                namespace_name=namespace_name,
-                policy_name=policy_name,
-                resource=resource,
-                content_type=content_type,
-                cls=lambda x, y, z: x,
-                headers=_headers,
-                params=_params,
-                **kwargs
-            )
-        kwargs.pop("error_map", None)
-
-        def get_long_running_output(pipeline_response):
-            response = pipeline_response.http_response
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
-            if cls:
-                return cls(pipeline_response, deserialized, {})  # type: ignore
-            return deserialized
-
-        if polling is True:
-            polling_method: PollingMethod = cast(
-                PollingMethod, ARMPolling(lro_delay, lro_options={"final-state-via": "azure-async-operation"}, **kwargs)
-            )
-        elif polling is False:
-            polling_method = cast(PollingMethod, NoPolling())
-        else:
-            polling_method = polling
-        if cont_token:
-            return LROPoller[JSON].from_continuation_token(
-                polling_method=polling_method,
-                continuation_token=cont_token,
-                client=self._client,
-                deserialization_callback=get_long_running_output,
-            )
-        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
-
-    def _update_initial(
-        self,
-        resource_group_name: str,
-        namespace_name: str,
-        policy_name: str,
-        properties: Union[JSON, IO[bytes]],
-        **kwargs: Any
-    ) -> Optional[JSON]:
-        error_map: MutableMapping[int, Type[HttpResponseError]] = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-        _params = kwargs.pop("params", {}) or {}
-
-        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[Optional[JSON]] = kwargs.pop("cls", None)
-
-        content_type = content_type or "application/json"
-        _json = None
-        _content = None
-        if isinstance(properties, (IOBase, bytes)):
-            _content = properties
-        else:
-            _json = properties
-
-        _request = build_policies_update_request(
-            resource_group_name=resource_group_name,
-            namespace_name=namespace_name,
-            policy_name=policy_name,
-            subscription_id=self._config.subscription_id,
-            content_type=content_type,
-            api_version=self._config.api_version,
-            json=_json,
-            content=_content,
-            headers=_headers,
-            params=_params,
-        )
-        _request.url = self._client.format_url(_request.url)
-
-        _stream = False
-        pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
-            _request, stream=_stream, **kwargs
-        )
-
-        response = pipeline_response.http_response
-
-        if response.status_code not in [200, 202]:
-            if _stream:
-                response.read()  # Load the body in memory and close the socket
-            map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
-
-        deserialized = None
-        response_headers = {}
-        if response.status_code == 200:
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
-
-        if response.status_code == 202:
-            response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
-            response_headers["Retry-After"] = self._deserialize("int", response.headers.get("Retry-After"))
-
-        if cls:
-            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
-
-        return deserialized  # type: ignore
-
-    @overload
-    def begin_update(
-        self,
-        resource_group_name: str,
-        namespace_name: str,
-        policy_name: str,
-        properties: JSON,
-        *,
-        content_type: str = "application/json",
-        **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
-        """Update a Policy.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
-        :type namespace_name: str
-        :param policy_name: The name of the Policy tracked resource. Required.
-        :type policy_name: str
-        :param properties: The resource properties to be updated. Required.
-        :type properties: JSON
-        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                properties = {
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "certificate": {
-                            "certificateAuthorityConfiguration": {},  # Optional. The
-                              configuration to set up an ICA.
-                            "leafCertificateConfiguration": {
-                                "validityPeriodInDays": 0  # Optional. The validity
-                                  period in days.
-                            }
-                        }
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "certificate": {
-                            "certificateAuthorityConfiguration": {
-                                "keyType": "str",  # Crypto type: RSA or EC.
-                                  Required. "ECC"
-                                "subject": "str",  # Optional. Certificate subject.
-                                "validityNotAfter": "2020-02-20 00:00:00",  #
-                                  Optional. Certificate is valid not after this date. Format ISO8601.
-                                  Generated based on validity period.
-                                "validityNotBefore": "2020-02-20 00:00:00"  #
-                                  Optional. Certificate is valid not before this date. Format ISO8601.
-                                  Generated based on on validity period.
-                            },
-                            "leafCertificateConfiguration": {
-                                "validityPeriodInDays": 0  # The validity period in
-                                  days. Required.
-                            }
-                        },
-                        "provisioningState": "str"  # Optional. The status of the last
-                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-        """
-
-    @overload
-    def begin_update(
-        self,
-        resource_group_name: str,
-        namespace_name: str,
-        policy_name: str,
-        properties: IO[bytes],
-        *,
-        content_type: str = "application/json",
-        **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
-        """Update a Policy.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
-        :type namespace_name: str
-        :param policy_name: The name of the Policy tracked resource. Required.
-        :type policy_name: str
-        :param properties: The resource properties to be updated. Required.
-        :type properties: IO[bytes]
-        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "certificate": {
-                            "certificateAuthorityConfiguration": {
-                                "keyType": "str",  # Crypto type: RSA or EC.
-                                  Required. "ECC"
-                                "subject": "str",  # Optional. Certificate subject.
-                                "validityNotAfter": "2020-02-20 00:00:00",  #
-                                  Optional. Certificate is valid not after this date. Format ISO8601.
-                                  Generated based on validity period.
-                                "validityNotBefore": "2020-02-20 00:00:00"  #
-                                  Optional. Certificate is valid not before this date. Format ISO8601.
-                                  Generated based on on validity period.
-                            },
-                            "leafCertificateConfiguration": {
-                                "validityPeriodInDays": 0  # The validity period in
-                                  days. Required.
-                            }
-                        },
-                        "provisioningState": "str"  # Optional. The status of the last
-                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-        """
-
-    @distributed_trace
-    def begin_update(
-        self,
-        resource_group_name: str,
-        namespace_name: str,
-        policy_name: str,
-        properties: Union[JSON, IO[bytes]],
-        **kwargs: Any
-    ) -> LROPoller[JSON]:
-        # pylint: disable=line-too-long
-        """Update a Policy.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
-        :type namespace_name: str
-        :param policy_name: The name of the Policy tracked resource. Required.
-        :type policy_name: str
-        :param properties: The resource properties to be updated. Is either a JSON type or a IO[bytes]
-         type. Required.
-        :type properties: JSON or IO[bytes]
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                properties = {
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "certificate": {
-                            "certificateAuthorityConfiguration": {},  # Optional. The
-                              configuration to set up an ICA.
-                            "leafCertificateConfiguration": {
-                                "validityPeriodInDays": 0  # Optional. The validity
-                                  period in days.
-                            }
-                        }
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",  # The geo-location where the resource lives. Required.
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
-                    "properties": {
-                        "certificate": {
-                            "certificateAuthorityConfiguration": {
-                                "keyType": "str",  # Crypto type: RSA or EC.
-                                  Required. "ECC"
-                                "subject": "str",  # Optional. Certificate subject.
-                                "validityNotAfter": "2020-02-20 00:00:00",  #
-                                  Optional. Certificate is valid not after this date. Format ISO8601.
-                                  Generated based on validity period.
-                                "validityNotBefore": "2020-02-20 00:00:00"  #
-                                  Optional. Certificate is valid not before this date. Format ISO8601.
-                                  Generated based on on validity period.
-                            },
-                            "leafCertificateConfiguration": {
-                                "validityPeriodInDays": 0  # The validity period in
-                                  days. Required.
-                            }
-                        },
-                        "provisioningState": "str"  # Optional. The status of the last
-                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                    },
-                    "tags": {
-                        "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
-                }
-        """
-        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-        _params = kwargs.pop("params", {}) or {}
-
-        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
-        polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
-        lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
-        cont_token: Optional[str] = kwargs.pop("continuation_token", None)
-        if cont_token is None:
-            raw_result = self._update_initial(
-                resource_group_name=resource_group_name,
-                namespace_name=namespace_name,
-                policy_name=policy_name,
-                properties=properties,
-                content_type=content_type,
-                cls=lambda x, y, z: x,
-                headers=_headers,
-                params=_params,
-                **kwargs
-            )
-        kwargs.pop("error_map", None)
-
-        def get_long_running_output(pipeline_response):
-            response = pipeline_response.http_response
-            if response.content:
-                deserialized = response.json()
-            else:
-                deserialized = None
-            if cls:
-                return cls(pipeline_response, deserialized, {})  # type: ignore
-            return deserialized
-
-        if polling is True:
-            polling_method: PollingMethod = cast(
-                PollingMethod, ARMPolling(lro_delay, lro_options={"final-state-via": "location"}, **kwargs)
-            )
-        elif polling is False:
-            polling_method = cast(PollingMethod, NoPolling())
-        else:
-            polling_method = polling
-        if cont_token:
-            return LROPoller[JSON].from_continuation_token(
-                polling_method=polling_method,
-                continuation_token=cont_token,
-                client=self._client,
-                deserialization_callback=get_long_running_output,
-            )
-        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
-
-    def _delete_initial(  # pylint: disable=inconsistent-return-statements
-        self, resource_group_name: str, namespace_name: str, policy_name: str, **kwargs: Any
-    ) -> None:
-        error_map: MutableMapping[int, Type[HttpResponseError]] = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[None] = kwargs.pop("cls", None)
-
-        _request = build_policies_delete_request(
-            resource_group_name=resource_group_name,
-            namespace_name=namespace_name,
-            policy_name=policy_name,
-            subscription_id=self._config.subscription_id,
-            api_version=self._config.api_version,
-            headers=_headers,
-            params=_params,
-        )
-        _request.url = self._client.format_url(_request.url)
-
-        _stream = False
-        pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
-            _request, stream=_stream, **kwargs
-        )
-
-        response = pipeline_response.http_response
-
-        if response.status_code not in [202, 204]:
-            if _stream:
-                response.read()  # Load the body in memory and close the socket
-            map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
-
-        response_headers = {}
-        if response.status_code == 202:
-            response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
-            response_headers["Retry-After"] = self._deserialize("int", response.headers.get("Retry-After"))
-
-        if cls:
-            return cls(pipeline_response, None, response_headers)  # type: ignore
-
-    @distributed_trace
-    def begin_delete(
-        self, resource_group_name: str, namespace_name: str, policy_name: str, **kwargs: Any
-    ) -> LROPoller[None]:
-        """Delete a Policy.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
-        :type namespace_name: str
-        :param policy_name: The name of the Policy tracked resource. Required.
-        :type policy_name: str
-        :return: An instance of LROPoller that returns None
-        :rtype: ~azure.core.polling.LROPoller[None]
-        :raises ~azure.core.exceptions.HttpResponseError:
-        """
-        _headers = kwargs.pop("headers", {}) or {}
-        _params = kwargs.pop("params", {}) or {}
-
-        cls: ClsType[None] = kwargs.pop("cls", None)
-        polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
-        lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
-        cont_token: Optional[str] = kwargs.pop("continuation_token", None)
-        if cont_token is None:
-            raw_result = self._delete_initial(  # type: ignore
-                resource_group_name=resource_group_name,
-                namespace_name=namespace_name,
-                policy_name=policy_name,
-                cls=lambda x, y, z: x,
-                headers=_headers,
-                params=_params,
-                **kwargs
-            )
-        kwargs.pop("error_map", None)
-
-        def get_long_running_output(pipeline_response):  # pylint: disable=inconsistent-return-statements
-            if cls:
-                return cls(pipeline_response, None, {})  # type: ignore
-
-        if polling is True:
-            polling_method: PollingMethod = cast(
-                PollingMethod, ARMPolling(lro_delay, lro_options={"final-state-via": "location"}, **kwargs)
-            )
-        elif polling is False:
-            polling_method = cast(PollingMethod, NoPolling())
-        else:
-            polling_method = polling
-        if cont_token:
-            return LROPoller[None].from_continuation_token(
-                polling_method=polling_method,
-                continuation_token=cont_token,
-                client=self._client,
-                deserialization_callback=get_long_running_output,
-            )
-        return LROPoller[None](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
-
-    @overload
-    def revoke_device(  # pylint: disable=inconsistent-return-statements
-        self,
-        resource_group_name: str,
-        namespace_name: str,
-        policy_name: str,
-        body: JSON,
-        *,
-        content_type: str = "application/json",
-        **kwargs: Any
-    ) -> None:
-        """A synchronous resource action that returns no content.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
-        :type namespace_name: str
-        :param policy_name: The name of the Policy tracked resource. Required.
-        :type policy_name: str
-        :param body: The content of the action request. Required.
-        :type body: JSON
-        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :return: None
-        :rtype: None
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                body = {
-                    "resourceId": "str"  # Optional. ResourceId of the device to revoke
-                      credentials for.
-                }
-        """
-
-    @overload
-    def revoke_device(  # pylint: disable=inconsistent-return-statements
-        self,
-        resource_group_name: str,
-        namespace_name: str,
-        policy_name: str,
-        body: IO[bytes],
-        *,
-        content_type: str = "application/json",
-        **kwargs: Any
-    ) -> None:
-        """A synchronous resource action that returns no content.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
-        :type namespace_name: str
-        :param policy_name: The name of the Policy tracked resource. Required.
-        :type policy_name: str
-        :param body: The content of the action request. Required.
-        :type body: IO[bytes]
-        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :return: None
-        :rtype: None
-        :raises ~azure.core.exceptions.HttpResponseError:
-        """
-
-    @distributed_trace
-    def revoke_device(  # pylint: disable=inconsistent-return-statements
-        self,
-        resource_group_name: str,
-        namespace_name: str,
-        policy_name: str,
-        body: Union[JSON, IO[bytes]],
-        **kwargs: Any
-    ) -> None:
-        """A synchronous resource action that returns no content.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
-        :type namespace_name: str
-        :param policy_name: The name of the Policy tracked resource. Required.
-        :type policy_name: str
-        :param body: The content of the action request. Is either a JSON type or a IO[bytes] type.
-         Required.
-        :type body: JSON or IO[bytes]
-        :return: None
-        :rtype: None
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                body = {
-                    "resourceId": "str"  # Optional. ResourceId of the device to revoke
-                      credentials for.
-                }
-        """
-        error_map: MutableMapping[int, Type[HttpResponseError]] = {
-            401: ClientAuthenticationError,
-            404: ResourceNotFoundError,
-            409: ResourceExistsError,
-            304: ResourceNotModifiedError,
-        }
-        error_map.update(kwargs.pop("error_map", {}) or {})
-
-        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
-        _params = kwargs.pop("params", {}) or {}
-
-        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[None] = kwargs.pop("cls", None)
-
-        content_type = content_type or "application/json"
-        _json = None
-        _content = None
-        if isinstance(body, (IOBase, bytes)):
-            _content = body
-        else:
-            _json = body
-
-        _request = build_policies_revoke_device_request(
-            resource_group_name=resource_group_name,
-            namespace_name=namespace_name,
-            policy_name=policy_name,
-            subscription_id=self._config.subscription_id,
-            content_type=content_type,
-            api_version=self._config.api_version,
-            json=_json,
-            content=_content,
-            headers=_headers,
-            params=_params,
-        )
-        _request.url = self._client.format_url(_request.url)
-
-        _stream = False
-        pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
-            _request, stream=_stream, **kwargs
-        )
-
-        response = pipeline_response.http_response
-
-        if response.status_code not in [204]:
-            if _stream:
-                response.read()  # Load the body in memory and close the socket
-            map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
-
-        if cls:
-            return cls(pipeline_response, None, {})  # type: ignore
-
-
 class SchemaRegistriesOperations:
     """
     .. warning::
         **DO NOT** instantiate this class directly.
 
         Instead, you should access the following operations through
-        :class:`~aziotops.mgmt.PrivateDeviceRegistryManagementService`'s
+        :class:`~deviceregistry.mgmt.DeviceRegistryMgmtClient`'s
         :attr:`schema_registries` attribute.
     """
 
@@ -13607,8 +10567,13 @@ class SchemaRegistriesOperations:
                 # JSON input template you can fill out and use as your body input.
                 properties = {
                     "identity": {
-                        "type": "str"  # Optional. The type of managed identity assigned to
-                          this resource. Known values are: "None" and "SystemAssigned".
+                        "type": "str",  # Type of managed service identity (either system
+                          assigned, or none). Required. Known values are: "None" and "SystemAssigned".
+                        "principalId": "str",  # Optional. The service principal ID of the
+                          system assigned identity. This property will only be provided for a system
+                          assigned identity.
+                        "tenantId": "str"  # Optional. The tenant ID of the system assigned
+                          identity. This property will only be provided for a system assigned identity.
                     },
                     "properties": {
                         "description": "str",  # Optional. Human-readable description of the
@@ -13781,8 +10746,13 @@ class SchemaRegistriesOperations:
                 # JSON input template you can fill out and use as your body input.
                 properties = {
                     "identity": {
-                        "type": "str"  # Optional. The type of managed identity assigned to
-                          this resource. Known values are: "None" and "SystemAssigned".
+                        "type": "str",  # Type of managed service identity (either system
+                          assigned, or none). Required. Known values are: "None" and "SystemAssigned".
+                        "principalId": "str",  # Optional. The service principal ID of the
+                          system assigned identity. This property will only be provided for a system
+                          assigned identity.
+                        "tenantId": "str"  # Optional. The tenant ID of the system assigned
+                          identity. This property will only be provided for a system assigned identity.
                     },
                     "properties": {
                         "description": "str",  # Optional. Human-readable description of the
@@ -14000,7 +10970,7 @@ class NamespaceAssetsOperations:
         **DO NOT** instantiate this class directly.
 
         Instead, you should access the following operations through
-        :class:`~aziotops.mgmt.PrivateDeviceRegistryManagementService`'s
+        :class:`~deviceregistry.mgmt.DeviceRegistryMgmtClient`'s
         :attr:`namespace_assets` attribute.
     """
 
@@ -14019,7 +10989,7 @@ class NamespaceAssetsOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
         :return: An iterator like instance of JSON object
         :rtype: ~azure.core.paging.ItemPaged[JSON]
@@ -14121,11 +11091,11 @@ class NamespaceAssetsOperations:
                         "enabled": bool,  # Optional. Enabled/disabled status of the asset.
                         "eventGroups": [
                             {
-                                "dataSource": "str",  # The address of the notifier
-                                  of the event group in the asset (e.g. URL) so that a client can
-                                  access the event group on the asset. Required.
                                 "name": "str",  # The name of the event group.
                                   Required.
+                                "dataSource": "str",  # Optional. The address of the
+                                  notifier of the event group in the asset (e.g. URL) so that a client
+                                  can access the event group on the asset.
                                 "defaultDestinations": [
                                     event_destination
                                 ],
@@ -14135,10 +11105,10 @@ class NamespaceAssetsOperations:
                                   publishingInterval, samplingInterval, and queueSize.
                                 "events": [
                                     {
-                                        "dataSource": "str",  # Reference to
-                                          a data source for a given event. Required.
                                         "name": "str",  # The name of the
                                           event. Required.
+                                        "dataSource": "str",  # Optional.
+                                          Reference to a data source for a given event.
                                         "destinations": [
                                             event_destination
                                         ],
@@ -14163,8 +11133,6 @@ class NamespaceAssetsOperations:
                           (in UTC) that is updated each time the resource is modified.
                         "managementGroups": [
                             {
-                                "dataSource": "str",  # Reference to a data source
-                                  for a given management group. Required.
                                 "name": "str",  # Name of the management group.
                                   Required.
                                 "actions": [
@@ -14176,9 +11144,9 @@ class NamespaceAssetsOperations:
                                         "actionConfiguration": "str",  #
                                           Optional. Stringified JSON that contains connector-specific
                                           configuration for the action.
-                                        "actionType": "str",  # Optional. The
-                                          type of the action. Known values are: "Call", "Read", and
-                                          "Write".
+                                        "actionType": "Call",  # Optional.
+                                          Default value is "Call". The type of the action. Known values
+                                          are: "Call", "Read", and "Write".
                                         "timeoutInSeconds": 0,  # Optional.
                                           Response timeout for the action.
                                         "topic": "str",  # Optional. The MQTT
@@ -14188,6 +11156,8 @@ class NamespaceAssetsOperations:
                                           type definition ID.
                                     }
                                 ],
+                                "dataSource": "str",  # Optional. Reference to a data
+                                  source for a given management group.
                                 "defaultTimeoutInSeconds": 100,  # Optional. Default
                                   value is 100. Default response timeout for all actions that are part
                                   of the management group.
@@ -14292,47 +11262,55 @@ class NamespaceAssetsOperations:
                                     }
                                 }
                             ],
-                            "events": [
+                            "eventGroups": [
                                 {
-                                    "name": "str",  # The name of the event. Must
-                                      be unique within the status.events array. This name is used to
-                                      correlate between the spec and status event information.
-                                      Required.
-                                    "error": {
-                                        "code": "str",  # Optional. Error
-                                          code for classification of errors (ex: '400', '404', '500',
-                                          etc.).
-                                        "details": [
-                                            {
+                                    "name": "str",  # The name of the event
+                                      group. Must be unique within the status.eventGroups array. This
+                                      name is used to correlate between the spec and status event group
+                                      information. Required.
+                                    "events": [
+                                        {
+                                            "name": "str",  # The name of
+                                              the event. Must be unique within the status.events array.
+                                              This name is used to correlate between the spec and
+                                              status event information. Required.
+                                            "error": {
                                                 "code": "str",  #
-                                                  Optional. Multi-part error code for classification
-                                                  and root causing of errors (ex: 400.200.100.432).
-                                                "correlationId":
-                                                  "str",  # Optional. Unique identifier for the
-                                                  transaction to aid in debugging.
-                                                "info": "str",  #
-                                                  Optional. Human-readable helpful detailed text
-                                                  context for debugging (ex: "u201cThe following
-                                                  mechanisms are supported..."u201d).
+                                                  Optional. Error code for classification of errors
+                                                  (ex: '400', '404', '500', etc.).
+                                                "details": [
+                                                    {
+                "code": "str",  # Optional. Multi-part error
+                                                          code for classification and root causing of
+                                                          errors (ex: 400.200.100.432).
+                "correlationId": "str",  # Optional. Unique
+                                                          identifier for the transaction to aid in
+                                                          debugging.
+                "info": "str",  # Optional. Human-readable
+                                                          helpful detailed text context for debugging
+                                                          (ex: "u201cThe following mechanisms are
+                                                          supported..."u201d).
+                "message": "str"  # Optional. Human-readable
+                                                          helpful error message to provide additional
+                                                          context for error (ex: "u201cAuthentication
+                                                          method not supported"u201d).
+                                                    }
+                                                ],
                                                 "message": "str"  #
                                                   Optional. Human-readable helpful error message to
-                                                  provide additional context for error (ex:
-                                                  "u201cAuthentication method not supported"u201d).
+                                                  provide additional context for error (e.g.,:
+                                                  "u201cCapability ID 'foo' does not exist"u201d).
+                                            },
+                                            "messageSchemaReference": {
+                                                "schemaName": "str",
+                                                  # The message schema name. Required.
+                "schemaRegistryNamespace": "str",  # The message
+                                                  schema registry namespace. Required.
+                                                "schemaVersion":
+                                                  "str"  # The message schema version. Required.
                                             }
-                                        ],
-                                        "message": "str"  # Optional.
-                                          Human-readable helpful error message to provide additional
-                                          context for error (e.g.,: "u201cCapability ID 'foo' does not
-                                          exist"u201d).
-                                    },
-                                    "messageSchemaReference": {
-                                        "schemaName": "str",  # The message
-                                          schema name. Required.
-                                        "schemaRegistryNamespace": "str",  #
-                                          The message schema registry namespace. Required.
-                                        "schemaVersion": "str"  # The message
-                                          schema version. Required.
-                                    }
+                                        }
+                                    ]
                                 }
                             ],
                             "managementGroups": [
@@ -14557,9 +11535,9 @@ class NamespaceAssetsOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param asset_name: Asset name parameter. Required.
+        :param asset_name: The name of the asset. Required.
         :type asset_name: str
         :return: JSON object
         :rtype: JSON
@@ -14661,11 +11639,11 @@ class NamespaceAssetsOperations:
                         "enabled": bool,  # Optional. Enabled/disabled status of the asset.
                         "eventGroups": [
                             {
-                                "dataSource": "str",  # The address of the notifier
-                                  of the event group in the asset (e.g. URL) so that a client can
-                                  access the event group on the asset. Required.
                                 "name": "str",  # The name of the event group.
                                   Required.
+                                "dataSource": "str",  # Optional. The address of the
+                                  notifier of the event group in the asset (e.g. URL) so that a client
+                                  can access the event group on the asset.
                                 "defaultDestinations": [
                                     event_destination
                                 ],
@@ -14675,10 +11653,10 @@ class NamespaceAssetsOperations:
                                   publishingInterval, samplingInterval, and queueSize.
                                 "events": [
                                     {
-                                        "dataSource": "str",  # Reference to
-                                          a data source for a given event. Required.
                                         "name": "str",  # The name of the
                                           event. Required.
+                                        "dataSource": "str",  # Optional.
+                                          Reference to a data source for a given event.
                                         "destinations": [
                                             event_destination
                                         ],
@@ -14703,8 +11681,6 @@ class NamespaceAssetsOperations:
                           (in UTC) that is updated each time the resource is modified.
                         "managementGroups": [
                             {
-                                "dataSource": "str",  # Reference to a data source
-                                  for a given management group. Required.
                                 "name": "str",  # Name of the management group.
                                   Required.
                                 "actions": [
@@ -14716,9 +11692,9 @@ class NamespaceAssetsOperations:
                                         "actionConfiguration": "str",  #
                                           Optional. Stringified JSON that contains connector-specific
                                           configuration for the action.
-                                        "actionType": "str",  # Optional. The
-                                          type of the action. Known values are: "Call", "Read", and
-                                          "Write".
+                                        "actionType": "Call",  # Optional.
+                                          Default value is "Call". The type of the action. Known values
+                                          are: "Call", "Read", and "Write".
                                         "timeoutInSeconds": 0,  # Optional.
                                           Response timeout for the action.
                                         "topic": "str",  # Optional. The MQTT
@@ -14728,6 +11704,8 @@ class NamespaceAssetsOperations:
                                           type definition ID.
                                     }
                                 ],
+                                "dataSource": "str",  # Optional. Reference to a data
+                                  source for a given management group.
                                 "defaultTimeoutInSeconds": 100,  # Optional. Default
                                   value is 100. Default response timeout for all actions that are part
                                   of the management group.
@@ -14832,47 +11810,55 @@ class NamespaceAssetsOperations:
                                     }
                                 }
                             ],
-                            "events": [
+                            "eventGroups": [
                                 {
-                                    "name": "str",  # The name of the event. Must
-                                      be unique within the status.events array. This name is used to
-                                      correlate between the spec and status event information.
-                                      Required.
-                                    "error": {
-                                        "code": "str",  # Optional. Error
-                                          code for classification of errors (ex: '400', '404', '500',
-                                          etc.).
-                                        "details": [
-                                            {
+                                    "name": "str",  # The name of the event
+                                      group. Must be unique within the status.eventGroups array. This
+                                      name is used to correlate between the spec and status event group
+                                      information. Required.
+                                    "events": [
+                                        {
+                                            "name": "str",  # The name of
+                                              the event. Must be unique within the status.events array.
+                                              This name is used to correlate between the spec and
+                                              status event information. Required.
+                                            "error": {
                                                 "code": "str",  #
-                                                  Optional. Multi-part error code for classification
-                                                  and root causing of errors (ex: 400.200.100.432).
-                                                "correlationId":
-                                                  "str",  # Optional. Unique identifier for the
-                                                  transaction to aid in debugging.
-                                                "info": "str",  #
-                                                  Optional. Human-readable helpful detailed text
-                                                  context for debugging (ex: "u201cThe following
-                                                  mechanisms are supported..."u201d).
+                                                  Optional. Error code for classification of errors
+                                                  (ex: '400', '404', '500', etc.).
+                                                "details": [
+                                                    {
+                "code": "str",  # Optional. Multi-part error
+                                                          code for classification and root causing of
+                                                          errors (ex: 400.200.100.432).
+                "correlationId": "str",  # Optional. Unique
+                                                          identifier for the transaction to aid in
+                                                          debugging.
+                "info": "str",  # Optional. Human-readable
+                                                          helpful detailed text context for debugging
+                                                          (ex: "u201cThe following mechanisms are
+                                                          supported..."u201d).
+                "message": "str"  # Optional. Human-readable
+                                                          helpful error message to provide additional
+                                                          context for error (ex: "u201cAuthentication
+                                                          method not supported"u201d).
+                                                    }
+                                                ],
                                                 "message": "str"  #
                                                   Optional. Human-readable helpful error message to
-                                                  provide additional context for error (ex:
-                                                  "u201cAuthentication method not supported"u201d).
+                                                  provide additional context for error (e.g.,:
+                                                  "u201cCapability ID 'foo' does not exist"u201d).
+                                            },
+                                            "messageSchemaReference": {
+                                                "schemaName": "str",
+                                                  # The message schema name. Required.
+                "schemaRegistryNamespace": "str",  # The message
+                                                  schema registry namespace. Required.
+                                                "schemaVersion":
+                                                  "str"  # The message schema version. Required.
                                             }
-                                        ],
-                                        "message": "str"  # Optional.
-                                          Human-readable helpful error message to provide additional
-                                          context for error (e.g.,: "u201cCapability ID 'foo' does not
-                                          exist"u201d).
-                                    },
-                                    "messageSchemaReference": {
-                                        "schemaName": "str",  # The message
-                                          schema name. Required.
-                                        "schemaRegistryNamespace": "str",  #
-                                          The message schema registry namespace. Required.
-                                        "schemaVersion": "str"  # The message
-                                          schema version. Required.
-                                    }
+                                        }
+                                    ]
                                 }
                             ],
                             "managementGroups": [
@@ -15164,9 +12150,9 @@ class NamespaceAssetsOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param asset_name: Asset name parameter. Required.
+        :param asset_name: The name of the asset. Required.
         :type asset_name: str
         :param resource: Resource create parameters. Required.
         :type resource: JSON
@@ -15273,11 +12259,11 @@ class NamespaceAssetsOperations:
                         "enabled": bool,  # Optional. Enabled/disabled status of the asset.
                         "eventGroups": [
                             {
-                                "dataSource": "str",  # The address of the notifier
-                                  of the event group in the asset (e.g. URL) so that a client can
-                                  access the event group on the asset. Required.
                                 "name": "str",  # The name of the event group.
                                   Required.
+                                "dataSource": "str",  # Optional. The address of the
+                                  notifier of the event group in the asset (e.g. URL) so that a client
+                                  can access the event group on the asset.
                                 "defaultDestinations": [
                                     event_destination
                                 ],
@@ -15287,10 +12273,10 @@ class NamespaceAssetsOperations:
                                   publishingInterval, samplingInterval, and queueSize.
                                 "events": [
                                     {
-                                        "dataSource": "str",  # Reference to
-                                          a data source for a given event. Required.
                                         "name": "str",  # The name of the
                                           event. Required.
+                                        "dataSource": "str",  # Optional.
+                                          Reference to a data source for a given event.
                                         "destinations": [
                                             event_destination
                                         ],
@@ -15315,8 +12301,6 @@ class NamespaceAssetsOperations:
                           (in UTC) that is updated each time the resource is modified.
                         "managementGroups": [
                             {
-                                "dataSource": "str",  # Reference to a data source
-                                  for a given management group. Required.
                                 "name": "str",  # Name of the management group.
                                   Required.
                                 "actions": [
@@ -15328,9 +12312,9 @@ class NamespaceAssetsOperations:
                                         "actionConfiguration": "str",  #
                                           Optional. Stringified JSON that contains connector-specific
                                           configuration for the action.
-                                        "actionType": "str",  # Optional. The
-                                          type of the action. Known values are: "Call", "Read", and
-                                          "Write".
+                                        "actionType": "Call",  # Optional.
+                                          Default value is "Call". The type of the action. Known values
+                                          are: "Call", "Read", and "Write".
                                         "timeoutInSeconds": 0,  # Optional.
                                           Response timeout for the action.
                                         "topic": "str",  # Optional. The MQTT
@@ -15340,6 +12324,8 @@ class NamespaceAssetsOperations:
                                           type definition ID.
                                     }
                                 ],
+                                "dataSource": "str",  # Optional. Reference to a data
+                                  source for a given management group.
                                 "defaultTimeoutInSeconds": 100,  # Optional. Default
                                   value is 100. Default response timeout for all actions that are part
                                   of the management group.
@@ -15444,47 +12430,55 @@ class NamespaceAssetsOperations:
                                     }
                                 }
                             ],
-                            "events": [
+                            "eventGroups": [
                                 {
-                                    "name": "str",  # The name of the event. Must
-                                      be unique within the status.events array. This name is used to
-                                      correlate between the spec and status event information.
-                                      Required.
-                                    "error": {
-                                        "code": "str",  # Optional. Error
-                                          code for classification of errors (ex: '400', '404', '500',
-                                          etc.).
-                                        "details": [
-                                            {
+                                    "name": "str",  # The name of the event
+                                      group. Must be unique within the status.eventGroups array. This
+                                      name is used to correlate between the spec and status event group
+                                      information. Required.
+                                    "events": [
+                                        {
+                                            "name": "str",  # The name of
+                                              the event. Must be unique within the status.events array.
+                                              This name is used to correlate between the spec and
+                                              status event information. Required.
+                                            "error": {
                                                 "code": "str",  #
-                                                  Optional. Multi-part error code for classification
-                                                  and root causing of errors (ex: 400.200.100.432).
-                                                "correlationId":
-                                                  "str",  # Optional. Unique identifier for the
-                                                  transaction to aid in debugging.
-                                                "info": "str",  #
-                                                  Optional. Human-readable helpful detailed text
-                                                  context for debugging (ex: "u201cThe following
-                                                  mechanisms are supported..."u201d).
+                                                  Optional. Error code for classification of errors
+                                                  (ex: '400', '404', '500', etc.).
+                                                "details": [
+                                                    {
+                "code": "str",  # Optional. Multi-part error
+                                                          code for classification and root causing of
+                                                          errors (ex: 400.200.100.432).
+                "correlationId": "str",  # Optional. Unique
+                                                          identifier for the transaction to aid in
+                                                          debugging.
+                "info": "str",  # Optional. Human-readable
+                                                          helpful detailed text context for debugging
+                                                          (ex: "u201cThe following mechanisms are
+                                                          supported..."u201d).
+                "message": "str"  # Optional. Human-readable
+                                                          helpful error message to provide additional
+                                                          context for error (ex: "u201cAuthentication
+                                                          method not supported"u201d).
+                                                    }
+                                                ],
                                                 "message": "str"  #
                                                   Optional. Human-readable helpful error message to
-                                                  provide additional context for error (ex:
-                                                  "u201cAuthentication method not supported"u201d).
+                                                  provide additional context for error (e.g.,:
+                                                  "u201cCapability ID 'foo' does not exist"u201d).
+                                            },
+                                            "messageSchemaReference": {
+                                                "schemaName": "str",
+                                                  # The message schema name. Required.
+                "schemaRegistryNamespace": "str",  # The message
+                                                  schema registry namespace. Required.
+                                                "schemaVersion":
+                                                  "str"  # The message schema version. Required.
                                             }
-                                        ],
-                                        "message": "str"  # Optional.
-                                          Human-readable helpful error message to provide additional
-                                          context for error (e.g.,: "u201cCapability ID 'foo' does not
-                                          exist"u201d).
-                                    },
-                                    "messageSchemaReference": {
-                                        "schemaName": "str",  # The message
-                                          schema name. Required.
-                                        "schemaRegistryNamespace": "str",  #
-                                          The message schema registry namespace. Required.
-                                        "schemaVersion": "str"  # The message
-                                          schema version. Required.
-                                    }
+                                        }
+                                    ]
                                 }
                             ],
                             "managementGroups": [
@@ -15725,11 +12719,11 @@ class NamespaceAssetsOperations:
                         "enabled": bool,  # Optional. Enabled/disabled status of the asset.
                         "eventGroups": [
                             {
-                                "dataSource": "str",  # The address of the notifier
-                                  of the event group in the asset (e.g. URL) so that a client can
-                                  access the event group on the asset. Required.
                                 "name": "str",  # The name of the event group.
                                   Required.
+                                "dataSource": "str",  # Optional. The address of the
+                                  notifier of the event group in the asset (e.g. URL) so that a client
+                                  can access the event group on the asset.
                                 "defaultDestinations": [
                                     event_destination
                                 ],
@@ -15739,10 +12733,10 @@ class NamespaceAssetsOperations:
                                   publishingInterval, samplingInterval, and queueSize.
                                 "events": [
                                     {
-                                        "dataSource": "str",  # Reference to
-                                          a data source for a given event. Required.
                                         "name": "str",  # The name of the
                                           event. Required.
+                                        "dataSource": "str",  # Optional.
+                                          Reference to a data source for a given event.
                                         "destinations": [
                                             event_destination
                                         ],
@@ -15767,8 +12761,6 @@ class NamespaceAssetsOperations:
                           (in UTC) that is updated each time the resource is modified.
                         "managementGroups": [
                             {
-                                "dataSource": "str",  # Reference to a data source
-                                  for a given management group. Required.
                                 "name": "str",  # Name of the management group.
                                   Required.
                                 "actions": [
@@ -15780,9 +12772,9 @@ class NamespaceAssetsOperations:
                                         "actionConfiguration": "str",  #
                                           Optional. Stringified JSON that contains connector-specific
                                           configuration for the action.
-                                        "actionType": "str",  # Optional. The
-                                          type of the action. Known values are: "Call", "Read", and
-                                          "Write".
+                                        "actionType": "Call",  # Optional.
+                                          Default value is "Call". The type of the action. Known values
+                                          are: "Call", "Read", and "Write".
                                         "timeoutInSeconds": 0,  # Optional.
                                           Response timeout for the action.
                                         "topic": "str",  # Optional. The MQTT
@@ -15792,6 +12784,8 @@ class NamespaceAssetsOperations:
                                           type definition ID.
                                     }
                                 ],
+                                "dataSource": "str",  # Optional. Reference to a data
+                                  source for a given management group.
                                 "defaultTimeoutInSeconds": 100,  # Optional. Default
                                   value is 100. Default response timeout for all actions that are part
                                   of the management group.
@@ -15896,47 +12890,55 @@ class NamespaceAssetsOperations:
                                     }
                                 }
                             ],
-                            "events": [
+                            "eventGroups": [
                                 {
-                                    "name": "str",  # The name of the event. Must
-                                      be unique within the status.events array. This name is used to
-                                      correlate between the spec and status event information.
-                                      Required.
-                                    "error": {
-                                        "code": "str",  # Optional. Error
-                                          code for classification of errors (ex: '400', '404', '500',
-                                          etc.).
-                                        "details": [
-                                            {
+                                    "name": "str",  # The name of the event
+                                      group. Must be unique within the status.eventGroups array. This
+                                      name is used to correlate between the spec and status event group
+                                      information. Required.
+                                    "events": [
+                                        {
+                                            "name": "str",  # The name of
+                                              the event. Must be unique within the status.events array.
+                                              This name is used to correlate between the spec and
+                                              status event information. Required.
+                                            "error": {
                                                 "code": "str",  #
-                                                  Optional. Multi-part error code for classification
-                                                  and root causing of errors (ex: 400.200.100.432).
-                                                "correlationId":
-                                                  "str",  # Optional. Unique identifier for the
-                                                  transaction to aid in debugging.
-                                                "info": "str",  #
-                                                  Optional. Human-readable helpful detailed text
-                                                  context for debugging (ex: "u201cThe following
-                                                  mechanisms are supported..."u201d).
+                                                  Optional. Error code for classification of errors
+                                                  (ex: '400', '404', '500', etc.).
+                                                "details": [
+                                                    {
+                "code": "str",  # Optional. Multi-part error
+                                                          code for classification and root causing of
+                                                          errors (ex: 400.200.100.432).
+                "correlationId": "str",  # Optional. Unique
+                                                          identifier for the transaction to aid in
+                                                          debugging.
+                "info": "str",  # Optional. Human-readable
+                                                          helpful detailed text context for debugging
+                                                          (ex: "u201cThe following mechanisms are
+                                                          supported..."u201d).
+                "message": "str"  # Optional. Human-readable
+                                                          helpful error message to provide additional
+                                                          context for error (ex: "u201cAuthentication
+                                                          method not supported"u201d).
+                                                    }
+                                                ],
                                                 "message": "str"  #
                                                   Optional. Human-readable helpful error message to
-                                                  provide additional context for error (ex:
-                                                  "u201cAuthentication method not supported"u201d).
+                                                  provide additional context for error (e.g.,:
+                                                  "u201cCapability ID 'foo' does not exist"u201d).
+                                            },
+                                            "messageSchemaReference": {
+                                                "schemaName": "str",
+                                                  # The message schema name. Required.
+                "schemaRegistryNamespace": "str",  # The message
+                                                  schema registry namespace. Required.
+                                                "schemaVersion":
+                                                  "str"  # The message schema version. Required.
                                             }
-                                        ],
-                                        "message": "str"  # Optional.
-                                          Human-readable helpful error message to provide additional
-                                          context for error (e.g.,: "u201cCapability ID 'foo' does not
-                                          exist"u201d).
-                                    },
-                                    "messageSchemaReference": {
-                                        "schemaName": "str",  # The message
-                                          schema name. Required.
-                                        "schemaRegistryNamespace": "str",  #
-                                          The message schema registry namespace. Required.
-                                        "schemaVersion": "str"  # The message
-                                          schema version. Required.
-                                    }
+                                        }
+                                    ]
                                 }
                             ],
                             "managementGroups": [
@@ -16102,9 +13104,9 @@ class NamespaceAssetsOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param asset_name: Asset name parameter. Required.
+        :param asset_name: The name of the asset. Required.
         :type asset_name: str
         :param resource: Resource create parameters. Required.
         :type resource: IO[bytes]
@@ -16211,11 +13213,11 @@ class NamespaceAssetsOperations:
                         "enabled": bool,  # Optional. Enabled/disabled status of the asset.
                         "eventGroups": [
                             {
-                                "dataSource": "str",  # The address of the notifier
-                                  of the event group in the asset (e.g. URL) so that a client can
-                                  access the event group on the asset. Required.
                                 "name": "str",  # The name of the event group.
                                   Required.
+                                "dataSource": "str",  # Optional. The address of the
+                                  notifier of the event group in the asset (e.g. URL) so that a client
+                                  can access the event group on the asset.
                                 "defaultDestinations": [
                                     event_destination
                                 ],
@@ -16225,10 +13227,10 @@ class NamespaceAssetsOperations:
                                   publishingInterval, samplingInterval, and queueSize.
                                 "events": [
                                     {
-                                        "dataSource": "str",  # Reference to
-                                          a data source for a given event. Required.
                                         "name": "str",  # The name of the
                                           event. Required.
+                                        "dataSource": "str",  # Optional.
+                                          Reference to a data source for a given event.
                                         "destinations": [
                                             event_destination
                                         ],
@@ -16253,8 +13255,6 @@ class NamespaceAssetsOperations:
                           (in UTC) that is updated each time the resource is modified.
                         "managementGroups": [
                             {
-                                "dataSource": "str",  # Reference to a data source
-                                  for a given management group. Required.
                                 "name": "str",  # Name of the management group.
                                   Required.
                                 "actions": [
@@ -16266,9 +13266,9 @@ class NamespaceAssetsOperations:
                                         "actionConfiguration": "str",  #
                                           Optional. Stringified JSON that contains connector-specific
                                           configuration for the action.
-                                        "actionType": "str",  # Optional. The
-                                          type of the action. Known values are: "Call", "Read", and
-                                          "Write".
+                                        "actionType": "Call",  # Optional.
+                                          Default value is "Call". The type of the action. Known values
+                                          are: "Call", "Read", and "Write".
                                         "timeoutInSeconds": 0,  # Optional.
                                           Response timeout for the action.
                                         "topic": "str",  # Optional. The MQTT
@@ -16278,6 +13278,8 @@ class NamespaceAssetsOperations:
                                           type definition ID.
                                     }
                                 ],
+                                "dataSource": "str",  # Optional. Reference to a data
+                                  source for a given management group.
                                 "defaultTimeoutInSeconds": 100,  # Optional. Default
                                   value is 100. Default response timeout for all actions that are part
                                   of the management group.
@@ -16382,47 +13384,55 @@ class NamespaceAssetsOperations:
                                     }
                                 }
                             ],
-                            "events": [
+                            "eventGroups": [
                                 {
-                                    "name": "str",  # The name of the event. Must
-                                      be unique within the status.events array. This name is used to
-                                      correlate between the spec and status event information.
-                                      Required.
-                                    "error": {
-                                        "code": "str",  # Optional. Error
-                                          code for classification of errors (ex: '400', '404', '500',
-                                          etc.).
-                                        "details": [
-                                            {
+                                    "name": "str",  # The name of the event
+                                      group. Must be unique within the status.eventGroups array. This
+                                      name is used to correlate between the spec and status event group
+                                      information. Required.
+                                    "events": [
+                                        {
+                                            "name": "str",  # The name of
+                                              the event. Must be unique within the status.events array.
+                                              This name is used to correlate between the spec and
+                                              status event information. Required.
+                                            "error": {
                                                 "code": "str",  #
-                                                  Optional. Multi-part error code for classification
-                                                  and root causing of errors (ex: 400.200.100.432).
-                                                "correlationId":
-                                                  "str",  # Optional. Unique identifier for the
-                                                  transaction to aid in debugging.
-                                                "info": "str",  #
-                                                  Optional. Human-readable helpful detailed text
-                                                  context for debugging (ex: "u201cThe following
-                                                  mechanisms are supported..."u201d).
+                                                  Optional. Error code for classification of errors
+                                                  (ex: '400', '404', '500', etc.).
+                                                "details": [
+                                                    {
+                "code": "str",  # Optional. Multi-part error
+                                                          code for classification and root causing of
+                                                          errors (ex: 400.200.100.432).
+                "correlationId": "str",  # Optional. Unique
+                                                          identifier for the transaction to aid in
+                                                          debugging.
+                "info": "str",  # Optional. Human-readable
+                                                          helpful detailed text context for debugging
+                                                          (ex: "u201cThe following mechanisms are
+                                                          supported..."u201d).
+                "message": "str"  # Optional. Human-readable
+                                                          helpful error message to provide additional
+                                                          context for error (ex: "u201cAuthentication
+                                                          method not supported"u201d).
+                                                    }
+                                                ],
                                                 "message": "str"  #
                                                   Optional. Human-readable helpful error message to
-                                                  provide additional context for error (ex:
-                                                  "u201cAuthentication method not supported"u201d).
+                                                  provide additional context for error (e.g.,:
+                                                  "u201cCapability ID 'foo' does not exist"u201d).
+                                            },
+                                            "messageSchemaReference": {
+                                                "schemaName": "str",
+                                                  # The message schema name. Required.
+                "schemaRegistryNamespace": "str",  # The message
+                                                  schema registry namespace. Required.
+                                                "schemaVersion":
+                                                  "str"  # The message schema version. Required.
                                             }
-                                        ],
-                                        "message": "str"  # Optional.
-                                          Human-readable helpful error message to provide additional
-                                          context for error (e.g.,: "u201cCapability ID 'foo' does not
-                                          exist"u201d).
-                                    },
-                                    "messageSchemaReference": {
-                                        "schemaName": "str",  # The message
-                                          schema name. Required.
-                                        "schemaRegistryNamespace": "str",  #
-                                          The message schema registry namespace. Required.
-                                        "schemaVersion": "str"  # The message
-                                          schema version. Required.
-                                    }
+                                        }
+                                    ]
                                 }
                             ],
                             "managementGroups": [
@@ -16586,9 +13596,9 @@ class NamespaceAssetsOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param asset_name: Asset name parameter. Required.
+        :param asset_name: The name of the asset. Required.
         :type asset_name: str
         :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
          Required.
@@ -16693,11 +13703,11 @@ class NamespaceAssetsOperations:
                         "enabled": bool,  # Optional. Enabled/disabled status of the asset.
                         "eventGroups": [
                             {
-                                "dataSource": "str",  # The address of the notifier
-                                  of the event group in the asset (e.g. URL) so that a client can
-                                  access the event group on the asset. Required.
                                 "name": "str",  # The name of the event group.
                                   Required.
+                                "dataSource": "str",  # Optional. The address of the
+                                  notifier of the event group in the asset (e.g. URL) so that a client
+                                  can access the event group on the asset.
                                 "defaultDestinations": [
                                     event_destination
                                 ],
@@ -16707,10 +13717,10 @@ class NamespaceAssetsOperations:
                                   publishingInterval, samplingInterval, and queueSize.
                                 "events": [
                                     {
-                                        "dataSource": "str",  # Reference to
-                                          a data source for a given event. Required.
                                         "name": "str",  # The name of the
                                           event. Required.
+                                        "dataSource": "str",  # Optional.
+                                          Reference to a data source for a given event.
                                         "destinations": [
                                             event_destination
                                         ],
@@ -16735,8 +13745,6 @@ class NamespaceAssetsOperations:
                           (in UTC) that is updated each time the resource is modified.
                         "managementGroups": [
                             {
-                                "dataSource": "str",  # Reference to a data source
-                                  for a given management group. Required.
                                 "name": "str",  # Name of the management group.
                                   Required.
                                 "actions": [
@@ -16748,9 +13756,9 @@ class NamespaceAssetsOperations:
                                         "actionConfiguration": "str",  #
                                           Optional. Stringified JSON that contains connector-specific
                                           configuration for the action.
-                                        "actionType": "str",  # Optional. The
-                                          type of the action. Known values are: "Call", "Read", and
-                                          "Write".
+                                        "actionType": "Call",  # Optional.
+                                          Default value is "Call". The type of the action. Known values
+                                          are: "Call", "Read", and "Write".
                                         "timeoutInSeconds": 0,  # Optional.
                                           Response timeout for the action.
                                         "topic": "str",  # Optional. The MQTT
@@ -16760,6 +13768,8 @@ class NamespaceAssetsOperations:
                                           type definition ID.
                                     }
                                 ],
+                                "dataSource": "str",  # Optional. Reference to a data
+                                  source for a given management group.
                                 "defaultTimeoutInSeconds": 100,  # Optional. Default
                                   value is 100. Default response timeout for all actions that are part
                                   of the management group.
@@ -16864,47 +13874,55 @@ class NamespaceAssetsOperations:
                                     }
                                 }
                             ],
-                            "events": [
+                            "eventGroups": [
                                 {
-                                    "name": "str",  # The name of the event. Must
-                                      be unique within the status.events array. This name is used to
-                                      correlate between the spec and status event information.
-                                      Required.
-                                    "error": {
-                                        "code": "str",  # Optional. Error
-                                          code for classification of errors (ex: '400', '404', '500',
-                                          etc.).
-                                        "details": [
-                                            {
+                                    "name": "str",  # The name of the event
+                                      group. Must be unique within the status.eventGroups array. This
+                                      name is used to correlate between the spec and status event group
+                                      information. Required.
+                                    "events": [
+                                        {
+                                            "name": "str",  # The name of
+                                              the event. Must be unique within the status.events array.
+                                              This name is used to correlate between the spec and
+                                              status event information. Required.
+                                            "error": {
                                                 "code": "str",  #
-                                                  Optional. Multi-part error code for classification
-                                                  and root causing of errors (ex: 400.200.100.432).
-                                                "correlationId":
-                                                  "str",  # Optional. Unique identifier for the
-                                                  transaction to aid in debugging.
-                                                "info": "str",  #
-                                                  Optional. Human-readable helpful detailed text
-                                                  context for debugging (ex: "u201cThe following
-                                                  mechanisms are supported..."u201d).
+                                                  Optional. Error code for classification of errors
+                                                  (ex: '400', '404', '500', etc.).
+                                                "details": [
+                                                    {
+                "code": "str",  # Optional. Multi-part error
+                                                          code for classification and root causing of
+                                                          errors (ex: 400.200.100.432).
+                "correlationId": "str",  # Optional. Unique
+                                                          identifier for the transaction to aid in
+                                                          debugging.
+                "info": "str",  # Optional. Human-readable
+                                                          helpful detailed text context for debugging
+                                                          (ex: "u201cThe following mechanisms are
+                                                          supported..."u201d).
+                "message": "str"  # Optional. Human-readable
+                                                          helpful error message to provide additional
+                                                          context for error (ex: "u201cAuthentication
+                                                          method not supported"u201d).
+                                                    }
+                                                ],
                                                 "message": "str"  #
                                                   Optional. Human-readable helpful error message to
-                                                  provide additional context for error (ex:
-                                                  "u201cAuthentication method not supported"u201d).
+                                                  provide additional context for error (e.g.,:
+                                                  "u201cCapability ID 'foo' does not exist"u201d).
+                                            },
+                                            "messageSchemaReference": {
+                                                "schemaName": "str",
+                                                  # The message schema name. Required.
+                "schemaRegistryNamespace": "str",  # The message
+                                                  schema registry namespace. Required.
+                                                "schemaVersion":
+                                                  "str"  # The message schema version. Required.
                                             }
-                                        ],
-                                        "message": "str"  # Optional.
-                                          Human-readable helpful error message to provide additional
-                                          context for error (e.g.,: "u201cCapability ID 'foo' does not
-                                          exist"u201d).
-                                    },
-                                    "messageSchemaReference": {
-                                        "schemaName": "str",  # The message
-                                          schema name. Required.
-                                        "schemaRegistryNamespace": "str",  #
-                                          The message schema registry namespace. Required.
-                                        "schemaVersion": "str"  # The message
-                                          schema version. Required.
-                                    }
+                                        }
+                                    ]
                                 }
                             ],
                             "managementGroups": [
@@ -17145,11 +14163,11 @@ class NamespaceAssetsOperations:
                         "enabled": bool,  # Optional. Enabled/disabled status of the asset.
                         "eventGroups": [
                             {
-                                "dataSource": "str",  # The address of the notifier
-                                  of the event group in the asset (e.g. URL) so that a client can
-                                  access the event group on the asset. Required.
                                 "name": "str",  # The name of the event group.
                                   Required.
+                                "dataSource": "str",  # Optional. The address of the
+                                  notifier of the event group in the asset (e.g. URL) so that a client
+                                  can access the event group on the asset.
                                 "defaultDestinations": [
                                     event_destination
                                 ],
@@ -17159,10 +14177,10 @@ class NamespaceAssetsOperations:
                                   publishingInterval, samplingInterval, and queueSize.
                                 "events": [
                                     {
-                                        "dataSource": "str",  # Reference to
-                                          a data source for a given event. Required.
                                         "name": "str",  # The name of the
                                           event. Required.
+                                        "dataSource": "str",  # Optional.
+                                          Reference to a data source for a given event.
                                         "destinations": [
                                             event_destination
                                         ],
@@ -17187,8 +14205,6 @@ class NamespaceAssetsOperations:
                           (in UTC) that is updated each time the resource is modified.
                         "managementGroups": [
                             {
-                                "dataSource": "str",  # Reference to a data source
-                                  for a given management group. Required.
                                 "name": "str",  # Name of the management group.
                                   Required.
                                 "actions": [
@@ -17200,9 +14216,9 @@ class NamespaceAssetsOperations:
                                         "actionConfiguration": "str",  #
                                           Optional. Stringified JSON that contains connector-specific
                                           configuration for the action.
-                                        "actionType": "str",  # Optional. The
-                                          type of the action. Known values are: "Call", "Read", and
-                                          "Write".
+                                        "actionType": "Call",  # Optional.
+                                          Default value is "Call". The type of the action. Known values
+                                          are: "Call", "Read", and "Write".
                                         "timeoutInSeconds": 0,  # Optional.
                                           Response timeout for the action.
                                         "topic": "str",  # Optional. The MQTT
@@ -17212,6 +14228,8 @@ class NamespaceAssetsOperations:
                                           type definition ID.
                                     }
                                 ],
+                                "dataSource": "str",  # Optional. Reference to a data
+                                  source for a given management group.
                                 "defaultTimeoutInSeconds": 100,  # Optional. Default
                                   value is 100. Default response timeout for all actions that are part
                                   of the management group.
@@ -17316,47 +14334,55 @@ class NamespaceAssetsOperations:
                                     }
                                 }
                             ],
-                            "events": [
+                            "eventGroups": [
                                 {
-                                    "name": "str",  # The name of the event. Must
-                                      be unique within the status.events array. This name is used to
-                                      correlate between the spec and status event information.
-                                      Required.
-                                    "error": {
-                                        "code": "str",  # Optional. Error
-                                          code for classification of errors (ex: '400', '404', '500',
-                                          etc.).
-                                        "details": [
-                                            {
+                                    "name": "str",  # The name of the event
+                                      group. Must be unique within the status.eventGroups array. This
+                                      name is used to correlate between the spec and status event group
+                                      information. Required.
+                                    "events": [
+                                        {
+                                            "name": "str",  # The name of
+                                              the event. Must be unique within the status.events array.
+                                              This name is used to correlate between the spec and
+                                              status event information. Required.
+                                            "error": {
                                                 "code": "str",  #
-                                                  Optional. Multi-part error code for classification
-                                                  and root causing of errors (ex: 400.200.100.432).
-                                                "correlationId":
-                                                  "str",  # Optional. Unique identifier for the
-                                                  transaction to aid in debugging.
-                                                "info": "str",  #
-                                                  Optional. Human-readable helpful detailed text
-                                                  context for debugging (ex: "u201cThe following
-                                                  mechanisms are supported..."u201d).
+                                                  Optional. Error code for classification of errors
+                                                  (ex: '400', '404', '500', etc.).
+                                                "details": [
+                                                    {
+                "code": "str",  # Optional. Multi-part error
+                                                          code for classification and root causing of
+                                                          errors (ex: 400.200.100.432).
+                "correlationId": "str",  # Optional. Unique
+                                                          identifier for the transaction to aid in
+                                                          debugging.
+                "info": "str",  # Optional. Human-readable
+                                                          helpful detailed text context for debugging
+                                                          (ex: "u201cThe following mechanisms are
+                                                          supported..."u201d).
+                "message": "str"  # Optional. Human-readable
+                                                          helpful error message to provide additional
+                                                          context for error (ex: "u201cAuthentication
+                                                          method not supported"u201d).
+                                                    }
+                                                ],
                                                 "message": "str"  #
                                                   Optional. Human-readable helpful error message to
-                                                  provide additional context for error (ex:
-                                                  "u201cAuthentication method not supported"u201d).
+                                                  provide additional context for error (e.g.,:
+                                                  "u201cCapability ID 'foo' does not exist"u201d).
+                                            },
+                                            "messageSchemaReference": {
+                                                "schemaName": "str",
+                                                  # The message schema name. Required.
+                "schemaRegistryNamespace": "str",  # The message
+                                                  schema registry namespace. Required.
+                                                "schemaVersion":
+                                                  "str"  # The message schema version. Required.
                                             }
-                                        ],
-                                        "message": "str"  # Optional.
-                                          Human-readable helpful error message to provide additional
-                                          context for error (e.g.,: "u201cCapability ID 'foo' does not
-                                          exist"u201d).
-                                    },
-                                    "messageSchemaReference": {
-                                        "schemaName": "str",  # The message
-                                          schema name. Required.
-                                        "schemaRegistryNamespace": "str",  #
-                                          The message schema registry namespace. Required.
-                                        "schemaVersion": "str"  # The message
-                                          schema version. Required.
-                                    }
+                                        }
+                                    ]
                                 }
                             ],
                             "managementGroups": [
@@ -17644,9 +14670,9 @@ class NamespaceAssetsOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param asset_name: Asset name parameter. Required.
+        :param asset_name: The name of the asset. Required.
         :type asset_name: str
         :param properties: The resource properties to be updated. Required.
         :type properties: JSON
@@ -17734,11 +14760,11 @@ class NamespaceAssetsOperations:
                         "enabled": bool,  # Optional. Enabled/disabled status of the asset.
                         "eventGroups": [
                             {
-                                "dataSource": "str",  # The address of the notifier
-                                  of the event group in the asset (e.g. URL) so that a client can
-                                  access the event group on the asset. Required.
                                 "name": "str",  # The name of the event group.
                                   Required.
+                                "dataSource": "str",  # Optional. The address of the
+                                  notifier of the event group in the asset (e.g. URL) so that a client
+                                  can access the event group on the asset.
                                 "defaultDestinations": [
                                     event_destination
                                 ],
@@ -17748,10 +14774,10 @@ class NamespaceAssetsOperations:
                                   publishingInterval, samplingInterval, and queueSize.
                                 "events": [
                                     {
-                                        "dataSource": "str",  # Reference to
-                                          a data source for a given event. Required.
                                         "name": "str",  # The name of the
                                           event. Required.
+                                        "dataSource": "str",  # Optional.
+                                          Reference to a data source for a given event.
                                         "destinations": [
                                             event_destination
                                         ],
@@ -17772,8 +14798,6 @@ class NamespaceAssetsOperations:
                           number.
                         "managementGroups": [
                             {
-                                "dataSource": "str",  # Reference to a data source
-                                  for a given management group. Required.
                                 "name": "str",  # Name of the management group.
                                   Required.
                                 "actions": [
@@ -17785,9 +14809,9 @@ class NamespaceAssetsOperations:
                                         "actionConfiguration": "str",  #
                                           Optional. Stringified JSON that contains connector-specific
                                           configuration for the action.
-                                        "actionType": "str",  # Optional. The
-                                          type of the action. Known values are: "Call", "Read", and
-                                          "Write".
+                                        "actionType": "Call",  # Optional.
+                                          Default value is "Call". The type of the action. Known values
+                                          are: "Call", "Read", and "Write".
                                         "timeoutInSeconds": 0,  # Optional.
                                           Response timeout for the action.
                                         "topic": "str",  # Optional. The MQTT
@@ -17797,6 +14821,8 @@ class NamespaceAssetsOperations:
                                           type definition ID.
                                     }
                                 ],
+                                "dataSource": "str",  # Optional. Reference to a data
+                                  source for a given management group.
                                 "defaultTimeoutInSeconds": 100,  # Optional. Default
                                   value is 100. Default response timeout for all actions that are part
                                   of the management group.
@@ -17930,11 +14956,11 @@ class NamespaceAssetsOperations:
                         "enabled": bool,  # Optional. Enabled/disabled status of the asset.
                         "eventGroups": [
                             {
-                                "dataSource": "str",  # The address of the notifier
-                                  of the event group in the asset (e.g. URL) so that a client can
-                                  access the event group on the asset. Required.
                                 "name": "str",  # The name of the event group.
                                   Required.
+                                "dataSource": "str",  # Optional. The address of the
+                                  notifier of the event group in the asset (e.g. URL) so that a client
+                                  can access the event group on the asset.
                                 "defaultDestinations": [
                                     event_destination
                                 ],
@@ -17944,10 +14970,10 @@ class NamespaceAssetsOperations:
                                   publishingInterval, samplingInterval, and queueSize.
                                 "events": [
                                     {
-                                        "dataSource": "str",  # Reference to
-                                          a data source for a given event. Required.
                                         "name": "str",  # The name of the
                                           event. Required.
+                                        "dataSource": "str",  # Optional.
+                                          Reference to a data source for a given event.
                                         "destinations": [
                                             event_destination
                                         ],
@@ -17972,8 +14998,6 @@ class NamespaceAssetsOperations:
                           (in UTC) that is updated each time the resource is modified.
                         "managementGroups": [
                             {
-                                "dataSource": "str",  # Reference to a data source
-                                  for a given management group. Required.
                                 "name": "str",  # Name of the management group.
                                   Required.
                                 "actions": [
@@ -17985,9 +15009,9 @@ class NamespaceAssetsOperations:
                                         "actionConfiguration": "str",  #
                                           Optional. Stringified JSON that contains connector-specific
                                           configuration for the action.
-                                        "actionType": "str",  # Optional. The
-                                          type of the action. Known values are: "Call", "Read", and
-                                          "Write".
+                                        "actionType": "Call",  # Optional.
+                                          Default value is "Call". The type of the action. Known values
+                                          are: "Call", "Read", and "Write".
                                         "timeoutInSeconds": 0,  # Optional.
                                           Response timeout for the action.
                                         "topic": "str",  # Optional. The MQTT
@@ -17997,6 +15021,8 @@ class NamespaceAssetsOperations:
                                           type definition ID.
                                     }
                                 ],
+                                "dataSource": "str",  # Optional. Reference to a data
+                                  source for a given management group.
                                 "defaultTimeoutInSeconds": 100,  # Optional. Default
                                   value is 100. Default response timeout for all actions that are part
                                   of the management group.
@@ -18101,47 +15127,55 @@ class NamespaceAssetsOperations:
                                     }
                                 }
                             ],
-                            "events": [
+                            "eventGroups": [
                                 {
-                                    "name": "str",  # The name of the event. Must
-                                      be unique within the status.events array. This name is used to
-                                      correlate between the spec and status event information.
-                                      Required.
-                                    "error": {
-                                        "code": "str",  # Optional. Error
-                                          code for classification of errors (ex: '400', '404', '500',
-                                          etc.).
-                                        "details": [
-                                            {
+                                    "name": "str",  # The name of the event
+                                      group. Must be unique within the status.eventGroups array. This
+                                      name is used to correlate between the spec and status event group
+                                      information. Required.
+                                    "events": [
+                                        {
+                                            "name": "str",  # The name of
+                                              the event. Must be unique within the status.events array.
+                                              This name is used to correlate between the spec and
+                                              status event information. Required.
+                                            "error": {
                                                 "code": "str",  #
-                                                  Optional. Multi-part error code for classification
-                                                  and root causing of errors (ex: 400.200.100.432).
-                                                "correlationId":
-                                                  "str",  # Optional. Unique identifier for the
-                                                  transaction to aid in debugging.
-                                                "info": "str",  #
-                                                  Optional. Human-readable helpful detailed text
-                                                  context for debugging (ex: "u201cThe following
-                                                  mechanisms are supported..."u201d).
+                                                  Optional. Error code for classification of errors
+                                                  (ex: '400', '404', '500', etc.).
+                                                "details": [
+                                                    {
+                "code": "str",  # Optional. Multi-part error
+                                                          code for classification and root causing of
+                                                          errors (ex: 400.200.100.432).
+                "correlationId": "str",  # Optional. Unique
+                                                          identifier for the transaction to aid in
+                                                          debugging.
+                "info": "str",  # Optional. Human-readable
+                                                          helpful detailed text context for debugging
+                                                          (ex: "u201cThe following mechanisms are
+                                                          supported..."u201d).
+                "message": "str"  # Optional. Human-readable
+                                                          helpful error message to provide additional
+                                                          context for error (ex: "u201cAuthentication
+                                                          method not supported"u201d).
+                                                    }
+                                                ],
                                                 "message": "str"  #
                                                   Optional. Human-readable helpful error message to
-                                                  provide additional context for error (ex:
-                                                  "u201cAuthentication method not supported"u201d).
+                                                  provide additional context for error (e.g.,:
+                                                  "u201cCapability ID 'foo' does not exist"u201d).
+                                            },
+                                            "messageSchemaReference": {
+                                                "schemaName": "str",
+                                                  # The message schema name. Required.
+                "schemaRegistryNamespace": "str",  # The message
+                                                  schema registry namespace. Required.
+                                                "schemaVersion":
+                                                  "str"  # The message schema version. Required.
                                             }
-                                        ],
-                                        "message": "str"  # Optional.
-                                          Human-readable helpful error message to provide additional
-                                          context for error (e.g.,: "u201cCapability ID 'foo' does not
-                                          exist"u201d).
-                                    },
-                                    "messageSchemaReference": {
-                                        "schemaName": "str",  # The message
-                                          schema name. Required.
-                                        "schemaRegistryNamespace": "str",  #
-                                          The message schema registry namespace. Required.
-                                        "schemaVersion": "str"  # The message
-                                          schema version. Required.
-                                    }
+                                        }
+                                    ]
                                 }
                             ],
                             "managementGroups": [
@@ -18307,9 +15341,9 @@ class NamespaceAssetsOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param asset_name: Asset name parameter. Required.
+        :param asset_name: The name of the asset. Required.
         :type asset_name: str
         :param properties: The resource properties to be updated. Required.
         :type properties: IO[bytes]
@@ -18416,11 +15450,11 @@ class NamespaceAssetsOperations:
                         "enabled": bool,  # Optional. Enabled/disabled status of the asset.
                         "eventGroups": [
                             {
-                                "dataSource": "str",  # The address of the notifier
-                                  of the event group in the asset (e.g. URL) so that a client can
-                                  access the event group on the asset. Required.
                                 "name": "str",  # The name of the event group.
                                   Required.
+                                "dataSource": "str",  # Optional. The address of the
+                                  notifier of the event group in the asset (e.g. URL) so that a client
+                                  can access the event group on the asset.
                                 "defaultDestinations": [
                                     event_destination
                                 ],
@@ -18430,10 +15464,10 @@ class NamespaceAssetsOperations:
                                   publishingInterval, samplingInterval, and queueSize.
                                 "events": [
                                     {
-                                        "dataSource": "str",  # Reference to
-                                          a data source for a given event. Required.
                                         "name": "str",  # The name of the
                                           event. Required.
+                                        "dataSource": "str",  # Optional.
+                                          Reference to a data source for a given event.
                                         "destinations": [
                                             event_destination
                                         ],
@@ -18458,8 +15492,6 @@ class NamespaceAssetsOperations:
                           (in UTC) that is updated each time the resource is modified.
                         "managementGroups": [
                             {
-                                "dataSource": "str",  # Reference to a data source
-                                  for a given management group. Required.
                                 "name": "str",  # Name of the management group.
                                   Required.
                                 "actions": [
@@ -18471,9 +15503,9 @@ class NamespaceAssetsOperations:
                                         "actionConfiguration": "str",  #
                                           Optional. Stringified JSON that contains connector-specific
                                           configuration for the action.
-                                        "actionType": "str",  # Optional. The
-                                          type of the action. Known values are: "Call", "Read", and
-                                          "Write".
+                                        "actionType": "Call",  # Optional.
+                                          Default value is "Call". The type of the action. Known values
+                                          are: "Call", "Read", and "Write".
                                         "timeoutInSeconds": 0,  # Optional.
                                           Response timeout for the action.
                                         "topic": "str",  # Optional. The MQTT
@@ -18483,6 +15515,8 @@ class NamespaceAssetsOperations:
                                           type definition ID.
                                     }
                                 ],
+                                "dataSource": "str",  # Optional. Reference to a data
+                                  source for a given management group.
                                 "defaultTimeoutInSeconds": 100,  # Optional. Default
                                   value is 100. Default response timeout for all actions that are part
                                   of the management group.
@@ -18587,47 +15621,55 @@ class NamespaceAssetsOperations:
                                     }
                                 }
                             ],
-                            "events": [
+                            "eventGroups": [
                                 {
-                                    "name": "str",  # The name of the event. Must
-                                      be unique within the status.events array. This name is used to
-                                      correlate between the spec and status event information.
-                                      Required.
-                                    "error": {
-                                        "code": "str",  # Optional. Error
-                                          code for classification of errors (ex: '400', '404', '500',
-                                          etc.).
-                                        "details": [
-                                            {
+                                    "name": "str",  # The name of the event
+                                      group. Must be unique within the status.eventGroups array. This
+                                      name is used to correlate between the spec and status event group
+                                      information. Required.
+                                    "events": [
+                                        {
+                                            "name": "str",  # The name of
+                                              the event. Must be unique within the status.events array.
+                                              This name is used to correlate between the spec and
+                                              status event information. Required.
+                                            "error": {
                                                 "code": "str",  #
-                                                  Optional. Multi-part error code for classification
-                                                  and root causing of errors (ex: 400.200.100.432).
-                                                "correlationId":
-                                                  "str",  # Optional. Unique identifier for the
-                                                  transaction to aid in debugging.
-                                                "info": "str",  #
-                                                  Optional. Human-readable helpful detailed text
-                                                  context for debugging (ex: "u201cThe following
-                                                  mechanisms are supported..."u201d).
+                                                  Optional. Error code for classification of errors
+                                                  (ex: '400', '404', '500', etc.).
+                                                "details": [
+                                                    {
+                "code": "str",  # Optional. Multi-part error
+                                                          code for classification and root causing of
+                                                          errors (ex: 400.200.100.432).
+                "correlationId": "str",  # Optional. Unique
+                                                          identifier for the transaction to aid in
+                                                          debugging.
+                "info": "str",  # Optional. Human-readable
+                                                          helpful detailed text context for debugging
+                                                          (ex: "u201cThe following mechanisms are
+                                                          supported..."u201d).
+                "message": "str"  # Optional. Human-readable
+                                                          helpful error message to provide additional
+                                                          context for error (ex: "u201cAuthentication
+                                                          method not supported"u201d).
+                                                    }
+                                                ],
                                                 "message": "str"  #
                                                   Optional. Human-readable helpful error message to
-                                                  provide additional context for error (ex:
-                                                  "u201cAuthentication method not supported"u201d).
+                                                  provide additional context for error (e.g.,:
+                                                  "u201cCapability ID 'foo' does not exist"u201d).
+                                            },
+                                            "messageSchemaReference": {
+                                                "schemaName": "str",
+                                                  # The message schema name. Required.
+                "schemaRegistryNamespace": "str",  # The message
+                                                  schema registry namespace. Required.
+                                                "schemaVersion":
+                                                  "str"  # The message schema version. Required.
                                             }
-                                        ],
-                                        "message": "str"  # Optional.
-                                          Human-readable helpful error message to provide additional
-                                          context for error (e.g.,: "u201cCapability ID 'foo' does not
-                                          exist"u201d).
-                                    },
-                                    "messageSchemaReference": {
-                                        "schemaName": "str",  # The message
-                                          schema name. Required.
-                                        "schemaRegistryNamespace": "str",  #
-                                          The message schema registry namespace. Required.
-                                        "schemaVersion": "str"  # The message
-                                          schema version. Required.
-                                    }
+                                        }
+                                    ]
                                 }
                             ],
                             "managementGroups": [
@@ -18791,9 +15833,9 @@ class NamespaceAssetsOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param asset_name: Asset name parameter. Required.
+        :param asset_name: The name of the asset. Required.
         :type asset_name: str
         :param properties: The resource properties to be updated. Is either a JSON type or a IO[bytes]
          type. Required.
@@ -18879,11 +15921,11 @@ class NamespaceAssetsOperations:
                         "enabled": bool,  # Optional. Enabled/disabled status of the asset.
                         "eventGroups": [
                             {
-                                "dataSource": "str",  # The address of the notifier
-                                  of the event group in the asset (e.g. URL) so that a client can
-                                  access the event group on the asset. Required.
                                 "name": "str",  # The name of the event group.
                                   Required.
+                                "dataSource": "str",  # Optional. The address of the
+                                  notifier of the event group in the asset (e.g. URL) so that a client
+                                  can access the event group on the asset.
                                 "defaultDestinations": [
                                     event_destination
                                 ],
@@ -18893,10 +15935,10 @@ class NamespaceAssetsOperations:
                                   publishingInterval, samplingInterval, and queueSize.
                                 "events": [
                                     {
-                                        "dataSource": "str",  # Reference to
-                                          a data source for a given event. Required.
                                         "name": "str",  # The name of the
                                           event. Required.
+                                        "dataSource": "str",  # Optional.
+                                          Reference to a data source for a given event.
                                         "destinations": [
                                             event_destination
                                         ],
@@ -18917,8 +15959,6 @@ class NamespaceAssetsOperations:
                           number.
                         "managementGroups": [
                             {
-                                "dataSource": "str",  # Reference to a data source
-                                  for a given management group. Required.
                                 "name": "str",  # Name of the management group.
                                   Required.
                                 "actions": [
@@ -18930,9 +15970,9 @@ class NamespaceAssetsOperations:
                                         "actionConfiguration": "str",  #
                                           Optional. Stringified JSON that contains connector-specific
                                           configuration for the action.
-                                        "actionType": "str",  # Optional. The
-                                          type of the action. Known values are: "Call", "Read", and
-                                          "Write".
+                                        "actionType": "Call",  # Optional.
+                                          Default value is "Call". The type of the action. Known values
+                                          are: "Call", "Read", and "Write".
                                         "timeoutInSeconds": 0,  # Optional.
                                           Response timeout for the action.
                                         "topic": "str",  # Optional. The MQTT
@@ -18942,6 +15982,8 @@ class NamespaceAssetsOperations:
                                           type definition ID.
                                     }
                                 ],
+                                "dataSource": "str",  # Optional. Reference to a data
+                                  source for a given management group.
                                 "defaultTimeoutInSeconds": 100,  # Optional. Default
                                   value is 100. Default response timeout for all actions that are part
                                   of the management group.
@@ -19075,11 +16117,11 @@ class NamespaceAssetsOperations:
                         "enabled": bool,  # Optional. Enabled/disabled status of the asset.
                         "eventGroups": [
                             {
-                                "dataSource": "str",  # The address of the notifier
-                                  of the event group in the asset (e.g. URL) so that a client can
-                                  access the event group on the asset. Required.
                                 "name": "str",  # The name of the event group.
                                   Required.
+                                "dataSource": "str",  # Optional. The address of the
+                                  notifier of the event group in the asset (e.g. URL) so that a client
+                                  can access the event group on the asset.
                                 "defaultDestinations": [
                                     event_destination
                                 ],
@@ -19089,10 +16131,10 @@ class NamespaceAssetsOperations:
                                   publishingInterval, samplingInterval, and queueSize.
                                 "events": [
                                     {
-                                        "dataSource": "str",  # Reference to
-                                          a data source for a given event. Required.
                                         "name": "str",  # The name of the
                                           event. Required.
+                                        "dataSource": "str",  # Optional.
+                                          Reference to a data source for a given event.
                                         "destinations": [
                                             event_destination
                                         ],
@@ -19117,8 +16159,6 @@ class NamespaceAssetsOperations:
                           (in UTC) that is updated each time the resource is modified.
                         "managementGroups": [
                             {
-                                "dataSource": "str",  # Reference to a data source
-                                  for a given management group. Required.
                                 "name": "str",  # Name of the management group.
                                   Required.
                                 "actions": [
@@ -19130,9 +16170,9 @@ class NamespaceAssetsOperations:
                                         "actionConfiguration": "str",  #
                                           Optional. Stringified JSON that contains connector-specific
                                           configuration for the action.
-                                        "actionType": "str",  # Optional. The
-                                          type of the action. Known values are: "Call", "Read", and
-                                          "Write".
+                                        "actionType": "Call",  # Optional.
+                                          Default value is "Call". The type of the action. Known values
+                                          are: "Call", "Read", and "Write".
                                         "timeoutInSeconds": 0,  # Optional.
                                           Response timeout for the action.
                                         "topic": "str",  # Optional. The MQTT
@@ -19142,6 +16182,8 @@ class NamespaceAssetsOperations:
                                           type definition ID.
                                     }
                                 ],
+                                "dataSource": "str",  # Optional. Reference to a data
+                                  source for a given management group.
                                 "defaultTimeoutInSeconds": 100,  # Optional. Default
                                   value is 100. Default response timeout for all actions that are part
                                   of the management group.
@@ -19246,47 +16288,55 @@ class NamespaceAssetsOperations:
                                     }
                                 }
                             ],
-                            "events": [
+                            "eventGroups": [
                                 {
-                                    "name": "str",  # The name of the event. Must
-                                      be unique within the status.events array. This name is used to
-                                      correlate between the spec and status event information.
-                                      Required.
-                                    "error": {
-                                        "code": "str",  # Optional. Error
-                                          code for classification of errors (ex: '400', '404', '500',
-                                          etc.).
-                                        "details": [
-                                            {
+                                    "name": "str",  # The name of the event
+                                      group. Must be unique within the status.eventGroups array. This
+                                      name is used to correlate between the spec and status event group
+                                      information. Required.
+                                    "events": [
+                                        {
+                                            "name": "str",  # The name of
+                                              the event. Must be unique within the status.events array.
+                                              This name is used to correlate between the spec and
+                                              status event information. Required.
+                                            "error": {
                                                 "code": "str",  #
-                                                  Optional. Multi-part error code for classification
-                                                  and root causing of errors (ex: 400.200.100.432).
-                                                "correlationId":
-                                                  "str",  # Optional. Unique identifier for the
-                                                  transaction to aid in debugging.
-                                                "info": "str",  #
-                                                  Optional. Human-readable helpful detailed text
-                                                  context for debugging (ex: "u201cThe following
-                                                  mechanisms are supported..."u201d).
+                                                  Optional. Error code for classification of errors
+                                                  (ex: '400', '404', '500', etc.).
+                                                "details": [
+                                                    {
+                "code": "str",  # Optional. Multi-part error
+                                                          code for classification and root causing of
+                                                          errors (ex: 400.200.100.432).
+                "correlationId": "str",  # Optional. Unique
+                                                          identifier for the transaction to aid in
+                                                          debugging.
+                "info": "str",  # Optional. Human-readable
+                                                          helpful detailed text context for debugging
+                                                          (ex: "u201cThe following mechanisms are
+                                                          supported..."u201d).
+                "message": "str"  # Optional. Human-readable
+                                                          helpful error message to provide additional
+                                                          context for error (ex: "u201cAuthentication
+                                                          method not supported"u201d).
+                                                    }
+                                                ],
                                                 "message": "str"  #
                                                   Optional. Human-readable helpful error message to
-                                                  provide additional context for error (ex:
-                                                  "u201cAuthentication method not supported"u201d).
+                                                  provide additional context for error (e.g.,:
+                                                  "u201cCapability ID 'foo' does not exist"u201d).
+                                            },
+                                            "messageSchemaReference": {
+                                                "schemaName": "str",
+                                                  # The message schema name. Required.
+                "schemaRegistryNamespace": "str",  # The message
+                                                  schema registry namespace. Required.
+                                                "schemaVersion":
+                                                  "str"  # The message schema version. Required.
                                             }
-                                        ],
-                                        "message": "str"  # Optional.
-                                          Human-readable helpful error message to provide additional
-                                          context for error (e.g.,: "u201cCapability ID 'foo' does not
-                                          exist"u201d).
-                                    },
-                                    "messageSchemaReference": {
-                                        "schemaName": "str",  # The message
-                                          schema name. Required.
-                                        "schemaRegistryNamespace": "str",  #
-                                          The message schema registry namespace. Required.
-                                        "schemaVersion": "str"  # The message
-                                          schema version. Required.
-                                    }
+                                        }
+                                    ]
                                 }
                             ],
                             "managementGroups": [
@@ -19540,9 +16590,9 @@ class NamespaceAssetsOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param asset_name: Asset name parameter. Required.
+        :param asset_name: The name of the asset. Required.
         :type asset_name: str
         :return: An instance of LROPoller that returns None
         :rtype: ~azure.core.polling.LROPoller[None]
@@ -19589,13 +16639,2402 @@ class NamespaceAssetsOperations:
         return LROPoller[None](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
 
+class CredentialsOperations:
+    """
+    .. warning::
+        **DO NOT** instantiate this class directly.
+
+        Instead, you should access the following operations through
+        :class:`~deviceregistry.mgmt.DeviceRegistryMgmtClient`'s
+        :attr:`credentials` attribute.
+    """
+
+    def __init__(self, *args, **kwargs):
+        input_args = list(args)
+        self._client = input_args.pop(0) if input_args else kwargs.pop("client")
+        self._config = input_args.pop(0) if input_args else kwargs.pop("config")
+        self._serialize = input_args.pop(0) if input_args else kwargs.pop("serializer")
+        self._deserialize = input_args.pop(0) if input_args else kwargs.pop("deserializer")
+
+    @distributed_trace
+    def list_by_resource_group(self, resource_group_name: str, namespace_name: str, **kwargs: Any) -> Iterable[JSON]:
+        # pylint: disable=line-too-long
+        """List Credential resources by Namespace.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "location": "str",  # The geo-location where the resource lives. Required.
+                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
+                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
+                    "name": "str",  # Optional. The name of the resource.
+                    "properties": {
+                        "provisioningState": "str"  # Optional. The status of the last
+                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
+                          and "Deleting".
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
+                          resource creation (UTC).
+                        "createdBy": "str",  # Optional. The identity that created the
+                          resource.
+                        "createdByType": "str",  # Optional. The type of identity that
+                          created the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
+                          of resource last modification (UTC).
+                        "lastModifiedBy": "str",  # Optional. The identity that last modified
+                          the resource.
+                        "lastModifiedByType": "str"  # Optional. The type of identity that
+                          last modified the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                    },
+                    "tags": {
+                        "str": "str"  # Optional. Resource tags.
+                    },
+                    "type": "str"  # Optional. The type of the resource. E.g.
+                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
+                }
+        """
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        error_map: MutableMapping[int, Type[HttpResponseError]] = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        def prepare_request(next_link=None):
+            if not next_link:
+
+                _request = build_credentials_list_by_resource_group_request(
+                    resource_group_name=resource_group_name,
+                    namespace_name=namespace_name,
+                    subscription_id=self._config.subscription_id,
+                    api_version=self._config.api_version,
+                    headers=_headers,
+                    params=_params,
+                )
+                _request.url = self._client.format_url(_request.url)
+
+            else:
+                # make call to next link with the client's api-version
+                _parsed_next_link = urllib.parse.urlparse(next_link)
+                _next_request_params = case_insensitive_dict(
+                    {
+                        key: [urllib.parse.quote(v) for v in value]
+                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
+                    }
+                )
+                _next_request_params["api-version"] = self._config.api_version
+                _request = HttpRequest(
+                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
+                )
+                _request.url = self._client.format_url(_request.url)
+
+            return _request
+
+        def extract_data(pipeline_response):
+            deserialized = pipeline_response.http_response.json()
+            list_of_elem = deserialized["value"]
+            if cls:
+                list_of_elem = cls(list_of_elem)  # type: ignore
+            return deserialized.get("nextLink") or None, iter(list_of_elem)
+
+        def get_next(next_link=None):
+            _request = prepare_request(next_link)
+
+            _stream = False
+            pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
+                _request, stream=_stream, **kwargs
+            )
+            response = pipeline_response.http_response
+
+            if response.status_code not in [200]:
+                if _stream:
+                    response.read()  # Load the body in memory and close the socket
+                map_error(status_code=response.status_code, response=response, error_map=error_map)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+
+            return pipeline_response
+
+        return ItemPaged(get_next, extract_data)
+
+    @distributed_trace
+    def get(self, resource_group_name: str, namespace_name: str, **kwargs: Any) -> JSON:
+        # pylint: disable=line-too-long
+        """Get a Credential.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "location": "str",  # The geo-location where the resource lives. Required.
+                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
+                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
+                    "name": "str",  # Optional. The name of the resource.
+                    "properties": {
+                        "provisioningState": "str"  # Optional. The status of the last
+                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
+                          and "Deleting".
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
+                          resource creation (UTC).
+                        "createdBy": "str",  # Optional. The identity that created the
+                          resource.
+                        "createdByType": "str",  # Optional. The type of identity that
+                          created the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
+                          of resource last modification (UTC).
+                        "lastModifiedBy": "str",  # Optional. The identity that last modified
+                          the resource.
+                        "lastModifiedByType": "str"  # Optional. The type of identity that
+                          last modified the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                    },
+                    "tags": {
+                        "str": "str"  # Optional. Resource tags.
+                    },
+                    "type": "str"  # Optional. The type of the resource. E.g.
+                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
+                }
+        """
+        error_map: MutableMapping[int, Type[HttpResponseError]] = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        _request = build_credentials_get_request(
+            resource_group_name=resource_group_name,
+            namespace_name=namespace_name,
+            subscription_id=self._config.subscription_id,
+            api_version=self._config.api_version,
+            headers=_headers,
+            params=_params,
+        )
+        _request.url = self._client.format_url(_request.url)
+
+        _stream = False
+        pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
+            _request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [200]:
+            if _stream:
+                response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+
+        if response.content:
+            deserialized = response.json()
+        else:
+            deserialized = None
+
+        if cls:
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+
+        return cast(JSON, deserialized)  # type: ignore
+
+    def _create_or_update_initial(
+        self, resource_group_name: str, namespace_name: str, resource: Union[JSON, IO[bytes]], **kwargs: Any
+    ) -> JSON:
+        error_map: MutableMapping[int, Type[HttpResponseError]] = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+        _params = kwargs.pop("params", {}) or {}
+
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(resource, (IOBase, bytes)):
+            _content = resource
+        else:
+            _json = resource
+
+        _request = build_credentials_create_or_update_request(
+            resource_group_name=resource_group_name,
+            namespace_name=namespace_name,
+            subscription_id=self._config.subscription_id,
+            content_type=content_type,
+            api_version=self._config.api_version,
+            json=_json,
+            content=_content,
+            headers=_headers,
+            params=_params,
+        )
+        _request.url = self._client.format_url(_request.url)
+
+        _stream = False
+        pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
+            _request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [200, 201]:
+            if _stream:
+                response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+
+        response_headers = {}
+        if response.status_code == 200:
+            if response.content:
+                deserialized = response.json()
+            else:
+                deserialized = None
+
+        if response.status_code == 201:
+            response_headers["Azure-AsyncOperation"] = self._deserialize(
+                "str", response.headers.get("Azure-AsyncOperation")
+            )
+            response_headers["Retry-After"] = self._deserialize("int", response.headers.get("Retry-After"))
+
+            if response.content:
+                deserialized = response.json()
+            else:
+                deserialized = None
+
+        if cls:
+            return cls(pipeline_response, cast(JSON, deserialized), response_headers)  # type: ignore
+
+        return cast(JSON, deserialized)  # type: ignore
+
+    @overload
+    def begin_create_or_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        resource: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        # pylint: disable=line-too-long
+        """Create a Credential.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                resource = {
+                    "location": "str",  # The geo-location where the resource lives. Required.
+                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
+                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
+                    "name": "str",  # Optional. The name of the resource.
+                    "properties": {
+                        "provisioningState": "str"  # Optional. The status of the last
+                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
+                          and "Deleting".
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
+                          resource creation (UTC).
+                        "createdBy": "str",  # Optional. The identity that created the
+                          resource.
+                        "createdByType": "str",  # Optional. The type of identity that
+                          created the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
+                          of resource last modification (UTC).
+                        "lastModifiedBy": "str",  # Optional. The identity that last modified
+                          the resource.
+                        "lastModifiedByType": "str"  # Optional. The type of identity that
+                          last modified the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                    },
+                    "tags": {
+                        "str": "str"  # Optional. Resource tags.
+                    },
+                    "type": "str"  # Optional. The type of the resource. E.g.
+                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "location": "str",  # The geo-location where the resource lives. Required.
+                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
+                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
+                    "name": "str",  # Optional. The name of the resource.
+                    "properties": {
+                        "provisioningState": "str"  # Optional. The status of the last
+                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
+                          and "Deleting".
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
+                          resource creation (UTC).
+                        "createdBy": "str",  # Optional. The identity that created the
+                          resource.
+                        "createdByType": "str",  # Optional. The type of identity that
+                          created the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
+                          of resource last modification (UTC).
+                        "lastModifiedBy": "str",  # Optional. The identity that last modified
+                          the resource.
+                        "lastModifiedByType": "str"  # Optional. The type of identity that
+                          last modified the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                    },
+                    "tags": {
+                        "str": "str"  # Optional. Resource tags.
+                    },
+                    "type": "str"  # Optional. The type of the resource. E.g.
+                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
+                }
+        """
+
+    @overload
+    def begin_create_or_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        resource: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        # pylint: disable=line-too-long
+        """Create a Credential.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "location": "str",  # The geo-location where the resource lives. Required.
+                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
+                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
+                    "name": "str",  # Optional. The name of the resource.
+                    "properties": {
+                        "provisioningState": "str"  # Optional. The status of the last
+                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
+                          and "Deleting".
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
+                          resource creation (UTC).
+                        "createdBy": "str",  # Optional. The identity that created the
+                          resource.
+                        "createdByType": "str",  # Optional. The type of identity that
+                          created the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
+                          of resource last modification (UTC).
+                        "lastModifiedBy": "str",  # Optional. The identity that last modified
+                          the resource.
+                        "lastModifiedByType": "str"  # Optional. The type of identity that
+                          last modified the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                    },
+                    "tags": {
+                        "str": "str"  # Optional. Resource tags.
+                    },
+                    "type": "str"  # Optional. The type of the resource. E.g.
+                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
+                }
+        """
+
+    @distributed_trace
+    def begin_create_or_update(
+        self, resource_group_name: str, namespace_name: str, resource: Union[JSON, IO[bytes]], **kwargs: Any
+    ) -> LROPoller[JSON]:
+        # pylint: disable=line-too-long
+        """Create a Credential.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type resource: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                resource = {
+                    "location": "str",  # The geo-location where the resource lives. Required.
+                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
+                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
+                    "name": "str",  # Optional. The name of the resource.
+                    "properties": {
+                        "provisioningState": "str"  # Optional. The status of the last
+                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
+                          and "Deleting".
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
+                          resource creation (UTC).
+                        "createdBy": "str",  # Optional. The identity that created the
+                          resource.
+                        "createdByType": "str",  # Optional. The type of identity that
+                          created the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
+                          of resource last modification (UTC).
+                        "lastModifiedBy": "str",  # Optional. The identity that last modified
+                          the resource.
+                        "lastModifiedByType": "str"  # Optional. The type of identity that
+                          last modified the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                    },
+                    "tags": {
+                        "str": "str"  # Optional. Resource tags.
+                    },
+                    "type": "str"  # Optional. The type of the resource. E.g.
+                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "location": "str",  # The geo-location where the resource lives. Required.
+                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
+                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
+                    "name": "str",  # Optional. The name of the resource.
+                    "properties": {
+                        "provisioningState": "str"  # Optional. The status of the last
+                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
+                          and "Deleting".
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
+                          resource creation (UTC).
+                        "createdBy": "str",  # Optional. The identity that created the
+                          resource.
+                        "createdByType": "str",  # Optional. The type of identity that
+                          created the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
+                          of resource last modification (UTC).
+                        "lastModifiedBy": "str",  # Optional. The identity that last modified
+                          the resource.
+                        "lastModifiedByType": "str"  # Optional. The type of identity that
+                          last modified the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                    },
+                    "tags": {
+                        "str": "str"  # Optional. Resource tags.
+                    },
+                    "type": "str"  # Optional. The type of the resource. E.g.
+                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
+                }
+        """
+        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+        _params = kwargs.pop("params", {}) or {}
+
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
+        lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
+        cont_token: Optional[str] = kwargs.pop("continuation_token", None)
+        if cont_token is None:
+            raw_result = self._create_or_update_initial(
+                resource_group_name=resource_group_name,
+                namespace_name=namespace_name,
+                resource=resource,
+                content_type=content_type,
+                cls=lambda x, y, z: x,
+                headers=_headers,
+                params=_params,
+                **kwargs
+            )
+        kwargs.pop("error_map", None)
+
+        def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
+            if response.content:
+                deserialized = response.json()
+            else:
+                deserialized = None
+            if cls:
+                return cls(pipeline_response, deserialized, {})  # type: ignore
+            return deserialized
+
+        if polling is True:
+            polling_method: PollingMethod = cast(
+                PollingMethod, ARMPolling(lro_delay, lro_options={"final-state-via": "azure-async-operation"}, **kwargs)
+            )
+        elif polling is False:
+            polling_method = cast(PollingMethod, NoPolling())
+        else:
+            polling_method = polling
+        if cont_token:
+            return LROPoller[JSON].from_continuation_token(
+                polling_method=polling_method,
+                continuation_token=cont_token,
+                client=self._client,
+                deserialization_callback=get_long_running_output,
+            )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
+
+    def _update_initial(
+        self, resource_group_name: str, namespace_name: str, properties: Union[JSON, IO[bytes]], **kwargs: Any
+    ) -> Optional[JSON]:
+        error_map: MutableMapping[int, Type[HttpResponseError]] = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+        _params = kwargs.pop("params", {}) or {}
+
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[Optional[JSON]] = kwargs.pop("cls", None)
+
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(properties, (IOBase, bytes)):
+            _content = properties
+        else:
+            _json = properties
+
+        _request = build_credentials_update_request(
+            resource_group_name=resource_group_name,
+            namespace_name=namespace_name,
+            subscription_id=self._config.subscription_id,
+            content_type=content_type,
+            api_version=self._config.api_version,
+            json=_json,
+            content=_content,
+            headers=_headers,
+            params=_params,
+        )
+        _request.url = self._client.format_url(_request.url)
+
+        _stream = False
+        pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
+            _request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [200, 202]:
+            if _stream:
+                response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+
+        deserialized = None
+        response_headers = {}
+        if response.status_code == 200:
+            if response.content:
+                deserialized = response.json()
+            else:
+                deserialized = None
+
+        if response.status_code == 202:
+            response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
+            response_headers["Retry-After"] = self._deserialize("int", response.headers.get("Retry-After"))
+
+        if cls:
+            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+
+        return deserialized  # type: ignore
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        properties: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        # pylint: disable=line-too-long
+        """Update a Credential.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                properties = {
+                    "tags": {
+                        "str": "str"  # Optional. Resource tags.
+                    }
+                }
+
+                # response body for status code(s): 200
+                response == {
+                    "location": "str",  # The geo-location where the resource lives. Required.
+                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
+                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
+                    "name": "str",  # Optional. The name of the resource.
+                    "properties": {
+                        "provisioningState": "str"  # Optional. The status of the last
+                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
+                          and "Deleting".
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
+                          resource creation (UTC).
+                        "createdBy": "str",  # Optional. The identity that created the
+                          resource.
+                        "createdByType": "str",  # Optional. The type of identity that
+                          created the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
+                          of resource last modification (UTC).
+                        "lastModifiedBy": "str",  # Optional. The identity that last modified
+                          the resource.
+                        "lastModifiedByType": "str"  # Optional. The type of identity that
+                          last modified the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                    },
+                    "tags": {
+                        "str": "str"  # Optional. Resource tags.
+                    },
+                    "type": "str"  # Optional. The type of the resource. E.g.
+                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
+                }
+        """
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        properties: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        # pylint: disable=line-too-long
+        """Update a Credential.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "location": "str",  # The geo-location where the resource lives. Required.
+                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
+                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
+                    "name": "str",  # Optional. The name of the resource.
+                    "properties": {
+                        "provisioningState": "str"  # Optional. The status of the last
+                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
+                          and "Deleting".
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
+                          resource creation (UTC).
+                        "createdBy": "str",  # Optional. The identity that created the
+                          resource.
+                        "createdByType": "str",  # Optional. The type of identity that
+                          created the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
+                          of resource last modification (UTC).
+                        "lastModifiedBy": "str",  # Optional. The identity that last modified
+                          the resource.
+                        "lastModifiedByType": "str"  # Optional. The type of identity that
+                          last modified the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                    },
+                    "tags": {
+                        "str": "str"  # Optional. Resource tags.
+                    },
+                    "type": "str"  # Optional. The type of the resource. E.g.
+                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
+                }
+        """
+
+    @distributed_trace
+    def begin_update(
+        self, resource_group_name: str, namespace_name: str, properties: Union[JSON, IO[bytes]], **kwargs: Any
+    ) -> LROPoller[JSON]:
+        # pylint: disable=line-too-long
+        """Update a Credential.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param properties: The resource properties to be updated. Is either a JSON type or a IO[bytes]
+         type. Required.
+        :type properties: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                properties = {
+                    "tags": {
+                        "str": "str"  # Optional. Resource tags.
+                    }
+                }
+
+                # response body for status code(s): 200
+                response == {
+                    "location": "str",  # The geo-location where the resource lives. Required.
+                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
+                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
+                    "name": "str",  # Optional. The name of the resource.
+                    "properties": {
+                        "provisioningState": "str"  # Optional. The status of the last
+                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
+                          and "Deleting".
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
+                          resource creation (UTC).
+                        "createdBy": "str",  # Optional. The identity that created the
+                          resource.
+                        "createdByType": "str",  # Optional. The type of identity that
+                          created the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
+                          of resource last modification (UTC).
+                        "lastModifiedBy": "str",  # Optional. The identity that last modified
+                          the resource.
+                        "lastModifiedByType": "str"  # Optional. The type of identity that
+                          last modified the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                    },
+                    "tags": {
+                        "str": "str"  # Optional. Resource tags.
+                    },
+                    "type": "str"  # Optional. The type of the resource. E.g.
+                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
+                }
+        """
+        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+        _params = kwargs.pop("params", {}) or {}
+
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
+        lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
+        cont_token: Optional[str] = kwargs.pop("continuation_token", None)
+        if cont_token is None:
+            raw_result = self._update_initial(
+                resource_group_name=resource_group_name,
+                namespace_name=namespace_name,
+                properties=properties,
+                content_type=content_type,
+                cls=lambda x, y, z: x,
+                headers=_headers,
+                params=_params,
+                **kwargs
+            )
+        kwargs.pop("error_map", None)
+
+        def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
+            if response.content:
+                deserialized = response.json()
+            else:
+                deserialized = None
+            if cls:
+                return cls(pipeline_response, deserialized, {})  # type: ignore
+            return deserialized
+
+        if polling is True:
+            polling_method: PollingMethod = cast(
+                PollingMethod, ARMPolling(lro_delay, lro_options={"final-state-via": "location"}, **kwargs)
+            )
+        elif polling is False:
+            polling_method = cast(PollingMethod, NoPolling())
+        else:
+            polling_method = polling
+        if cont_token:
+            return LROPoller[JSON].from_continuation_token(
+                polling_method=polling_method,
+                continuation_token=cont_token,
+                client=self._client,
+                deserialization_callback=get_long_running_output,
+            )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
+
+    def _delete_initial(  # pylint: disable=inconsistent-return-statements
+        self, resource_group_name: str, namespace_name: str, **kwargs: Any
+    ) -> None:
+        error_map: MutableMapping[int, Type[HttpResponseError]] = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[None] = kwargs.pop("cls", None)
+
+        _request = build_credentials_delete_request(
+            resource_group_name=resource_group_name,
+            namespace_name=namespace_name,
+            subscription_id=self._config.subscription_id,
+            api_version=self._config.api_version,
+            headers=_headers,
+            params=_params,
+        )
+        _request.url = self._client.format_url(_request.url)
+
+        _stream = False
+        pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
+            _request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [202, 204]:
+            if _stream:
+                response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+
+        response_headers = {}
+        if response.status_code == 202:
+            response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
+            response_headers["Retry-After"] = self._deserialize("int", response.headers.get("Retry-After"))
+
+        if cls:
+            return cls(pipeline_response, None, response_headers)  # type: ignore
+
+    @distributed_trace
+    def begin_delete(self, resource_group_name: str, namespace_name: str, **kwargs: Any) -> LROPoller[None]:
+        """Delete a Credential.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :return: An instance of LROPoller that returns None
+        :rtype: ~azure.core.polling.LROPoller[None]
+        :raises ~azure.core.exceptions.HttpResponseError:
+        """
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[None] = kwargs.pop("cls", None)
+        polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
+        lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
+        cont_token: Optional[str] = kwargs.pop("continuation_token", None)
+        if cont_token is None:
+            raw_result = self._delete_initial(  # type: ignore
+                resource_group_name=resource_group_name,
+                namespace_name=namespace_name,
+                cls=lambda x, y, z: x,
+                headers=_headers,
+                params=_params,
+                **kwargs
+            )
+        kwargs.pop("error_map", None)
+
+        def get_long_running_output(pipeline_response):  # pylint: disable=inconsistent-return-statements
+            if cls:
+                return cls(pipeline_response, None, {})  # type: ignore
+
+        if polling is True:
+            polling_method: PollingMethod = cast(
+                PollingMethod, ARMPolling(lro_delay, lro_options={"final-state-via": "location"}, **kwargs)
+            )
+        elif polling is False:
+            polling_method = cast(PollingMethod, NoPolling())
+        else:
+            polling_method = polling
+        if cont_token:
+            return LROPoller[None].from_continuation_token(
+                polling_method=polling_method,
+                continuation_token=cont_token,
+                client=self._client,
+                deserialization_callback=get_long_running_output,
+            )
+        return LROPoller[None](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
+
+    def _synchronize_initial(  # pylint: disable=inconsistent-return-statements
+        self, resource_group_name: str, namespace_name: str, **kwargs: Any
+    ) -> None:
+        error_map: MutableMapping[int, Type[HttpResponseError]] = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[None] = kwargs.pop("cls", None)
+
+        _request = build_credentials_synchronize_request(
+            resource_group_name=resource_group_name,
+            namespace_name=namespace_name,
+            subscription_id=self._config.subscription_id,
+            api_version=self._config.api_version,
+            headers=_headers,
+            params=_params,
+        )
+        _request.url = self._client.format_url(_request.url)
+
+        _stream = False
+        pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
+            _request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [202]:
+            if _stream:
+                response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+
+        response_headers = {}
+        response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
+        response_headers["Retry-After"] = self._deserialize("int", response.headers.get("Retry-After"))
+
+        if cls:
+            return cls(pipeline_response, None, response_headers)  # type: ignore
+
+    @distributed_trace
+    def begin_synchronize(self, resource_group_name: str, namespace_name: str, **kwargs: Any) -> LROPoller[None]:
+        """A long-running resource action.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :return: An instance of LROPoller that returns None
+        :rtype: ~azure.core.polling.LROPoller[None]
+        :raises ~azure.core.exceptions.HttpResponseError:
+        """
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[None] = kwargs.pop("cls", None)
+        polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
+        lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
+        cont_token: Optional[str] = kwargs.pop("continuation_token", None)
+        if cont_token is None:
+            raw_result = self._synchronize_initial(  # type: ignore
+                resource_group_name=resource_group_name,
+                namespace_name=namespace_name,
+                cls=lambda x, y, z: x,
+                headers=_headers,
+                params=_params,
+                **kwargs
+            )
+        kwargs.pop("error_map", None)
+
+        def get_long_running_output(pipeline_response):  # pylint: disable=inconsistent-return-statements
+            if cls:
+                return cls(pipeline_response, None, {})  # type: ignore
+
+        if polling is True:
+            polling_method: PollingMethod = cast(
+                PollingMethod, ARMPolling(lro_delay, lro_options={"final-state-via": "location"}, **kwargs)
+            )
+        elif polling is False:
+            polling_method = cast(PollingMethod, NoPolling())
+        else:
+            polling_method = polling
+        if cont_token:
+            return LROPoller[None].from_continuation_token(
+                polling_method=polling_method,
+                continuation_token=cont_token,
+                client=self._client,
+                deserialization_callback=get_long_running_output,
+            )
+        return LROPoller[None](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
+
+
+class PoliciesOperations:
+    """
+    .. warning::
+        **DO NOT** instantiate this class directly.
+
+        Instead, you should access the following operations through
+        :class:`~deviceregistry.mgmt.DeviceRegistryMgmtClient`'s
+        :attr:`policies` attribute.
+    """
+
+    def __init__(self, *args, **kwargs):
+        input_args = list(args)
+        self._client = input_args.pop(0) if input_args else kwargs.pop("client")
+        self._config = input_args.pop(0) if input_args else kwargs.pop("config")
+        self._serialize = input_args.pop(0) if input_args else kwargs.pop("serializer")
+        self._deserialize = input_args.pop(0) if input_args else kwargs.pop("deserializer")
+
+    @distributed_trace
+    def list_by_resource_group(self, resource_group_name: str, namespace_name: str, **kwargs: Any) -> Iterable[JSON]:
+        # pylint: disable=line-too-long
+        """List Policy resources by Credential.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :return: An iterator like instance of JSON object
+        :rtype: ~azure.core.paging.ItemPaged[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "location": "str",  # The geo-location where the resource lives. Required.
+                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
+                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
+                    "name": "str",  # Optional. The name of the resource.
+                    "properties": {
+                        "certificate": {
+                            "certificateAuthorityConfiguration": {
+                                "keyType": "str",  # Crypto type: ECC. Required.
+                                  "ECC"
+                                "subject": "str",  # Optional. Certificate subject.
+                                "validityNotAfter": "2020-02-20 00:00:00",  #
+                                  Optional. Certificate is valid not after this date. Format ISO8601.
+                                  Generated based on validity period.
+                                "validityNotBefore": "2020-02-20 00:00:00"  #
+                                  Optional. Certificate is valid not before this date. Format ISO8601.
+                                  Generated based on on validity period.
+                            },
+                            "leafCertificateConfiguration": {
+                                "validityPeriodInDays": 0  # The validity period in
+                                  days. Required.
+                            }
+                        },
+                        "provisioningState": "str"  # Optional. The status of the last
+                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
+                          and "Deleting".
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
+                          resource creation (UTC).
+                        "createdBy": "str",  # Optional. The identity that created the
+                          resource.
+                        "createdByType": "str",  # Optional. The type of identity that
+                          created the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
+                          of resource last modification (UTC).
+                        "lastModifiedBy": "str",  # Optional. The identity that last modified
+                          the resource.
+                        "lastModifiedByType": "str"  # Optional. The type of identity that
+                          last modified the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                    },
+                    "tags": {
+                        "str": "str"  # Optional. Resource tags.
+                    },
+                    "type": "str"  # Optional. The type of the resource. E.g.
+                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
+                }
+        """
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        error_map: MutableMapping[int, Type[HttpResponseError]] = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        def prepare_request(next_link=None):
+            if not next_link:
+
+                _request = build_policies_list_by_resource_group_request(
+                    resource_group_name=resource_group_name,
+                    namespace_name=namespace_name,
+                    subscription_id=self._config.subscription_id,
+                    api_version=self._config.api_version,
+                    headers=_headers,
+                    params=_params,
+                )
+                _request.url = self._client.format_url(_request.url)
+
+            else:
+                # make call to next link with the client's api-version
+                _parsed_next_link = urllib.parse.urlparse(next_link)
+                _next_request_params = case_insensitive_dict(
+                    {
+                        key: [urllib.parse.quote(v) for v in value]
+                        for key, value in urllib.parse.parse_qs(_parsed_next_link.query).items()
+                    }
+                )
+                _next_request_params["api-version"] = self._config.api_version
+                _request = HttpRequest(
+                    "GET", urllib.parse.urljoin(next_link, _parsed_next_link.path), params=_next_request_params
+                )
+                _request.url = self._client.format_url(_request.url)
+
+            return _request
+
+        def extract_data(pipeline_response):
+            deserialized = pipeline_response.http_response.json()
+            list_of_elem = deserialized["value"]
+            if cls:
+                list_of_elem = cls(list_of_elem)  # type: ignore
+            return deserialized.get("nextLink") or None, iter(list_of_elem)
+
+        def get_next(next_link=None):
+            _request = prepare_request(next_link)
+
+            _stream = False
+            pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
+                _request, stream=_stream, **kwargs
+            )
+            response = pipeline_response.http_response
+
+            if response.status_code not in [200]:
+                if _stream:
+                    response.read()  # Load the body in memory and close the socket
+                map_error(status_code=response.status_code, response=response, error_map=error_map)
+                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+
+            return pipeline_response
+
+        return ItemPaged(get_next, extract_data)
+
+    @distributed_trace
+    def get(self, resource_group_name: str, namespace_name: str, policy_name: str, **kwargs: Any) -> JSON:
+        # pylint: disable=line-too-long
+        """Get a Policy.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param policy_name: The name of the Policy tracked resource. Required.
+        :type policy_name: str
+        :return: JSON object
+        :rtype: JSON
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "location": "str",  # The geo-location where the resource lives. Required.
+                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
+                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
+                    "name": "str",  # Optional. The name of the resource.
+                    "properties": {
+                        "certificate": {
+                            "certificateAuthorityConfiguration": {
+                                "keyType": "str",  # Crypto type: ECC. Required.
+                                  "ECC"
+                                "subject": "str",  # Optional. Certificate subject.
+                                "validityNotAfter": "2020-02-20 00:00:00",  #
+                                  Optional. Certificate is valid not after this date. Format ISO8601.
+                                  Generated based on validity period.
+                                "validityNotBefore": "2020-02-20 00:00:00"  #
+                                  Optional. Certificate is valid not before this date. Format ISO8601.
+                                  Generated based on on validity period.
+                            },
+                            "leafCertificateConfiguration": {
+                                "validityPeriodInDays": 0  # The validity period in
+                                  days. Required.
+                            }
+                        },
+                        "provisioningState": "str"  # Optional. The status of the last
+                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
+                          and "Deleting".
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
+                          resource creation (UTC).
+                        "createdBy": "str",  # Optional. The identity that created the
+                          resource.
+                        "createdByType": "str",  # Optional. The type of identity that
+                          created the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
+                          of resource last modification (UTC).
+                        "lastModifiedBy": "str",  # Optional. The identity that last modified
+                          the resource.
+                        "lastModifiedByType": "str"  # Optional. The type of identity that
+                          last modified the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                    },
+                    "tags": {
+                        "str": "str"  # Optional. Resource tags.
+                    },
+                    "type": "str"  # Optional. The type of the resource. E.g.
+                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
+                }
+        """
+        error_map: MutableMapping[int, Type[HttpResponseError]] = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        _request = build_policies_get_request(
+            resource_group_name=resource_group_name,
+            namespace_name=namespace_name,
+            policy_name=policy_name,
+            subscription_id=self._config.subscription_id,
+            api_version=self._config.api_version,
+            headers=_headers,
+            params=_params,
+        )
+        _request.url = self._client.format_url(_request.url)
+
+        _stream = False
+        pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
+            _request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [200]:
+            if _stream:
+                response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+
+        if response.content:
+            deserialized = response.json()
+        else:
+            deserialized = None
+
+        if cls:
+            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+
+        return cast(JSON, deserialized)  # type: ignore
+
+    def _create_or_update_initial(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        policy_name: str,
+        resource: Union[JSON, IO[bytes]],
+        **kwargs: Any
+    ) -> JSON:
+        error_map: MutableMapping[int, Type[HttpResponseError]] = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+        _params = kwargs.pop("params", {}) or {}
+
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(resource, (IOBase, bytes)):
+            _content = resource
+        else:
+            _json = resource
+
+        _request = build_policies_create_or_update_request(
+            resource_group_name=resource_group_name,
+            namespace_name=namespace_name,
+            policy_name=policy_name,
+            subscription_id=self._config.subscription_id,
+            content_type=content_type,
+            api_version=self._config.api_version,
+            json=_json,
+            content=_content,
+            headers=_headers,
+            params=_params,
+        )
+        _request.url = self._client.format_url(_request.url)
+
+        _stream = False
+        pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
+            _request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [200, 201]:
+            if _stream:
+                response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+
+        response_headers = {}
+        if response.status_code == 200:
+            if response.content:
+                deserialized = response.json()
+            else:
+                deserialized = None
+
+        if response.status_code == 201:
+            response_headers["Azure-AsyncOperation"] = self._deserialize(
+                "str", response.headers.get("Azure-AsyncOperation")
+            )
+            response_headers["Retry-After"] = self._deserialize("int", response.headers.get("Retry-After"))
+
+            if response.content:
+                deserialized = response.json()
+            else:
+                deserialized = None
+
+        if cls:
+            return cls(pipeline_response, cast(JSON, deserialized), response_headers)  # type: ignore
+
+        return cast(JSON, deserialized)  # type: ignore
+
+    @overload
+    def begin_create_or_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        policy_name: str,
+        resource: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        # pylint: disable=line-too-long
+        """Create a Policy.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param policy_name: The name of the Policy tracked resource. Required.
+        :type policy_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                resource = {
+                    "location": "str",  # The geo-location where the resource lives. Required.
+                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
+                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
+                    "name": "str",  # Optional. The name of the resource.
+                    "properties": {
+                        "certificate": {
+                            "certificateAuthorityConfiguration": {
+                                "keyType": "str",  # Crypto type: ECC. Required.
+                                  "ECC"
+                                "subject": "str",  # Optional. Certificate subject.
+                                "validityNotAfter": "2020-02-20 00:00:00",  #
+                                  Optional. Certificate is valid not after this date. Format ISO8601.
+                                  Generated based on validity period.
+                                "validityNotBefore": "2020-02-20 00:00:00"  #
+                                  Optional. Certificate is valid not before this date. Format ISO8601.
+                                  Generated based on on validity period.
+                            },
+                            "leafCertificateConfiguration": {
+                                "validityPeriodInDays": 0  # The validity period in
+                                  days. Required.
+                            }
+                        },
+                        "provisioningState": "str"  # Optional. The status of the last
+                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
+                          and "Deleting".
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
+                          resource creation (UTC).
+                        "createdBy": "str",  # Optional. The identity that created the
+                          resource.
+                        "createdByType": "str",  # Optional. The type of identity that
+                          created the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
+                          of resource last modification (UTC).
+                        "lastModifiedBy": "str",  # Optional. The identity that last modified
+                          the resource.
+                        "lastModifiedByType": "str"  # Optional. The type of identity that
+                          last modified the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                    },
+                    "tags": {
+                        "str": "str"  # Optional. Resource tags.
+                    },
+                    "type": "str"  # Optional. The type of the resource. E.g.
+                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "location": "str",  # The geo-location where the resource lives. Required.
+                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
+                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
+                    "name": "str",  # Optional. The name of the resource.
+                    "properties": {
+                        "certificate": {
+                            "certificateAuthorityConfiguration": {
+                                "keyType": "str",  # Crypto type: ECC. Required.
+                                  "ECC"
+                                "subject": "str",  # Optional. Certificate subject.
+                                "validityNotAfter": "2020-02-20 00:00:00",  #
+                                  Optional. Certificate is valid not after this date. Format ISO8601.
+                                  Generated based on validity period.
+                                "validityNotBefore": "2020-02-20 00:00:00"  #
+                                  Optional. Certificate is valid not before this date. Format ISO8601.
+                                  Generated based on on validity period.
+                            },
+                            "leafCertificateConfiguration": {
+                                "validityPeriodInDays": 0  # The validity period in
+                                  days. Required.
+                            }
+                        },
+                        "provisioningState": "str"  # Optional. The status of the last
+                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
+                          and "Deleting".
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
+                          resource creation (UTC).
+                        "createdBy": "str",  # Optional. The identity that created the
+                          resource.
+                        "createdByType": "str",  # Optional. The type of identity that
+                          created the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
+                          of resource last modification (UTC).
+                        "lastModifiedBy": "str",  # Optional. The identity that last modified
+                          the resource.
+                        "lastModifiedByType": "str"  # Optional. The type of identity that
+                          last modified the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                    },
+                    "tags": {
+                        "str": "str"  # Optional. Resource tags.
+                    },
+                    "type": "str"  # Optional. The type of the resource. E.g.
+                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
+                }
+        """
+
+    @overload
+    def begin_create_or_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        policy_name: str,
+        resource: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        # pylint: disable=line-too-long
+        """Create a Policy.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param policy_name: The name of the Policy tracked resource. Required.
+        :type policy_name: str
+        :param resource: Resource create parameters. Required.
+        :type resource: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "location": "str",  # The geo-location where the resource lives. Required.
+                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
+                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
+                    "name": "str",  # Optional. The name of the resource.
+                    "properties": {
+                        "certificate": {
+                            "certificateAuthorityConfiguration": {
+                                "keyType": "str",  # Crypto type: ECC. Required.
+                                  "ECC"
+                                "subject": "str",  # Optional. Certificate subject.
+                                "validityNotAfter": "2020-02-20 00:00:00",  #
+                                  Optional. Certificate is valid not after this date. Format ISO8601.
+                                  Generated based on validity period.
+                                "validityNotBefore": "2020-02-20 00:00:00"  #
+                                  Optional. Certificate is valid not before this date. Format ISO8601.
+                                  Generated based on on validity period.
+                            },
+                            "leafCertificateConfiguration": {
+                                "validityPeriodInDays": 0  # The validity period in
+                                  days. Required.
+                            }
+                        },
+                        "provisioningState": "str"  # Optional. The status of the last
+                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
+                          and "Deleting".
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
+                          resource creation (UTC).
+                        "createdBy": "str",  # Optional. The identity that created the
+                          resource.
+                        "createdByType": "str",  # Optional. The type of identity that
+                          created the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
+                          of resource last modification (UTC).
+                        "lastModifiedBy": "str",  # Optional. The identity that last modified
+                          the resource.
+                        "lastModifiedByType": "str"  # Optional. The type of identity that
+                          last modified the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                    },
+                    "tags": {
+                        "str": "str"  # Optional. Resource tags.
+                    },
+                    "type": "str"  # Optional. The type of the resource. E.g.
+                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
+                }
+        """
+
+    @distributed_trace
+    def begin_create_or_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        policy_name: str,
+        resource: Union[JSON, IO[bytes]],
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        # pylint: disable=line-too-long
+        """Create a Policy.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param policy_name: The name of the Policy tracked resource. Required.
+        :type policy_name: str
+        :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
+         Required.
+        :type resource: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                resource = {
+                    "location": "str",  # The geo-location where the resource lives. Required.
+                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
+                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
+                    "name": "str",  # Optional. The name of the resource.
+                    "properties": {
+                        "certificate": {
+                            "certificateAuthorityConfiguration": {
+                                "keyType": "str",  # Crypto type: ECC. Required.
+                                  "ECC"
+                                "subject": "str",  # Optional. Certificate subject.
+                                "validityNotAfter": "2020-02-20 00:00:00",  #
+                                  Optional. Certificate is valid not after this date. Format ISO8601.
+                                  Generated based on validity period.
+                                "validityNotBefore": "2020-02-20 00:00:00"  #
+                                  Optional. Certificate is valid not before this date. Format ISO8601.
+                                  Generated based on on validity period.
+                            },
+                            "leafCertificateConfiguration": {
+                                "validityPeriodInDays": 0  # The validity period in
+                                  days. Required.
+                            }
+                        },
+                        "provisioningState": "str"  # Optional. The status of the last
+                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
+                          and "Deleting".
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
+                          resource creation (UTC).
+                        "createdBy": "str",  # Optional. The identity that created the
+                          resource.
+                        "createdByType": "str",  # Optional. The type of identity that
+                          created the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
+                          of resource last modification (UTC).
+                        "lastModifiedBy": "str",  # Optional. The identity that last modified
+                          the resource.
+                        "lastModifiedByType": "str"  # Optional. The type of identity that
+                          last modified the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                    },
+                    "tags": {
+                        "str": "str"  # Optional. Resource tags.
+                    },
+                    "type": "str"  # Optional. The type of the resource. E.g.
+                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
+                }
+
+                # response body for status code(s): 200, 201
+                response == {
+                    "location": "str",  # The geo-location where the resource lives. Required.
+                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
+                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
+                    "name": "str",  # Optional. The name of the resource.
+                    "properties": {
+                        "certificate": {
+                            "certificateAuthorityConfiguration": {
+                                "keyType": "str",  # Crypto type: ECC. Required.
+                                  "ECC"
+                                "subject": "str",  # Optional. Certificate subject.
+                                "validityNotAfter": "2020-02-20 00:00:00",  #
+                                  Optional. Certificate is valid not after this date. Format ISO8601.
+                                  Generated based on validity period.
+                                "validityNotBefore": "2020-02-20 00:00:00"  #
+                                  Optional. Certificate is valid not before this date. Format ISO8601.
+                                  Generated based on on validity period.
+                            },
+                            "leafCertificateConfiguration": {
+                                "validityPeriodInDays": 0  # The validity period in
+                                  days. Required.
+                            }
+                        },
+                        "provisioningState": "str"  # Optional. The status of the last
+                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
+                          and "Deleting".
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
+                          resource creation (UTC).
+                        "createdBy": "str",  # Optional. The identity that created the
+                          resource.
+                        "createdByType": "str",  # Optional. The type of identity that
+                          created the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
+                          of resource last modification (UTC).
+                        "lastModifiedBy": "str",  # Optional. The identity that last modified
+                          the resource.
+                        "lastModifiedByType": "str"  # Optional. The type of identity that
+                          last modified the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                    },
+                    "tags": {
+                        "str": "str"  # Optional. Resource tags.
+                    },
+                    "type": "str"  # Optional. The type of the resource. E.g.
+                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
+                }
+        """
+        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+        _params = kwargs.pop("params", {}) or {}
+
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
+        lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
+        cont_token: Optional[str] = kwargs.pop("continuation_token", None)
+        if cont_token is None:
+            raw_result = self._create_or_update_initial(
+                resource_group_name=resource_group_name,
+                namespace_name=namespace_name,
+                policy_name=policy_name,
+                resource=resource,
+                content_type=content_type,
+                cls=lambda x, y, z: x,
+                headers=_headers,
+                params=_params,
+                **kwargs
+            )
+        kwargs.pop("error_map", None)
+
+        def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
+            if response.content:
+                deserialized = response.json()
+            else:
+                deserialized = None
+            if cls:
+                return cls(pipeline_response, deserialized, {})  # type: ignore
+            return deserialized
+
+        if polling is True:
+            polling_method: PollingMethod = cast(
+                PollingMethod, ARMPolling(lro_delay, lro_options={"final-state-via": "azure-async-operation"}, **kwargs)
+            )
+        elif polling is False:
+            polling_method = cast(PollingMethod, NoPolling())
+        else:
+            polling_method = polling
+        if cont_token:
+            return LROPoller[JSON].from_continuation_token(
+                polling_method=polling_method,
+                continuation_token=cont_token,
+                client=self._client,
+                deserialization_callback=get_long_running_output,
+            )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
+
+    def _update_initial(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        policy_name: str,
+        properties: Union[JSON, IO[bytes]],
+        **kwargs: Any
+    ) -> Optional[JSON]:
+        error_map: MutableMapping[int, Type[HttpResponseError]] = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+        _params = kwargs.pop("params", {}) or {}
+
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[Optional[JSON]] = kwargs.pop("cls", None)
+
+        content_type = content_type or "application/json"
+        _json = None
+        _content = None
+        if isinstance(properties, (IOBase, bytes)):
+            _content = properties
+        else:
+            _json = properties
+
+        _request = build_policies_update_request(
+            resource_group_name=resource_group_name,
+            namespace_name=namespace_name,
+            policy_name=policy_name,
+            subscription_id=self._config.subscription_id,
+            content_type=content_type,
+            api_version=self._config.api_version,
+            json=_json,
+            content=_content,
+            headers=_headers,
+            params=_params,
+        )
+        _request.url = self._client.format_url(_request.url)
+
+        _stream = False
+        pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
+            _request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [200, 202]:
+            if _stream:
+                response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+
+        deserialized = None
+        response_headers = {}
+        if response.status_code == 200:
+            if response.content:
+                deserialized = response.json()
+            else:
+                deserialized = None
+
+        if response.status_code == 202:
+            response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
+            response_headers["Retry-After"] = self._deserialize("int", response.headers.get("Retry-After"))
+
+        if cls:
+            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
+
+        return deserialized  # type: ignore
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        policy_name: str,
+        properties: JSON,
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        # pylint: disable=line-too-long
+        """Update a Policy.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param policy_name: The name of the Policy tracked resource. Required.
+        :type policy_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: JSON
+        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                properties = {
+                    "properties": {
+                        "certificate": {
+                            "certificateAuthorityConfiguration": {},  # Optional. The
+                              configuration to set up an ICA.
+                            "leafCertificateConfiguration": {
+                                "validityPeriodInDays": 0  # Optional. The validity
+                                  period in days.
+                            }
+                        }
+                    },
+                    "tags": {
+                        "str": "str"  # Optional. Resource tags.
+                    }
+                }
+
+                # response body for status code(s): 200
+                response == {
+                    "location": "str",  # The geo-location where the resource lives. Required.
+                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
+                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
+                    "name": "str",  # Optional. The name of the resource.
+                    "properties": {
+                        "certificate": {
+                            "certificateAuthorityConfiguration": {
+                                "keyType": "str",  # Crypto type: ECC. Required.
+                                  "ECC"
+                                "subject": "str",  # Optional. Certificate subject.
+                                "validityNotAfter": "2020-02-20 00:00:00",  #
+                                  Optional. Certificate is valid not after this date. Format ISO8601.
+                                  Generated based on validity period.
+                                "validityNotBefore": "2020-02-20 00:00:00"  #
+                                  Optional. Certificate is valid not before this date. Format ISO8601.
+                                  Generated based on on validity period.
+                            },
+                            "leafCertificateConfiguration": {
+                                "validityPeriodInDays": 0  # The validity period in
+                                  days. Required.
+                            }
+                        },
+                        "provisioningState": "str"  # Optional. The status of the last
+                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
+                          and "Deleting".
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
+                          resource creation (UTC).
+                        "createdBy": "str",  # Optional. The identity that created the
+                          resource.
+                        "createdByType": "str",  # Optional. The type of identity that
+                          created the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
+                          of resource last modification (UTC).
+                        "lastModifiedBy": "str",  # Optional. The identity that last modified
+                          the resource.
+                        "lastModifiedByType": "str"  # Optional. The type of identity that
+                          last modified the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                    },
+                    "tags": {
+                        "str": "str"  # Optional. Resource tags.
+                    },
+                    "type": "str"  # Optional. The type of the resource. E.g.
+                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
+                }
+        """
+
+    @overload
+    def begin_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        policy_name: str,
+        properties: IO[bytes],
+        *,
+        content_type: str = "application/json",
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        # pylint: disable=line-too-long
+        """Update a Policy.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param policy_name: The name of the Policy tracked resource. Required.
+        :type policy_name: str
+        :param properties: The resource properties to be updated. Required.
+        :type properties: IO[bytes]
+        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
+         Default value is "application/json".
+        :paramtype content_type: str
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # response body for status code(s): 200
+                response == {
+                    "location": "str",  # The geo-location where the resource lives. Required.
+                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
+                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
+                    "name": "str",  # Optional. The name of the resource.
+                    "properties": {
+                        "certificate": {
+                            "certificateAuthorityConfiguration": {
+                                "keyType": "str",  # Crypto type: ECC. Required.
+                                  "ECC"
+                                "subject": "str",  # Optional. Certificate subject.
+                                "validityNotAfter": "2020-02-20 00:00:00",  #
+                                  Optional. Certificate is valid not after this date. Format ISO8601.
+                                  Generated based on validity period.
+                                "validityNotBefore": "2020-02-20 00:00:00"  #
+                                  Optional. Certificate is valid not before this date. Format ISO8601.
+                                  Generated based on on validity period.
+                            },
+                            "leafCertificateConfiguration": {
+                                "validityPeriodInDays": 0  # The validity period in
+                                  days. Required.
+                            }
+                        },
+                        "provisioningState": "str"  # Optional. The status of the last
+                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
+                          and "Deleting".
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
+                          resource creation (UTC).
+                        "createdBy": "str",  # Optional. The identity that created the
+                          resource.
+                        "createdByType": "str",  # Optional. The type of identity that
+                          created the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
+                          of resource last modification (UTC).
+                        "lastModifiedBy": "str",  # Optional. The identity that last modified
+                          the resource.
+                        "lastModifiedByType": "str"  # Optional. The type of identity that
+                          last modified the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                    },
+                    "tags": {
+                        "str": "str"  # Optional. Resource tags.
+                    },
+                    "type": "str"  # Optional. The type of the resource. E.g.
+                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
+                }
+        """
+
+    @distributed_trace
+    def begin_update(
+        self,
+        resource_group_name: str,
+        namespace_name: str,
+        policy_name: str,
+        properties: Union[JSON, IO[bytes]],
+        **kwargs: Any
+    ) -> LROPoller[JSON]:
+        # pylint: disable=line-too-long
+        """Update a Policy.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param policy_name: The name of the Policy tracked resource. Required.
+        :type policy_name: str
+        :param properties: The resource properties to be updated. Is either a JSON type or a IO[bytes]
+         type. Required.
+        :type properties: JSON or IO[bytes]
+        :return: An instance of LROPoller that returns JSON object
+        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :raises ~azure.core.exceptions.HttpResponseError:
+
+        Example:
+            .. code-block:: python
+
+                # JSON input template you can fill out and use as your body input.
+                properties = {
+                    "properties": {
+                        "certificate": {
+                            "certificateAuthorityConfiguration": {},  # Optional. The
+                              configuration to set up an ICA.
+                            "leafCertificateConfiguration": {
+                                "validityPeriodInDays": 0  # Optional. The validity
+                                  period in days.
+                            }
+                        }
+                    },
+                    "tags": {
+                        "str": "str"  # Optional. Resource tags.
+                    }
+                }
+
+                # response body for status code(s): 200
+                response == {
+                    "location": "str",  # The geo-location where the resource lives. Required.
+                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
+                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
+                    "name": "str",  # Optional. The name of the resource.
+                    "properties": {
+                        "certificate": {
+                            "certificateAuthorityConfiguration": {
+                                "keyType": "str",  # Crypto type: ECC. Required.
+                                  "ECC"
+                                "subject": "str",  # Optional. Certificate subject.
+                                "validityNotAfter": "2020-02-20 00:00:00",  #
+                                  Optional. Certificate is valid not after this date. Format ISO8601.
+                                  Generated based on validity period.
+                                "validityNotBefore": "2020-02-20 00:00:00"  #
+                                  Optional. Certificate is valid not before this date. Format ISO8601.
+                                  Generated based on on validity period.
+                            },
+                            "leafCertificateConfiguration": {
+                                "validityPeriodInDays": 0  # The validity period in
+                                  days. Required.
+                            }
+                        },
+                        "provisioningState": "str"  # Optional. The status of the last
+                          operation. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
+                          and "Deleting".
+                    },
+                    "systemData": {
+                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
+                          resource creation (UTC).
+                        "createdBy": "str",  # Optional. The identity that created the
+                          resource.
+                        "createdByType": "str",  # Optional. The type of identity that
+                          created the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
+                          of resource last modification (UTC).
+                        "lastModifiedBy": "str",  # Optional. The identity that last modified
+                          the resource.
+                        "lastModifiedByType": "str"  # Optional. The type of identity that
+                          last modified the resource. Known values are: "User", "Application",
+                          "ManagedIdentity", and "Key".
+                    },
+                    "tags": {
+                        "str": "str"  # Optional. Resource tags.
+                    },
+                    "type": "str"  # Optional. The type of the resource. E.g.
+                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
+                }
+        """
+        _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
+        _params = kwargs.pop("params", {}) or {}
+
+        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
+        lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
+        cont_token: Optional[str] = kwargs.pop("continuation_token", None)
+        if cont_token is None:
+            raw_result = self._update_initial(
+                resource_group_name=resource_group_name,
+                namespace_name=namespace_name,
+                policy_name=policy_name,
+                properties=properties,
+                content_type=content_type,
+                cls=lambda x, y, z: x,
+                headers=_headers,
+                params=_params,
+                **kwargs
+            )
+        kwargs.pop("error_map", None)
+
+        def get_long_running_output(pipeline_response):
+            response = pipeline_response.http_response
+            if response.content:
+                deserialized = response.json()
+            else:
+                deserialized = None
+            if cls:
+                return cls(pipeline_response, deserialized, {})  # type: ignore
+            return deserialized
+
+        if polling is True:
+            polling_method: PollingMethod = cast(
+                PollingMethod, ARMPolling(lro_delay, lro_options={"final-state-via": "location"}, **kwargs)
+            )
+        elif polling is False:
+            polling_method = cast(PollingMethod, NoPolling())
+        else:
+            polling_method = polling
+        if cont_token:
+            return LROPoller[JSON].from_continuation_token(
+                polling_method=polling_method,
+                continuation_token=cont_token,
+                client=self._client,
+                deserialization_callback=get_long_running_output,
+            )
+        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
+
+    def _delete_initial(  # pylint: disable=inconsistent-return-statements
+        self, resource_group_name: str, namespace_name: str, policy_name: str, **kwargs: Any
+    ) -> None:
+        error_map: MutableMapping[int, Type[HttpResponseError]] = {
+            401: ClientAuthenticationError,
+            404: ResourceNotFoundError,
+            409: ResourceExistsError,
+            304: ResourceNotModifiedError,
+        }
+        error_map.update(kwargs.pop("error_map", {}) or {})
+
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[None] = kwargs.pop("cls", None)
+
+        _request = build_policies_delete_request(
+            resource_group_name=resource_group_name,
+            namespace_name=namespace_name,
+            policy_name=policy_name,
+            subscription_id=self._config.subscription_id,
+            api_version=self._config.api_version,
+            headers=_headers,
+            params=_params,
+        )
+        _request.url = self._client.format_url(_request.url)
+
+        _stream = False
+        pipeline_response: PipelineResponse = self._client._pipeline.run(  # pylint: disable=protected-access
+            _request, stream=_stream, **kwargs
+        )
+
+        response = pipeline_response.http_response
+
+        if response.status_code not in [202, 204]:
+            if _stream:
+                response.read()  # Load the body in memory and close the socket
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+
+        response_headers = {}
+        if response.status_code == 202:
+            response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
+            response_headers["Retry-After"] = self._deserialize("int", response.headers.get("Retry-After"))
+
+        if cls:
+            return cls(pipeline_response, None, response_headers)  # type: ignore
+
+    @distributed_trace
+    def begin_delete(
+        self, resource_group_name: str, namespace_name: str, policy_name: str, **kwargs: Any
+    ) -> LROPoller[None]:
+        """Delete a Policy.
+
+        :param resource_group_name: The name of the resource group. The name is case insensitive.
+         Required.
+        :type resource_group_name: str
+        :param namespace_name: The name of the namespace. Required.
+        :type namespace_name: str
+        :param policy_name: The name of the Policy tracked resource. Required.
+        :type policy_name: str
+        :return: An instance of LROPoller that returns None
+        :rtype: ~azure.core.polling.LROPoller[None]
+        :raises ~azure.core.exceptions.HttpResponseError:
+        """
+        _headers = kwargs.pop("headers", {}) or {}
+        _params = kwargs.pop("params", {}) or {}
+
+        cls: ClsType[None] = kwargs.pop("cls", None)
+        polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
+        lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
+        cont_token: Optional[str] = kwargs.pop("continuation_token", None)
+        if cont_token is None:
+            raw_result = self._delete_initial(  # type: ignore
+                resource_group_name=resource_group_name,
+                namespace_name=namespace_name,
+                policy_name=policy_name,
+                cls=lambda x, y, z: x,
+                headers=_headers,
+                params=_params,
+                **kwargs
+            )
+        kwargs.pop("error_map", None)
+
+        def get_long_running_output(pipeline_response):  # pylint: disable=inconsistent-return-statements
+            if cls:
+                return cls(pipeline_response, None, {})  # type: ignore
+
+        if polling is True:
+            polling_method: PollingMethod = cast(
+                PollingMethod, ARMPolling(lro_delay, lro_options={"final-state-via": "location"}, **kwargs)
+            )
+        elif polling is False:
+            polling_method = cast(PollingMethod, NoPolling())
+        else:
+            polling_method = polling
+        if cont_token:
+            return LROPoller[None].from_continuation_token(
+                polling_method=polling_method,
+                continuation_token=cont_token,
+                client=self._client,
+                deserialization_callback=get_long_running_output,
+            )
+        return LROPoller[None](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
+
+
 class NamespaceDevicesOperations:
     """
     .. warning::
         **DO NOT** instantiate this class directly.
 
         Instead, you should access the following operations through
-        :class:`~aziotops.mgmt.PrivateDeviceRegistryManagementService`'s
+        :class:`~deviceregistry.mgmt.DeviceRegistryMgmtClient`'s
         :attr:`namespace_devices` attribute.
     """
 
@@ -19614,7 +19053,7 @@ class NamespaceDevicesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
         :return: An iterator like instance of JSON object
         :rtype: ~azure.core.paging.ItemPaged[JSON]
@@ -19643,20 +19082,24 @@ class NamespaceDevicesOperations:
                           Populated only if the device had been created from discovery flow. Discovered
                           device name must be provided.
                         "enabled": True,  # Optional. Default value is True. Indicates if the
-                          resource and identity are enabled or not. A disabled device cannot
-                          authenticate with AAD.
+                          resource is enabled or not.
                         "endpoints": {
                             "inbound": {
                                 "str": {
-                                    "address": "str",  # Fully qualified domain
-                                      name. Required.
+                                    "address": "str",  # The endpoint address &
+                                      port. This can be either an IP address (e.g., 192.168.1.1) or a
+                                      fully qualified domain name (FQDN, e.g., server.example.com).
+                                      Required.
+                                    "endpointType": "str",  # Type of connection
+                                      endpoint. Required.
                                     "additionalConfiguration": "str",  #
-                                      Optional. Stringified JSON that contains connectivity type
-                                      specific further configuration (e.g. OPC UA, Modbus, ONVIF).
+                                      Optional. Stringified JSON that contains configuration to be used
+                                      by the connector (e.g., OPC UA, ONVIF).
                                     "authentication": {
                                         "method": "str",  # Defines the
-                                          authentication method. Required. Known values are:
-                                          "Anonymous", "Certificate", and "UsernamePassword".
+                                          method to authenticate the user of the client at the server.
+                                          Required. Known values are: "Anonymous", "Certificate", and
+                                          "UsernamePassword".
                                         "usernamePasswordCredentials": {
                                             "passwordSecretName": "str",
                                               # The name of the secret containing the password.
@@ -19667,22 +19110,20 @@ class NamespaceDevicesOperations:
                                         },
                                         "x509Credentials": {
                                             "certificateSecretName":
-                                              "str"  # The name of the secret containing the
+                                              "str",  # The name of the secret containing the
                                               certificate and private key (e.g. stored as .der/.pem or
                                               .der/.pfx). Required.
+                "intermediateCertificatesSecretName": "str",  # Optional.
+                                              The name of the secret containing the combined
+                                              intermediate certificates in PEM format.
+                                            "keySecretName": "str"  #
+                                              Optional. The name of the secret containing the
+                                              certificate private key in PEM or DER format.
                                         }
                                     },
-                                    "endpointType": "str",  # Optional. Type of
-                                      connection endpoint.
                                     "trustSettings": {
-                                        "issuerList": "str",  # Optional.
-                                          Defines a secret reference for certificate issuers to trust.
-                                          Either trustList or issuerList is required when autoTrust is
-                                          set to false.
                                         "trustList": "str"  # Optional.
-                                          Defines a secret reference for certificates to trust. Either
-                                          trustList or issuerList is required when autoTrust is set to
-                                          false.
+                                          Defines a secret reference for certificates to trust.
                                     },
                                     "version": "str"  # Optional. Protocol
                                       version associated with the endpoint e.g. 1 or 2 for endpointType
@@ -19693,38 +19134,30 @@ class NamespaceDevicesOperations:
                             "outbound": {
                                 "assigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 },
                                 "unassigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 }
                             }
                         },
-                        "externalDeviceId": "str",  # Optional. Gets the device Id provided
-                          by customer.
-                        "internalMetadata": {
-                            "credentials": {
-                                "credentialId": "str",  # Optional. Resource Id of
-                                  the Policy.
-                                "validationScheme": "str"  # Optional. The name of
-                                  field on certificate that contains the Id.
-                            }
-                        },
+                        "externalDeviceId": "str",  # Optional. The Device ID provided by the
+                          customer.
                         "lastTransitionTime": "2020-02-20 00:00:00",  # Optional. A timestamp
-                          that is updated each time the resource is modified.
-                        "manufacturer": "str",  # Optional. Hardware manufacturer name.
-                        "model": "str",  # Optional. Model name.
-                        "operatingSystem": "str",  # Optional. Operating system name.
-                        "operatingSystemVersion": "str",  # Optional. Operating system
+                          (in UTC) that is updated each time the resource is modified.
+                        "manufacturer": "str",  # Optional. Device manufacturer.
+                        "model": "str",  # Optional. Device model.
+                        "operatingSystem": "str",  # Optional. Device operating system.
+                        "operatingSystemVersion": "str",  # Optional. Device operating system
                           version.
                         "policy": {
                             "resourceId": "str"  # Optional. Resource Id of the Policy.
@@ -19807,8 +19240,7 @@ class NamespaceDevicesOperations:
                                 }
                             }
                         },
-                        "uuid": "str",  # Optional. Gets a unique identifier for this
-                          resource.
+                        "uuid": "str",  # Optional. A unique identifier for the device.
                         "version": 0  # Optional. An integer that is incremented each time
                           the resource is modified.
                     },
@@ -19912,9 +19344,9 @@ class NamespaceDevicesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param device_name: Name of the device. Required.
+        :param device_name: The name of the device. Required.
         :type device_name: str
         :return: JSON object
         :rtype: JSON
@@ -19943,20 +19375,24 @@ class NamespaceDevicesOperations:
                           Populated only if the device had been created from discovery flow. Discovered
                           device name must be provided.
                         "enabled": True,  # Optional. Default value is True. Indicates if the
-                          resource and identity are enabled or not. A disabled device cannot
-                          authenticate with AAD.
+                          resource is enabled or not.
                         "endpoints": {
                             "inbound": {
                                 "str": {
-                                    "address": "str",  # Fully qualified domain
-                                      name. Required.
+                                    "address": "str",  # The endpoint address &
+                                      port. This can be either an IP address (e.g., 192.168.1.1) or a
+                                      fully qualified domain name (FQDN, e.g., server.example.com).
+                                      Required.
+                                    "endpointType": "str",  # Type of connection
+                                      endpoint. Required.
                                     "additionalConfiguration": "str",  #
-                                      Optional. Stringified JSON that contains connectivity type
-                                      specific further configuration (e.g. OPC UA, Modbus, ONVIF).
+                                      Optional. Stringified JSON that contains configuration to be used
+                                      by the connector (e.g., OPC UA, ONVIF).
                                     "authentication": {
                                         "method": "str",  # Defines the
-                                          authentication method. Required. Known values are:
-                                          "Anonymous", "Certificate", and "UsernamePassword".
+                                          method to authenticate the user of the client at the server.
+                                          Required. Known values are: "Anonymous", "Certificate", and
+                                          "UsernamePassword".
                                         "usernamePasswordCredentials": {
                                             "passwordSecretName": "str",
                                               # The name of the secret containing the password.
@@ -19967,22 +19403,20 @@ class NamespaceDevicesOperations:
                                         },
                                         "x509Credentials": {
                                             "certificateSecretName":
-                                              "str"  # The name of the secret containing the
+                                              "str",  # The name of the secret containing the
                                               certificate and private key (e.g. stored as .der/.pem or
                                               .der/.pfx). Required.
+                "intermediateCertificatesSecretName": "str",  # Optional.
+                                              The name of the secret containing the combined
+                                              intermediate certificates in PEM format.
+                                            "keySecretName": "str"  #
+                                              Optional. The name of the secret containing the
+                                              certificate private key in PEM or DER format.
                                         }
                                     },
-                                    "endpointType": "str",  # Optional. Type of
-                                      connection endpoint.
                                     "trustSettings": {
-                                        "issuerList": "str",  # Optional.
-                                          Defines a secret reference for certificate issuers to trust.
-                                          Either trustList or issuerList is required when autoTrust is
-                                          set to false.
                                         "trustList": "str"  # Optional.
-                                          Defines a secret reference for certificates to trust. Either
-                                          trustList or issuerList is required when autoTrust is set to
-                                          false.
+                                          Defines a secret reference for certificates to trust.
                                     },
                                     "version": "str"  # Optional. Protocol
                                       version associated with the endpoint e.g. 1 or 2 for endpointType
@@ -19993,38 +19427,30 @@ class NamespaceDevicesOperations:
                             "outbound": {
                                 "assigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 },
                                 "unassigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 }
                             }
                         },
-                        "externalDeviceId": "str",  # Optional. Gets the device Id provided
-                          by customer.
-                        "internalMetadata": {
-                            "credentials": {
-                                "credentialId": "str",  # Optional. Resource Id of
-                                  the Policy.
-                                "validationScheme": "str"  # Optional. The name of
-                                  field on certificate that contains the Id.
-                            }
-                        },
+                        "externalDeviceId": "str",  # Optional. The Device ID provided by the
+                          customer.
                         "lastTransitionTime": "2020-02-20 00:00:00",  # Optional. A timestamp
-                          that is updated each time the resource is modified.
-                        "manufacturer": "str",  # Optional. Hardware manufacturer name.
-                        "model": "str",  # Optional. Model name.
-                        "operatingSystem": "str",  # Optional. Operating system name.
-                        "operatingSystemVersion": "str",  # Optional. Operating system
+                          (in UTC) that is updated each time the resource is modified.
+                        "manufacturer": "str",  # Optional. Device manufacturer.
+                        "model": "str",  # Optional. Device model.
+                        "operatingSystem": "str",  # Optional. Device operating system.
+                        "operatingSystemVersion": "str",  # Optional. Device operating system
                           version.
                         "policy": {
                             "resourceId": "str"  # Optional. Resource Id of the Policy.
@@ -20107,8 +19533,7 @@ class NamespaceDevicesOperations:
                                 }
                             }
                         },
-                        "uuid": "str",  # Optional. Gets a unique identifier for this
-                          resource.
+                        "uuid": "str",  # Optional. A unique identifier for the device.
                         "version": 0  # Optional. An integer that is incremented each time
                           the resource is modified.
                     },
@@ -20279,9 +19704,9 @@ class NamespaceDevicesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param device_name: Name of the device. Required.
+        :param device_name: The name of the device. Required.
         :type device_name: str
         :param resource: Resource create parameters. Required.
         :type resource: JSON
@@ -20315,20 +19740,24 @@ class NamespaceDevicesOperations:
                           Populated only if the device had been created from discovery flow. Discovered
                           device name must be provided.
                         "enabled": True,  # Optional. Default value is True. Indicates if the
-                          resource and identity are enabled or not. A disabled device cannot
-                          authenticate with AAD.
+                          resource is enabled or not.
                         "endpoints": {
                             "inbound": {
                                 "str": {
-                                    "address": "str",  # Fully qualified domain
-                                      name. Required.
+                                    "address": "str",  # The endpoint address &
+                                      port. This can be either an IP address (e.g., 192.168.1.1) or a
+                                      fully qualified domain name (FQDN, e.g., server.example.com).
+                                      Required.
+                                    "endpointType": "str",  # Type of connection
+                                      endpoint. Required.
                                     "additionalConfiguration": "str",  #
-                                      Optional. Stringified JSON that contains connectivity type
-                                      specific further configuration (e.g. OPC UA, Modbus, ONVIF).
+                                      Optional. Stringified JSON that contains configuration to be used
+                                      by the connector (e.g., OPC UA, ONVIF).
                                     "authentication": {
                                         "method": "str",  # Defines the
-                                          authentication method. Required. Known values are:
-                                          "Anonymous", "Certificate", and "UsernamePassword".
+                                          method to authenticate the user of the client at the server.
+                                          Required. Known values are: "Anonymous", "Certificate", and
+                                          "UsernamePassword".
                                         "usernamePasswordCredentials": {
                                             "passwordSecretName": "str",
                                               # The name of the secret containing the password.
@@ -20339,22 +19768,20 @@ class NamespaceDevicesOperations:
                                         },
                                         "x509Credentials": {
                                             "certificateSecretName":
-                                              "str"  # The name of the secret containing the
+                                              "str",  # The name of the secret containing the
                                               certificate and private key (e.g. stored as .der/.pem or
                                               .der/.pfx). Required.
+                "intermediateCertificatesSecretName": "str",  # Optional.
+                                              The name of the secret containing the combined
+                                              intermediate certificates in PEM format.
+                                            "keySecretName": "str"  #
+                                              Optional. The name of the secret containing the
+                                              certificate private key in PEM or DER format.
                                         }
                                     },
-                                    "endpointType": "str",  # Optional. Type of
-                                      connection endpoint.
                                     "trustSettings": {
-                                        "issuerList": "str",  # Optional.
-                                          Defines a secret reference for certificate issuers to trust.
-                                          Either trustList or issuerList is required when autoTrust is
-                                          set to false.
                                         "trustList": "str"  # Optional.
-                                          Defines a secret reference for certificates to trust. Either
-                                          trustList or issuerList is required when autoTrust is set to
-                                          false.
+                                          Defines a secret reference for certificates to trust.
                                     },
                                     "version": "str"  # Optional. Protocol
                                       version associated with the endpoint e.g. 1 or 2 for endpointType
@@ -20365,38 +19792,30 @@ class NamespaceDevicesOperations:
                             "outbound": {
                                 "assigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 },
                                 "unassigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 }
                             }
                         },
-                        "externalDeviceId": "str",  # Optional. Gets the device Id provided
-                          by customer.
-                        "internalMetadata": {
-                            "credentials": {
-                                "credentialId": "str",  # Optional. Resource Id of
-                                  the Policy.
-                                "validationScheme": "str"  # Optional. The name of
-                                  field on certificate that contains the Id.
-                            }
-                        },
+                        "externalDeviceId": "str",  # Optional. The Device ID provided by the
+                          customer.
                         "lastTransitionTime": "2020-02-20 00:00:00",  # Optional. A timestamp
-                          that is updated each time the resource is modified.
-                        "manufacturer": "str",  # Optional. Hardware manufacturer name.
-                        "model": "str",  # Optional. Model name.
-                        "operatingSystem": "str",  # Optional. Operating system name.
-                        "operatingSystemVersion": "str",  # Optional. Operating system
+                          (in UTC) that is updated each time the resource is modified.
+                        "manufacturer": "str",  # Optional. Device manufacturer.
+                        "model": "str",  # Optional. Device model.
+                        "operatingSystem": "str",  # Optional. Device operating system.
+                        "operatingSystemVersion": "str",  # Optional. Device operating system
                           version.
                         "policy": {
                             "resourceId": "str"  # Optional. Resource Id of the Policy.
@@ -20479,8 +19898,7 @@ class NamespaceDevicesOperations:
                                 }
                             }
                         },
-                        "uuid": "str",  # Optional. Gets a unique identifier for this
-                          resource.
+                        "uuid": "str",  # Optional. A unique identifier for the device.
                         "version": 0  # Optional. An integer that is incremented each time
                           the resource is modified.
                     },
@@ -20527,20 +19945,24 @@ class NamespaceDevicesOperations:
                           Populated only if the device had been created from discovery flow. Discovered
                           device name must be provided.
                         "enabled": True,  # Optional. Default value is True. Indicates if the
-                          resource and identity are enabled or not. A disabled device cannot
-                          authenticate with AAD.
+                          resource is enabled or not.
                         "endpoints": {
                             "inbound": {
                                 "str": {
-                                    "address": "str",  # Fully qualified domain
-                                      name. Required.
+                                    "address": "str",  # The endpoint address &
+                                      port. This can be either an IP address (e.g., 192.168.1.1) or a
+                                      fully qualified domain name (FQDN, e.g., server.example.com).
+                                      Required.
+                                    "endpointType": "str",  # Type of connection
+                                      endpoint. Required.
                                     "additionalConfiguration": "str",  #
-                                      Optional. Stringified JSON that contains connectivity type
-                                      specific further configuration (e.g. OPC UA, Modbus, ONVIF).
+                                      Optional. Stringified JSON that contains configuration to be used
+                                      by the connector (e.g., OPC UA, ONVIF).
                                     "authentication": {
                                         "method": "str",  # Defines the
-                                          authentication method. Required. Known values are:
-                                          "Anonymous", "Certificate", and "UsernamePassword".
+                                          method to authenticate the user of the client at the server.
+                                          Required. Known values are: "Anonymous", "Certificate", and
+                                          "UsernamePassword".
                                         "usernamePasswordCredentials": {
                                             "passwordSecretName": "str",
                                               # The name of the secret containing the password.
@@ -20551,22 +19973,20 @@ class NamespaceDevicesOperations:
                                         },
                                         "x509Credentials": {
                                             "certificateSecretName":
-                                              "str"  # The name of the secret containing the
+                                              "str",  # The name of the secret containing the
                                               certificate and private key (e.g. stored as .der/.pem or
                                               .der/.pfx). Required.
+                "intermediateCertificatesSecretName": "str",  # Optional.
+                                              The name of the secret containing the combined
+                                              intermediate certificates in PEM format.
+                                            "keySecretName": "str"  #
+                                              Optional. The name of the secret containing the
+                                              certificate private key in PEM or DER format.
                                         }
                                     },
-                                    "endpointType": "str",  # Optional. Type of
-                                      connection endpoint.
                                     "trustSettings": {
-                                        "issuerList": "str",  # Optional.
-                                          Defines a secret reference for certificate issuers to trust.
-                                          Either trustList or issuerList is required when autoTrust is
-                                          set to false.
                                         "trustList": "str"  # Optional.
-                                          Defines a secret reference for certificates to trust. Either
-                                          trustList or issuerList is required when autoTrust is set to
-                                          false.
+                                          Defines a secret reference for certificates to trust.
                                     },
                                     "version": "str"  # Optional. Protocol
                                       version associated with the endpoint e.g. 1 or 2 for endpointType
@@ -20577,38 +19997,30 @@ class NamespaceDevicesOperations:
                             "outbound": {
                                 "assigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 },
                                 "unassigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 }
                             }
                         },
-                        "externalDeviceId": "str",  # Optional. Gets the device Id provided
-                          by customer.
-                        "internalMetadata": {
-                            "credentials": {
-                                "credentialId": "str",  # Optional. Resource Id of
-                                  the Policy.
-                                "validationScheme": "str"  # Optional. The name of
-                                  field on certificate that contains the Id.
-                            }
-                        },
+                        "externalDeviceId": "str",  # Optional. The Device ID provided by the
+                          customer.
                         "lastTransitionTime": "2020-02-20 00:00:00",  # Optional. A timestamp
-                          that is updated each time the resource is modified.
-                        "manufacturer": "str",  # Optional. Hardware manufacturer name.
-                        "model": "str",  # Optional. Model name.
-                        "operatingSystem": "str",  # Optional. Operating system name.
-                        "operatingSystemVersion": "str",  # Optional. Operating system
+                          (in UTC) that is updated each time the resource is modified.
+                        "manufacturer": "str",  # Optional. Device manufacturer.
+                        "model": "str",  # Optional. Device model.
+                        "operatingSystem": "str",  # Optional. Device operating system.
+                        "operatingSystemVersion": "str",  # Optional. Device operating system
                           version.
                         "policy": {
                             "resourceId": "str"  # Optional. Resource Id of the Policy.
@@ -20691,8 +20103,7 @@ class NamespaceDevicesOperations:
                                 }
                             }
                         },
-                        "uuid": "str",  # Optional. Gets a unique identifier for this
-                          resource.
+                        "uuid": "str",  # Optional. A unique identifier for the device.
                         "version": 0  # Optional. An integer that is incremented each time
                           the resource is modified.
                     },
@@ -20737,9 +20148,9 @@ class NamespaceDevicesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param device_name: Name of the device. Required.
+        :param device_name: The name of the device. Required.
         :type device_name: str
         :param resource: Resource create parameters. Required.
         :type resource: IO[bytes]
@@ -20773,20 +20184,24 @@ class NamespaceDevicesOperations:
                           Populated only if the device had been created from discovery flow. Discovered
                           device name must be provided.
                         "enabled": True,  # Optional. Default value is True. Indicates if the
-                          resource and identity are enabled or not. A disabled device cannot
-                          authenticate with AAD.
+                          resource is enabled or not.
                         "endpoints": {
                             "inbound": {
                                 "str": {
-                                    "address": "str",  # Fully qualified domain
-                                      name. Required.
+                                    "address": "str",  # The endpoint address &
+                                      port. This can be either an IP address (e.g., 192.168.1.1) or a
+                                      fully qualified domain name (FQDN, e.g., server.example.com).
+                                      Required.
+                                    "endpointType": "str",  # Type of connection
+                                      endpoint. Required.
                                     "additionalConfiguration": "str",  #
-                                      Optional. Stringified JSON that contains connectivity type
-                                      specific further configuration (e.g. OPC UA, Modbus, ONVIF).
+                                      Optional. Stringified JSON that contains configuration to be used
+                                      by the connector (e.g., OPC UA, ONVIF).
                                     "authentication": {
                                         "method": "str",  # Defines the
-                                          authentication method. Required. Known values are:
-                                          "Anonymous", "Certificate", and "UsernamePassword".
+                                          method to authenticate the user of the client at the server.
+                                          Required. Known values are: "Anonymous", "Certificate", and
+                                          "UsernamePassword".
                                         "usernamePasswordCredentials": {
                                             "passwordSecretName": "str",
                                               # The name of the secret containing the password.
@@ -20797,22 +20212,20 @@ class NamespaceDevicesOperations:
                                         },
                                         "x509Credentials": {
                                             "certificateSecretName":
-                                              "str"  # The name of the secret containing the
+                                              "str",  # The name of the secret containing the
                                               certificate and private key (e.g. stored as .der/.pem or
                                               .der/.pfx). Required.
+                "intermediateCertificatesSecretName": "str",  # Optional.
+                                              The name of the secret containing the combined
+                                              intermediate certificates in PEM format.
+                                            "keySecretName": "str"  #
+                                              Optional. The name of the secret containing the
+                                              certificate private key in PEM or DER format.
                                         }
                                     },
-                                    "endpointType": "str",  # Optional. Type of
-                                      connection endpoint.
                                     "trustSettings": {
-                                        "issuerList": "str",  # Optional.
-                                          Defines a secret reference for certificate issuers to trust.
-                                          Either trustList or issuerList is required when autoTrust is
-                                          set to false.
                                         "trustList": "str"  # Optional.
-                                          Defines a secret reference for certificates to trust. Either
-                                          trustList or issuerList is required when autoTrust is set to
-                                          false.
+                                          Defines a secret reference for certificates to trust.
                                     },
                                     "version": "str"  # Optional. Protocol
                                       version associated with the endpoint e.g. 1 or 2 for endpointType
@@ -20823,38 +20236,30 @@ class NamespaceDevicesOperations:
                             "outbound": {
                                 "assigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 },
                                 "unassigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 }
                             }
                         },
-                        "externalDeviceId": "str",  # Optional. Gets the device Id provided
-                          by customer.
-                        "internalMetadata": {
-                            "credentials": {
-                                "credentialId": "str",  # Optional. Resource Id of
-                                  the Policy.
-                                "validationScheme": "str"  # Optional. The name of
-                                  field on certificate that contains the Id.
-                            }
-                        },
+                        "externalDeviceId": "str",  # Optional. The Device ID provided by the
+                          customer.
                         "lastTransitionTime": "2020-02-20 00:00:00",  # Optional. A timestamp
-                          that is updated each time the resource is modified.
-                        "manufacturer": "str",  # Optional. Hardware manufacturer name.
-                        "model": "str",  # Optional. Model name.
-                        "operatingSystem": "str",  # Optional. Operating system name.
-                        "operatingSystemVersion": "str",  # Optional. Operating system
+                          (in UTC) that is updated each time the resource is modified.
+                        "manufacturer": "str",  # Optional. Device manufacturer.
+                        "model": "str",  # Optional. Device model.
+                        "operatingSystem": "str",  # Optional. Device operating system.
+                        "operatingSystemVersion": "str",  # Optional. Device operating system
                           version.
                         "policy": {
                             "resourceId": "str"  # Optional. Resource Id of the Policy.
@@ -20937,8 +20342,7 @@ class NamespaceDevicesOperations:
                                 }
                             }
                         },
-                        "uuid": "str",  # Optional. Gets a unique identifier for this
-                          resource.
+                        "uuid": "str",  # Optional. A unique identifier for the device.
                         "version": 0  # Optional. An integer that is incremented each time
                           the resource is modified.
                     },
@@ -20981,9 +20385,9 @@ class NamespaceDevicesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param device_name: Name of the device. Required.
+        :param device_name: The name of the device. Required.
         :type device_name: str
         :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
          Required.
@@ -21015,20 +20419,24 @@ class NamespaceDevicesOperations:
                           Populated only if the device had been created from discovery flow. Discovered
                           device name must be provided.
                         "enabled": True,  # Optional. Default value is True. Indicates if the
-                          resource and identity are enabled or not. A disabled device cannot
-                          authenticate with AAD.
+                          resource is enabled or not.
                         "endpoints": {
                             "inbound": {
                                 "str": {
-                                    "address": "str",  # Fully qualified domain
-                                      name. Required.
+                                    "address": "str",  # The endpoint address &
+                                      port. This can be either an IP address (e.g., 192.168.1.1) or a
+                                      fully qualified domain name (FQDN, e.g., server.example.com).
+                                      Required.
+                                    "endpointType": "str",  # Type of connection
+                                      endpoint. Required.
                                     "additionalConfiguration": "str",  #
-                                      Optional. Stringified JSON that contains connectivity type
-                                      specific further configuration (e.g. OPC UA, Modbus, ONVIF).
+                                      Optional. Stringified JSON that contains configuration to be used
+                                      by the connector (e.g., OPC UA, ONVIF).
                                     "authentication": {
                                         "method": "str",  # Defines the
-                                          authentication method. Required. Known values are:
-                                          "Anonymous", "Certificate", and "UsernamePassword".
+                                          method to authenticate the user of the client at the server.
+                                          Required. Known values are: "Anonymous", "Certificate", and
+                                          "UsernamePassword".
                                         "usernamePasswordCredentials": {
                                             "passwordSecretName": "str",
                                               # The name of the secret containing the password.
@@ -21039,22 +20447,20 @@ class NamespaceDevicesOperations:
                                         },
                                         "x509Credentials": {
                                             "certificateSecretName":
-                                              "str"  # The name of the secret containing the
+                                              "str",  # The name of the secret containing the
                                               certificate and private key (e.g. stored as .der/.pem or
                                               .der/.pfx). Required.
+                "intermediateCertificatesSecretName": "str",  # Optional.
+                                              The name of the secret containing the combined
+                                              intermediate certificates in PEM format.
+                                            "keySecretName": "str"  #
+                                              Optional. The name of the secret containing the
+                                              certificate private key in PEM or DER format.
                                         }
                                     },
-                                    "endpointType": "str",  # Optional. Type of
-                                      connection endpoint.
                                     "trustSettings": {
-                                        "issuerList": "str",  # Optional.
-                                          Defines a secret reference for certificate issuers to trust.
-                                          Either trustList or issuerList is required when autoTrust is
-                                          set to false.
                                         "trustList": "str"  # Optional.
-                                          Defines a secret reference for certificates to trust. Either
-                                          trustList or issuerList is required when autoTrust is set to
-                                          false.
+                                          Defines a secret reference for certificates to trust.
                                     },
                                     "version": "str"  # Optional. Protocol
                                       version associated with the endpoint e.g. 1 or 2 for endpointType
@@ -21065,38 +20471,30 @@ class NamespaceDevicesOperations:
                             "outbound": {
                                 "assigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 },
                                 "unassigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 }
                             }
                         },
-                        "externalDeviceId": "str",  # Optional. Gets the device Id provided
-                          by customer.
-                        "internalMetadata": {
-                            "credentials": {
-                                "credentialId": "str",  # Optional. Resource Id of
-                                  the Policy.
-                                "validationScheme": "str"  # Optional. The name of
-                                  field on certificate that contains the Id.
-                            }
-                        },
+                        "externalDeviceId": "str",  # Optional. The Device ID provided by the
+                          customer.
                         "lastTransitionTime": "2020-02-20 00:00:00",  # Optional. A timestamp
-                          that is updated each time the resource is modified.
-                        "manufacturer": "str",  # Optional. Hardware manufacturer name.
-                        "model": "str",  # Optional. Model name.
-                        "operatingSystem": "str",  # Optional. Operating system name.
-                        "operatingSystemVersion": "str",  # Optional. Operating system
+                          (in UTC) that is updated each time the resource is modified.
+                        "manufacturer": "str",  # Optional. Device manufacturer.
+                        "model": "str",  # Optional. Device model.
+                        "operatingSystem": "str",  # Optional. Device operating system.
+                        "operatingSystemVersion": "str",  # Optional. Device operating system
                           version.
                         "policy": {
                             "resourceId": "str"  # Optional. Resource Id of the Policy.
@@ -21179,8 +20577,7 @@ class NamespaceDevicesOperations:
                                 }
                             }
                         },
-                        "uuid": "str",  # Optional. Gets a unique identifier for this
-                          resource.
+                        "uuid": "str",  # Optional. A unique identifier for the device.
                         "version": 0  # Optional. An integer that is incremented each time
                           the resource is modified.
                     },
@@ -21227,20 +20624,24 @@ class NamespaceDevicesOperations:
                           Populated only if the device had been created from discovery flow. Discovered
                           device name must be provided.
                         "enabled": True,  # Optional. Default value is True. Indicates if the
-                          resource and identity are enabled or not. A disabled device cannot
-                          authenticate with AAD.
+                          resource is enabled or not.
                         "endpoints": {
                             "inbound": {
                                 "str": {
-                                    "address": "str",  # Fully qualified domain
-                                      name. Required.
+                                    "address": "str",  # The endpoint address &
+                                      port. This can be either an IP address (e.g., 192.168.1.1) or a
+                                      fully qualified domain name (FQDN, e.g., server.example.com).
+                                      Required.
+                                    "endpointType": "str",  # Type of connection
+                                      endpoint. Required.
                                     "additionalConfiguration": "str",  #
-                                      Optional. Stringified JSON that contains connectivity type
-                                      specific further configuration (e.g. OPC UA, Modbus, ONVIF).
+                                      Optional. Stringified JSON that contains configuration to be used
+                                      by the connector (e.g., OPC UA, ONVIF).
                                     "authentication": {
                                         "method": "str",  # Defines the
-                                          authentication method. Required. Known values are:
-                                          "Anonymous", "Certificate", and "UsernamePassword".
+                                          method to authenticate the user of the client at the server.
+                                          Required. Known values are: "Anonymous", "Certificate", and
+                                          "UsernamePassword".
                                         "usernamePasswordCredentials": {
                                             "passwordSecretName": "str",
                                               # The name of the secret containing the password.
@@ -21251,22 +20652,20 @@ class NamespaceDevicesOperations:
                                         },
                                         "x509Credentials": {
                                             "certificateSecretName":
-                                              "str"  # The name of the secret containing the
+                                              "str",  # The name of the secret containing the
                                               certificate and private key (e.g. stored as .der/.pem or
                                               .der/.pfx). Required.
+                "intermediateCertificatesSecretName": "str",  # Optional.
+                                              The name of the secret containing the combined
+                                              intermediate certificates in PEM format.
+                                            "keySecretName": "str"  #
+                                              Optional. The name of the secret containing the
+                                              certificate private key in PEM or DER format.
                                         }
                                     },
-                                    "endpointType": "str",  # Optional. Type of
-                                      connection endpoint.
                                     "trustSettings": {
-                                        "issuerList": "str",  # Optional.
-                                          Defines a secret reference for certificate issuers to trust.
-                                          Either trustList or issuerList is required when autoTrust is
-                                          set to false.
                                         "trustList": "str"  # Optional.
-                                          Defines a secret reference for certificates to trust. Either
-                                          trustList or issuerList is required when autoTrust is set to
-                                          false.
+                                          Defines a secret reference for certificates to trust.
                                     },
                                     "version": "str"  # Optional. Protocol
                                       version associated with the endpoint e.g. 1 or 2 for endpointType
@@ -21277,38 +20676,30 @@ class NamespaceDevicesOperations:
                             "outbound": {
                                 "assigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 },
                                 "unassigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 }
                             }
                         },
-                        "externalDeviceId": "str",  # Optional. Gets the device Id provided
-                          by customer.
-                        "internalMetadata": {
-                            "credentials": {
-                                "credentialId": "str",  # Optional. Resource Id of
-                                  the Policy.
-                                "validationScheme": "str"  # Optional. The name of
-                                  field on certificate that contains the Id.
-                            }
-                        },
+                        "externalDeviceId": "str",  # Optional. The Device ID provided by the
+                          customer.
                         "lastTransitionTime": "2020-02-20 00:00:00",  # Optional. A timestamp
-                          that is updated each time the resource is modified.
-                        "manufacturer": "str",  # Optional. Hardware manufacturer name.
-                        "model": "str",  # Optional. Model name.
-                        "operatingSystem": "str",  # Optional. Operating system name.
-                        "operatingSystemVersion": "str",  # Optional. Operating system
+                          (in UTC) that is updated each time the resource is modified.
+                        "manufacturer": "str",  # Optional. Device manufacturer.
+                        "model": "str",  # Optional. Device model.
+                        "operatingSystem": "str",  # Optional. Device operating system.
+                        "operatingSystemVersion": "str",  # Optional. Device operating system
                           version.
                         "policy": {
                             "resourceId": "str"  # Optional. Resource Id of the Policy.
@@ -21391,8 +20782,7 @@ class NamespaceDevicesOperations:
                                 }
                             }
                         },
-                        "uuid": "str",  # Optional. Gets a unique identifier for this
-                          resource.
+                        "uuid": "str",  # Optional. A unique identifier for the device.
                         "version": 0  # Optional. An integer that is incremented each time
                           the resource is modified.
                     },
@@ -21559,9 +20949,9 @@ class NamespaceDevicesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param device_name: Name of the device. Required.
+        :param device_name: The name of the device. Required.
         :type device_name: str
         :param properties: The resource properties to be updated. Required.
         :type properties: JSON
@@ -21577,29 +20967,29 @@ class NamespaceDevicesOperations:
 
                 # JSON input template you can fill out and use as your body input.
                 properties = {
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
                     "properties": {
                         "attributes": {
                             "str": {}  # Optional. A set of key-value pairs that contain
                               custom attributes set by the customer.
                         },
-                        "enabled": True,  # Optional. Default value is True. Indicates if the
-                          resource and identity are enabled or not. A disabled device cannot
-                          authenticate with AAD.
+                        "enabled": bool,  # Optional. Indicates if the resource and identity
+                          are enabled or not. A disabled device cannot authenticate with Microsoft
+                          Entra ID.
                         "endpoints": {
                             "inbound": {
                                 "str": {
                                     "additionalConfiguration": "str",  #
-                                      Optional. Stringified JSON that contains connectivity type
-                                      specific further configuration (e.g. OPC UA, Modbus, ONVIF).
-                                    "address": "str",  # Optional. Fully
-                                      qualified domain name.
+                                      Optional. Stringified JSON that contains configuration to be used
+                                      by the connector (e.g., OPC UA, ONVIF).
+                                    "address": "str",  # Optional. The endpoint
+                                      address & port. This can be either an IP address (e.g.,
+                                      192.168.1.1) or a fully qualified domain name (FQDN, e.g.,
+                                      server.example.com).
                                     "authentication": {
                                         "method": "str",  # Optional. Defines
-                                          the authentication method. Known values are: "Anonymous",
-                                          "Certificate", and "UsernamePassword".
+                                          the method to authenticate the user of the client at the
+                                          server. Known values are: "Anonymous", "Certificate", and
+                                          "UsernamePassword".
                                         "usernamePasswordCredentials": {
                                             "passwordSecretName": "str",
                                               # Optional. The name of the secret containing the
@@ -21610,22 +21000,22 @@ class NamespaceDevicesOperations:
                                         },
                                         "x509Credentials": {
                                             "certificateSecretName":
-                                              "str"  # Optional. The name of the secret containing the
+                                              "str",  # Optional. The name of the secret containing the
                                               certificate and private key (e.g. stored as .der/.pem or
                                               .der/.pfx).
+                "intermediateCertificatesSecretName": "str",  # Optional.
+                                              The name of the secret containing the combined
+                                              intermediate certificates in PEM format.
+                                            "keySecretName": "str"  #
+                                              Optional. The name of the secret containing the
+                                              certificate private key in PEM or DER format.
                                         }
                                     },
                                     "endpointType": "str",  # Optional. Type of
                                       connection endpoint.
                                     "trustSettings": {
-                                        "issuerList": "str",  # Optional.
-                                          Defines a secret reference for certificate issuers to trust.
-                                          Either trustList or issuerList is required when autoTrust is
-                                          set to false.
                                         "trustList": "str"  # Optional.
-                                          Defines a secret reference for certificates to trust. Either
-                                          trustList or issuerList is required when autoTrust is set to
-                                          false.
+                                          Defines a secret reference for certificates to trust.
                                     },
                                     "version": "str"  # Optional. Protocol
                                       version associated with the endpoint e.g. 1 or 2 for endpointType
@@ -21636,142 +21026,31 @@ class NamespaceDevicesOperations:
                             "outbound": {
                                 "assigned": {
                                     "str": {
-                                        "address": "str",  # Optional. Fully
-                                          qualified domain name.
+                                        "address": "str",  # Optional. The
+                                          endpoint address to connect to.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 },
                                 "unassigned": {
                                     "str": {
-                                        "address": "str",  # Optional. Fully
-                                          qualified domain name.
+                                        "address": "str",  # Optional. The
+                                          endpoint address to connect to.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 }
                             }
                         },
-                        "externalDeviceId": "str",  # Optional. Gets the device Id provided
-                          by customer.
-                        "internalMetadata": {
-                            "credentials": {
-                                "credentialId": "str",  # Optional. Resource Id of
-                                  the Policy.
-                                "validationScheme": "str"  # Optional. The name of
-                                  field on certificate that contains the Id.
-                            }
-                        },
-                        "manufacturer": "str",  # Optional. Hardware manufacturer name.
-                        "model": "str",  # Optional. Hardware model name.
-                        "operatingSystem": "str",  # Optional. operating system name.
-                        "operatingSystemVersion": "str",  # Optional. Operating system
+                        "operatingSystemVersion": "str",  # Optional. Device operating system
                           version.
                         "policy": {
                             "resourceId": "str"  # Optional. Resource Id of the Policy.
-                        },
-                        "provisioningState": "str",  # Optional. Provisioning state of the
-                          resource. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                        "status": {
-                            "config": {
-                                "error": {
-                                    "code": "str",  # Optional. Error code for
-                                      classification of errors (ex: '400', '404', '500', etc.).
-                                    "details": [
-                                        {
-                                            "code": "str",  # Optional.
-                                              Multi-part error code for classification and root causing
-                                              of errors (ex: 400.200.100.432).
-                                            "correlationId": "str",  #
-                                              Optional. Unique identifier for the transaction to aid in
-                                              debugging.
-                                            "info": "str",  # Optional.
-                                              Human-readable helpful detailed text context for
-                                              debugging (ex: "u201cThe following mechanisms are
-                                              supported..."u201d).
-                                            "message": "str"  # Optional.
-                                              Human-readable helpful error message to provide
-                                              additional context for error (ex: "u201cAuthentication
-                                              method not supported"u201d).
-                                        }
-                                    ],
-                                    "message": "str"  # Optional. Human-readable
-                                      helpful error message to provide additional context for error
-                                      (e.g.,: "u201cCapability ID 'foo' does not exist"u201d).
-                                },
-                                "lastTransitionTime": "2020-02-20 00:00:00",  #
-                                  Optional. A read-only timestamp indicating the last time the
-                                  configuration has been modified from the perspective of the current
-                                  actual (edge) state of the CRD. Edge would be the only writer of this
-                                  value and would sync back up to the cloud.
-                                "version": 0  # Optional. A read-only incremental
-                                  counter indicating the number of times the configuration has been
-                                  modified from the perspective of the current actual (edge) state of
-                                  the CRD. Edge would be the only writer of this value and would sync
-                                  back up to the cloud. In steady state, this should equal version.
-                            },
-                            "endpoints": {
-                                "inbound": {
-                                    "str": {
-                                        "error": {
-                                            "code": "str",  # Optional.
-                                              Error code for classification of errors (ex: '400',
-                                              '404', '500', etc.).
-                                            "details": [
-                                                {
-                                                    "code":
-                                                      "str",  # Optional. Multi-part error code for
-                                                      classification and root causing of errors (ex:
-                                                      400.200.100.432).
-                "correlationId": "str",  # Optional. Unique
-                                                      identifier for the transaction to aid in
-                                                      debugging.
-                                                    "info":
-                                                      "str",  # Optional. Human-readable helpful
-                                                      detailed text context for debugging (ex:
-                                                      "u201cThe following mechanisms are
-                                                      supported..."u201d).
-                                                    "message":
-                                                      "str"  # Optional. Human-readable helpful error
-                                                      message to provide additional context for error
-                                                      (ex: "u201cAuthentication method not
-                                                      supported"u201d).
-                                                }
-                                            ],
-                                            "message": "str"  # Optional.
-                                              Human-readable helpful error message to provide
-                                              additional context for error (e.g.,: "u201cCapability ID
-                                              'foo' does not exist"u201d).
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        "uuid": "str"  # Optional. Gets a unique identifier for this
-                          resource.
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
+                        }
                     },
                     "tags": {
                         "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
+                    }
                 }
 
                 # response body for status code(s): 200
@@ -21794,20 +21073,24 @@ class NamespaceDevicesOperations:
                           Populated only if the device had been created from discovery flow. Discovered
                           device name must be provided.
                         "enabled": True,  # Optional. Default value is True. Indicates if the
-                          resource and identity are enabled or not. A disabled device cannot
-                          authenticate with AAD.
+                          resource is enabled or not.
                         "endpoints": {
                             "inbound": {
                                 "str": {
-                                    "address": "str",  # Fully qualified domain
-                                      name. Required.
+                                    "address": "str",  # The endpoint address &
+                                      port. This can be either an IP address (e.g., 192.168.1.1) or a
+                                      fully qualified domain name (FQDN, e.g., server.example.com).
+                                      Required.
+                                    "endpointType": "str",  # Type of connection
+                                      endpoint. Required.
                                     "additionalConfiguration": "str",  #
-                                      Optional. Stringified JSON that contains connectivity type
-                                      specific further configuration (e.g. OPC UA, Modbus, ONVIF).
+                                      Optional. Stringified JSON that contains configuration to be used
+                                      by the connector (e.g., OPC UA, ONVIF).
                                     "authentication": {
                                         "method": "str",  # Defines the
-                                          authentication method. Required. Known values are:
-                                          "Anonymous", "Certificate", and "UsernamePassword".
+                                          method to authenticate the user of the client at the server.
+                                          Required. Known values are: "Anonymous", "Certificate", and
+                                          "UsernamePassword".
                                         "usernamePasswordCredentials": {
                                             "passwordSecretName": "str",
                                               # The name of the secret containing the password.
@@ -21818,22 +21101,20 @@ class NamespaceDevicesOperations:
                                         },
                                         "x509Credentials": {
                                             "certificateSecretName":
-                                              "str"  # The name of the secret containing the
+                                              "str",  # The name of the secret containing the
                                               certificate and private key (e.g. stored as .der/.pem or
                                               .der/.pfx). Required.
+                "intermediateCertificatesSecretName": "str",  # Optional.
+                                              The name of the secret containing the combined
+                                              intermediate certificates in PEM format.
+                                            "keySecretName": "str"  #
+                                              Optional. The name of the secret containing the
+                                              certificate private key in PEM or DER format.
                                         }
                                     },
-                                    "endpointType": "str",  # Optional. Type of
-                                      connection endpoint.
                                     "trustSettings": {
-                                        "issuerList": "str",  # Optional.
-                                          Defines a secret reference for certificate issuers to trust.
-                                          Either trustList or issuerList is required when autoTrust is
-                                          set to false.
                                         "trustList": "str"  # Optional.
-                                          Defines a secret reference for certificates to trust. Either
-                                          trustList or issuerList is required when autoTrust is set to
-                                          false.
+                                          Defines a secret reference for certificates to trust.
                                     },
                                     "version": "str"  # Optional. Protocol
                                       version associated with the endpoint e.g. 1 or 2 for endpointType
@@ -21844,38 +21125,30 @@ class NamespaceDevicesOperations:
                             "outbound": {
                                 "assigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 },
                                 "unassigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 }
                             }
                         },
-                        "externalDeviceId": "str",  # Optional. Gets the device Id provided
-                          by customer.
-                        "internalMetadata": {
-                            "credentials": {
-                                "credentialId": "str",  # Optional. Resource Id of
-                                  the Policy.
-                                "validationScheme": "str"  # Optional. The name of
-                                  field on certificate that contains the Id.
-                            }
-                        },
+                        "externalDeviceId": "str",  # Optional. The Device ID provided by the
+                          customer.
                         "lastTransitionTime": "2020-02-20 00:00:00",  # Optional. A timestamp
-                          that is updated each time the resource is modified.
-                        "manufacturer": "str",  # Optional. Hardware manufacturer name.
-                        "model": "str",  # Optional. Model name.
-                        "operatingSystem": "str",  # Optional. Operating system name.
-                        "operatingSystemVersion": "str",  # Optional. Operating system
+                          (in UTC) that is updated each time the resource is modified.
+                        "manufacturer": "str",  # Optional. Device manufacturer.
+                        "model": "str",  # Optional. Device model.
+                        "operatingSystem": "str",  # Optional. Device operating system.
+                        "operatingSystemVersion": "str",  # Optional. Device operating system
                           version.
                         "policy": {
                             "resourceId": "str"  # Optional. Resource Id of the Policy.
@@ -21958,8 +21231,7 @@ class NamespaceDevicesOperations:
                                 }
                             }
                         },
-                        "uuid": "str",  # Optional. Gets a unique identifier for this
-                          resource.
+                        "uuid": "str",  # Optional. A unique identifier for the device.
                         "version": 0  # Optional. An integer that is incremented each time
                           the resource is modified.
                     },
@@ -22004,9 +21276,9 @@ class NamespaceDevicesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param device_name: Name of the device. Required.
+        :param device_name: The name of the device. Required.
         :type device_name: str
         :param properties: The resource properties to be updated. Required.
         :type properties: IO[bytes]
@@ -22040,20 +21312,24 @@ class NamespaceDevicesOperations:
                           Populated only if the device had been created from discovery flow. Discovered
                           device name must be provided.
                         "enabled": True,  # Optional. Default value is True. Indicates if the
-                          resource and identity are enabled or not. A disabled device cannot
-                          authenticate with AAD.
+                          resource is enabled or not.
                         "endpoints": {
                             "inbound": {
                                 "str": {
-                                    "address": "str",  # Fully qualified domain
-                                      name. Required.
+                                    "address": "str",  # The endpoint address &
+                                      port. This can be either an IP address (e.g., 192.168.1.1) or a
+                                      fully qualified domain name (FQDN, e.g., server.example.com).
+                                      Required.
+                                    "endpointType": "str",  # Type of connection
+                                      endpoint. Required.
                                     "additionalConfiguration": "str",  #
-                                      Optional. Stringified JSON that contains connectivity type
-                                      specific further configuration (e.g. OPC UA, Modbus, ONVIF).
+                                      Optional. Stringified JSON that contains configuration to be used
+                                      by the connector (e.g., OPC UA, ONVIF).
                                     "authentication": {
                                         "method": "str",  # Defines the
-                                          authentication method. Required. Known values are:
-                                          "Anonymous", "Certificate", and "UsernamePassword".
+                                          method to authenticate the user of the client at the server.
+                                          Required. Known values are: "Anonymous", "Certificate", and
+                                          "UsernamePassword".
                                         "usernamePasswordCredentials": {
                                             "passwordSecretName": "str",
                                               # The name of the secret containing the password.
@@ -22064,22 +21340,20 @@ class NamespaceDevicesOperations:
                                         },
                                         "x509Credentials": {
                                             "certificateSecretName":
-                                              "str"  # The name of the secret containing the
+                                              "str",  # The name of the secret containing the
                                               certificate and private key (e.g. stored as .der/.pem or
                                               .der/.pfx). Required.
+                "intermediateCertificatesSecretName": "str",  # Optional.
+                                              The name of the secret containing the combined
+                                              intermediate certificates in PEM format.
+                                            "keySecretName": "str"  #
+                                              Optional. The name of the secret containing the
+                                              certificate private key in PEM or DER format.
                                         }
                                     },
-                                    "endpointType": "str",  # Optional. Type of
-                                      connection endpoint.
                                     "trustSettings": {
-                                        "issuerList": "str",  # Optional.
-                                          Defines a secret reference for certificate issuers to trust.
-                                          Either trustList or issuerList is required when autoTrust is
-                                          set to false.
                                         "trustList": "str"  # Optional.
-                                          Defines a secret reference for certificates to trust. Either
-                                          trustList or issuerList is required when autoTrust is set to
-                                          false.
+                                          Defines a secret reference for certificates to trust.
                                     },
                                     "version": "str"  # Optional. Protocol
                                       version associated with the endpoint e.g. 1 or 2 for endpointType
@@ -22090,38 +21364,30 @@ class NamespaceDevicesOperations:
                             "outbound": {
                                 "assigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 },
                                 "unassigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 }
                             }
                         },
-                        "externalDeviceId": "str",  # Optional. Gets the device Id provided
-                          by customer.
-                        "internalMetadata": {
-                            "credentials": {
-                                "credentialId": "str",  # Optional. Resource Id of
-                                  the Policy.
-                                "validationScheme": "str"  # Optional. The name of
-                                  field on certificate that contains the Id.
-                            }
-                        },
+                        "externalDeviceId": "str",  # Optional. The Device ID provided by the
+                          customer.
                         "lastTransitionTime": "2020-02-20 00:00:00",  # Optional. A timestamp
-                          that is updated each time the resource is modified.
-                        "manufacturer": "str",  # Optional. Hardware manufacturer name.
-                        "model": "str",  # Optional. Model name.
-                        "operatingSystem": "str",  # Optional. Operating system name.
-                        "operatingSystemVersion": "str",  # Optional. Operating system
+                          (in UTC) that is updated each time the resource is modified.
+                        "manufacturer": "str",  # Optional. Device manufacturer.
+                        "model": "str",  # Optional. Device model.
+                        "operatingSystem": "str",  # Optional. Device operating system.
+                        "operatingSystemVersion": "str",  # Optional. Device operating system
                           version.
                         "policy": {
                             "resourceId": "str"  # Optional. Resource Id of the Policy.
@@ -22204,8 +21470,7 @@ class NamespaceDevicesOperations:
                                 }
                             }
                         },
-                        "uuid": "str",  # Optional. Gets a unique identifier for this
-                          resource.
+                        "uuid": "str",  # Optional. A unique identifier for the device.
                         "version": 0  # Optional. An integer that is incremented each time
                           the resource is modified.
                     },
@@ -22248,9 +21513,9 @@ class NamespaceDevicesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param device_name: Name of the device. Required.
+        :param device_name: The name of the device. Required.
         :type device_name: str
         :param properties: The resource properties to be updated. Is either a JSON type or a IO[bytes]
          type. Required.
@@ -22264,29 +21529,29 @@ class NamespaceDevicesOperations:
 
                 # JSON input template you can fill out and use as your body input.
                 properties = {
-                    "id": "str",  # Optional. Fully qualified resource ID for the resource. E.g.
-                      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}".
-                    "name": "str",  # Optional. The name of the resource.
                     "properties": {
                         "attributes": {
                             "str": {}  # Optional. A set of key-value pairs that contain
                               custom attributes set by the customer.
                         },
-                        "enabled": True,  # Optional. Default value is True. Indicates if the
-                          resource and identity are enabled or not. A disabled device cannot
-                          authenticate with AAD.
+                        "enabled": bool,  # Optional. Indicates if the resource and identity
+                          are enabled or not. A disabled device cannot authenticate with Microsoft
+                          Entra ID.
                         "endpoints": {
                             "inbound": {
                                 "str": {
                                     "additionalConfiguration": "str",  #
-                                      Optional. Stringified JSON that contains connectivity type
-                                      specific further configuration (e.g. OPC UA, Modbus, ONVIF).
-                                    "address": "str",  # Optional. Fully
-                                      qualified domain name.
+                                      Optional. Stringified JSON that contains configuration to be used
+                                      by the connector (e.g., OPC UA, ONVIF).
+                                    "address": "str",  # Optional. The endpoint
+                                      address & port. This can be either an IP address (e.g.,
+                                      192.168.1.1) or a fully qualified domain name (FQDN, e.g.,
+                                      server.example.com).
                                     "authentication": {
                                         "method": "str",  # Optional. Defines
-                                          the authentication method. Known values are: "Anonymous",
-                                          "Certificate", and "UsernamePassword".
+                                          the method to authenticate the user of the client at the
+                                          server. Known values are: "Anonymous", "Certificate", and
+                                          "UsernamePassword".
                                         "usernamePasswordCredentials": {
                                             "passwordSecretName": "str",
                                               # Optional. The name of the secret containing the
@@ -22297,22 +21562,22 @@ class NamespaceDevicesOperations:
                                         },
                                         "x509Credentials": {
                                             "certificateSecretName":
-                                              "str"  # Optional. The name of the secret containing the
+                                              "str",  # Optional. The name of the secret containing the
                                               certificate and private key (e.g. stored as .der/.pem or
                                               .der/.pfx).
+                "intermediateCertificatesSecretName": "str",  # Optional.
+                                              The name of the secret containing the combined
+                                              intermediate certificates in PEM format.
+                                            "keySecretName": "str"  #
+                                              Optional. The name of the secret containing the
+                                              certificate private key in PEM or DER format.
                                         }
                                     },
                                     "endpointType": "str",  # Optional. Type of
                                       connection endpoint.
                                     "trustSettings": {
-                                        "issuerList": "str",  # Optional.
-                                          Defines a secret reference for certificate issuers to trust.
-                                          Either trustList or issuerList is required when autoTrust is
-                                          set to false.
                                         "trustList": "str"  # Optional.
-                                          Defines a secret reference for certificates to trust. Either
-                                          trustList or issuerList is required when autoTrust is set to
-                                          false.
+                                          Defines a secret reference for certificates to trust.
                                     },
                                     "version": "str"  # Optional. Protocol
                                       version associated with the endpoint e.g. 1 or 2 for endpointType
@@ -22323,142 +21588,31 @@ class NamespaceDevicesOperations:
                             "outbound": {
                                 "assigned": {
                                     "str": {
-                                        "address": "str",  # Optional. Fully
-                                          qualified domain name.
+                                        "address": "str",  # Optional. The
+                                          endpoint address to connect to.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 },
                                 "unassigned": {
                                     "str": {
-                                        "address": "str",  # Optional. Fully
-                                          qualified domain name.
+                                        "address": "str",  # Optional. The
+                                          endpoint address to connect to.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 }
                             }
                         },
-                        "externalDeviceId": "str",  # Optional. Gets the device Id provided
-                          by customer.
-                        "internalMetadata": {
-                            "credentials": {
-                                "credentialId": "str",  # Optional. Resource Id of
-                                  the Policy.
-                                "validationScheme": "str"  # Optional. The name of
-                                  field on certificate that contains the Id.
-                            }
-                        },
-                        "manufacturer": "str",  # Optional. Hardware manufacturer name.
-                        "model": "str",  # Optional. Hardware model name.
-                        "operatingSystem": "str",  # Optional. operating system name.
-                        "operatingSystemVersion": "str",  # Optional. Operating system
+                        "operatingSystemVersion": "str",  # Optional. Device operating system
                           version.
                         "policy": {
                             "resourceId": "str"  # Optional. Resource Id of the Policy.
-                        },
-                        "provisioningState": "str",  # Optional. Provisioning state of the
-                          resource. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
-                          and "Deleting".
-                        "status": {
-                            "config": {
-                                "error": {
-                                    "code": "str",  # Optional. Error code for
-                                      classification of errors (ex: '400', '404', '500', etc.).
-                                    "details": [
-                                        {
-                                            "code": "str",  # Optional.
-                                              Multi-part error code for classification and root causing
-                                              of errors (ex: 400.200.100.432).
-                                            "correlationId": "str",  #
-                                              Optional. Unique identifier for the transaction to aid in
-                                              debugging.
-                                            "info": "str",  # Optional.
-                                              Human-readable helpful detailed text context for
-                                              debugging (ex: "u201cThe following mechanisms are
-                                              supported..."u201d).
-                                            "message": "str"  # Optional.
-                                              Human-readable helpful error message to provide
-                                              additional context for error (ex: "u201cAuthentication
-                                              method not supported"u201d).
-                                        }
-                                    ],
-                                    "message": "str"  # Optional. Human-readable
-                                      helpful error message to provide additional context for error
-                                      (e.g.,: "u201cCapability ID 'foo' does not exist"u201d).
-                                },
-                                "lastTransitionTime": "2020-02-20 00:00:00",  #
-                                  Optional. A read-only timestamp indicating the last time the
-                                  configuration has been modified from the perspective of the current
-                                  actual (edge) state of the CRD. Edge would be the only writer of this
-                                  value and would sync back up to the cloud.
-                                "version": 0  # Optional. A read-only incremental
-                                  counter indicating the number of times the configuration has been
-                                  modified from the perspective of the current actual (edge) state of
-                                  the CRD. Edge would be the only writer of this value and would sync
-                                  back up to the cloud. In steady state, this should equal version.
-                            },
-                            "endpoints": {
-                                "inbound": {
-                                    "str": {
-                                        "error": {
-                                            "code": "str",  # Optional.
-                                              Error code for classification of errors (ex: '400',
-                                              '404', '500', etc.).
-                                            "details": [
-                                                {
-                                                    "code":
-                                                      "str",  # Optional. Multi-part error code for
-                                                      classification and root causing of errors (ex:
-                                                      400.200.100.432).
-                "correlationId": "str",  # Optional. Unique
-                                                      identifier for the transaction to aid in
-                                                      debugging.
-                                                    "info":
-                                                      "str",  # Optional. Human-readable helpful
-                                                      detailed text context for debugging (ex:
-                                                      "u201cThe following mechanisms are
-                                                      supported..."u201d).
-                                                    "message":
-                                                      "str"  # Optional. Human-readable helpful error
-                                                      message to provide additional context for error
-                                                      (ex: "u201cAuthentication method not
-                                                      supported"u201d).
-                                                }
-                                            ],
-                                            "message": "str"  # Optional.
-                                              Human-readable helpful error message to provide
-                                              additional context for error (e.g.,: "u201cCapability ID
-                                              'foo' does not exist"u201d).
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        "uuid": "str"  # Optional. Gets a unique identifier for this
-                          resource.
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",  # Optional. The timestamp of
-                          resource creation (UTC).
-                        "createdBy": "str",  # Optional. The identity that created the
-                          resource.
-                        "createdByType": "str",  # Optional. The type of identity that
-                          created the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
-                        "lastModifiedAt": "2020-02-20 00:00:00",  # Optional. The timestamp
-                          of resource last modification (UTC).
-                        "lastModifiedBy": "str",  # Optional. The identity that last modified
-                          the resource.
-                        "lastModifiedByType": "str"  # Optional. The type of identity that
-                          last modified the resource. Known values are: "User", "Application",
-                          "ManagedIdentity", and "Key".
+                        }
                     },
                     "tags": {
                         "str": "str"  # Optional. Resource tags.
-                    },
-                    "type": "str"  # Optional. The type of the resource. E.g.
-                      "Microsoft.Compute/virtualMachines" or "Microsoft.Storage/storageAccounts".
+                    }
                 }
 
                 # response body for status code(s): 200
@@ -22481,20 +21635,24 @@ class NamespaceDevicesOperations:
                           Populated only if the device had been created from discovery flow. Discovered
                           device name must be provided.
                         "enabled": True,  # Optional. Default value is True. Indicates if the
-                          resource and identity are enabled or not. A disabled device cannot
-                          authenticate with AAD.
+                          resource is enabled or not.
                         "endpoints": {
                             "inbound": {
                                 "str": {
-                                    "address": "str",  # Fully qualified domain
-                                      name. Required.
+                                    "address": "str",  # The endpoint address &
+                                      port. This can be either an IP address (e.g., 192.168.1.1) or a
+                                      fully qualified domain name (FQDN, e.g., server.example.com).
+                                      Required.
+                                    "endpointType": "str",  # Type of connection
+                                      endpoint. Required.
                                     "additionalConfiguration": "str",  #
-                                      Optional. Stringified JSON that contains connectivity type
-                                      specific further configuration (e.g. OPC UA, Modbus, ONVIF).
+                                      Optional. Stringified JSON that contains configuration to be used
+                                      by the connector (e.g., OPC UA, ONVIF).
                                     "authentication": {
                                         "method": "str",  # Defines the
-                                          authentication method. Required. Known values are:
-                                          "Anonymous", "Certificate", and "UsernamePassword".
+                                          method to authenticate the user of the client at the server.
+                                          Required. Known values are: "Anonymous", "Certificate", and
+                                          "UsernamePassword".
                                         "usernamePasswordCredentials": {
                                             "passwordSecretName": "str",
                                               # The name of the secret containing the password.
@@ -22505,22 +21663,20 @@ class NamespaceDevicesOperations:
                                         },
                                         "x509Credentials": {
                                             "certificateSecretName":
-                                              "str"  # The name of the secret containing the
+                                              "str",  # The name of the secret containing the
                                               certificate and private key (e.g. stored as .der/.pem or
                                               .der/.pfx). Required.
+                "intermediateCertificatesSecretName": "str",  # Optional.
+                                              The name of the secret containing the combined
+                                              intermediate certificates in PEM format.
+                                            "keySecretName": "str"  #
+                                              Optional. The name of the secret containing the
+                                              certificate private key in PEM or DER format.
                                         }
                                     },
-                                    "endpointType": "str",  # Optional. Type of
-                                      connection endpoint.
                                     "trustSettings": {
-                                        "issuerList": "str",  # Optional.
-                                          Defines a secret reference for certificate issuers to trust.
-                                          Either trustList or issuerList is required when autoTrust is
-                                          set to false.
                                         "trustList": "str"  # Optional.
-                                          Defines a secret reference for certificates to trust. Either
-                                          trustList or issuerList is required when autoTrust is set to
-                                          false.
+                                          Defines a secret reference for certificates to trust.
                                     },
                                     "version": "str"  # Optional. Protocol
                                       version associated with the endpoint e.g. 1 or 2 for endpointType
@@ -22531,38 +21687,30 @@ class NamespaceDevicesOperations:
                             "outbound": {
                                 "assigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 },
                                 "unassigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 }
                             }
                         },
-                        "externalDeviceId": "str",  # Optional. Gets the device Id provided
-                          by customer.
-                        "internalMetadata": {
-                            "credentials": {
-                                "credentialId": "str",  # Optional. Resource Id of
-                                  the Policy.
-                                "validationScheme": "str"  # Optional. The name of
-                                  field on certificate that contains the Id.
-                            }
-                        },
+                        "externalDeviceId": "str",  # Optional. The Device ID provided by the
+                          customer.
                         "lastTransitionTime": "2020-02-20 00:00:00",  # Optional. A timestamp
-                          that is updated each time the resource is modified.
-                        "manufacturer": "str",  # Optional. Hardware manufacturer name.
-                        "model": "str",  # Optional. Model name.
-                        "operatingSystem": "str",  # Optional. Operating system name.
-                        "operatingSystemVersion": "str",  # Optional. Operating system
+                          (in UTC) that is updated each time the resource is modified.
+                        "manufacturer": "str",  # Optional. Device manufacturer.
+                        "model": "str",  # Optional. Device model.
+                        "operatingSystem": "str",  # Optional. Device operating system.
+                        "operatingSystemVersion": "str",  # Optional. Device operating system
                           version.
                         "policy": {
                             "resourceId": "str"  # Optional. Resource Id of the Policy.
@@ -22645,8 +21793,7 @@ class NamespaceDevicesOperations:
                                 }
                             }
                         },
-                        "uuid": "str",  # Optional. Gets a unique identifier for this
-                          resource.
+                        "uuid": "str",  # Optional. A unique identifier for the device.
                         "version": 0  # Optional. An integer that is incremented each time
                           the resource is modified.
                     },
@@ -22779,9 +21926,9 @@ class NamespaceDevicesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param device_name: Name of the device. Required.
+        :param device_name: The name of the device. Required.
         :type device_name: str
         :return: An instance of LROPoller that returns None
         :rtype: ~azure.core.polling.LROPoller[None]
@@ -22834,7 +21981,7 @@ class NamespaceDiscoveredAssetsOperations:
         **DO NOT** instantiate this class directly.
 
         Instead, you should access the following operations through
-        :class:`~aziotops.mgmt.PrivateDeviceRegistryManagementService`'s
+        :class:`~deviceregistry.mgmt.DeviceRegistryMgmtClient`'s
         :attr:`namespace_discovered_assets` attribute.
     """
 
@@ -22853,7 +22000,7 @@ class NamespaceDiscoveredAssetsOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
         :return: An iterator like instance of JSON object
         :rtype: ~azure.core.paging.ItemPaged[JSON]
@@ -22958,11 +22105,11 @@ class NamespaceDiscoveredAssetsOperations:
                           reference.
                         "eventGroups": [
                             {
-                                "dataSource": "str",  # The address of the notifier
-                                  of the event group in the asset (e.g. URL) so that a client can
-                                  access the event group on the asset. Required.
                                 "name": "str",  # The name of the event group.
                                   Required.
+                                "dataSource": "str",  # Optional. The address of the
+                                  notifier of the event group in the asset (e.g. URL) so that a client
+                                  can access the event group on the asset.
                                 "defaultDestinations": [
                                     event_destination
                                 ],
@@ -22972,10 +22119,10 @@ class NamespaceDiscoveredAssetsOperations:
                                   publishingInterval, samplingInterval, and queueSize.
                                 "events": [
                                     {
-                                        "dataSource": "str",  # Reference to
-                                          a data source for a given event. Required.
                                         "name": "str",  # The name of the
                                           event. Required.
+                                        "dataSource": "str",  # Optional.
+                                          Reference to a data source for a given event.
                                         "destinations": [
                                             event_destination
                                         ],
@@ -22999,12 +22146,8 @@ class NamespaceDiscoveredAssetsOperations:
                           customer.
                         "hardwareRevision": "str",  # Optional. Asset hardware revision
                           number.
-                        "lastTransitionTime": "2020-02-20 00:00:00",  # Optional. A timestamp
-                          (in UTC) that is updated each time the resource is modified.
                         "managementGroups": [
                             {
-                                "dataSource": "str",  # Reference to a data source
-                                  for a given management group. Required.
                                 "name": "str",  # Name of the management group.
                                   Required.
                                 "actions": [
@@ -23016,9 +22159,9 @@ class NamespaceDiscoveredAssetsOperations:
                                         "actionConfiguration": "str",  #
                                           Optional. Stringified JSON that contains connector-specific
                                           configuration for the action.
-                                        "actionType": "str",  # Optional. The
-                                          type of the action. Known values are: "Call", "Read", and
-                                          "Write".
+                                        "actionType": "Call",  # Optional.
+                                          Default value is "Call". The type of the action. Known values
+                                          are: "Call", "Read", and "Write".
                                         "lastUpdatedOn": "2020-02-20
                                           00:00:00",  # Optional. Timestamp (in UTC) indicating when
                                           the management action was added or modified.
@@ -23031,6 +22174,8 @@ class NamespaceDiscoveredAssetsOperations:
                                           type definition ID.
                                     }
                                 ],
+                                "dataSource": "str",  # Optional. Reference to a data
+                                  source for a given management group.
                                 "defaultTimeoutInSeconds": 100,  # Optional. Default
                                   value is 100. Default response timeout for all actions that are part
                                   of the management group.
@@ -23174,9 +22319,9 @@ class NamespaceDiscoveredAssetsOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param discovered_asset_name: Namespace Discovered Asset name parameter. Required.
+        :param discovered_asset_name: The name of the discovered asset. Required.
         :type discovered_asset_name: str
         :return: JSON object
         :rtype: JSON
@@ -23281,11 +22426,11 @@ class NamespaceDiscoveredAssetsOperations:
                           reference.
                         "eventGroups": [
                             {
-                                "dataSource": "str",  # The address of the notifier
-                                  of the event group in the asset (e.g. URL) so that a client can
-                                  access the event group on the asset. Required.
                                 "name": "str",  # The name of the event group.
                                   Required.
+                                "dataSource": "str",  # Optional. The address of the
+                                  notifier of the event group in the asset (e.g. URL) so that a client
+                                  can access the event group on the asset.
                                 "defaultDestinations": [
                                     event_destination
                                 ],
@@ -23295,10 +22440,10 @@ class NamespaceDiscoveredAssetsOperations:
                                   publishingInterval, samplingInterval, and queueSize.
                                 "events": [
                                     {
-                                        "dataSource": "str",  # Reference to
-                                          a data source for a given event. Required.
                                         "name": "str",  # The name of the
                                           event. Required.
+                                        "dataSource": "str",  # Optional.
+                                          Reference to a data source for a given event.
                                         "destinations": [
                                             event_destination
                                         ],
@@ -23322,12 +22467,8 @@ class NamespaceDiscoveredAssetsOperations:
                           customer.
                         "hardwareRevision": "str",  # Optional. Asset hardware revision
                           number.
-                        "lastTransitionTime": "2020-02-20 00:00:00",  # Optional. A timestamp
-                          (in UTC) that is updated each time the resource is modified.
                         "managementGroups": [
                             {
-                                "dataSource": "str",  # Reference to a data source
-                                  for a given management group. Required.
                                 "name": "str",  # Name of the management group.
                                   Required.
                                 "actions": [
@@ -23339,9 +22480,9 @@ class NamespaceDiscoveredAssetsOperations:
                                         "actionConfiguration": "str",  #
                                           Optional. Stringified JSON that contains connector-specific
                                           configuration for the action.
-                                        "actionType": "str",  # Optional. The
-                                          type of the action. Known values are: "Call", "Read", and
-                                          "Write".
+                                        "actionType": "Call",  # Optional.
+                                          Default value is "Call". The type of the action. Known values
+                                          are: "Call", "Read", and "Write".
                                         "lastUpdatedOn": "2020-02-20
                                           00:00:00",  # Optional. Timestamp (in UTC) indicating when
                                           the management action was added or modified.
@@ -23354,6 +22495,8 @@ class NamespaceDiscoveredAssetsOperations:
                                           type definition ID.
                                     }
                                 ],
+                                "dataSource": "str",  # Optional. Reference to a data
+                                  source for a given management group.
                                 "defaultTimeoutInSeconds": 100,  # Optional. Default
                                   value is 100. Default response timeout for all actions that are part
                                   of the management group.
@@ -23564,9 +22707,9 @@ class NamespaceDiscoveredAssetsOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param discovered_asset_name: Namespace Discovered Asset name parameter. Required.
+        :param discovered_asset_name: The name of the discovered asset. Required.
         :type discovered_asset_name: str
         :param resource: Resource create parameters. Required.
         :type resource: JSON
@@ -23676,11 +22819,11 @@ class NamespaceDiscoveredAssetsOperations:
                           reference.
                         "eventGroups": [
                             {
-                                "dataSource": "str",  # The address of the notifier
-                                  of the event group in the asset (e.g. URL) so that a client can
-                                  access the event group on the asset. Required.
                                 "name": "str",  # The name of the event group.
                                   Required.
+                                "dataSource": "str",  # Optional. The address of the
+                                  notifier of the event group in the asset (e.g. URL) so that a client
+                                  can access the event group on the asset.
                                 "defaultDestinations": [
                                     event_destination
                                 ],
@@ -23690,10 +22833,10 @@ class NamespaceDiscoveredAssetsOperations:
                                   publishingInterval, samplingInterval, and queueSize.
                                 "events": [
                                     {
-                                        "dataSource": "str",  # Reference to
-                                          a data source for a given event. Required.
                                         "name": "str",  # The name of the
                                           event. Required.
+                                        "dataSource": "str",  # Optional.
+                                          Reference to a data source for a given event.
                                         "destinations": [
                                             event_destination
                                         ],
@@ -23717,12 +22860,8 @@ class NamespaceDiscoveredAssetsOperations:
                           customer.
                         "hardwareRevision": "str",  # Optional. Asset hardware revision
                           number.
-                        "lastTransitionTime": "2020-02-20 00:00:00",  # Optional. A timestamp
-                          (in UTC) that is updated each time the resource is modified.
                         "managementGroups": [
                             {
-                                "dataSource": "str",  # Reference to a data source
-                                  for a given management group. Required.
                                 "name": "str",  # Name of the management group.
                                   Required.
                                 "actions": [
@@ -23734,9 +22873,9 @@ class NamespaceDiscoveredAssetsOperations:
                                         "actionConfiguration": "str",  #
                                           Optional. Stringified JSON that contains connector-specific
                                           configuration for the action.
-                                        "actionType": "str",  # Optional. The
-                                          type of the action. Known values are: "Call", "Read", and
-                                          "Write".
+                                        "actionType": "Call",  # Optional.
+                                          Default value is "Call". The type of the action. Known values
+                                          are: "Call", "Read", and "Write".
                                         "lastUpdatedOn": "2020-02-20
                                           00:00:00",  # Optional. Timestamp (in UTC) indicating when
                                           the management action was added or modified.
@@ -23749,6 +22888,8 @@ class NamespaceDiscoveredAssetsOperations:
                                           type definition ID.
                                     }
                                 ],
+                                "dataSource": "str",  # Optional. Reference to a data
+                                  source for a given management group.
                                 "defaultTimeoutInSeconds": 100,  # Optional. Default
                                   value is 100. Default response timeout for all actions that are part
                                   of the management group.
@@ -23911,11 +23052,11 @@ class NamespaceDiscoveredAssetsOperations:
                           reference.
                         "eventGroups": [
                             {
-                                "dataSource": "str",  # The address of the notifier
-                                  of the event group in the asset (e.g. URL) so that a client can
-                                  access the event group on the asset. Required.
                                 "name": "str",  # The name of the event group.
                                   Required.
+                                "dataSource": "str",  # Optional. The address of the
+                                  notifier of the event group in the asset (e.g. URL) so that a client
+                                  can access the event group on the asset.
                                 "defaultDestinations": [
                                     event_destination
                                 ],
@@ -23925,10 +23066,10 @@ class NamespaceDiscoveredAssetsOperations:
                                   publishingInterval, samplingInterval, and queueSize.
                                 "events": [
                                     {
-                                        "dataSource": "str",  # Reference to
-                                          a data source for a given event. Required.
                                         "name": "str",  # The name of the
                                           event. Required.
+                                        "dataSource": "str",  # Optional.
+                                          Reference to a data source for a given event.
                                         "destinations": [
                                             event_destination
                                         ],
@@ -23952,12 +23093,8 @@ class NamespaceDiscoveredAssetsOperations:
                           customer.
                         "hardwareRevision": "str",  # Optional. Asset hardware revision
                           number.
-                        "lastTransitionTime": "2020-02-20 00:00:00",  # Optional. A timestamp
-                          (in UTC) that is updated each time the resource is modified.
                         "managementGroups": [
                             {
-                                "dataSource": "str",  # Reference to a data source
-                                  for a given management group. Required.
                                 "name": "str",  # Name of the management group.
                                   Required.
                                 "actions": [
@@ -23969,9 +23106,9 @@ class NamespaceDiscoveredAssetsOperations:
                                         "actionConfiguration": "str",  #
                                           Optional. Stringified JSON that contains connector-specific
                                           configuration for the action.
-                                        "actionType": "str",  # Optional. The
-                                          type of the action. Known values are: "Call", "Read", and
-                                          "Write".
+                                        "actionType": "Call",  # Optional.
+                                          Default value is "Call". The type of the action. Known values
+                                          are: "Call", "Read", and "Write".
                                         "lastUpdatedOn": "2020-02-20
                                           00:00:00",  # Optional. Timestamp (in UTC) indicating when
                                           the management action was added or modified.
@@ -23984,6 +23121,8 @@ class NamespaceDiscoveredAssetsOperations:
                                           type definition ID.
                                     }
                                 ],
+                                "dataSource": "str",  # Optional. Reference to a data
+                                  source for a given management group.
                                 "defaultTimeoutInSeconds": 100,  # Optional. Default
                                   value is 100. Default response timeout for all actions that are part
                                   of the management group.
@@ -24068,9 +23207,9 @@ class NamespaceDiscoveredAssetsOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param discovered_asset_name: Namespace Discovered Asset name parameter. Required.
+        :param discovered_asset_name: The name of the discovered asset. Required.
         :type discovered_asset_name: str
         :param resource: Resource create parameters. Required.
         :type resource: IO[bytes]
@@ -24180,11 +23319,11 @@ class NamespaceDiscoveredAssetsOperations:
                           reference.
                         "eventGroups": [
                             {
-                                "dataSource": "str",  # The address of the notifier
-                                  of the event group in the asset (e.g. URL) so that a client can
-                                  access the event group on the asset. Required.
                                 "name": "str",  # The name of the event group.
                                   Required.
+                                "dataSource": "str",  # Optional. The address of the
+                                  notifier of the event group in the asset (e.g. URL) so that a client
+                                  can access the event group on the asset.
                                 "defaultDestinations": [
                                     event_destination
                                 ],
@@ -24194,10 +23333,10 @@ class NamespaceDiscoveredAssetsOperations:
                                   publishingInterval, samplingInterval, and queueSize.
                                 "events": [
                                     {
-                                        "dataSource": "str",  # Reference to
-                                          a data source for a given event. Required.
                                         "name": "str",  # The name of the
                                           event. Required.
+                                        "dataSource": "str",  # Optional.
+                                          Reference to a data source for a given event.
                                         "destinations": [
                                             event_destination
                                         ],
@@ -24221,12 +23360,8 @@ class NamespaceDiscoveredAssetsOperations:
                           customer.
                         "hardwareRevision": "str",  # Optional. Asset hardware revision
                           number.
-                        "lastTransitionTime": "2020-02-20 00:00:00",  # Optional. A timestamp
-                          (in UTC) that is updated each time the resource is modified.
                         "managementGroups": [
                             {
-                                "dataSource": "str",  # Reference to a data source
-                                  for a given management group. Required.
                                 "name": "str",  # Name of the management group.
                                   Required.
                                 "actions": [
@@ -24238,9 +23373,9 @@ class NamespaceDiscoveredAssetsOperations:
                                         "actionConfiguration": "str",  #
                                           Optional. Stringified JSON that contains connector-specific
                                           configuration for the action.
-                                        "actionType": "str",  # Optional. The
-                                          type of the action. Known values are: "Call", "Read", and
-                                          "Write".
+                                        "actionType": "Call",  # Optional.
+                                          Default value is "Call". The type of the action. Known values
+                                          are: "Call", "Read", and "Write".
                                         "lastUpdatedOn": "2020-02-20
                                           00:00:00",  # Optional. Timestamp (in UTC) indicating when
                                           the management action was added or modified.
@@ -24253,6 +23388,8 @@ class NamespaceDiscoveredAssetsOperations:
                                           type definition ID.
                                     }
                                 ],
+                                "dataSource": "str",  # Optional. Reference to a data
+                                  source for a given management group.
                                 "defaultTimeoutInSeconds": 100,  # Optional. Default
                                   value is 100. Default response timeout for all actions that are part
                                   of the management group.
@@ -24335,9 +23472,9 @@ class NamespaceDiscoveredAssetsOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param discovered_asset_name: Namespace Discovered Asset name parameter. Required.
+        :param discovered_asset_name: The name of the discovered asset. Required.
         :type discovered_asset_name: str
         :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
          Required.
@@ -24445,11 +23582,11 @@ class NamespaceDiscoveredAssetsOperations:
                           reference.
                         "eventGroups": [
                             {
-                                "dataSource": "str",  # The address of the notifier
-                                  of the event group in the asset (e.g. URL) so that a client can
-                                  access the event group on the asset. Required.
                                 "name": "str",  # The name of the event group.
                                   Required.
+                                "dataSource": "str",  # Optional. The address of the
+                                  notifier of the event group in the asset (e.g. URL) so that a client
+                                  can access the event group on the asset.
                                 "defaultDestinations": [
                                     event_destination
                                 ],
@@ -24459,10 +23596,10 @@ class NamespaceDiscoveredAssetsOperations:
                                   publishingInterval, samplingInterval, and queueSize.
                                 "events": [
                                     {
-                                        "dataSource": "str",  # Reference to
-                                          a data source for a given event. Required.
                                         "name": "str",  # The name of the
                                           event. Required.
+                                        "dataSource": "str",  # Optional.
+                                          Reference to a data source for a given event.
                                         "destinations": [
                                             event_destination
                                         ],
@@ -24486,12 +23623,8 @@ class NamespaceDiscoveredAssetsOperations:
                           customer.
                         "hardwareRevision": "str",  # Optional. Asset hardware revision
                           number.
-                        "lastTransitionTime": "2020-02-20 00:00:00",  # Optional. A timestamp
-                          (in UTC) that is updated each time the resource is modified.
                         "managementGroups": [
                             {
-                                "dataSource": "str",  # Reference to a data source
-                                  for a given management group. Required.
                                 "name": "str",  # Name of the management group.
                                   Required.
                                 "actions": [
@@ -24503,9 +23636,9 @@ class NamespaceDiscoveredAssetsOperations:
                                         "actionConfiguration": "str",  #
                                           Optional. Stringified JSON that contains connector-specific
                                           configuration for the action.
-                                        "actionType": "str",  # Optional. The
-                                          type of the action. Known values are: "Call", "Read", and
-                                          "Write".
+                                        "actionType": "Call",  # Optional.
+                                          Default value is "Call". The type of the action. Known values
+                                          are: "Call", "Read", and "Write".
                                         "lastUpdatedOn": "2020-02-20
                                           00:00:00",  # Optional. Timestamp (in UTC) indicating when
                                           the management action was added or modified.
@@ -24518,6 +23651,8 @@ class NamespaceDiscoveredAssetsOperations:
                                           type definition ID.
                                     }
                                 ],
+                                "dataSource": "str",  # Optional. Reference to a data
+                                  source for a given management group.
                                 "defaultTimeoutInSeconds": 100,  # Optional. Default
                                   value is 100. Default response timeout for all actions that are part
                                   of the management group.
@@ -24680,11 +23815,11 @@ class NamespaceDiscoveredAssetsOperations:
                           reference.
                         "eventGroups": [
                             {
-                                "dataSource": "str",  # The address of the notifier
-                                  of the event group in the asset (e.g. URL) so that a client can
-                                  access the event group on the asset. Required.
                                 "name": "str",  # The name of the event group.
                                   Required.
+                                "dataSource": "str",  # Optional. The address of the
+                                  notifier of the event group in the asset (e.g. URL) so that a client
+                                  can access the event group on the asset.
                                 "defaultDestinations": [
                                     event_destination
                                 ],
@@ -24694,10 +23829,10 @@ class NamespaceDiscoveredAssetsOperations:
                                   publishingInterval, samplingInterval, and queueSize.
                                 "events": [
                                     {
-                                        "dataSource": "str",  # Reference to
-                                          a data source for a given event. Required.
                                         "name": "str",  # The name of the
                                           event. Required.
+                                        "dataSource": "str",  # Optional.
+                                          Reference to a data source for a given event.
                                         "destinations": [
                                             event_destination
                                         ],
@@ -24721,12 +23856,8 @@ class NamespaceDiscoveredAssetsOperations:
                           customer.
                         "hardwareRevision": "str",  # Optional. Asset hardware revision
                           number.
-                        "lastTransitionTime": "2020-02-20 00:00:00",  # Optional. A timestamp
-                          (in UTC) that is updated each time the resource is modified.
                         "managementGroups": [
                             {
-                                "dataSource": "str",  # Reference to a data source
-                                  for a given management group. Required.
                                 "name": "str",  # Name of the management group.
                                   Required.
                                 "actions": [
@@ -24738,9 +23869,9 @@ class NamespaceDiscoveredAssetsOperations:
                                         "actionConfiguration": "str",  #
                                           Optional. Stringified JSON that contains connector-specific
                                           configuration for the action.
-                                        "actionType": "str",  # Optional. The
-                                          type of the action. Known values are: "Call", "Read", and
-                                          "Write".
+                                        "actionType": "Call",  # Optional.
+                                          Default value is "Call". The type of the action. Known values
+                                          are: "Call", "Read", and "Write".
                                         "lastUpdatedOn": "2020-02-20
                                           00:00:00",  # Optional. Timestamp (in UTC) indicating when
                                           the management action was added or modified.
@@ -24753,6 +23884,8 @@ class NamespaceDiscoveredAssetsOperations:
                                           type definition ID.
                                     }
                                 ],
+                                "dataSource": "str",  # Optional. Reference to a data
+                                  source for a given management group.
                                 "defaultTimeoutInSeconds": 100,  # Optional. Default
                                   value is 100. Default response timeout for all actions that are part
                                   of the management group.
@@ -24959,9 +24092,9 @@ class NamespaceDiscoveredAssetsOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param discovered_asset_name: Namespace Discovered Asset name parameter. Required.
+        :param discovered_asset_name: The name of the discovered asset. Required.
         :type discovered_asset_name: str
         :param properties: The resource properties to be updated. Required.
         :type properties: JSON
@@ -25061,11 +24194,11 @@ class NamespaceDiscoveredAssetsOperations:
                           reference.
                         "eventGroups": [
                             {
-                                "dataSource": "str",  # The address of the notifier
-                                  of the event group in the asset (e.g. URL) so that a client can
-                                  access the event group on the asset. Required.
                                 "name": "str",  # The name of the event group.
                                   Required.
+                                "dataSource": "str",  # Optional. The address of the
+                                  notifier of the event group in the asset (e.g. URL) so that a client
+                                  can access the event group on the asset.
                                 "defaultDestinations": [
                                     event_destination
                                 ],
@@ -25075,10 +24208,10 @@ class NamespaceDiscoveredAssetsOperations:
                                   publishingInterval, samplingInterval, and queueSize.
                                 "events": [
                                     {
-                                        "dataSource": "str",  # Reference to
-                                          a data source for a given event. Required.
                                         "name": "str",  # The name of the
                                           event. Required.
+                                        "dataSource": "str",  # Optional.
+                                          Reference to a data source for a given event.
                                         "destinations": [
                                             event_destination
                                         ],
@@ -25102,8 +24235,6 @@ class NamespaceDiscoveredAssetsOperations:
                           number.
                         "managementGroups": [
                             {
-                                "dataSource": "str",  # Reference to a data source
-                                  for a given management group. Required.
                                 "name": "str",  # Name of the management group.
                                   Required.
                                 "actions": [
@@ -25115,9 +24246,9 @@ class NamespaceDiscoveredAssetsOperations:
                                         "actionConfiguration": "str",  #
                                           Optional. Stringified JSON that contains connector-specific
                                           configuration for the action.
-                                        "actionType": "str",  # Optional. The
-                                          type of the action. Known values are: "Call", "Read", and
-                                          "Write".
+                                        "actionType": "Call",  # Optional.
+                                          Default value is "Call". The type of the action. Known values
+                                          are: "Call", "Read", and "Write".
                                         "lastUpdatedOn": "2020-02-20
                                           00:00:00",  # Optional. Timestamp (in UTC) indicating when
                                           the management action was added or modified.
@@ -25130,6 +24261,8 @@ class NamespaceDiscoveredAssetsOperations:
                                           type definition ID.
                                     }
                                 ],
+                                "dataSource": "str",  # Optional. Reference to a data
+                                  source for a given management group.
                                 "defaultTimeoutInSeconds": 100,  # Optional. Default
                                   value is 100. Default response timeout for all actions that are part
                                   of the management group.
@@ -25273,11 +24406,11 @@ class NamespaceDiscoveredAssetsOperations:
                           reference.
                         "eventGroups": [
                             {
-                                "dataSource": "str",  # The address of the notifier
-                                  of the event group in the asset (e.g. URL) so that a client can
-                                  access the event group on the asset. Required.
                                 "name": "str",  # The name of the event group.
                                   Required.
+                                "dataSource": "str",  # Optional. The address of the
+                                  notifier of the event group in the asset (e.g. URL) so that a client
+                                  can access the event group on the asset.
                                 "defaultDestinations": [
                                     event_destination
                                 ],
@@ -25287,10 +24420,10 @@ class NamespaceDiscoveredAssetsOperations:
                                   publishingInterval, samplingInterval, and queueSize.
                                 "events": [
                                     {
-                                        "dataSource": "str",  # Reference to
-                                          a data source for a given event. Required.
                                         "name": "str",  # The name of the
                                           event. Required.
+                                        "dataSource": "str",  # Optional.
+                                          Reference to a data source for a given event.
                                         "destinations": [
                                             event_destination
                                         ],
@@ -25314,12 +24447,8 @@ class NamespaceDiscoveredAssetsOperations:
                           customer.
                         "hardwareRevision": "str",  # Optional. Asset hardware revision
                           number.
-                        "lastTransitionTime": "2020-02-20 00:00:00",  # Optional. A timestamp
-                          (in UTC) that is updated each time the resource is modified.
                         "managementGroups": [
                             {
-                                "dataSource": "str",  # Reference to a data source
-                                  for a given management group. Required.
                                 "name": "str",  # Name of the management group.
                                   Required.
                                 "actions": [
@@ -25331,9 +24460,9 @@ class NamespaceDiscoveredAssetsOperations:
                                         "actionConfiguration": "str",  #
                                           Optional. Stringified JSON that contains connector-specific
                                           configuration for the action.
-                                        "actionType": "str",  # Optional. The
-                                          type of the action. Known values are: "Call", "Read", and
-                                          "Write".
+                                        "actionType": "Call",  # Optional.
+                                          Default value is "Call". The type of the action. Known values
+                                          are: "Call", "Read", and "Write".
                                         "lastUpdatedOn": "2020-02-20
                                           00:00:00",  # Optional. Timestamp (in UTC) indicating when
                                           the management action was added or modified.
@@ -25346,6 +24475,8 @@ class NamespaceDiscoveredAssetsOperations:
                                           type definition ID.
                                     }
                                 ],
+                                "dataSource": "str",  # Optional. Reference to a data
+                                  source for a given management group.
                                 "defaultTimeoutInSeconds": 100,  # Optional. Default
                                   value is 100. Default response timeout for all actions that are part
                                   of the management group.
@@ -25430,9 +24561,9 @@ class NamespaceDiscoveredAssetsOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param discovered_asset_name: Namespace Discovered Asset name parameter. Required.
+        :param discovered_asset_name: The name of the discovered asset. Required.
         :type discovered_asset_name: str
         :param properties: The resource properties to be updated. Required.
         :type properties: IO[bytes]
@@ -25542,11 +24673,11 @@ class NamespaceDiscoveredAssetsOperations:
                           reference.
                         "eventGroups": [
                             {
-                                "dataSource": "str",  # The address of the notifier
-                                  of the event group in the asset (e.g. URL) so that a client can
-                                  access the event group on the asset. Required.
                                 "name": "str",  # The name of the event group.
                                   Required.
+                                "dataSource": "str",  # Optional. The address of the
+                                  notifier of the event group in the asset (e.g. URL) so that a client
+                                  can access the event group on the asset.
                                 "defaultDestinations": [
                                     event_destination
                                 ],
@@ -25556,10 +24687,10 @@ class NamespaceDiscoveredAssetsOperations:
                                   publishingInterval, samplingInterval, and queueSize.
                                 "events": [
                                     {
-                                        "dataSource": "str",  # Reference to
-                                          a data source for a given event. Required.
                                         "name": "str",  # The name of the
                                           event. Required.
+                                        "dataSource": "str",  # Optional.
+                                          Reference to a data source for a given event.
                                         "destinations": [
                                             event_destination
                                         ],
@@ -25583,12 +24714,8 @@ class NamespaceDiscoveredAssetsOperations:
                           customer.
                         "hardwareRevision": "str",  # Optional. Asset hardware revision
                           number.
-                        "lastTransitionTime": "2020-02-20 00:00:00",  # Optional. A timestamp
-                          (in UTC) that is updated each time the resource is modified.
                         "managementGroups": [
                             {
-                                "dataSource": "str",  # Reference to a data source
-                                  for a given management group. Required.
                                 "name": "str",  # Name of the management group.
                                   Required.
                                 "actions": [
@@ -25600,9 +24727,9 @@ class NamespaceDiscoveredAssetsOperations:
                                         "actionConfiguration": "str",  #
                                           Optional. Stringified JSON that contains connector-specific
                                           configuration for the action.
-                                        "actionType": "str",  # Optional. The
-                                          type of the action. Known values are: "Call", "Read", and
-                                          "Write".
+                                        "actionType": "Call",  # Optional.
+                                          Default value is "Call". The type of the action. Known values
+                                          are: "Call", "Read", and "Write".
                                         "lastUpdatedOn": "2020-02-20
                                           00:00:00",  # Optional. Timestamp (in UTC) indicating when
                                           the management action was added or modified.
@@ -25615,6 +24742,8 @@ class NamespaceDiscoveredAssetsOperations:
                                           type definition ID.
                                     }
                                 ],
+                                "dataSource": "str",  # Optional. Reference to a data
+                                  source for a given management group.
                                 "defaultTimeoutInSeconds": 100,  # Optional. Default
                                   value is 100. Default response timeout for all actions that are part
                                   of the management group.
@@ -25697,9 +24826,9 @@ class NamespaceDiscoveredAssetsOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param discovered_asset_name: Namespace Discovered Asset name parameter. Required.
+        :param discovered_asset_name: The name of the discovered asset. Required.
         :type discovered_asset_name: str
         :param properties: The resource properties to be updated. Is either a JSON type or a IO[bytes]
          type. Required.
@@ -25797,11 +24926,11 @@ class NamespaceDiscoveredAssetsOperations:
                           reference.
                         "eventGroups": [
                             {
-                                "dataSource": "str",  # The address of the notifier
-                                  of the event group in the asset (e.g. URL) so that a client can
-                                  access the event group on the asset. Required.
                                 "name": "str",  # The name of the event group.
                                   Required.
+                                "dataSource": "str",  # Optional. The address of the
+                                  notifier of the event group in the asset (e.g. URL) so that a client
+                                  can access the event group on the asset.
                                 "defaultDestinations": [
                                     event_destination
                                 ],
@@ -25811,10 +24940,10 @@ class NamespaceDiscoveredAssetsOperations:
                                   publishingInterval, samplingInterval, and queueSize.
                                 "events": [
                                     {
-                                        "dataSource": "str",  # Reference to
-                                          a data source for a given event. Required.
                                         "name": "str",  # The name of the
                                           event. Required.
+                                        "dataSource": "str",  # Optional.
+                                          Reference to a data source for a given event.
                                         "destinations": [
                                             event_destination
                                         ],
@@ -25838,8 +24967,6 @@ class NamespaceDiscoveredAssetsOperations:
                           number.
                         "managementGroups": [
                             {
-                                "dataSource": "str",  # Reference to a data source
-                                  for a given management group. Required.
                                 "name": "str",  # Name of the management group.
                                   Required.
                                 "actions": [
@@ -25851,9 +24978,9 @@ class NamespaceDiscoveredAssetsOperations:
                                         "actionConfiguration": "str",  #
                                           Optional. Stringified JSON that contains connector-specific
                                           configuration for the action.
-                                        "actionType": "str",  # Optional. The
-                                          type of the action. Known values are: "Call", "Read", and
-                                          "Write".
+                                        "actionType": "Call",  # Optional.
+                                          Default value is "Call". The type of the action. Known values
+                                          are: "Call", "Read", and "Write".
                                         "lastUpdatedOn": "2020-02-20
                                           00:00:00",  # Optional. Timestamp (in UTC) indicating when
                                           the management action was added or modified.
@@ -25866,6 +24993,8 @@ class NamespaceDiscoveredAssetsOperations:
                                           type definition ID.
                                     }
                                 ],
+                                "dataSource": "str",  # Optional. Reference to a data
+                                  source for a given management group.
                                 "defaultTimeoutInSeconds": 100,  # Optional. Default
                                   value is 100. Default response timeout for all actions that are part
                                   of the management group.
@@ -26009,11 +25138,11 @@ class NamespaceDiscoveredAssetsOperations:
                           reference.
                         "eventGroups": [
                             {
-                                "dataSource": "str",  # The address of the notifier
-                                  of the event group in the asset (e.g. URL) so that a client can
-                                  access the event group on the asset. Required.
                                 "name": "str",  # The name of the event group.
                                   Required.
+                                "dataSource": "str",  # Optional. The address of the
+                                  notifier of the event group in the asset (e.g. URL) so that a client
+                                  can access the event group on the asset.
                                 "defaultDestinations": [
                                     event_destination
                                 ],
@@ -26023,10 +25152,10 @@ class NamespaceDiscoveredAssetsOperations:
                                   publishingInterval, samplingInterval, and queueSize.
                                 "events": [
                                     {
-                                        "dataSource": "str",  # Reference to
-                                          a data source for a given event. Required.
                                         "name": "str",  # The name of the
                                           event. Required.
+                                        "dataSource": "str",  # Optional.
+                                          Reference to a data source for a given event.
                                         "destinations": [
                                             event_destination
                                         ],
@@ -26050,12 +25179,8 @@ class NamespaceDiscoveredAssetsOperations:
                           customer.
                         "hardwareRevision": "str",  # Optional. Asset hardware revision
                           number.
-                        "lastTransitionTime": "2020-02-20 00:00:00",  # Optional. A timestamp
-                          (in UTC) that is updated each time the resource is modified.
                         "managementGroups": [
                             {
-                                "dataSource": "str",  # Reference to a data source
-                                  for a given management group. Required.
                                 "name": "str",  # Name of the management group.
                                   Required.
                                 "actions": [
@@ -26067,9 +25192,9 @@ class NamespaceDiscoveredAssetsOperations:
                                         "actionConfiguration": "str",  #
                                           Optional. Stringified JSON that contains connector-specific
                                           configuration for the action.
-                                        "actionType": "str",  # Optional. The
-                                          type of the action. Known values are: "Call", "Read", and
-                                          "Write".
+                                        "actionType": "Call",  # Optional.
+                                          Default value is "Call". The type of the action. Known values
+                                          are: "Call", "Read", and "Write".
                                         "lastUpdatedOn": "2020-02-20
                                           00:00:00",  # Optional. Timestamp (in UTC) indicating when
                                           the management action was added or modified.
@@ -26082,6 +25207,8 @@ class NamespaceDiscoveredAssetsOperations:
                                           type definition ID.
                                     }
                                 ],
+                                "dataSource": "str",  # Optional. Reference to a data
+                                  source for a given management group.
                                 "defaultTimeoutInSeconds": 100,  # Optional. Default
                                   value is 100. Default response timeout for all actions that are part
                                   of the management group.
@@ -26254,9 +25381,9 @@ class NamespaceDiscoveredAssetsOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param discovered_asset_name: Namespace Discovered Asset name parameter. Required.
+        :param discovered_asset_name: The name of the discovered asset. Required.
         :type discovered_asset_name: str
         :return: An instance of LROPoller that returns None
         :rtype: ~azure.core.polling.LROPoller[None]
@@ -26309,7 +25436,7 @@ class NamespaceDiscoveredDevicesOperations:
         **DO NOT** instantiate this class directly.
 
         Instead, you should access the following operations through
-        :class:`~aziotops.mgmt.PrivateDeviceRegistryManagementService`'s
+        :class:`~deviceregistry.mgmt.DeviceRegistryMgmtClient`'s
         :attr:`namespace_discovered_devices` attribute.
     """
 
@@ -26328,7 +25455,7 @@ class NamespaceDiscoveredDevicesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
         :return: An iterator like instance of JSON object
         :rtype: ~azure.core.paging.ItemPaged[JSON]
@@ -26349,7 +25476,7 @@ class NamespaceDiscoveredDevicesOperations:
                     "name": "str",  # Optional. The name of the resource.
                     "properties": {
                         "discoveryId": "str",  # Identifier used to detect changes in the
-                          asset endpoint profile. Required.
+                          discovered device. Required.
                         "version": 0,  # An integer that is incremented each time the
                           resource is modified. Required.
                         "attributes": {
@@ -26359,13 +25486,18 @@ class NamespaceDiscoveredDevicesOperations:
                         "endpoints": {
                             "inbound": {
                                 "str": {
-                                    "address": "str",  # Fully qualified domain
-                                      name. Required.
+                                    "address": "str",  # The endpoint address &
+                                      port. This can be either an IP address (e.g., 192.168.1.1) or a
+                                      fully qualified domain name (FQDN, e.g., server.example.com).
+                                      Required.
                                     "endpointType": "str",  # Type of connection
                                       endpoint. Required.
                                     "additionalConfiguration": "str",  #
-                                      Optional. Stringified JSON that contains connectivity type
-                                      specific further configuration (e.g. OPC UA, Modbus, ONVIF).
+                                      Optional. Stringified JSON that contains configuration to be used
+                                      by the connector (e.g., OPC UA, ONVIF).
+                                    "lastUpdatedOn": "2020-02-20 00:00:00",  #
+                                      Optional. The timestamp (in UTC) when the endpoint was
+                                      discovered.
                                     "supportedAuthenticationMethods": [
                                         "str"  # Optional. List of supported
                                           authentication methods supported by device for Inbound
@@ -26380,21 +25512,21 @@ class NamespaceDiscoveredDevicesOperations:
                             "outbound": {
                                 "assigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 }
                             }
                         },
-                        "externalDeviceId": "str",  # Optional. A device id that represents
+                        "externalDeviceId": "str",  # Optional. A device ID that represents
                           the device in a system external to Azure. Unique within scope of an Azure
-                          Tenant.
-                        "manufacturer": "str",  # Optional. Hardware manufacturer name.
-                        "model": "str",  # Optional. Model name.
-                        "operatingSystem": "str",  # Optional. Operating system name.
-                        "operatingSystemVersion": "str",  # Optional. Operating system
+                          tenant.
+                        "manufacturer": "str",  # Optional. Device manufacturer.
+                        "model": "str",  # Optional. Device model.
+                        "operatingSystem": "str",  # Optional. Device operating system name.
+                        "operatingSystemVersion": "str",  # Optional. Device operating system
                           version.
                         "provisioningState": "str"  # Optional. Provisioning state of the
                           resource. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
@@ -26500,9 +25632,9 @@ class NamespaceDiscoveredDevicesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param discovered_device_name: Discovered device name parameter. Required.
+        :param discovered_device_name: The name of the discovered device. Required.
         :type discovered_device_name: str
         :return: JSON object
         :rtype: JSON
@@ -26523,7 +25655,7 @@ class NamespaceDiscoveredDevicesOperations:
                     "name": "str",  # Optional. The name of the resource.
                     "properties": {
                         "discoveryId": "str",  # Identifier used to detect changes in the
-                          asset endpoint profile. Required.
+                          discovered device. Required.
                         "version": 0,  # An integer that is incremented each time the
                           resource is modified. Required.
                         "attributes": {
@@ -26533,13 +25665,18 @@ class NamespaceDiscoveredDevicesOperations:
                         "endpoints": {
                             "inbound": {
                                 "str": {
-                                    "address": "str",  # Fully qualified domain
-                                      name. Required.
+                                    "address": "str",  # The endpoint address &
+                                      port. This can be either an IP address (e.g., 192.168.1.1) or a
+                                      fully qualified domain name (FQDN, e.g., server.example.com).
+                                      Required.
                                     "endpointType": "str",  # Type of connection
                                       endpoint. Required.
                                     "additionalConfiguration": "str",  #
-                                      Optional. Stringified JSON that contains connectivity type
-                                      specific further configuration (e.g. OPC UA, Modbus, ONVIF).
+                                      Optional. Stringified JSON that contains configuration to be used
+                                      by the connector (e.g., OPC UA, ONVIF).
+                                    "lastUpdatedOn": "2020-02-20 00:00:00",  #
+                                      Optional. The timestamp (in UTC) when the endpoint was
+                                      discovered.
                                     "supportedAuthenticationMethods": [
                                         "str"  # Optional. List of supported
                                           authentication methods supported by device for Inbound
@@ -26554,21 +25691,21 @@ class NamespaceDiscoveredDevicesOperations:
                             "outbound": {
                                 "assigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 }
                             }
                         },
-                        "externalDeviceId": "str",  # Optional. A device id that represents
+                        "externalDeviceId": "str",  # Optional. A device ID that represents
                           the device in a system external to Azure. Unique within scope of an Azure
-                          Tenant.
-                        "manufacturer": "str",  # Optional. Hardware manufacturer name.
-                        "model": "str",  # Optional. Model name.
-                        "operatingSystem": "str",  # Optional. Operating system name.
-                        "operatingSystemVersion": "str",  # Optional. Operating system
+                          tenant.
+                        "manufacturer": "str",  # Optional. Device manufacturer.
+                        "model": "str",  # Optional. Device model.
+                        "operatingSystem": "str",  # Optional. Device operating system name.
+                        "operatingSystemVersion": "str",  # Optional. Device operating system
                           version.
                         "provisioningState": "str"  # Optional. Provisioning state of the
                           resource. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
@@ -26741,9 +25878,9 @@ class NamespaceDiscoveredDevicesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param discovered_device_name: Discovered device name parameter. Required.
+        :param discovered_device_name: The name of the discovered device. Required.
         :type discovered_device_name: str
         :param resource: Resource create parameters. Required.
         :type resource: JSON
@@ -26769,7 +25906,7 @@ class NamespaceDiscoveredDevicesOperations:
                     "name": "str",  # Optional. The name of the resource.
                     "properties": {
                         "discoveryId": "str",  # Identifier used to detect changes in the
-                          asset endpoint profile. Required.
+                          discovered device. Required.
                         "version": 0,  # An integer that is incremented each time the
                           resource is modified. Required.
                         "attributes": {
@@ -26779,13 +25916,18 @@ class NamespaceDiscoveredDevicesOperations:
                         "endpoints": {
                             "inbound": {
                                 "str": {
-                                    "address": "str",  # Fully qualified domain
-                                      name. Required.
+                                    "address": "str",  # The endpoint address &
+                                      port. This can be either an IP address (e.g., 192.168.1.1) or a
+                                      fully qualified domain name (FQDN, e.g., server.example.com).
+                                      Required.
                                     "endpointType": "str",  # Type of connection
                                       endpoint. Required.
                                     "additionalConfiguration": "str",  #
-                                      Optional. Stringified JSON that contains connectivity type
-                                      specific further configuration (e.g. OPC UA, Modbus, ONVIF).
+                                      Optional. Stringified JSON that contains configuration to be used
+                                      by the connector (e.g., OPC UA, ONVIF).
+                                    "lastUpdatedOn": "2020-02-20 00:00:00",  #
+                                      Optional. The timestamp (in UTC) when the endpoint was
+                                      discovered.
                                     "supportedAuthenticationMethods": [
                                         "str"  # Optional. List of supported
                                           authentication methods supported by device for Inbound
@@ -26800,21 +25942,21 @@ class NamespaceDiscoveredDevicesOperations:
                             "outbound": {
                                 "assigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 }
                             }
                         },
-                        "externalDeviceId": "str",  # Optional. A device id that represents
+                        "externalDeviceId": "str",  # Optional. A device ID that represents
                           the device in a system external to Azure. Unique within scope of an Azure
-                          Tenant.
-                        "manufacturer": "str",  # Optional. Hardware manufacturer name.
-                        "model": "str",  # Optional. Model name.
-                        "operatingSystem": "str",  # Optional. Operating system name.
-                        "operatingSystemVersion": "str",  # Optional. Operating system
+                          tenant.
+                        "manufacturer": "str",  # Optional. Device manufacturer.
+                        "model": "str",  # Optional. Device model.
+                        "operatingSystem": "str",  # Optional. Device operating system name.
+                        "operatingSystemVersion": "str",  # Optional. Device operating system
                           version.
                         "provisioningState": "str"  # Optional. Provisioning state of the
                           resource. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
@@ -26855,7 +25997,7 @@ class NamespaceDiscoveredDevicesOperations:
                     "name": "str",  # Optional. The name of the resource.
                     "properties": {
                         "discoveryId": "str",  # Identifier used to detect changes in the
-                          asset endpoint profile. Required.
+                          discovered device. Required.
                         "version": 0,  # An integer that is incremented each time the
                           resource is modified. Required.
                         "attributes": {
@@ -26865,13 +26007,18 @@ class NamespaceDiscoveredDevicesOperations:
                         "endpoints": {
                             "inbound": {
                                 "str": {
-                                    "address": "str",  # Fully qualified domain
-                                      name. Required.
+                                    "address": "str",  # The endpoint address &
+                                      port. This can be either an IP address (e.g., 192.168.1.1) or a
+                                      fully qualified domain name (FQDN, e.g., server.example.com).
+                                      Required.
                                     "endpointType": "str",  # Type of connection
                                       endpoint. Required.
                                     "additionalConfiguration": "str",  #
-                                      Optional. Stringified JSON that contains connectivity type
-                                      specific further configuration (e.g. OPC UA, Modbus, ONVIF).
+                                      Optional. Stringified JSON that contains configuration to be used
+                                      by the connector (e.g., OPC UA, ONVIF).
+                                    "lastUpdatedOn": "2020-02-20 00:00:00",  #
+                                      Optional. The timestamp (in UTC) when the endpoint was
+                                      discovered.
                                     "supportedAuthenticationMethods": [
                                         "str"  # Optional. List of supported
                                           authentication methods supported by device for Inbound
@@ -26886,21 +26033,21 @@ class NamespaceDiscoveredDevicesOperations:
                             "outbound": {
                                 "assigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 }
                             }
                         },
-                        "externalDeviceId": "str",  # Optional. A device id that represents
+                        "externalDeviceId": "str",  # Optional. A device ID that represents
                           the device in a system external to Azure. Unique within scope of an Azure
-                          Tenant.
-                        "manufacturer": "str",  # Optional. Hardware manufacturer name.
-                        "model": "str",  # Optional. Model name.
-                        "operatingSystem": "str",  # Optional. Operating system name.
-                        "operatingSystemVersion": "str",  # Optional. Operating system
+                          tenant.
+                        "manufacturer": "str",  # Optional. Device manufacturer.
+                        "model": "str",  # Optional. Device model.
+                        "operatingSystem": "str",  # Optional. Device operating system name.
+                        "operatingSystemVersion": "str",  # Optional. Device operating system
                           version.
                         "provisioningState": "str"  # Optional. Provisioning state of the
                           resource. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
@@ -26947,9 +26094,9 @@ class NamespaceDiscoveredDevicesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param discovered_device_name: Discovered device name parameter. Required.
+        :param discovered_device_name: The name of the discovered device. Required.
         :type discovered_device_name: str
         :param resource: Resource create parameters. Required.
         :type resource: IO[bytes]
@@ -26975,7 +26122,7 @@ class NamespaceDiscoveredDevicesOperations:
                     "name": "str",  # Optional. The name of the resource.
                     "properties": {
                         "discoveryId": "str",  # Identifier used to detect changes in the
-                          asset endpoint profile. Required.
+                          discovered device. Required.
                         "version": 0,  # An integer that is incremented each time the
                           resource is modified. Required.
                         "attributes": {
@@ -26985,13 +26132,18 @@ class NamespaceDiscoveredDevicesOperations:
                         "endpoints": {
                             "inbound": {
                                 "str": {
-                                    "address": "str",  # Fully qualified domain
-                                      name. Required.
+                                    "address": "str",  # The endpoint address &
+                                      port. This can be either an IP address (e.g., 192.168.1.1) or a
+                                      fully qualified domain name (FQDN, e.g., server.example.com).
+                                      Required.
                                     "endpointType": "str",  # Type of connection
                                       endpoint. Required.
                                     "additionalConfiguration": "str",  #
-                                      Optional. Stringified JSON that contains connectivity type
-                                      specific further configuration (e.g. OPC UA, Modbus, ONVIF).
+                                      Optional. Stringified JSON that contains configuration to be used
+                                      by the connector (e.g., OPC UA, ONVIF).
+                                    "lastUpdatedOn": "2020-02-20 00:00:00",  #
+                                      Optional. The timestamp (in UTC) when the endpoint was
+                                      discovered.
                                     "supportedAuthenticationMethods": [
                                         "str"  # Optional. List of supported
                                           authentication methods supported by device for Inbound
@@ -27006,21 +26158,21 @@ class NamespaceDiscoveredDevicesOperations:
                             "outbound": {
                                 "assigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 }
                             }
                         },
-                        "externalDeviceId": "str",  # Optional. A device id that represents
+                        "externalDeviceId": "str",  # Optional. A device ID that represents
                           the device in a system external to Azure. Unique within scope of an Azure
-                          Tenant.
-                        "manufacturer": "str",  # Optional. Hardware manufacturer name.
-                        "model": "str",  # Optional. Model name.
-                        "operatingSystem": "str",  # Optional. Operating system name.
-                        "operatingSystemVersion": "str",  # Optional. Operating system
+                          tenant.
+                        "manufacturer": "str",  # Optional. Device manufacturer.
+                        "model": "str",  # Optional. Device model.
+                        "operatingSystem": "str",  # Optional. Device operating system name.
+                        "operatingSystemVersion": "str",  # Optional. Device operating system
                           version.
                         "provisioningState": "str"  # Optional. Provisioning state of the
                           resource. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
@@ -27065,9 +26217,9 @@ class NamespaceDiscoveredDevicesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param discovered_device_name: Discovered device name parameter. Required.
+        :param discovered_device_name: The name of the discovered device. Required.
         :type discovered_device_name: str
         :param resource: Resource create parameters. Is either a JSON type or a IO[bytes] type.
          Required.
@@ -27091,7 +26243,7 @@ class NamespaceDiscoveredDevicesOperations:
                     "name": "str",  # Optional. The name of the resource.
                     "properties": {
                         "discoveryId": "str",  # Identifier used to detect changes in the
-                          asset endpoint profile. Required.
+                          discovered device. Required.
                         "version": 0,  # An integer that is incremented each time the
                           resource is modified. Required.
                         "attributes": {
@@ -27101,13 +26253,18 @@ class NamespaceDiscoveredDevicesOperations:
                         "endpoints": {
                             "inbound": {
                                 "str": {
-                                    "address": "str",  # Fully qualified domain
-                                      name. Required.
+                                    "address": "str",  # The endpoint address &
+                                      port. This can be either an IP address (e.g., 192.168.1.1) or a
+                                      fully qualified domain name (FQDN, e.g., server.example.com).
+                                      Required.
                                     "endpointType": "str",  # Type of connection
                                       endpoint. Required.
                                     "additionalConfiguration": "str",  #
-                                      Optional. Stringified JSON that contains connectivity type
-                                      specific further configuration (e.g. OPC UA, Modbus, ONVIF).
+                                      Optional. Stringified JSON that contains configuration to be used
+                                      by the connector (e.g., OPC UA, ONVIF).
+                                    "lastUpdatedOn": "2020-02-20 00:00:00",  #
+                                      Optional. The timestamp (in UTC) when the endpoint was
+                                      discovered.
                                     "supportedAuthenticationMethods": [
                                         "str"  # Optional. List of supported
                                           authentication methods supported by device for Inbound
@@ -27122,21 +26279,21 @@ class NamespaceDiscoveredDevicesOperations:
                             "outbound": {
                                 "assigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 }
                             }
                         },
-                        "externalDeviceId": "str",  # Optional. A device id that represents
+                        "externalDeviceId": "str",  # Optional. A device ID that represents
                           the device in a system external to Azure. Unique within scope of an Azure
-                          Tenant.
-                        "manufacturer": "str",  # Optional. Hardware manufacturer name.
-                        "model": "str",  # Optional. Model name.
-                        "operatingSystem": "str",  # Optional. Operating system name.
-                        "operatingSystemVersion": "str",  # Optional. Operating system
+                          tenant.
+                        "manufacturer": "str",  # Optional. Device manufacturer.
+                        "model": "str",  # Optional. Device model.
+                        "operatingSystem": "str",  # Optional. Device operating system name.
+                        "operatingSystemVersion": "str",  # Optional. Device operating system
                           version.
                         "provisioningState": "str"  # Optional. Provisioning state of the
                           resource. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
@@ -27177,7 +26334,7 @@ class NamespaceDiscoveredDevicesOperations:
                     "name": "str",  # Optional. The name of the resource.
                     "properties": {
                         "discoveryId": "str",  # Identifier used to detect changes in the
-                          asset endpoint profile. Required.
+                          discovered device. Required.
                         "version": 0,  # An integer that is incremented each time the
                           resource is modified. Required.
                         "attributes": {
@@ -27187,13 +26344,18 @@ class NamespaceDiscoveredDevicesOperations:
                         "endpoints": {
                             "inbound": {
                                 "str": {
-                                    "address": "str",  # Fully qualified domain
-                                      name. Required.
+                                    "address": "str",  # The endpoint address &
+                                      port. This can be either an IP address (e.g., 192.168.1.1) or a
+                                      fully qualified domain name (FQDN, e.g., server.example.com).
+                                      Required.
                                     "endpointType": "str",  # Type of connection
                                       endpoint. Required.
                                     "additionalConfiguration": "str",  #
-                                      Optional. Stringified JSON that contains connectivity type
-                                      specific further configuration (e.g. OPC UA, Modbus, ONVIF).
+                                      Optional. Stringified JSON that contains configuration to be used
+                                      by the connector (e.g., OPC UA, ONVIF).
+                                    "lastUpdatedOn": "2020-02-20 00:00:00",  #
+                                      Optional. The timestamp (in UTC) when the endpoint was
+                                      discovered.
                                     "supportedAuthenticationMethods": [
                                         "str"  # Optional. List of supported
                                           authentication methods supported by device for Inbound
@@ -27208,21 +26370,21 @@ class NamespaceDiscoveredDevicesOperations:
                             "outbound": {
                                 "assigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 }
                             }
                         },
-                        "externalDeviceId": "str",  # Optional. A device id that represents
+                        "externalDeviceId": "str",  # Optional. A device ID that represents
                           the device in a system external to Azure. Unique within scope of an Azure
-                          Tenant.
-                        "manufacturer": "str",  # Optional. Hardware manufacturer name.
-                        "model": "str",  # Optional. Model name.
-                        "operatingSystem": "str",  # Optional. Operating system name.
-                        "operatingSystemVersion": "str",  # Optional. Operating system
+                          tenant.
+                        "manufacturer": "str",  # Optional. Device manufacturer.
+                        "model": "str",  # Optional. Device model.
+                        "operatingSystem": "str",  # Optional. Device operating system name.
+                        "operatingSystemVersion": "str",  # Optional. Device operating system
                           version.
                         "provisioningState": "str"  # Optional. Provisioning state of the
                           resource. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
@@ -27391,9 +26553,9 @@ class NamespaceDiscoveredDevicesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param discovered_device_name: Discovered device name parameter. Required.
+        :param discovered_device_name: The name of the discovered device. Required.
         :type discovered_device_name: str
         :param properties: The resource properties to be updated. Required.
         :type properties: JSON
@@ -27415,17 +26577,22 @@ class NamespaceDiscoveredDevicesOperations:
                               custom attributes.
                         },
                         "discoveryId": "str",  # Optional. Identifier used to detect changes
-                          in the asset endpoint profile.
+                          in the discovered device.
                         "endpoints": {
                             "inbound": {
                                 "str": {
                                     "additionalConfiguration": "str",  #
-                                      Optional. Stringified JSON that contains connectivity type
-                                      specific further configuration (e.g. OPC UA, Modbus, ONVIF).
-                                    "address": "str",  # Optional. Fully
-                                      qualified domain name.
+                                      Optional. Stringified JSON that contains configuration to be used
+                                      by the connector (e.g., OPC UA, ONVIF).
+                                    "address": "str",  # Optional. The endpoint
+                                      address & port. This can be either an IP address (e.g.,
+                                      192.168.1.1) or a fully qualified domain name (FQDN, e.g.,
+                                      server.example.com).
                                     "endpointType": "str",  # Optional. Type of
                                       connection endpoint.
+                                    "lastUpdatedOn": "2020-02-20 00:00:00",  #
+                                      Optional. The timestamp (in UTC) when the endpoint was
+                                      discovered.
                                     "supportedAuthenticationMethods": [
                                         "str"  # Optional. List of supported
                                           authentication methods supported by device for Inbound
@@ -27440,18 +26607,18 @@ class NamespaceDiscoveredDevicesOperations:
                             "outbound": {
                                 "assigned": {
                                     "str": {
-                                        "address": "str",  # Optional. Fully
-                                          qualified domain name.
+                                        "address": "str",  # Optional. The
+                                          endpoint address to connect to.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 }
                             }
                         },
-                        "externalDeviceId": "str",  # Optional. A device id that represents
+                        "externalDeviceId": "str",  # Optional. A device ID that represents
                           the device in a system external to Azure. Unique within scope of an Azure
-                          Tenant.
-                        "operatingSystemVersion": "str",  # Optional. Operating system
+                          tenant.
+                        "operatingSystemVersion": "str",  # Optional. Device operating system
                           version.
                         "version": 0  # Optional. An integer that is incremented each time
                           the resource is modified.
@@ -27473,7 +26640,7 @@ class NamespaceDiscoveredDevicesOperations:
                     "name": "str",  # Optional. The name of the resource.
                     "properties": {
                         "discoveryId": "str",  # Identifier used to detect changes in the
-                          asset endpoint profile. Required.
+                          discovered device. Required.
                         "version": 0,  # An integer that is incremented each time the
                           resource is modified. Required.
                         "attributes": {
@@ -27483,13 +26650,18 @@ class NamespaceDiscoveredDevicesOperations:
                         "endpoints": {
                             "inbound": {
                                 "str": {
-                                    "address": "str",  # Fully qualified domain
-                                      name. Required.
+                                    "address": "str",  # The endpoint address &
+                                      port. This can be either an IP address (e.g., 192.168.1.1) or a
+                                      fully qualified domain name (FQDN, e.g., server.example.com).
+                                      Required.
                                     "endpointType": "str",  # Type of connection
                                       endpoint. Required.
                                     "additionalConfiguration": "str",  #
-                                      Optional. Stringified JSON that contains connectivity type
-                                      specific further configuration (e.g. OPC UA, Modbus, ONVIF).
+                                      Optional. Stringified JSON that contains configuration to be used
+                                      by the connector (e.g., OPC UA, ONVIF).
+                                    "lastUpdatedOn": "2020-02-20 00:00:00",  #
+                                      Optional. The timestamp (in UTC) when the endpoint was
+                                      discovered.
                                     "supportedAuthenticationMethods": [
                                         "str"  # Optional. List of supported
                                           authentication methods supported by device for Inbound
@@ -27504,21 +26676,21 @@ class NamespaceDiscoveredDevicesOperations:
                             "outbound": {
                                 "assigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 }
                             }
                         },
-                        "externalDeviceId": "str",  # Optional. A device id that represents
+                        "externalDeviceId": "str",  # Optional. A device ID that represents
                           the device in a system external to Azure. Unique within scope of an Azure
-                          Tenant.
-                        "manufacturer": "str",  # Optional. Hardware manufacturer name.
-                        "model": "str",  # Optional. Model name.
-                        "operatingSystem": "str",  # Optional. Operating system name.
-                        "operatingSystemVersion": "str",  # Optional. Operating system
+                          tenant.
+                        "manufacturer": "str",  # Optional. Device manufacturer.
+                        "model": "str",  # Optional. Device model.
+                        "operatingSystem": "str",  # Optional. Device operating system name.
+                        "operatingSystemVersion": "str",  # Optional. Device operating system
                           version.
                         "provisioningState": "str"  # Optional. Provisioning state of the
                           resource. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
@@ -27565,9 +26737,9 @@ class NamespaceDiscoveredDevicesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param discovered_device_name: Discovered device name parameter. Required.
+        :param discovered_device_name: The name of the discovered device. Required.
         :type discovered_device_name: str
         :param properties: The resource properties to be updated. Required.
         :type properties: IO[bytes]
@@ -27593,7 +26765,7 @@ class NamespaceDiscoveredDevicesOperations:
                     "name": "str",  # Optional. The name of the resource.
                     "properties": {
                         "discoveryId": "str",  # Identifier used to detect changes in the
-                          asset endpoint profile. Required.
+                          discovered device. Required.
                         "version": 0,  # An integer that is incremented each time the
                           resource is modified. Required.
                         "attributes": {
@@ -27603,13 +26775,18 @@ class NamespaceDiscoveredDevicesOperations:
                         "endpoints": {
                             "inbound": {
                                 "str": {
-                                    "address": "str",  # Fully qualified domain
-                                      name. Required.
+                                    "address": "str",  # The endpoint address &
+                                      port. This can be either an IP address (e.g., 192.168.1.1) or a
+                                      fully qualified domain name (FQDN, e.g., server.example.com).
+                                      Required.
                                     "endpointType": "str",  # Type of connection
                                       endpoint. Required.
                                     "additionalConfiguration": "str",  #
-                                      Optional. Stringified JSON that contains connectivity type
-                                      specific further configuration (e.g. OPC UA, Modbus, ONVIF).
+                                      Optional. Stringified JSON that contains configuration to be used
+                                      by the connector (e.g., OPC UA, ONVIF).
+                                    "lastUpdatedOn": "2020-02-20 00:00:00",  #
+                                      Optional. The timestamp (in UTC) when the endpoint was
+                                      discovered.
                                     "supportedAuthenticationMethods": [
                                         "str"  # Optional. List of supported
                                           authentication methods supported by device for Inbound
@@ -27624,21 +26801,21 @@ class NamespaceDiscoveredDevicesOperations:
                             "outbound": {
                                 "assigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 }
                             }
                         },
-                        "externalDeviceId": "str",  # Optional. A device id that represents
+                        "externalDeviceId": "str",  # Optional. A device ID that represents
                           the device in a system external to Azure. Unique within scope of an Azure
-                          Tenant.
-                        "manufacturer": "str",  # Optional. Hardware manufacturer name.
-                        "model": "str",  # Optional. Model name.
-                        "operatingSystem": "str",  # Optional. Operating system name.
-                        "operatingSystemVersion": "str",  # Optional. Operating system
+                          tenant.
+                        "manufacturer": "str",  # Optional. Device manufacturer.
+                        "model": "str",  # Optional. Device model.
+                        "operatingSystem": "str",  # Optional. Device operating system name.
+                        "operatingSystemVersion": "str",  # Optional. Device operating system
                           version.
                         "provisioningState": "str"  # Optional. Provisioning state of the
                           resource. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
@@ -27683,9 +26860,9 @@ class NamespaceDiscoveredDevicesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param discovered_device_name: Discovered device name parameter. Required.
+        :param discovered_device_name: The name of the discovered device. Required.
         :type discovered_device_name: str
         :param properties: The resource properties to be updated. Is either a JSON type or a IO[bytes]
          type. Required.
@@ -27705,17 +26882,22 @@ class NamespaceDiscoveredDevicesOperations:
                               custom attributes.
                         },
                         "discoveryId": "str",  # Optional. Identifier used to detect changes
-                          in the asset endpoint profile.
+                          in the discovered device.
                         "endpoints": {
                             "inbound": {
                                 "str": {
                                     "additionalConfiguration": "str",  #
-                                      Optional. Stringified JSON that contains connectivity type
-                                      specific further configuration (e.g. OPC UA, Modbus, ONVIF).
-                                    "address": "str",  # Optional. Fully
-                                      qualified domain name.
+                                      Optional. Stringified JSON that contains configuration to be used
+                                      by the connector (e.g., OPC UA, ONVIF).
+                                    "address": "str",  # Optional. The endpoint
+                                      address & port. This can be either an IP address (e.g.,
+                                      192.168.1.1) or a fully qualified domain name (FQDN, e.g.,
+                                      server.example.com).
                                     "endpointType": "str",  # Optional. Type of
                                       connection endpoint.
+                                    "lastUpdatedOn": "2020-02-20 00:00:00",  #
+                                      Optional. The timestamp (in UTC) when the endpoint was
+                                      discovered.
                                     "supportedAuthenticationMethods": [
                                         "str"  # Optional. List of supported
                                           authentication methods supported by device for Inbound
@@ -27730,18 +26912,18 @@ class NamespaceDiscoveredDevicesOperations:
                             "outbound": {
                                 "assigned": {
                                     "str": {
-                                        "address": "str",  # Optional. Fully
-                                          qualified domain name.
+                                        "address": "str",  # Optional. The
+                                          endpoint address to connect to.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 }
                             }
                         },
-                        "externalDeviceId": "str",  # Optional. A device id that represents
+                        "externalDeviceId": "str",  # Optional. A device ID that represents
                           the device in a system external to Azure. Unique within scope of an Azure
-                          Tenant.
-                        "operatingSystemVersion": "str",  # Optional. Operating system
+                          tenant.
+                        "operatingSystemVersion": "str",  # Optional. Device operating system
                           version.
                         "version": 0  # Optional. An integer that is incremented each time
                           the resource is modified.
@@ -27763,7 +26945,7 @@ class NamespaceDiscoveredDevicesOperations:
                     "name": "str",  # Optional. The name of the resource.
                     "properties": {
                         "discoveryId": "str",  # Identifier used to detect changes in the
-                          asset endpoint profile. Required.
+                          discovered device. Required.
                         "version": 0,  # An integer that is incremented each time the
                           resource is modified. Required.
                         "attributes": {
@@ -27773,13 +26955,18 @@ class NamespaceDiscoveredDevicesOperations:
                         "endpoints": {
                             "inbound": {
                                 "str": {
-                                    "address": "str",  # Fully qualified domain
-                                      name. Required.
+                                    "address": "str",  # The endpoint address &
+                                      port. This can be either an IP address (e.g., 192.168.1.1) or a
+                                      fully qualified domain name (FQDN, e.g., server.example.com).
+                                      Required.
                                     "endpointType": "str",  # Type of connection
                                       endpoint. Required.
                                     "additionalConfiguration": "str",  #
-                                      Optional. Stringified JSON that contains connectivity type
-                                      specific further configuration (e.g. OPC UA, Modbus, ONVIF).
+                                      Optional. Stringified JSON that contains configuration to be used
+                                      by the connector (e.g., OPC UA, ONVIF).
+                                    "lastUpdatedOn": "2020-02-20 00:00:00",  #
+                                      Optional. The timestamp (in UTC) when the endpoint was
+                                      discovered.
                                     "supportedAuthenticationMethods": [
                                         "str"  # Optional. List of supported
                                           authentication methods supported by device for Inbound
@@ -27794,21 +26981,21 @@ class NamespaceDiscoveredDevicesOperations:
                             "outbound": {
                                 "assigned": {
                                     "str": {
-                                        "address": "str",  # Fully qualified
-                                          domain name. Required.
+                                        "address": "str",  # The endpoint
+                                          address to connect to. Required.
                                         "endpointType": "str"  # Optional.
-                                          Type of connection used for the endpoint.
+                                          Type of connection used for the messaging endpoint.
                                     }
                                 }
                             }
                         },
-                        "externalDeviceId": "str",  # Optional. A device id that represents
+                        "externalDeviceId": "str",  # Optional. A device ID that represents
                           the device in a system external to Azure. Unique within scope of an Azure
-                          Tenant.
-                        "manufacturer": "str",  # Optional. Hardware manufacturer name.
-                        "model": "str",  # Optional. Model name.
-                        "operatingSystem": "str",  # Optional. Operating system name.
-                        "operatingSystemVersion": "str",  # Optional. Operating system
+                          tenant.
+                        "manufacturer": "str",  # Optional. Device manufacturer.
+                        "model": "str",  # Optional. Device model.
+                        "operatingSystem": "str",  # Optional. Device operating system name.
+                        "operatingSystemVersion": "str",  # Optional. Device operating system
                           version.
                         "provisioningState": "str"  # Optional. Provisioning state of the
                           resource. Known values are: "Succeeded", "Failed", "Canceled", "Accepted",
@@ -27943,9 +27130,9 @@ class NamespaceDiscoveredDevicesOperations:
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :param namespace_name: Namespace name parameter. Required.
+        :param namespace_name: The name of the namespace. Required.
         :type namespace_name: str
-        :param discovered_device_name: Discovered device name parameter. Required.
+        :param discovered_device_name: The name of the discovered device. Required.
         :type discovered_device_name: str
         :return: An instance of LROPoller that returns None
         :rtype: ~azure.core.polling.LROPoller[None]
@@ -27998,7 +27185,7 @@ class SchemasOperations:
         **DO NOT** instantiate this class directly.
 
         Instead, you should access the following operations through
-        :class:`~aziotops.mgmt.PrivateDeviceRegistryManagementService`'s
+        :class:`~deviceregistry.mgmt.DeviceRegistryMgmtClient`'s
         :attr:`schemas` attribute.
     """
 
@@ -28725,7 +27912,7 @@ class SchemaVersionsOperations:
         **DO NOT** instantiate this class directly.
 
         Instead, you should access the following operations through
-        :class:`~aziotops.mgmt.PrivateDeviceRegistryManagementService`'s
+        :class:`~deviceregistry.mgmt.DeviceRegistryMgmtClient`'s
         :attr:`schema_versions` attribute.
     """
 

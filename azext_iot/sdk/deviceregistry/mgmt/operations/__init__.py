@@ -13,10 +13,10 @@ from ._operations import AssetsOperations
 from ._operations import BillingContainersOperations
 from ._operations import OperationStatusOperations
 from ._operations import NamespacesOperations
-from ._operations import CredentialsOperations
-from ._operations import PoliciesOperations
 from ._operations import SchemaRegistriesOperations
 from ._operations import NamespaceAssetsOperations
+from ._operations import CredentialsOperations
+from ._operations import PoliciesOperations
 from ._operations import NamespaceDevicesOperations
 from ._operations import NamespaceDiscoveredAssetsOperations
 from ._operations import NamespaceDiscoveredDevicesOperations
@@ -34,10 +34,10 @@ __all__ = [
     "BillingContainersOperations",
     "OperationStatusOperations",
     "NamespacesOperations",
-    "CredentialsOperations",
-    "PoliciesOperations",
     "SchemaRegistriesOperations",
     "NamespaceAssetsOperations",
+    "CredentialsOperations",
+    "PoliciesOperations",
     "NamespaceDevicesOperations",
     "NamespaceDiscoveredAssetsOperations",
     "NamespaceDiscoveredDevicesOperations",
