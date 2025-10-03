@@ -9,8 +9,7 @@ This section aims to provide the community with example automation scripts using
 
 # -----------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
-# Private distribution for preview customers
-# Governed by license terms at https://aka.ms/iothub-certmgmt-privprev-license
+# Licensed under the MIT License. See License.txt in the project root for license information.
 # -----------------------------------------------------------------------------
 
 # This bash script will provision, simulate and monitor device telemetry.

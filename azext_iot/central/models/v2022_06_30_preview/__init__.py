@@ -1,8 +1,7 @@
 # coding=utf-8
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
-# Private distribution for preview customers
-# Governed by license terms at https://aka.ms/iothub-certmgmt-privprev-license
+# Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
 from azext_iot.central.models.v2022_06_30_preview.device import Device as DevicePreview
