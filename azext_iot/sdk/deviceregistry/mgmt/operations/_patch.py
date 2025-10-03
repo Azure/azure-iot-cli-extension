@@ -1,7 +1,6 @@
 # ------------------------------------
 # Copyright (c) Microsoft Corporation.
-# Private distribution for preview customers
-# Governed by license terms at https://aka.ms/iothub-certmgmt-privprev-license
+# Licensed under the MIT License.
 # ------------------------------------
 """Customize generated code here.
 
