@@ -9,7 +9,8 @@ This section aims to provide the community with example automation scripts using
 
 # -----------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
-# Licensed under the MIT License. See License.txt in the project root for license information.
+# Licensed under the MIT License. See License.txt in the project root for
+# license information.
 # -----------------------------------------------------------------------------
 
 # This bash script will provision, simulate and monitor device telemetry.

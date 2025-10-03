@@ -86,6 +86,7 @@ setup(
     long_description="{} Intended for power users and/or automation of IoT solutions at scale.".format(
         short_description
     ),
+    license="MIT",
     author="Microsoft",
     author_email="iotupx@microsoft.com",  # +@digimaun
     url="https://github.com/azure/azure-iot-cli-extension",
