@@ -8,7 +8,7 @@ jobs:
     runs-on:
       [
         self-hosted,
-        1ES.Pool=iotupx-azdevice-github-hosted-pool,
+        1ES.Pool=iotupx-iot-cli-github-hosted-pool,
         1ES.ImageOverride=Ubuntu20.04Compliant,
       ]
     permissions:

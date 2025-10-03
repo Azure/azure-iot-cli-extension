@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - dev
-      - cms
       - feature/*
   workflow_call:
     inputs:
@@ -23,7 +22,6 @@ jobs:
       # needed to write security info to repository
       security-events: write
       contents: read
-      actions: read
     steps:
     - uses: actions/checkout@v4
 
