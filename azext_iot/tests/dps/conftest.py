@@ -33,6 +33,7 @@ settings = DynamoSettings(
     opt_env_set=list(set(ENV_SET_TEST_IOTHUB_OPTIONAL + ENV_SET_TEST_IOTDPS_OPTIONAL))
 )
 ENTITY_RG = settings.env.azext_iot_testrg
+ENTITY_LOCATION = "westus"
 MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries if settings.env.azext_iot_rbac_max_tries else 10
 
 
@@ -94,7 +95,7 @@ def _iot_dps_provisioner(iot_hub: Optional[Dict] = None) -> dict:
         if settings.env.azext_iot_testdps:
             logger.error(f"DPS {dps_name} specified in pytest settings not found. DPS will be created")
 
-        base_command = f"iot dps create --name {dps_name} --resource-group {ENTITY_RG}"
+        base_command = f"iot dps create --name {dps_name} --resource-group {ENTITY_RG} --location {ENTITY_LOCATION}"
         if iot_hub:
             base_command += f" --tags hubname={iot_hub['name']}"
         target_dps = cli.invoke(base_command).as_json()
