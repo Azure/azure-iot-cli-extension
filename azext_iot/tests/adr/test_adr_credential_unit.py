@@ -7,6 +7,9 @@
 import pytest
 from unittest.mock import Mock, patch
 
+from azure.cli.core.azclierror import ResourceNotFoundError
+from azure.core.exceptions import HttpResponseError
+
 
 @pytest.mark.parametrize(
     "namespace_name, resource_group_name, tags, location",
@@ -72,6 +75,56 @@ def test_show_credential(fixture_credential_provider):
     fixture_credential_provider.client.credentials.get.assert_called_once_with(
         resource_group_name="test-rg", namespace_name="test-namespace"
     )
+
+
+@pytest.mark.parametrize(
+    "namespace_exists, expected_exception",
+    [
+        (True, ResourceNotFoundError),
+        (False, HttpResponseError),
+    ],
+)
+def test_show_credential_not_found(fixture_credential_provider, namespace_exists, expected_exception):
+    """Test credential show when credential or namespace doesn't exist - covers both namespace exists/doesn't exist scenarios."""
+    test_namespace = "test-namespace"
+    test_rg = "test_rg"
+
+    # HTTP 404 mock
+    mock_404_response = Mock()
+    mock_404_response.status_code = 404
+    http_404_error = HttpResponseError(response=mock_404_response)
+
+    if namespace_exists:
+        # namespace get succeeds
+        mock_namespace = Mock()
+        fixture_credential_provider.client.namespaces.get.return_value = mock_namespace
+        # credential returns 404
+        fixture_credential_provider.client.credentials.get.side_effect = http_404_error
+    else:
+        # namespace returns 404
+        fixture_credential_provider.client.namespaces.get.side_effect = http_404_error
+
+    with pytest.raises(expected_exception) as exc_info:
+        fixture_credential_provider.show(namespace_name=test_namespace, resource_group_name=test_rg)
+
+    if namespace_exists:
+        error_message = str(exc_info.value)
+        assert f"No credential found for namespace '{test_namespace}'" in error_message
+    else:
+        assert exc_info.value.response.status_code == 404
+
+    # Namespace get should always be called
+    fixture_credential_provider.client.namespaces.get.assert_called_once_with(
+        resource_group_name=test_rg, namespace_name=test_namespace
+    )
+
+    # Credential get is only called if namespace exists
+    if namespace_exists:
+        fixture_credential_provider.client.credentials.get.assert_called_once_with(
+            resource_group_name=test_rg, namespace_name=test_namespace
+        )
+    else:
+        fixture_credential_provider.client.credentials.get.assert_not_called()
 
 
 def test_delete_credential(fixture_credential_provider, mock_poller):
