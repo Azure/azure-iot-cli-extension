@@ -7,6 +7,9 @@
 import pytest
 from unittest.mock import Mock
 
+from azure.cli.core.azclierror import ResourceNotFoundError
+from azure.core.exceptions import HttpResponseError
+
 
 @pytest.mark.parametrize(
     "test_params",
@@ -158,6 +161,11 @@ def test_show_policy(fixture_policy_provider):
         "location": "eastus",
         "properties": {"certificate": {"status": "active"}},
     }
+
+    # Mock successful namespace check
+    mock_namespace = Mock()
+    fixture_policy_provider.client.namespaces.get.return_value = mock_namespace
+
     fixture_policy_provider.client.policies.get.return_value = expected_policy
 
     result = fixture_policy_provider.show(
@@ -165,6 +173,11 @@ def test_show_policy(fixture_policy_provider):
     )
 
     assert result == expected_policy
+
+    # Verify namespace and policy calls were made
+    fixture_policy_provider.client.namespaces.get.assert_called_once_with(
+        resource_group_name="test-rg", namespace_name="test-namespace"
+    )
     fixture_policy_provider.client.policies.get.assert_called_once_with(
         resource_group_name="test-rg", namespace_name="test-namespace", policy_name="test-policy"
     )
@@ -177,26 +190,20 @@ def test_list_policies_by_resource_group(fixture_policy_provider):
     mock_policies_iterator.__iter__ = Mock(return_value=iter(expected_policies))
     fixture_policy_provider.client.policies.list_by_resource_group.return_value = mock_policies_iterator
 
+    # Mock successful namespace check
+    mock_namespace = Mock()
+    fixture_policy_provider.client.namespaces.get.return_value = mock_namespace
+
     result = fixture_policy_provider.list(namespace_name="test-namespace", resource_group_name="test-rg")
 
     assert result == expected_policies
-    fixture_policy_provider.client.policies.list_by_resource_group.assert_called_once_with(
+
+    # Verify namespace and policy list calls were made
+    fixture_policy_provider.client.namespaces.get.assert_called_once_with(
         resource_group_name="test-rg", namespace_name="test-namespace"
     )
-
-
-def test_list_policies_by_subscription(fixture_policy_provider):
-    """Test successful policy listing by subscription."""
-    expected_policies = [{"name": "policy1", "location": "eastus"}, {"name": "policy2", "location": "westus"}]
-    mock_policies_iterator = Mock()
-    mock_policies_iterator.__iter__ = Mock(return_value=iter(expected_policies))
-    fixture_policy_provider.client.policies.list_by_subscription.return_value = mock_policies_iterator
-
-    result = fixture_policy_provider.list(namespace_name="test-namespace")
-
-    assert result == expected_policies
-    fixture_policy_provider.client.policies.list_by_subscription.assert_called_once_with(
-        namespace_name="test-namespace"
+    fixture_policy_provider.client.policies.list_by_resource_group.assert_called_once_with(
+        resource_group_name="test-rg", namespace_name="test-namespace"
     )
 
 
@@ -359,3 +366,110 @@ def test_update_policy_no_changes(fixture_policy_provider):
     # Should return early without calling the client
     assert result is None
     fixture_policy_provider.client.policies.begin_update.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "namespace_exists, expected_exception",
+    [
+        (True, ResourceNotFoundError),
+        (False, HttpResponseError),
+    ],
+)
+def test_show_policy_error_scenarios(fixture_policy_provider, namespace_exists, expected_exception):
+    """Test policy show error scenarios: namespace missing or credentials missing."""
+    test_namespace = "test-namespace"
+    test_rg = "test-rg"
+    test_policy = "test-policy"
+
+    # HTTP 404 mock
+    mock_404_response = Mock()
+    mock_404_response.status_code = 404
+    http_404_error = HttpResponseError(response=mock_404_response)
+
+    if namespace_exists:
+        # Mock namespace exists
+        mock_namespace = Mock()
+        fixture_policy_provider.client.namespaces.get.return_value = mock_namespace
+
+        # ParentResourceNotFound (credentials don't exist)
+        class MockParentResourceNotFoundError(HttpResponseError):
+            def __str__(self):
+                return "ParentResourceNotFound"
+
+        parent_error = MockParentResourceNotFoundError(response=mock_404_response)
+        fixture_policy_provider.client.policies.get.side_effect = parent_error
+    else:
+        # Mock namespace doesn't exist
+        fixture_policy_provider.client.namespaces.get.side_effect = http_404_error
+
+    with pytest.raises(expected_exception) as exc_info:
+        fixture_policy_provider.show(
+            policy_name=test_policy, namespace_name=test_namespace, resource_group_name=test_rg
+        )
+
+    error_message = str(exc_info.value)
+    if namespace_exists:
+        assert f"No credential exists on namespace '{test_namespace}'" in error_message
+        fixture_policy_provider.client.policies.get.assert_called_once_with(
+            resource_group_name=test_rg, namespace_name=test_namespace, policy_name=test_policy
+        )
+    else:
+        assert exc_info.value.response.status_code == 404
+        fixture_policy_provider.client.policies.get.assert_not_called()
+
+    # Namespace get should always be called
+    fixture_policy_provider.client.namespaces.get.assert_called_once_with(
+        resource_group_name=test_rg, namespace_name=test_namespace
+    )
+
+
+@pytest.mark.parametrize(
+    "namespace_exists, expected_exception",
+    [
+        (True, ResourceNotFoundError),
+        (False, HttpResponseError),
+    ],
+)
+def test_list_policy_error_scenarios(fixture_policy_provider, namespace_exists, expected_exception):
+    """Test policy list error scenarios: namespace missing or credentials missing."""
+    test_namespace = "test-namespace"
+    test_rg = "test-rg"
+
+    # HTTP 404 mock
+    mock_404_response = Mock()
+    mock_404_response.status_code = 404
+    http_404_error = HttpResponseError(response=mock_404_response)
+
+    if namespace_exists:
+        # Mock namespace exists
+        mock_namespace = Mock()
+        fixture_policy_provider.client.namespaces.get.return_value = mock_namespace
+
+        # ParentResourceNotFound (credentials don't exist)
+        class MockParentResourceNotFoundError(HttpResponseError):
+            def __str__(self):
+                return "ParentResourceNotFound error message"
+
+        parent_error = MockParentResourceNotFoundError(response=mock_404_response)
+        fixture_policy_provider.client.policies.list_by_resource_group.side_effect = parent_error
+    else:
+        # Mock namespace doesn't exist
+        fixture_policy_provider.client.namespaces.get.side_effect = http_404_error
+
+    with pytest.raises(expected_exception) as exc_info:
+        fixture_policy_provider.list(namespace_name=test_namespace, resource_group_name=test_rg)
+
+    error_message = str(exc_info.value)
+    if namespace_exists:
+        assert f"No credential exists on namespace '{test_namespace}'" in error_message
+        fixture_policy_provider.client.policies.list_by_resource_group.assert_called_once_with(
+            resource_group_name=test_rg, namespace_name=test_namespace
+        )
+    else:
+        assert exc_info.value.response.status_code == 404
+        fixture_policy_provider.client.policies.list_by_resource_group.assert_not_called()
+
+    # Namespace get should always be called
+    fixture_policy_provider.client.namespaces.get.assert_called_once_with(
+        resource_group_name=test_rg, namespace_name=test_namespace
+    )

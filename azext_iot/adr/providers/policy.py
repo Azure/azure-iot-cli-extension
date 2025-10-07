@@ -6,10 +6,12 @@
 
 from typing import Dict, Optional
 
-from azure.cli.core.azclierror import AzureResponseError
+from azure.cli.core.azclierror import AzureResponseError, ResourceNotFoundError
+from azure.core.exceptions import HttpResponseError
 from knack.log import get_logger
 from rich.console import Console
 
+from azext_iot.adr.common import POLICY_PARENT_RESOURCE_NOT_FOUND_MSG
 from azext_iot.adr.providers.base import ADRProvider
 from azext_iot.common.utility import wait_for_terminal_state
 
@@ -80,22 +82,45 @@ class PolicyProvider(ADRProvider):
             return wait_for_terminal_state(poller, **kwargs)
 
     def show(self, policy_name: str, namespace_name: str, resource_group_name: str):
-        return self.client.policies.get(
-            resource_group_name=resource_group_name,
-            namespace_name=namespace_name,
-            policy_name=policy_name,
-        )
+        # Ensure namespace exists
+        self.client.namespaces.get(resource_group_name=resource_group_name, namespace_name=namespace_name)
+        
+        try:
+            return self.client.policies.get(
+                resource_group_name=resource_group_name,
+                namespace_name=namespace_name,
+                policy_name=policy_name,
+            )
+        except HttpResponseError as e:
+            if e.status_code == 404 and "ParentResourceNotFound" in str(e):
+                raise ResourceNotFoundError(
+                    POLICY_PARENT_RESOURCE_NOT_FOUND_MSG.format(
+                        namespace_name=namespace_name,
+                        resource_group_name=resource_group_name
+                    )
+                )
+            raise
 
-    def list(self, namespace_name: str, resource_group_name: Optional[str] = None):
-        if resource_group_name:
+    def list(self, namespace_name: str, resource_group_name: str):
+        # Ensure namespace exists
+        self.client.namespaces.get(resource_group_name=resource_group_name, namespace_name=namespace_name)
+        
+        try:
             return list(
                 self.client.policies.list_by_resource_group(
                     resource_group_name=resource_group_name,
                     namespace_name=namespace_name,
                 )
             )
-        else:
-            return list(self.client.policies.list_by_subscription(namespace_name=namespace_name))
+        except HttpResponseError as e:
+            if e.status_code == 404 and "ParentResourceNotFound" in str(e):
+                raise ResourceNotFoundError(
+                    POLICY_PARENT_RESOURCE_NOT_FOUND_MSG.format(
+                        namespace_name=namespace_name,
+                        resource_group_name=resource_group_name
+                    )
+                )
+            raise
 
     def delete(self, policy_name: str, namespace_name: str, resource_group_name: str, **kwargs):
         with console.status(f"Deleting policy '{policy_name}' from namespace {namespace_name}..."):
