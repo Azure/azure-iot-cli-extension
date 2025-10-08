@@ -84,7 +84,7 @@ class PolicyProvider(ADRProvider):
     def show(self, policy_name: str, namespace_name: str, resource_group_name: str):
         # Ensure namespace exists
         self.client.namespaces.get(resource_group_name=resource_group_name, namespace_name=namespace_name)
-        
+
         try:
             return self.client.policies.get(
                 resource_group_name=resource_group_name,
@@ -95,8 +95,7 @@ class PolicyProvider(ADRProvider):
             if e.status_code == 404 and "ParentResourceNotFound" in str(e):
                 raise ResourceNotFoundError(
                     POLICY_PARENT_RESOURCE_NOT_FOUND_MSG.format(
-                        namespace_name=namespace_name,
-                        resource_group_name=resource_group_name
+                        namespace_name=namespace_name, resource_group_name=resource_group_name
                     )
                 )
             raise
@@ -104,7 +103,7 @@ class PolicyProvider(ADRProvider):
     def list(self, namespace_name: str, resource_group_name: str):
         # Ensure namespace exists
         self.client.namespaces.get(resource_group_name=resource_group_name, namespace_name=namespace_name)
-        
+
         try:
             return list(
                 self.client.policies.list_by_resource_group(
@@ -116,8 +115,7 @@ class PolicyProvider(ADRProvider):
             if e.status_code == 404 and "ParentResourceNotFound" in str(e):
                 raise ResourceNotFoundError(
                     POLICY_PARENT_RESOURCE_NOT_FOUND_MSG.format(
-                        namespace_name=namespace_name,
-                        resource_group_name=resource_group_name
+                        namespace_name=namespace_name, resource_group_name=resource_group_name
                     )
                 )
             raise

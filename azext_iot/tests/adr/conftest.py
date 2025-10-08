@@ -22,7 +22,9 @@ TEST_RG = settings.env.azext_iot_testrg
 
 # Test constants for integration tests
 CUSTOM_POLICY_NAME = "custompolicy"
-CUSTOM_CERT_VALIDITY_DAYS = 15
+CUSTOM_CERT_VALIDITY_DAYS = 30
+CUSTOM_CERT_UPDATE_VALIDITY_DAYS = 15
+CUSTOM_CERT_UPDATE_KEYTYPE = "RSA"
 CUSTOM_CERT_KEY_TYPE = "ECC"
 CUSTOM_CERT_SUBJECT = "CN=test-device"
 
