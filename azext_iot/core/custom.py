@@ -42,6 +42,7 @@ from azext_iot.core.shared import (
 )
 from azext_iot.iothub.common import SYSTEM_ASSIGNED_IDENTITY
 from azext_iot.sdk.dps.mgmt.models import (
+    CertificateResponse,
     CertificateProperties as DPSCertificateProperties,
     DeviceRegistryNamespaceAuthenticationType,
     DeviceRegistryNamespaceDescription,
@@ -505,12 +506,13 @@ def iot_dps_certificate_create(client, dps_name, certificate_name, certificate_p
     if not certificate:
         raise CLIError("Error uploading certificate '{0}'.".format(certificate_path))
     certificate_bytes = certificate.encode('utf-8')
-    cert_description = DPSCertificateProperties(certificate=certificate_bytes, is_verified=is_verified)
+    properties = DPSCertificateProperties(certificate=certificate_bytes, is_verified=is_verified)
+    certificate_description = CertificateResponse(properties=properties)
     return client.dps_certificate.create_or_update(
         resource_group_name=resource_group_name,
         provisioning_service_name=dps_name,
         certificate_name=certificate_name,
-        certificate_description=cert_description
+        certificate_description=certificate_description
     )
 
 
@@ -526,12 +528,13 @@ def iot_dps_certificate_update(client, dps_name, certificate_name, certificate_p
             if not certificate:
                 raise CLIError("Error uploading certificate '{0}'.".format(certificate_path))
             certificate_bytes = certificate.encode('utf-8')
-            cert_description = DPSCertificateProperties(certificate=certificate_bytes, is_verified=is_verified)
+            properties = DPSCertificateProperties(certificate=certificate_bytes, is_verified=is_verified)
+            certificate_description = CertificateResponse(properties=properties)
             return client.dps_certificate.create_or_update(
                 resource_group_name=resource_group_name,
                 provisioning_service_name=dps_name,
                 certificate_name=certificate_name,
-                certificate_description=cert_description,
+                certificate_description=certificate_description,
                 etag=etag
             )
     raise CLIError("Certificate '{0}' does not exist. Use 'iot dps certificate create' to create a new certificate."
