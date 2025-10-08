@@ -9,6 +9,8 @@ from knack.log import get_logger
 
 from azext_iot.tests import CaptureOutputLiveScenarioTest
 from azext_iot.tests.adr.conftest import (
+    CUSTOM_CERT_KEY_TYPE,
+    CUSTOM_CERT_SUBJECT,
     CUSTOM_POLICY_NAME,
     CUSTOM_CERT_VALIDITY_DAYS,
     TEST_RG,
@@ -241,9 +243,9 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
             custom_policy = self.cmd(
                 f"iot adr ns policy create --ns {namespace_name} -g {rg} "
                 f"--policy-name {CUSTOM_POLICY_NAME} "
-                # f"--cert-subject '{CUSTOM_CERT_SUBJECT}' "
+                f"--cert-subject '{CUSTOM_CERT_SUBJECT}' "
                 f"--cert-validity-days {CUSTOM_CERT_VALIDITY_DAYS} "
-                # f"--cert-key-type {CUSTOM_CERT_KEY_TYPE}"
+                f"--cert-key-type {CUSTOM_CERT_KEY_TYPE}"
             ).get_output_in_json()
 
             assert custom_policy["name"] == CUSTOM_POLICY_NAME
@@ -251,11 +253,10 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
                 custom_policy["properties"]["certificate"]["leafCertificateConfiguration"]["validityPeriodInDays"]
                 == CUSTOM_CERT_VALIDITY_DAYS
             )
-            # TODO - custom policy keytype disabled
-            # assert (
-            #     custom_policy["properties"]["certificate"]["certificateAuthorityConfiguration"]["keyType"]
-            #     == CUSTOM_CERT_KEY_TYPE
-            # )
+            assert (
+                custom_policy["properties"]["certificate"]["certificateAuthorityConfiguration"]["keyType"]
+                == CUSTOM_CERT_KEY_TYPE
+            )
             assert custom_policy["properties"]["provisioningState"] == "Succeeded"
             assert custom_policy["location"] == TEST_LOCATION.lower()
 
@@ -263,7 +264,7 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
             ca_config = custom_policy["properties"]["certificate"]["certificateAuthorityConfiguration"]
             assert "subject" in ca_config
 
-            # TODO - custom policy subject disabled
+            # TODO: Re-enable when service issues are resolved
             # assert (
             #     custom_policy["properties"]["certificate"]["certificateAuthorityConfiguration"]["subject"]
             #     == CUSTOM_CERT_SUBJECT
