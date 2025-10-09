@@ -4,11 +4,13 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import pytest
 from unittest.mock import Mock
 
+import pytest
 from azure.cli.core.azclierror import ResourceNotFoundError
 from azure.core.exceptions import HttpResponseError
+
+from azext_iot.adr.common import DEFAULT_NS_POLICY_CERT_KEY_TYPE
 
 
 @pytest.mark.parametrize(
@@ -28,20 +30,10 @@ from azure.core.exceptions import HttpResponseError
             "policy_name": "policy",
             "namespace_name": "namespace",
             "resource_group_name": "rg",
-            "cert_key_type": "RSA",
+            "cert_key_type": None,
             "cert_subject": None,
             "cert_validity_days": None,
             "tags": None,
-            "location": None,
-        },
-        {
-            "policy_name": "policy",
-            "namespace_name": "namespace",
-            "resource_group_name": "rg",
-            "cert_key_type": None,
-            "cert_subject": "test",
-            "cert_validity_days": None,
-            "tags": {"example": "tag"},
             "location": None,
         },
         {
@@ -58,7 +50,7 @@ from azure.core.exceptions import HttpResponseError
             "policy_name": "policy",
             "namespace_name": "namespace",
             "resource_group_name": "rg",
-            "cert_key_type": "RSA",
+            "cert_key_type": None,
             "cert_subject": None,
             "cert_validity_days": None,
             "tags": None,
@@ -223,70 +215,92 @@ def test_delete_policy(fixture_policy_provider, mock_poller):
     )
 
 
-@pytest.mark.parametrize(
-    "cert_params",
-    [
-        {"cert_key_type": "RSA", "cert_subject": None, "cert_validity_days": None},
-        {"cert_key_type": None, "cert_subject": "test", "cert_validity_days": None},
-        {"cert_key_type": "ECC", "cert_subject": "test", "cert_validity_days": None},
-        {"cert_key_type": None, "cert_subject": None, "cert_validity_days": 30},
-        {"cert_key_type": "RSA", "cert_subject": "test", "cert_validity_days": 30},
-    ],
-)
-def test_certificate_configuration_combinations(
+@pytest.mark.parametrize("cert_key_type", [None, "ECC"])
+@pytest.mark.parametrize("cert_validity_days", [None, 30])
+@pytest.mark.parametrize("cert_subject", [None, "test"])
+def test_create_policy_certificate_validation(
     fixture_policy_provider,
-    cert_params,
+    mock_poller,
+    cert_key_type,
+    cert_validity_days,
+    cert_subject,
 ):
-    """Test various certificate configuration combinations."""
-    mock_policy_result = Mock()
-    fixture_policy_provider.client.policies.begin_create_or_update.return_value = mock_policy_result
+    """Test certificate parameter validation - both key type and validity must be provided together."""
+    from azure.cli.core.azclierror import RequiredArgumentMissingError
 
-    # Mock namespace.get to return location
-    mock_namespace = {"location": "eastus"}
-    fixture_policy_provider.client.namespaces.get.return_value = mock_namespace
+    # Check if any certificate parameters are provided
+    any_cert_params = any([cert_subject is not None, cert_key_type is not None, cert_validity_days is not None])
+    # Only validity days is required if params provided
+    should_succeed = not any_cert_params or cert_validity_days is not None
 
-    fixture_policy_provider.create(
-        policy_name="cert-test-policy",
-        namespace_name="test-namespace",
-        resource_group_name="test-rg",
-        certificate_key_type=cert_params["cert_key_type"],
-        certificate_subject=cert_params["cert_subject"],
-        certificate_validity_days=cert_params["cert_validity_days"],
-    )
+    if should_succeed:
+        # Mock successful creation
+        mock_policy_result = Mock()
+        poller = mock_poller(mock_policy_result)
+        fixture_policy_provider.client.policies.begin_create_or_update.return_value = poller
 
-    call_args = fixture_policy_provider.client.policies.begin_create_or_update.call_args
-    resource = call_args[1]["resource"]
+        # Mock namespace.get to return location
+        mock_namespace = {"location": "eastus"}
+        fixture_policy_provider.client.namespaces.get.return_value = mock_namespace
 
-    # Extract cert params for easier reading
-    cert_key_type = cert_params["cert_key_type"]
-    cert_subject = cert_params["cert_subject"]
-    cert_validity_days = cert_params["cert_validity_days"]
+        result = fixture_policy_provider.create(
+            policy_name="cert-test-policy",
+            namespace_name="test-namespace",
+            resource_group_name="test-rg",
+            certificate_key_type=cert_key_type,
+            certificate_subject=cert_subject,
+            certificate_validity_days=cert_validity_days,
+        )
 
-    # Verify certificate configuration
-    if cert_key_type or cert_subject or cert_validity_days:
-        assert "properties" in resource
-        assert "certificate" in resource["properties"]
-        cert_config = resource["properties"]["certificate"]
+        assert result == mock_policy_result
 
-        # Check CA configuration
-        if cert_key_type or cert_subject:
+        call_args = fixture_policy_provider.client.policies.begin_create_or_update.call_args
+        resource = call_args[1]["resource"]
+
+        # Verify certificate configuration
+        if any_cert_params:
+            assert "properties" in resource
+            assert "certificate" in resource["properties"]
+            cert_config = resource["properties"]["certificate"]
+
+            # Check CA configuration
             assert "certificateAuthorityConfiguration" in cert_config
             ca_config = cert_config["certificateAuthorityConfiguration"]
 
-            if cert_key_type:
-                assert ca_config["keyType"] == cert_key_type
+            # Key type should be either the provided one or the default ECC
+            expected_key_type = cert_key_type if cert_key_type else DEFAULT_NS_POLICY_CERT_KEY_TYPE
+            assert ca_config["keyType"] == expected_key_type
+
             if cert_subject:
                 assert ca_config["subject"] == cert_subject
 
-        # Check leaf certificate configuration
-        if cert_validity_days:
+            # Check leaf certificate configuration
             assert "leafCertificateConfiguration" in cert_config
             leaf_config = cert_config["leafCertificateConfiguration"]
             assert leaf_config["validityPeriodInDays"] == cert_validity_days
+        else:
+            # No certificate configuration should be present
+            if "properties" in resource:
+                assert "certificate" not in resource["properties"]
     else:
-        # No certificate configuration should be present
-        if "properties" in resource:
-            assert "certificate" not in resource["properties"]
+        # Should raise validation error
+        with pytest.raises(RequiredArgumentMissingError) as exc_info:
+            fixture_policy_provider.create(
+                policy_name="cert-test-policy",
+                namespace_name="test-namespace",
+                resource_group_name="test-rg",
+                certificate_key_type=cert_key_type,
+                certificate_subject=cert_subject,
+                certificate_validity_days=cert_validity_days,
+            )
+
+        # Verify the error message mentions the required parameter
+        error_message = str(exc_info.value)
+        assert "cert-validity-days" in error_message
+
+        # Should not make any API calls if validation fails
+        fixture_policy_provider.client.namespaces.get.assert_not_called()
+        fixture_policy_provider.client.policies.begin_create_or_update.assert_not_called()
 
 
 @pytest.mark.parametrize(

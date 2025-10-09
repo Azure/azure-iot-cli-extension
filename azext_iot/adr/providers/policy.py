@@ -6,12 +6,12 @@
 
 from typing import Dict, Optional
 
-from azure.cli.core.azclierror import AzureResponseError, ResourceNotFoundError
+from azure.cli.core.azclierror import AzureResponseError, RequiredArgumentMissingError, ResourceNotFoundError
 from azure.core.exceptions import HttpResponseError
 from knack.log import get_logger
 from rich.console import Console
 
-from azext_iot.adr.common import POLICY_PARENT_RESOURCE_NOT_FOUND_MSG
+from azext_iot.adr.common import DEFAULT_NS_POLICY_CERT_KEY_TYPE, POLICY_PARENT_RESOURCE_NOT_FOUND_MSG
 from azext_iot.adr.providers.base import ADRProvider
 from azext_iot.common.utility import wait_for_terminal_state
 
@@ -35,6 +35,24 @@ class PolicyProvider(ADRProvider):
         certificate_validity_days: Optional[int] = None,
         **kwargs,
     ):
+        # Check if any cert params are provided before setting defaults
+        any_cert_params = any([
+            certificate_subject is not None,
+            certificate_key_type is not None,
+            certificate_validity_days is not None
+        ])
+
+        # Client provides default keytype, but validity must be set
+        if any_cert_params:
+            if certificate_key_type is None:
+                certificate_key_type = DEFAULT_NS_POLICY_CERT_KEY_TYPE
+
+            # Validate that validity is also provided
+            if certificate_validity_days is None:
+                raise RequiredArgumentMissingError(
+                    "Certificate validity period (--cert-validity-days) must be provided when creating a custom policy."
+                )
+
         if not location:
             namespace = self.client.namespaces.get(
                 resource_group_name=resource_group_name, namespace_name=namespace_name

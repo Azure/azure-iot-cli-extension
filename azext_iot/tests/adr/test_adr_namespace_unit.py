@@ -4,21 +4,27 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import pytest
 from unittest.mock import Mock, patch
-from azure.cli.core.azclierror import MutuallyExclusiveArgumentError
-from azext_iot.adr.common import IdentityType, DEFAULT_NS_POLICY_NAME
+
+import pytest
+from azure.cli.core.azclierror import MutuallyExclusiveArgumentError, RequiredArgumentMissingError
+
+from azext_iot.adr.common import DEFAULT_NS_POLICY_CERT_KEY_TYPE, DEFAULT_NS_POLICY_NAME, IdentityType
 
 
 @pytest.mark.parametrize("enable_credential_policy", [False, True])
 @pytest.mark.parametrize("policy_name", [None, "test-policy"])
-@pytest.mark.parametrize("cert_validity_days", [None, 365])
+@pytest.mark.parametrize("cert_key_type", [None, DEFAULT_NS_POLICY_CERT_KEY_TYPE])
+@pytest.mark.parametrize("cert_validity_days", [None, 30])
+@pytest.mark.parametrize("cert_subject", [None, "CN=TestSubject"])
 def test_create_namespace(
     fixture_namespace_provider,
     fixture_credential_provider,
     fixture_policy_provider,
     mock_poller,
+    cert_key_type,
     cert_validity_days,
+    cert_subject,
     policy_name,
     enable_credential_policy,
 ):
@@ -26,11 +32,25 @@ def test_create_namespace(
     resource_group_name = "test-rg"
     location = "eastus"
     tags = None
-    cert_key_type = None
-    cert_subject = None
 
     fixture_credential_provider.create = Mock(return_value={"id": "credential-id"})
     fixture_policy_provider.create = Mock(return_value={"id": "policy-id"})
+
+    # Check if any certificate parameters are provided
+    any_cert_params = any([cert_subject is not None, cert_key_type is not None, cert_validity_days is not None])
+    # Only validity days is required (key type gets defaulted)
+    cert_params_invalid = any_cert_params and cert_validity_days is None
+
+    # Check if we should create credential policy
+    should_create_credential_policy = any(
+        [
+            enable_credential_policy,
+            policy_name,
+            cert_key_type,
+            cert_subject,
+            cert_validity_days,
+        ]
+    )
 
     with patch(
         "azext_iot.adr.providers.credential.CredentialProvider", return_value=fixture_credential_provider
@@ -52,12 +72,28 @@ def test_create_namespace(
         fixture_namespace_provider.client.credentials.begin_create_or_update.return_value = credential_poller
         fallback_location = location
 
-        # If enable_credential_policy is False and either policy_name or cert_validity_days is set, expect error
-        if (
-            enable_credential_policy is False
-            and (policy_name is not None or cert_validity_days is not None)
-        ):
+        # Test parameter validation
+        if enable_credential_policy is False and any([
+            policy_name is not None,
+            cert_key_type is not None,
+            cert_validity_days is not None,
+            cert_subject is not None
+        ]):
             with pytest.raises(MutuallyExclusiveArgumentError):
+                fixture_namespace_provider.create(
+                    namespace_name=namespace_name,
+                    resource_group_name=resource_group_name,
+                    location=location,
+                    tags=tags,
+                    enable_credential_policy=enable_credential_policy,
+                    policy_name=policy_name,
+                    certificate_key_type=cert_key_type,
+                    certificate_subject=cert_subject,
+                    certificate_validity_days=cert_validity_days,
+                )
+        # Test certificate parameter validation
+        elif cert_params_invalid:
+            with pytest.raises(RequiredArgumentMissingError):
                 fixture_namespace_provider.create(
                     namespace_name=namespace_name,
                     resource_group_name=resource_group_name,
@@ -91,7 +127,10 @@ def test_create_namespace(
             assert call_args[1]["resource_group_name"] == resource_group_name
             assert call_args[1]["namespace_name"] == namespace_name
 
-            expected_resource = {"location": fallback_location, "identity": {"type": IdentityType.system_assigned.value}}
+            expected_resource = {
+                "location": fallback_location,
+                "identity": {"type": IdentityType.system_assigned.value},
+            }
             assert call_args[1]["resource"]["location"] == expected_resource["location"]
             assert call_args[1]["resource"]["identity"] == expected_resource["identity"]
 
@@ -106,12 +145,16 @@ def test_create_namespace(
                     location=fallback_location,
                 )
                 expected_policy_name = policy_name if policy_name is not None else DEFAULT_NS_POLICY_NAME
+                expected_cert_key_type = cert_key_type
+                if any_cert_params and expected_cert_key_type is None:
+                    expected_cert_key_type = DEFAULT_NS_POLICY_CERT_KEY_TYPE
+
                 fixture_policy_provider.create.assert_called_once_with(
                     policy_name=expected_policy_name,
                     namespace_name=namespace_name,
                     resource_group_name=resource_group_name,
                     location=fallback_location,
-                    certificate_key_type=cert_key_type,
+                    certificate_key_type=expected_cert_key_type,
                     certificate_subject=cert_subject,
                     certificate_validity_days=cert_validity_days,
                 )

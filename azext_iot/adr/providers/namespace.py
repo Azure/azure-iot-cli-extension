@@ -6,11 +6,11 @@
 
 from typing import Dict, Optional
 
-from azure.cli.core.azclierror import MutuallyExclusiveArgumentError
+from azure.cli.core.azclierror import MutuallyExclusiveArgumentError, RequiredArgumentMissingError
 from knack.log import get_logger
 from rich.console import Console
 
-from azext_iot.adr.common import DEFAULT_NS_POLICY_NAME, IdentityType
+from azext_iot.adr.common import DEFAULT_NS_POLICY_NAME, DEFAULT_NS_POLICY_CERT_KEY_TYPE, IdentityType
 from azext_iot.adr.providers.base import ADRProvider
 from azext_iot.common.utility import wait_for_terminal_state
 
@@ -35,6 +35,38 @@ class NamespaceProvider(ADRProvider):
         certificate_validity_days: Optional[int] = None,
         **kwargs,
     ):
+        # Validate parameters before creating anything
+        should_create_credential_policy = any([
+            enable_credential_policy,
+            policy_name,
+            certificate_key_type,
+            certificate_subject,
+            certificate_validity_days,
+        ])
+
+        if should_create_credential_policy:
+            # user provided policy inputs but enable is strictly false
+            if enable_credential_policy is False:
+                raise MutuallyExclusiveArgumentError(
+                    "Cannot create a custom policy if `--enable-credential-policy` is false."
+                )
+
+            # Check if any cert params are provided
+            custom_cert_params = any([
+                certificate_subject is not None,
+                certificate_key_type is not None,
+                certificate_validity_days is not None
+            ])
+
+            # Default key type is ECC, but user must provide validity
+            if custom_cert_params:
+                if certificate_validity_days is None:
+                    raise RequiredArgumentMissingError(
+                        "Certificate validity period (--cert-validity-days) must be provided when creating a custom policy."
+                    )
+                if not certificate_key_type:
+                    certificate_key_type = DEFAULT_NS_POLICY_CERT_KEY_TYPE
+
         if not location:
             location = self._ensure_location(self.cmd.cli_ctx, resource_group_name, location)
 
@@ -65,20 +97,17 @@ class NamespaceProvider(ADRProvider):
             namespace_result["resourceGroup"] = resource_group_name
 
         # Create credential and policy if requested or if policy parameters are provided
-        should_create_credential_policy = any([
-            enable_credential_policy,
-            policy_name,
-            certificate_key_type,
-            certificate_subject,
-            certificate_validity_days,
-        ])
+        should_create_credential_policy = any(
+            [
+                enable_credential_policy,
+                policy_name,
+                certificate_key_type is not None,
+                certificate_subject,
+                certificate_validity_days is not None,
+            ]
+        )
 
         if should_create_credential_policy:
-            # user provided policy inputs but enable is strictly false
-            if enable_credential_policy is False:
-                raise MutuallyExclusiveArgumentError(
-                    "Cannot create a namespace with policy if `--enable-credential-policy` set to false."
-                )
             try:
                 from azext_iot.adr.providers.credential import CredentialProvider
 
