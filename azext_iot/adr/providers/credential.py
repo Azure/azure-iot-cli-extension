@@ -45,7 +45,7 @@ class CredentialProvider(ADRProvider):
                     "Namespace does not contain a location property."
                 )
 
-        credentials_resource = {"location": location}
+        credentials_resource = {"location": location, "properties": {}}
 
         if tags:
             credentials_resource["tags"] = tags

@@ -7,7 +7,7 @@
 import pytest
 from knack.log import get_logger
 
-from azext_iot.adr.common import DEFAULT_NS_POLICY_CERT_KEY_TYPE, DEFAULT_NS_POLICY_CERT_VALIDITY_DAYS
+from azext_iot.adr.common import DEFAULT_NS_POLICY_CERT_KEY_TYPE, DEFAULT_NS_POLICY_NAME, DEFAULT_NS_POLICY_CERT_VALIDITY_DAYS
 from azext_iot.tests import CaptureOutputLiveScenarioTest
 from azext_iot.tests.adr.conftest import (
     CUSTOM_CERT_KEY_TYPE,
@@ -20,7 +20,7 @@ from azext_iot.tests.adr.conftest import (
 
 logger = get_logger(__name__)
 
-TEST_LOCATION = "westus"
+TEST_LOCATION = "centraluseuap"
 
 
 @pytest.mark.usefixtures("set_cwd")
@@ -68,9 +68,14 @@ class TestADRLifecycleIntegration(CaptureOutputLiveScenarioTest):
             assert credential_show["properties"]["provisioningState"] == "Succeeded"
 
             # Create default credential policy
-            default_policy = self.cmd(f"iot adr ns policy create --ns {namespace_name} -g {rg}").get_output_in_json()
-
-            assert default_policy["name"] == "default"
+            # TODO - once service issue is resolved, remove extra default inputs besides name
+            default_policy = self.cmd(
+                f"iot adr ns policy create --ns {namespace_name} -g {rg} "
+                f"--name {DEFAULT_NS_POLICY_NAME} "
+                f"--cert-validity-days {DEFAULT_NS_POLICY_CERT_VALIDITY_DAYS} "
+                f"--cert-key-type {DEFAULT_NS_POLICY_CERT_KEY_TYPE}"
+            ).get_output_in_json()
+            assert default_policy["name"] == DEFAULT_NS_POLICY_NAME
             assert default_policy["properties"]["provisioningState"] == "Succeeded"
             leaf_config = default_policy["properties"]["certificate"]["leafCertificateConfiguration"]
             ca_config = default_policy["properties"]["certificate"]["certificateAuthorityConfiguration"]
