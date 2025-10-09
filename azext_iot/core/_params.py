@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from argcomplete.completers import FilesCompleter
+from argcomplete.completers import FilesCompleter  # pylint: disable=import-error
 from knack.arguments import CLIArgumentType
 from azure.cli.core.commands.parameters import (get_location_type,
                                                 file_type,
