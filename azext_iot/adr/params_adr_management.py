@@ -17,9 +17,6 @@ from azure.cli.core.commands.parameters import (
 )
 from azure.cli.core.commands.validators import get_default_location_from_resource_group
 from azext_iot.adr.common import (
-    DEFAULT_NS_POLICY_CERT_KEY_TYPE,
-    DEFAULT_NS_POLICY_CERT_VALIDITY_DAYS,
-    DEFAULT_NS_POLICY_NAME,
     PolicyCertificateKeyType,
 )
 
@@ -44,25 +41,18 @@ def load_adr_management_arguments(self, _):
             arg_type=get_location_type(self.cli_ctx),
             validator=get_default_location_from_resource_group,
         )
-        # TODO - CMS Preview - opt-out for credential and policy
+        # Enable credential and policy creation
         context.argument(
-            "no_credential",
+            "enable_credential_policy",
             arg_group="Credential",
-            options_list=["--no-credentials", "--nc"],
+            options_list=["--enable-credential-policy", "--ecp"],
             arg_type=get_three_state_flag(),
-            help="Do not create a credential or a credential policy for this Device Registry namespace.",
-        )
-        context.argument(
-            "no_policy",
-            arg_group="Policy",
-            options_list=["--no-policy", "--np"],
-            arg_type=get_three_state_flag(),
-            help="Do not create a credential policy for this Device Registry namespace.",
+            help="Create a credential and credential policy for this Device Registry namespace. "
+                 "This is also enabled when any custom policy parameters are provided.",
         )
         context.argument(
             "policy_name",
             arg_group="Policy",
-            default=DEFAULT_NS_POLICY_NAME,
             options_list=["--policy-name", "--pn"],
             help="Customize the name of the namespace credential policy",
         )
@@ -93,7 +83,6 @@ def load_adr_management_arguments(self, _):
             context.argument(
                 "certificate_key_type",
                 options_list=["--cert-key-type"],
-                default=DEFAULT_NS_POLICY_CERT_KEY_TYPE,
                 arg_type=get_enum_type(PolicyCertificateKeyType),
                 arg_group="Policy Certificate",
                 help="Policy certificate authority key type.",
@@ -108,7 +97,6 @@ def load_adr_management_arguments(self, _):
                 "certificate_validity_days",
                 options_list=["--cert-validity-days"],
                 type=int,
-                default=DEFAULT_NS_POLICY_CERT_VALIDITY_DAYS,
                 arg_group="Policy Certificate",
                 help="Policy certificate validity period in days.",
             )

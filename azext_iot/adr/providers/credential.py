@@ -6,11 +6,13 @@
 
 from typing import TYPE_CHECKING, Dict, Optional
 
+from azure.cli.core.azclierror import AzureResponseError, ResourceNotFoundError
+from azure.core.exceptions import HttpResponseError
 from knack.log import get_logger
 from rich.console import Console
 
+from azext_iot.adr.common import CREDENTIAL_NOT_FOUND_MSG
 from azext_iot.adr.providers.base import ADRProvider
-from azure.cli.core.azclierror import AzureResponseError
 from azext_iot.common.utility import wait_for_terminal_state
 
 if TYPE_CHECKING:
@@ -43,7 +45,7 @@ class CredentialProvider(ADRProvider):
                     "Namespace does not contain a location property."
                 )
 
-        credentials_resource = {"location": location}
+        credentials_resource = {"location": location, "properties": {}}
 
         if tags:
             credentials_resource["tags"] = tags
@@ -57,7 +59,20 @@ class CredentialProvider(ADRProvider):
             return wait_for_terminal_state(poller, **kwargs)
 
     def show(self, namespace_name: str, resource_group_name: str):
-        return self.client.credentials.get(resource_group_name=resource_group_name, namespace_name=namespace_name)
+        # Check if parent namespace exists, will 404 if not
+        self.client.namespaces.get(resource_group_name=resource_group_name, namespace_name=namespace_name)
+
+        # Show friendly error if credential doesn't exist
+        try:
+            return self.client.credentials.get(resource_group_name=resource_group_name, namespace_name=namespace_name)
+        except HttpResponseError as e:
+            if e.status_code == 404:
+                raise ResourceNotFoundError(
+                    CREDENTIAL_NOT_FOUND_MSG.format(
+                        namespace_name=namespace_name, resource_group_name=resource_group_name
+                    )
+                )
+            raise
 
     def delete(self, namespace_name: str, resource_group_name: str, **kwargs):
         with console.status(f"Deleting credentials for namespace {namespace_name}..."):

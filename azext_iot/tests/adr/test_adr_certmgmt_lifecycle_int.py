@@ -9,10 +9,10 @@ from knack.log import get_logger
 
 from azext_iot.tests import CaptureOutputLiveScenarioTest
 from azext_iot.tests.adr.conftest import (
-    CUSTOM_POLICY_NAME,
-    CUSTOM_CERT_VALIDITY_DAYS,
     CUSTOM_CERT_KEY_TYPE,
     CUSTOM_CERT_SUBJECT,
+    CUSTOM_POLICY_NAME,
+    CUSTOM_CERT_VALIDITY_DAYS,
     TEST_RG,
     generate_adr_namespace_name,
     generate_hub_name,
@@ -24,8 +24,9 @@ from azext_iot.tests.adr.conftest import (
 
 logger = get_logger(__name__)
 
-# Test-wide constants
-TEST_LOCATION = "westus"
+# TODO - change once service rolls out to more regions
+TEST_LOCATION = "centraluseuap"
+# TODO - change once built-in role exists
 CUSTOM_ROLE_NAME = "ADR Cert Management Integration Role"
 
 
@@ -35,6 +36,7 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
     def __init__(self, test_case):
         super(TestADRCertificateManagementLifecycle, self).__init__(test_case)
 
+    # TODO - update once built-in role exists
     def find_or_create_custom_adr_role(self, subscription_id, resource_group_name):
         rg_scope = f"/subscriptions/{subscription_id}/resourceGroups/{resource_group_name}"
 
@@ -217,9 +219,9 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
             # Assign IoT Hub RP contributor access to resource group (required for ADR integration)
             self.assign_hub_rp_contributor_role(subscription_id, rg)
 
-            # Create ADR namespace
+            # Create ADR namespace with credential and policy
             namespace = self.cmd(
-                f"iot adr ns create -n {namespace_name} -g {rg} --location {TEST_LOCATION}"
+                f"iot adr ns create -n {namespace_name} -g {rg} --location {TEST_LOCATION} --enable-credential-policy"
             ).get_output_in_json()
             adr_resource_id = namespace["id"]
 

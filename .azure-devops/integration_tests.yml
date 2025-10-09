@@ -66,6 +66,9 @@ parameters:
   - name: "testADU"
     type: boolean
     default: true
+  - name: "testADR"
+    type: boolean
+    default: false
   - name: "azureCLIVersion"
     type: string
     default: "released"
@@ -130,10 +133,12 @@ stages:
           testDPS: ${{ parameters.testDPS }}
           testHub: ${{ parameters.testHub }}
           testADU: ${{ parameters.testADU }}
+          testADR: ${{ parameters.testADR }}
           maxParallelADT: 2
           maxParallelDPS: 2
           maxParallelHub: 2
           maxParallelADU: 4
+          maxParallelADR: 2
       - job: "evaluateCmdTable"
         displayName: "Evaluate Command Table"
         steps:

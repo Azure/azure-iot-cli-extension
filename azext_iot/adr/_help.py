@@ -32,18 +32,16 @@ def load_adr_help():
   type: command
   short-summary: Create a Device Registry namespace.
   long-summary: |
-    By default, a namespace is created with a system-assigned managed identity, as well as a credential and credential policy - both named 'default'.
-    The policy name can be customized with the --policy-name argument, but the 'default' credential name cannot be changed.
-    To skip creating both of these child resources, use `--no-credential`. To only skip policy creation, use `--no-policy`.
+    By default, a namespace is created with a system-assigned managed identity.
+    To create a credential and credential policy, use `--enable-credential-policy` or provide any policy parameters.
+    The policy resource name can be customized with the --policy-name argument, but the 'default' credential name cannot be changed.
   examples:
-    - name: Create a basic Device Registry namespace (with system assigned identity, credential, and policy)
+    - name: Create a basic Device Registry namespace
       text: az iot adr ns create -n myNamespace -g myResourceGroup
-    - name: Create a Device Registry namespace with custom credential policy properties
-      text: >
-        az iot adr ns create -n myNamespace -g myResourceGroup --policy-name myPolicy
-        --cert-key-type ECC --cert-subject "CN=MyDevices" --cert-validity-days 60
-    - name: Create a Device Registry namespace with no credential (and therefore no policy)
-      text: az iot adr ns create -n myNamespace -g myResourceGroup --no-credential
+    - name: Create a Device Registry namespace with credential and default policy
+      text: az iot adr ns create -n myNamespace -g myResourceGroup --enable-credential-policy
+    - name: Create a Device Registry namespace with custom credential policy
+      text: az iot adr ns create -n myNamespace -g myResourceGroup --policy-name myPolicy --cert-validity-days 30
   """
 
     helps[
@@ -151,12 +149,10 @@ def load_adr_help():
   type: command
   short-summary: Create a policy for a Device Registry namespace.
   examples:
-    - name: Create a basic policy with a default subject, certificate type (ECC), and validity (30 days).
+    - name: Create a basic policy with a default subject, certificate type (ECC), and validity period.
       text: az iot adr ns policy create -n myPolicy --ns myNamespace -g myResourceGroup
-    - name: Create a policy with custom name and certificate inputs.
-      text: |
-          az iot adr ns policy create -n myPolicy --ns myNamespace -g myResourceGroup
-          --cert-key-type ECC --cert-validity-days 15 --cert-subject "CN=MyDevices"
+    - name: Create a policy with custom validity period
+      text: az iot adr ns policy create -n myPolicy --ns myNamespace -g myResourceGroup --cert-validity-days 30
   """
 
     helps[
@@ -197,6 +193,4 @@ def load_adr_help():
   examples:
     - name: Update certificate validity period
       text: az iot adr ns policy update -n myPolicy --cert-validity-days 10 --ns myNamespace -g myResourceGroup
-    - name: Update certificate subject
-      text: az iot adr ns policy update -n myPolicy --cert-subject "CN=NewDevices" --ns myNamespace -g myResourceGroup
   """

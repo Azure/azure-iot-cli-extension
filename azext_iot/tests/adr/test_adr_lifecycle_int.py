@@ -7,7 +7,7 @@
 import pytest
 from knack.log import get_logger
 
-from azext_iot.adr.common import DEFAULT_NS_POLICY_CERT_KEY_TYPE, DEFAULT_NS_POLICY_CERT_VALIDITY_DAYS
+from azext_iot.adr.common import DEFAULT_NS_POLICY_CERT_KEY_TYPE, DEFAULT_NS_POLICY_NAME, DEFAULT_NS_POLICY_CERT_VALIDITY_DAYS
 from azext_iot.tests import CaptureOutputLiveScenarioTest
 from azext_iot.tests.adr.conftest import (
     CUSTOM_CERT_KEY_TYPE,
@@ -20,7 +20,8 @@ from azext_iot.tests.adr.conftest import (
 
 logger = get_logger(__name__)
 
-TEST_LOCATION = "westus"
+# TODO - change once service rolls out to more regions
+TEST_LOCATION = "centraluseuap"
 
 
 @pytest.mark.usefixtures("set_cwd")
@@ -34,7 +35,7 @@ class TestADRLifecycleIntegration(CaptureOutputLiveScenarioTest):
         namespace_name = generate_adr_namespace_name()
 
         try:
-            # Create ADR namespace
+            # Create ADR namespace with no credentials
             namespace = self.cmd(
                 f"iot adr ns create -n {namespace_name} -g {rg} --location {TEST_LOCATION}"
             ).get_output_in_json()
@@ -50,22 +51,47 @@ class TestADRLifecycleIntegration(CaptureOutputLiveScenarioTest):
             assert namespace_show["location"] == TEST_LOCATION
             assert namespace_show["properties"]["provisioningState"] == "Succeeded"
 
-            # Show default credential (created with namespace)
+            # Verify no credential exists
+            self.cmd(f"iot adr ns credential show --ns {namespace_name} -g {rg}", expect_failure=True)
+
+            # Create credential for the namespace
+            credential = self.cmd(f"iot adr ns credential create --ns {namespace_name} -g {rg}").get_output_in_json()
+
+            assert credential["name"] == "default"
+            assert credential["location"] == TEST_LOCATION
+            assert credential["properties"]["provisioningState"] == "Succeeded"
+
+            # Show credential
             credential_show = self.cmd(f"iot adr ns credential show --ns {namespace_name} -g {rg}").get_output_in_json()
 
             assert credential_show["name"] == "default"
             assert credential_show["location"] == TEST_LOCATION
             assert credential_show["properties"]["provisioningState"] == "Succeeded"
 
-            # Show default credential policy (created with namespace)
+            # Create default credential policy
+            # TODO - once service issue is resolved, remove extra default inputs besides name
             default_policy = self.cmd(
-                f"iot adr ns policy show --ns {namespace_name} -g {rg} --policy-name default"
+                f"iot adr ns policy create --ns {namespace_name} -g {rg} "
+                f"--name {DEFAULT_NS_POLICY_NAME} "
+                f"--cert-validity-days {DEFAULT_NS_POLICY_CERT_VALIDITY_DAYS} "
+                f"--cert-key-type {DEFAULT_NS_POLICY_CERT_KEY_TYPE}"
             ).get_output_in_json()
-
-            assert default_policy["name"] == "default"
+            assert default_policy["name"] == DEFAULT_NS_POLICY_NAME
             assert default_policy["properties"]["provisioningState"] == "Succeeded"
             leaf_config = default_policy["properties"]["certificate"]["leafCertificateConfiguration"]
             ca_config = default_policy["properties"]["certificate"]["certificateAuthorityConfiguration"]
+            assert leaf_config["validityPeriodInDays"] == DEFAULT_NS_POLICY_CERT_VALIDITY_DAYS
+            assert ca_config["keyType"] == DEFAULT_NS_POLICY_CERT_KEY_TYPE
+
+            # Show default credential policy
+            default_policy_show = self.cmd(
+                f"iot adr ns policy show --ns {namespace_name} -g {rg} --policy-name default"
+            ).get_output_in_json()
+
+            assert default_policy_show["name"] == "default"
+            assert default_policy_show["properties"]["provisioningState"] == "Succeeded"
+            leaf_config = default_policy_show["properties"]["certificate"]["leafCertificateConfiguration"]
+            ca_config = default_policy_show["properties"]["certificate"]["certificateAuthorityConfiguration"]
             assert leaf_config["validityPeriodInDays"] == DEFAULT_NS_POLICY_CERT_VALIDITY_DAYS
             assert ca_config["keyType"] == DEFAULT_NS_POLICY_CERT_KEY_TYPE
 
@@ -102,20 +128,17 @@ class TestADRLifecycleIntegration(CaptureOutputLiveScenarioTest):
             # TODO - cert subject not respected
             # assert ca_config["subject"] == CUSTOM_CERT_SUBJECT
 
-            # TODO: policy update hangs
+            # TODO - enable after testing, update more properties once service is stable
             # Update custom credential policy
             # updated_policy = self.cmd(
             #     f"iot adr ns policy update --ns {namespace_name} -g {rg} "
             #     f"--policy-name {CUSTOM_POLICY_NAME} "
-            #     f"--cert-validity-days 15"
+            #     f"--cert-validity-days {CUSTOM_CERT_UPDATE_VALIDITY_DAYS}"
             # ).get_output_in_json()
-            # print(f"{updated_policy=}")
-            #
             # assert updated_policy["properties"]["provisioningState"] == "Succeeded"
             # leaf_config = updated_policy["properties"]["certificate"]["leafCertificateConfiguration"]
             # ca_config = updated_policy["properties"]["certificate"]["certificateAuthorityConfiguration"]
-            # assert leaf_config["validityPeriodInDays"] == 15
-            # assert ca_config["subject"] == CUSTOM_CERT_SUBJECT
+            # assert leaf_config["validityPeriodInDays"] == CUSTOM_CERT_UPDATE_VALIDITY_DAYS
 
             # List ADR credential policies
             policies = self.cmd(f"iot adr ns policy list --ns {namespace_name} -g {rg}").get_output_in_json()
@@ -134,7 +157,7 @@ class TestADRLifecycleIntegration(CaptureOutputLiveScenarioTest):
 
             # Delete policies
             self.cmd(f"iot adr ns policy delete --ns {namespace_name} -g {rg} --policy-name {CUSTOM_POLICY_NAME} -y")
-            self.cmd(f"iot adr ns policy delete --ns {namespace_name} -g {rg} --policy-name default -y")
+            self.cmd(f"iot adr ns policy delete --ns {namespace_name} -g {rg} --policy-name {DEFAULT_NS_POLICY_NAME} -y")
 
             # Verify all policies were deleted
             policies_after = self.cmd(f"iot adr ns policy list --ns {namespace_name} -g {rg}").get_output_in_json()

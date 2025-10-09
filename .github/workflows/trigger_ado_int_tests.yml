@@ -22,6 +22,10 @@ on:
         description: Run ADU tests
         type: boolean
         default: true
+      testADR:
+        description: Run ADR tests
+        type: boolean
+        default: false
       python_versions:
         description: "Python versions to test"
         type: string
@@ -56,6 +60,10 @@ on:
         default: true
       testADU:
         description: Run ADU tests
+        type: boolean
+        default: true
+      testADR:
+        description: Run ADR tests
         type: boolean
         default: true
       python_versions:
@@ -117,6 +125,7 @@ jobs:
           cmdArgs+=("testDPS=${{inputs.testDPS}}")
           cmdArgs+=("testHub=${{inputs.testHub}}")
           cmdArgs+=("testADU=${{inputs.testADU}}")
+          cmdArgs+=("testADR=${{inputs.testADR}}")
           echo "Running: az pipelines run ${cmdArgs[@]}"
           res=$(az pipelines run "${cmdArgs[@]}")
 

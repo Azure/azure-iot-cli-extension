@@ -61,7 +61,6 @@ def adr_policy_update(
     resource_group_name: str,
     tags: Optional[Dict[str, str]] = None,
     certificate_key_type: Optional[str] = None,
-    certificate_subject: Optional[str] = None,
     certificate_validity_days: Optional[int] = None,
 ):
     provider = PolicyProvider(cmd)
@@ -71,6 +70,5 @@ def adr_policy_update(
         resource_group_name=resource_group_name,
         tags=tags,
         certificate_key_type=certificate_key_type,
-        certificate_subject=certificate_subject,
         certificate_validity_days=certificate_validity_days,
     )
