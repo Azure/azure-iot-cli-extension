@@ -7,9 +7,14 @@
 from unittest.mock import Mock, patch
 
 import pytest
-from azure.cli.core.azclierror import MutuallyExclusiveArgumentError, RequiredArgumentMissingError
+from azure.cli.core.azclierror import MutuallyExclusiveArgumentError
 
-from azext_iot.adr.common import DEFAULT_NS_POLICY_CERT_KEY_TYPE, DEFAULT_NS_POLICY_NAME, IdentityType
+from azext_iot.adr.common import (
+    DEFAULT_NS_POLICY_CERT_KEY_TYPE,
+    DEFAULT_NS_POLICY_NAME,
+    DEFAULT_NS_POLICY_CERT_VALIDITY_DAYS,
+    IdentityType,
+)
 
 
 @pytest.mark.parametrize("enable_credential_policy", [False, True])
@@ -35,11 +40,6 @@ def test_create_namespace(
 
     fixture_credential_provider.create = Mock(return_value={"id": "credential-id"})
     fixture_policy_provider.create = Mock(return_value={"id": "policy-id"})
-
-    # Check if any certificate parameters are provided
-    any_cert_params = any([cert_subject is not None, cert_key_type is not None, cert_validity_days is not None])
-    # Only validity days is required (key type gets defaulted)
-    cert_params_invalid = any_cert_params and cert_validity_days is None
 
     # Check if we should create credential policy
     should_create_credential_policy = any(
@@ -77,23 +77,9 @@ def test_create_namespace(
             policy_name is not None,
             cert_key_type is not None,
             cert_validity_days is not None,
-            cert_subject is not None
+            cert_subject is not None,
         ]):
             with pytest.raises(MutuallyExclusiveArgumentError):
-                fixture_namespace_provider.create(
-                    namespace_name=namespace_name,
-                    resource_group_name=resource_group_name,
-                    location=location,
-                    tags=tags,
-                    enable_credential_policy=enable_credential_policy,
-                    policy_name=policy_name,
-                    certificate_key_type=cert_key_type,
-                    certificate_subject=cert_subject,
-                    certificate_validity_days=cert_validity_days,
-                )
-        # Test certificate parameter validation
-        elif cert_params_invalid:
-            with pytest.raises(RequiredArgumentMissingError):
                 fixture_namespace_provider.create(
                     namespace_name=namespace_name,
                     resource_group_name=resource_group_name,
@@ -138,16 +124,17 @@ def test_create_namespace(
                 [enable_credential_policy, policy_name, cert_key_type, cert_subject, cert_validity_days]
             )
 
-            if should_create_credential_policy and not (enable_credential_policy is False and policy_name):
+            if should_create_credential_policy:
                 fixture_credential_provider.create.assert_called_once_with(
                     namespace_name=namespace_name,
                     resource_group_name=resource_group_name,
                     location=fallback_location,
                 )
                 expected_policy_name = policy_name if policy_name is not None else DEFAULT_NS_POLICY_NAME
-                expected_cert_key_type = cert_key_type
-                if any_cert_params and expected_cert_key_type is None:
-                    expected_cert_key_type = DEFAULT_NS_POLICY_CERT_KEY_TYPE
+                expected_cert_key_type = cert_key_type if cert_key_type is not None else DEFAULT_NS_POLICY_CERT_KEY_TYPE
+                expected_cert_validity_days = (
+                    cert_validity_days if cert_validity_days is not None else DEFAULT_NS_POLICY_CERT_VALIDITY_DAYS
+                )
 
                 fixture_policy_provider.create.assert_called_once_with(
                     policy_name=expected_policy_name,
@@ -156,7 +143,7 @@ def test_create_namespace(
                     location=fallback_location,
                     certificate_key_type=expected_cert_key_type,
                     certificate_subject=cert_subject,
-                    certificate_validity_days=cert_validity_days,
+                    certificate_validity_days=expected_cert_validity_days,
                 )
             else:
                 fixture_credential_provider.create.assert_not_called()

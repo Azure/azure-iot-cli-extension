@@ -6,12 +6,16 @@
 
 from typing import Dict, Optional
 
-from azure.cli.core.azclierror import AzureResponseError, RequiredArgumentMissingError, ResourceNotFoundError
+from azure.cli.core.azclierror import AzureResponseError, ResourceNotFoundError
 from azure.core.exceptions import HttpResponseError
 from knack.log import get_logger
 from rich.console import Console
 
-from azext_iot.adr.common import DEFAULT_NS_POLICY_CERT_KEY_TYPE, POLICY_PARENT_RESOURCE_NOT_FOUND_MSG
+from azext_iot.adr.common import (
+    DEFAULT_NS_POLICY_CERT_KEY_TYPE,
+    DEFAULT_NS_POLICY_CERT_VALIDITY_DAYS,
+    POLICY_PARENT_RESOURCE_NOT_FOUND_MSG,
+)
 from azext_iot.adr.providers.base import ADRProvider
 from azext_iot.common.utility import wait_for_terminal_state
 
@@ -35,23 +39,6 @@ class PolicyProvider(ADRProvider):
         certificate_validity_days: Optional[int] = None,
         **kwargs,
     ):
-        # Check if any cert params are provided before setting defaults
-        any_cert_params = any([
-            certificate_subject is not None,
-            certificate_key_type is not None,
-            certificate_validity_days is not None
-        ])
-
-        # Client provides default keytype, but validity must be set
-        if any_cert_params:
-            if certificate_key_type is None:
-                certificate_key_type = DEFAULT_NS_POLICY_CERT_KEY_TYPE
-
-            # Validate that validity is also provided
-            if certificate_validity_days is None:
-                raise RequiredArgumentMissingError(
-                    "Certificate validity period (--cert-validity-days) must be provided when creating a custom policy."
-                )
 
         if not location:
             namespace = self.client.namespaces.get(
@@ -69,23 +56,23 @@ class PolicyProvider(ADRProvider):
         if tags:
             policy_resource["tags"] = tags
 
-        # Build certificate configuration
+        # Build certificate configuration, for service defaults MUST be empty object
         properties = {}
 
+        # If user provides custom values, create custom policy cert object
         if certificate_key_type or certificate_subject or certificate_validity_days:
             certificate_config = {}
+            # Set defaults for required parameters if not provided
+            if certificate_key_type is None:
+                certificate_key_type = DEFAULT_NS_POLICY_CERT_KEY_TYPE
+            if certificate_validity_days is None:
+                certificate_validity_days = DEFAULT_NS_POLICY_CERT_VALIDITY_DAYS
 
-            if certificate_key_type or certificate_subject:
-                ca_config = {}
-                if certificate_key_type:
-                    ca_config["keyType"] = certificate_key_type
-                if certificate_subject:
-                    ca_config["subject"] = certificate_subject
-                certificate_config["certificateAuthorityConfiguration"] = ca_config
-
-            if certificate_validity_days:
-                certificate_config["leafCertificateConfiguration"] = {"validityPeriodInDays": certificate_validity_days}
-
+            ca_config = {"keyType": certificate_key_type}
+            if certificate_subject:
+                ca_config["subject"] = certificate_subject
+            certificate_config["certificateAuthorityConfiguration"] = ca_config
+            certificate_config["leafCertificateConfiguration"] = {"validityPeriodInDays": certificate_validity_days}
             properties["certificate"] = certificate_config
 
         policy_resource["properties"] = properties

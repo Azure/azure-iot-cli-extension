@@ -6,11 +6,16 @@
 
 from typing import Dict, Optional
 
-from azure.cli.core.azclierror import MutuallyExclusiveArgumentError, RequiredArgumentMissingError
+from azure.cli.core.azclierror import MutuallyExclusiveArgumentError
 from knack.log import get_logger
 from rich.console import Console
 
-from azext_iot.adr.common import DEFAULT_NS_POLICY_NAME, DEFAULT_NS_POLICY_CERT_KEY_TYPE, IdentityType
+from azext_iot.adr.common import (
+    DEFAULT_NS_POLICY_NAME,
+    DEFAULT_NS_POLICY_CERT_KEY_TYPE,
+    DEFAULT_NS_POLICY_CERT_VALIDITY_DAYS,
+    IdentityType,
+)
 from azext_iot.adr.providers.base import ADRProvider
 from azext_iot.common.utility import wait_for_terminal_state
 
@@ -35,7 +40,7 @@ class NamespaceProvider(ADRProvider):
         certificate_validity_days: Optional[int] = None,
         **kwargs,
     ):
-        # Validate parameters before creating anything
+        # If any policy arguments provided, create policy
         should_create_credential_policy = any([
             enable_credential_policy,
             policy_name,
@@ -51,28 +56,18 @@ class NamespaceProvider(ADRProvider):
                     "Cannot create a custom policy if `--enable-credential-policy` is false."
                 )
 
-            # Check if any cert params are provided
-            custom_cert_params = any([
-                certificate_subject is not None,
-                certificate_key_type is not None,
-                certificate_validity_days is not None
-            ])
-
-            # Default key type is ECC, but user must provide validity
-            if custom_cert_params:
-                if certificate_validity_days is None:
-                    raise RequiredArgumentMissingError(
-                        "Certificate validity period (--cert-validity-days) must be provided when creating a custom policy."
-                    )
-                if not certificate_key_type:
-                    certificate_key_type = DEFAULT_NS_POLICY_CERT_KEY_TYPE
+            # Set defaults for certificate parameters if not provided
+            if certificate_key_type is None:
+                certificate_key_type = DEFAULT_NS_POLICY_CERT_KEY_TYPE
+            if certificate_validity_days is None:
+                certificate_validity_days = DEFAULT_NS_POLICY_CERT_VALIDITY_DAYS
 
         if not location:
             location = self._ensure_location(self.cmd.cli_ctx, resource_group_name, location)
 
         namespace_resource = {"location": location}
 
-        # TODO - CMS Preview - default system assigned identity, credential, policy
+        # Default system assigned identity
         namespace_resource["identity"] = {"type": IdentityType.system_assigned.value}
 
         if tags:

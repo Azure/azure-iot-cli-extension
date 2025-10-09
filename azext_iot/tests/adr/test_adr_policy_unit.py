@@ -10,7 +10,7 @@ import pytest
 from azure.cli.core.azclierror import ResourceNotFoundError
 from azure.core.exceptions import HttpResponseError
 
-from azext_iot.adr.common import DEFAULT_NS_POLICY_CERT_KEY_TYPE
+from azext_iot.adr.common import DEFAULT_NS_POLICY_CERT_KEY_TYPE, DEFAULT_NS_POLICY_CERT_VALIDITY_DAYS
 
 
 @pytest.mark.parametrize(
@@ -225,82 +225,56 @@ def test_create_policy_certificate_validation(
     cert_validity_days,
     cert_subject,
 ):
-    """Test certificate parameter validation - both key type and validity must be provided together."""
-    from azure.cli.core.azclierror import RequiredArgumentMissingError
+    """Test certificate parameter validation - defaults are provided when parameters are specified."""
+    # Mock successful creation
+    mock_policy_result = Mock()
+    poller = mock_poller(mock_policy_result)
+    fixture_policy_provider.client.policies.begin_create_or_update.return_value = poller
 
-    # Check if any certificate parameters are provided
-    any_cert_params = any([cert_subject is not None, cert_key_type is not None, cert_validity_days is not None])
-    # Only validity days is required if params provided
-    should_succeed = not any_cert_params or cert_validity_days is not None
+    # Mock namespace.get to return location
+    mock_namespace = {"location": "eastus"}
+    fixture_policy_provider.client.namespaces.get.return_value = mock_namespace
 
-    if should_succeed:
-        # Mock successful creation
-        mock_policy_result = Mock()
-        poller = mock_poller(mock_policy_result)
-        fixture_policy_provider.client.policies.begin_create_or_update.return_value = poller
+    result = fixture_policy_provider.create(
+        policy_name="cert-test-policy",
+        namespace_name="test-namespace",
+        resource_group_name="test-rg",
+        certificate_key_type=cert_key_type,
+        certificate_subject=cert_subject,
+        certificate_validity_days=cert_validity_days,
+    )
 
-        # Mock namespace.get to return location
-        mock_namespace = {"location": "eastus"}
-        fixture_policy_provider.client.namespaces.get.return_value = mock_namespace
+    assert result == mock_policy_result
 
-        result = fixture_policy_provider.create(
-            policy_name="cert-test-policy",
-            namespace_name="test-namespace",
-            resource_group_name="test-rg",
-            certificate_key_type=cert_key_type,
-            certificate_subject=cert_subject,
-            certificate_validity_days=cert_validity_days,
-        )
+    call_args = fixture_policy_provider.client.policies.begin_create_or_update.call_args
+    resource = call_args[1]["resource"]
 
-        assert result == mock_policy_result
+    # Verify certificate configuration
+    if any([cert_subject is not None, cert_key_type is not None, cert_validity_days is not None]):
+        assert "properties" in resource
+        assert "certificate" in resource["properties"]
+        cert_config = resource["properties"]["certificate"]
 
-        call_args = fixture_policy_provider.client.policies.begin_create_or_update.call_args
-        resource = call_args[1]["resource"]
+        # Check CA configuration
+        assert "certificateAuthorityConfiguration" in cert_config
+        ca_config = cert_config["certificateAuthorityConfiguration"]
 
-        # Verify certificate configuration
-        if any_cert_params:
-            assert "properties" in resource
-            assert "certificate" in resource["properties"]
-            cert_config = resource["properties"]["certificate"]
+        # Key type should default if None
+        expected_key_type = cert_key_type if cert_key_type is not None else DEFAULT_NS_POLICY_CERT_KEY_TYPE
+        assert ca_config["keyType"] == expected_key_type
 
-            # Check CA configuration
-            assert "certificateAuthorityConfiguration" in cert_config
-            ca_config = cert_config["certificateAuthorityConfiguration"]
+        if cert_subject:
+            assert ca_config["subject"] == cert_subject
 
-            # Key type should be either the provided one or the default ECC
-            expected_key_type = cert_key_type if cert_key_type else DEFAULT_NS_POLICY_CERT_KEY_TYPE
-            assert ca_config["keyType"] == expected_key_type
-
-            if cert_subject:
-                assert ca_config["subject"] == cert_subject
-
-            # Check leaf certificate configuration
-            assert "leafCertificateConfiguration" in cert_config
-            leaf_config = cert_config["leafCertificateConfiguration"]
-            assert leaf_config["validityPeriodInDays"] == cert_validity_days
-        else:
-            # No certificate configuration should be present
-            if "properties" in resource:
-                assert "certificate" not in resource["properties"]
+        # Check leaf certificate configuration
+        assert "leafCertificateConfiguration" in cert_config
+        leaf_config = cert_config["leafCertificateConfiguration"]
+        # Validity should default if None
+        expected_validity = cert_validity_days if cert_validity_days is not None else DEFAULT_NS_POLICY_CERT_VALIDITY_DAYS
+        assert leaf_config["validityPeriodInDays"] == expected_validity
     else:
-        # Should raise validation error
-        with pytest.raises(RequiredArgumentMissingError) as exc_info:
-            fixture_policy_provider.create(
-                policy_name="cert-test-policy",
-                namespace_name="test-namespace",
-                resource_group_name="test-rg",
-                certificate_key_type=cert_key_type,
-                certificate_subject=cert_subject,
-                certificate_validity_days=cert_validity_days,
-            )
-
-        # Verify the error message mentions the required parameter
-        error_message = str(exc_info.value)
-        assert "cert-validity-days" in error_message
-
-        # Should not make any API calls if validation fails
-        fixture_policy_provider.client.namespaces.get.assert_not_called()
-        fixture_policy_provider.client.policies.begin_create_or_update.assert_not_called()
+        # empty properties object for service defaults
+        assert "properties" in resource and not resource["properties"]
 
 
 @pytest.mark.parametrize(
