@@ -24,8 +24,9 @@ from azext_iot.tests.adr.conftest import (
 
 logger = get_logger(__name__)
 
-# Test-wide constants
-TEST_LOCATION = "westus"
+# TODO - change once service rolls out to more regions
+TEST_LOCATION = "centraluseuap"
+# TODO - change once built-in role exists
 CUSTOM_ROLE_NAME = "ADR Cert Management Integration Role"
 
 
@@ -35,6 +36,7 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
     def __init__(self, test_case):
         super(TestADRCertificateManagementLifecycle, self).__init__(test_case)
 
+    # TODO - update once built-in role exists
     def find_or_create_custom_adr_role(self, subscription_id, resource_group_name):
         rg_scope = f"/subscriptions/{subscription_id}/resourceGroups/{resource_group_name}"
 

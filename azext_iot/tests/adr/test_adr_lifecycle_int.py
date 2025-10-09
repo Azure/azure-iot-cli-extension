@@ -20,6 +20,7 @@ from azext_iot.tests.adr.conftest import (
 
 logger = get_logger(__name__)
 
+# TODO - change once service rolls out to more regions
 TEST_LOCATION = "centraluseuap"
 
 
@@ -156,7 +157,7 @@ class TestADRLifecycleIntegration(CaptureOutputLiveScenarioTest):
 
             # Delete policies
             self.cmd(f"iot adr ns policy delete --ns {namespace_name} -g {rg} --policy-name {CUSTOM_POLICY_NAME} -y")
-            self.cmd(f"iot adr ns policy delete --ns {namespace_name} -g {rg} --policy-name default -y")
+            self.cmd(f"iot adr ns policy delete --ns {namespace_name} -g {rg} --policy-name {DEFAULT_NS_POLICY_NAME} -y")
 
             # Verify all policies were deleted
             policies_after = self.cmd(f"iot adr ns policy list --ns {namespace_name} -g {rg}").get_output_in_json()
