@@ -277,37 +277,24 @@ def test_create_policy_certificate_validation(
         assert "properties" in resource and not resource["properties"]
 
 
-@pytest.mark.parametrize(
-    "update_params",
-    [
-        {"tags": None, "cert_subject": None, "cert_validity_days": None},
-        {"tags": {"env": "test"}, "cert_subject": "test", "cert_validity_days": None},
-        {"tags": {"env": "prod", "team": "ops"}, "cert_subject": None, "cert_validity_days": 30},
-        {"tags": None, "cert_subject": "test", "cert_validity_days": 30},
-    ],
-)
-def test_update_policy(fixture_policy_provider, mock_poller, update_params):
+@pytest.mark.parametrize("tags", [None, {"env": "test"}])
+@pytest.mark.parametrize("cert_validity_days", [None, 30])
+def test_update_policy(fixture_policy_provider, mock_poller, tags, cert_validity_days):
     """Test successful policy update."""
     mock_update_result = Mock()
     poller = mock_poller(mock_update_result)
     fixture_policy_provider.client.policies.begin_update.return_value = poller
-
-    # Extract params for easier reading
-    tags = update_params["tags"]
-    cert_subject = update_params["cert_subject"]
-    cert_validity_days = update_params["cert_validity_days"]
 
     result = fixture_policy_provider.update(
         policy_name="test-policy",
         namespace_name="test-namespace",
         resource_group_name="test-rg",
         tags=tags,
-        certificate_subject=cert_subject,
         certificate_validity_days=cert_validity_days,
     )
 
     # If no changes, the method returns early with None
-    if not tags and not cert_subject and not cert_validity_days:
+    if not tags and not cert_validity_days:
         assert result is None
         fixture_policy_provider.client.policies.begin_update.assert_not_called()
         return
@@ -330,14 +317,9 @@ def test_update_policy(fixture_policy_provider, mock_poller, update_params):
         assert "tags" not in properties or properties["tags"] is None
 
     # Verify certificate configuration based on parameters
-    if cert_subject or cert_validity_days:
+    if cert_validity_days:
         assert "properties" in properties
         cert_props = properties["properties"].get("certificate", {})
-
-        if cert_subject:
-            ca_config = cert_props.get("certificateAuthorityConfiguration", {})
-            assert ca_config["subject"] == cert_subject
-
         if cert_validity_days:
             leaf_config = cert_props.get("leafCertificateConfiguration", {})
             assert leaf_config["validityPeriodInDays"] == cert_validity_days
