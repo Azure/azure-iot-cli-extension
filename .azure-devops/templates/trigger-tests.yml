@@ -147,7 +147,7 @@ jobs:
 
   - job: "testADR"
     timeoutInMinutes: 200
-    displayName: "Test ADU"
+    displayName: "Test ADR"
     condition: and(succeeded(), eq('${{ parameters.testADR }}', true))
     strategy:
       matrix: $[ variables['pythonVersions'] ]
