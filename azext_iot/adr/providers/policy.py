@@ -143,32 +143,24 @@ class PolicyProvider(ADRProvider):
         certificate_validity_days: Optional[int] = None,
         **kwargs,
     ):
-        update_payload = {}
+        resource = self.show(
+            policy_name=policy_name, namespace_name=namespace_name, resource_group_name=resource_group_name
+        )
         if tags:
-            update_payload["tags"] = tags
+            resource["tags"] = tags
 
-        properties = {}
+        properties = resource["properties"]
         if certificate_validity_days:
-            properties["certificate"] = {}
-            properties = {
-                "certificate": {
-                    "leafCertificateConfiguration": {
-                        "validityPeriodInDays": certificate_validity_days
-                    }
-                }
-            }
-        if properties:
-            update_payload["properties"] = properties
-
-        # return if nothing to update
-        if not update_payload:
-            return
+            properties["certificate"]["leafCertificateConfiguration"][
+                "validityPeriodInDays"
+            ] = certificate_validity_days
+        resource["properties"] = properties
 
         with console.status(f"Updating policy '{policy_name}' for namespace {namespace_name}..."):
-            poller = self.client.policies.begin_update(
+            poller = self.client.policies.begin_create_or_update(
                 resource_group_name=resource_group_name,
                 namespace_name=namespace_name,
                 policy_name=policy_name,
-                properties=update_payload,
+                resource=resource,
             )
             return wait_for_terminal_state(poller, **kwargs)

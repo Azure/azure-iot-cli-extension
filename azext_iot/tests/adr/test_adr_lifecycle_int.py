@@ -12,6 +12,7 @@ from azext_iot.tests import CaptureOutputLiveScenarioTest
 from azext_iot.tests.adr.conftest import (
     CUSTOM_CERT_KEY_TYPE,
     CUSTOM_CERT_SUBJECT,
+    CUSTOM_CERT_UPDATE_VALIDITY_DAYS,
     CUSTOM_CERT_VALIDITY_DAYS,
     CUSTOM_POLICY_NAME,
     TEST_RG,
@@ -128,17 +129,17 @@ class TestADRLifecycleIntegration(CaptureOutputLiveScenarioTest):
             # TODO - cert subject not respected
             # assert ca_config["subject"] == CUSTOM_CERT_SUBJECT
 
-            # TODO - enable after testing, update more properties once service is stable
+            # TODO - service currently only supports validity period updates
             # Update custom credential policy
-            # updated_policy = self.cmd(
-            #     f"iot adr ns policy update --ns {namespace_name} -g {rg} "
-            #     f"--policy-name {CUSTOM_POLICY_NAME} "
-            #     f"--cert-validity-days {CUSTOM_CERT_UPDATE_VALIDITY_DAYS}"
-            # ).get_output_in_json()
-            # assert updated_policy["properties"]["provisioningState"] == "Succeeded"
-            # leaf_config = updated_policy["properties"]["certificate"]["leafCertificateConfiguration"]
-            # ca_config = updated_policy["properties"]["certificate"]["certificateAuthorityConfiguration"]
-            # assert leaf_config["validityPeriodInDays"] == CUSTOM_CERT_UPDATE_VALIDITY_DAYS
+            updated_policy = self.cmd(
+                f"iot adr ns policy update --ns {namespace_name} -g {rg} "
+                f"--policy-name {CUSTOM_POLICY_NAME} "
+                f"--cert-validity-days {CUSTOM_CERT_UPDATE_VALIDITY_DAYS}"
+            ).get_output_in_json()
+            assert updated_policy["properties"]["provisioningState"] == "Succeeded"
+            leaf_config = updated_policy["properties"]["certificate"]["leafCertificateConfiguration"]
+            ca_config = updated_policy["properties"]["certificate"]["certificateAuthorityConfiguration"]
+            assert leaf_config["validityPeriodInDays"] == CUSTOM_CERT_UPDATE_VALIDITY_DAYS
 
             # List ADR credential policies
             policies = self.cmd(f"iot adr ns policy list --ns {namespace_name} -g {rg}").get_output_in_json()

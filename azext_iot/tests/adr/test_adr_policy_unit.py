@@ -270,86 +270,137 @@ def test_create_policy_certificate_validation(
         assert "leafCertificateConfiguration" in cert_config
         leaf_config = cert_config["leafCertificateConfiguration"]
         # Validity should default if None
-        expected_validity = cert_validity_days if cert_validity_days is not None else DEFAULT_NS_POLICY_CERT_VALIDITY_DAYS
+        expected_validity = (
+            cert_validity_days if cert_validity_days is not None else DEFAULT_NS_POLICY_CERT_VALIDITY_DAYS
+        )
         assert leaf_config["validityPeriodInDays"] == expected_validity
     else:
-        # empty properties object for service defaults
-        assert "properties" in resource and not resource["properties"]
+        # empty properties object for service defaults (no user input)
+        assert resource["properties"] == {}
 
 
 @pytest.mark.parametrize("tags", [None, {"env": "test"}])
-@pytest.mark.parametrize("cert_validity_days", [None, 30])
+@pytest.mark.parametrize("cert_validity_days", [None, 20])
 def test_update_policy(fixture_policy_provider, mock_poller, tags, cert_validity_days):
     """Test successful policy update."""
+    # Mock existing policy from show()
+    existing_policy_name = "test-policy"
+    namespace_name = "test-namespace"
+    rg = "test-rg"
+    existing_policy = {
+        "name": existing_policy_name,
+        "location": "location",
+        "tags": {"existing": "tag"},
+        "properties": {"certificate": {"leafCertificateConfiguration": {"validityPeriodInDays": 30}}},
+    }
+
+    # Mock show call
+    fixture_policy_provider.client.namespaces.get.return_value = Mock()
+    fixture_policy_provider.client.policies.get.return_value = existing_policy
+
+    # Mock create_or_update call
     mock_update_result = Mock()
     poller = mock_poller(mock_update_result)
-    fixture_policy_provider.client.policies.begin_update.return_value = poller
+    fixture_policy_provider.client.policies.begin_create_or_update.return_value = poller
 
     result = fixture_policy_provider.update(
-        policy_name="test-policy",
-        namespace_name="test-namespace",
-        resource_group_name="test-rg",
+        policy_name=existing_policy_name,
+        namespace_name=namespace_name,
+        resource_group_name=rg,
         tags=tags,
         certificate_validity_days=cert_validity_days,
     )
 
-    # If no changes, the method returns early with None
-    if not tags and not cert_validity_days:
-        assert result is None
-        fixture_policy_provider.client.policies.begin_update.assert_not_called()
-        return
-
     assert result == mock_update_result
-    fixture_policy_provider.client.policies.begin_update.assert_called_once()
 
-    call_args = fixture_policy_provider.client.policies.begin_update.call_args
-    assert call_args[1]["resource_group_name"] == "test-rg"
-    assert call_args[1]["namespace_name"] == "test-namespace"
-    assert call_args[1]["policy_name"] == "test-policy"
-
-    properties = call_args[1]["properties"]
-
-    # Verify tags
-    if tags:
-        assert "tags" in properties
-        assert properties["tags"] == tags
-    else:
-        assert "tags" not in properties or properties["tags"] is None
-
-    # Verify certificate configuration based on parameters
-    if cert_validity_days:
-        assert "properties" in properties
-        cert_props = properties["properties"].get("certificate", {})
-        if cert_validity_days:
-            leaf_config = cert_props.get("leafCertificateConfiguration", {})
-            assert leaf_config["validityPeriodInDays"] == cert_validity_days
-
-
-def test_update_policy_no_changes(fixture_policy_provider):
-    """Test policy update with no parameters returns early."""
-    result = fixture_policy_provider.update(
-        policy_name="test-policy",
-        namespace_name="test-namespace",
-        resource_group_name="test-rg",
+    # Verify policy get was called
+    fixture_policy_provider.client.policies.get.assert_called_once_with(
+        resource_group_name=rg, namespace_name=namespace_name, policy_name=existing_policy_name
     )
 
-    # Should return early without calling the client
-    assert result is None
-    fixture_policy_provider.client.policies.begin_update.assert_not_called()
+    # Verify begin_create_or_update was called
+    fixture_policy_provider.client.policies.begin_create_or_update.assert_called_once()
+
+    call_args = fixture_policy_provider.client.policies.begin_create_or_update.call_args
+    assert call_args[1]["resource_group_name"] == rg
+    assert call_args[1]["namespace_name"] == namespace_name
+    assert call_args[1]["policy_name"] == existing_policy_name
+
+    resource = call_args[1]["resource"]
+
+    # Verify only provided properties were changed
+    assert resource["tags"] == (tags if tags else existing_policy["tags"])
+    expected_validity = (
+        cert_validity_days
+        if cert_validity_days
+        else existing_policy["properties"]["certificate"]["leafCertificateConfiguration"]["validityPeriodInDays"]
+    )
+    assert (
+        resource["properties"]["certificate"]["leafCertificateConfiguration"]["validityPeriodInDays"]
+        == expected_validity
+    )
 
 
-@pytest.mark.parametrize(
-    "namespace_exists, expected_exception",
-    [
-        (True, ResourceNotFoundError),
-        (False, HttpResponseError),
-    ],
-)
-def test_show_policy_error_scenarios(fixture_policy_provider, namespace_exists, expected_exception):
+@pytest.mark.parametrize("namespace_exists", [True, False])
+def test_update_policy_error_scenarios(fixture_policy_provider, namespace_exists):
+    """Test policy update error scenarios: namespace missing or credentials missing during show."""
+    _test_namespace_or_credential_not_found_error(
+        fixture_policy_provider,
+        operation_method="update",
+        operation_kwargs={
+            "policy_name": "test-policy",
+            "namespace_name": "test-namespace",
+            "resource_group_name": "test-rg",
+            "tags": {"test": "tag"},
+        },
+        namespace_exists=namespace_exists,
+    )
+
+
+@pytest.mark.parametrize("namespace_exists", [True, False])
+def test_show_policy_error_scenarios(fixture_policy_provider, namespace_exists):
     """Test policy show error scenarios: namespace missing or credentials missing."""
-    test_namespace = "test-namespace"
-    test_rg = "test-rg"
-    test_policy = "test-policy"
+    _test_namespace_or_credential_not_found_error(
+        fixture_policy_provider,
+        operation_method="show",
+        operation_kwargs={
+            "policy_name": "test-policy",
+            "namespace_name": "test-namespace",
+            "resource_group_name": "test-rg",
+        },
+        namespace_exists=namespace_exists,
+    )
+
+
+@pytest.mark.parametrize("namespace_exists", [True, False])
+def test_list_policy_error_scenarios(fixture_policy_provider, namespace_exists):
+    """Test policy list error scenarios: namespace missing or credentials missing."""
+    _test_namespace_or_credential_not_found_error(
+        fixture_policy_provider,
+        operation_method="list",
+        operation_kwargs={"namespace_name": "test-namespace", "resource_group_name": "test-rg"},
+        namespace_exists=namespace_exists,
+    )
+
+
+def _test_namespace_or_credential_not_found_error(
+    fixture_policy_provider,
+    operation_method,
+    operation_kwargs,
+    namespace_exists=True,
+):
+    """
+    Common test helper for namespace/credential not found errors during policy commands.
+
+    Args:
+        fixture_policy_provider: The policy provider fixture
+        operation_method: String name of the method to test (e.g., "show", "list", "update")
+        operation_kwargs: Dict of kwargs to pass to the operation method
+        namespace_exists: Whether namespace exists (True) or not (False)
+    """
+    # Setup common test data
+    test_namespace = operation_kwargs.get("namespace_name", "test-namespace")
+    test_rg = operation_kwargs.get("resource_group_name", "test-rg")
 
     # HTTP 404 mock
     mock_404_response = Mock()
@@ -361,85 +412,60 @@ def test_show_policy_error_scenarios(fixture_policy_provider, namespace_exists, 
         mock_namespace = Mock()
         fixture_policy_provider.client.namespaces.get.return_value = mock_namespace
 
-        # ParentResourceNotFound (credentials don't exist)
+        # Mock credential not found (ParentResourceNotFound)
         class MockParentResourceNotFoundError(HttpResponseError):
             def __str__(self):
                 return "ParentResourceNotFound"
 
         parent_error = MockParentResourceNotFoundError(response=mock_404_response)
-        fixture_policy_provider.client.policies.get.side_effect = parent_error
+
+        # Set up the appropriate client method to raise parent error
+        if operation_method == "list":
+            fixture_policy_provider.client.policies.list_by_resource_group.side_effect = parent_error
+        else:  # show or update (both use get)
+            fixture_policy_provider.client.policies.get.side_effect = parent_error
+
+        expected_exception = ResourceNotFoundError
+        expected_error_substring = f"No credential exists on namespace '{test_namespace}'"
     else:
         # Mock namespace doesn't exist
         fixture_policy_provider.client.namespaces.get.side_effect = http_404_error
+        expected_exception = HttpResponseError
+        expected_error_substring = None
 
+    # Execute the operation and verify it raises the expected exception
+    provider_method = getattr(fixture_policy_provider, operation_method)
     with pytest.raises(expected_exception) as exc_info:
-        fixture_policy_provider.show(
-            policy_name=test_policy, namespace_name=test_namespace, resource_group_name=test_rg
-        )
+        provider_method(**operation_kwargs)
 
-    error_message = str(exc_info.value)
-    if namespace_exists:
-        assert f"No credential exists on namespace '{test_namespace}'" in error_message
-        fixture_policy_provider.client.policies.get.assert_called_once_with(
-            resource_group_name=test_rg, namespace_name=test_namespace, policy_name=test_policy
-        )
+    # Verify error message content
+    if expected_error_substring:
+        assert expected_error_substring in str(exc_info.value)
     else:
         assert exc_info.value.response.status_code == 404
-        fixture_policy_provider.client.policies.get.assert_not_called()
 
-    # Namespace get should always be called
+    # Verify namespace get was called
     fixture_policy_provider.client.namespaces.get.assert_called_once_with(
         resource_group_name=test_rg, namespace_name=test_namespace
     )
 
-
-@pytest.mark.parametrize(
-    "namespace_exists, expected_exception",
-    [
-        (True, ResourceNotFoundError),
-        (False, HttpResponseError),
-    ],
-)
-def test_list_policy_error_scenarios(fixture_policy_provider, namespace_exists, expected_exception):
-    """Test policy list error scenarios: namespace missing or credentials missing."""
-    test_namespace = "test-namespace"
-    test_rg = "test-rg"
-
-    # HTTP 404 mock
-    mock_404_response = Mock()
-    mock_404_response.status_code = 404
-    http_404_error = HttpResponseError(response=mock_404_response)
-
+    # Verify policy operations based on namespace existence
     if namespace_exists:
-        # Mock namespace exists
-        mock_namespace = Mock()
-        fixture_policy_provider.client.namespaces.get.return_value = mock_namespace
-
-        # ParentResourceNotFound (credentials don't exist)
-        class MockParentResourceNotFoundError(HttpResponseError):
-            def __str__(self):
-                return "ParentResourceNotFound error message"
-
-        parent_error = MockParentResourceNotFoundError(response=mock_404_response)
-        fixture_policy_provider.client.policies.list_by_resource_group.side_effect = parent_error
+        if operation_method == "list":
+            fixture_policy_provider.client.policies.list_by_resource_group.assert_called_once_with(
+                resource_group_name=test_rg, namespace_name=test_namespace
+            )
+        else:  # show or update
+            fixture_policy_provider.client.policies.get.assert_called_once_with(
+                resource_group_name=test_rg,
+                namespace_name=test_namespace,
+                policy_name=operation_kwargs.get("policy_name"),
+            )
     else:
-        # Mock namespace doesn't exist
-        fixture_policy_provider.client.namespaces.get.side_effect = http_404_error
-
-    with pytest.raises(expected_exception) as exc_info:
-        fixture_policy_provider.list(namespace_name=test_namespace, resource_group_name=test_rg)
-
-    error_message = str(exc_info.value)
-    if namespace_exists:
-        assert f"No credential exists on namespace '{test_namespace}'" in error_message
-        fixture_policy_provider.client.policies.list_by_resource_group.assert_called_once_with(
-            resource_group_name=test_rg, namespace_name=test_namespace
-        )
-    else:
-        assert exc_info.value.response.status_code == 404
+        # When namespace doesn't exist, policy methods shouldn't be called
+        fixture_policy_provider.client.policies.get.assert_not_called()
         fixture_policy_provider.client.policies.list_by_resource_group.assert_not_called()
 
-    # Namespace get should always be called
-    fixture_policy_provider.client.namespaces.get.assert_called_once_with(
-        resource_group_name=test_rg, namespace_name=test_namespace
-    )
+    # For update, also verify that begin_create_or_update wasn't called
+    if operation_method == "update":
+        fixture_policy_provider.client.policies.begin_create_or_update.assert_not_called()
