@@ -1128,7 +1128,7 @@ def load_arguments(self, _):
         )
         context.argument(
             "credential_policy_name",
-            options_list=["--credential-policy-name", "--credential-policy"],
+            options_list=["--credential-policy-name", "--cpn"],
             help="ADR Namespace Credential Policy Name.",
             arg_group="ADR Credential Policy"
         )
@@ -1240,7 +1240,7 @@ def load_arguments(self, _):
         )
         context.argument(
             "credential_policy_name",
-            options_list=["--credential-policy-name", "--credential-policy"],
+            options_list=["--credential-policy-name", "--cpn"],
             help="ADR Namespace Credential Policy Name.",
             arg_group="ADR Credential Policy"
         )
