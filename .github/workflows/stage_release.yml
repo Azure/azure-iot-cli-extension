@@ -18,7 +18,7 @@ jobs:
       - name: Setup python
         uses: actions/setup-python@v5
         with:
-            python-version: "3.13"
+          python-version: "3.13"
       - name: Install and determine version
         run: |
           wheel=$(find ./release/*.whl)
@@ -39,6 +39,14 @@ jobs:
           echo tag: "${{ env.tag }}"
           echo version: "${{ env.version }}"
           echo wheel: "${{ env.wheel }}"
-          gh release create "${{ env.tag }}" --generate-notes -d -t "azure-iot ${{ env.version }}" "${{ env.wheel }}" "./SBOM.zip#SBOM" --repo "${{ github.repository }}"
+          echo target: "${{ github.ref }}"
+          gh release create --draft \
+          "${{ env.tag }}" \
+          "${{ env.wheel }}" \
+          "./SBOM.zip#SBOM" \
+          --repo "${{ github.repository }}" \
+          --target "${{ github.ref }}" \
+          --title "azure-iot ${{ env.version }}" \
+          --generate-notes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
