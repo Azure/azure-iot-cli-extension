@@ -23,6 +23,7 @@ jobs:
   security:
     permissions:
       # needed to write security info to repository
+      id-token: write
       security-events: write
       contents: read
     uses: ./.github/workflows/security_checks.yml
