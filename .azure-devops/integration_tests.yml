@@ -68,7 +68,7 @@ parameters:
     default: true
   - name: "testADR"
     type: boolean
-    default: false
+    default: true
   - name: "azureCLIVersion"
     type: string
     default: "released"

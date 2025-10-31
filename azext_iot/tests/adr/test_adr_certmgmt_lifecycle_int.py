@@ -11,23 +11,20 @@ from azext_iot.tests import CaptureOutputLiveScenarioTest
 from azext_iot.tests.adr.conftest import (
     CUSTOM_CERT_KEY_TYPE,
     CUSTOM_CERT_SUBJECT,
-    CUSTOM_POLICY_NAME,
     CUSTOM_CERT_VALIDITY_DAYS,
+    CUSTOM_POLICY_NAME,
     TEST_RG,
     generate_adr_namespace_name,
-    generate_hub_name,
-    generate_dps_name,
-    generate_identity_name,
     generate_device_id,
+    generate_dps_name,
     generate_enrollment_group_id,
+    generate_hub_name,
+    generate_identity_name,
 )
 
 logger = get_logger(__name__)
 
-# TODO - change once service rolls out to more regions
-TEST_LOCATION = "centraluseuap"
-# TODO - change once built-in role exists
-CUSTOM_ROLE_NAME = "ADR Cert Management Integration Role"
+TEST_LOCATION = "westus"
 
 
 @pytest.mark.usefixtures("set_cwd")
@@ -35,59 +32,6 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
 
     def __init__(self, test_case):
         super(TestADRCertificateManagementLifecycle, self).__init__(test_case)
-
-    # TODO - update once built-in role exists
-    def find_or_create_custom_adr_role(self, subscription_id, resource_group_name):
-        rg_scope = f"/subscriptions/{subscription_id}/resourceGroups/{resource_group_name}"
-
-        custom_role_def = {
-            "Name": CUSTOM_ROLE_NAME,
-            "Description": "Custom role for ADR namespace integration with IoT Hub and DPS",
-            "Actions": [
-                "Microsoft.DeviceRegistry/namespaces/devices/read",
-                "Microsoft.DeviceRegistry/namespaces/devices/write",
-                "Microsoft.DeviceRegistry/namespaces/read",
-                "Microsoft.DeviceRegistry/namespaces/write",
-                "Microsoft.DeviceRegistry/namespaces/credentials/read",
-                "Microsoft.DeviceRegistry/namespaces/credentials/policies/read",
-            ],
-            "NotActions": [],
-            "DataActions": [],
-            "NotDataActions": [],
-            "AssignableScopes": [rg_scope],
-        }
-
-        try:
-            # Check if custom role already exists
-            existing_roles = self.cmd(f"role definition list --name '{CUSTOM_ROLE_NAME}'").get_output_in_json()
-            if not existing_roles:
-                # Create temporary file for role definition
-                import tempfile
-                import json
-                import os
-
-                with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as temp_file:
-                    json.dump(custom_role_def, temp_file, indent=2)
-                    temp_file_path = temp_file.name
-
-                try:
-                    role_create_result = self.cmd(
-                        f"role definition create --role-definition '{temp_file_path}'"
-                    ).get_output_in_json()
-                    custom_role_id = role_create_result["id"]
-                    print(f"Created custom role scoped to RG: {CUSTOM_ROLE_NAME} with ID: {custom_role_id}")
-                finally:
-                    os.unlink(temp_file_path)
-            else:
-                print(f"Custom role already exists: {CUSTOM_ROLE_NAME}")
-                custom_role_id = existing_roles[0]["id"]
-
-            print(f"Using custom role ID: {custom_role_id}")
-            return custom_role_id
-
-        except Exception as e:
-            logger.warning(f"Failed to create/fetch custom role: {e}")
-            return None
 
     def assign_role(self, assignee_id, role, scope, assignee_type="auto"):
         try:
@@ -139,58 +83,15 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
 
         except Exception as e:
             logger.warning(f"Failed to assign IoT Hub RP contributor role: {e}")
-            # Continue without this assignment - test may still work
 
-    def assign_custom_role_to_identity(self, custom_role_id, identity_principal_id, scope_resource_id):
-        """
-        Helper function to assign custom role to user assigned managed identity using role ID.
-        Returns the role assignment ID if successful, None otherwise.
-        """
-        if not custom_role_id:
-            logger.warning("No custom role ID provided for assignment")
-            return None
-
-        # Use the consolidated role assignment method
-        assignment_id = self.assign_role(
-            assignee_id=identity_principal_id,
-            role=custom_role_id,
-            scope=scope_resource_id,
-        )
-
-        if assignment_id:
-            print(f"Custom role assignment to UAMI: {assignment_id}")
-
-        return assignment_id
-
-    def cleanup_custom_role(self, custom_role_id=None):
-        """
-        Helper function to clean up the custom role after test completion.
-        Accepts role ID for more reliable deletion.
-        """
-        try:
-            if custom_role_id:
-                # Use role ID for more reliable deletion
-                self.cmd(f"role definition delete --name '{custom_role_id}'")
-                print(f"Deleted custom role by ID: {custom_role_id}")
-            else:
-                # Fallback to name-based deletion
-                self.cmd(f"role definition delete --name '{CUSTOM_ROLE_NAME}' -y")
-                print(f"Deleted custom role by name: {CUSTOM_ROLE_NAME}")
-        except Exception as e:
-            logger.warning(f"Failed to delete custom role: {e}")
-
-    def cleanup_role_assignment(self, role_assignment_id=None):
-        """
-        Helper function to clean up role assignment.
-        """
-        if not role_assignment_id:
-            return
-
-        try:
-            self.cmd(f"role assignment delete --ids '{role_assignment_id}'")
-            print(f"Deleted role assignment: {role_assignment_id}")
-        except Exception as e:
-            logger.warning(f"Failed to delete role assignment {role_assignment_id}: {e}")
+    def assign_adr_roles_to_identity(self, identity_principal_id, scope_resource_id):
+        for role in ["Azure Device Registry Contributor", "Azure Device Registry Onboarding"]:
+            print(f"Assigning {role} to UAMI: {identity_principal_id}")
+            self.assign_role(
+                assignee_id=identity_principal_id,
+                role=role,
+                scope=scope_resource_id,
+            )
 
     def test_adr_certificate_management_lifecycle(self):
         rg = TEST_RG
@@ -201,8 +102,6 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
         device_id = generate_device_id()
         enrollment_group_id = generate_enrollment_group_id()
         credential_policy_name = CUSTOM_POLICY_NAME
-        custom_role_id = None  # Track role ID for cleanup
-        role_assignment_id = None  # Track role assignment for cleanup
 
         try:
             # Create user assigned identity
@@ -234,12 +133,11 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
             assert "principalId" in namespace["identity"]
             assert "tenantId" in namespace["identity"]
 
-            # Create or fetch custom role for ADR integration
-            custom_role_id = self.find_or_create_custom_adr_role(subscription_id, rg)
-            # Assign custom role to identity for ADR access
-            role_assignment_id = self.assign_custom_role_to_identity(
-                custom_role_id, identity_principal_id, adr_resource_id
-            )
+            # Assign built-in ADR roles to identity for ADR access
+            self.assign_adr_roles_to_identity(identity_principal_id, adr_resource_id)
+
+            # Delete default policy
+            self.cmd(f"iot adr ns policy delete --ns {namespace_name} -g {rg} --policy-name default -y")
 
             # Create custom credential policy for this test
             custom_policy = self.cmd(
@@ -385,7 +283,7 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
 
             # Validate certificate sync results
             cert_list = certificates.get("value", [])
-            assert len(cert_list) == 2  # default policy + custom policy
+            assert len(cert_list) == 1
 
             custom_policy_resource_id = (
                 f"/subscriptions/{subscription_id}/resourceGroups/{rg}/providers/"
@@ -393,31 +291,17 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
                 f"default/policies/{credential_policy_name}"
             )
 
-            default_policy_resource_id = (
-                f"/subscriptions/{subscription_id}/resourceGroups/{rg}/providers/"
-                f"Microsoft.DeviceRegistry/namespaces/{namespace_name}/credentials/"
-                f"default/policies/default"
-            )
-
-            # Find certificates by policy resource ID
+            # Find certificate by policy resource ID
             custom_policy_cert = None
-            default_policy_cert = None
 
             for cert in cert_list:
                 if cert["properties"]["PolicyResourceId"] == custom_policy_resource_id:
                     custom_policy_cert = cert
-                elif cert["properties"]["PolicyResourceId"] == default_policy_resource_id:
-                    default_policy_cert = cert
 
             # Validate custom policy certificate properties
             assert custom_policy_cert is not None, "Custom policy certificate not found"
             cert_props = custom_policy_cert["properties"]
             assert cert_props["PolicyResourceId"] == custom_policy_resource_id
-
-            # Validate default policy certificate properties
-            assert default_policy_cert is not None, "Default policy certificate not found"
-            default_cert_props = default_policy_cert["properties"]
-            assert default_cert_props["PolicyResourceId"] == default_policy_resource_id
 
         finally:
             # Cleanup all resources
@@ -445,9 +329,3 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
                 self.cmd(f"identity delete -n {identity_name} -g {rg}")
             except Exception as e:
                 logger.warning(f"Failed to delete identity {identity_name}: {e}")
-
-            # Delete role assignment first (before deleting the role definition)
-            self.cleanup_role_assignment(role_assignment_id)
-
-            # Delete custom role
-            self.cleanup_custom_role(custom_role_id)

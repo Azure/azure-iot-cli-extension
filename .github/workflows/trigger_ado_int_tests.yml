@@ -25,7 +25,7 @@ on:
       testADR:
         description: Run ADR tests
         type: boolean
-        default: false
+        default: true
       python_versions:
         description: "Python versions to test"
         type: string
