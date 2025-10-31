@@ -13,14 +13,17 @@ Release History
 * To install preview extensions, you will need to add the `--allow-preview` argument to `az extension add/update` commands.
 * This release alters several existing IoT Hub and DPS commands from CLI core modules, namely control-plane create/update commands for Hub and DPS.
 * These commands will display the following expected warning when using this extension:
-  > `The behavior of this command has been altered by the following extension: azure-iot`
+
+  - `The behavior of this command has been altered by the following extension: azure-iot`
 
 **Azure Device Registry updates**
 
 * New command group `az iot adr ns` to manage Azure Device Registry namespaces, policies and credentials
-  * `az iot adr ns` to manage Device Registry namespaces.
-  * `az iot adr ns credential` to manage namespace credentials.
-  * `az iot adr ns policy` to manage namespace policies.
+
+  - `az iot adr ns` to manage Device Registry namespaces.
+  - `az iot adr ns credential` to manage namespace credentials.
+  - `az iot adr ns policy` to manage namespace policies.
+
 * New management SDK using `2025-11-01-preview` API version.
 
 **IoT Hub updates**
@@ -28,8 +31,9 @@ Release History
 * New management SDK using `2025-08-01-preview` API version.
 * New Hub `Gen2` SKU to support ADR integration.
 * `Gen2` hub creation now supports linking an ADR namespace using `--ns-resource-id` and `--ns-identity-id` arguments.
-  * When linking an ADR namespace, our CLI will attempt to create role assignments for the ADR namespace to manage the Hub.
-  * `--skip-ns-ra` can be used to skip role assignment creation, or `--custom-ns-role-id` can be used to specify a custom role assignment.
+
+  - When linking an ADR namespace, our CLI will attempt to create role assignments for the ADR namespace to manage the Hub.
+  - `--skip-ns-ra` can be used to skip role assignment creation, or `--custom-ns-role-id` can be used to specify a custom role assignment.
 
 **DPS updates**
 
