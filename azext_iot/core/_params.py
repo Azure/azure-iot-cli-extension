@@ -235,7 +235,6 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
                    type=str, help='Specify the minimum TLS version to support for this hub. Can be set to '
                                   '"1.0" or "1.2". For example, minimum TLS version set to "1.2" '
                                   'results in clients that use a TLS version below 1.2 to be rejected.')
-        c.argument('tags', tags_type)
         c.argument('system_identity', options_list=['--mi-system-assigned'],
                    arg_type=get_three_state_flag(),
                    help="Enable system-assigned managed identity for this hub")
@@ -247,6 +246,11 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
         c.argument('identity_scopes', options_list=['--scopes'], nargs='*',
                    help="Space separated list of scopes to assign the role (--role) "
                    "for the system-assigned managed identity.")
+
+    # Tag-type should only be for hub create/update (conflicts with device-twin update twin tags)
+    for cmd in ["iot hub create", "iot hub update"]:
+        with self.argument_context(cmd) as c:
+            c.argument('tags', tags_type)
 
     with self.argument_context('iot hub identity assign') as c:
         c.argument('system_identity', options_list=['--system-assigned', '--system'],

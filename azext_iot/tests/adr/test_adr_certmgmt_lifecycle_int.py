@@ -38,7 +38,7 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
             # Check if role assignment already exists
             # For object ID checks, we can use either --assignee or --assignee-object-id
             existing_assignment = self.cmd(
-                f"role assignment list --assignee-object-id '{assignee_id}' --scope '{scope}' --role '{role}'"
+                f"role assignment list --assignee '{assignee_id}' --scope '{scope}' --role '{role}'"
             ).get_output_in_json()
 
             if existing_assignment:
@@ -101,7 +101,6 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
         identity_name = generate_identity_name()
         device_id = generate_device_id()
         enrollment_group_id = generate_enrollment_group_id()
-        credential_policy_name = CUSTOM_POLICY_NAME
 
         try:
             # Create user assigned identity
@@ -241,7 +240,7 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
             enrollment_group = self.cmd(
                 f"iot dps enrollment-group create --dps-name {dps_name} -g {rg} "
                 f"--enrollment-id {enrollment_group_id} "
-                f"--credential-policy-name {credential_policy_name}"
+                f"--credential-policy-name {CUSTOM_POLICY_NAME}"
             ).get_output_in_json()
             assert enrollment_group["enrollmentGroupId"] == enrollment_group_id
 
@@ -252,14 +251,14 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
             assert enrollment_group_show["enrollmentGroupId"] == enrollment_group_id
 
             # Validate enrollment group credential policy reference
-            assert enrollment_group_show["credentialPolicyName"] == credential_policy_name
+            assert enrollment_group_show["credentialPolicyName"] == CUSTOM_POLICY_NAME
             assert enrollment_group_show["attestation"]["type"] == "symmetricKey"
 
             # Create individual enrollment with credential policy
             individual_enrollment = self.cmd(
                 f"iot dps enrollment create --dps-name {dps_name} -g {rg} "
                 f"--enrollment-id {device_id} "
-                f"--credential-policy-name {credential_policy_name} "
+                f"--credential-policy-name {CUSTOM_POLICY_NAME} "
                 f"--attestation-type symmetrickey"
             ).get_output_in_json()
             assert individual_enrollment["registrationId"] == device_id
@@ -271,7 +270,7 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
             assert individual_enrollment_show["registrationId"] == device_id
 
             # Validate individual enrollment credential policy reference
-            assert individual_enrollment_show["credentialPolicyName"] == credential_policy_name
+            assert individual_enrollment_show["credentialPolicyName"] == CUSTOM_POLICY_NAME
             assert individual_enrollment_show["attestation"]["type"] == "symmetricKey"
             assert individual_enrollment_show["provisioningStatus"] == "enabled"
 
@@ -288,7 +287,7 @@ class TestADRCertificateManagementLifecycle(CaptureOutputLiveScenarioTest):
             custom_policy_resource_id = (
                 f"/subscriptions/{subscription_id}/resourceGroups/{rg}/providers/"
                 f"Microsoft.DeviceRegistry/namespaces/{namespace_name}/credentials/"
-                f"default/policies/{credential_policy_name}"
+                f"default/policies/{CUSTOM_POLICY_NAME}"
             )
 
             # Find certificate by policy resource ID
