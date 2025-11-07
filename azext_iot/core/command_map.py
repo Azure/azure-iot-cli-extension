@@ -60,7 +60,7 @@ def load_core_commands(self, _):
     with self.command_group(
         "iot hub", command_type=core_ops, client_factory=iot_hub_service_factory
     ) as cmd_group:
-        cmd_group.command("create", "iot_hub_create")
+        cmd_group.command("create", "iot_hub_create", supports_no_wait=True)
         cmd_group.generic_update_command(
             "update",
             getter_name="iot_hub_get",
@@ -68,7 +68,7 @@ def load_core_commands(self, _):
             custom_func_type=core_ops,
             custom_func_name="update_iot_hub_custom",
         )
-        cmd_group.command("delete", "iot_hub_delete")
+        cmd_group.command("delete", "iot_hub_delete", supports_no_wait=True)
         cmd_group.show_command("show", "iot_hub_get")
         cmd_group.command("list", "iot_hub_list")
         cmd_group.command('list-skus', 'iot_hub_sku_list')

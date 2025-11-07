@@ -30,7 +30,7 @@ from knack.util import CLIError
 
 from azext_iot._factory import iot_hub_service_factory, resource_service_factory
 from azext_iot.common.certops import open_certificate
-from azext_iot.common.shared import AuthenticationType
+from azext_iot.sdk.iothub.mgmt.models import AuthenticationType
 from azext_iot.core.shared import (
     ADR_CONFIGURE_ROLES_ERROR_MSG,
     ADR_NS_IDENTITY_ROLES_FOR_HUB,
@@ -734,7 +734,7 @@ def iot_hub_create(
         raise RequiredArgumentMissingError('Please mention storage container name.')
     if fileupload_storage_container_name and not fileupload_storage_connectionstring:
         raise RequiredArgumentMissingError('Please mention storage connection string.')
-    identity_based_file_upload = fileupload_storage_authentication_type and fileupload_storage_authentication_type == AuthenticationType.IdentityBased.value
+    identity_based_file_upload = fileupload_storage_authentication_type and fileupload_storage_authentication_type == AuthenticationType.IDENTITY_BASED.value
     if not identity_based_file_upload and fileupload_storage_identity:
         raise RequiredArgumentMissingError('In order to set a fileupload storage identity, please set file upload storage authentication (--fsa) to IdentityBased')
     if identity_based_file_upload or fileupload_storage_identity:
@@ -927,7 +927,7 @@ def update_iot_hub_custom(instance,
             default_storage_endpoint = StorageEndpointProperties(container_name=fileupload_storage_container_name, connection_string=fileupload_storage_connectionstring)
 
         # if setting a fileupload storage identity or changing fileupload to identity-based
-        if fileupload_storage_identity or fileupload_storage_authentication_type == AuthenticationType.IdentityBased.value:
+        if fileupload_storage_identity or fileupload_storage_authentication_type == AuthenticationType.IDENTITY_BASED.value:
             _validate_fileupload_identity(instance, fileupload_storage_identity)
 
         instance.properties.storage_endpoints['$default'] = _process_fileupload_args(
@@ -959,9 +959,10 @@ def update_iot_hub_custom(instance,
             f"Cannot change IoT Hub SKU from {existing_sku_name} to {final_sku_name}."
         )
 
-    adr_namespace_resource_id = instance.device_registry.namespace_resource_id if instance.device_registry else None
+    device_registry = getattr(instance.properties, "device_registry", None)
+    adr_namespace_resource_id = device_registry.namespace_resource_id if device_registry else None
     _validate_and_set_adr_properties(
-        instance=instance,
+        instance=instance.properties,
         sku=final_sku_name,
         adr_namespace_resource_id=adr_namespace_resource_id,
         adr_identity_resource_id=adr_ns_identity_id,
@@ -1276,7 +1277,7 @@ def iot_hub_get_stats(client, hub_name, resource_group_name=None):
 
 
 def validate_authentication_type_input(endpoint_type, connection_string=None, authentication_type=None, endpoint_uri=None, entity_path=None):
-    is_keyBased = (AuthenticationType.KeyBased.value == authentication_type) or (authentication_type is None)
+    is_keyBased = (AuthenticationType.KEY_BASED.value == authentication_type) or (authentication_type is None)
     has_connection_string = connection_string is not None
     if is_keyBased and not has_connection_string:
         raise CLIError("Please provide a connection string '--connection-string/-c'")
@@ -1298,7 +1299,7 @@ def iot_hub_routing_endpoint_create(cmd, client, hub_name, endpoint_name, endpoi
                                     identity=None):
     resource_group_name = _ensure_hub_resource_group_name(client, resource_group_name, hub_name)
     hub = iot_hub_get(cmd, client, hub_name, resource_group_name)
-    if identity and authentication_type != AuthenticationType.IdentityBased.value:
+    if identity and authentication_type != AuthenticationType.IDENTITY_BASED.value:
         raise ArgumentUsageError("In order to use an identity for authentication, you must select --auth-type as 'identityBased'")
 
     if EndpointType.EventHub.value == endpoint_type.lower():
@@ -1497,7 +1498,7 @@ def iot_hub_route_test(cmd, client, hub_name, route_name=None, source_type=None,
             route=route
         )
         return client.iot_hub_resource.test_route(
-            resource_name=hub_name, resource_group_name=resource_group_name, input=test_route_input
+            iot_hub_name=hub_name, resource_group_name=resource_group_name, input=test_route_input
         )
     test_all_routes_input = TestAllRoutesInput(
         routing_source=source_type,
@@ -1505,7 +1506,7 @@ def iot_hub_route_test(cmd, client, hub_name, route_name=None, source_type=None,
         twin=None
     )
     return client.iot_hub_resource.test_all_routes(
-        resource_name=hub_name, resource_group_name=resource_group_name, input=test_all_routes_input
+        iot_hub_name=hub_name, resource_group_name=resource_group_name, input=test_all_routes_input
     )
 
 
@@ -1559,11 +1560,11 @@ def iot_hub_manual_failover(cmd, client, hub_name, resource_group_name=None, no_
     failover_input = FailoverInput(failover_region=failover_region)
     if no_wait:
         return client.iot_hub.begin_manual_failover(
-            resource_name=hub_name, resource_group_name=resource_group_name, failover_input=failover_input
+            iot_hub_name=hub_name, resource_group_name=resource_group_name, failover_input=failover_input
         )
     LongRunningOperation(cmd.cli_ctx)(
         client.iot_hub.begin_manual_failover(
-            resource_name=hub_name, resource_group_name=resource_group_name, failover_input=failover_input
+            iot_hub_name=hub_name, resource_group_name=resource_group_name, failover_input=failover_input
         )
     )
     return iot_hub_get(cmd, client, hub_name, resource_group_name)
@@ -1712,12 +1713,12 @@ def _process_fileupload_args(
         fileupload_storage_identity=None,
 ):
     from datetime import timedelta
-    if fileupload_storage_authentication_type and fileupload_storage_authentication_type == AuthenticationType.IdentityBased.value:
-        default_storage_endpoint.authentication_type = AuthenticationType.IdentityBased.value
+    if fileupload_storage_authentication_type and fileupload_storage_authentication_type == AuthenticationType.IDENTITY_BASED.value:
+        default_storage_endpoint.authentication_type = AuthenticationType.IDENTITY_BASED.value
         if fileupload_storage_container_uri:
             default_storage_endpoint.container_uri = fileupload_storage_container_uri
-    elif fileupload_storage_authentication_type and fileupload_storage_authentication_type == AuthenticationType.KeyBased.value:
-        default_storage_endpoint.authentication_type = AuthenticationType.KeyBased.value
+    elif fileupload_storage_authentication_type and fileupload_storage_authentication_type == AuthenticationType.KEY_BASED.value:
+        default_storage_endpoint.authentication_type = AuthenticationType.KEY_BASED.value
         default_storage_endpoint.identity = None
     elif fileupload_storage_authentication_type is not None:
         default_storage_endpoint.authentication_type = None
@@ -1736,7 +1737,7 @@ def _process_fileupload_args(
     # Fix for identity/authentication-type params missing on hybrid profile api
     if hasattr(default_storage_endpoint, 'authentication_type'):
         # If we are now (or will be) using fsa=identity AND we've set a new identity
-        if default_storage_endpoint.authentication_type == AuthenticationType.IdentityBased.value and fileupload_storage_identity:
+        if default_storage_endpoint.authentication_type == AuthenticationType.IDENTITY_BASED.value and fileupload_storage_identity:
             # setup new fsi
             default_storage_endpoint.identity = ManagedIdentity(
                 user_assigned_identity=fileupload_storage_identity) if fileupload_storage_identity not in [IdentityType.none.value, SYSTEM_ASSIGNED_IDENTITY] else None
