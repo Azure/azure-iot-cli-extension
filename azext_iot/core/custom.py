@@ -535,7 +535,8 @@ def iot_dps_certificate_update(client, dps_name, certificate_name, certificate_p
                 provisioning_service_name=dps_name,
                 certificate_name=certificate_name,
                 certificate_description=certificate_description,
-                etag=etag
+                etag=etag,
+                match_condition=MatchConditions.IfNotModified
             )
     raise CLIError("Certificate '{0}' does not exist. Use 'iot dps certificate create' to create a new certificate."
                    .format(certificate_name))
