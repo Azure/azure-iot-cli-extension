@@ -78,10 +78,15 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
                    'Only available in select regions. Learn more at https://aka.ms/dpsdr')
 
     # plan to slowly align this with extension naming patterns - n should be aligned with dps_name
-    for subgroup in ['linked-hub', 'certificate', 'identity']:
+    for subgroup in ['linked-hub', 'certificate']:
         with self.argument_context('iot dps {}'.format(subgroup)) as c:
             c.argument('dps_name', options_list=['--dps-name'], id_part=None,
                        help='IoT Hub Device Provisioning Service name.', arg_group=None)
+
+    # Identity operates on DPS resource itself, so use --name like IoT Hub
+    with self.argument_context('iot dps identity') as c:
+        c.argument('dps_name', options_list=['--name', '-n'],
+                   help='IoT Hub Device Provisioning Service name.', arg_group=None)
 
     # To replace above
     for subgroup in ['policy']:
@@ -143,7 +148,7 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
 
     with self.argument_context('iot dps certificate') as c:
         c.argument('certificate_path', options_list=['--path', '-p'], type=file_type,
-                   completer=FilesCompleter([".cer", ".pem"]), 
+                   completer=FilesCompleter([".cer", ".pem"]),
                    help='The path to the file containing the certificate.',
                    arg_group=None)
         c.argument('certificate_name', options_list=['--certificate-name', '--name', '-n'],

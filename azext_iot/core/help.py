@@ -63,7 +63,7 @@ def patch_core_help():
     - name: Assign a system-assigned identity to an Azure IoT Hub Device Provisioning Service.
       text: az iot dps identity assign --name MyDps --resource-group MyResourceGroup --system
     - name: Assign both a system-assigned and a user-managed identity to an Azure IoT Hub Device Provisioning Service.
-      text: az iot dps identity assign --system --user IdentityResourceId
+      text: az iot dps identity assign --name MyDps --resource-group MyResourceGroup --system --user IdentityResourceId
 """
 
     helps[
@@ -75,7 +75,7 @@ def patch_core_help():
     - name: Remove a system-assigned identity from an Azure IoT Hub Device Provisioning Service.
       text: az iot dps identity remove --name MyDps --resource-group MyResourceGroup --system
     - name: Remove a user-managed identity from an Azure IoT Hub Device Provisioning Service.
-      text: az iot dps identity remove --user IdentityResourceId
+      text: az iot dps identity remove --name MyDps --resource-group MyResourceGroup --user IdentityResourceId
 """
 
     helps[
