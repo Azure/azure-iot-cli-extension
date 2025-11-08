@@ -1472,11 +1472,11 @@ helps[
           az iot dps connection-string show --resource-group MyResourceGroup
     - name: Show all connection strings of the given DPS using primary key.
       text: >
-          az iot dps connection-string show --name MyDPS --all
+          az iot dps connection-string show -n MyDPS --all
     - name: Show the connection string of the given DPS using the default policy and primary key.
       text: >
-          az iot dps connection-string show --name MyDPS
+          az iot dps connection-string show -n MyDPS
     - name: Show the connection string of the given DPS using policy 'service' and secondary key.
       text: >
-          az iot dps connection-string show --name MyDPS --policy-name service --key-type secondary
+          az iot dps connection-string show -n MyDPS --policy-name service --key-type secondary
 """

@@ -974,14 +974,11 @@ def load_arguments(self, _):
             'Use to avoid session login via "az login". '
             "If both an entity connection string and name are provided the connection string takes priority. "
             "Required if --dps-name is not provided.",
-            arg_group="Device Provisioning Service Identifier"
         )
-        # TODO - CMS Preview - Hack to quiet the linter
         context.argument(
             "dps_name",
-            options_list=["--dps-name", "--name", "-n"],
+            options_list=["--dps-name", "-n"],
             help="Name or hostname of the Azure IoT Hub Device Provisioning Service. Required if --login is not provided.",
-            arg_group="Device Provisioning Service Identifier"
         )
         context.argument(
             "initial_twin_properties",
@@ -1074,6 +1071,12 @@ def load_arguments(self, _):
             arg_type=dps_auth_type_dataplane_param_type,
         )
 
+    # Apply arg_group only to dataplane commands
+    for dps_dataplane_command in ["compute-device-key", "connection-string", "enrollment", "enrollment-group"]:
+        with self.argument_context(f"iot dps {dps_dataplane_command}") as context:
+            context.argument("dps_name", arg_group="Device Provisioning Service Identifier")
+            context.argument("login", arg_group="Device Provisioning Service Identifier")
+
     with self.argument_context("iot dps compute-device-key") as context:
         context.argument(
             "enrollment_id",
@@ -1091,11 +1094,6 @@ def load_arguments(self, _):
         context.argument("registration_id", help="ID of device registration. ")
 
     with self.argument_context("iot dps connection-string") as context:
-        context.argument(
-            "dps_name",
-            options_list=["--dps-name", "--name", "-n"],
-            help="IoT Hub Device Provisioning Service name."
-        )
         context.argument(
             "show_all",
             options_list=["--show-all", "--all"],

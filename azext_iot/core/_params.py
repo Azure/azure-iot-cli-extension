@@ -41,7 +41,7 @@ hub_name_type = CLIArgumentType(
     help='IoT Hub name.')
 
 dps_name_type = CLIArgumentType(
-    options_list=['--dps-name', '--name', '-n'],
+    options_list=['--name', '-n'],
     completer=get_resource_name_completion_list('Microsoft.Devices/ProvisioningServices'),
     help='IoT Hub Device Provisioning Service name')
 
@@ -57,8 +57,12 @@ system_assigned_type = CLIArgumentType(
 def load_arguments(self, _):  # pylint: disable=too-many-statements
     # Arguments for IoT DPS
     with self.argument_context('iot dps') as c:
-        c.argument('dps_name', dps_name_type, id_part='name')
         c.argument('tags', tags_type)
+
+    # Direct DPS resource commands use --name -n
+    for subgroup in ['create', 'update', 'show', 'delete']:
+        with self.argument_context('iot dps {}'.format(subgroup)) as c:
+            c.argument('dps_name', dps_name_type, id_part='name')
 
     with self.argument_context('iot dps create') as c:
         c.argument('location', get_location_type(self.cli_ctx),
@@ -74,14 +78,16 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
                    'Only available in select regions. Learn more at https://aka.ms/dpsdr')
 
     # plan to slowly align this with extension naming patterns - n should be aligned with dps_name
-    for subgroup in ['linked-hub', 'certificate']:
+    for subgroup in ['linked-hub', 'certificate', 'identity']:
         with self.argument_context('iot dps {}'.format(subgroup)) as c:
-            c.argument('dps_name', options_list=['--dps-name'], id_part=None)
+            c.argument('dps_name', options_list=['--dps-name'], id_part=None,
+                       help='IoT Hub Device Provisioning Service name.', arg_group=None)
 
     # To replace above
     for subgroup in ['policy']:
         with self.argument_context('iot dps {}'.format(subgroup)) as c:
-            c.argument('dps_name', options_list=['--dps-name', '-n'], id_part=None)
+            c.argument('dps_name', options_list=['--dps-name', '-n'], id_part=None,
+                       help='IoT Hub Device Provisioning Service name.', arg_group=None)
 
     with self.argument_context('iot dps policy') as c:
         c.argument('access_policy_name', options_list=['--policy-name', '--pn'],
@@ -109,6 +115,7 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
 
     with self.argument_context('iot dps linked-hub create') as c:
         c.argument('connection_string',
+                   options_list=['--connection-string', '--cs'],
                    help='Connection string of the IoT hub. Required if hub name is not provided using --hub-name.',
                    arg_group='IoT Hub Identifier')
         c.argument('hub_name',
@@ -136,7 +143,9 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
 
     with self.argument_context('iot dps certificate') as c:
         c.argument('certificate_path', options_list=['--path', '-p'], type=file_type,
-                   completer=FilesCompleter([".cer", ".pem"]), help='The path to the file containing the certificate.')
+                   completer=FilesCompleter([".cer", ".pem"]), 
+                   help='The path to the file containing the certificate.',
+                   arg_group=None)
         c.argument('certificate_name', options_list=['--certificate-name', '--name', '-n'],
                    help='A friendly name for the certificate.')
         c.argument('etag', options_list=['--etag', '-e'], help='Entity Tag (etag) of the object.')
