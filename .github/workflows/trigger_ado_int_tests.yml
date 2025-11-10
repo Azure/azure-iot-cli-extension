@@ -170,12 +170,12 @@ jobs:
           # if status is not completed, or the result is one of failed, canceled; then fail the job
           if [[ "$status" != "completed" || "$result" =~ (failed|canceled) ]]; then
             echo "::error::Pipeline did not complete successfully"
-            echo "# ❌ ${PIPELINE:-$DEFAULT_TITLE} Failed ❌" >> $GITHUB_STEP_SUMMARY
+            echo "# [FAILED] ${PIPELINE:-$DEFAULT_TITLE} Failed [FAILED]" >> $GITHUB_STEP_SUMMARY
             echo "The pipeline did not complete successfully. Please check the logs [here](${PORTAL_URL})" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
 
-          echo "# ✅ ${PIPELINE:-$DEFAULT_TITLE} Completed ✅" >> $GITHUB_STEP_SUMMARY
+          echo "# [SUCCESS] ${PIPELINE:-$DEFAULT_TITLE} Completed [SUCCESS]" >> $GITHUB_STEP_SUMMARY
           echo "The pipeline completed successfully. You can check the logs [here](${PORTAL_URL})" >> $GITHUB_STEP_SUMMARY
   CancelPipeline:
     runs-on: ubuntu-latest
@@ -200,5 +200,5 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"status": "cancelling"}' \
             "${RUN_URL}?api-version=7.2-preview.7"
-          echo "# ❌ ${PIPELINE:-$DEFAULT_TITLE} Cancelled ❌" >> $GITHUB_STEP_SUMMARY
+          echo "# [CANCELLED] ${PIPELINE:-$DEFAULT_TITLE} Cancelled [CANCELLED]" >> $GITHUB_STEP_SUMMARY
           echo "The pipeline was cancelled. You can check the logs [here](${PORTAL_URL})" >> $GITHUB_STEP_SUMMARY

@@ -6,6 +6,7 @@ on:
     branches:
       - dev
       - feature/*
+      - release/*
   workflow_call:
     inputs:
       continue-on-error:
@@ -20,6 +21,7 @@ jobs:
     runs-on: windows-latest
     permissions:
       # needed to write security info to repository
+      id-token: write
       security-events: write
       contents: read
     steps:
