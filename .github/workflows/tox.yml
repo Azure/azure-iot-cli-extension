@@ -28,7 +28,7 @@ jobs:
         os:
           - ubuntu-24.04
           - windows-2025
-          - macos-15
+          - macos-15-intel
         py:
           - "3.13"
           - "3.12"

@@ -129,7 +129,7 @@ stages:
   - stage: "test_msi"
     displayName: "Run all tests against Windows MSI install"
     pool:
-      vmImage: "windows-2019"
+      vmImage: "windows-2025"
     dependsOn: [build, test_min]
     variables:
       pythonVersions: $[variables['msiTestingMatrix']]
@@ -163,7 +163,7 @@ stages:
       pythonVersions: $[variables['msiTestingMatrix']]
     condition: succeeded()
     pool:
-      vmImage: "windows-2019"
+      vmImage: "windows-2025"
     jobs:
       - template: templates/smoke-tests.yml
         parameters:
