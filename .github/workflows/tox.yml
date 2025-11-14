@@ -26,9 +26,9 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-22.04
-          - windows-2022
-          - macos-13
+          - ubuntu-24.04
+          - windows-2025
+          - macos-15
         py:
           - "3.13"
           - "3.12"
@@ -48,7 +48,7 @@ jobs:
       - name: Run test suite
         run: tox r --skip-pkg-install
       - name: Upload coverage report
-        if: ${{ matrix.os == 'ubuntu-22.04' && matrix.py == '3.13' }}
+        if: ${{ matrix.os == 'ubuntu-24.04' && matrix.py == '3.13' }}
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:

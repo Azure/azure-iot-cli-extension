@@ -23,9 +23,9 @@ variables:
 parameters:
   - name: linuxImage
     type: string
-    default: "ubuntu-22.04"
+    default: "ubuntu-24.04"
     values:
-      - "ubuntu-22.04"
+      - "ubuntu-24.04"
       - "ubuntu-latest"
 
 jobs:
@@ -82,7 +82,7 @@ jobs:
         "build_and_publish_azure_cli_test_sdk",
       ]
     pool:
-      vmImage: "macOS-13"
+      vmImage: "macOS-15"
 
     steps:
       - template: templates/run-tests-parallel.yml
