@@ -82,7 +82,7 @@ jobs:
         "build_and_publish_azure_cli_test_sdk",
       ]
     pool:
-      vmImage: "macos-15-intel"
+      vmImage: "macOS-15"
 
     steps:
       - template: templates/run-tests-parallel.yml
