@@ -6,7 +6,7 @@
 
 import re
 
-from uamqp.message import Message
+from azure.eventhub import EventData
 
 from azext_iot.central.providers import CentralDeviceProvider
 from azext_iot.central.providers import CentralDeviceTemplateProvider
@@ -22,7 +22,7 @@ from azext_iot.central.models.v2022_06_30_preview import TemplatePreview
 class CentralParser(CommonParser):
     def __init__(
         self,
-        message: Message,
+        message: EventData,
         common_parser_args: CommonParserArguments,
         central_device_provider: CentralDeviceProvider,
         central_template_provider: CentralDeviceTemplateProvider,

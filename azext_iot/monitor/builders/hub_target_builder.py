@@ -83,11 +83,11 @@ class EventTargetBuilder:
         partition_ids = target["events"].get("partition_ids", [])
         partition_count = target["events"].get("partition_count", 0)
         if partition_ids:
-            return Target(hostname=endpoint, path=path, partitions=partition_ids, auth=auth)
+            return Target(hostname=endpoint, path=path, partitions=partition_ids, auth=auth, policy=target["policy"], key=target["primarykey"])
         if partition_count:
             for i in range(int(partition_count)):
                 partition_ids.append(str(i))
-            return Target(hostname=endpoint, path=path, partitions=partition_ids, auth=auth)
+            return Target(hostname=endpoint, path=path, partitions=partition_ids, auth=auth, policy=target["policy"], key=target["primarykey"])
         meta_data = await query_meta_data(
             address=target["events"]["address"],
             path=target["events"]["path"],
@@ -100,11 +100,11 @@ class EventTargetBuilder:
             amqp_partition_ids = [partition.decode("utf-8") for partition in meta_data.get(b"partition_ids", [])]
             amqp_partition_count = meta_data.get(b"partition_count", 0)
             if amqp_partition_ids:
-                return Target(hostname=endpoint, path=path, partitions=amqp_partition_ids, auth=auth)
+                return Target(hostname=endpoint, path=path, partitions=amqp_partition_ids, auth=auth, policy=target["policy"], key=target["primarykey"])
             if amqp_partition_count:
                 for i in range(int(amqp_partition_count)):
                     amqp_partition_ids.append(str(i))
-                return Target(hostname=endpoint, path=path, partitions=amqp_partition_ids, auth=auth)
+                return Target(hostname=endpoint, path=path, partitions=amqp_partition_ids, auth=auth, policy=target["policy"], key=target["primarykey"])
 
         raise CLIInternalError(
             f"Unable to determine partitions for '{target['entity'].split('.')[0]}'."

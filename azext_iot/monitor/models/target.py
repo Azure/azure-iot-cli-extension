@@ -12,12 +12,16 @@ class Target:
         path: str,
         partitions: list,
         auth,  # : uamqp.authentication.SASTokenAsync,
+        policy: str = None,
+        key: str = None,
     ):
         self.hostname = hostname
         self.path = path
         self.auth = auth
         self.partitions = partitions
         self.consumer_group = None
+        self.policy = policy
+        self.key = key
 
     def add_consumer_group(self, consumer_group: str):
         self.consumer_group = consumer_group
