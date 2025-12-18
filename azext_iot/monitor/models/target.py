@@ -11,13 +11,15 @@ class Target:
         hostname: str,
         path: str,
         partitions: list,
-        auth,  # : uamqp.authentication.SASTokenAsync,
+        auth=None,  # Deprecated
         policy: str = None,
         key: str = None,
+        sas_credential=None,  # AzureSasCredential for IoT Central
     ):
         self.hostname = hostname
         self.path = path
-        self.auth = auth
+        self.auth = auth  # Keep for backward compatibility
+        self.sas_credential = sas_credential  # Secure credential object for IoT Central
         self.partitions = partitions
         self.consumer_group = None
         self.policy = policy

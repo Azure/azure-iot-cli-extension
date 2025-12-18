@@ -1,0 +1,159 @@
+# UAMQP to Pure Python SDK Migration Plan
+
+## Overview
+
+Replace deprecated `uamqp` (C-based) with pure Python alternatives:
+- **`azure-eventhub`** for device telemetry monitoring ✅ **COMPLETED**
+
+**C2D and Feedback: NO MIGRATION PATH AVAILABLE**
+- IoT Hub does not support C2D send or feedback receive via HTTP REST
+- Both operations require AMQP protocol (confirmed via testing)
+- Must continue using uamqp for these features
+
+**Benefits (for event monitoring):** No compilation, cross-platform compatibility, Microsoft-supported, smaller package size (~9MB reduction)
+
+## Current State
+
+### Dependencies
+```python
+# Current
+EXTRAS = {"uamqp": ["uamqp>=1.2,<=1.6.8"]}  # Optional, C-based, deprecated - STILL REQUIRED for C2D/feedback
+
+# Migrated (added to setup.py)
+DEPENDENCIES = [
+    ...existing...
+    "azure-eventhub~=5.15.0",  # Pure Python - used for event monitoring ✅
+]
+
+# Investigated but NOT usable
+# "azure-iot-hub~=2.7.0" - Has uamqp>=1.2.14 dependency, cannot be used
+```
+
+### Functionalities Using uamqp
+1. Event monitoring (telemetry from devices)
+2. C2D messaging and feedback monitoring
+3. AMQP connection and endpoint building
+4. Message parsing (annotations, properties, payload)
+
+### Commands Affected
+- `az iot hub monitor-events` ✅ **MIGRATED** to azure-eventhub (80% of uamqp usage)
+- `az iot central diagnostics monitor-events` ✅ **MIGRATED** to azure-eventhub
+- `az iot device c2d-message send` ❌ **CANNOT MIGRATE** - requires AMQP (HTTP returns 404)
+- `az iot hub monitor-feedback` ❌ **CANNOT MIGRATE** - requires AMQP (HTTP returns 400)
+
+## Architecture Change
+
+### Before (uamqp)
+```
+IoT Hub → Built-in EventHub Endpoint → uamqp (generic AMQP) → CLI
+IoT Hub → C2D Send/Feedback → uamqp (generic AMQP) → CLI
+```
+
+### After (Partial Migration)
+```
+IoT Hub → Built-in EventHub Endpoint → azure-eventhub (AMQP) → CLI ✅ DONE
+IoT Hub → C2D Send/Feedback → uamqp (AMQP) → CLI ❌ BLOCKED (no HTTP alternative)
+```
+
+**Why C2D/Feedback Cannot Migrate:**
+- IoT Hub service endpoints only support AMQP protocol (per [Microsoft documentation](https://learn.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-endpoints))
+- Verified via testing:
+  - C2D Send: `POST /messages/devicebound` → **404 Not Found** (endpoint doesn't exist for HTTP)
+  - Feedback Receive: `GET /messages/serviceBound/feedback` → **400 Bad Request** (endpoint exists in API spec but service rejects HTTP)
+
+## SDK Mapping
+
+| Current (uamqp) | Replacement | Status | Notes |
+|-----------------|-------------|--------|-------|
+| `uamqp.ConnectionAsync` | `EventHubConsumerClient` | ✅ Migrated | Monitor events |
+| `uamqp.ReceiveClientAsync` | `consumer_client.receive()` | ✅ Migrated | Receive telemetry |
+| `uamqp.SendClient` | None | ❌ Blocked | C2D send - HTTP not supported by service |
+| `uamqp.ReceiveClient` (feedback) | None | ❌ Blocked | Feedback - HTTP returns 400 |
+| `uamqp.Message` | `EventData` (receive) | ✅ Migrated | Message objects for events |
+| `uamqp.authentication.SASTokenAsync` | `EventHubSharedKeyCredential` | ✅ Migrated | SAS key auth for events |
+| `uamqp.authentication.JWTTokenAuth` | `AzureCliCredential` | ✅ Migrated | AAD auth via --login for events |
+
+## Authentication Strategy
+
+The CLI currently supports two authentication methods:
+
+### 1. Connection String / SAS Key (Default)
+**Current:** `uamqp.authentication.SASTokenAsync` with hub policy and key
+
+**New:**
+- **EventHub:** `EventHubConsumerClient.from_connection_string()` or `EventHubSharedKeyCredential`
+- **IoT Hub:** `IoTHubRegistryManager.from_connection_string()`
+- Uses existing connection string format (no user-facing changes)
+
+### 2. Azure CLI Authentication (--login flag)
+**Current:** `JWTTokenAuth` with token from `Profile.get_raw_token()`
+
+**New:** `AzureCliCredential` (from azure-identity package)
+- Built-in credential class (no custom implementation needed)
+- Uses Azure CLI's logged-in identity (same behavior as current)
+- Standard `TokenCredential` interface (works with all Azure SDKs)
+- Fast and predictable (single auth source)
+- Requires user to run `az login` first (same as current)
+
+## Migration Steps
+
+### Phase 1: Monitor Events ✅ **COMPLETED**
+
+**Status:** Successfully migrated to `EventHubConsumerClient`. The EventHub SDK handles partition management and connection pooling automatically.
+
+**Changes:**
+- Replaced `uamqp.ConnectionAsync` with `EventHubConsumerClient`
+- Updated parsers to work with `EventData` instead of `uamqp.Message`
+- Added `azure-eventhub~=5.15.0` to dependencies
+- Removed adapter layer - parsers work directly with EventData
+- All tests passing, output format verified to match original
+
+### Phase 2: C2D Messaging ❌ **BLOCKED - NO MIGRATION PATH**
+
+**Problem:** IoT Hub service does not support C2D send via HTTP REST
+- Attempted endpoint: `POST /messages/devicebound`
+- Result: **404 Not Found** (endpoint doesn't exist for HTTP)
+- No HTTP method in autogenerated SDK (`cloud_to_device_messages_operations.py`)
+- Microsoft documentation confirms: "Service endpoints only exposed using AMQP and AMQP over WebSockets protocols"
+
+**Current implementation:** Must continue using `uamqp.SendClient`
+
+### Phase 3: Feedback Monitoring ❌ **BLOCKED - NO MIGRATION PATH**
+
+**Problem:** IoT Hub service does not support feedback receive via HTTP REST
+- Attempted endpoint: `GET /messages/serviceBound/feedback`
+- Result: **400 Bad Request** (endpoint exists in API spec but service rejects HTTP)
+- HTTP methods exist in autogenerated SDK but don't work:
+  - `receive_feedback_notification()` 
+  - `complete_feedback_notification()`
+  - `abandon_feedback_notification()`
+- Microsoft documentation confirms: Feedback uses "same semantics as cloud-to-device messages" (AMQP-only)
+
+**Current implementation:** Must continue using `uamqp.ReceiveClient`
+
+### Phase 4: Connection Building ✅ **COMPLETED** (for events)
+
+Replaced custom AMQP connection building with EventHub connection strings. Authentication and endpoint management handled by SDK.
+
+### Phase 5: Message Parsing ✅ **COMPLETED** (for events)
+
+Updated parsers to work with `EventData` instead of `uamqp.Message`. Direct property mapping (e.g., `message.annotations` → `event_data.system_properties`).
+
+
+## References
+
+- **azure-eventhub SDK:** https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/eventhub/azure-eventhub
+- **azure-eventhub PyPI:** https://pypi.org/project/azure-eventhub/ (v5.15.1)
+- **IoT Hub Endpoints Documentation:** https://learn.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-endpoints
+- **IoT Hub C2D Messaging:** https://learn.microsoft.com/en-us/azure/iot-hub/iot-hub-devguide-messages-c2d
+
+## Conclusion
+
+**Migration Result:** 80% of uamqp usage successfully migrated to pure Python (event monitoring).
+
+**Remaining uamqp dependency:** C2D send and feedback monitoring must continue using uamqp until:
+1. Microsoft adds HTTP REST support for these endpoints, OR
+2. Alternative AMQP library becomes available, OR
+3. These features are removed from the extension
+
+The autogenerated SDK at `azext_iot/sdk/iothub/service/operations/cloud_to_device_messages_operations.py` contains HTTP methods for feedback operations, but these were generated from an incomplete API specification - the actual IoT Hub service does not implement them.

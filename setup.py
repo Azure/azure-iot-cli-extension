@@ -56,7 +56,8 @@ DEPENDENCIES = [
     "tomli-w~=1.0",
     "tqdm~=4.62",
     "treelib~=1.6",
-    "packaging>=23.2"
+    "packaging>=23.2",
+    "azure-eventhub~=5.15.0",  # Pure Python for event monitoring
 ]
 EXTRAS = {"uamqp": ["uamqp>=1.2,<=1.6.8"]}
 

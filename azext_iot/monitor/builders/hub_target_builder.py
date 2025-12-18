@@ -5,19 +5,16 @@
 # --------------------------------------------------------------------------------------------
 
 import asyncio
-import uamqp
 
 from azure.cli.core.azclierror import CLIInternalError
+from azure.eventhub.aio import EventHubConsumerClient
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
-from azext_iot.common.utility import parse_entity, unicode_binary_map, url_encode_str
-from azext_iot.monitor.builders._common import query_meta_data
+from azext_iot.common.utility import url_encode_str
 from azext_iot.monitor.models.target import Target
-
-# To provide amqp frame trace
-DEBUG = False
 
 
 class AmqpBuilder:
+    """Helper class for building AMQP endpoints (used by C2D operations)"""
     @classmethod
     def build_iothub_amqp_endpoint_from_target(cls, target, duration=360):
         hub_name = target["entity"].split(".")[0]
@@ -40,71 +37,47 @@ class EventTargetBuilder:
             self._build_iot_hub_target_async(target)
         )
 
-    def _build_auth_container(self, target):
-        sas_uri = "sb://{}/{}".format(
-            target["events"]["endpoint"], target["events"]["path"]
-        )
-        return uamqp.authentication.SASTokenAsync.from_shared_access_key(
-            sas_uri, target["policy"], target["primarykey"]
-        )
-
-    async def _evaluate_redirect(self, endpoint):
-        source = uamqp.address.Source(
-            "amqps://{}/messages/events/$management".format(endpoint)
-        )
-        receive_client = uamqp.ReceiveClientAsync(
-            source, timeout=30000, prefetch=1, debug=DEBUG
-        )
-
-        try:
-            await receive_client.open_async()
-            await receive_client.receive_message_batch_async(max_batch_size=1)
-        except uamqp.errors.LinkRedirect as redirect:
-            redirect = unicode_binary_map(parse_entity(redirect))
-            result = {}
-            result["events"] = {}
-            result["events"]["endpoint"] = redirect["hostname"]
-            result["events"]["path"] = (
-                redirect["address"].replace("amqps://", "").split("/")[1]
-            )
-            result["events"]["address"] = redirect["address"]
-            return redirect, result
-        finally:
-            await receive_client.close_async()
-
     async def _build_iot_hub_target_async(self, target):
-        endpoint = AmqpBuilder.build_iothub_amqp_endpoint_from_target(target)
+        # Event Hub endpoint should be provided via include_events=True in discovery
         if "events" not in target:
-            _, link_redirect_events = await self._evaluate_redirect(endpoint)
-            target.update(link_redirect_events)
+            raise CLIInternalError(
+                "Event Hub endpoint information is missing. "
+                "Ensure the target includes Event Hub configuration."
+            )
         endpoint = target["events"]["endpoint"]
         path = target["events"]["path"]
-        auth = self._build_auth_container(target)
         partition_ids = target["events"].get("partition_ids", [])
         partition_count = target["events"].get("partition_count", 0)
         if partition_ids:
-            return Target(hostname=endpoint, path=path, partitions=partition_ids, auth=auth, policy=target["policy"], key=target["primarykey"])
+            return Target(hostname=endpoint, path=path, partitions=partition_ids, policy=target["policy"], key=target["primarykey"])
         if partition_count:
             for i in range(int(partition_count)):
                 partition_ids.append(str(i))
-            return Target(hostname=endpoint, path=path, partitions=partition_ids, auth=auth, policy=target["policy"], key=target["primarykey"])
-        meta_data = await query_meta_data(
-            address=target["events"]["address"],
-            path=target["events"]["path"],
-            auth=auth,
+            return Target(hostname=endpoint, path=path, partitions=partition_ids, policy=target["policy"], key=target["primarykey"])
+        
+        # Query partition metadata using azure-eventhub
+        connection_str = f"Endpoint=sb://{endpoint}/;SharedAccessKeyName={target['policy']};SharedAccessKey={target['primarykey']};EntityPath={path}"
+        client = EventHubConsumerClient.from_connection_string(
+            connection_str,
+            consumer_group="$Default",
+            eventhub_name=path,
         )
-        # Re-make auth container otherwise ValueError: The supplied authentication
-        # has already been consumed by another connection.
-        auth = self._build_auth_container(target)
-        if meta_data:
-            amqp_partition_ids = [partition.decode("utf-8") for partition in meta_data.get(b"partition_ids", [])]
-            amqp_partition_count = meta_data.get(b"partition_count", 0)
-            if amqp_partition_ids:
-                return Target(hostname=endpoint, path=path, partitions=amqp_partition_ids, auth=auth, policy=target["policy"], key=target["primarykey"])
-            if amqp_partition_count:
-                for i in range(int(amqp_partition_count)):
-                    amqp_partition_ids.append(str(i))
-                return Target(hostname=endpoint, path=path, partitions=amqp_partition_ids, auth=auth, policy=target["policy"], key=target["primarykey"])
+        
+        try:
+            async with client:
+                amqp_partition_ids = await client.get_partition_ids()
+                if amqp_partition_ids:
+                    return Target(
+                        hostname=endpoint,
+                        path=path,
+                        partitions=list(amqp_partition_ids),
+                        policy=target["policy"],
+                        key=target["primarykey"]
+                    )
+        except Exception as e:
+            raise CLIInternalError(
+                f"Unable to query partitions for '{target['entity'].split('.')[0]}': {e}"
+            )
 
         raise CLIInternalError(
             f"Unable to determine partitions for '{target['entity'].split('.')[0]}'."

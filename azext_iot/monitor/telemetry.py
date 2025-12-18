@@ -101,15 +101,25 @@ async def _initiate_event_monitor(
         logger.warning("No Event Hub partitions found to listen on.")
         return
 
-    # Build EventHub connection string
-    connection_str = f"Endpoint=sb://{target.hostname}/;SharedAccessKeyName={target.policy};SharedAccessKey={target.key};EntityPath={target.path}"
-    
     # Create EventHub Consumer Client
-    consumer_client = EventHubConsumerClient.from_connection_string(
-        connection_str,
-        consumer_group=target.consumer_group,
-        eventhub_name=target.path,
-    )
+    if target.policy and target.key:
+        # IoT Hub: Use connection string with shared access key
+        connection_str = f"Endpoint=sb://{target.hostname}/;SharedAccessKeyName={target.policy};SharedAccessKey={target.key};EntityPath={target.path}"
+        consumer_client = EventHubConsumerClient.from_connection_string(
+            connection_str,
+            consumer_group=target.consumer_group,
+            eventhub_name=target.path,
+        )
+    elif target.sas_credential:
+        # IoT Central: Use AzureSasCredential (secure token handling)
+        consumer_client = EventHubConsumerClient(
+            fully_qualified_namespace=target.hostname,
+            eventhub_name=target.path,
+            consumer_group=target.consumer_group,
+            credential=target.sas_credential,
+        )
+    else:
+        raise ValueError("Target must have either (policy, key) or sas_credential")
 
     try:
         receive_tasks = []
