@@ -38,13 +38,17 @@ class EventTargetBuilder:
         )
 
     async def _build_iot_hub_target_async(self, target):
-        # Event Hub endpoint must be provided via REST API (include_events=True)
+        # If events metadata not provided, attempt to discover it
         if "events" not in target:
-            raise CLIInternalError(
-                f"Unable to discover Event Hub endpoint for '{target['entity']}'. "
-                "Event Hub endpoint must be obtained via REST API. "
-                "Please ensure include_events=True is set when calling discovery.get_target()."
-            )
+            event_info = await self._discover_eventhub_endpoint(target)
+            if event_info:
+                target["events"] = event_info
+            else:
+                raise CLIInternalError(
+                    f"Unable to discover Event Hub endpoint for '{target['entity']}'. "
+                    "Event Hub endpoint must be obtained via REST API. "
+                    "Please ensure include_events=True is set when calling discovery.get_target()."
+                )
         
         endpoint = target["events"]["endpoint"]
         path = target["events"]["path"]
@@ -84,3 +88,52 @@ class EventTargetBuilder:
         raise CLIInternalError(
             f"Unable to determine partitions for '{target['entity'].split('.')[0]}'."
         )
+    
+    async def _discover_eventhub_endpoint(self, target):
+        """
+        Discover Event Hub endpoint using Azure IoT Hub Management API.
+        
+        The Event Hub-compatible endpoint information is only available through
+        the Azure Resource Manager API, not discoverable via AMQP/Event Hub protocols.
+        
+        This method uses the Azure IoT Hub Management SDK to query the IoT Hub
+        resource and extract the built-in Event Hub endpoint details.
+        """
+        try:
+            from azext_iot._factory import iot_hub_service_factory
+            from azext_iot.common.utility import trim_from_start
+            
+            # Get the IoT Hub Management client from the target's command context
+            cmd = target.get("cmd")
+            if not cmd:
+                return None
+            
+            hub_name = target.get("name")
+            resource_group = target.get("resourcegroup")
+            subscription = target.get("subscription")
+            
+            if not all([hub_name, resource_group, subscription]):
+                # Missing required information to query Azure Resource Manager
+                return None
+            
+            # Query the IoT Hub resource to get Event Hub endpoint information
+            client = iot_hub_service_factory(cmd.cli_ctx).iot_hub_resource
+            resource = client.get(resource_group, hub_name)
+            
+            if resource and resource.properties and resource.properties.event_hub_endpoints:
+                events_endpoint = resource.properties.event_hub_endpoints.get("events")
+                if events_endpoint:
+                    return {
+                        "endpoint": trim_from_start(events_endpoint.endpoint, "sb://").strip("/"),
+                        "path": events_endpoint.path,
+                        "partition_count": events_endpoint.partition_count,
+                        "partition_ids": events_endpoint.partition_ids
+                    }
+        except Exception as e:
+            # If discovery fails, log the error and return None
+            # This will trigger the helpful error message in the caller
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug(f"Event Hub endpoint discovery failed: {e}")
+        
+        return None
