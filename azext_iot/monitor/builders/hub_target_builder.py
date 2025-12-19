@@ -14,7 +14,6 @@ from azext_iot.monitor.models.target import Target
 
 
 class AmqpBuilder:
-    """Helper class for building AMQP endpoints (used by C2D operations)"""
     @classmethod
     def build_iothub_amqp_endpoint_from_target(cls, target, duration=360):
         hub_name = target["entity"].split(".")[0]
@@ -93,11 +92,6 @@ class EventTargetBuilder:
         """
         Discover Event Hub endpoint using Azure IoT Hub Management API.
         
-        The Event Hub-compatible endpoint information is only available through
-        the Azure Resource Manager API, not discoverable via AMQP/Event Hub protocols.
-        
-        This method uses the Azure IoT Hub Management SDK to query the IoT Hub
-        resource and extract the built-in Event Hub endpoint details.
         """
         try:
             from azext_iot._factory import iot_hub_service_factory
