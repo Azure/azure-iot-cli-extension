@@ -38,12 +38,14 @@ class EventTargetBuilder:
         )
 
     async def _build_iot_hub_target_async(self, target):
-        # Event Hub endpoint should be provided via include_events=True in discovery
+        # Event Hub endpoint must be provided via REST API (include_events=True)
         if "events" not in target:
             raise CLIInternalError(
-                "Event Hub endpoint information is missing. "
-                "Ensure the target includes Event Hub configuration."
+                f"Unable to discover Event Hub endpoint for '{target['entity']}'. "
+                "Event Hub endpoint must be obtained via REST API. "
+                "Please ensure include_events=True is set when calling discovery.get_target()."
             )
+        
         endpoint = target["events"]["endpoint"]
         path = target["events"]["path"]
         partition_ids = target["events"].get("partition_ids", [])

@@ -33,7 +33,6 @@ async def convert_token_to_target(tokens) -> Target:
 
 
 async def _query_partition_count(hostname, path, credential):
-    """Get partition count using azure-eventhub client properties"""
     fully_qualified_namespace = hostname
     
     client = EventHubConsumerClient(
