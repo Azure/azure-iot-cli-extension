@@ -241,7 +241,6 @@ def _get_endpoint_and_token_auth_pyamqp(
             get_token=token_provider,
             token_type=b"Bearer"
         )
-        auth.update_token()
     else:
         # Generate IoT Hub-compatible SAS token using our SasTokenAuthentication
         # which correctly uses base64-decoded keys for HMAC (unlike PyAMQP's generate_sas_token)
