@@ -41,9 +41,22 @@ class IotHubDiscovery(BaseDiscovery):
     def _make_kwargs(self, **kwargs) -> Dict[str, Any]:
         return kwargs
 
-    @classmethod
-    def get_target_by_cstring(cls, connection_string: str) -> Dict[str, str]:
-        return IotHubTarget.from_connection_string(cstring=connection_string).as_dict()
+    def get_target_by_cstring(self, connection_string: str, **kwargs) -> Dict[str, str]:
+        target = IotHubTarget.from_connection_string(cstring=connection_string).as_dict()
+        
+        # When using connection string, provide minimal info needed for _discover_eventhub_endpoint fallback
+        # We need to find the resource to get resourcegroup and subscription for the fallback to work
+        try:
+            resource = self.find_resource(resource_name=target["name"])
+            target["subscription"] = self.sub_id
+            target["resourcegroup"] = resource.additional_properties.get("resourcegroup")
+        except Exception:
+            # If we can't find the resource, the fallback discovery won't work
+            # but that's okay - the error will be clearer later
+            pass
+        
+        target["cmd"] = self.cmd
+        return target
 
     def _build_target_from_hostname(self, resource_hostname: str) -> Dict[str, str]:
         login = AuthenticationTypeDataplane.login.value

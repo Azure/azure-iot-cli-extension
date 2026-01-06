@@ -74,17 +74,20 @@ IoT Hub → C2D Send → PyAMQP (azure.eventhub._pyamqp) → CLI
 | `uamqp.SendClient` | `PyAMQPSendClient` | C2D send |
 | `uamqp.Message` | `EventData` / `PyAMQP Message` | Message objects |
 | `uamqp.authentication.SASTokenAsync` | `EventHubSharedKeyCredential` / `PyAMQPCBSAuth` | SAS key auth |
-| `uamqp.authentication.JWTTokenAuth` | `AzureCliCredential` / `PyAMQPJWTTokenAuth` | AAD auth via --login |
+| `uamqp.authentication.JWTTokenAuth` | `AzureCliCredential` / `PyAMQPJWTTokenAuth` | AAD auth (az login) |
 
 ## Authentication
 
-The CLI supports two authentication methods:
+The CLI supports authentication via connection string or IoT Hub name:
 
-### 1. Connection String / SAS Key (Default)
+### Connection String Authentication
+
+Connection strings can be provided via the `--login` flag to avoid session login via `az login`.
 
 **Event Monitoring:**
 - Uses `EventHubConsumerClient.from_connection_string()` or `EventHubSharedKeyCredential`
-- Standard connection string format
+- Standard IoT Hub connection string format
+- Example: `--login 'HostName=myhub.azure-devices.net;SharedAccessKeyName=iothubowner;SharedAccessKey=12345'`
 
 **C2D Send / Feedback Monitoring:**
 - Uses `PyAMQPCBSAuth` with IoT Hub SAS tokens
@@ -93,11 +96,14 @@ The CLI supports two authentication methods:
   - PyAMQP's built-in `SASTokenAuth` uses raw UTF-8 keys (Event Hub style)
   - Solution: Generate IoT Hub-compatible tokens and pass via CBS authentication
 
-### 2. Azure CLI Authentication (--login flag)
+### IoT Hub Name Authentication
+
+When using `--hub-name` (or `-n`) without `--login`, the extension uses Azure CLI authentication.
 
 **Event Monitoring:**
 - Uses `AzureCliCredential` (from azure-identity package)
 - Standard `TokenCredential` interface
+- Requires user to run `az login` first
 
 **C2D Send / Feedback Monitoring:**
 - Uses `PyAMQPJWTTokenAuth` with Azure CLI credentials

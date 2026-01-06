@@ -20,7 +20,7 @@ class Issue:
         self.device_id = device_id
         self.message = None
         if message:
-            message_body = next(message.get_data())
+            message_body = b"".join(message.body)
             self.message = unicode_decode(data=message_body, default="Failed to represent content in unicode format.")
 
         if not self.device_id:

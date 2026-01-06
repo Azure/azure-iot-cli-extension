@@ -68,8 +68,8 @@ class CommonParser(AbstractBaseParser):
             annotations = self._parse_annotations(message)
             event["annotations"] = annotations
 
-        if system_properties and ("sys" in properties or "all" in properties):
-            event["properties"]["system"] = system_properties
+        if "sys" in properties or "all" in properties:
+            event["properties"]["system"] = system_properties if system_properties else {}
 
         if "app" in properties or "all" in properties:
             application_properties = self._parse_application_properties(message)
@@ -196,7 +196,10 @@ class CommonParser(AbstractBaseParser):
                                       'content-type', 'content-encoding',
                                       b'content_type', b'content_encoding',
                                       'content_type', 'content_encoding']}
-            return unicode_binary_map(annotations)
+            result = unicode_binary_map(annotations)
+            # Normalize keys: replace dashes with underscores for consistency with uAMQP
+            normalized = {k.replace('-', '_'): v for k, v in result.items()}
+            return normalized
         except Exception:
             details = strings.invalid_annotations()
             self._add_issue(severity=Severity.warning, details=details)

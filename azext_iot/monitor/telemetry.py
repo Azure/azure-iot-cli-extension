@@ -8,6 +8,7 @@ import asyncio
 import sys
 from azure.eventhub.aio import EventHubConsumerClient
 from azure.eventhub import EventData
+from datetime import datetime, timezone
 
 from uuid import uuid4
 from knack.log import get_logger
@@ -149,22 +150,30 @@ async def _monitor_events(
     """Monitor events using EventHub SDK"""
     try:
         async def on_event(partition_context, event):
-            # Pass EventData directly to parser
             on_message_received(event)
+
+        # Convert milliseconds to datetime for EventHub SDK
+        if isinstance(enqueued_time_utc, int):
+            starting_position = datetime.fromtimestamp(enqueued_time_utc / 1000.0, tz=timezone.utc)
+        else:
+            starting_position = enqueued_time_utc
 
         receive_kwargs = {
             "on_event": on_event,
             "partition_id": str(partition_id),
-            "starting_position": enqueued_time_utc,
+            "starting_position": starting_position,
         }
 
-        if timeout > 0:
-            receive_kwargs["max_wait_time"] = timeout
-
-        # receive() is a long-running task that calls on_event for each message
         async with consumer_client:
-            await consumer_client.receive(**receive_kwargs)
+            if timeout > 0:
+                timeout_seconds = timeout / 1000.0
+                await asyncio.wait_for(consumer_client.receive(**receive_kwargs), timeout=timeout_seconds)
+            else:
+                await consumer_client.receive(**receive_kwargs)
 
+    except asyncio.TimeoutError:
+        # This is expected - timeout means monitoring period is over
+        pass
     except asyncio.CancelledError:
         logger.info("Monitoring cancelled on partition %s", partition_id)
     except KeyboardInterrupt:

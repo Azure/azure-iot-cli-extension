@@ -21,7 +21,7 @@ from azure.eventhub._pyamqp import ReceiveClient as PyAMQPReceiveClient, SendCli
 from azure.eventhub._pyamqp.authentication import JWTTokenAuth as PyAMQPJWTTokenAuth
 from azure.eventhub._pyamqp.authentication import _CBSAuth as PyAMQPCBSAuth
 from azure.eventhub._pyamqp.message import Message as PyAMQPMessage
-from azure.eventhub._pyamqp.error import AMQPLinkError
+from azure.eventhub._pyamqp.error import AMQPLinkError, AMQPConnectionError
 
 # To provide amqp frame trace
 DEBUG = False
@@ -178,11 +178,21 @@ def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
         message_generator = client.receive_messages_iter()
         for msg_tuple in message_generator:
             # PyAMQP returns (frame, message) tuples from _received_messages queue
-            frame, msg = msg_tuple if isinstance(msg_tuple, tuple) else (None, msg_tuple)
+            # frame is a TransferFrame NamedTuple with delivery_id and delivery_tag
+            if isinstance(msg_tuple, tuple) and len(msg_tuple) == 2:
+                frame, msg = msg_tuple
+            else:
+                # Fallback for when only message is returned
+                frame, msg = None, msg_tuple
+            
             match = handle_msg(msg)
             if match:
                 logger.info("Requested message Id has been matched...")
-                client.settle_messages(msg, 'accepted')
+                if frame and hasattr(frame, 'delivery_id') and hasattr(frame, 'delivery_tag'):
+                    client.settle_messages(frame.delivery_id, frame.delivery_tag, 'accepted')
+                else:
+                    # If no frame info, message is auto-settled by PyAMQP
+                    logger.debug("No frame delivery info available for settlement")
                 return match
     except KeyboardInterrupt:
         logger.info("Stopping C2D feedback monitor...")
@@ -193,6 +203,10 @@ def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
             logger.info("Feedback monitoring ended - link detached by service")
         else:
             logger.warning(f"AMQP link error during feedback monitoring: {e}")
+    except AMQPConnectionError as e:
+        # Connection errors can occur due to transient network issues or server-side disconnects
+        logger.warning(f"AMQP connection error during feedback monitoring: {e}")
+        # Don't re-raise - this is often a transient issue that shouldn't fail the operation
     except Exception as e:
         logger.error(f"Error in feedback monitoring: {e}", exc_info=True)
         raise
