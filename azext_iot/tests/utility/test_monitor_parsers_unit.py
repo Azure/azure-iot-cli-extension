@@ -39,7 +39,7 @@ def _create_event_data(
     Helper function to create EventData object that mimics structure expected by parsers.
     The parsers expect:
     - message.system_properties: dict with annotations (device_id, interface, etc.) and content-type/encoding
-    - message.properties: dict with application properties  
+    - message.properties: dict with application properties
     - message.body: bytes or generator of payload
     - message.get_data(): generator that yields body (for Issue class compatibility)
     """
@@ -51,17 +51,17 @@ def _create_event_data(
             self.properties = properties
             # For component_name parsing which still uses annotations
             self.annotations = system_properties
-        
+
         def get_data(self):
             """Generator that yields the body - for backward compatibility with Issue class"""
             yield self.body
-    
+
     # Convert body to bytes if needed
     if isinstance(body, str):
         body_bytes = body.encode('utf-8')
     else:
         body_bytes = body
-    
+
     # Build system_properties (includes annotations and content-type/encoding)
     system_props = dict(annotations) if annotations else {}
     if content_type:
@@ -70,7 +70,7 @@ def _create_event_data(
     if content_encoding:
         system_props['content-encoding'] = content_encoding
         system_props['content_encoding'] = content_encoding
-    
+
     # Create the mock EventData
     return MockEventData(
         body=body_bytes,

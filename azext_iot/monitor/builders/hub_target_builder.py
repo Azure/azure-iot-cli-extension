@@ -48,26 +48,37 @@ class EventTargetBuilder:
                     "Event Hub endpoint must be obtained via REST API. "
                     "Please ensure include_events=True is set when calling discovery.get_target()."
                 )
-        
+
         endpoint = target["events"]["endpoint"]
         path = target["events"]["path"]
         partition_ids = target["events"].get("partition_ids", [])
         partition_count = target["events"].get("partition_count", 0)
         if partition_ids:
-            return Target(hostname=endpoint, path=path, partitions=partition_ids, policy=target["policy"], key=target["primarykey"])
+            return Target(
+                hostname=endpoint, path=path, partitions=partition_ids,
+                policy=target["policy"], key=target["primarykey"]
+            )
         if partition_count:
             for i in range(int(partition_count)):
                 partition_ids.append(str(i))
-            return Target(hostname=endpoint, path=path, partitions=partition_ids, policy=target["policy"], key=target["primarykey"])
-        
+            return Target(
+                hostname=endpoint, path=path, partitions=partition_ids,
+                policy=target["policy"], key=target["primarykey"]
+            )
+
         # Query partition metadata using azure-eventhub
-        connection_str = f"Endpoint=sb://{endpoint}/;SharedAccessKeyName={target['policy']};SharedAccessKey={target['primarykey']};EntityPath={path}"
+        connection_str = (
+            f"Endpoint=sb://{endpoint}/;"
+            f"SharedAccessKeyName={target['policy']};"
+            f"SharedAccessKey={target['primarykey']};"
+            f"EntityPath={path}"
+        )
         client = EventHubConsumerClient.from_connection_string(
             connection_str,
             consumer_group="$Default",
             eventhub_name=path,
         )
-        
+
         try:
             async with client:
                 amqp_partition_ids = await client.get_partition_ids()
@@ -87,33 +98,33 @@ class EventTargetBuilder:
         raise CLIInternalError(
             f"Unable to determine partitions for '{target['entity'].split('.')[0]}'."
         )
-    
+
     async def _discover_eventhub_endpoint(self, target):
         """
         Discover Event Hub endpoint using Azure IoT Hub Management API.
-        
+
         """
         try:
             from azext_iot._factory import iot_hub_service_factory
             from azext_iot.common.utility import trim_from_start
-            
+
             # Get the IoT Hub Management client from the target's command context
             cmd = target.get("cmd")
             if not cmd:
                 return None
-            
+
             hub_name = target.get("name")
             resource_group = target.get("resourcegroup")
             subscription = target.get("subscription")
-            
+
             if not all([hub_name, resource_group, subscription]):
                 # Missing required information to query Azure Resource Manager
                 return None
-            
+
             # Query the IoT Hub resource to get Event Hub endpoint information
             client = iot_hub_service_factory(cmd.cli_ctx).iot_hub_resource
             resource = client.get(resource_group, hub_name)
-            
+
             if resource and resource.properties and resource.properties.event_hub_endpoints:
                 events_endpoint = resource.properties.event_hub_endpoints.get("events")
                 if events_endpoint:
@@ -129,5 +140,5 @@ class EventTargetBuilder:
             import logging
             logger = logging.getLogger(__name__)
             logger.debug(f"Event Hub endpoint discovery failed: {e}")
-        
+
         return None

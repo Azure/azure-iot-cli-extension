@@ -34,14 +34,14 @@ async def convert_token_to_target(tokens) -> Target:
 
 async def _query_partition_count(hostname, path, credential):
     fully_qualified_namespace = hostname
-    
+
     client = EventHubConsumerClient(
         fully_qualified_namespace=fully_qualified_namespace,
         eventhub_name=path,
         consumer_group="$Default",
         credential=credential,
     )
-    
+
     try:
         async with client:
             # Get partition IDs to determine count

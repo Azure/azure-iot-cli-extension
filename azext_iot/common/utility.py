@@ -469,7 +469,6 @@ def init_monitoring(
     if message_count and message_count <= 0:
         raise InvalidArgumentValueError("Message count must be greater than 0.")
 
-    config = cmd.cli_ctx.config
     output = cmd.cli_ctx.invocation.data.get("output", None)
     if not output:
         output = "json"

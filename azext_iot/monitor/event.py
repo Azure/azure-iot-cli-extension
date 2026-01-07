@@ -14,7 +14,6 @@ from knack.log import get_logger
 from azext_iot.constants import USER_AGENT
 from azext_iot.common.shared import AuthenticationTypeDataplane
 from azext_iot.common.utility import shell_safe_json_parse
-from azext_iot.monitor.builders.hub_target_builder import AmqpBuilder
 
 # Use pyamqp for C2D send and feedback monitoring (uamqp replacement)
 from azure.eventhub._pyamqp import ReceiveClient as PyAMQPReceiveClient, SendClient as PyAMQPSendClient
@@ -51,15 +50,15 @@ def send_c2d_message(
 
     # Build PyAMQP message properties (Properties is immutable, set all at creation)
     from azure.eventhub._pyamqp.message import Properties
-    
+
     target_msg_id = message_id if message_id else str(uuid4())
-    
+
     # Only include non-None properties
     props_kwargs = {
         "to": "/devices/{}/messages/devicebound".format(device_id),
         "message_id": target_msg_id,
     }
-    
+
     if correlation_id:
         props_kwargs["correlation_id"] = correlation_id
     if user_id:
@@ -70,7 +69,7 @@ def send_c2d_message(
         props_kwargs["content_encoding"] = content_encoding
     if expiry_time_utc:
         props_kwargs["absolute_expiry_time"] = int(expiry_time_utc)
-    
+
     msg_props = Properties(**props_kwargs)
 
     content_type = content_type.lower() if content_type else ""
@@ -117,7 +116,7 @@ def send_c2d_message(
         network_trace=DEBUG,
         container_id=_get_container_id(),
     )
-    
+
     try:
         client.open()
         client.send_message(message, timeout=10)
@@ -127,7 +126,7 @@ def send_c2d_message(
         errors = [str(e)]
     finally:
         client.close()
-    
+
     return target_msg_id, errors
 
 
@@ -184,7 +183,7 @@ def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
             else:
                 # Fallback for when only message is returned
                 frame, msg = None, msg_tuple
-            
+
             match = handle_msg(msg)
             if match:
                 logger.info("Requested message Id has been matched...")
@@ -213,7 +212,7 @@ def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
     finally:
         try:
             client.close()
-        except:
+        except Exception:
             pass
 
 
@@ -226,7 +225,7 @@ def _get_endpoint_and_token_auth_pyamqp(
 ) -> Tuple[str, Union[PyAMQPJWTTokenAuth, PyAMQPCBSAuth, None]]:
     """
     Get endpoint and authentication for pyamqp (uamqp replacement).
-    
+
     Note: IoT Hub requires SAS tokens with base64-decoded keys for HMAC signature,
     but PyAMQP's SASTokenAuth uses raw UTF-8 encoded keys (Event Hub/Service Bus style).
     We generate IoT Hub-compatible SAS tokens using SasTokenAuthentication and pass via CBS auth.
@@ -235,11 +234,11 @@ def _get_endpoint_and_token_auth_pyamqp(
     from azext_iot.common.sas_token_auth import SasTokenAuthentication
     from time import time
     from collections import namedtuple
-    
+
     AccessToken = namedtuple("AccessToken", ["token", "expires_on"])
     endpoint_with_op = operation  # pyamqp uses relative path
     auth = None
-    
+
     if target["policy"] == AuthenticationTypeDataplane.login.value:
         # Use JWT token auth for AAD login
         def token_provider():
@@ -248,7 +247,7 @@ def _get_endpoint_and_token_auth_pyamqp(
             creds, _, _ = profile.get_raw_token(resource=IOTHUB_RESOURCE_ID)
             access_token = AccessToken(f"{creds[0]} {creds[1]}", time() + 3599)
             return access_token
-        
+
         auth = PyAMQPJWTTokenAuth(
             audience=IOTHUB_RESOURCE_ID,
             uri=f"amqps://{target['entity']}{operation}",
@@ -264,12 +263,12 @@ def _get_endpoint_and_token_auth_pyamqp(
             shared_access_key=target['primarykey'],
             expiry=token_duration
         )
-        
+
         def sas_token_provider():
             # Generate SAS token and return as AccessToken
             token = sas_generator.generate_sas_token()
             return AccessToken(token, time() + token_duration)
-        
+
         # Use CBS authentication with our pre-generated SAS token
         auth = PyAMQPCBSAuth(
             uri=f"amqps://{target['entity']}{operation}",

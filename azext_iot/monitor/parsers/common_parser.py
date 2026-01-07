@@ -11,7 +11,7 @@ from azext_iot.monitor.utility import unicode_decode
 
 from azure.eventhub import EventData
 
-from azext_iot.common.utility import parse_entity, unicode_binary_map
+from azext_iot.common.utility import unicode_binary_map
 from azext_iot.monitor.base_classes import AbstractBaseParser
 from azext_iot.monitor.parsers import strings
 from azext_iot.monitor.models.arguments import CommonParserArguments
@@ -192,10 +192,10 @@ class CommonParser(AbstractBaseParser):
             sys_props = message.system_properties or {}
             # Filter out content-type/encoding from annotations
             annotations = {k: v for k, v in sys_props.items()
-                          if k not in [b'content-type', b'content-encoding',
-                                      'content-type', 'content-encoding',
-                                      b'content_type', b'content_encoding',
-                                      'content_type', 'content_encoding']}
+                           if k not in [b'content-type', b'content-encoding',
+                                        'content-type', 'content-encoding',
+                                        b'content_type', b'content_encoding',
+                                        'content_type', 'content_encoding']}
             result = unicode_binary_map(annotations)
             # Normalize keys: replace hyphens with underscores for consistent Python-friendly key format
             normalized = {k.replace('-', '_'): v for k, v in result.items()}

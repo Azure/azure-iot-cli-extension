@@ -7,7 +7,6 @@
 import asyncio
 import sys
 from azure.eventhub.aio import EventHubConsumerClient
-from azure.eventhub import EventData
 from datetime import datetime, timezone
 
 from uuid import uuid4
@@ -105,7 +104,12 @@ async def _initiate_event_monitor(
     # Create EventHub Consumer Client
     if target.policy and target.key:
         # IoT Hub: Use connection string with shared access key
-        connection_str = f"Endpoint=sb://{target.hostname}/;SharedAccessKeyName={target.policy};SharedAccessKey={target.key};EntityPath={target.path}"
+        connection_str = (
+            f"Endpoint=sb://{target.hostname}/;"
+            f"SharedAccessKeyName={target.policy};"
+            f"SharedAccessKey={target.key};"
+            f"EntityPath={target.path}"
+        )
         consumer_client = EventHubConsumerClient.from_connection_string(
             connection_str,
             consumer_group=target.consumer_group,

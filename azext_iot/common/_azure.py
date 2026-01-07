@@ -29,7 +29,7 @@ def _parse_connection_string(cs, validate=None, cstring_type="entity"):
 def parse_iot_hub_connection_string(cs):
     validate = ["HostName", "SharedAccessKeyName", "SharedAccessKey"]
     decomposed = _parse_connection_string(cs, validate, "IoT Hub")
-    
+
     # Validate SharedAccessKey is valid Base64
     import base64
     try:
@@ -38,7 +38,7 @@ def parse_iot_hub_connection_string(cs):
             base64.b64decode(key, validate=True)
     except Exception as e:
         raise ValueError(f"IoT Hub connection string has invalid SharedAccessKey (not valid Base64): {e}")
-    
+
     return decomposed
 
 
