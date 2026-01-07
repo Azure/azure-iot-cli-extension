@@ -117,9 +117,9 @@ class TestInstallPipPackage(object):
     @pytest.mark.parametrize(
         "install_type, package_name, expected",
         [
-            ({"exact_version": "1.2"}, "uamqp", "uamqp==1.2"),
-            ({"compatible_version": "1.2"}, "uamqp", "uamqp~=1.2"),
-            ({"custom_version": ">=1.2,<1.3"}, "uamqp", "uamqp>=1.2,<1.3"),
+            ({"exact_version": "1.2"}, "testpkg", "testpkg==1.2"),
+            ({"compatible_version": "1.2"}, "testpkg", "testpkg~=1.2"),
+            ({"custom_version": ">=1.2,<1.3"}, "testpkg", "testpkg>=1.2,<1.3"),
         ],
     )
     def test_pip_install(

@@ -51,7 +51,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         super(TestIoTHubMessaging, self).tearDown()
 
-    def test_uamqp_device_messaging(self):
+    def test_device_messaging(self):
         device_count = 1
         device_ids = self.generate_device_names(device_count)
 
