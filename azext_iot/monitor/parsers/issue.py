@@ -20,7 +20,20 @@ class Issue:
         self.device_id = device_id
         self.message = None
         if message:
-            message_body = b"".join(message.body)
+            # Handle different body types from EventData
+            body = message.body
+            if isinstance(body, bytes):
+                message_body = body
+            elif isinstance(body, str):
+                message_body = body.encode('utf-8')
+            elif isinstance(body, list):
+                message_body = b''.join(chunk if isinstance(chunk, bytes) else chunk.encode('utf-8') for chunk in body)
+            else:
+                # body is a generator - consume it
+                chunks = []
+                for chunk in body:
+                    chunks.append(chunk if isinstance(chunk, bytes) else chunk.encode('utf-8'))
+                message_body = b''.join(chunks)
             self.message = unicode_decode(data=message_body, default="Failed to represent content in unicode format.")
 
         if not self.device_id:

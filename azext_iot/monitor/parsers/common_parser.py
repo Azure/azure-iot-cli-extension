@@ -197,7 +197,7 @@ class CommonParser(AbstractBaseParser):
                                       b'content_type', b'content_encoding',
                                       'content_type', 'content_encoding']}
             result = unicode_binary_map(annotations)
-            # Normalize keys: replace dashes with underscores for consistency with uAMQP
+            # Normalize keys: replace hyphens with underscores for consistent Python-friendly key format
             normalized = {k.replace('-', '_'): v for k, v in result.items()}
             return normalized
         except Exception:

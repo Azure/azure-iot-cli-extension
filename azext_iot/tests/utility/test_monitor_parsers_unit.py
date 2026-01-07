@@ -225,9 +225,10 @@ class TestCommonParser:
         # verify
         assert parsed_msg["event"]["payload"] == payload
         assert parsed_msg["event"]["origin"] == device_id
-        device_identifier = str(common_parser.DEVICE_ID_IDENTIFIER, "utf8")
+        # Keys are normalized: hyphens replaced with underscores
+        device_identifier = str(common_parser.DEVICE_ID_IDENTIFIER, "utf8").replace("-", "_")
         assert parsed_msg["event"]["annotations"][device_identifier] == device_id
-        module_identifier = str(common_parser.MODULE_ID_IDENTIFIER, "utf8")
+        module_identifier = str(common_parser.MODULE_ID_IDENTIFIER, "utf8").replace("-", "_")
         if module_id:
             assert parsed_msg["event"]["annotations"][module_identifier] == module_id
         else:
@@ -241,14 +242,16 @@ class TestCommonParser:
         assert parsed_msg["event"]["component"] == component_name
 
         if interface_name:
-            interface_identifier = str(interface_identifier_bytes, "utf8")
+            # Keys are normalized: hyphens replaced with underscores
+            interface_identifier = str(interface_identifier_bytes, "utf8").replace("-", "_")
             assert (
                 parsed_msg["event"]["annotations"][interface_identifier]
                 == interface_name
             )
 
         if component_name:
-            component_identifier = str(common_parser.COMPONENT_NAME_IDENTIFIER, "utf8")
+            # Keys are normalized: hyphens replaced with underscores
+            component_identifier = str(common_parser.COMPONENT_NAME_IDENTIFIER, "utf8").replace("-", "_")
             assert (
                 parsed_msg["event"]["annotations"][component_identifier]
                 == component_name
@@ -431,7 +434,7 @@ class TestCentralParser:
         # verify
         assert parsed_msg["event"]["payload"] == self.bad_dcm_payload
         assert parsed_msg["event"]["origin"] == self.device_id
-        device_identifier = str(common_parser.DEVICE_ID_IDENTIFIER, "utf8")
+        device_identifier = str(common_parser.DEVICE_ID_IDENTIFIER, "utf8").replace("-", "_")
         assert parsed_msg["event"]["annotations"][device_identifier] == self.device_id
 
         properties = parsed_msg["event"]["properties"]
@@ -471,9 +474,9 @@ class TestCentralParser:
         # verify
         assert parsed_msg["event"]["payload"] == self.bad_dcm_payload
         assert parsed_msg["event"]["origin"] == self.device_id
-        device_identifier = str(common_parser.DEVICE_ID_IDENTIFIER, "utf8")
+        device_identifier = str(common_parser.DEVICE_ID_IDENTIFIER, "utf8").replace("-", "_")
         assert parsed_msg["event"]["annotations"][device_identifier] == self.device_id
-        component_identifier = str(common_parser.COMPONENT_NAME_IDENTIFIER, "utf8")
+        component_identifier = str(common_parser.COMPONENT_NAME_IDENTIFIER, "utf8").replace("-", "_")
         assert (
             parsed_msg["event"]["annotations"][component_identifier]
             == self.component_name
@@ -515,9 +518,9 @@ class TestCentralParser:
         # verify
         assert parsed_msg["event"]["payload"] == self.bad_dcm_payload
         assert parsed_msg["event"]["origin"] == self.device_id
-        device_identifier = str(common_parser.DEVICE_ID_IDENTIFIER, "utf8")
+        device_identifier = str(common_parser.DEVICE_ID_IDENTIFIER, "utf8").replace("-", "_")
         assert parsed_msg["event"]["annotations"][device_identifier] == self.device_id
-        component_identifier = str(common_parser.COMPONENT_NAME_IDENTIFIER, "utf8")
+        component_identifier = str(common_parser.COMPONENT_NAME_IDENTIFIER, "utf8").replace("-", "_")
         assert (
             parsed_msg["event"]["annotations"][component_identifier]
             == self.component_name
@@ -563,9 +566,9 @@ class TestCentralParser:
         # verify
         assert parsed_msg["event"]["payload"] == self.bad_dcm_payload
         assert parsed_msg["event"]["origin"] == self.device_id
-        device_identifier = str(common_parser.DEVICE_ID_IDENTIFIER, "utf8")
+        device_identifier = str(common_parser.DEVICE_ID_IDENTIFIER, "utf8").replace("-", "_")
         assert parsed_msg["event"]["annotations"][device_identifier] == self.device_id
-        component_identifier = str(common_parser.COMPONENT_NAME_IDENTIFIER, "utf8")
+        component_identifier = str(common_parser.COMPONENT_NAME_IDENTIFIER, "utf8").replace("-", "_")
         assert (
             parsed_msg["event"]["annotations"][component_identifier]
             == list(device_template.components.keys())[1]
