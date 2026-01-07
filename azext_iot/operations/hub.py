@@ -2705,11 +2705,6 @@ def iot_hub_monitor_feedback(
     login=None,
     auth_type_dataplane=None,
 ):
-    from azext_iot.common.deps import ensure_uamqp
-
-    config = cmd.cli_ctx.config
-    ensure_uamqp(config, yes, repair)
-
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         resource_name=hub_name_or_hostname,

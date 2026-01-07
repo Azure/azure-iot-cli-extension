@@ -2,7 +2,6 @@ pytest==8.1.1
 pytest-mock==3.12.0
 pytest-cov
 pytest-env
-uamqp~=1.6.6
 responses==0.22.0
 black
 setuptools==70.0.0

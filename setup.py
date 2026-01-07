@@ -39,9 +39,8 @@ if not PACKAGE_NAME:
 # 'pyyaml'
 # 'knack'
 
-# There is also a dependency for uamqp for amqp based commands
-# though that is installed out of band (managed by the extension)
-# for compatibility reasons.
+# AMQP-based commands now use PyAMQP (bundled in azure-eventhub)
+# and azure-eventhub for telemetry monitoring.
 
 DEPENDENCIES = [
     "azure-core>=1.24.0,<2.0.0",
@@ -59,7 +58,8 @@ DEPENDENCIES = [
     "packaging>=23.2",
     "azure-eventhub~=5.15.0",
 ]
-EXTRAS = {"uamqp": ["uamqp>=1.2,<=1.6.8"]}
+# uamqp extra removed - now using PyAMQP and azure-eventhub
+EXTRAS = {}
 
 CLASSIFIERS = [
     "Development Status :: 4 - Beta",
