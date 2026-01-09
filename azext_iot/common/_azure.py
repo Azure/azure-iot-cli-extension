@@ -23,7 +23,7 @@ def _parse_connection_string(cs, validate=None, cstring_type="entity"):
                         cstring_type, k
                     )
                 )
-    
+
     # Validate SharedAccessKey is valid Base64 if present
     import base64
     try:
@@ -32,7 +32,7 @@ def _parse_connection_string(cs, validate=None, cstring_type="entity"):
             base64.b64decode(key, validate=True)
     except Exception as e:
         raise ValueError(f"{cstring_type} connection string has invalid SharedAccessKey (not valid Base64): {e}")
-    
+
     return decomposed
 
 

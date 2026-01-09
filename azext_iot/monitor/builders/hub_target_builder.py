@@ -53,11 +53,11 @@ class EventTargetBuilder:
         path = target["events"]["path"]
         partition_ids = target["events"].get("partition_ids", [])
         partition_count = target["events"].get("partition_count", 0)
-        
+
         # Store policy and key for credential generation at usage time
         policy = target["policy"]
         key = target["primarykey"]
-        
+
         if partition_ids:
             return Target(
                 hostname=endpoint, path=path, partitions=partition_ids,
@@ -108,7 +108,7 @@ class EventTargetBuilder:
         """
         Discover Event Hub endpoint using AMQP link redirect.
         This allows discovery with just a connection string, without Azure login.
-        
+
         When connecting to IoT Hub's management endpoint, it redirects to the
         Event Hub-compatible endpoint, revealing the actual endpoint and path.
         """
@@ -120,14 +120,14 @@ class EventTargetBuilder:
                 from azext_iot.common.sas_token_auth import SasTokenAuthentication
                 from time import time
                 from collections import namedtuple
-                
+
                 AccessToken = namedtuple("AccessToken", ["token", "expires_on"])
-                
+
                 hostname = target["entity"]
                 policy = target["policy"]
                 key = target["primarykey"]
                 token_duration = 360
-                
+
                 # Generate IoT Hub-compatible SAS token
                 sas_generator = SasTokenAuthentication(
                     uri=hostname,
@@ -135,14 +135,14 @@ class EventTargetBuilder:
                     shared_access_key=key,
                     expiry=token_duration
                 )
-                
+
                 def sas_token_provider():
                     token = sas_generator.generate_sas_token()
                     return AccessToken(token, time() + token_duration)
-                
+
                 # Management endpoint to trigger redirect
                 source = f"amqps://{hostname}/messages/events/$management"
-                
+
                 # Use CBS authentication
                 auth = PyAMQPCBSAuth(
                     uri=source,
@@ -151,7 +151,7 @@ class EventTargetBuilder:
                     get_token=sas_token_provider,
                     expires_in=token_duration
                 )
-                
+
                 client = PyAMQPReceiveClient(
                     hostname=hostname,
                     source=source,
@@ -160,7 +160,7 @@ class EventTargetBuilder:
                     timeout=30000,
                     prefetch=1
                 )
-                
+
                 result = None
                 try:
                     client.open()
@@ -171,22 +171,26 @@ class EventTargetBuilder:
                     if redirect.info:
                         hostname_redirect = redirect.info.get(b"hostname") or redirect.info.get("hostname")
                         address_redirect = redirect.info.get(b"address") or redirect.info.get("address")
-                        
+
                         if isinstance(hostname_redirect, bytes):
                             hostname_redirect = hostname_redirect.decode("utf-8")
                         if isinstance(address_redirect, bytes):
                             address_redirect = address_redirect.decode("utf-8")
-                        
+
                         if hostname_redirect and address_redirect:
                             # Parse address to extract path
                             # Address format: "amqps://hostname:port/path/$management"
-                            path = address_redirect.replace("amqps://", "").split("/", 1)[1] if "/" in address_redirect else address_redirect
+                            path = (
+                                address_redirect.replace("amqps://", "").split("/", 1)[1]
+                                if "/" in address_redirect
+                                else address_redirect
+                            )
                             # Remove port and $management suffix
                             if ":" in path:
                                 path = path.split("/", 1)[1] if "/" in path else path
                             if path.endswith("/$management"):
                                 path = path.replace("/$management", "")
-                            
+
                             result = {
                                 "endpoint": hostname_redirect,
                                 "path": path
@@ -200,17 +204,17 @@ class EventTargetBuilder:
                         client.close()
                     except Exception:
                         pass
-                
+
                 return result
-                    
+
             except Exception as e:
                 # If AMQP redirect discovery fails, return None to try ARM API fallback
                 import logging
                 logger = logging.getLogger(__name__)
                 logger.debug(f"AMQP link redirect discovery failed: {e}")
-            
+
             return None
-        
+
         # Run the synchronous redirect logic in a thread pool
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, _sync_redirect)
