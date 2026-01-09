@@ -5,7 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from typing import List
-from azext_iot.monitor.utility import unicode_decode
+from azext_iot.monitor.utility import unicode_decode, extract_message_body
 from knack.log import get_logger
 
 from azext_iot.monitor.models.enum import Severity
@@ -20,20 +20,8 @@ class Issue:
         self.device_id = device_id
         self.message = None
         if message:
-            # Handle different body types from EventData
-            body = message.body
-            if isinstance(body, bytes):
-                message_body = body
-            elif isinstance(body, str):
-                message_body = body.encode('utf-8')
-            elif isinstance(body, list):
-                message_body = b''.join(chunk if isinstance(chunk, bytes) else chunk.encode('utf-8') for chunk in body)
-            else:
-                # body is a generator - consume it
-                chunks = []
-                for chunk in body:
-                    chunks.append(chunk if isinstance(chunk, bytes) else chunk.encode('utf-8'))
-                message_body = b''.join(chunks)
+            # Extract message body using utility function
+            message_body = extract_message_body(message)
             self.message = unicode_decode(data=message_body, default="Failed to represent content in unicode format.")
 
         if not self.device_id:

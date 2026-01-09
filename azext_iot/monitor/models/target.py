@@ -17,11 +17,11 @@ class Target:
     ):
         self.hostname = hostname
         self.path = path
-        self.sas_credential = sas_credential  # Secure credential object for IoT Central
+        self.sas_credential = sas_credential  # IoT Central: Pre-generated SAS token credential
         self.partitions = partitions
         self.consumer_group = None
-        self.policy = policy
-        self.key = key
+        self.policy = policy  # IoT Hub: Shared access policy name
+        self.key = key  # IoT Hub: Shared access key
 
     def add_consumer_group(self, consumer_group: str):
         self.consumer_group = consumer_group

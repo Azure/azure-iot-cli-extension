@@ -270,7 +270,7 @@ class BaseDiscovery(ABC):
         """
         cstring = kwargs.get("login")
         if cstring:
-            return self.get_target_by_cstring(connection_string=cstring, **kwargs)
+            return self.get_target_by_cstring(connection_string=cstring)
 
         resource_group_name = resource_group_name or kwargs.get("rg")
 

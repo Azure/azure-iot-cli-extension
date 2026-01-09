@@ -41,3 +41,37 @@ def unicode_decode(data: bytes, default: str = None):
         data = default
 
     return data
+
+
+def extract_message_body(message) -> bytes:
+    """
+    Extract and materialize message body from EventData.
+    Handles different body types: bytes, str, list, or generator.
+
+    Args:
+        message: EventData message object
+
+    Returns:
+        bytes: The message body as bytes
+    """
+    body = message.body
+    if isinstance(body, bytes):
+        return body
+    elif isinstance(body, str):
+        return body.encode('utf-8')
+    elif isinstance(body, list):
+        return b''.join(chunk if isinstance(chunk, bytes) else chunk.encode('utf-8') for chunk in body)
+    else:
+        # body is a generator - consume it
+        try:
+            chunks = []
+            for chunk in body:
+                if isinstance(chunk, bytes):
+                    chunks.append(chunk)
+                elif isinstance(chunk, str):
+                    chunks.append(chunk.encode('utf-8'))
+                else:
+                    chunks.append(str(chunk).encode('utf-8'))
+            return b''.join(chunks)
+        except Exception:
+            return b''

@@ -37,40 +37,45 @@ class EventTargetBuilder:
         )
 
     async def _build_iot_hub_target_async(self, target):
-        # If events metadata not provided, attempt to discover it
+        # If events metadata not provided, attempt to discover it via AMQP redirect
         if "events" not in target:
-            event_info = await self._discover_eventhub_endpoint(target)
+            event_info = await self._evaluate_redirect(target)
             if event_info:
                 target["events"] = event_info
             else:
                 raise CLIInternalError(
                     f"Unable to discover Event Hub endpoint for '{target['entity']}'. "
-                    "Event Hub endpoint must be obtained via REST API. "
-                    "Please ensure include_events=True is set when calling discovery.get_target()."
+                    "Ensure the IoT Hub connection string is valid or provide hub name with "
+                    "--hub-name to use Azure Resource Manager discovery."
                 )
 
         endpoint = target["events"]["endpoint"]
         path = target["events"]["path"]
         partition_ids = target["events"].get("partition_ids", [])
         partition_count = target["events"].get("partition_count", 0)
+        
+        # Store policy and key for credential generation at usage time
+        policy = target["policy"]
+        key = target["primarykey"]
+        
         if partition_ids:
             return Target(
                 hostname=endpoint, path=path, partitions=partition_ids,
-                policy=target["policy"], key=target["primarykey"]
+                policy=policy, key=key
             )
         if partition_count:
             for i in range(int(partition_count)):
                 partition_ids.append(str(i))
             return Target(
                 hostname=endpoint, path=path, partitions=partition_ids,
-                policy=target["policy"], key=target["primarykey"]
+                policy=policy, key=key
             )
 
         # Query partition metadata using azure-eventhub
         connection_str = (
             f"Endpoint=sb://{endpoint}/;"
-            f"SharedAccessKeyName={target['policy']};"
-            f"SharedAccessKey={target['primarykey']};"
+            f"SharedAccessKeyName={policy};"
+            f"SharedAccessKey={key};"
             f"EntityPath={path}"
         )
         client = EventHubConsumerClient.from_connection_string(
@@ -87,8 +92,8 @@ class EventTargetBuilder:
                         hostname=endpoint,
                         path=path,
                         partitions=list(amqp_partition_ids),
-                        policy=target["policy"],
-                        key=target["primarykey"]
+                        policy=policy,
+                        key=key
                     )
         except Exception as e:
             raise CLIInternalError(
@@ -99,46 +104,113 @@ class EventTargetBuilder:
             f"Unable to determine partitions for '{target['entity'].split('.')[0]}'."
         )
 
-    async def _discover_eventhub_endpoint(self, target):
+    async def _evaluate_redirect(self, target):
         """
-        Discover Event Hub endpoint using Azure IoT Hub Management API.
-
+        Discover Event Hub endpoint using AMQP link redirect.
+        This allows discovery with just a connection string, without Azure login.
+        
+        When connecting to IoT Hub's management endpoint, it redirects to the
+        Event Hub-compatible endpoint, revealing the actual endpoint and path.
         """
-        try:
-            from azext_iot._factory import iot_hub_service_factory
-            from azext_iot.common.utility import trim_from_start
-
-            # Get the IoT Hub Management client from the target's command context
-            cmd = target.get("cmd")
-            if not cmd:
-                return None
-
-            hub_name = target.get("name")
-            resource_group = target.get("resourcegroup")
-            subscription = target.get("subscription")
-
-            if not all([hub_name, resource_group, subscription]):
-                # Missing required information to query Azure Resource Manager
-                return None
-
-            # Query the IoT Hub resource to get Event Hub endpoint information
-            client = iot_hub_service_factory(cmd.cli_ctx).iot_hub_resource
-            resource = client.get(resource_group, hub_name)
-
-            if resource and resource.properties and resource.properties.event_hub_endpoints:
-                events_endpoint = resource.properties.event_hub_endpoints.get("events")
-                if events_endpoint:
-                    return {
-                        "endpoint": trim_from_start(events_endpoint.endpoint, "sb://").strip("/"),
-                        "path": events_endpoint.path,
-                        "partition_count": events_endpoint.partition_count,
-                        "partition_ids": events_endpoint.partition_ids
-                    }
-        except Exception as e:
-            # If discovery fails, log the error and return None
-            # This will trigger the helpful error message in the caller
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.debug(f"Event Hub endpoint discovery failed: {e}")
-
-        return None
+        def _sync_redirect():
+            try:
+                from azure.eventhub._pyamqp import ReceiveClient as PyAMQPReceiveClient
+                from azure.eventhub._pyamqp.error import AMQPLinkRedirect
+                from azure.eventhub._pyamqp.authentication import _CBSAuth as PyAMQPCBSAuth
+                from azext_iot.common.sas_token_auth import SasTokenAuthentication
+                from time import time
+                from collections import namedtuple
+                
+                AccessToken = namedtuple("AccessToken", ["token", "expires_on"])
+                
+                hostname = target["entity"]
+                policy = target["policy"]
+                key = target["primarykey"]
+                token_duration = 360
+                
+                # Generate IoT Hub-compatible SAS token
+                sas_generator = SasTokenAuthentication(
+                    uri=hostname,
+                    shared_access_policy_name=policy,
+                    shared_access_key=key,
+                    expiry=token_duration
+                )
+                
+                def sas_token_provider():
+                    token = sas_generator.generate_sas_token()
+                    return AccessToken(token, time() + token_duration)
+                
+                # Management endpoint to trigger redirect
+                source = f"amqps://{hostname}/messages/events/$management"
+                
+                # Use CBS authentication
+                auth = PyAMQPCBSAuth(
+                    uri=source,
+                    audience=hostname,
+                    token_type=b"servicebus.windows.net:sastoken",
+                    get_token=sas_token_provider,
+                    expires_in=token_duration
+                )
+                
+                client = PyAMQPReceiveClient(
+                    hostname=hostname,
+                    source=source,
+                    auth=auth,
+                    network_trace=False,
+                    timeout=30000,
+                    prefetch=1
+                )
+                
+                result = None
+                try:
+                    client.open()
+                    # Try to receive - this will trigger link redirect from IoT Hub
+                    client.receive_message_batch(max_batch_size=1, timeout=5000)
+                except AMQPLinkRedirect as redirect:
+                    # Extract redirect information
+                    if redirect.info:
+                        hostname_redirect = redirect.info.get(b"hostname") or redirect.info.get("hostname")
+                        address_redirect = redirect.info.get(b"address") or redirect.info.get("address")
+                        
+                        if isinstance(hostname_redirect, bytes):
+                            hostname_redirect = hostname_redirect.decode("utf-8")
+                        if isinstance(address_redirect, bytes):
+                            address_redirect = address_redirect.decode("utf-8")
+                        
+                        if hostname_redirect and address_redirect:
+                            # Parse address to extract path
+                            # Address format: "amqps://hostname:port/path/$management"
+                            path = address_redirect.replace("amqps://", "").split("/", 1)[1] if "/" in address_redirect else address_redirect
+                            # Remove port and $management suffix
+                            if ":" in path:
+                                path = path.split("/", 1)[1] if "/" in path else path
+                            if path.endswith("/$management"):
+                                path = path.replace("/$management", "")
+                            
+                            result = {
+                                "endpoint": hostname_redirect,
+                                "path": path
+                            }
+                except Exception as e:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.debug(f"AMQP redirect receive failed: {e}")
+                finally:
+                    try:
+                        client.close()
+                    except Exception:
+                        pass
+                
+                return result
+                    
+            except Exception as e:
+                # If AMQP redirect discovery fails, return None to try ARM API fallback
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.debug(f"AMQP link redirect discovery failed: {e}")
+            
+            return None
+        
+        # Run the synchronous redirect logic in a thread pool
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, _sync_redirect)

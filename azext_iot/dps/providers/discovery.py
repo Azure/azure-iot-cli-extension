@@ -49,8 +49,7 @@ class DPSDiscovery(BaseDiscovery):
         return kwargs
 
     @classmethod
-    def get_target_by_cstring(cls, connection_string: str, **kwargs) -> Dict[str, str]:
-        # DPS doesn't need kwargs like IoTHub does, but accept them for compatibility
+    def get_target_by_cstring(cls, connection_string: str) -> Dict[str, str]:
         return DPSTarget.from_connection_string(cstring=connection_string).as_dict()
 
     def _build_target_from_hostname(self, resource_hostname: str) -> Dict[str, str]:

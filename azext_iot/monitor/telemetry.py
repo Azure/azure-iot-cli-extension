@@ -102,8 +102,13 @@ async def _initiate_event_monitor(
         return
 
     # Create EventHub Consumer Client
+    # Note: azure-eventhub SDK uses different patterns for async context:
+    #   - IoT Hub: Connection string with policy+key (SDK handles auth internally)
+    #   - IoT Central: AzureSasCredential with pre-generated token
+    # EventHubSharedKeyCredential has sync/async compatibility issues with aio client
+
     if target.policy and target.key:
-        # IoT Hub: Use connection string with shared access key
+        # IoT Hub: Use connection string (works with async EventHubConsumerClient)
         connection_str = (
             f"Endpoint=sb://{target.hostname}/;"
             f"SharedAccessKeyName={target.policy};"
@@ -116,7 +121,7 @@ async def _initiate_event_monitor(
             eventhub_name=target.path,
         )
     elif target.sas_credential:
-        # IoT Central: Use AzureSasCredential (secure token handling)
+        # IoT Central: Use pre-generated SAS token credential
         consumer_client = EventHubConsumerClient(
             fully_qualified_namespace=target.hostname,
             eventhub_name=target.path,
