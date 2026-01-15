@@ -43,19 +43,6 @@ def _create_event_data(
     - message.body: bytes or generator of payload
     - message.get_data(): generator that yields body (for Issue class compatibility)
     """
-    # Create a mock EventData-like object
-    class MockEventData:
-        def __init__(self, body, system_properties, properties):
-            self.body = body
-            self.system_properties = system_properties
-            self.properties = properties
-            # For component_name parsing which still uses annotations
-            self.annotations = system_properties
-
-        def get_data(self):
-            """Generator that yields the body - for backward compatibility with Issue class"""
-            yield self.body
-
     # Convert body to bytes if needed
     if isinstance(body, str):
         body_bytes = body.encode('utf-8')
@@ -71,12 +58,21 @@ def _create_event_data(
         system_props['content-encoding'] = content_encoding
         system_props['content_encoding'] = content_encoding
 
-    # Create the mock EventData
-    return MockEventData(
-        body=body_bytes,
-        system_properties=system_props,
-        properties=application_properties or {}
-    )
+    # Create mock with spec=EventData to catch access to non-existent attributes
+    mock_event = mock.Mock(spec=EventData)
+    mock_event.body = body_bytes
+    mock_event.system_properties = system_props
+    mock_event.properties = application_properties or {}
+    # For component_name parsing which still uses annotations
+    mock_event.annotations = system_props
+
+    # Configure get_data method - needs to be set up properly for spec
+    def get_data_generator():
+        yield body_bytes
+
+    mock_event.get_data = mock.Mock(return_value=get_data_generator())
+
+    return mock_event
 
 
 def _validate_issues(

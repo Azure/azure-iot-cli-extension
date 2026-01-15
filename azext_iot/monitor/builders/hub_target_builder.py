@@ -8,9 +8,12 @@ import asyncio
 
 from azure.cli.core.azclierror import CLIInternalError
 from azure.eventhub.aio import EventHubConsumerClient
+from knack.log import get_logger
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.utility import url_encode_str
 from azext_iot.monitor.models.target import Target
+
+logger = get_logger(__name__)
 
 
 class AmqpBuilder:
@@ -196,8 +199,6 @@ class EventTargetBuilder:
                                 "path": path
                             }
                 except Exception as e:
-                    import logging
-                    logger = logging.getLogger(__name__)
                     logger.debug(f"AMQP redirect receive failed: {e}")
                 finally:
                     try:
@@ -209,8 +210,6 @@ class EventTargetBuilder:
 
             except Exception as e:
                 # If AMQP redirect discovery fails, return None to try ARM API fallback
-                import logging
-                logger = logging.getLogger(__name__)
                 logger.debug(f"AMQP link redirect discovery failed: {e}")
 
             return None

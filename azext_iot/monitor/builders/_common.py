@@ -9,8 +9,6 @@ from azure.eventhub.aio import EventHubConsumerClient
 from azure.core.credentials import AzureSasCredential
 from azext_iot.monitor.models.target import Target
 
-DEBUG = False
-
 
 async def convert_token_to_target(tokens) -> Target:
     event_hub_token = tokens["eventhubSasToken"]
@@ -22,10 +20,7 @@ async def convert_token_to_target(tokens) -> Target:
     url = urllib.parse.urlparse(raw_url)
     hostname = url.hostname
 
-    # Create secure credential object
     credential = AzureSasCredential(sas_token)
-
-    # Get partition count using azure-eventhub
     partition_count = await _query_partition_count(hostname, path, credential)
     partitions = [str(i) for i in range(partition_count)]
 
@@ -44,7 +39,6 @@ async def _query_partition_count(hostname, path, credential):
 
     try:
         async with client:
-            # Get partition IDs to determine count
             partition_ids = await client.get_partition_ids()
             return len(partition_ids)
     except Exception as e:
