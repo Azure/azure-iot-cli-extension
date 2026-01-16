@@ -7,6 +7,7 @@
 import asyncio
 import sys
 from azure.eventhub.aio import EventHubConsumerClient
+from azure.cli.core.azclierror import CLIInternalError
 from datetime import datetime, timezone
 
 from uuid import uuid4
@@ -129,7 +130,10 @@ async def _initiate_event_monitor(
             credential=target.sas_credential,
         )
     else:
-        raise ValueError("Target must have either (policy, key) or sas_credential")
+        raise CLIInternalError(
+            "Target object is missing authentication credentials. "
+            "This indicates an internal error in target construction."
+        )
 
     try:
         receive_tasks = []
