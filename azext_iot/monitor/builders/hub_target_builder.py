@@ -90,22 +90,17 @@ class EventTargetBuilder:
         try:
             async with client:
                 amqp_partition_ids = await client.get_partition_ids()
-                if amqp_partition_ids:
-                    return Target(
-                        hostname=endpoint,
-                        path=path,
-                        partitions=list(amqp_partition_ids),
-                        policy=policy,
-                        key=key
-                    )
+                return Target(
+                    hostname=endpoint,
+                    path=path,
+                    partitions=list(amqp_partition_ids),
+                    policy=policy,
+                    key=key
+                )
         except Exception as e:
             raise CLIInternalError(
                 f"Unable to query partitions for '{target['entity'].split('.')[0]}': {e}"
             )
-
-        raise CLIInternalError(
-            f"Unable to determine partitions for '{target['entity'].split('.')[0]}'."
-        )
 
     async def _evaluate_redirect(self, target):
         """
