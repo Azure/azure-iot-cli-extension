@@ -17,15 +17,17 @@ steps:
 
   - ${{ if eq(parameters.azureCLIVersion, 'min') }}:
       - template: install-azure-cli-min.yml
-
-  - ${{ if eq(parameters.azureCLIVersion, 'released') }}:
+  - ${{ elseif eq(parameters.azureCLIVersion, 'released') }}:
       - template: install-azure-cli-released.yml
-
-  - ${{ if eq(parameters.azureCLIVersion, 'msi') }}:
+  - ${{ else }}:
       - template: install-azure-cli-msi.yml
 
   - template: download-install-local-azure-test-sdk.yml
 
   - template: download-install-local-azure-iot-cli-extension.yml
 
-  - template: set-pythonpath.yml
+  # Set PYTHONPATH based on OS
+  - ${{ if eq(variables['Agent.OS'], 'Windows_NT') }}:
+      - template: set-pythonpath-windows.yml
+  - ${{ else }}:
+      - template: set-pythonpath-linux.yml

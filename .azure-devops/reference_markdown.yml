@@ -25,7 +25,7 @@ jobs:
       - template: templates/build-publish-azure-iot-cli-extension.yml
       - template: templates/install-azure-cli-released.yml
       - template: templates/download-install-local-azure-iot-cli-extension.yml
-      - template: templates/set-pythonpath.yml
+      - template: templates/set-pythonpath-linux.yml
       - template: templates/generate-publish-help-documentation.yml
         parameters:
           rootCommand: ${{ parameters.rootCommand }}

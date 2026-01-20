@@ -1,0 +1,13 @@
+steps:
+  - task: PowerShell@2
+    displayName: "Set Extension Path (Windows)"
+    name: "setExtensionPath"
+    inputs:
+      targetType: "inline"
+      script: |
+        $extensionPath = Join-Path $env:USERPROFILE ".azure\cliextensions\azure-iot"
+        if (Test-Path $extensionPath) {
+          Write-Host "##vso[task.setvariable variable=PYTHONPATH;]$extensionPath"
+        } else {
+          Write-Host "##vso[task.logissue type=warning]Extension path not found at $extensionPath"
+        }

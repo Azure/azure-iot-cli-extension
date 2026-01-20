@@ -120,7 +120,10 @@ stages:
       pythonVersions: ${{ parameters.pythonVersionsTestingMatrix }}
     condition: succeeded()
     pool:
-      vmImage: ${{ parameters.testAgentVmImage }}
+      ${{ if eq(parameters.azureCLIVersion, 'msi') }}:
+        vmImage: 'windows-2025'
+      ${{ else }}:
+        vmImage: ${{ parameters.testAgentVmImage }}
     jobs:
       - template: templates/trigger-tests.yml
         parameters:
@@ -136,6 +139,8 @@ stages:
           maxParallelADU: 4
       - job: "evaluateCmdTable"
         displayName: "Evaluate Command Table"
+        pool:
+          vmImage: ${{ parameters.testAgentVmImage }}
         steps:
           - template: templates/evaluate-command-table.yml
   - stage: "smokeTest"
@@ -145,7 +150,10 @@ stages:
       pythonVersions: ${{ parameters.pythonVersionsTestingMatrix }}
     condition: succeeded()
     pool:
-      vmImage: ${{ parameters.testAgentVmImage }}
+      ${{ if eq(parameters.azureCLIVersion, 'msi') }}:
+        vmImage: 'windows-2025'
+      ${{ else }}:
+        vmImage: ${{ parameters.testAgentVmImage }}
     jobs:
       - template: templates/smoke-tests.yml
         parameters:
