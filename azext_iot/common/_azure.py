@@ -23,17 +23,6 @@ def _parse_connection_string(cs, validate=None, cstring_type="entity"):
                         cstring_type, k
                     )
                 )
-        # Validate SharedAccessKey is valid Base64 if present and validation is requested
-        # Skip validation for redacted values (e.g., "****" or "***")
-        if "SharedAccessKey" in validate:
-            import base64
-            key = decomposed.get("SharedAccessKey")
-            # Only validate if key exists and doesn't look like a redacted value
-            if key and not (set(key) <= {'*'}):
-                try:
-                    base64.b64decode(key, validate=True)
-                except Exception as e:
-                    raise ValueError(f"{cstring_type} connection string has invalid SharedAccessKey (not valid Base64): {e}")
 
     return decomposed
 
