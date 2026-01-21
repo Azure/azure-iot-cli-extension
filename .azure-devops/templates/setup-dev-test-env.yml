@@ -26,8 +26,4 @@ steps:
 
   - template: download-install-local-azure-iot-cli-extension.yml
 
-  # Set PYTHONPATH based on OS
-  - ${{ if eq(variables['Agent.OS'], 'Windows_NT') }}:
-      - template: set-pythonpath-windows.yml
-  - ${{ else }}:
-      - template: set-pythonpath-linux.yml
+  - template: set-pythonpath.yml

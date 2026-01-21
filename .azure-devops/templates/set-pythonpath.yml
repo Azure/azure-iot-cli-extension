@@ -1,0 +1,24 @@
+steps:
+  - task: PowerShell@2
+    displayName: "Set Extension Path (Windows)"
+    condition: eq(variables['Agent.OS'], 'Windows_NT')
+    inputs:
+      targetType: "inline"
+      script: |
+        $extensionPath = Join-Path $env:USERPROFILE ".azure\cliextensions\azure-iot"
+        if (Test-Path $extensionPath) {
+          Write-Host "##vso[task.setvariable variable=PYTHONPATH;]$extensionPath"
+        } else {
+          Write-Host "##vso[task.logissue type=warning]Extension path not found at $extensionPath"
+        }
+
+  - task: PythonScript@0
+    displayName: "Set Extension Path (Linux/macOS)"
+    condition: ne(variables['Agent.OS'], 'Windows_NT')
+    inputs:
+      scriptSource: "inline"
+      script: |
+        from azure.cli.core.extension import get_extension_path
+        extension_path = get_extension_path("azure-iot")
+        print("Extension path is " + extension_path)
+        print("##vso[task.setvariable variable=PYTHONPATH;]"+extension_path)
