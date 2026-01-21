@@ -5,11 +5,12 @@ steps:
     inputs:
       targetType: "inline"
       script: |
-        $extensionPath = Join-Path $env:USERPROFILE ".azure\cliextensions\azure-iot"
-        if (Test-Path $extensionPath) {
+        $extensionPath = az extension show -n azure-iot --query path -o tsv
+        if ($extensionPath) {
+          Write-Host "Extension path is $extensionPath"
           Write-Host "##vso[task.setvariable variable=PYTHONPATH;]$extensionPath"
         } else {
-          Write-Host "##vso[task.logissue type=warning]Extension path not found at $extensionPath"
+          Write-Host "##vso[task.logissue type=warning]Extension path not found"
         }
 
   - task: PythonScript@0
