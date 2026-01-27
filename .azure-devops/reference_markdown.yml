@@ -22,7 +22,6 @@ jobs:
 
     steps:
       - template: templates/setup-python.yml
-      - template: templates/install-dev-requirements.yml
       - template: templates/build-publish-azure-iot-cli-extension.yml
       - template: templates/install-azure-cli-released.yml
       - template: templates/download-install-local-azure-iot-cli-extension.yml

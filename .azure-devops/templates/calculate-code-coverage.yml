@@ -6,7 +6,6 @@ steps:
   - template: setup-python.yml
     parameters:
       pythonVersion: ${{ parameters.pythonVersion }}
-  - template: install-dev-requirements.yml
 
   - task: DownloadBuildArtifacts@0
     displayName: "Download code coverage KPIs"
