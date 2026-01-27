@@ -35,6 +35,7 @@ jobs:
 
     steps:
       - template: templates/setup-python.yml
+      - template: templates/install-dev-requirements.yml
       - template: templates/build-publish-azure-iot-cli-extension.yml
 
   - job: "build_and_publish_azure_cli_test_sdk"
@@ -43,6 +44,7 @@ jobs:
 
     steps:
       - template: templates/setup-python.yml
+      - template: templates/install-dev-requirements.yml
       - template: templates/build-publish-azure-cli-test-sdk.yml
 
   - job: "run_unit_tests_ubuntu"

@@ -85,6 +85,7 @@ stages:
           - template: templates/setup-python.yml
             parameters:
               pythonVersion: ${{ parameters.pythonVersion }}
+          - template: templates/install-dev-requirements.yml
           - template: templates/build-publish-azure-iot-cli-extension.yml
 
       - job: "Build_Publish_Azure_CLI_Test_SDK"
@@ -92,6 +93,7 @@ stages:
           - template: templates/setup-python.yml
             parameters:
               pythonVersion: ${{ parameters.pythonVersion }}
+          - template: templates/install-dev-requirements.yml
           - template: templates/build-publish-azure-cli-test-sdk.yml
 
       - job: "recordVersion"
