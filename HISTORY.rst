@@ -3,6 +3,18 @@
 Release History
 ===============
 
+0.28.0
++++++++++++++++
+
+**General updates**
+
+* **[Breaking Change]** Replaced `uamqp` dependency with `azure-eventhub` (PyAMQP). This change removes the need to install the `uamqp` Cython package.
+
+  * The `--repair` / `-r` argument for `az iot hub monitor-events` and related commands is now deprecated and has no effect.
+  * Commands affected: `az iot hub monitor-events`, `az iot hub monitor-feedback`, `az iot device c2d-message send`, `az iot central diagnostics monitor-events`
+
+* Added `azure-eventhub~=5.15.0` as a required dependency.
+
 0.27.0
 +++++++++++++++
 
