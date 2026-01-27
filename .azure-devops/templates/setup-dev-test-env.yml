@@ -20,10 +20,12 @@ steps:
   - ${{ elseif eq(parameters.azureCLIVersion, 'released') }}:
       - template: install-azure-cli-released.yml
   - ${{ else }}:
-      - template: install-azure-cli-msi.yml
+      - template: verify-azure-cli-msi.yml
 
   - template: download-install-local-azure-test-sdk.yml
 
   - template: download-install-local-azure-iot-cli-extension.yml
 
   - template: set-pythonpath.yml
+
+  - template: install-dev-requirements.yml
