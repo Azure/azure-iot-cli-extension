@@ -27,7 +27,7 @@ jobs:
           - template: install-azure-cli-released.yml
 
       - ${{ if eq(parameters.azureCLIVersion, 'msi') }}:
-          - template: verify-azure-cli-msi.yml
+          - template: install-azure-cli-msi.yml
 
       - template: download-install-local-azure-iot-cli-extension.yml
 
