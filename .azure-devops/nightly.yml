@@ -22,6 +22,9 @@ parameters:
     values:
       - "ubuntu-24.04"
       - "ubuntu-latest"
+  - name: windowsImage
+    type: string
+    default: "windows-2025"
   - name: pythonVersion
     displayName: "Python version for building wheel, KPIs"
     type: string
@@ -129,7 +132,7 @@ stages:
   - stage: "test_msi"
     displayName: "Run all tests against Windows MSI install"
     pool:
-      vmImage: "windows-2025"
+      vmImage: ${{ parameters.windowsImage }}
     dependsOn: [build, test_min]
     variables:
       pythonVersions: $[variables['msiTestingMatrix']]
@@ -163,7 +166,7 @@ stages:
       pythonVersions: $[variables['msiTestingMatrix']]
     condition: succeeded()
     pool:
-      vmImage: "windows-2025"
+      vmImage: ${{ parameters.windowsImage }}
     jobs:
       - template: templates/smoke-tests.yml
         parameters:
