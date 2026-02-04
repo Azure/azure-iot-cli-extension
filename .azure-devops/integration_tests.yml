@@ -13,6 +13,9 @@ parameters:
     values:
       - "ubuntu-24.04"
       - "ubuntu-latest"
+  - name: windowsAgentVmImage
+    type: string
+    default: "windows-2025"
   - name: pythonVersion
     displayName: "Python version for building wheels, KPIs"
     type: string
@@ -121,7 +124,7 @@ stages:
     condition: succeeded()
     pool:
       ${{ if eq(parameters.azureCLIVersion, 'msi') }}:
-        vmImage: 'windows-2025'
+        vmImage: ${{ parameters.windowsAgentVmImage }}
       ${{ else }}:
         vmImage: ${{ parameters.testAgentVmImage }}
     jobs:
@@ -151,7 +154,7 @@ stages:
     condition: succeeded()
     pool:
       ${{ if eq(parameters.azureCLIVersion, 'msi') }}:
-        vmImage: 'windows-2025'
+        vmImage: ${{ parameters.windowsAgentVmImage }}
       ${{ else }}:
         vmImage: ${{ parameters.testAgentVmImage }}
     jobs:

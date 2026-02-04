@@ -27,6 +27,9 @@ parameters:
     values:
       - "ubuntu-24.04"
       - "ubuntu-latest"
+  - name: windowsImage
+    type: string
+    default: "windows-2025"
 
 jobs:
   - job: "build_and_publish_azure_iot_cli_ext"
@@ -98,7 +101,7 @@ jobs:
         "build_and_publish_azure_cli_test_sdk",
       ]
     pool:
-      vmImage: "windows-2025"
+      vmImage: ${{ parameters.windowsImage }}
 
     steps:
       - task: PowerShell@2
@@ -147,7 +150,7 @@ jobs:
   - job: CredScan
     displayName: "Credential Scan"
     pool:
-      vmImage: "windows-2025"
+      vmImage: ${{ parameters.windowsImage }}
 
     steps:
       - task: CredScan@3
