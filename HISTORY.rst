@@ -3,6 +3,13 @@
 Release History
 ===============
 
+0.28.1
++++++++++++++++
+
+**General updates**
+
+* Updated ``azure-iot-device`` dependency to ``>=2.15.0rc1,<3.0.0dev0`` for Windows platform compatibility.
+
 0.28.0
 +++++++++++++++
 
