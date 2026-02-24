@@ -230,8 +230,7 @@ def load_iothub_help():
         type: command
         short-summary: Send a cloud-to-device message.
         long-summary: |
-                      This command relies on and may install dependent Cython package (uamqp) upon first execution.
-                      https://github.com/Azure/azure-uamqp-python
+                      Send a cloud-to-device message via AMQP to a target device.
 
                       Note: Content-encoding is defaulted to utf-8. The command will send the message body
                       with encoding action when the content-encoding property is either utf-8, utf-16 or

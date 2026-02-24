@@ -6,7 +6,6 @@
 
 import json
 import os
-import uamqp
 import yaml
 
 from typing import Optional, Tuple, Union
@@ -15,8 +14,13 @@ from knack.log import get_logger
 from azext_iot.constants import USER_AGENT
 from azext_iot.common.shared import AuthenticationTypeDataplane
 from azext_iot.common.utility import shell_safe_json_parse
-from azext_iot.monitor.builders.hub_target_builder import AmqpBuilder
-from uamqp.authentication import JWTTokenAuth
+
+# Use pyamqp for C2D send and feedback monitoring
+from azure.eventhub._pyamqp import ReceiveClient as PyAMQPReceiveClient, SendClient as PyAMQPSendClient
+from azure.eventhub._pyamqp.authentication import JWTTokenAuth as PyAMQPJWTTokenAuth
+from azure.eventhub._pyamqp.authentication import _CBSAuth as PyAMQPCBSAuth
+from azure.eventhub._pyamqp.message import Message as PyAMQPMessage
+from azure.eventhub._pyamqp.error import AMQPLinkError, AMQPConnectionError
 
 # To provide amqp frame trace
 DEBUG = False
@@ -44,26 +48,29 @@ def send_c2d_message(
 
     app_props["iothub-ack"] = ack if ack else "none"
 
-    msg_props = uamqp.message.MessageProperties()
-    msg_props.to = "/devices/{}/messages/devicebound".format(device_id)
+    # Build PyAMQP message properties (Properties is immutable, set all at creation)
+    from azure.eventhub._pyamqp.message import Properties
 
     target_msg_id = message_id if message_id else str(uuid4())
-    msg_props.message_id = target_msg_id
+
+    # Only include non-None properties
+    props_kwargs = {
+        "to": "/devices/{}/messages/devicebound".format(device_id),
+        "message_id": target_msg_id,
+    }
 
     if correlation_id:
-        msg_props.correlation_id = correlation_id
-
+        props_kwargs["correlation_id"] = correlation_id
     if user_id:
-        msg_props.user_id = user_id
-
+        props_kwargs["user_id"] = user_id
     if content_type:
-        msg_props.content_type = content_type
-
+        props_kwargs["content_type"] = content_type
     if content_encoding:
-        msg_props.content_encoding = content_encoding
-
+        props_kwargs["content_encoding"] = content_encoding
     if expiry_time_utc:
-        msg_props.absolute_expiry_time = int(expiry_time_utc)
+        props_kwargs["absolute_expiry_time"] = int(expiry_time_utc)
+
+    msg_props = Properties(**props_kwargs)
 
     content_type = content_type.lower() if content_type else ""
 
@@ -90,30 +97,44 @@ def send_c2d_message(
     else:
         msg_body = data
 
-    message = uamqp.Message(
-        body=msg_body, properties=msg_props, application_properties=app_props
+    # Create PyAMQP message - use 'data' parameter (list of byte arrays)
+    message = PyAMQPMessage(
+        data=[msg_body] if isinstance(msg_body, bytes) else [msg_body.encode('utf-8')],
+        properties=msg_props,
+        application_properties=app_props
     )
 
     operation = "/messages/devicebound"
-    endpoint_target, token_auth = _get_endpoint_and_token_auth(
+    endpoint_target, token_auth = _get_endpoint_and_token_auth_pyamqp(
         target=target, operation=operation
     )
 
-    client = uamqp.SendClient(
+    client = PyAMQPSendClient(
+        hostname=target['entity'],
         target=endpoint_target,
         auth=token_auth,
-        client_name=_get_container_id(),
-        debug=DEBUG,
+        network_trace=DEBUG,
+        container_id=_get_container_id(),
     )
-    client.queue_message(message)
-    result = client.send_all_messages()
-    errors = [m for m in result if m == uamqp.constants.MessageState.SendFailed]
+
+    try:
+        client.open()
+        client.send_message(message, timeout=10)
+        errors = []
+    except Exception as e:
+        logger.error(f"Failed to send C2D message: {e}")
+        errors = [str(e)]
+    finally:
+        client.close()
+
     return target_msg_id, errors
 
 
 def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
     def handle_msg(msg):
-        payload = next(msg.get_data())
+        # PyAMQP message has 'data' property
+        # The data can be a list of data sections, so we get the first one
+        payload = msg.data[0] if isinstance(msg.data, list) and msg.data else msg.data
         if isinstance(payload, bytes):
             payload = str(payload, "utf8")
         # assume json [] based on spec
@@ -133,8 +154,8 @@ def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
         return None
 
     operation = "/messages/servicebound/feedback"
-    endpoint_target, token_auth = _get_endpoint_and_token_auth(
-        target=target, operation=operation
+    endpoint_target, token_auth = _get_endpoint_and_token_auth_pyamqp(
+        target=target, operation=operation, token_duration=token_duration
     )
     device_filter_txt = None
     if device_id:
@@ -145,57 +166,116 @@ def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
     )
 
     try:
-        client = uamqp.ReceiveClient(
+        client = PyAMQPReceiveClient(
+            hostname=target['entity'],
             source=endpoint_target,
             auth=token_auth,
             client_name=_get_container_id(),
-            debug=DEBUG,
+            network_trace=DEBUG,
         )
+        client.open()
         message_generator = client.receive_messages_iter()
-        for msg in message_generator:
+        for msg_tuple in message_generator:
+            # PyAMQP returns (frame, message) tuples from _received_messages queue
+            # frame is a TransferFrame NamedTuple with delivery_id and delivery_tag
+            if isinstance(msg_tuple, tuple) and len(msg_tuple) == 2:
+                frame, msg = msg_tuple
+            else:
+                # Fallback for when only message is returned
+                frame, msg = None, msg_tuple
+
             match = handle_msg(msg)
             if match:
                 logger.info("Requested message Id has been matched...")
-                msg.accept()
+                if frame and hasattr(frame, 'delivery_id') and hasattr(frame, 'delivery_tag'):
+                    client.settle_messages(frame.delivery_id, frame.delivery_tag, 'accepted')
+                else:
+                    # If no frame info, message is auto-settled by PyAMQP
+                    logger.debug("No frame delivery info available for settlement")
                 return match
-    except uamqp.errors.AMQPConnectionError:
-        logger.debug("AMQPS connection has expired...")
+    except KeyboardInterrupt:
+        logger.info("Stopping C2D feedback monitor...")
+    except AMQPLinkError as e:
+        # Link detachment is expected when device disconnects or service closes the connection
+        error_condition = getattr(e, 'condition', None)
+        if error_condition and 'detach' in str(error_condition).lower():
+            logger.info("Feedback monitoring ended - link detached by service")
+        else:
+            logger.warning(f"AMQP link error during feedback monitoring: {e}")
+    except AMQPConnectionError as e:
+        # Connection errors can occur due to transient network issues or server-side disconnects
+        logger.warning(f"AMQP connection error during feedback monitoring: {e}")
+        # Don't re-raise - this is often a transient issue that shouldn't fail the operation
+    except Exception as e:
+        logger.error(f"Error in feedback monitoring: {e}", exc_info=True)
+        raise
     finally:
-        client.close()
+        try:
+            client.close()
+        except Exception:
+            pass
 
 
 def _get_container_id():
     return "{}/{}".format(USER_AGENT, str(uuid4()))
 
 
-def _get_endpoint_and_token_auth(
-    target: dict, operation: str
-) -> Tuple[str, Union[JWTTokenAuth, None]]:
+def _get_endpoint_and_token_auth_pyamqp(
+    target: dict, operation: str, token_duration: int = 3600
+) -> Tuple[str, Union[PyAMQPJWTTokenAuth, PyAMQPCBSAuth, None]]:
+    """
+    Get endpoint and authentication for pyamqp.
+
+    Note: IoT Hub requires SAS tokens with base64-decoded keys for HMAC signature,
+    but PyAMQP's SASTokenAuth uses raw UTF-8 encoded keys (Event Hub/Service Bus style).
+    We generate IoT Hub-compatible SAS tokens using SasTokenAuthentication and pass via CBS auth.
+    """
     from azext_iot.constants import IOTHUB_RESOURCE_ID
+    from azext_iot.common.sas_token_auth import SasTokenAuthentication
     from time import time
     from collections import namedtuple
 
     AccessToken = namedtuple("AccessToken", ["token", "expires_on"])
+    endpoint_with_op = operation  # pyamqp uses relative path
+    auth = None
 
-    def token_provider():
-        from azure.cli.core._profile import Profile
-        profile = Profile(cli_ctx=target["cmd"].cli_ctx)
-        creds, _, _ = profile.get_raw_token(resource=IOTHUB_RESOURCE_ID)
-        access_token = AccessToken(f"{creds[0]} {creds[1]}", time() + 3599)
-        return access_token
-
-    endpoint_with_op = None
-    jwt_token_auth = None
     if target["policy"] == AuthenticationTypeDataplane.login.value:
-        endpoint_with_op = f"amqps://{target['entity']}{operation}"
-        jwt_token_auth = JWTTokenAuth(
-            audience=IOTHUB_RESOURCE_ID,
-            uri=endpoint_with_op,
-            get_token=token_provider,
-            token_type=b"Bearer",
-        )
-        jwt_token_auth.update_token()  # Work-around for uamqp error.
-    else:
-        endpoint_with_op = f"amqps://{AmqpBuilder.build_iothub_amqp_endpoint_from_target(target)}{operation}"
+        # Use JWT token auth for AAD login
+        def token_provider():
+            from azure.cli.core._profile import Profile
+            profile = Profile(cli_ctx=target["cmd"].cli_ctx)
+            creds, _, _ = profile.get_raw_token(resource=IOTHUB_RESOURCE_ID)
+            access_token = AccessToken(f"{creds[0]} {creds[1]}", time() + 3599)
+            return access_token
 
-    return endpoint_with_op, jwt_token_auth
+        auth = PyAMQPJWTTokenAuth(
+            audience=IOTHUB_RESOURCE_ID,
+            uri=f"amqps://{target['entity']}{operation}",
+            get_token=token_provider,
+            token_type=b"Bearer"
+        )
+    else:
+        # Generate IoT Hub-compatible SAS token using our SasTokenAuthentication
+        # which correctly uses base64-decoded keys for HMAC (unlike PyAMQP's generate_sas_token)
+        sas_generator = SasTokenAuthentication(
+            uri=target['entity'],
+            shared_access_policy_name=target['policy'],
+            shared_access_key=target['primarykey'],
+            expiry=token_duration
+        )
+
+        def sas_token_provider():
+            # Generate SAS token and return as AccessToken
+            token = sas_generator.generate_sas_token()
+            return AccessToken(token, time() + token_duration)
+
+        # Use CBS authentication with our pre-generated SAS token
+        auth = PyAMQPCBSAuth(
+            uri=f"amqps://{target['entity']}{operation}",
+            audience=target['entity'],
+            token_type=b"servicebus.windows.net:sastoken",
+            get_token=sas_token_provider,
+            expires_in=token_duration
+        )
+
+    return endpoint_with_op, auth

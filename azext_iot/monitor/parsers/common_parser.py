@@ -7,11 +7,11 @@
 import json
 import re
 from azext_iot.iothub.common import NON_DECODABLE_PAYLOAD
-from azext_iot.monitor.utility import unicode_decode
+from azext_iot.monitor.utility import unicode_decode, extract_message_body
 
-from uamqp.message import Message
+from azure.eventhub import EventData
 
-from azext_iot.common.utility import parse_entity, unicode_binary_map
+from azext_iot.common.utility import unicode_binary_map
 from azext_iot.monitor.base_classes import AbstractBaseParser
 from azext_iot.monitor.parsers import strings
 from azext_iot.monitor.models.arguments import CommonParserArguments
@@ -26,7 +26,7 @@ COMPONENT_NAME_IDENTIFIER = b"dt-subject"
 
 
 class CommonParser(AbstractBaseParser):
-    def __init__(self, message: Message, common_parser_args: CommonParserArguments):
+    def __init__(self, message: EventData, common_parser_args: CommonParserArguments):
         self.issues_handler = IssueHandler()
         self._common_parser_args = common_parser_args
         self._message = message
@@ -68,8 +68,8 @@ class CommonParser(AbstractBaseParser):
             annotations = self._parse_annotations(message)
             event["annotations"] = annotations
 
-        if system_properties and ("sys" in properties or "all" in properties):
-            event["properties"]["system"] = system_properties
+        if "sys" in properties or "all" in properties:
+            event["properties"]["system"] = system_properties if system_properties else {}
 
         if "app" in properties or "all" in properties:
             application_properties = self._parse_application_properties(message)
@@ -91,51 +91,63 @@ class CommonParser(AbstractBaseParser):
             device_id=self.device_id,
         )
 
-    def _parse_device_id(self, message: Message) -> str:
+    def _parse_device_id(self, message: EventData) -> str:
         try:
-            return str(message.annotations.get(DEVICE_ID_IDENTIFIER), "utf8")
+            sys_props = message.system_properties or {}
+            return str(sys_props.get(DEVICE_ID_IDENTIFIER), "utf8")
         except Exception:
             details = strings.unknown_device_id()
             self._add_issue(severity=Severity.error, details=details)
             return ""
 
-    def _parse_module_id(self, message: Message) -> str:
+    def _parse_module_id(self, message: EventData) -> str:
         try:
-            return str(message.annotations.get(MODULE_ID_IDENTIFIER), "utf8")
+            sys_props = message.system_properties or {}
+            return str(sys_props.get(MODULE_ID_IDENTIFIER), "utf8")
         except Exception:
             # a message not containing an module name is expected for non-edge devices
             # so there's no "issue" to log here
             return ""
 
-    def _parse_interface_name(self, message: Message) -> str:
+    def _parse_interface_name(self, message: EventData) -> str:
         try:
             # Grab either the DTDL v1 or v2 amqp interface identifier.
             # It's highly unlikely both will be present at the same time
             # as they reflect different versions of a Plug & Play device.
-            target_interface = message.annotations.get(
+            sys_props = message.system_properties or {}
+            target_interface = sys_props.get(
                 INTERFACE_NAME_IDENTIFIER_V1
-            ) or message.annotations.get(INTERFACE_NAME_IDENTIFIER_V2)
+            ) or sys_props.get(INTERFACE_NAME_IDENTIFIER_V2)
             return str(target_interface, "utf8")
         except Exception:
             # a message not containing an interface name is expected for non-pnp devices
             # so there's no "issue" to log here
             return ""
 
-    def _parse_component_name(self, message: Message) -> str:
+    def _parse_component_name(self, message: EventData) -> str:
         try:
             return str(message.annotations.get(COMPONENT_NAME_IDENTIFIER), "utf8")
         except Exception:
             return ""
 
-    def _parse_system_properties(self, message: Message):
+    def _parse_system_properties(self, message: EventData):
         try:
-            return unicode_binary_map(parse_entity(message.properties, True))
+            sys_props = message.system_properties or {}
+            # Extract content-type and content-encoding with various key formats
+            result = {}
+            for key, value in sys_props.items():
+                # Skip keys that go in annotations
+                if key in [b'content-type', 'content-type', b'content_type', 'content_type']:
+                    result['content_type'] = value
+                elif key in [b'content-encoding', 'content-encoding', b'content_encoding', 'content_encoding']:
+                    result['content_encoding'] = value
+            return unicode_binary_map(result)
         except Exception:
             details = strings.invalid_system_properties()
             self._add_issue(severity=Severity.warning, details=details)
             return {}
 
-    def _parse_content_encoding(self, message: Message, system_properties) -> str:
+    def _parse_content_encoding(self, message: EventData, system_properties) -> str:
         content_encoding = ""
 
         if "content_encoding" in system_properties:
@@ -175,25 +187,36 @@ class CommonParser(AbstractBaseParser):
 
         return actual_content_type
 
-    def _parse_annotations(self, message: Message):
+    def _parse_annotations(self, message: EventData):
         try:
-            return unicode_binary_map(message.annotations)
+            sys_props = message.system_properties or {}
+            # Filter out content-type/encoding from annotations
+            annotations = {k: v for k, v in sys_props.items()
+                           if k not in [b'content-type', b'content-encoding',
+                                        'content-type', 'content-encoding',
+                                        b'content_type', b'content_encoding',
+                                        'content_type', 'content_encoding']}
+            result = unicode_binary_map(annotations)
+            # Normalize keys: replace hyphens with underscores for consistent Python-friendly key format
+            normalized = {k.replace('-', '_'): v for k, v in result.items()}
+            return normalized
         except Exception:
             details = strings.invalid_annotations()
             self._add_issue(severity=Severity.warning, details=details)
             return {}
 
-    def _parse_application_properties(self, message: Message):
+    def _parse_application_properties(self, message: EventData):
         try:
-            return unicode_binary_map(message.application_properties)
+            return unicode_binary_map(message.properties or {})
         except Exception:
             details = strings.invalid_application_properties()
             self._add_issue(severity=Severity.warning, details=details)
             return {}
 
-    def _parse_payload(self, message: Message, content_type):
+    def _parse_payload(self, message: EventData, content_type):
         payload = ""
-        data = next(message.get_data())
+        # Materialize body from generator using utility function
+        data = extract_message_body(message)
 
         if data:
             payload = unicode_decode(data=data, default=NON_DECODABLE_PAYLOAD)

@@ -1,11 +1,13 @@
 steps:
-  - task: PythonScript@0
+  - task: Bash@3
     displayName: "Set Extension Path"
-    name: "setExtensionPath"
     inputs:
-      scriptSource: "inline"
+      targetType: "inline"
       script: |
-        from azure.cli.core.extension import get_extension_path
-        extension_path = get_extension_path("azure-iot")
-        print("Extension path is " + extension_path)
-        print("##vso[task.setvariable variable=PYTHONPATH;]"+extension_path)
+        extensionPath=$(az extension show -n azure-iot --query path -o tsv)
+        if [ -n "$extensionPath" ]; then
+          echo "Extension path is $extensionPath"
+          echo "##vso[task.setvariable variable=PYTHONPATH;]$extensionPath"
+        else
+          echo "##vso[task.logissue type=warning]Extension path not found"
+        fi

@@ -9,7 +9,7 @@ import json
 import pytest
 
 from unittest import mock
-from uamqp.message import Message, MessageProperties
+from azure.eventhub import EventData
 from azext_iot.central.providers import (
     CentralDeviceProvider,
     CentralDeviceTemplateProvider,
@@ -26,6 +26,53 @@ from azext_iot.tests.test_constants import FileNames
 
 def _encode_app_props(app_props: dict):
     return {key.encode(): value.encode() for key, value in app_props.items()}
+
+
+def _create_event_data(
+    body,
+    content_type=None,
+    content_encoding=None,
+    annotations=None,
+    application_properties=None,
+):
+    """
+    Helper function to create EventData object that mimics structure expected by parsers.
+    The parsers expect:
+    - message.system_properties: dict with annotations (device_id, interface, etc.) and content-type/encoding
+    - message.properties: dict with application properties
+    - message.body: bytes or generator of payload
+    - message.get_data(): generator that yields body (for Issue class compatibility)
+    """
+    # Convert body to bytes if needed
+    if isinstance(body, str):
+        body_bytes = body.encode('utf-8')
+    else:
+        body_bytes = body
+
+    # Build system_properties (includes annotations and content-type/encoding)
+    system_props = dict(annotations) if annotations else {}
+    if content_type:
+        system_props['content-type'] = content_type
+        system_props['content_type'] = content_type
+    if content_encoding:
+        system_props['content-encoding'] = content_encoding
+        system_props['content_encoding'] = content_encoding
+
+    # Create mock with spec=EventData to catch access to non-existent attributes
+    mock_event = mock.Mock(spec=EventData)
+    mock_event.body = body_bytes
+    mock_event.system_properties = system_props
+    mock_event.properties = application_properties or {}
+    # For component_name parsing which still uses annotations
+    mock_event.annotations = system_props
+
+    # Configure get_data method - needs to be set up properly for spec
+    def get_data_generator():
+        yield body_bytes
+
+    mock_event.get_data = mock.Mock(return_value=get_data_generator())
+
+    return mock_event
 
 
 def _validate_issues(
@@ -152,18 +199,17 @@ class TestCommonParser:
         interface_identifier_bytes,
     ):
         # setup
-        properties = MessageProperties(
-            content_encoding=encoding, content_type=content_type
-        )
-        message = Message(
+        annotations = {
+            common_parser.DEVICE_ID_IDENTIFIER: device_id.encode(),
+            interface_identifier_bytes: interface_name.encode(),
+            common_parser.MODULE_ID_IDENTIFIER: module_id.encode(),
+            common_parser.COMPONENT_NAME_IDENTIFIER: component_name.encode(),
+        }
+        message = _create_event_data(
             body=json.dumps(payload).encode(),
-            properties=properties,
-            annotations={
-                common_parser.DEVICE_ID_IDENTIFIER: device_id.encode(),
-                interface_identifier_bytes: interface_name.encode(),
-                common_parser.MODULE_ID_IDENTIFIER: module_id.encode(),
-                common_parser.COMPONENT_NAME_IDENTIFIER: component_name.encode(),
-            },
+            content_type=content_type,
+            content_encoding=encoding,
+            annotations=annotations,
             application_properties=_encode_app_props(app_properties),
         )
         args = CommonParserArguments(properties=["all"], content_type=content_type)
@@ -175,9 +221,10 @@ class TestCommonParser:
         # verify
         assert parsed_msg["event"]["payload"] == payload
         assert parsed_msg["event"]["origin"] == device_id
-        device_identifier = str(common_parser.DEVICE_ID_IDENTIFIER, "utf8")
+        # Keys are normalized: hyphens replaced with underscores
+        device_identifier = str(common_parser.DEVICE_ID_IDENTIFIER, "utf8").replace("-", "_")
         assert parsed_msg["event"]["annotations"][device_identifier] == device_id
-        module_identifier = str(common_parser.MODULE_ID_IDENTIFIER, "utf8")
+        module_identifier = str(common_parser.MODULE_ID_IDENTIFIER, "utf8").replace("-", "_")
         if module_id:
             assert parsed_msg["event"]["annotations"][module_identifier] == module_id
         else:
@@ -191,14 +238,16 @@ class TestCommonParser:
         assert parsed_msg["event"]["component"] == component_name
 
         if interface_name:
-            interface_identifier = str(interface_identifier_bytes, "utf8")
+            # Keys are normalized: hyphens replaced with underscores
+            interface_identifier = str(interface_identifier_bytes, "utf8").replace("-", "_")
             assert (
                 parsed_msg["event"]["annotations"][interface_identifier]
                 == interface_name
             )
 
         if component_name:
-            component_identifier = str(common_parser.COMPONENT_NAME_IDENTIFIER, "utf8")
+            # Keys are normalized: hyphens replaced with underscores
+            component_identifier = str(common_parser.COMPONENT_NAME_IDENTIFIER, "utf8").replace("-", "_")
             assert (
                 parsed_msg["event"]["annotations"][component_identifier]
                 == component_name
@@ -209,11 +258,11 @@ class TestCommonParser:
     def test_parse_message_bad_content_type_should_warn(self):
         # setup
         encoded_payload = json.dumps(self.payload).encode()
-        properties = MessageProperties(content_type=self.bad_content_type)
-        message = Message(
+        annotations = {common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()}
+        message = _create_event_data(
             body=encoded_payload,
-            properties=properties,
-            annotations={common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
+            content_type=self.bad_content_type,
+            annotations=annotations,
         )
         args = CommonParserArguments(content_type="application/json")
         parser = common_parser.CommonParser(message=message, common_parser_args=args)
@@ -239,13 +288,12 @@ class TestCommonParser:
     def test_parse_bad_type_and_bad_payload_should_error(self):
         # setup
         encoded_payload = self.bad_payload.encode()
-        properties = MessageProperties(
-            content_type=self.bad_content_type, content_encoding=self.encoding
-        )
-        message = Message(
+        annotations = {common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()}
+        message = _create_event_data(
             body=encoded_payload,
-            properties=properties,
-            annotations={common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
+            content_type=self.bad_content_type,
+            content_encoding=self.encoding,
+            annotations=annotations,
         )
         args = CommonParserArguments(content_type="application/json")
         parser = common_parser.CommonParser(message=message, common_parser_args=args)
@@ -268,13 +316,12 @@ class TestCommonParser:
 
     def test_parse_message_bad_encoding_should_warn(self):
         # setup
-        properties = MessageProperties(
-            content_encoding=self.bad_encoding, content_type=self.content_type
-        )
-        message = Message(
+        annotations = {common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()}
+        message = _create_event_data(
             body=json.dumps(self.payload).encode(self.bad_encoding),
-            properties=properties,
-            annotations={common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
+            content_encoding=self.bad_encoding,
+            content_type=self.content_type,
+            annotations=annotations,
         )
         args = CommonParserArguments()
         parser = common_parser.CommonParser(message=message, common_parser_args=args)
@@ -287,13 +334,12 @@ class TestCommonParser:
 
     def test_parse_message_bad_json_should_fail(self):
         # setup
-        properties = MessageProperties(
-            content_encoding=self.encoding, content_type=self.content_type
-        )
-        message = Message(
+        annotations = {common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()}
+        message = _create_event_data(
             body=self.bad_payload.encode(),
-            properties=properties,
-            annotations={common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
+            content_encoding=self.encoding,
+            content_type=self.content_type,
+            annotations=annotations,
         )
         args = CommonParserArguments()
         parser = common_parser.CommonParser(message=message, common_parser_args=args)
@@ -329,13 +375,12 @@ class TestCentralParser:
         # setup
         device_template = self._get_template()
 
-        properties = MessageProperties(
-            content_encoding=self.encoding, content_type=self.content_type
-        )
-        message = Message(
+        annotations = {common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()}
+        message = _create_event_data(
             body=json.dumps(self.bad_field_name).encode(),
-            properties=properties,
-            annotations={common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
+            content_encoding=self.encoding,
+            content_type=self.content_type,
+            annotations=annotations,
         )
         args = CommonParserArguments()
         parser = self._create_parser(
@@ -366,13 +411,12 @@ class TestCentralParser:
         # setup
         device_template = self._get_template()
 
-        properties = MessageProperties(
-            content_encoding=self.encoding, content_type=self.content_type
-        )
-        message = Message(
+        annotations = {common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()}
+        message = _create_event_data(
             body=json.dumps(self.bad_dcm_payload).encode(),
-            properties=properties,
-            annotations={common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
+            content_encoding=self.encoding,
+            content_type=self.content_type,
+            annotations=annotations,
             application_properties=_encode_app_props(self.app_properties),
         )
         args = CommonParserArguments(properties=["all"])
@@ -386,7 +430,7 @@ class TestCentralParser:
         # verify
         assert parsed_msg["event"]["payload"] == self.bad_dcm_payload
         assert parsed_msg["event"]["origin"] == self.device_id
-        device_identifier = str(common_parser.DEVICE_ID_IDENTIFIER, "utf8")
+        device_identifier = str(common_parser.DEVICE_ID_IDENTIFIER, "utf8").replace("-", "_")
         assert parsed_msg["event"]["annotations"][device_identifier] == self.device_id
 
         properties = parsed_msg["event"]["properties"]
@@ -404,16 +448,15 @@ class TestCentralParser:
         # setup
         device_template = self._get_template()
 
-        properties = MessageProperties(
-            content_encoding=self.encoding, content_type=self.content_type
-        )
-        message = Message(
+        annotations = {
+            common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode(),
+            common_parser.COMPONENT_NAME_IDENTIFIER: self.component_name.encode(),
+        }
+        message = _create_event_data(
             body=json.dumps(self.bad_dcm_payload).encode(),
-            properties=properties,
-            annotations={
-                common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode(),
-                common_parser.COMPONENT_NAME_IDENTIFIER: self.component_name.encode(),
-            },
+            content_encoding=self.encoding,
+            content_type=self.content_type,
+            annotations=annotations,
             application_properties=_encode_app_props(self.app_properties),
         )
         args = CommonParserArguments(properties=["all"])
@@ -427,9 +470,9 @@ class TestCentralParser:
         # verify
         assert parsed_msg["event"]["payload"] == self.bad_dcm_payload
         assert parsed_msg["event"]["origin"] == self.device_id
-        device_identifier = str(common_parser.DEVICE_ID_IDENTIFIER, "utf8")
+        device_identifier = str(common_parser.DEVICE_ID_IDENTIFIER, "utf8").replace("-", "_")
         assert parsed_msg["event"]["annotations"][device_identifier] == self.device_id
-        component_identifier = str(common_parser.COMPONENT_NAME_IDENTIFIER, "utf8")
+        component_identifier = str(common_parser.COMPONENT_NAME_IDENTIFIER, "utf8").replace("-", "_")
         assert (
             parsed_msg["event"]["annotations"][component_identifier]
             == self.component_name
@@ -449,16 +492,15 @@ class TestCentralParser:
             load_json(FileNames.central_property_validation_template_file)
         )
 
-        properties = MessageProperties(
-            content_encoding=self.encoding, content_type=self.content_type
-        )
-        message = Message(
+        annotations = {
+            common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode(),
+            common_parser.COMPONENT_NAME_IDENTIFIER: self.component_name.encode(),
+        }
+        message = _create_event_data(
             body=json.dumps(self.bad_dcm_payload).encode(),
-            properties=properties,
-            annotations={
-                common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode(),
-                common_parser.COMPONENT_NAME_IDENTIFIER: self.component_name.encode(),
-            },
+            content_encoding=self.encoding,
+            content_type=self.content_type,
+            annotations=annotations,
             application_properties=_encode_app_props(self.app_properties),
         )
         args = CommonParserArguments(properties=["all"])
@@ -472,9 +514,9 @@ class TestCentralParser:
         # verify
         assert parsed_msg["event"]["payload"] == self.bad_dcm_payload
         assert parsed_msg["event"]["origin"] == self.device_id
-        device_identifier = str(common_parser.DEVICE_ID_IDENTIFIER, "utf8")
+        device_identifier = str(common_parser.DEVICE_ID_IDENTIFIER, "utf8").replace("-", "_")
         assert parsed_msg["event"]["annotations"][device_identifier] == self.device_id
-        component_identifier = str(common_parser.COMPONENT_NAME_IDENTIFIER, "utf8")
+        component_identifier = str(common_parser.COMPONENT_NAME_IDENTIFIER, "utf8").replace("-", "_")
         assert (
             parsed_msg["event"]["annotations"][component_identifier]
             == self.component_name
@@ -496,18 +538,17 @@ class TestCentralParser:
             load_json(FileNames.central_property_validation_template_file)
         )
 
-        properties = MessageProperties(
-            content_encoding=self.encoding, content_type=self.content_type
-        )
-        message = Message(
+        annotations = {
+            common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode(),
+            common_parser.COMPONENT_NAME_IDENTIFIER: list(
+                device_template.components.keys()
+            )[1].encode(),
+        }
+        message = _create_event_data(
             body=json.dumps(self.bad_dcm_payload).encode(),
-            properties=properties,
-            annotations={
-                common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode(),
-                common_parser.COMPONENT_NAME_IDENTIFIER: list(
-                    device_template.components.keys()
-                )[1].encode(),
-            },
+            content_encoding=self.encoding,
+            content_type=self.content_type,
+            annotations=annotations,
             application_properties=_encode_app_props(self.app_properties),
         )
         args = CommonParserArguments(properties=["all"])
@@ -521,9 +562,9 @@ class TestCentralParser:
         # verify
         assert parsed_msg["event"]["payload"] == self.bad_dcm_payload
         assert parsed_msg["event"]["origin"] == self.device_id
-        device_identifier = str(common_parser.DEVICE_ID_IDENTIFIER, "utf8")
+        device_identifier = str(common_parser.DEVICE_ID_IDENTIFIER, "utf8").replace("-", "_")
         assert parsed_msg["event"]["annotations"][device_identifier] == self.device_id
-        component_identifier = str(common_parser.COMPONENT_NAME_IDENTIFIER, "utf8")
+        component_identifier = str(common_parser.COMPONENT_NAME_IDENTIFIER, "utf8").replace("-", "_")
         assert (
             parsed_msg["event"]["annotations"][component_identifier]
             == list(device_template.components.keys())[1]
@@ -544,13 +585,12 @@ class TestCentralParser:
         # setup
         device_template = "an_unparseable_template"
 
-        properties = MessageProperties(
-            content_encoding=self.encoding, content_type=self.content_type
-        )
-        message = Message(
+        annotations = {common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()}
+        message = _create_event_data(
             body=json.dumps(self.bad_dcm_payload).encode(),
-            properties=properties,
-            annotations={common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
+            content_encoding=self.encoding,
+            content_type=self.content_type,
+            annotations=annotations,
             application_properties=_encode_app_props(self.app_properties),
         )
         args = CommonParserArguments(properties=["all"])
@@ -580,13 +620,12 @@ class TestCentralParser:
         # setup
         device_template = self._get_template()
 
-        properties = MessageProperties(
-            content_encoding=self.encoding, content_type=self.content_type
-        )
-        message = Message(
+        annotations = {common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()}
+        message = _create_event_data(
             body=json.dumps(self.type_mismatch_payload).encode(),
-            properties=properties,
-            annotations={common_parser.DEVICE_ID_IDENTIFIER: self.device_id.encode()},
+            content_encoding=self.encoding,
+            content_type=self.content_type,
+            annotations=annotations,
             application_properties=_encode_app_props(self.app_properties),
         )
         args = CommonParserArguments(properties=["all"])
@@ -616,7 +655,7 @@ class TestCentralParser:
     def _create_parser(
         self,
         device_template: TemplatePreview,
-        message: Message,
+        message: EventData,
         args: CommonParserArguments,
     ):
         device_provider = CentralDeviceProvider(

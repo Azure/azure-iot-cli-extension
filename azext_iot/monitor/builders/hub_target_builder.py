@@ -5,16 +5,15 @@
 # --------------------------------------------------------------------------------------------
 
 import asyncio
-import uamqp
 
 from azure.cli.core.azclierror import CLIInternalError
+from azure.eventhub.aio import EventHubConsumerClient
+from knack.log import get_logger
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
-from azext_iot.common.utility import parse_entity, unicode_binary_map, url_encode_str
-from azext_iot.monitor.builders._common import query_meta_data
+from azext_iot.common.utility import url_encode_str
 from azext_iot.monitor.models.target import Target
 
-# To provide amqp frame trace
-DEBUG = False
+logger = get_logger(__name__)
 
 
 class AmqpBuilder:
@@ -40,72 +39,176 @@ class EventTargetBuilder:
             self._build_iot_hub_target_async(target)
         )
 
-    def _build_auth_container(self, target):
-        sas_uri = "sb://{}/{}".format(
-            target["events"]["endpoint"], target["events"]["path"]
-        )
-        return uamqp.authentication.SASTokenAsync.from_shared_access_key(
-            sas_uri, target["policy"], target["primarykey"]
-        )
-
-    async def _evaluate_redirect(self, endpoint):
-        source = uamqp.address.Source(
-            "amqps://{}/messages/events/$management".format(endpoint)
-        )
-        receive_client = uamqp.ReceiveClientAsync(
-            source, timeout=30000, prefetch=1, debug=DEBUG
-        )
-
-        try:
-            await receive_client.open_async()
-            await receive_client.receive_message_batch_async(max_batch_size=1)
-        except uamqp.errors.LinkRedirect as redirect:
-            redirect = unicode_binary_map(parse_entity(redirect))
-            result = {}
-            result["events"] = {}
-            result["events"]["endpoint"] = redirect["hostname"]
-            result["events"]["path"] = (
-                redirect["address"].replace("amqps://", "").split("/")[1]
-            )
-            result["events"]["address"] = redirect["address"]
-            return redirect, result
-        finally:
-            await receive_client.close_async()
-
     async def _build_iot_hub_target_async(self, target):
-        endpoint = AmqpBuilder.build_iothub_amqp_endpoint_from_target(target)
+        # If events metadata not provided, attempt to discover it via AMQP redirect
         if "events" not in target:
-            _, link_redirect_events = await self._evaluate_redirect(endpoint)
-            target.update(link_redirect_events)
+            event_info = await self._evaluate_redirect(target)
+            if event_info:
+                target["events"] = event_info
+            else:
+                raise CLIInternalError(
+                    f"Unable to discover Event Hub endpoint for '{target['entity']}'. "
+                    "Ensure the IoT Hub connection string is valid or provide hub name with "
+                    "--hub-name to use Azure Resource Manager discovery."
+                )
+
         endpoint = target["events"]["endpoint"]
         path = target["events"]["path"]
-        auth = self._build_auth_container(target)
         partition_ids = target["events"].get("partition_ids", [])
         partition_count = target["events"].get("partition_count", 0)
+
+        # Store policy and key for credential generation at usage time
+        policy = target["policy"]
+        key = target["primarykey"]
+
         if partition_ids:
-            return Target(hostname=endpoint, path=path, partitions=partition_ids, auth=auth)
+            return Target(
+                hostname=endpoint, path=path, partitions=partition_ids,
+                policy=policy, key=key
+            )
         if partition_count:
             for i in range(int(partition_count)):
                 partition_ids.append(str(i))
-            return Target(hostname=endpoint, path=path, partitions=partition_ids, auth=auth)
-        meta_data = await query_meta_data(
-            address=target["events"]["address"],
-            path=target["events"]["path"],
-            auth=auth,
-        )
-        # Re-make auth container otherwise ValueError: The supplied authentication
-        # has already been consumed by another connection.
-        auth = self._build_auth_container(target)
-        if meta_data:
-            amqp_partition_ids = [partition.decode("utf-8") for partition in meta_data.get(b"partition_ids", [])]
-            amqp_partition_count = meta_data.get(b"partition_count", 0)
-            if amqp_partition_ids:
-                return Target(hostname=endpoint, path=path, partitions=amqp_partition_ids, auth=auth)
-            if amqp_partition_count:
-                for i in range(int(amqp_partition_count)):
-                    amqp_partition_ids.append(str(i))
-                return Target(hostname=endpoint, path=path, partitions=amqp_partition_ids, auth=auth)
+            return Target(
+                hostname=endpoint, path=path, partitions=partition_ids,
+                policy=policy, key=key
+            )
 
-        raise CLIInternalError(
-            f"Unable to determine partitions for '{target['entity'].split('.')[0]}'."
+        # Query partition metadata using azure-eventhub
+        connection_str = (
+            f"Endpoint=sb://{endpoint}/;"
+            f"SharedAccessKeyName={policy};"
+            f"SharedAccessKey={key};"
+            f"EntityPath={path}"
         )
+        client = EventHubConsumerClient.from_connection_string(
+            connection_str,
+            consumer_group="$Default",
+            eventhub_name=path,
+        )
+
+        try:
+            async with client:
+                amqp_partition_ids = await client.get_partition_ids()
+                return Target(
+                    hostname=endpoint,
+                    path=path,
+                    partitions=list(amqp_partition_ids),
+                    policy=policy,
+                    key=key
+                )
+        except Exception as e:
+            raise CLIInternalError(
+                f"Unable to query partitions for '{target['entity'].split('.')[0]}': {e}"
+            )
+
+    async def _evaluate_redirect(self, target):
+        """
+        Discover Event Hub endpoint using AMQP link redirect.
+        This allows discovery with just a connection string, without Azure login.
+
+        When connecting to IoT Hub's management endpoint, it redirects to the
+        Event Hub-compatible endpoint, revealing the actual endpoint and path.
+        """
+        def _sync_redirect():
+            try:
+                from azure.eventhub._pyamqp import ReceiveClient as PyAMQPReceiveClient
+                from azure.eventhub._pyamqp.error import AMQPLinkRedirect
+                from azure.eventhub._pyamqp.authentication import _CBSAuth as PyAMQPCBSAuth
+                from azext_iot.common.sas_token_auth import SasTokenAuthentication
+                from time import time
+                from collections import namedtuple
+
+                AccessToken = namedtuple("AccessToken", ["token", "expires_on"])
+
+                hostname = target["entity"]
+                policy = target["policy"]
+                key = target["primarykey"]
+                token_duration = 360
+
+                # Generate IoT Hub-compatible SAS token
+                sas_generator = SasTokenAuthentication(
+                    uri=hostname,
+                    shared_access_policy_name=policy,
+                    shared_access_key=key,
+                    expiry=token_duration
+                )
+
+                def sas_token_provider():
+                    token = sas_generator.generate_sas_token()
+                    return AccessToken(token, time() + token_duration)
+
+                # Management endpoint to trigger redirect
+                source = f"amqps://{hostname}/messages/events/$management"
+
+                # Use CBS authentication
+                auth = PyAMQPCBSAuth(
+                    uri=source,
+                    audience=hostname,
+                    token_type=b"servicebus.windows.net:sastoken",
+                    get_token=sas_token_provider,
+                    expires_in=token_duration
+                )
+
+                client = PyAMQPReceiveClient(
+                    hostname=hostname,
+                    source=source,
+                    auth=auth,
+                    network_trace=False,
+                    timeout=30000,
+                    prefetch=1
+                )
+
+                result = None
+                try:
+                    client.open()
+                    # Try to receive - this will trigger link redirect from IoT Hub
+                    client.receive_message_batch(max_batch_size=1, timeout=5000)
+                except AMQPLinkRedirect as redirect:
+                    # Extract redirect information
+                    if redirect.info:
+                        hostname_redirect = redirect.info.get(b"hostname") or redirect.info.get("hostname")
+                        address_redirect = redirect.info.get(b"address") or redirect.info.get("address")
+
+                        if isinstance(hostname_redirect, bytes):
+                            hostname_redirect = hostname_redirect.decode("utf-8")
+                        if isinstance(address_redirect, bytes):
+                            address_redirect = address_redirect.decode("utf-8")
+
+                        if hostname_redirect and address_redirect:
+                            # Parse address to extract path
+                            # Address format: "amqps://hostname:port/path/$management"
+                            path = (
+                                address_redirect.replace("amqps://", "").split("/", 1)[1]
+                                if "/" in address_redirect
+                                else address_redirect
+                            )
+                            # Remove port and $management suffix
+                            if ":" in path:
+                                path = path.split("/", 1)[1] if "/" in path else path
+                            if path.endswith("/$management"):
+                                path = path.replace("/$management", "")
+
+                            result = {
+                                "endpoint": hostname_redirect,
+                                "path": path
+                            }
+                except Exception as e:
+                    logger.debug(f"AMQP redirect receive failed: {e}")
+                finally:
+                    try:
+                        client.close()
+                    except Exception:
+                        pass
+
+                return result
+
+            except Exception as e:
+                # If AMQP redirect discovery fails, return None to try ARM API fallback
+                logger.debug(f"AMQP link redirect discovery failed: {e}")
+
+            return None
+
+        # Run the synchronous redirect logic in a thread pool
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, _sync_redirect)

@@ -7,6 +7,7 @@
 
 import json
 import pytest
+from time import sleep
 from knack.log import get_logger
 
 from azext_iot.central.models.enum import Role, get_enum_values
@@ -62,6 +63,9 @@ class TestIotCentral(CentralLiveScenarioTest):
         )
         device_client.send_message(msg)
 
+        # Wait for message to propagate through IoT Central backend
+        sleep(5)
+
         # Test with invalid app-id
         command = "iot central diagnostics monitor-events --app-id {} -y".format(
             self.app_id + "zzz"
@@ -104,6 +108,9 @@ class TestIotCentral(CentralLiveScenarioTest):
             content_type="application/json",
         )
         device_client.send_message(msg)
+
+        # Wait for message to propagate through IoT Central backend
+        sleep(5)
 
         # Validate the messages
         output = self._get_validate_messages_output(device_id, enqueued_time)

@@ -13,7 +13,6 @@ from unittest import mock
 from knack.util import CLIError
 from importlib.metadata import PackageNotFoundError
 from azure.cli.core.azclierror import CLIInternalError
-from azure.cli.core.extension import get_extension_path
 from azext_iot.common.utility import (
     handle_service_exception,
     validate_min_python_version,
@@ -24,8 +23,6 @@ from azext_iot.common.utility import (
     ensure_iotdps_sdk_min_version,
 )
 from azext_iot.operations.generic import _process_top
-from azext_iot.common.deps import ensure_uamqp
-from azext_iot.constants import EXTENSION_NAME, UAMQP_DEP_NAME, UAMQP_COMPAT_VERSION
 from azext_iot._validators import mode2_iot_login_handler
 from azext_iot.common.embedded_cli import EmbeddedCLI
 
@@ -96,123 +93,6 @@ class TestMode2Handler(object):
             mode2_iot_login_handler(
                 cmd=mode2_scenario["cmd"], namespace=mode2_scenario["namespace"]
             )
-
-
-class TestEnsureUamqp(object):
-    @pytest.fixture()
-    def uamqp_scenario(self, mocker):
-        installer = mocker.patch("azext_iot.common.deps.install")
-        installer.return_value = True
-        test_import = mocker.patch("azext_iot.common.deps.test_import_and_version")
-        test_import.return_value = True
-        m_exit = mocker.patch("azext_iot.common.deps.sys.exit")
-
-        return {
-            "installer": installer,
-            "test_import": test_import,
-            "exit": m_exit,
-        }
-
-    @pytest.mark.parametrize(
-        "case, extra_input, external_input",
-        [
-            ("importerror", None, "y"),
-            ("importerror", None, "n"),
-            ("importerror", "yes;", None),
-            ("repair", "repair;", "y"),
-            ("repair", "repair;yes;", None),
-            ("repair", "repair;", "n"),
-        ],
-    )
-    def test_ensure_uamqp_version(
-        self, mocker, uamqp_scenario, case, extra_input, external_input
-    ):
-        from functools import partial
-
-        if case == "importerror":
-            uamqp_scenario["test_import"].return_value = False
-
-        kwargs = {}
-        user_cancelled = True
-        if extra_input and "yes;" in extra_input:
-            kwargs["yes"] = True
-            user_cancelled = False
-        if extra_input and "repair;" in extra_input:
-            kwargs["repair"] = True
-        if external_input:
-            mocked_input = mocker.patch("azext_iot.common.deps.input")
-            mocked_input.return_value = external_input
-            if external_input.lower() == "y":
-                user_cancelled = False
-
-        method = partial(ensure_uamqp, mocker.MagicMock(), **kwargs)
-        method()
-
-        if uamqp_scenario["test_import"]:
-            pass
-        elif user_cancelled:
-            assert uamqp_scenario["exit"].call_args
-        else:
-            install_args = uamqp_scenario["installer"].call_args
-            assert install_args[0][0] == UAMQP_DEP_NAME
-            assert install_args[1]["compatible_version"] == UAMQP_COMPAT_VERSION
-
-
-class TestInstallPipPackage(object):
-    @pytest.fixture()
-    def subprocess_scenario(self, mocker):
-        return mocker.patch("azext_iot.common.pip.subprocess")
-
-    @pytest.fixture()
-    def subprocess_error(self, mocker):
-        from subprocess import CalledProcessError
-
-        patch_check_output = mocker.patch(
-            "azext_iot.common.pip.subprocess.check_output"
-        )
-        patch_check_output.side_effect = CalledProcessError(
-            returncode=1, cmd="cmd", output=None
-        )
-        return patch_check_output
-
-    @pytest.mark.parametrize(
-        "install_type, package_name, expected",
-        [
-            ({"exact_version": "1.2"}, "uamqp", "uamqp==1.2"),
-            ({"compatible_version": "1.2"}, "uamqp", "uamqp~=1.2"),
-            ({"custom_version": ">=1.2,<1.3"}, "uamqp", "uamqp>=1.2,<1.3"),
-        ],
-    )
-    def test_pip_install(
-        self, subprocess_scenario, install_type, package_name, expected
-    ):
-        from azext_iot.common.pip import install
-        from sys import executable
-
-        install(package_name, **install_type)
-
-        assert subprocess_scenario.check_output.call_count == 1
-
-        call = subprocess_scenario.check_output.call_args[0][0]
-
-        assert call == [
-            executable,
-            "-m",
-            "pip",
-            "--disable-pip-version-check",
-            "--no-cache-dir",
-            "install",
-            "-U",
-            "--target",
-            get_extension_path(EXTENSION_NAME),
-            expected,
-        ]
-
-    def test_pip_error(self, subprocess_error):
-        from azext_iot.common.pip import install
-
-        with pytest.raises(RuntimeError):
-            install("uamqp")
 
 
 class TestProcessJsonArg(object):
@@ -324,16 +204,16 @@ class TestVersionComparison(object):
     @pytest.mark.parametrize(
         "installed, expected, result",
         [
-            # nothing installed, check for compat version
-            (None, UAMQP_COMPAT_VERSION, False),
-            # 1.2, check for compat version
-            ("1.2", UAMQP_COMPAT_VERSION, False),
-            # 1.6.5, check for compat version,
-            ("1.6.5", UAMQP_COMPAT_VERSION, False),
-            # compat version installed
-            ("1.6.6", UAMQP_COMPAT_VERSION, True),
-            # compat++ version installed
-            ("1.6.7", UAMQP_COMPAT_VERSION, True),
+            # nothing installed, check for example version
+            (None, "1.6.6", False),
+            # 1.2, check for example version
+            ("1.2", "1.6.6", False),
+            # 1.6.5, check for example version,
+            ("1.6.5", "1.6.6", False),
+            # example version installed
+            ("1.6.6", "1.6.6", True),
+            # newer version installed
+            ("1.6.7", "1.6.6", True),
             # 1.9 installed, 1.10 expected
             ("1.9.9", "1.10.0", False),
         ]
@@ -348,7 +228,7 @@ class TestVersionComparison(object):
         else:
             mocked_version.side_effect = [PackageNotFoundError]
 
-        assert test_import_and_version(package=UAMQP_DEP_NAME, expected_version=expected) == result
+        assert test_import_and_version(package="test-package", expected_version=expected) == result
 
 
 class TestEmbeddedCli(object):

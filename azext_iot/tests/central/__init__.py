@@ -652,7 +652,7 @@ class CentralLiveScenarioTest(CaptureOutputLiveScenarioTest):
             asserts = []
 
         output = self.command_execute_assert(
-            "iot central diagnostics monitor-events -n {} -d {} --et {} --to 1 -y".format(
+            "iot central diagnostics monitor-events -n {} -d {} --et {} --to 5 -y".format(
                 self.app_id, device_id, enqueued_time
             ),
             asserts,

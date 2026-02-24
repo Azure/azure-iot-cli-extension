@@ -34,8 +34,7 @@ helps[
     type: command
     short-summary: Monitor device telemetry & messages sent to an IoT Hub.
     long-summary: |
-                  This command relies on and may install dependent Cython package (uamqp) upon first execution.
-                  https://github.com/Azure/azure-uamqp-python
+                  This command uses azure-eventhub's AMQP implementation.
 
                   Note: The event will be displayed even if the message body is non-unicode decodable, in
                   this case the event payload portion will be displayed as {{non-decodable payload}} with
@@ -83,8 +82,7 @@ helps[
     type: command
     short-summary: Monitor feedback sent by devices to acknowledge cloud-to-device (C2D) messages.
     long-summary: |
-                  This command relies on and may install dependent Cython package (uamqp) upon first execution.
-                  https://github.com/Azure/azure-uamqp-python
+                  This command uses azure-eventhub's AMQP implementation.
     examples:
     - name: Basic usage
       text: >

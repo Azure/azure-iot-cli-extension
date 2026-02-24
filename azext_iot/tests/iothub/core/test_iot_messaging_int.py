@@ -51,7 +51,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         super(TestIoTHubMessaging, self).tearDown()
 
-    def test_uamqp_device_messaging(self):
+    def test_device_messaging(self):
         device_count = 1
         device_ids = self.generate_device_names(device_count)
 
@@ -426,11 +426,11 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 "hub_name_or_hostname": self.entity_name,
                 "receive_settle": "complete",
                 "data": "Testing mqtt c2d and direct method invocations",
-                "msg_count": 4,
+                "msg_count": 10,
                 "msg_interval": 5,
                 "protocol_type": "mqtt",
             },
-            max_runs=4,
+            max_runs=10,
             return_handle=True,
         )
 
@@ -464,11 +464,11 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 "hub_name_or_hostname": self.entity_name,
                 "receive_settle": "complete",
                 "data": "Ping from c2d ack wait test",
-                "msg_count": 2,
+                "msg_count": 6,
                 "msg_interval": 5,
                 "protocol_type": "http",
             },
-            max_runs=4,
+            max_runs=6,
             return_handle=True,
         )
 
@@ -945,7 +945,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         token.set()
         thread.join()
 
-    def test_device_messaging(self):
+    def test_pyamqp_device_messaging(self):
         device_count = 1
         device_ids = self.generate_device_names(device_count)
 

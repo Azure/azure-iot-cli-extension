@@ -467,8 +467,6 @@ def init_monitoring(
     yes,
     message_count: Optional[int] = None,
 ):
-    from azext_iot.common.deps import ensure_uamqp
-
     if timeout < 0:
         raise InvalidArgumentValueError(
             "Monitoring timeout must be 0 (inf) or greater."
@@ -478,11 +476,9 @@ def init_monitoring(
     if message_count and message_count <= 0:
         raise InvalidArgumentValueError("Message count must be greater than 0.")
 
-    config = cmd.cli_ctx.config
     output = cmd.cli_ctx.invocation.data.get("output", None)
     if not output:
         output = "json"
-    ensure_uamqp(config, yes, repair)
 
     if not properties:
         properties = []

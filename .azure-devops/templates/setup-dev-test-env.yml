@@ -17,11 +17,9 @@ steps:
 
   - ${{ if eq(parameters.azureCLIVersion, 'min') }}:
       - template: install-azure-cli-min.yml
-
-  - ${{ if eq(parameters.azureCLIVersion, 'released') }}:
+  - ${{ elseif eq(parameters.azureCLIVersion, 'released') }}:
       - template: install-azure-cli-released.yml
-
-  - ${{ if eq(parameters.azureCLIVersion, 'msi') }}:
+  - ${{ else }}:
       - template: install-azure-cli-msi.yml
 
   - template: download-install-local-azure-test-sdk.yml

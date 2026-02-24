@@ -23,6 +23,7 @@ def _parse_connection_string(cs, validate=None, cstring_type="entity"):
                         cstring_type, k
                     )
                 )
+
     return decomposed
 
 

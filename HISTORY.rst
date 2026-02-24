@@ -3,6 +3,14 @@
 Release History
 ===============
 
+0.28.1
++++++++++++++++
+
+**General updates**
+
+* Updated ``azure-iot-device`` dependency to ``>=2.15.0rc1,<3.0.0dev0`` for Windows platform compatibility.
+
+
 0.30.0b1 (Preview)
 +++++++++++++++
 
@@ -42,6 +50,18 @@ Release History
 * Enrollment and enrollment-group commands now support configuring an ADR credential policy with the `--credential-policy-name` argument.
 * DPS now support both system and user assigned managed identities.
 
+
+0.28.0
++++++++++++++++
+
+**General updates**
+
+* **[Breaking Change]** Replaced `uamqp` dependency with `azure-eventhub` (PyAMQP). This change removes the need to install the `uamqp` Cython package.
+
+  * The `--repair` / `-r` argument for `az iot hub monitor-events` and related commands is now deprecated and has no effect.
+  * Commands affected: `az iot hub monitor-events`, `az iot hub monitor-feedback`, `az iot device c2d-message send`, `az iot central diagnostics monitor-events`
+
+* Added `azure-eventhub~=5.15.0` as a required dependency.
 
 0.27.0
 +++++++++++++++

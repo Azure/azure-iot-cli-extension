@@ -6,7 +6,9 @@
 
 import asyncio
 import sys
-import uamqp
+from azure.eventhub.aio import EventHubConsumerClient
+from azure.cli.core.azclierror import CLIInternalError
+from datetime import datetime, timezone
 
 from uuid import uuid4
 from knack.log import get_logger
@@ -29,7 +31,7 @@ def start_single_monitor(
     """
     :param on_message_received:
         A callback to process messages as they arrive from the service.
-        It takes a single argument, a ~uamqp.message.Message object.
+        It takes a single argument, a message object.
     """
     return start_multiple_monitors(
         targets=[target],
@@ -50,7 +52,7 @@ def start_multiple_monitors(
     """
     :param on_message_received:
         A callback to process messages as they arrive from the service.
-        It takes a single argument, a ~uamqp.message.Message object.
+        It takes a single argument, a message object.
     """
     coroutines = [
         _initiate_event_monitor(
@@ -100,81 +102,98 @@ async def _initiate_event_monitor(
         logger.warning("No Event Hub partitions found to listen on.")
         return
 
-    coroutines = []
+    # Create EventHub Consumer Client
+    # Note: azure-eventhub SDK uses different patterns for async context:
+    #   - IoT Hub: Connection string with policy+key (SDK handles auth internally)
+    #   - IoT Central: AzureSasCredential with pre-generated token
+    # EventHubSharedKeyCredential has sync/async compatibility issues with aio client
 
-    async with uamqp.ConnectionAsync(
-        target.hostname,
-        sasl=target.auth,
-        debug=DEBUG,
-        container_id=_get_container_id(),
-        properties=_get_conn_props(),
-    ) as conn:
-        for p in target.partitions:
-            coroutines.append(
+    if target.policy and target.key:
+        # IoT Hub: Use connection string (works with async EventHubConsumerClient)
+        connection_str = (
+            f"Endpoint=sb://{target.hostname}/;"
+            f"SharedAccessKeyName={target.policy};"
+            f"SharedAccessKey={target.key};"
+            f"EntityPath={target.path}"
+        )
+        consumer_client = EventHubConsumerClient.from_connection_string(
+            connection_str,
+            consumer_group=target.consumer_group,
+            eventhub_name=target.path,
+        )
+    elif target.sas_credential:
+        # IoT Central: Use pre-generated SAS token credential
+        consumer_client = EventHubConsumerClient(
+            fully_qualified_namespace=target.hostname,
+            eventhub_name=target.path,
+            consumer_group=target.consumer_group,
+            credential=target.sas_credential,
+        )
+    else:
+        raise CLIInternalError(
+            "Target object is missing authentication credentials. "
+            "This indicates an internal error in target construction."
+        )
+
+    try:
+        receive_tasks = []
+        for partition_id in target.partitions:
+            receive_tasks.append(
                 _monitor_events(
-                    target=target,
-                    connection=conn,
-                    partition=p,
+                    consumer_client=consumer_client,
+                    partition_id=partition_id,
                     enqueued_time_utc=enqueued_time_utc,
                     on_message_received=on_message_received,
                     timeout=timeout,
                 )
             )
-        return await asyncio.gather(*coroutines, return_exceptions=True)
+        return await asyncio.gather(*receive_tasks, return_exceptions=True)
+    except Exception as e:
+        logger.error(f"Error during event monitoring: {e}")
+        raise RuntimeError(f"Event monitoring failed: {e}")
 
 
 async def _monitor_events(
-    target: Target,
-    connection,
-    partition,
+    consumer_client,
+    partition_id,
     enqueued_time_utc,
     on_message_received,
     timeout=0,
 ):
-    source = uamqp.address.Source(
-        "amqps://{}/{}/ConsumerGroups/{}/Partitions/{}".format(
-            target.hostname, target.path, target.consumer_group, partition
-        )
-    )
-    source.set_filter(
-        bytes(
-            "amqp.annotation.x-opt-enqueuedtimeutc > " + str(enqueued_time_utc), "utf8"
-        )
-    )
-
-    exp_cancelled = False
-    receive_client = uamqp.ReceiveClientAsync(
-        source,
-        auth=target.auth,
-        timeout=timeout,
-        prefetch=0,
-        client_name=_get_container_id(),
-        debug=DEBUG,
-    )
-
+    """Monitor events using EventHub SDK"""
     try:
-        if connection:
-            await receive_client.open_async(connection=connection)
+        async def on_event(partition_context, event):
+            on_message_received(event)
 
-        async for msg in receive_client.receive_messages_iter_async():
-            on_message_received(msg)
+        # Convert milliseconds to datetime for EventHub SDK
+        if isinstance(enqueued_time_utc, int):
+            starting_position = datetime.fromtimestamp(enqueued_time_utc / 1000.0, tz=timezone.utc)
+        else:
+            starting_position = enqueued_time_utc
 
+        receive_kwargs = {
+            "on_event": on_event,
+            "partition_id": str(partition_id),
+            "starting_position": starting_position,
+        }
+
+        async with consumer_client:
+            if timeout > 0:
+                timeout_seconds = timeout / 1000.0
+                await asyncio.wait_for(consumer_client.receive(**receive_kwargs), timeout=timeout_seconds)
+            else:
+                await consumer_client.receive(**receive_kwargs)
+
+    except asyncio.TimeoutError:
+        # This is expected - timeout means monitoring period is over
+        pass
     except asyncio.CancelledError:
-        exp_cancelled = True
-        await receive_client.close_async()
-    except uamqp.errors.LinkDetach as ld:
-        if isinstance(ld.description, bytes):
-            ld.description = str(ld.description, "utf8")
-        raise RuntimeError(ld.description)
+        logger.info("Monitoring cancelled on partition %s", partition_id)
     except KeyboardInterrupt:
-        logger.info("Keyboard interrupt, closing monitor on partition %s", partition)
-        exp_cancelled = True
-        await receive_client.close_async()
+        logger.info("Keyboard interrupt, closing monitor on partition %s", partition_id)
         raise
     finally:
-        if not exp_cancelled:
-            await receive_client.close_async()
-        logger.info("Closed monitor on partition %s", partition)
+        logger.info("Closed monitor on partition %s", partition_id)
 
 
 def _stop_and_suppress_eloop(loop):

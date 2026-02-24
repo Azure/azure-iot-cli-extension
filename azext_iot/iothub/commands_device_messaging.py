@@ -131,9 +131,6 @@ def iot_c2d_message_send(
     login: Optional[str] = None,
     auth_type_dataplane: Optional[str] = None
 ):
-    from azext_iot.common.deps import ensure_uamqp
-    ensure_uamqp(cmd.cli_ctx.config, yes, repair)
-
     messaging_provider = DeviceMessagingProvider(
         cmd=cmd,
         device_id=device_id,

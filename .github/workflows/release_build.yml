@@ -47,9 +47,19 @@ jobs:
           echo "version=$version" >> $GITHUB_ENV
       - name: Generate SBOM
         run: |
-          curl -Lo $RUNNER_TEMP/sbom-tool https://github.com/microsoft/sbom-tool/releases/download/v2.2.3/sbom-tool-linux-x64
+          # Create clean venv with only runtime dependencies (excludes dev/test deps)
+          python -m venv $RUNNER_TEMP/sbom-venv
+          $RUNNER_TEMP/sbom-venv/bin/pip install --upgrade pip
+          $RUNNER_TEMP/sbom-venv/bin/pip install ${{ env.wheel }}
+          $RUNNER_TEMP/sbom-venv/bin/pip freeze > ./dist/requirements.txt
+          # Add Windows-specific azure-iot-device version (not installed on Linux CI, but needed for complete SBOM)
+          # Note: This causes a pip conflict warning in sbom-tool but both versions are correctly included in SBOM
+          echo "azure-iot-device>=2.15.0rc1,<3.0.0dev0" >> ./dist/requirements.txt
+          curl -Lo $RUNNER_TEMP/sbom-tool https://github.com/microsoft/sbom-tool/releases/download/v4.1.5/sbom-tool-linux-x64
           chmod +x $RUNNER_TEMP/sbom-tool
-          $RUNNER_TEMP/sbom-tool generate -b ./dist -bc . -pn "Azure IoT CLI Extension" -pv "${{ env.version }}" -ps Microsoft
+          $RUNNER_TEMP/sbom-tool generate -b ./dist -bc ./dist -pn "Azure IoT CLI Extension" -pv "${{ env.version }}" -ps Microsoft
+          # Clean up temporary files
+          rm -rf ./dist/requirements.txt $RUNNER_TEMP/sbom-venv
 
       - name: Upload Wheel Artifact
         uses: actions/upload-artifact@v4
