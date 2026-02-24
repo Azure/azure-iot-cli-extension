@@ -75,6 +75,28 @@ configuration:
 
             `az extension update --name azure-iot`
       description: 
+    - if:
+      - payloadType: Issues
+      - bodyContains:
+          pattern: "ImportError: cannot import name 'c_uamqp' from partially initialized module 'uamqp'"
+          isRegex: False
+      - isAction:
+          action: Opened
+      then:
+      - addReply:
+          reply: >-
+            Thanks for submitting an issue, @${issueAuthor}. I noticed your issue contains the following error:
+
+
+            `ImportError: cannot import name 'c_uamqp' from partially initialized module 'uamqp'`
+
+
+            The `uamqp` dependency has been deprecated and removed in newer versions of the `azure-iot` extension,
+            which now uses a pure Python AMQP implementation. Updating to the latest version of the extension should
+            resolve this issue:
+
+            `az extension update --name azure-iot`
+      description: 
 
 onFailure: 
 onSuccess: 

@@ -201,7 +201,7 @@ def load_arguments(self, _):
             options_list=["--repair", "-r"],
             arg_type=get_three_state_flag(),
             deprecate_info=context.deprecate(hide=True),
-            help="[Deprecated] Previously used to reinstall uamqp dependency. No longer applicable. Default: false",
+            help="[Deprecated] Reinstall uamqp dependency compatible with extension version. Default: false",
         )
         context.argument(
             "consumer_group",

@@ -13,7 +13,6 @@ from unittest import mock
 from knack.util import CLIError
 from importlib.metadata import PackageNotFoundError
 from azure.cli.core.azclierror import CLIInternalError
-from azure.cli.core.extension import get_extension_path
 from azext_iot.common.utility import (
     handle_service_exception,
     validate_min_python_version,
@@ -24,7 +23,6 @@ from azext_iot.common.utility import (
     ensure_iotdps_sdk_min_version,
 )
 from azext_iot.operations.generic import _process_top
-from azext_iot.constants import EXTENSION_NAME
 from azext_iot._validators import mode2_iot_login_handler
 from azext_iot.common.embedded_cli import EmbeddedCLI
 
