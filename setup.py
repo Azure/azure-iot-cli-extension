@@ -59,7 +59,6 @@ DEPENDENCIES = [
     "packaging>=23.2",
     "azure-eventhub~=5.15.0",
 ]
-# uamqp extra removed - now using PyAMQP and azure-eventhub
 EXTRAS = {}
 
 CLASSIFIERS = [

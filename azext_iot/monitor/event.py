@@ -15,7 +15,7 @@ from azext_iot.constants import USER_AGENT
 from azext_iot.common.shared import AuthenticationTypeDataplane
 from azext_iot.common.utility import shell_safe_json_parse
 
-# Use pyamqp for C2D send and feedback monitoring (uamqp replacement)
+# Use pyamqp for C2D send and feedback monitoring
 from azure.eventhub._pyamqp import ReceiveClient as PyAMQPReceiveClient, SendClient as PyAMQPSendClient
 from azure.eventhub._pyamqp.authentication import JWTTokenAuth as PyAMQPJWTTokenAuth
 from azure.eventhub._pyamqp.authentication import _CBSAuth as PyAMQPCBSAuth
@@ -97,7 +97,7 @@ def send_c2d_message(
     else:
         msg_body = data
 
-    # Create PyAMQP message - use 'data' parameter (list of byte arrays) to match uamqp behavior
+    # Create PyAMQP message - use 'data' parameter (list of byte arrays)
     message = PyAMQPMessage(
         data=[msg_body] if isinstance(msg_body, bytes) else [msg_body.encode('utf-8')],
         properties=msg_props,
@@ -224,7 +224,7 @@ def _get_endpoint_and_token_auth_pyamqp(
     target: dict, operation: str, token_duration: int = 3600
 ) -> Tuple[str, Union[PyAMQPJWTTokenAuth, PyAMQPCBSAuth, None]]:
     """
-    Get endpoint and authentication for pyamqp (uamqp replacement).
+    Get endpoint and authentication for pyamqp.
 
     Note: IoT Hub requires SAS tokens with base64-decoded keys for HMAC signature,
     but PyAMQP's SASTokenAuth uses raw UTF-8 encoded keys (Event Hub/Service Bus style).

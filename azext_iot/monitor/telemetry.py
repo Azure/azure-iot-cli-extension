@@ -31,7 +31,7 @@ def start_single_monitor(
     """
     :param on_message_received:
         A callback to process messages as they arrive from the service.
-        It takes a single argument, a ~uamqp.message.Message object.
+        It takes a single argument, a message object.
     """
     return start_multiple_monitors(
         targets=[target],
@@ -52,7 +52,7 @@ def start_multiple_monitors(
     """
     :param on_message_received:
         A callback to process messages as they arrive from the service.
-        It takes a single argument, a ~uamqp.message.Message object.
+        It takes a single argument, a message object.
     """
     coroutines = [
         _initiate_event_monitor(

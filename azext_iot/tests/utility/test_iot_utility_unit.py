@@ -97,63 +97,6 @@ class TestMode2Handler(object):
             )
 
 
-class TestInstallPipPackage(object):
-    @pytest.fixture()
-    def subprocess_scenario(self, mocker):
-        return mocker.patch("azext_iot.common.pip.subprocess")
-
-    @pytest.fixture()
-    def subprocess_error(self, mocker):
-        from subprocess import CalledProcessError
-
-        patch_check_output = mocker.patch(
-            "azext_iot.common.pip.subprocess.check_output"
-        )
-        patch_check_output.side_effect = CalledProcessError(
-            returncode=1, cmd="cmd", output=None
-        )
-        return patch_check_output
-
-    @pytest.mark.parametrize(
-        "install_type, package_name, expected",
-        [
-            ({"exact_version": "1.2"}, "testpkg", "testpkg==1.2"),
-            ({"compatible_version": "1.2"}, "testpkg", "testpkg~=1.2"),
-            ({"custom_version": ">=1.2,<1.3"}, "testpkg", "testpkg>=1.2,<1.3"),
-        ],
-    )
-    def test_pip_install(
-        self, subprocess_scenario, install_type, package_name, expected
-    ):
-        from azext_iot.common.pip import install
-        from sys import executable
-
-        install(package_name, **install_type)
-
-        assert subprocess_scenario.check_output.call_count == 1
-
-        call = subprocess_scenario.check_output.call_args[0][0]
-
-        assert call == [
-            executable,
-            "-m",
-            "pip",
-            "--disable-pip-version-check",
-            "--no-cache-dir",
-            "install",
-            "-U",
-            "--target",
-            get_extension_path(EXTENSION_NAME),
-            expected,
-        ]
-
-    def test_pip_error(self, subprocess_error):
-        from azext_iot.common.pip import install
-
-        with pytest.raises(RuntimeError):
-            install("uamqp")
-
-
 class TestProcessJsonArg(object):
     @pytest.mark.parametrize(
         "content, argname", [('{"authenticationType": "sas"}', "myarg0")]
