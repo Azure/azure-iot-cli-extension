@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
-from unittest.mock import MagicMock, patch
 
 
 CLOUD_CONFIGS = [
@@ -24,8 +23,8 @@ CLOUD_CONFIGS = [
 ]
 
 
-def _build_cli_ctx(cloud_config):
-    cli_ctx = MagicMock()
+def _build_cli_ctx(mocker, cloud_config):
+    cli_ctx = mocker.MagicMock()
     cli_ctx.cloud.endpoints.resource_manager = cloud_config["resource_manager"]
     cli_ctx.cloud.endpoints.active_directory_resource_id = cloud_config["active_directory_resource_id"]
     cli_ctx.data = {"subscription_id": "test-sub-id"}
@@ -36,13 +35,14 @@ def _build_cli_ctx(cloud_config):
 class TestFactoryCredentialScopes:
     """Ensure management client factories pass cloud-specific credential_scopes."""
 
-    @patch("azext_iot._factory.AZURE_CLI_CREDENTIAL")
-    @patch("azext_iot.sdk.iothub.mgmt.IotHubClient")
-    @patch("azure.cli.core.commands.client_factory.get_subscription_id", return_value="test-sub")
-    def test_iot_hub_factory(self, mock_get_sub, mock_client_cls, mock_cred, cloud_config):
+    def test_iot_hub_factory(self, mocker, cloud_config):
+        mocker.patch("azext_iot._factory.AZURE_CLI_CREDENTIAL")
+        mock_client_cls = mocker.patch("azext_iot.sdk.iothub.mgmt.IotHubClient")
+        mocker.patch("azure.cli.core.commands.client_factory.get_subscription_id", return_value="test-sub")
+
         from azext_iot._factory import iot_hub_service_factory
 
-        cli_ctx = _build_cli_ctx(cloud_config)
+        cli_ctx = _build_cli_ctx(mocker, cloud_config)
         iot_hub_service_factory(cli_ctx)
 
         mock_client_cls.assert_called_once()
@@ -50,13 +50,14 @@ class TestFactoryCredentialScopes:
         assert call_kwargs["credential_scopes"] == cloud_config["expected_scopes"]
         assert call_kwargs["endpoint"] == cloud_config["resource_manager"]
 
-    @patch("azext_iot._factory.AZURE_CLI_CREDENTIAL")
-    @patch("azext_iot.sdk.dps.mgmt.IotDpsClient")
-    @patch("azure.cli.core.commands.client_factory.get_subscription_id", return_value="test-sub")
-    def test_dps_factory(self, mock_get_sub, mock_client_cls, mock_cred, cloud_config):
+    def test_dps_factory(self, mocker, cloud_config):
+        mocker.patch("azext_iot._factory.AZURE_CLI_CREDENTIAL")
+        mock_client_cls = mocker.patch("azext_iot.sdk.dps.mgmt.IotDpsClient")
+        mocker.patch("azure.cli.core.commands.client_factory.get_subscription_id", return_value="test-sub")
+
         from azext_iot._factory import iot_service_provisioning_factory
 
-        cli_ctx = _build_cli_ctx(cloud_config)
+        cli_ctx = _build_cli_ctx(mocker, cloud_config)
         iot_service_provisioning_factory(cli_ctx)
 
         mock_client_cls.assert_called_once()
@@ -64,13 +65,14 @@ class TestFactoryCredentialScopes:
         assert call_kwargs["credential_scopes"] == cloud_config["expected_scopes"]
         assert call_kwargs["endpoint"] == cloud_config["resource_manager"]
 
-    @patch("azext_iot._factory.AZURE_CLI_CREDENTIAL")
-    @patch("azext_iot.sdk.deviceregistry.mgmt.DeviceRegistryMgmtClient")
-    @patch("azure.cli.core.commands.client_factory.get_subscription_id", return_value="test-sub")
-    def test_adr_factory(self, mock_get_sub, mock_client_cls, mock_cred, cloud_config):
+    def test_adr_factory(self, mocker, cloud_config):
+        mocker.patch("azext_iot._factory.AZURE_CLI_CREDENTIAL")
+        mock_client_cls = mocker.patch("azext_iot.sdk.deviceregistry.mgmt.DeviceRegistryMgmtClient")
+        mocker.patch("azure.cli.core.commands.client_factory.get_subscription_id", return_value="test-sub")
+
         from azext_iot._factory import adr_service_factory
 
-        cli_ctx = _build_cli_ctx(cloud_config)
+        cli_ctx = _build_cli_ctx(mocker, cloud_config)
         adr_service_factory(cli_ctx)
 
         mock_client_cls.assert_called_once()
