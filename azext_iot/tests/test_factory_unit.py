@@ -13,13 +13,13 @@ CLOUD_CONFIGS = [
         "id": "public",
         "resource_manager": "https://management.azure.com",
         "active_directory_resource_id": "https://management.core.windows.net/",
-        "expected_scopes": ["https://management.core.windows.net/.default"],
+        "expected_scopes": ["https://management.core.windows.net//.default"],
     },
     {
         "id": "usgov",
         "resource_manager": "https://management.usgovcloudapi.net",
         "active_directory_resource_id": "https://management.core.usgovcloudapi.net/",
-        "expected_scopes": ["https://management.core.usgovcloudapi.net/.default"],
+        "expected_scopes": ["https://management.core.usgovcloudapi.net//.default"],
     },
 ]
 
