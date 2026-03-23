@@ -90,6 +90,9 @@ class DeviceProvider(ADRProvider):
         **kwargs,
     ):
         """Revoke credentials for a device in the namespace."""
+        body = {}
+        if disable is not None:
+            body["disable"] = disable
         with console.status(
             f"Revoking credentials for device '{device_name}' in namespace {namespace_name}..."
         ):
@@ -97,6 +100,6 @@ class DeviceProvider(ADRProvider):
                 resource_group_name=resource_group_name,
                 namespace_name=namespace_name,
                 device_name=device_name,
-                body={"disable": disable},
+                body=body,
             )
             return wait_for_terminal_state(poller, **kwargs)
