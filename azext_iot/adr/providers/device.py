@@ -86,13 +86,13 @@ class DeviceProvider(ADRProvider):
         device_name: str,
         namespace_name: str,
         resource_group_name: str,
-        disable: Optional[bool] = None,
+        disable: bool = False,
         **kwargs,
     ):
         """Revoke credentials for a device in the namespace."""
         body = {}
-        if disable is not None:
-            body["disable"] = disable
+        if disable:
+            body["disable"] = True
         with console.status(
             f"Revoking credentials for device '{device_name}' in namespace {namespace_name}..."
         ):

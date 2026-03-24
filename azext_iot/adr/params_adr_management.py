@@ -172,7 +172,7 @@ def load_adr_management_arguments(self, _):
         context.argument(
             "disable",
             options_list=["--disable"],
-            arg_type=get_three_state_flag(),
+            action="store_true",
             help="Disable the device after revoking credentials. "
                  "Prevents new credentials from being issued.",
         )

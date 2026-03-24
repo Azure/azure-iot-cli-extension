@@ -55,7 +55,7 @@ def adr_device_revoke(
     device_name: str,
     namespace_name: str,
     resource_group_name: str,
-    disable: Optional[bool] = None,
+    disable: bool = False,
 ):
     provider = DeviceProvider(cmd)
     return provider.revoke(

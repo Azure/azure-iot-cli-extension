@@ -110,8 +110,14 @@ def test_device_update_all_fields(fixture_device_provider, mock_poller):
     )
 
 
-@pytest.mark.parametrize("disable", [None, True, False])
-def test_device_revoke(fixture_device_provider, mock_poller, disable):
+@pytest.mark.parametrize(
+    "disable, expected_body",
+    [
+        (False, {}),
+        (True, {"disable": True}),
+    ],
+)
+def test_device_revoke(fixture_device_provider, mock_poller, disable, expected_body):
     mock_revoke_result = Mock()
     mock_revoke_result.result = "Succeeded"
     poller = mock_poller(mock_revoke_result)
@@ -129,7 +135,7 @@ def test_device_revoke(fixture_device_provider, mock_poller, disable):
         resource_group_name="test-rg",
         namespace_name="test-namespace",
         device_name="test-device",
-        body={"disable": disable},
+        body=expected_body,
     )
 
 
