@@ -6,8 +6,10 @@
 
 import urllib
 from azure.eventhub.aio import EventHubConsumerClient
+from azure.eventhub import TransportType
 from azure.core.credentials import AzureSasCredential
 from azext_iot.monitor.models.target import Target
+from azext_iot.monitor.utility import get_http_proxy_settings
 
 
 async def convert_token_to_target(tokens) -> Target:
@@ -29,13 +31,19 @@ async def convert_token_to_target(tokens) -> Target:
 
 async def _query_partition_count(hostname, path, credential):
     fully_qualified_namespace = hostname
+    proxy_settings = get_http_proxy_settings()
 
-    client = EventHubConsumerClient(
-        fully_qualified_namespace=fully_qualified_namespace,
-        eventhub_name=path,
-        consumer_group="$Default",
-        credential=credential,
-    )
+    create_kwargs = {
+        "fully_qualified_namespace": fully_qualified_namespace,
+        "eventhub_name": path,
+        "consumer_group": "$Default",
+        "credential": credential,
+    }
+    if proxy_settings:
+        create_kwargs["http_proxy"] = proxy_settings
+        create_kwargs["transport_type"] = TransportType.AmqpOverWebsocket
+
+    client = EventHubConsumerClient(**create_kwargs)
 
     try:
         async with client:

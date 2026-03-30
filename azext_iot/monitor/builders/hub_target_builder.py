@@ -7,11 +7,13 @@
 import asyncio
 
 from azure.cli.core.azclierror import CLIInternalError
+from azure.eventhub import TransportType
 from azure.eventhub.aio import EventHubConsumerClient
 from knack.log import get_logger
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.utility import url_encode_str
 from azext_iot.monitor.models.target import Target
+from azext_iot.monitor.utility import get_http_proxy_settings
 
 logger = get_logger(__name__)
 
@@ -81,10 +83,18 @@ class EventTargetBuilder:
             f"SharedAccessKey={key};"
             f"EntityPath={path}"
         )
+        create_kwargs = {
+            "consumer_group": "$Default",
+            "eventhub_name": path,
+        }
+        proxy_settings = get_http_proxy_settings()
+        if proxy_settings:
+            create_kwargs["http_proxy"] = proxy_settings
+            create_kwargs["transport_type"] = TransportType.AmqpOverWebsocket
+
         client = EventHubConsumerClient.from_connection_string(
             connection_str,
-            consumer_group="$Default",
-            eventhub_name=path,
+            **create_kwargs,
         )
 
         try:

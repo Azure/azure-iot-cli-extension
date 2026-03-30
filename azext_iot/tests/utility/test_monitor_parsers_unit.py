@@ -10,16 +10,21 @@ import pytest
 
 from unittest import mock
 from azure.eventhub import EventData
+from azure.eventhub import TransportType
 from azext_iot.central.providers import (
     CentralDeviceProvider,
     CentralDeviceTemplateProvider,
 )
 from azext_iot.central.models.v2022_06_30_preview import TemplatePreview
 from azext_iot.central.models.ga_2022_07_31 import DeviceGa
+from azext_iot.monitor import telemetry
+from azext_iot.monitor.builders import _common
+from azext_iot.monitor.models.target import Target
 from azext_iot.monitor.parsers import common_parser, central_parser
 from azext_iot.monitor.parsers import strings
 from azext_iot.monitor.models.arguments import CommonParserArguments
 from azext_iot.monitor.models.enum import Severity
+from azext_iot.monitor.utility import get_http_proxy_settings
 from azext_iot.tests.helpers import load_json
 from azext_iot.tests.test_constants import FileNames
 
@@ -674,3 +679,117 @@ class TestCentralParser:
             central_template_provider=template_provider,
             common_parser_args=args,
         )
+
+
+class TestMonitorProxySupport:
+    def test_get_http_proxy_settings_prefers_https(self, monkeypatch):
+        monkeypatch.setenv("HTTP_PROXY", "http://http-proxy.local:8080")
+        monkeypatch.setenv("HTTPS_PROXY", "http://https-proxy.local:8443")
+
+        result = get_http_proxy_settings()
+
+        assert result["proxy_hostname"] == "http://https-proxy.local"
+        assert result["proxy_port"] == 8443
+
+    def test_get_http_proxy_settings_falls_back_to_http(self, monkeypatch):
+        monkeypatch.delenv("HTTPS_PROXY", raising=False)
+        monkeypatch.delenv("https_proxy", raising=False)
+        monkeypatch.setenv(
+            "HTTP_PROXY", "http://user%40name:p%40ss@http-proxy.local:8080"
+        )
+
+        result = get_http_proxy_settings()
+
+        assert result["proxy_hostname"] == "http://http-proxy.local"
+        assert result["proxy_port"] == 8080
+        assert result["username"] == "user@name"
+        assert result["password"] == "p@ss"
+
+    def test_get_http_proxy_settings_returns_none_for_invalid(self, monkeypatch):
+        monkeypatch.setenv("HTTPS_PROXY", "https://proxy.local")
+
+        assert get_http_proxy_settings() is None
+
+    async def _run_initiate(self, target):
+        await telemetry._initiate_event_monitor(
+            target=target,
+            enqueued_time_utc=0,
+            on_message_received=lambda _: None,
+            timeout=10,
+        )
+
+    def test_initiate_event_monitor_passes_http_proxy(self, mocker, monkeypatch):
+        target = Target(
+            hostname="testhub1234.azure-devices.net",
+            path="messages/events",
+            partitions=["0"],
+            policy="iothubowner",
+            key="abc",
+        )
+        target.add_consumer_group("$Default")
+
+        monkeypatch.setenv("HTTPS_PROXY", "http://proxy.local:3128")
+
+        captured = {}
+
+        def fake_from_connection_string(connection_str, **kwargs):
+            captured["kwargs"] = kwargs
+            return object()
+
+        async def fake_monitor_events(**kwargs):
+            return None
+
+        mocker.patch.object(
+            telemetry.EventHubConsumerClient,
+            "from_connection_string",
+            side_effect=fake_from_connection_string,
+        )
+        mocker.patch.object(
+            telemetry, "_monitor_events", side_effect=fake_monitor_events
+        )
+
+        import asyncio
+
+        asyncio.run(self._run_initiate(target))
+
+        assert "http_proxy" in captured["kwargs"]
+        assert captured["kwargs"]["http_proxy"]["proxy_hostname"] == "http://proxy.local"
+        assert captured["kwargs"]["http_proxy"]["proxy_port"] == 3128
+        assert captured["kwargs"]["transport_type"] == TransportType.AmqpOverWebsocket
+
+    class _FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get_partition_ids(self):
+            return ["0", "1"]
+
+    def test_query_partition_count_passes_http_proxy(self, mocker, monkeypatch):
+        monkeypatch.setenv("HTTP_PROXY", "http://proxy.local:8888")
+
+        captured = {}
+
+        def fake_eventhub_consumer_client(**kwargs):
+            captured["kwargs"] = kwargs
+            return self._FakeClient()
+
+        mocker.patch.object(
+            _common,
+            "EventHubConsumerClient",
+            side_effect=fake_eventhub_consumer_client,
+        )
+
+        import asyncio
+
+        count = asyncio.run(
+            _common._query_partition_count("host.servicebus.windows.net", "path", object())
+        )
+
+        assert count == 2
+        assert "http_proxy" in captured["kwargs"]
+        assert captured["kwargs"]["http_proxy"]["proxy_hostname"] == "http://proxy.local"
+        assert captured["kwargs"]["http_proxy"]["proxy_port"] == 8888
+        assert captured["kwargs"]["transport_type"] == TransportType.AmqpOverWebsocket

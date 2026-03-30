@@ -58,6 +58,7 @@ DEPENDENCIES = [
     "treelib~=1.6",
     "packaging>=23.2",
     "azure-eventhub~=5.15.0",
+    "aiohttp>=3.9,<4.0",
 ]
 EXTRAS = {}
 

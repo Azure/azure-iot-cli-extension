@@ -5,6 +5,8 @@
 # --------------------------------------------------------------------------------------------
 
 import asyncio
+import os
+from urllib.parse import unquote, urlparse
 
 
 def generate_on_start_string(device_id=None):
@@ -75,3 +77,33 @@ def extract_message_body(message) -> bytes:
             return b''.join(chunks)
         except Exception:
             return b''
+
+
+def get_http_proxy_settings():
+    """Return EventHub-compatible proxy settings from environment variables."""
+    proxy_value = (
+        os.environ.get("HTTPS_PROXY")
+        or os.environ.get("https_proxy")
+        or os.environ.get("HTTP_PROXY")
+        or os.environ.get("http_proxy")
+    )
+
+    if not proxy_value:
+        return None
+
+    parsed = urlparse(proxy_value if "://" in proxy_value else f"http://{proxy_value}")
+    if not parsed.hostname or not parsed.port:
+        return None
+
+    proxy_scheme = parsed.scheme or "http"
+    settings = {
+        "proxy_hostname": f"{proxy_scheme}://{parsed.hostname}",
+        "proxy_port": parsed.port,
+    }
+
+    if parsed.username:
+        settings["username"] = unquote(parsed.username)
+    if parsed.password:
+        settings["password"] = unquote(parsed.password)
+
+    return settings

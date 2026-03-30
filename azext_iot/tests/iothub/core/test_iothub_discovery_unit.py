@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
+from types import SimpleNamespace
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common._azure import parse_iot_hub_connection_string
 from azext_iot.common.shared import AuthenticationTypeDataplane
@@ -97,3 +98,40 @@ class TestIoTHubDiscovery:
         assert target["primarykey"] == AuthenticationTypeDataplane.login.value
         assert target["secondarykey"] == AuthenticationTypeDataplane.login.value
         assert target["cmd"] == fixture_cmd
+
+    def test_get_target_by_cstring_with_include_events_hydrates_events(
+        self, fixture_cmd, get_mgmt_client, mocker
+    ):
+        discovery = IotHubDiscovery(cmd=fixture_cmd)
+
+        fake_login = (
+            "HostName=CoolIoTHub.azure-devices.net;SharedAccessKeyName=iothubowner;"
+            "SharedAccessKey=AB+c/+5nm2XpDXcffhnGhnxz/TVF4m5ag7AuVIGwchj="
+        )
+
+        fake_events = SimpleNamespace(
+            endpoint="sb://cooliothub.servicebus.windows.net/",
+            partition_count=4,
+            path="cooliothub",
+            partition_ids=["0", "1", "2", "3"],
+        )
+        fake_resource = SimpleNamespace(
+            properties=SimpleNamespace(event_hub_endpoints={"events": fake_events})
+        )
+
+        find_resource = mocker.patch.object(
+            discovery, "find_resource", return_value=fake_resource
+        )
+
+        target = discovery.get_target(
+            resource_name="CoolIoTHub.azure-devices.net",
+            resource_group_name="myrg",
+            login=fake_login,
+            include_events=True,
+        )
+
+        find_resource.assert_called_once_with(resource_name="CoolIoTHub", rg="myrg")
+        assert target["events"]["endpoint"] == "cooliothub.servicebus.windows.net"
+        assert target["events"]["partition_count"] == 4
+        assert target["events"]["path"] == "cooliothub"
+        assert target["events"]["partition_ids"] == ["0", "1", "2", "3"]
