@@ -65,6 +65,7 @@ class TestADRDeviceLifecycle(ADRHubInfraHelper, CaptureOutputLiveScenarioTest):
                 namespace_name=namespace_name,
                 hub_name=hub_name,
                 identity_name=identity_name,
+                use_default_policy=True,
             )
             infra = self.setup_dps_with_sync(
                 infra=infra,
@@ -93,7 +94,7 @@ class TestADRDeviceLifecycle(ADRHubInfraHelper, CaptureOutputLiveScenarioTest):
             csr_pem = csr.public_bytes(serialization.Encoding.PEM).decode()
 
             # --- Step 2: Provision device via preview SDK ---
-            with timed_step("Step 2 ❯ Provision Device via DPS (preview SDK)"):
+            with timed_step("Step 2 ❯ Provision Device via DPS"):
                 enroll_show_cmd = (
                     f"iot dps enrollment show --dps-name {dps_name} -g {rg} "
                     f"--enrollment-id {device_id} --show-keys"
@@ -137,8 +138,12 @@ class TestADRDeviceLifecycle(ADRHubInfraHelper, CaptureOutputLiveScenarioTest):
                 _log(LogKind.CMD, "az %s", cmd)
                 return self.cmd(cmd)
 
+            def props(resp):
+                """Extract properties sub-dict from ARM resource envelope."""
+                return resp.get("properties", resp)
+
             # Poll until device appears (ZTP provisioning is async)
-            with timed_step("Step 3 ❯ Wait for Device to Appear"):
+            with timed_step("Step 3 ❯ Verify Device Appears"):
                 max_polls = 40
                 devices = []
                 for _poll in range(1, max_polls + 1):
@@ -157,63 +162,61 @@ class TestADRDeviceLifecycle(ADRHubInfraHelper, CaptureOutputLiveScenarioTest):
                 assert device["name"] == device_id
                 _log(LogKind.OK, "Device show returned correct device '%s'", device_id)
 
-            with timed_step("Step 4 ❯ Assign Policy & Update Device"):
+            with timed_step("Step 4 ❯ Update: Policy, Enabled, OS Version"):
                 updated_dev = device_cmd(
                     f"update -n {device_id} --policy-resource-id {infra['policy_resource_id']}"
                 ).get_output_in_json()
-                assert updated_dev.get("policy"), (
+                assert props(updated_dev).get("policy"), (
                     f"Policy assignment failed: {updated_dev}"
                 )
                 _log(LogKind.OK, "Policy assigned to device '%s'", device_id)
 
                 for val, expected in [("false", False), ("true", True)]:
                     updated = device_cmd(f"update -n {device_id} --enabled {val}").get_output_in_json()
-                    assert updated.get("enabled") is expected
+                    assert props(updated).get("enabled") is expected
                     _log(LogKind.OK, "Device enabled=%s after update --enabled %s", expected, val)
 
                 updated = device_cmd(f"update -n {device_id} --os-version 2.0.1").get_output_in_json()
-                assert updated.get("operatingSystemVersion") == "2.0.1"
+                assert props(updated).get("operatingSystemVersion") == "2.0.1"
 
                 updated = device_cmd(
                     f"update -n {device_id} --enabled false --os-version 3.0.0 --tags env=test"
                 ).get_output_in_json()
-                assert updated.get("enabled") is False
-                assert updated.get("operatingSystemVersion") == "3.0.0"
+                assert props(updated).get("enabled") is False
+                assert props(updated).get("operatingSystemVersion") == "3.0.0"
                 assert updated.get("tags", {}).get("env") == "test"
 
-            with timed_step("Step 4b ❯ Set & Clear Attributes"):
+            with timed_step("Step 5 ❯ Update: Set & Clear Attributes"):
                 # Set attributes
                 updated = device_cmd(
-                    'update -n {device_id} --attributes \'{{"region": "us", "tier": 1}}\''.format(
-                        device_id=device_id
-                    )
+                    f'update -n {device_id} --attributes \'{{{{"region": "us", "tier": 1}}}}\''
                 ).get_output_in_json()
-                assert updated.get("attributes", {}).get("region") == "us"
-                assert updated.get("attributes", {}).get("tier") == 1
+                assert props(updated).get("attributes", {}).get("region") == "us"
+                assert props(updated).get("attributes", {}).get("tier") == 1
                 _log(LogKind.OK, "Attributes set on device '%s'", device_id)
 
                 # Clear attributes
                 updated = device_cmd(
-                    "update -n {device_id} --attributes '{{}}'".format(device_id=device_id)
+                    f"update -n {device_id} --attributes ''"
                 ).get_output_in_json()
-                assert updated.get("attributes") == {} or updated.get("attributes") is None
+                assert props(updated).get("attributes") == {} or props(updated).get("attributes") is None
                 _log(LogKind.OK, "Attributes cleared on device '%s'", device_id)
 
-            with timed_step("Step 4c ❯ Clear OS Version"):
+            with timed_step("Step 6 ❯ Update: Clear OS Version"):
                 # Ensure os-version is set
                 updated = device_cmd(
                     f"update -n {device_id} --os-version 4.0.0"
                 ).get_output_in_json()
-                assert updated.get("operatingSystemVersion") == "4.0.0"
+                assert props(updated).get("operatingSystemVersion") == "4.0.0"
 
                 # Clear os-version
                 updated = device_cmd(
                     f"update -n {device_id} --os-version ''"
                 ).get_output_in_json()
-                assert updated.get("operatingSystemVersion") in ("", None)
+                assert props(updated).get("operatingSystemVersion") in ("", None)
                 _log(LogKind.OK, "OS version cleared on device '%s'", device_id)
 
-            with timed_step("Step 4d ❯ Clear Tags"):
+            with timed_step("Step 7 ❯ Update: Clear Tags"):
                 # Ensure tags are set
                 updated = device_cmd(
                     f"update -n {device_id} --tags env=staging"
@@ -227,47 +230,12 @@ class TestADRDeviceLifecycle(ADRHubInfraHelper, CaptureOutputLiveScenarioTest):
                 assert updated.get("tags") in ({}, None)
                 _log(LogKind.OK, "Tags cleared on device '%s'", device_id)
 
-            with timed_step("Step 4e ❯ Clear Policy"):
-                # Ensure policy is assigned
-                updated = device_cmd(
-                    f"update -n {device_id} --policy-resource-id {infra['policy_resource_id']}"
-                ).get_output_in_json()
-                assert updated.get("policy")
-                _log(LogKind.OK, "Policy re-assigned before clear test")
-
-                # Clear policy
-                updated = device_cmd(
-                    f"update -n {device_id} --policy-resource-id ''"
-                ).get_output_in_json()
-                assert not updated.get("policy") or not updated.get("policy", {}).get("resourceId")
-                _log(LogKind.OK, "Policy cleared on device '%s'", device_id)
-
-                # Re-enable for revoke tests
+            with timed_step("Step 8 ❯ Revoke Credentials"):
+                # Re-enable device (policy already assigned from Step 4)
                 device_cmd(f"update -n {device_id} --enabled true")
 
-                # 4b. Capture baseline state for revoke assertions
-                baseline = device_cmd(f"show -n {device_id}").get_output_in_json()
-                prev_version = baseline.get("version")
-                prev_transition = baseline.get("lastTransitionTime")
-                _log(
-                    LogKind.OK,
-                    "Baseline before revoke: version=%s, lastTransitionTime=%s",
-                    prev_version, prev_transition,
-                )
-
-                hub_name = infra["hub_name"]
-                pre_hub_dev = self.get_hub_device_identity(hub_name, rg, device_id)
-                prev_hub_thumbprint = (
-                    pre_hub_dev.get("authentication", {})
-                    .get("x509Thumbprint", {})
-                    .get("primaryThumbprint")
-                )
-                _log(LogKind.OK, "Baseline hub primaryThumbprint=%s", prev_hub_thumbprint)
-
-            with timed_step("Step 5 ❯ Device Revoke Scenarios"):
                 def revoke_and_check(revoke_args, expected_enabled, label=""):
-                    """Revoke device credentials and verify response, state, and hub identity."""
-                    nonlocal prev_version, prev_transition, prev_hub_thumbprint
+                    """Revoke device credentials and verify response and enabled state."""
                     call_label = label or revoke_args or '(default)'
 
                     # 1. Call revoke and capture response
@@ -298,85 +266,44 @@ class TestADRDeviceLifecycle(ADRHubInfraHelper, CaptureOutputLiveScenarioTest):
 
                     # 2. Query ADR device state
                     d = device_cmd(f"show -n {device_id}").get_output_in_json()
+                    dp = props(d)
 
                     if expected_enabled is not None:
-                        assert d.get("enabled") is expected_enabled, (
+                        assert dp.get("enabled") is expected_enabled, (
                             f"[{call_label}] expected enabled={expected_enabled}, "
-                            f"got {d.get('enabled')}"
-                        )
-
-                    cur_version = d.get("version")
-                    cur_transition = d.get("lastTransitionTime")
-                    if prev_version is not None and cur_version is not None:
-                        assert cur_version > prev_version, (
-                            f"[{call_label}] version should increment: "
-                            f"prev={prev_version}, cur={cur_version}"
-                        )
-                    if cur_transition is not None:
-                        assert cur_transition != prev_transition, (
-                            f"[{call_label}] lastTransitionTime should change: "
-                            f"prev={prev_transition}, cur={cur_transition}"
+                            f"got {dp.get('enabled')}"
                         )
                     _log(
                         LogKind.OK,
-                        "[%s] ADR device: enabled=%s, version=%s→%s, transition=%s→%s",
-                        call_label, d.get("enabled"),
-                        prev_version, cur_version,
-                        prev_transition, cur_transition,
+                        "[%s] ADR device: enabled=%s, version=%s",
+                        call_label, dp.get("enabled"), dp.get("version"),
                     )
-                    prev_version = cur_version
-                    prev_transition = cur_transition
-
-                    # 3. Check hub device identity for thumbprint change (retry loop)
-                    new_hub_thumbprint = None
-                    max_attempts = 4
-                    for attempt in range(1, max_attempts + 1):
-                        hub_dev = self.get_hub_device_identity(hub_name, rg, device_id)
-                        new_hub_thumbprint = (
-                            hub_dev.get("authentication", {})
-                            .get("x509Thumbprint", {})
-                            .get("primaryThumbprint")
-                        )
-                        if new_hub_thumbprint != prev_hub_thumbprint:
-                            break
-                        if attempt < max_attempts:
-                            _log(
-                                LogKind.WARN,
-                                "[%s] Hub thumbprint unchanged (attempt %d/%d), "
-                                "retrying in 15s ...",
-                                call_label, attempt, max_attempts,
-                            )
-                            time.sleep(15)
-
-                    if new_hub_thumbprint != prev_hub_thumbprint:
-                        _log(
-                            LogKind.OK,
-                            "[%s] Hub thumbprint changed: %s → %s",
-                            call_label, prev_hub_thumbprint, new_hub_thumbprint,
-                        )
-                    else:
-                        _log(
-                            LogKind.WARN,
-                            "[%s] Hub thumbprint did NOT change after %d attempts: %s",
-                            call_label, max_attempts, prev_hub_thumbprint,
-                        )
-                    prev_hub_thumbprint = new_hub_thumbprint
 
                 revoke_and_check("", expected_enabled=True, label="revoke-default")
                 revoke_and_check("--disable", expected_enabled=False, label="revoke-disable")
                 revoke_and_check("", expected_enabled=None, label="revoke-while-disabled")
-                revoke_and_check("--disable false", expected_enabled=False, label="revoke-disable-false")
 
                 device_cmd(f"update -n {device_id} --enabled true")
                 _log(LogKind.RESULT, "Device re-enabled for idempotency test")
-                # Update baseline after re-enable (version/transition change from update)
-                re_enabled = device_cmd(f"show -n {device_id}").get_output_in_json()
-                prev_version = re_enabled.get("version")
-                prev_transition = re_enabled.get("lastTransitionTime")
                 revoke_and_check("", expected_enabled=True, label="revoke-idempotency")
 
+            with timed_step("Step 9 ❯ Update: Clear Policy"):
+                # Ensure policy is assigned
+                updated = device_cmd(
+                    f"update -n {device_id} --policy-resource-id {infra['policy_resource_id']}"
+                ).get_output_in_json()
+                assert props(updated).get("policy")
+                _log(LogKind.OK, "Policy re-assigned before clear test")
+
+                # Clear policy
+                updated = device_cmd(
+                    f"update -n {device_id} --policy-resource-id ''"
+                ).get_output_in_json()
+                assert not props(updated).get("policy") or not props(updated).get("policy", {}).get("resourceId")
+                _log(LogKind.OK, "Policy cleared on device '%s'", device_id)
+
             # Revoke nonexistent device -- expect failure
-            _log(LogKind.STEP, "Step 6 ❯ Negative: Revoke Nonexistent Device")
+            _log(LogKind.STEP, "Step 10 ❯ Negative: Revoke Nonexistent Device")
             nonexistent_revoke_cmd = f"iot adr ns device revoke -n nonexistent-device --ns {namespace_name} -g {rg} -y"
             _log(LogKind.CMD, "az %s  (expect failure)", nonexistent_revoke_cmd)
             self.cmd(

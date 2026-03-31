@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 from knack.log import get_logger
 from rich.console import Console
@@ -43,7 +43,7 @@ class DeviceProvider(ADRProvider):
         enabled: Optional[bool] = None,
         tags: Optional[Dict[str, str]] = None,
         operating_system_version: Optional[str] = None,
-        attributes: Optional[Dict[str, Any]] = None,
+        attributes: Optional[str] = None,
         policy_resource_id: Optional[str] = None,
         **kwargs,
     ):
@@ -56,7 +56,10 @@ class DeviceProvider(ADRProvider):
             inner_props["operatingSystemVersion"] = operating_system_version
         if attributes is not None:
             if isinstance(attributes, str):
-                attributes = shell_safe_json_parse(attributes)
+                if attributes == "":
+                    attributes = None
+                else:
+                    attributes = shell_safe_json_parse(attributes)
             inner_props["attributes"] = attributes
         if policy_resource_id is not None:
             if policy_resource_id == "":

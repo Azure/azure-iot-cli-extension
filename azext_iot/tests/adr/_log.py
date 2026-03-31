@@ -35,6 +35,7 @@ _ANSI_RESET = "\033[0m"
 _ANSI = {
     "gold": "\033[38;2;202;157;100m",  # #CA9D64 Earthsong yellow – sandy gold
     "sage": "\033[38;2;153;166;103m",  # #99A667 Earthsong green – sage olive
+    "sky": "\033[38;2;116;175;198m",   # #74AFC6 soft steel blue – commands
     "terra": "\033[38;2;181;92;56m",    # #B55C38 Earthsong red – terracotta
     "clay": "\033[38;2;170;163;155m",  # #AAA39B Earthsong light warm gray – output
     "dim": "\033[38;2;84;74;70m",     # #544A46 Earthsong bright black – warm gray
@@ -54,7 +55,7 @@ class LogKind:
 _STYLES = {
     LogKind.TEST: ("▶ TEST: ", "gold"),
     LogKind.STEP: ("", "gold"),
-    LogKind.CMD: ("  › ", "sage"),
+    LogKind.CMD: ("  › ", "sky"),
     LogKind.RESULT: ("  ↳ ", "clay"),
     LogKind.OK: ("  ✓ ", "sage"),
     LogKind.WARN: ("  ⚠ ", "terra"),

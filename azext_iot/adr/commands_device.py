@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 from azext_iot.adr.providers.device import DeviceProvider
 
@@ -34,7 +34,7 @@ def adr_device_update(
     enabled: Optional[bool] = None,
     tags: Optional[Dict[str, str]] = None,
     operating_system_version: Optional[str] = None,
-    attributes: Optional[Dict[str, Any]] = None,
+    attributes: Optional[str] = None,
     policy_resource_id: Optional[str] = None,
 ):
     provider = DeviceProvider(cmd)

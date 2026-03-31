@@ -195,7 +195,7 @@ def process_toml_arg(path: str) -> Dict[str, Any]:
         )
 
 
-def shell_safe_json_parse(json_or_dict_string, preserve_order=False):
+def shell_safe_json_parse(json_or_dict_string, preserve_order=False) -> Any:
     """Allows the passing of JSON or Python dictionary strings. This is needed because certain
     JSON strings in CMD shell are not received in main's argv. This allows the user to specify
     the alternative notation, which does not have this problem (but is technically not JSON)."""
