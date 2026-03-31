@@ -21,7 +21,6 @@ parameters:
     type: string
     default: "3.13"
     values:
-      - "3.9"
       - "3.10"
       - "3.11"
       - "3.12"
@@ -30,10 +29,6 @@ parameters:
     type: object
     default: >
       {
-        Python39:
-        {
-          python: '3.9'
-        },
         Python310:
         {
           python: '3.10'
