@@ -149,7 +149,7 @@ def load_adr_help():
   type: command
   short-summary: Create a policy for a Device Registry namespace.
   long-summary: |
-    By default, policies use a service-managed CA. 
+    By default, policies use a service-managed CA.
     To use your own CA (Bring Your Own Root), use --enable-byor and then activate the policy with the signed CSR using activate-byor.
   examples:
     - name: Create a basic policy with a default subject, certificate type (ECC), and validity period.
@@ -284,7 +284,7 @@ def load_adr_help():
   short-summary: Revoke credentials for a device in a Device Registry namespace.
   long-summary: |
     This command revokes all active credentials for the specified device. The device will need to re-authenticate and obtain new credentials.
-    
+
     Use --disable to also prevent the device from obtaining new credentials.
   examples:
     - name: Revoke device credentials
