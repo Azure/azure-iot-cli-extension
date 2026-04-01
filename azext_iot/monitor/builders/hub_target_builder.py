@@ -42,6 +42,13 @@ class EventTargetBuilder:
         )
 
     async def _build_iot_hub_target_async(self, target):
+        cs = target.get("cs", "")
+        # If the connection string is an Event Hub connection string (e.g. from IoT Hub's
+        # built-in endpoint in the Azure portal), skip the AMQP redirect and connect
+        # directly.  This also ensures proxy settings are applied correctly.
+        if "EntityPath=" in cs and "servicebus.windows.net" in cs and "events" not in target:
+            return await self._build_from_eh_connection_string(cs)
+
         # If events metadata not provided, attempt to discover it via AMQP redirect
         if "events" not in target:
             event_info = await self._evaluate_redirect(target)
@@ -110,6 +117,54 @@ class EventTargetBuilder:
         except Exception as e:
             raise CLIInternalError(
                 f"Unable to query partitions for '{target['entity'].split('.')[0]}': {e}"
+            )
+
+    async def _build_from_eh_connection_string(self, cs: str) -> Target:
+        """Build a Target directly from an Event Hub connection string.
+
+        Parses and connects to the Event Hub endpoint described by *cs*, applying
+        any configured HTTP proxy.  Used when the caller supplies an EH connection
+        string (e.g. from IoT Hub's built-in endpoint in the Azure portal) so that
+        the AMQP link-redirect step can be skipped entirely.
+        """
+        parts = {}
+        for segment in cs.split(";"):
+            if "=" in segment:
+                k, _, v = segment.partition("=")
+                parts[k.strip()] = v.strip()
+
+        endpoint_raw = parts.get("Endpoint", "")
+        for prefix in ("sb://", "amqps://"):
+            if endpoint_raw.lower().startswith(prefix):
+                endpoint_raw = endpoint_raw[len(prefix):]
+                break
+        hostname = endpoint_raw.rstrip("/")
+        entity_path = parts.get("EntityPath", "")
+        sas_key_name = parts.get("SharedAccessKeyName", "")
+        sas_key = parts.get("SharedAccessKey", "")
+
+        create_kwargs = {
+            "consumer_group": "$Default",
+        }
+        proxy_settings = get_http_proxy_settings()
+        if proxy_settings:
+            create_kwargs["http_proxy"] = proxy_settings
+            create_kwargs["transport_type"] = TransportType.AmqpOverWebsocket
+
+        client = EventHubConsumerClient.from_connection_string(cs, **create_kwargs)
+        try:
+            async with client:
+                partition_ids = await client.get_partition_ids()
+                return Target(
+                    hostname=hostname,
+                    path=entity_path,
+                    partitions=list(partition_ids),
+                    policy=sas_key_name,
+                    key=sas_key,
+                )
+        except Exception as e:
+            raise CLIInternalError(
+                f"Unable to query partitions from Event Hub endpoint '{hostname}': {e}"
             )
 
     async def _evaluate_redirect(self, target):

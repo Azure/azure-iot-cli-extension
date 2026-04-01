@@ -43,54 +43,31 @@ class IotHubDiscovery(BaseDiscovery):
 
     @classmethod
     def get_target_by_cstring(cls, connection_string: str) -> Dict[str, str]:
-        return IotHubTarget.from_connection_string(cstring=connection_string).as_dict()
-
-    def get_target(
-        self, resource_name: str, resource_group_name: str = None, **kwargs
-    ) -> Dict[str, str]:
-        target = super().get_target(
-            resource_name=resource_name,
-            resource_group_name=resource_group_name,
-            **kwargs,
-        )
-
-        if not (
-            kwargs.get("login")
-            and kwargs.get("include_events")
-            and resource_name
-            and "events" not in target
-        ):
-            return target
-
-        try:
-            normalized_name = resource_name
-            if normalized_name.lower().startswith("https://"):
-                normalized_name = normalized_name[len("https://") :]
-            elif normalized_name.lower().startswith("http://"):
-                normalized_name = normalized_name[len("http://") :]
-
-            if "." in normalized_name:
-                normalized_name = normalized_name.split(".")[0]
-
-            resource = self.find_resource(
-                resource_name=normalized_name, rg=resource_group_name
-            )
-            events = resource.properties.event_hub_endpoints["events"]
-
-            target["events"] = {
-                "endpoint": trim_from_start(events.endpoint, "sb://").strip("/"),
-                "partition_count": events.partition_count,
-                "path": events.path,
-                "partition_ids": events.partition_ids,
+        # If this is an Event Hub connection string (e.g. the IoT Hub built-in endpoint
+        # connection string from the Azure portal), parse it directly.  An EH connection
+        # string uses "Endpoint=" and "EntityPath=" rather than "HostName=", so
+        # IotHubTarget.from_connection_string would raise a ValueError on it.
+        if "EntityPath=" in connection_string and "servicebus.windows.net" in connection_string:
+            from azext_iot.common._azure import parse_event_hub_connection_string
+            parsed = parse_event_hub_connection_string(connection_string)
+            endpoint_raw = parsed.get("Endpoint", "")
+            for prefix in ("sb://", "amqps://"):
+                if endpoint_raw.lower().startswith(prefix):
+                    endpoint_raw = endpoint_raw[len(prefix):]
+                    break
+            hostname = endpoint_raw.rstrip("/")
+            return {
+                "cs": connection_string,
+                "entity": hostname,
+                "name": hostname.split(".")[0],
+                "policy": parsed["SharedAccessKeyName"],
+                "primarykey": parsed["SharedAccessKey"],
+                "events": {
+                    "endpoint": hostname,
+                    "path": parsed["EntityPath"],
+                },
             }
-        except Exception as e:
-            logger.debug(
-                "Unable to hydrate events metadata from ARM for login target '%s': %s",
-                resource_name,
-                e,
-            )
-
-        return target
+        return IotHubTarget.from_connection_string(cstring=connection_string).as_dict()
 
     def _build_target_from_hostname(self, resource_hostname: str) -> Dict[str, str]:
         login = AuthenticationTypeDataplane.login.value

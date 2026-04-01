@@ -58,6 +58,8 @@ DEPENDENCIES = [
     "treelib~=1.6",
     "packaging>=23.2",
     "azure-eventhub~=5.15.0",
+    # aiohttp is required by azure-eventhub for async AMQP over WebSocket transport (used when proxy is configured).
+    # azure-eventhub does not include it as an extras dependency, so it must be declared explicitly.
     "aiohttp>=3.9,<4.0",
 ]
 EXTRAS = {}

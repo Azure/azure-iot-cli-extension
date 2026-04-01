@@ -96,6 +96,7 @@ def get_http_proxy_settings():
         return None
 
     proxy_scheme = parsed.scheme or "http"
+    # proxy_hostname must include the scheme (e.g. "http://host" not "host").
     settings = {
         "proxy_hostname": f"{proxy_scheme}://{parsed.hostname}",
         "proxy_port": parsed.port,

@@ -26,7 +26,7 @@ from knack.log import get_logger
 
 logger = get_logger(__name__)
 
-LIVE_CONSUMER_GROUPS = ["test1", "test2", "test3"]
+LIVE_CONSUMER_GROUPS = ["test1", "test2", "test3", "test4"]
 MQTT_PROVIDER_SETUP_TIME = 15
 
 messaging_data_path = get_context_path(__file__, "test_messaging_data.json")
@@ -1241,10 +1241,23 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 device_ids,
             )
 
-        # Monitor events with --login parameter
+        # Monitor events with --login parameter (IoT Hub connection string)
         self.command_execute_assert(
             "iot hub monitor-events -t 8 -y -p all --cg {} --et {} --login {}".format(
                 LIVE_CONSUMER_GROUPS[2], enqueued_time, self.connection_string
+            ),
+            device_ids,
+        )
+
+        # Monitor events with --login using an Event Hub connection string
+        # (the built-in endpoint CS available from `az iot hub connection-string show --eh`)
+        eh_cs_output = self.cmd(
+            "iot hub connection-string show -n {} --eh -o json".format(self.entity_name)
+        ).get_output_in_json()
+        eh_cs = eh_cs_output["connectionString"]
+        self.command_execute_assert(
+            "iot hub monitor-events -t 8 -y --cg {} --et {} --login {}".format(
+                LIVE_CONSUMER_GROUPS[3], enqueued_time, eh_cs
             ),
             device_ids,
         )

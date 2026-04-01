@@ -5,7 +5,6 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
-from types import SimpleNamespace
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common._azure import parse_iot_hub_connection_string
 from azext_iot.common.shared import AuthenticationTypeDataplane
@@ -99,39 +98,28 @@ class TestIoTHubDiscovery:
         assert target["secondarykey"] == AuthenticationTypeDataplane.login.value
         assert target["cmd"] == fixture_cmd
 
-    def test_get_target_by_cstring_with_include_events_hydrates_events(
-        self, fixture_cmd, get_mgmt_client, mocker
-    ):
+    def test_get_target_by_eh_connection_string(self, fixture_cmd, get_mgmt_client):
+        """An Event Hub connection string passed as --login is parsed directly without ARM."""
         discovery = IotHubDiscovery(cmd=fixture_cmd)
 
-        fake_login = (
-            "HostName=CoolIoTHub.azure-devices.net;SharedAccessKeyName=iothubowner;"
-            "SharedAccessKey=AB+c/+5nm2XpDXcffhnGhnxz/TVF4m5ag7AuVIGwchj="
-        )
-
-        fake_events = SimpleNamespace(
-            endpoint="sb://cooliothub.servicebus.windows.net/",
-            partition_count=4,
-            path="cooliothub",
-            partition_ids=["0", "1", "2", "3"],
-        )
-        fake_resource = SimpleNamespace(
-            properties=SimpleNamespace(event_hub_endpoints={"events": fake_events})
-        )
-
-        find_resource = mocker.patch.object(
-            discovery, "find_resource", return_value=fake_resource
+        fake_eh_cs = (
+            "Endpoint=sb://cooliothub.servicebus.windows.net/;"
+            "SharedAccessKeyName=iothubowner;"
+            "SharedAccessKey=AB+c/+5nm2XpDXcffhnGhnxz/TVF4m5ag7AuVIGwchj=;"
+            "EntityPath=cooliothub"
         )
 
         target = discovery.get_target(
-            resource_name="CoolIoTHub.azure-devices.net",
-            resource_group_name="myrg",
-            login=fake_login,
-            include_events=True,
+            resource_name=None, resource_group_name=None, login=fake_eh_cs
         )
 
-        find_resource.assert_called_once_with(resource_name="CoolIoTHub", rg="myrg")
+        # Ensure no ARM calls are made
+        assert get_mgmt_client.call_count == 0
+
+        assert target["cs"] == fake_eh_cs
+        assert target["entity"] == "cooliothub.servicebus.windows.net"
+        assert target["name"] == "cooliothub"
+        assert target["policy"] == "iothubowner"
+        assert target["primarykey"] == "AB+c/+5nm2XpDXcffhnGhnxz/TVF4m5ag7AuVIGwchj="
         assert target["events"]["endpoint"] == "cooliothub.servicebus.windows.net"
-        assert target["events"]["partition_count"] == 4
         assert target["events"]["path"] == "cooliothub"
-        assert target["events"]["partition_ids"] == ["0", "1", "2", "3"]
