@@ -2,10 +2,6 @@ trigger: none
 pr: none
 
 parameters:
-  - name: python39
-    displayName: "Test Python 3.9"
-    type: boolean
-    default: true
   - name: python310
     displayName: "Test Python 3.10"
     type: boolean
@@ -45,22 +41,6 @@ jobs:
           python: "3.13"
           toxEnvStr: "lint"
           desc: "Flake8, Pylint"
-        ${{ if parameters.python39 }}:
-          ${{ if parameters.azmin }}:
-            "python 3.9 tests, min CLI":
-              python: "3.9"
-              toxEnvStr: "py3.9-azmin-unit"
-              desc: "python 3.9 tests, min CLI"
-          ${{ if parameters.azcur }}:
-            "python 3.9 tests, current CLI":
-              python: "3.9"
-              toxEnvStr: "py3.9-azcur-unit"
-              desc: "Python 3.9 tests, current CLI"
-          ${{ if parameters.azdev }}:
-            "python 3.9 tests, dev CLI":
-              python: "3.9"
-              toxEnvStr: "py3.9-azdev-unit"
-              desc: "Python 3.9 tests, dev CLI"
         ${{ if parameters.python310 }}:
           ${{ if parameters.azmin }}:
             "python 3.10 tests, min CLI":
