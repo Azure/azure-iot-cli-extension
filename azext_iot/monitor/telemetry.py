@@ -28,6 +28,7 @@ def start_single_monitor(
     on_start_string: str,
     on_message_received,
     timeout=0,
+    transport=None,
 ):
     """
     :param on_message_received:
@@ -40,6 +41,7 @@ def start_single_monitor(
         on_start_string=on_start_string,
         on_message_received=on_message_received,
         timeout=timeout,
+        transport=transport,
     )
 
 
@@ -49,6 +51,7 @@ def start_multiple_monitors(
     enqueued_time_utc,
     on_message_received,
     timeout=0,
+    transport=None,
 ):
     """
     :param on_message_received:
@@ -61,6 +64,7 @@ def start_multiple_monitors(
             enqueued_time_utc=enqueued_time_utc,
             on_message_received=on_message_received,
             timeout=timeout,
+            transport=transport,
         )
         for target in targets
     ]
@@ -97,7 +101,7 @@ def start_multiple_monitors(
 
 
 async def _initiate_event_monitor(
-    target: Target, enqueued_time_utc, on_message_received, timeout=0
+    target: Target, enqueued_time_utc, on_message_received, timeout=0, transport=None
 ):
     if not target.partitions:
         logger.warning("No Event Hub partitions found to listen on.")
@@ -123,9 +127,10 @@ async def _initiate_event_monitor(
             "consumer_group": target.consumer_group,
             "eventhub_name": target.path,
         }
+        if transport == "amqp_ws" or proxy_settings:
+            create_kwargs["transport_type"] = TransportType.AmqpOverWebsocket
         if proxy_settings:
             create_kwargs["http_proxy"] = proxy_settings
-            create_kwargs["transport_type"] = TransportType.AmqpOverWebsocket
 
         consumer_client = EventHubConsumerClient.from_connection_string(
             connection_str,
@@ -139,9 +144,10 @@ async def _initiate_event_monitor(
             "consumer_group": target.consumer_group,
             "credential": target.sas_credential,
         }
+        if transport == "amqp_ws" or proxy_settings:
+            create_kwargs["transport_type"] = TransportType.AmqpOverWebsocket
         if proxy_settings:
             create_kwargs["http_proxy"] = proxy_settings
-            create_kwargs["transport_type"] = TransportType.AmqpOverWebsocket
 
         consumer_client = EventHubConsumerClient(**create_kwargs)
     else:

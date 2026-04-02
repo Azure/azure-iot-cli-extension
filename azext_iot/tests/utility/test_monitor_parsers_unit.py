@@ -793,3 +793,94 @@ class TestMonitorProxySupport:
         assert captured["kwargs"]["http_proxy"]["proxy_hostname"] == "http://proxy.local"
         assert captured["kwargs"]["http_proxy"]["proxy_port"] == 8888
         assert captured["kwargs"]["transport_type"] == TransportType.AmqpOverWebsocket
+
+    async def _run_initiate_with_transport(self, target, transport):
+        await telemetry._initiate_event_monitor(
+            target=target,
+            enqueued_time_utc=0,
+            on_message_received=lambda _: None,
+            timeout=10,
+            transport=transport,
+        )
+
+    def test_transport_amqp_ws_sets_websocket_without_proxy(self, mocker, monkeypatch):
+        """--transport amqp_ws forces AmqpOverWebsocket even when no proxy is set."""
+        monkeypatch.delenv("HTTPS_PROXY", raising=False)
+        monkeypatch.delenv("HTTP_PROXY", raising=False)
+        monkeypatch.delenv("https_proxy", raising=False)
+        monkeypatch.delenv("http_proxy", raising=False)
+
+        target = Target(
+            hostname="testhub1234.azure-devices.net",
+            path="messages/events",
+            partitions=["0"],
+            policy="iothubowner",
+            key="abc",
+        )
+        target.add_consumer_group("$Default")
+
+        captured = {}
+
+        def fake_from_connection_string(connection_str, **kwargs):
+            captured["kwargs"] = kwargs
+            return object()
+
+        async def fake_monitor_events(**kwargs):
+            return None
+
+        mocker.patch.object(
+            telemetry.EventHubConsumerClient,
+            "from_connection_string",
+            side_effect=fake_from_connection_string,
+        )
+        mocker.patch.object(
+            telemetry, "_monitor_events", side_effect=fake_monitor_events
+        )
+
+        import asyncio
+
+        asyncio.run(self._run_initiate_with_transport(target, "amqp_ws"))
+
+        assert captured["kwargs"].get("transport_type") == TransportType.AmqpOverWebsocket
+        assert "http_proxy" not in captured["kwargs"]
+
+    def test_transport_amqp_does_not_set_websocket(self, mocker, monkeypatch):
+        """--transport amqp (default) does not set AmqpOverWebsocket when no proxy."""
+        monkeypatch.delenv("HTTPS_PROXY", raising=False)
+        monkeypatch.delenv("HTTP_PROXY", raising=False)
+        monkeypatch.delenv("https_proxy", raising=False)
+        monkeypatch.delenv("http_proxy", raising=False)
+
+        target = Target(
+            hostname="testhub1234.azure-devices.net",
+            path="messages/events",
+            partitions=["0"],
+            policy="iothubowner",
+            key="abc",
+        )
+        target.add_consumer_group("$Default")
+
+        captured = {}
+
+        def fake_from_connection_string(connection_str, **kwargs):
+            captured["kwargs"] = kwargs
+            return object()
+
+        async def fake_monitor_events(**kwargs):
+            return None
+
+        mocker.patch.object(
+            telemetry.EventHubConsumerClient,
+            "from_connection_string",
+            side_effect=fake_from_connection_string,
+        )
+        mocker.patch.object(
+            telemetry, "_monitor_events", side_effect=fake_monitor_events
+        )
+
+        import asyncio
+
+        asyncio.run(self._run_initiate_with_transport(target, "amqp"))
+
+        assert "transport_type" not in captured["kwargs"]
+        assert "http_proxy" not in captured["kwargs"]

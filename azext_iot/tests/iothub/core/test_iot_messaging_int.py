@@ -1262,6 +1262,14 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             device_ids,
         )
 
+        # Monitor events with explicit --transport amqp_ws (AMQP over WebSocket)
+        self.command_execute_assert(
+            "iot hub monitor-events -n {} -g {} --cg {} --et {} -t 8 -y --transport amqp_ws".format(
+                self.entity_name, self.entity_rg, LIVE_CONSUMER_GROUPS[0], enqueued_time
+            ),
+            device_ids,
+        )
+
         enqueued_time = calculate_millisec_since_unix_epoch_utc()
 
         # Send messages that have JSON payload, but do not pass $.ct property

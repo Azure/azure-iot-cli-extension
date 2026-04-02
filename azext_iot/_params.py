@@ -432,6 +432,16 @@ def load_arguments(self, _):
             help="Number of telemetry messages to capture before the monitor is terminated. "
             "If not specified, monitor keeps running until meeting the timeout threshold of not receiving messages from hub.",
         )
+        context.argument(
+            "transport",
+            options_list=["--transport", "--tr"],
+            arg_type=get_enum_type(["amqp", "amqp_ws"]),
+            help="Underlying transport protocol for the Event Hub client. "
+            "'amqp_ws' (AMQP over WebSocket) is required when routing through an HTTP proxy "
+            "and may also be preferred in environments where port 5671 is blocked. "
+            "Defaults to 'amqp'. When a proxy is configured via HTTPS_PROXY or HTTP_PROXY "
+            "environment variables, 'amqp_ws' is used automatically.",
+        )
 
     with self.argument_context("iot hub monitor-feedback") as context:
         context.argument(

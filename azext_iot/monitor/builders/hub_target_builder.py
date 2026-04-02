@@ -36,18 +36,18 @@ class EventTargetBuilder:
         self.eventLoop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.eventLoop)
 
-    def build_iot_hub_target(self, target):
+    def build_iot_hub_target(self, target, transport=None):
         return self.eventLoop.run_until_complete(
-            self._build_iot_hub_target_async(target)
+            self._build_iot_hub_target_async(target, transport=transport)
         )
 
-    async def _build_iot_hub_target_async(self, target):
+    async def _build_iot_hub_target_async(self, target, transport=None):
         cs = target.get("cs", "")
         # If the connection string is an Event Hub connection string (e.g. from IoT Hub's
         # built-in endpoint in the Azure portal), skip the AMQP redirect and connect
         # directly.  This also ensures proxy settings are applied correctly.
         if "EntityPath=" in cs and "servicebus.windows.net" in cs and "events" not in target:
-            return await self._build_from_eh_connection_string(cs)
+            return await self._build_from_eh_connection_string(cs, transport=transport)
 
         # If events metadata not provided, attempt to discover it via AMQP redirect
         if "events" not in target:
@@ -95,9 +95,10 @@ class EventTargetBuilder:
             "eventhub_name": path,
         }
         proxy_settings = get_http_proxy_settings()
+        if transport == "amqp_ws" or proxy_settings:
+            create_kwargs["transport_type"] = TransportType.AmqpOverWebsocket
         if proxy_settings:
             create_kwargs["http_proxy"] = proxy_settings
-            create_kwargs["transport_type"] = TransportType.AmqpOverWebsocket
 
         client = EventHubConsumerClient.from_connection_string(
             connection_str,
@@ -119,7 +120,7 @@ class EventTargetBuilder:
                 f"Unable to query partitions for '{target['entity'].split('.')[0]}': {e}"
             )
 
-    async def _build_from_eh_connection_string(self, cs: str) -> Target:
+    async def _build_from_eh_connection_string(self, cs: str, transport=None) -> Target:
         """Build a Target directly from an Event Hub connection string.
 
         Parses and connects to the Event Hub endpoint described by *cs*, applying
@@ -147,9 +148,10 @@ class EventTargetBuilder:
             "consumer_group": "$Default",
         }
         proxy_settings = get_http_proxy_settings()
+        if transport == "amqp_ws" or proxy_settings:
+            create_kwargs["transport_type"] = TransportType.AmqpOverWebsocket
         if proxy_settings:
             create_kwargs["http_proxy"] = proxy_settings
-            create_kwargs["transport_type"] = TransportType.AmqpOverWebsocket
 
         client = EventHubConsumerClient.from_connection_string(cs, **create_kwargs)
         try:
