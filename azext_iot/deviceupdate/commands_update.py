@@ -234,7 +234,7 @@ def manifest_init_v5(
     deployable: bool = None,
     no_validation: Optional[bool] = None,
 ):
-    from datetime import datetime
+    from datetime import datetime, timezone
     from pathlib import PurePath
     from azure.cli.core.azclierror import ArgumentUsageError
     from azext_iot.deviceupdate.common import FP_HANDLERS_REQUIRE_CRITERIA
@@ -279,7 +279,7 @@ def manifest_init_v5(
 
     payload = {}
     payload["manifestVersion"] = "5.0"
-    payload["createdDateTime"] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    payload["createdDateTime"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     payload["updateId"] = {}
     payload["updateId"]["name"] = update_name
     payload["updateId"]["provider"] = update_provider
@@ -487,7 +487,7 @@ def stage_update(
     from azure.storage.blob import ResourceTypes, AccountSasPermissions, generate_account_sas
     from azure.core.exceptions import ResourceExistsError
     from pathlib import PurePath
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
 
     cli = EmbeddedCLI()
     # If the user is not logged in, 'account show' will fail asking the user to login
@@ -517,7 +517,7 @@ def stage_update(
                     name=f"{container_directory}{file_name}", data=data, overwrite=overwrite
                 )
 
-            target_datetime_expiry = datetime.utcnow() + timedelta(hours=3.0)
+            target_datetime_expiry = datetime.now(timezone.utc) + timedelta(hours=3.0)
             sas_token = generate_account_sas(
                 account_name=blob_service_client.credential.account_name,
                 account_key=blob_service_client.credential.account_key,

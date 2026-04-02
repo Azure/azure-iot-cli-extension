@@ -377,7 +377,7 @@ class DeviceMessagingProvider(IoTHubProvider):
                 self.calls += 1
                 payload = {
                     "id": str(uuid.uuid4()),
-                    "timestamp": str(datetime.datetime.utcnow()),
+                    "timestamp": str(datetime.datetime.now(datetime.timezone.utc)),
                     "data": str(data + " #{}".format(self.calls)),
                 }
                 return json.dumps(payload) if jsonify else payload

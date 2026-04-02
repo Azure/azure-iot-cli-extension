@@ -88,9 +88,9 @@ def _generate_root_certificate(subject: str, valid_days: int, key: rsa.RSAPrivat
         .issuer_name(subject_name)
         .public_key(key.public_key())
         .serial_number(x509.random_serial_number())
-        .not_valid_before(datetime.datetime.utcnow())
+        .not_valid_before(datetime.datetime.now(datetime.timezone.utc))
         .not_valid_after(
-            datetime.datetime.utcnow() + datetime.timedelta(days=valid_days)
+            datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=valid_days)
         )
         .add_extension(
             x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False
@@ -151,9 +151,9 @@ def _generate_device_certificate(
         .issuer_name(root_cert.issuer)
         .public_key(key.public_key())
         .serial_number(x509.random_serial_number())
-        .not_valid_before(datetime.datetime.utcnow())
+        .not_valid_before(datetime.datetime.now(datetime.timezone.utc))
         .not_valid_after(
-            datetime.datetime.utcnow() + datetime.timedelta(days=valid_days)
+            datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=valid_days)
         )
         .add_extension(
             x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False

@@ -59,9 +59,9 @@ def create_self_signed_certificate(
         .issuer_name(subject_name)
         .public_key(key.public_key())
         .serial_number(serial)
-        .not_valid_before(datetime.datetime.utcnow())
+        .not_valid_before(datetime.datetime.now(datetime.timezone.utc))
         .not_valid_after(
-            datetime.datetime.utcnow() + datetime.timedelta(days=valid_days)
+            datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=valid_days)
         )
     )
 
@@ -221,9 +221,9 @@ def create_ca_signed_certificate(
         .issuer_name(ca_cert.subject)
         .public_key(private_key.public_key())
         .serial_number(x509.random_serial_number())
-        .not_valid_before(datetime.datetime.utcnow())
+        .not_valid_before(datetime.datetime.now(datetime.timezone.utc))
         .not_valid_after(
-            datetime.datetime.utcnow() + datetime.timedelta(days=valid_days)
+            datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=valid_days)
         )
         .add_extension(subject_key_id, False)
         .add_extension(authority_key_id, False)
