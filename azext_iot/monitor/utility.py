@@ -8,6 +8,10 @@ import asyncio
 import os
 from urllib.parse import unquote, urlparse
 
+from knack.log import get_logger
+
+logger = get_logger(__name__)
+
 
 def generate_on_start_string(device_id=None):
     device_filter_txt = None
@@ -93,6 +97,11 @@ def get_http_proxy_settings():
 
     parsed = urlparse(proxy_value if "://" in proxy_value else f"http://{proxy_value}")
     if not parsed.hostname or not parsed.port:
+        logger.warning(
+            "Proxy environment variable is set (%r) but could not be parsed "
+            "(hostname or port missing) — proxy will not be used for event monitoring.",
+            proxy_value,
+        )
         return None
 
     proxy_scheme = parsed.scheme or "http"

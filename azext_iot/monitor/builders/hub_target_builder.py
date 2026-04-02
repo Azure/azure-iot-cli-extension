@@ -46,7 +46,7 @@ class EventTargetBuilder:
         # If the connection string is an Event Hub connection string (e.g. from IoT Hub's
         # built-in endpoint in the Azure portal), skip the AMQP redirect and connect
         # directly.  This also ensures proxy settings are applied correctly.
-        if "EntityPath=" in cs and "servicebus.windows.net" in cs and "events" not in target:
+        if "EntityPath=" in cs and "servicebus.windows.net" in cs:
             return await self._build_from_eh_connection_string(cs, transport=transport)
 
         # If events metadata not provided, attempt to discover it via AMQP redirect
@@ -128,21 +128,17 @@ class EventTargetBuilder:
         string (e.g. from IoT Hub's built-in endpoint in the Azure portal) so that
         the AMQP link-redirect step can be skipped entirely.
         """
-        parts = {}
-        for segment in cs.split(";"):
-            if "=" in segment:
-                k, _, v = segment.partition("=")
-                parts[k.strip()] = v.strip()
-
-        endpoint_raw = parts.get("Endpoint", "")
+        from azext_iot.common._azure import parse_event_hub_connection_string
+        parsed = parse_event_hub_connection_string(cs)
+        endpoint_raw = parsed.get("Endpoint", "")
         for prefix in ("sb://", "amqps://"):
             if endpoint_raw.lower().startswith(prefix):
                 endpoint_raw = endpoint_raw[len(prefix):]
                 break
         hostname = endpoint_raw.rstrip("/")
-        entity_path = parts.get("EntityPath", "")
-        sas_key_name = parts.get("SharedAccessKeyName", "")
-        sas_key = parts.get("SharedAccessKey", "")
+        entity_path = parsed["EntityPath"]
+        sas_key_name = parsed["SharedAccessKeyName"]
+        sas_key = parsed["SharedAccessKey"]
 
         create_kwargs = {
             "consumer_group": "$Default",

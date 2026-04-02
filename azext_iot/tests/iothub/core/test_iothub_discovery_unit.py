@@ -121,5 +121,5 @@ class TestIoTHubDiscovery:
         assert target["name"] == "cooliothub"
         assert target["policy"] == "iothubowner"
         assert target["primarykey"] == "AB+c/+5nm2XpDXcffhnGhnxz/TVF4m5ag7AuVIGwchj="
-        assert target["events"]["endpoint"] == "cooliothub.servicebus.windows.net"
-        assert target["events"]["path"] == "cooliothub"
+        # Endpoint resolution is deferred to EventTargetBuilder — no 'events' key here
+        assert "events" not in target

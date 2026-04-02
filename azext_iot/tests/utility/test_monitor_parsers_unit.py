@@ -708,7 +708,13 @@ class TestMonitorProxySupport:
     def test_get_http_proxy_settings_returns_none_for_invalid(self, monkeypatch):
         monkeypatch.setenv("HTTPS_PROXY", "https://proxy.local")
 
-        assert get_http_proxy_settings() is None
+        from unittest.mock import patch
+        with patch("azext_iot.monitor.utility.logger") as mock_logger:
+            result = get_http_proxy_settings()
+            assert result is None
+            mock_logger.warning.assert_called_once()
+            warning_msg = mock_logger.warning.call_args[0][0]
+            assert "proxy" in warning_msg.lower()
 
     async def _run_initiate(self, target):
         await telemetry._initiate_event_monitor(
