@@ -20,7 +20,7 @@ import hmac
 import hashlib
 from typing import Any, Optional, List, Dict
 from threading import Event, Thread
-from datetime import datetime
+from datetime import datetime, timezone
 from knack.log import get_logger
 from azure.cli.core.azclierror import (
     CLIInternalError,
@@ -213,12 +213,10 @@ def shell_safe_json_parse(json_or_dict_string, preserve_order=False):
 
 
 def read_file_content(file_path, allow_binary=False):
-    from codecs import open as codecs_open
-
     # Note, always put 'utf-8-sig' first, so that BOM in WinOS won't cause trouble.
     for encoding in ["utf-8-sig", "utf-8", "utf-16", "utf-16le", "utf-16be"]:
         try:
-            with codecs_open(file_path, encoding=encoding) as f:
+            with open(file_path, encoding=encoding) as f:
                 logger.debug("Attempting to read file %s as %s", file_path, encoding)
                 return f.read()
         except (UnicodeError, UnicodeDecodeError):
@@ -446,8 +444,8 @@ def dict_transform_lower_case_key(d):
 
 
 def calculate_millisec_since_unix_epoch_utc(offset_seconds: int = 0):
-    now = datetime.utcnow()
-    epoch = datetime.utcfromtimestamp(0)
+    now = datetime.now(timezone.utc)
+    epoch = datetime.fromtimestamp(0, tz=timezone.utc)
     return int(1000 * ((now - epoch).total_seconds() + offset_seconds))
 
 
@@ -673,7 +671,7 @@ def generate_storage_account_sas_token(
     list: bool = False,
     delete: bool = False,
 ):
-    from datetime import datetime, timedelta
+    from datetime import timedelta
     ensure_azure_namespace_path()
     from azure.storage.blob import ResourceTypes, AccountSasPermissions, generate_account_sas, BlobServiceClient
 
@@ -686,7 +684,7 @@ def generate_storage_account_sas_token(
         permission=AccountSasPermissions(
             read=read, write=write, create=create, update=update, add=add, list=list, delete=delete
         ),
-        expiry=datetime.utcnow() + timedelta(hours=expiry_in_hours)
+        expiry=datetime.now(timezone.utc) + timedelta(hours=expiry_in_hours)
     )
 
     return sas_token

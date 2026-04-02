@@ -611,7 +611,7 @@ def _stage_update_assets(file_paths: List[str], storage_account_id: str, storage
             f"--connection-string '{storage_account_cstring}' -n {file_name}"
         ).success()
 
-        target_datetime_expiry = (datetime.utcnow() + timedelta(hours=3.0)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        target_datetime_expiry = (datetime.now(timezone.utc) + timedelta(hours=3.0)).strftime("%Y-%m-%dT%H:%M:%SZ")
         file_sas_uri = cli.invoke(
             f"storage blob generate-sas --connection-string '{storage_account_cstring}' --container {storage_container} "
             f"--name {file_name} --permissions r --expiry {target_datetime_expiry} "
