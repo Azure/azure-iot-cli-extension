@@ -40,7 +40,7 @@ async def _query_partition_count(hostname, path, credential, transport=None):
         "consumer_group": "$Default",
         "credential": credential,
     }
-    if transport == Transport.amqp_ws or proxy_settings:
+    if transport == Transport.AMQP_WS or proxy_settings:
         create_kwargs["transport_type"] = TransportType.AmqpOverWebsocket
     if proxy_settings:
         create_kwargs["http_proxy"] = proxy_settings

@@ -15,5 +15,5 @@ class Severity(IntEnum):
 
 
 class Transport(str, Enum):
-    amqp = "amqp"
-    amqp_ws = "amqp_ws"
+    AMQP = "amqp"
+    AMQP_WS = "amqp_ws"

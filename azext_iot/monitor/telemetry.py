@@ -128,7 +128,7 @@ async def _initiate_event_monitor(
             "consumer_group": target.consumer_group,
             "eventhub_name": target.path,
         }
-        if transport == Transport.amqp_ws or proxy_settings:
+        if transport == Transport.AMQP_WS or proxy_settings:
             create_kwargs["transport_type"] = TransportType.AmqpOverWebsocket
         if proxy_settings:
             create_kwargs["http_proxy"] = proxy_settings
@@ -145,7 +145,7 @@ async def _initiate_event_monitor(
             "consumer_group": target.consumer_group,
             "credential": target.sas_credential,
         }
-        if transport == Transport.amqp_ws or proxy_settings:
+        if transport == Transport.AMQP_WS or proxy_settings:
             create_kwargs["transport_type"] = TransportType.AmqpOverWebsocket
         if proxy_settings:
             create_kwargs["http_proxy"] = proxy_settings

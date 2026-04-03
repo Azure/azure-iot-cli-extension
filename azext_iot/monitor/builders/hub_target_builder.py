@@ -96,7 +96,7 @@ class EventTargetBuilder:
             "eventhub_name": path,
         }
         proxy_settings = get_http_proxy_settings()
-        if transport == Transport.amqp_ws or proxy_settings:
+        if transport == Transport.AMQP_WS or proxy_settings:
             create_kwargs["transport_type"] = TransportType.AmqpOverWebsocket
         if proxy_settings:
             create_kwargs["http_proxy"] = proxy_settings
@@ -145,7 +145,7 @@ class EventTargetBuilder:
             "consumer_group": "$Default",
         }
         proxy_settings = get_http_proxy_settings()
-        if transport == Transport.amqp_ws or proxy_settings:
+        if transport == Transport.AMQP_WS or proxy_settings:
             create_kwargs["transport_type"] = TransportType.AmqpOverWebsocket
         if proxy_settings:
             create_kwargs["http_proxy"] = proxy_settings
