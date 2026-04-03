@@ -8,6 +8,7 @@ import asyncio
 import sys
 from azure.eventhub.aio import EventHubConsumerClient
 from azure.eventhub import TransportType
+from azext_iot.monitor.models.enum import Transport
 from azure.cli.core.azclierror import CLIInternalError
 from datetime import datetime, timezone
 
@@ -127,7 +128,7 @@ async def _initiate_event_monitor(
             "consumer_group": target.consumer_group,
             "eventhub_name": target.path,
         }
-        if transport == "amqp_ws" or proxy_settings:
+        if transport == Transport.amqp_ws or proxy_settings:
             create_kwargs["transport_type"] = TransportType.AmqpOverWebsocket
         if proxy_settings:
             create_kwargs["http_proxy"] = proxy_settings
@@ -144,7 +145,7 @@ async def _initiate_event_monitor(
             "consumer_group": target.consumer_group,
             "credential": target.sas_credential,
         }
-        if transport == "amqp_ws" or proxy_settings:
+        if transport == Transport.amqp_ws or proxy_settings:
             create_kwargs["transport_type"] = TransportType.AmqpOverWebsocket
         if proxy_settings:
             create_kwargs["http_proxy"] = proxy_settings

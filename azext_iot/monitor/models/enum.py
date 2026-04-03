@@ -5,10 +5,15 @@
 # --------------------------------------------------------------------------------------------
 
 
-from enum import IntEnum
+from enum import IntEnum, Enum
 
 
 class Severity(IntEnum):
     info = 1
     warning = 2
     error = 3
+
+
+class Transport(str, Enum):
+    amqp = "amqp"
+    amqp_ws = "amqp_ws"

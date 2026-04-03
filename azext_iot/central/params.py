@@ -18,7 +18,7 @@ from azext_iot.central.common import (
     EnrollmentGroupAttestationType,
 )
 from azure.cli.core.commands.parameters import get_three_state_flag, get_enum_type
-from azext_iot.monitor.models.enum import Severity
+from azext_iot.monitor.models.enum import Severity, Transport
 from azext_iot.central.models.enum import ApiVersion
 from azext_iot._params import event_msg_prop_type, event_timeout_type
 
@@ -339,6 +339,16 @@ def load_central_arguments(self, _):
             "module_id",
             options_list=["--module-id", "-m"],
             help="The IoT Edge Module ID if the device type is IoT Edge.",
+        )
+        context.argument(
+            "transport",
+            options_list=["--transport", "--tr"],
+            arg_type=get_enum_type(Transport),
+            help="Underlying transport protocol for the Event Hub client. "
+            "'amqp_ws' (AMQP over WebSocket) is required when routing through an HTTP proxy "
+            "and may also be preferred in environments where port 5671 is blocked. "
+            "Defaults to 'amqp'. When a proxy is configured via HTTPS_PROXY or HTTP_PROXY "
+            "environment variables, 'amqp_ws' is used automatically.",
         )
 
     with self.argument_context("iot central role") as context:

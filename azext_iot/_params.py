@@ -36,6 +36,7 @@ from azext_iot.common.shared import (
 )
 from azext_iot._validators import mode2_iot_login_handler, process_top
 from azext_iot.assets.user_messages import info_param_properties_device
+from azext_iot.monitor.models.enum import Transport
 
 
 dps_auth_type_dataplane_param_type = CLIArgumentType(
@@ -435,7 +436,7 @@ def load_arguments(self, _):
         context.argument(
             "transport",
             options_list=["--transport", "--tr"],
-            arg_type=get_enum_type(["amqp", "amqp_ws"]),
+            arg_type=get_enum_type(Transport),
             help="Underlying transport protocol for the Event Hub client. "
             "'amqp_ws' (AMQP over WebSocket) is required when routing through an HTTP proxy "
             "and may also be preferred in environments where port 5671 is blocked. "

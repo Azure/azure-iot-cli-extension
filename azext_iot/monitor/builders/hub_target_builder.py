@@ -12,6 +12,7 @@ from azure.eventhub.aio import EventHubConsumerClient
 from knack.log import get_logger
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.utility import url_encode_str
+from azext_iot.monitor.models.enum import Transport
 from azext_iot.monitor.models.target import Target
 from azext_iot.monitor.utility import get_http_proxy_settings
 
@@ -95,7 +96,7 @@ class EventTargetBuilder:
             "eventhub_name": path,
         }
         proxy_settings = get_http_proxy_settings()
-        if transport == "amqp_ws" or proxy_settings:
+        if transport == Transport.amqp_ws or proxy_settings:
             create_kwargs["transport_type"] = TransportType.AmqpOverWebsocket
         if proxy_settings:
             create_kwargs["http_proxy"] = proxy_settings
@@ -144,7 +145,7 @@ class EventTargetBuilder:
             "consumer_group": "$Default",
         }
         proxy_settings = get_http_proxy_settings()
-        if transport == "amqp_ws" or proxy_settings:
+        if transport == Transport.amqp_ws or proxy_settings:
             create_kwargs["transport_type"] = TransportType.AmqpOverWebsocket
         if proxy_settings:
             create_kwargs["http_proxy"] = proxy_settings

@@ -8,6 +8,7 @@ import urllib
 from azure.eventhub.aio import EventHubConsumerClient
 from azure.eventhub import TransportType
 from azure.core.credentials import AzureSasCredential
+from azext_iot.monitor.models.enum import Transport
 from azext_iot.monitor.models.target import Target
 from azext_iot.monitor.utility import get_http_proxy_settings
 
@@ -39,7 +40,7 @@ async def _query_partition_count(hostname, path, credential, transport=None):
         "consumer_group": "$Default",
         "credential": credential,
     }
-    if transport == "amqp_ws" or proxy_settings:
+    if transport == Transport.amqp_ws or proxy_settings:
         create_kwargs["transport_type"] = TransportType.AmqpOverWebsocket
     if proxy_settings:
         create_kwargs["http_proxy"] = proxy_settings
