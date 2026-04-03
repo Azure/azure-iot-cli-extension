@@ -117,9 +117,9 @@ class TestIoTHubDiscovery:
         assert get_mgmt_client.call_count == 0
 
         assert target["cs"] == fake_eh_cs
-        assert target["entity"] == "cooliothub.servicebus.windows.net"
-        assert target["name"] == "cooliothub"
-        assert target["policy"] == "iothubowner"
-        assert target["primarykey"] == "AB+c/+5nm2XpDXcffhnGhnxz/TVF4m5ag7AuVIGwchj="
+        assert target["entity"] == "eventhub"
+        assert target["name"] == "eventhub"
+        assert target["policy"] == ""
+        assert target["primarykey"] == ""
         # Endpoint resolution is deferred to EventTargetBuilder — no 'events' key here
         assert "events" not in target
