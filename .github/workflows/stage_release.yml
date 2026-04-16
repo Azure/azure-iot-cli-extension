@@ -1,11 +1,15 @@
 name: "[auto] Draft Github Release"
+permissions: {}
 
 on:
   workflow_call:
 
 jobs:
   create_draft_release:
-    runs-on: [self-hosted, 1ES.Pool=iotupx-iot-cli-github-hosted-pool, 1ES.ImageOverride=Ubuntu20.04Compliant]
+    runs-on:
+      - self-hosted
+      - 1ES.Pool=iotupx-iot-cli-github-hosted-pool
+      - 1ES.ImageOverride=Ubuntu20.04Compliant
     permissions:
       # needed to create a draft release
       contents: write

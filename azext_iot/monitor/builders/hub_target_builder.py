@@ -11,7 +11,7 @@ from azure.eventhub import TransportType
 from azure.eventhub.aio import EventHubConsumerClient
 from knack.log import get_logger
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
-from azext_iot.common.utility import url_encode_str
+from azext_iot.common.utility import url_encode_str, is_eventhub_connection_string
 from azext_iot.monitor.models.enum import Transport
 from azext_iot.monitor.models.target import Target
 from azext_iot.monitor.utility import get_http_proxy_settings
@@ -47,7 +47,7 @@ class EventTargetBuilder:
         # If the connection string is an Event Hub connection string (e.g. from IoT Hub's
         # built-in endpoint in the Azure portal), skip the AMQP redirect and connect
         # directly.  This also ensures proxy settings are applied correctly.
-        if "EntityPath=" in cs and "servicebus.windows.net" in cs:
+        if is_eventhub_connection_string(cs):
             return await self._build_from_eh_connection_string(cs, transport=transport)
 
         # If events metadata not provided, attempt to discover it via AMQP redirect
@@ -262,8 +262,8 @@ class EventTargetBuilder:
                 finally:
                     try:
                         client.close()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("Failed to close AMQP client during cleanup: %s", e)
 
                 return result
 

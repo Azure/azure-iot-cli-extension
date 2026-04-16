@@ -11,8 +11,10 @@ from typing import Any, Dict, Optional
 
 from azext_iot.common.utility import ensure_azure_namespace_path
 from azure.cli.core.azclierror import RequiredArgumentMissingError
+from knack.log import get_logger
 
 printer = pprint.PrettyPrinter(indent=2)
+logger = get_logger(__name__)
 
 
 class MQTTProvider(object):
@@ -190,5 +192,5 @@ class MQTTProvider(object):
     def shutdown(self):
         try:
             self.device_client.shutdown()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to shutdown MQTT device client: %s", e)

@@ -1,5 +1,7 @@
+# checkov:skip=CKV_GHA_7:workflow_dispatch inputs are typed booleans controlling release flow, not injected into build output
 name: Build and Publish Release
 run-name: Build and publish release${{ github.event.inputs.github_release == 'true' &&  ' - Stage Release' || ''}}
+permissions: {}
 on:
   # only manual trigger
   workflow_dispatch:
@@ -36,23 +38,29 @@ jobs:
     uses: ./.github/workflows/release_build.yml
     secrets: inherit
   unit-test:
+    permissions:
+      contents: read
     uses: ./.github/workflows/tox.yml
     with:
       continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
   azdev_linter:
+    permissions:
+      contents: read
     needs: [build]
     uses: ./.github/workflows/azdev_linter.yml
     with:
       continue-on-error: ${{ github.event.inputs.continue-on-error == 'true' }}
   int_test:
+    permissions:
+      contents: read
     needs: [build]
-    if:  always() && !cancelled() && !failure() && (github.event.inputs.run_int_tests == 'true')
+    if: always() && !cancelled() && !failure() && (github.event.inputs.run_int_tests == 'true')
     uses: ./.github/workflows/trigger_ado_int_tests.yml
     secrets: inherit
   approval:
     needs: [security, build, unit-test, azdev_linter]
     # only needed if (release || wheel) - conditionals allow previous jobs to be skipped and still run
-    if:  always() && !cancelled() && !failure() && (github.event.inputs.github_release == 'true')
+    if: always() && !cancelled() && !failure() && (github.event.inputs.github_release == 'true')
     environment: production
     runs-on: ubuntu-latest
     steps:
@@ -68,6 +76,6 @@ jobs:
       # needed to create draft release
       contents: write
     needs: [approval]
-    if:  always() && !cancelled() && !failure() && github.event.inputs.github_release == 'true'
+    if: always() && !cancelled() && !failure() && github.event.inputs.github_release == 'true'
     uses: ./.github/workflows/stage_release.yml
     secrets: inherit

@@ -1,4 +1,5 @@
 name: "[auto] Simple Build"
+permissions: {}
 on:
   workflow_call:
 jobs:

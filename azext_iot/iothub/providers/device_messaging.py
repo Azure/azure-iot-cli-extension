@@ -225,8 +225,8 @@ class DeviceMessagingProvider(IoTHubProvider):
                         logger.info(f"Decoding message data encoded with: {target_encoding}")
                         try:
                             payload["data"] = result.content.decode(target_encoding)
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug("Failed to decode message data with encoding %s: %s", target_encoding, e)
 
                 return payload
             return

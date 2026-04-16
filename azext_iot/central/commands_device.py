@@ -337,7 +337,7 @@ def list_children(
             ):
                 children.append(device)
         except Exception:
-            pass
+            logger.debug("Failed to get device twin for device '%s', skipping.", device.id)
 
     return children
 

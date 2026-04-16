@@ -1,4 +1,6 @@
+# checkov:skip=CKV_GHA_7:workflow_dispatch inputs are typed booleans controlling test selection, not injected into build output
 name: Run Azure DevOps Integration Tests
+permissions: {}
 on:
   workflow_call:
     inputs:
@@ -76,6 +78,7 @@ env:
   PROJECT: aziotcli
 jobs:
   call-ado-pipeline:
+    permissions: {}
     runs-on: ubuntu-latest
     name: Run integration tests
     outputs:
@@ -135,6 +138,7 @@ jobs:
           echo "You can follow the progress [here](${{ steps.start.outputs.portalUrl }})" >> $GITHUB_STEP_SUMMARY
 
   wait-for-completion:
+    permissions: {}
     runs-on: ubuntu-latest
     name: Wait for the pipeline to complete
     needs: [call-ado-pipeline]
@@ -167,6 +171,7 @@ jobs:
           echo "# [SUCCESS] ${PIPELINE:-$DEFAULT_TITLE} Completed [SUCCESS]" >> $GITHUB_STEP_SUMMARY
           echo "The pipeline completed successfully. You can check the logs [here](${PORTAL_URL})" >> $GITHUB_STEP_SUMMARY
   CancelPipeline:
+    permissions: {}
     runs-on: ubuntu-latest
     needs: [call-ado-pipeline, wait-for-completion]
     if: cancelled()

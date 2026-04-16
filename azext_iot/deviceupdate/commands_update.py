@@ -194,8 +194,8 @@ def import_update(
                             "Cached contents from usage of --defer were not removed. Use 'az cache' command group to manage. "
                         )
                     logger.error(lro._pipeline_response.http_response.text())
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to log LRO failure details: %s", e)
 
         import_poller.add_done_callback(import_handler)
         # @digimaun - TODO: Investigate better LRO error handling.

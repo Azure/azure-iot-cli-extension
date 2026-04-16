@@ -1,4 +1,5 @@
 name: "[auto] CLI Command Table Linter"
+permissions: {}
 on:
   workflow_call:
     inputs:

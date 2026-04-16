@@ -221,8 +221,8 @@ async def _monitor_events(
 def _stop_and_suppress_eloop(loop):
     try:
         loop.stop()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to stop event loop: %s", e)
 
 
 def _get_conn_props():

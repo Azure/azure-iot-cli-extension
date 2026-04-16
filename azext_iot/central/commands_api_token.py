@@ -8,7 +8,7 @@
 from typing import List
 from azext_iot.constants import CENTRAL_ENDPOINT
 from azext_iot.central.providers import CentralApiTokenProvider
-from azext_iot.central.models.enum import Role
+from azext_iot.central.models.enum import Role, get_enum_keys
 from azext_iot.central.common import API_VERSION
 
 
@@ -26,10 +26,7 @@ def add_api_token(
         cmd=cmd, app_id=app_id, token=token, api_version=api_version
     )
 
-    try:
-        role = Role[role].value
-    except Exception:
-        pass
+    role = Role[role].value if role in get_enum_keys(Role) else role
 
     return provider.add_api_token(
         token_id=token_id,

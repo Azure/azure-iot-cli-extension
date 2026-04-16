@@ -212,8 +212,8 @@ def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
     finally:
         try:
             client.close()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to close feedback client during cleanup: %s", e)
 
 
 def _get_container_id():

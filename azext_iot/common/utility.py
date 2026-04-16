@@ -219,16 +219,16 @@ def read_file_content(file_path, allow_binary=False):
             with open(file_path, encoding=encoding) as f:
                 logger.debug("Attempting to read file %s as %s", file_path, encoding)
                 return f.read()
-        except (UnicodeError, UnicodeDecodeError):
-            pass
+        except (UnicodeError, UnicodeDecodeError) as e:
+            logger.debug("Failed to decode file %s with encoding %s: %s", file_path, encoding, e)
 
     if allow_binary:
         try:
             with open(file_path, "rb") as input_file:
                 logger.debug("Attempting to read file %s as binary", file_path)
                 return base64.b64encode(input_file.read()).decode("utf-8")
-        except Exception:  # pylint: disable=broad-except
-            pass
+        except Exception as e:  # pylint: disable=broad-except
+            logger.debug("Failed to read file %s as binary: %s", file_path, e)
     raise FileOperationError(
         "Failed to decode file {} - unknown decoding".format(file_path)
     )
@@ -572,6 +572,25 @@ def scantree(path):
 
 def find_between(s, start, end):
     return (s.split(start))[1].split(end)[0]
+
+
+def is_eventhub_connection_string(cs: str) -> bool:
+    """Check if a connection string is an Event Hub connection string.
+
+    Validates that the string contains 'EntityPath=' and that the
+    Endpoint hostname ends with '.servicebus.windows.net'.
+    """
+    try:
+        from azext_iot.common._azure import parse_event_hub_connection_string
+        decomposed = parse_event_hub_connection_string(cs)
+        decomposed_lower = {k.lower(): v for k, v in decomposed.items()}
+        endpoint = decomposed_lower.get("endpoint", "")
+        from urllib.parse import urlparse
+        parsed = urlparse(endpoint)
+        hostname = (parsed.hostname or "").lower()
+        return hostname.endswith(".servicebus.windows.net")
+    except (IndexError, ValueError):
+        return False
 
 
 def valid_hostname(host_name):
