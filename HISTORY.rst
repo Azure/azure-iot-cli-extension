@@ -10,7 +10,7 @@ Release History
 
 * **[Breaking Change]** Minimum supported Python version bumped from 3.9 to 3.10.
 
-* Updated ``jsonschema`` dependency to ``>=4.25,<5``. The ``referencing`` package is now used for schema registry support.
+* Updated ``jsonschema`` dependency to ``>=4.25,<5``.
 
 * Added ``aiohttp>=3.9,<4.0`` as a required dependency to support AMQP over WebSocket transport for event monitoring.
 
