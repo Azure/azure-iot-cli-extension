@@ -365,12 +365,12 @@ class TestADRBYOREdgeCases(ADRHubInfraHelper, CaptureOutputLiveScenarioTest):
             self.cleanup_namespace(namespace_name, rg)
 
     def test_activate_byor_on_standard_policy_fails(self):
-        """Attempting activate-byor on a non-BYOR policy should fail.
+        """Attempting activate-byor on a non-BYOR policy is currently expected to fail.
 
         Note: The backend currently returns BringYourOwnRootNotEnabled as a
-        temporary measure due to an internal bug. This behavior is expected to
-        change once the backend fix is deployed, at which point the operation
-        may be silently accepted. Adjust expect_failure accordingly.
+        temporary measure due to an internal bug. Once the backend fix is
+        deployed, this operation may instead be silently accepted, and the test
+        expectation should be updated accordingly.
         """
         _log(LogKind.TEST, "test_activate_byor_on_standard_policy_fails")
         rg = TEST_RG
@@ -395,6 +395,24 @@ class TestADRBYOREdgeCases(ADRHubInfraHelper, CaptureOutputLiveScenarioTest):
                 # an internal bug. Once fixed, this may need expect_failure=False.
                 self.cmd(activate_cmd, expect_failure=True)  # TODO(BYOR): revert to expect_failure=False after backend fix
                 _log(LogKind.OK, "activate-byor on standard policy failed as expected")
+
+                _log(LogKind.STEP, "Verify ❯ standard policy remains unchanged after activate-byor attempt")
+                show_cmd = f"iot adr ns policy show --ns {namespace_name} -g {rg} --policy-name default"
+                _log(LogKind.CMD, "az %s", show_cmd)
+                policy = self.cmd(show_cmd).get_output_in_json()
+
+                byor = get_ca_config(policy).get("bringYourOwnRoot")
+                if byor:
+                    assert byor.get("enabled") is not True
+                    assert byor.get("status") != "Active"
+                    _log(
+                        LogKind.OK,
+                        "BYOR remains disabled after failed activation attempt (enabled=%s, status=%s)",
+                        byor.get("enabled"),
+                        byor.get("status"),
+                    )
+                else:
+                    _log(LogKind.OK, "No BYOR section on standard policy after failed activation attempt")
             finally:
                 os.unlink(dummy_cert)
 
@@ -402,12 +420,13 @@ class TestADRBYOREdgeCases(ADRHubInfraHelper, CaptureOutputLiveScenarioTest):
             self.cleanup_namespace(namespace_name, rg)
 
     def test_activate_byor_with_mismatched_chain_fails(self):
-        """Activating BYOR with a certificate that doesn't match the CSR should fail.
+        """Activating BYOR with a certificate that doesn't match the CSR is
+        currently expected to fail.
 
         Note: The backend currently returns CertificateSubjectMismatch as a
-        temporary measure due to an internal bug. This behavior is expected to
-        change once the backend fix is deployed, at which point the operation
-        may be silently accepted. Adjust expect_failure accordingly.
+        temporary measure due to an internal bug. Once the backend fix is
+        deployed, this operation may instead be silently accepted, and the test
+        expectation should be updated accordingly.
         """
         _log(LogKind.TEST, "test_activate_byor_with_mismatched_chain_fails")
         rg = TEST_RG
