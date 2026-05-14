@@ -3,6 +3,29 @@
 Release History
 ===============
 
+0.29.0
++++++++++++++++
+
+**General updates**
+
+* **[Breaking Change]** Minimum supported Python version bumped from 3.9 to 3.10.
+
+* Updated ``jsonschema`` dependency to ``>=4.25,<5``.
+
+* Added ``aiohttp>=3.9,<4.0`` as a required dependency to support AMQP over WebSocket transport for event monitoring.
+
+* Removed remaining ``uamqp`` references from help text and documentation.
+
+* Replaced deprecated ``datetime.utcnow()`` and ``codecs.open`` calls with timezone-aware equivalents.
+
+**IoT Hub / IoT Central monitoring updates**
+
+* ``az iot hub monitor-events`` and ``az iot central diagnostics monitor-events`` / ``validate-messages`` now automatically route traffic through an HTTP proxy when the ``HTTPS_PROXY`` or ``HTTP_PROXY`` environment variable is set, using AMQP over WebSocket transport.
+
+* Added ``--transport`` (``--tr``) parameter to ``az iot hub monitor-events``, ``az iot central diagnostics monitor-events``, and ``az iot central diagnostics validate-messages`` to explicitly select the underlying transport protocol (``amqp`` or ``amqp_ws``). Defaults to ``amqp``; ``amqp_ws`` (AMQP over WebSocket) is required when routing through an HTTP proxy or when port 5671 is blocked.
+
+* ``az iot hub monitor-events --login`` now accepts an Event Hub connection string (e.g. the built-in endpoint connection string from the Azure portal) in addition to an IoT Hub connection string.
+
 0.28.1
 +++++++++++++++
 
