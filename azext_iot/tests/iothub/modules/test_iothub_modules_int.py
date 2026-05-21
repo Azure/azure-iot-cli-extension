@@ -439,3 +439,100 @@ class TestIoTHubModules(IoTLiveScenarioTest):
             f"iot hub generate-sas-token -m {module_ids[0]} -d {device_ids[0]} --login {mixed_case_cstring}",
             checks=[self.exists("sas")],
         )
+
+    def test_iothub_module_hostname_type_permutations(self):
+        """Bug-bash #8 and #9: --hostname-type permutations for module-scope CS-show and SAS.
+
+        - `--hostname-type service` must be rejected on both CS-show and SAS.
+        - Classic / device permutations should succeed (device only on GWv2 hubs).
+        - On GWv2 hubs, auto (default) resolves to the device endpoint for both CS-show and SAS.
+        """
+        from urllib.parse import unquote
+
+        def extract_sr(sas_payload):
+            sas = sas_payload["sas"].replace("SharedAccessSignature ", "")
+            for part in sas.split("&"):
+                if part.startswith("sr="):
+                    return unquote(part[3:])
+            raise AssertionError(f"sas token had no sr= component: {sas}")
+
+        hub = self.cmd(
+            f"iot hub show -n {self.entity_name} -g {self.entity_rg}"
+        ).get_output_in_json()
+        props = hub["properties"]
+        classic_hn = props["hostName"]
+        device_hn = props.get("deviceHostName")
+        is_gwv2 = bool(device_hn)
+
+        device_id = self.generate_device_names(1)[0]
+        module_id = self.generate_device_names(1)[0]
+        self.cmd(
+            f"iot hub device-identity create -d {device_id} -n {self.entity_name} -g {self.entity_rg}"
+        )
+        self.cmd(
+            f"iot hub module-identity create -m {module_id} -d {device_id} -n {self.entity_name} -g {self.entity_rg}"
+        )
+
+        # --- module-identity connection-string show ---
+        # service is always rejected (bug #8)
+        self.cmd(
+            f"iot hub module-identity connection-string show -m {module_id} -d {device_id} "
+            f"-n {self.host_name} -g {self.entity_rg} --hostname-type service",
+            expect_failure=True,
+        )
+
+        # classic
+        cs_classic = self.cmd(
+            f"iot hub module-identity connection-string show -m {module_id} -d {device_id} "
+            f"-n {self.host_name} -g {self.entity_rg} --hostname-type classic",
+        ).get_output_in_json()["connectionString"]
+        assert f"HostName={classic_hn}" in cs_classic
+
+        if is_gwv2:
+            cs_device = self.cmd(
+                f"iot hub module-identity connection-string show -m {module_id} -d {device_id} "
+                f"-n {self.host_name} -g {self.entity_rg} --hostname-type device",
+            ).get_output_in_json()["connectionString"]
+            assert f"HostName={device_hn}" in cs_device
+
+            cs_auto = self.cmd(
+                f"iot hub module-identity connection-string show -m {module_id} -d {device_id} "
+                f"-n {self.host_name} -g {self.entity_rg}",
+            ).get_output_in_json()["connectionString"]
+            assert f"HostName={device_hn}" in cs_auto
+
+        # --- generate-sas-token (module scope) ---
+        # service is always rejected (bug #9)
+        self.cmd(
+            f"iot hub generate-sas-token -m {module_id} -d {device_id} "
+            f"-n {self.host_name} -g {self.entity_rg} --hostname-type service",
+            expect_failure=True,
+        )
+
+        token = self.cmd(
+            f"iot hub generate-sas-token -m {module_id} -d {device_id} "
+            f"-n {self.host_name} -g {self.entity_rg} --hostname-type classic",
+            checks=[self.exists("sas")],
+        ).get_output_in_json()
+        assert extract_sr(token) == f"{classic_hn}/devices/{device_id}/modules/{module_id}"
+
+        if is_gwv2:
+            token = self.cmd(
+                f"iot hub generate-sas-token -m {module_id} -d {device_id} "
+                f"-n {self.host_name} -g {self.entity_rg} --hostname-type device",
+                checks=[self.exists("sas")],
+            ).get_output_in_json()
+            assert extract_sr(token) == f"{device_hn}/devices/{device_id}/modules/{module_id}"
+
+            token = self.cmd(
+                f"iot hub generate-sas-token -m {module_id} -d {device_id} "
+                f"-n {self.host_name} -g {self.entity_rg}",
+                checks=[self.exists("sas")],
+            ).get_output_in_json()
+            assert extract_sr(token) == f"{device_hn}/devices/{device_id}/modules/{module_id}"
+        else:
+            self.cmd(
+                f"iot hub generate-sas-token -m {module_id} -d {device_id} "
+                f"-n {self.host_name} -g {self.entity_rg} --hostname-type device",
+                expect_failure=True,
+            )

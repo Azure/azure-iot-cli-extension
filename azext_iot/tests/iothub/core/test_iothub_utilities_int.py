@@ -67,6 +67,70 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
             checks=[self.exists("sas")],
         )
 
+    def test_iothub_generate_sas_token_hostname_type(self):
+        """Bug-bash #9: --hostname-type permutations for hub-level SAS.
+
+        Verifies the `sr=` audience in the generated SAS token matches the requested hostname type.
+        """
+        from urllib.parse import unquote
+
+        def extract_sr(sas_payload):
+            sas = sas_payload["sas"].replace("SharedAccessSignature ", "")
+            for part in sas.split("&"):
+                if part.startswith("sr="):
+                    return unquote(part[3:])
+            raise AssertionError(f"sas token had no sr= component: {sas}")
+
+        hub = self.cmd(
+            f"iot hub show -n {self.entity_name} -g {self.entity_rg}"
+        ).get_output_in_json()
+        props = hub["properties"]
+        classic_hn = props["hostName"]
+        device_hn = props.get("deviceHostName")
+        service_hn = props.get("serviceHostName")
+        is_gwv2 = bool(device_hn and service_hn)
+
+        # auto: defaults to service hostname on GWv2, classic on V1
+        token = self.cmd(
+            f"iot hub generate-sas-token -n {self.entity_name} -g {self.entity_rg}",
+            checks=[self.exists("sas")],
+        ).get_output_in_json()
+        expected_auto = service_hn if is_gwv2 else classic_hn
+        assert extract_sr(token) == expected_auto, \
+            f"auto: expected sr={expected_auto}, got {extract_sr(token)}"
+
+        # classic
+        token = self.cmd(
+            f"iot hub generate-sas-token -n {self.entity_name} -g {self.entity_rg} --hostname-type classic",
+            checks=[self.exists("sas")],
+        ).get_output_in_json()
+        assert extract_sr(token) == classic_hn
+
+        if is_gwv2:
+            # service (only valid on GWv2)
+            token = self.cmd(
+                f"iot hub generate-sas-token -n {self.entity_name} -g {self.entity_rg} --hostname-type service",
+                checks=[self.exists("sas")],
+            ).get_output_in_json()
+            assert extract_sr(token) == service_hn
+
+            # device (valid for hub-level SAS too — produces device-endpoint audience)
+            token = self.cmd(
+                f"iot hub generate-sas-token -n {self.entity_name} -g {self.entity_rg} --hostname-type device",
+                checks=[self.exists("sas")],
+            ).get_output_in_json()
+            assert extract_sr(token) == device_hn
+        else:
+            # service / device must error on classic hubs
+            self.cmd(
+                f"iot hub generate-sas-token -n {self.entity_name} -g {self.entity_rg} --hostname-type service",
+                expect_failure=True,
+            )
+            self.cmd(
+                f"iot hub generate-sas-token -n {self.entity_name} -g {self.entity_rg} --hostname-type device",
+                expect_failure=True,
+            )
+
     def test_iothub_connection_string_show(self):
         conn_str_pattern = r"^HostName={0}(\.\w+)?\.azure-devices\.net;SharedAccessKeyName=iothubowner;SharedAccessKey=".format(
             self.entity_name

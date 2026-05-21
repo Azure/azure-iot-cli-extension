@@ -33,6 +33,18 @@ Release History
 
 * For managed-identity links, the linked hub's hostname is auto-resolved from the IoT Hub's ``deviceHostName`` (with classic fallback for V1 hubs). CLI validates that the appropriate identity type is enabled on the DPS resource before creating a managed-identity link.
 
+**Bug fixes (0.31.0b1 bug bash follow-ups)**
+
+* ``az iot dps linked-hub create`` now rejects linking the same IoT Hub more than once to the same DPS, regardless of hostname type or authentication method. Previously the second link silently created a duplicate ``iotHubs`` entry under a different hostname (e.g. classic vs ``.device.``), leaving the DPS in an ambiguous state. Use ``az iot dps linked-hub delete`` to remove the existing link before re-linking.
+
+* ``az iot hub device-identity connection-string show`` and ``az iot hub module-identity connection-string show`` now reject ``--hostname-type service``. Devices and modules cannot authenticate against the service endpoint; use ``auto``, ``device`` or ``classic`` instead.
+
+* ``az iot hub generate-sas-token`` gains a ``--hostname-type`` parameter and now produces audience-correct SAS tokens for TLS 1.3 hubs:
+
+  - Hub-level SAS (no ``-d``) defaults to ``--hostname-type auto`` which resolves to the service hostname on GWv2 hubs and the classic hostname on V1 hubs. ``service``, ``device`` and ``classic`` are explicitly selectable.
+  - Device-level SAS (``-d``) and module-level SAS (``-d -m``) default to ``auto`` which resolves to the device hostname on GWv2 hubs and the classic hostname on V1 hubs. ``--hostname-type service`` is rejected.
+  - **Behavior change:** on GWv2 hubs the ``sr=`` audience for device/module SAS tokens now points at the device endpoint (``<hub>.device.azure-devices.net/devices/...``). Hub-side enforcement of audience-to-endpoint match is rolling out, so consumers should treat this as the correct default.
+
 0.29.0
 +++++++++++++++
 

@@ -689,6 +689,12 @@ helps[
       text: >
         az iot hub generate-sas-token --connection-string
         'HostName=myhub.azure-devices.net;DeviceId=mydevice;ModuleId=mymodule;SharedAccessKeyName=iothubowner;SharedAccessKey=12345'
+    - name: Generate a device SAS token whose audience targets the TLS 1.3 device endpoint of a GWv2 hub.
+      text: >
+        az iot hub generate-sas-token -d {device_id} -n {iothub_name} --hostname-type device
+    - name: Generate an IoT Hub SAS token whose audience explicitly targets the TLS 1.3 service endpoint.
+      text: >
+        az iot hub generate-sas-token -n {iothub_name} --hostname-type service
 """
 
 helps[

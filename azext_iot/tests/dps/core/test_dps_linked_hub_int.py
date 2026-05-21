@@ -172,3 +172,49 @@ def test_linked_hub_list_shows_hostname(provisioned_iot_dps_no_hub_module):
             f"Should find linked hub with name '{device_hostname}'. Found: {[h['name'] for h in linked_hubs]}"
     finally:
         _cleanup_linked_hub(dps_name, dps_rg, device_hostname)
+
+
+def test_linked_hub_create_rejects_duplicate_cross_hostname_type(provisioned_iot_dps_no_hub_module):
+    """Bug-bash #7: linking the same hub a second time (with different --hostname-type) must fail.
+
+    Step 1: link hub as classic.
+    Step 2: try to re-link the same hub as device → expect non-zero exit code.
+    """
+    dps_name = provisioned_iot_dps_no_hub_module["name"]
+    dps_rg = provisioned_iot_dps_no_hub_module["resourceGroup"]
+
+    gwv2_hub = _find_gwv2_hub(dps_rg)
+    if not gwv2_hub:
+        pytest.skip("No GWv2 hub available in resource group")
+
+    hub_name = gwv2_hub["name"]
+    classic_hostname = gwv2_hub["properties"]["hostName"]
+    device_hostname = gwv2_hub["properties"]["deviceHostName"]
+
+    try:
+        # Step 1: first link succeeds
+        cli.invoke(
+            f"iot dps linked-hub create --dps-name {dps_name} -g {dps_rg} "
+            f"--hub-name {hub_name} --hostname-type classic"
+        )
+
+        # Step 2: re-linking the same hub under a different hostname type must fail.
+        result = cli.invoke(
+            f"iot dps linked-hub create --dps-name {dps_name} -g {dps_rg} "
+            f"--hub-name {hub_name} --hostname-type device"
+        )
+        assert not result.success(), \
+            "Re-linking the same hub under a different hostname type should be rejected"
+
+        # Verify only the original classic entry remains.
+        linked_hubs = cli.invoke(
+            f"iot dps linked-hub list --dps-name {dps_name} -g {dps_rg}"
+        ).as_json()
+        names = [h["name"] for h in linked_hubs]
+        assert classic_hostname in names, \
+            f"Original classic link should still exist. Names: {names}"
+        assert device_hostname not in names, \
+            f"Device-hostname entry should NOT have been created. Names: {names}"
+    finally:
+        _cleanup_linked_hub(dps_name, dps_rg, classic_hostname)
+        _cleanup_linked_hub(dps_name, dps_rg, device_hostname)

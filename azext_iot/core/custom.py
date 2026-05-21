@@ -98,6 +98,22 @@ def _resolve_linked_hub_hostname(hub, hostname_type="auto"):
     return device_hostname or hub["properties"]["hostName"]
 
 
+def _linked_hub_hostname(hub):
+    """Return the raw hostname for a linked-hub entry, checking ``hostName``,
+    ``connectionString`` and ``name`` in turn. Returns "" if none is available.
+    """
+    hostname = hub.get("hostName", "") or ""
+    if not hostname:
+        cs = hub.get("connectionString", "") or ""
+        for part in cs.split(";"):
+            if part.lower().startswith("hostname="):
+                hostname = part.split("=", 1)[1]
+                break
+    if not hostname:
+        hostname = hub.get("name", "") or ""
+    return hostname
+
+
 def _warn_mixed_endpoint_types(linked_hubs):
     """Warn if DPS dynamic allocation references hubs with mixed hostname types."""
     types = set()
@@ -105,15 +121,7 @@ def _warn_mixed_endpoint_types(linked_hubs):
         # Only check hubs participating in allocation
         if hub.get("applyAllocationPolicy") is False:
             continue
-        hostname = hub.get("hostName", "")
-        if not hostname:
-            cs = hub.get("connectionString", "")
-            for part in cs.split(";"):
-                if part.lower().startswith("hostname="):
-                    hostname = part.split("=", 1)[1]
-                    break
-        if not hostname:
-            hostname = hub.get("name", "")
+        hostname = _linked_hub_hostname(hub)
         parts = hostname.split(".")
         if len(parts) > 1 and parts[1] == "device":
             types.add("device")
@@ -477,6 +485,20 @@ def iot_dps_linked_hub_create(
         linked_hub_entry["applyAllocationPolicy"] = apply_allocation_policy
     if allocation_weight is not None:
         linked_hub_entry["allocationWeight"] = allocation_weight
+
+    # Reject duplicate hub linking (same hub under any hostname type) — bug bash 0.31.0b1
+    new_short_name = _linked_hub_hostname(linked_hub_entry).split(".")[0].lower()
+    existing_short_names = {
+        _linked_hub_hostname(h).split(".")[0].lower()
+        for h in dps["properties"]["iotHubs"]
+    }
+    existing_short_names.discard("")
+    if new_short_name and new_short_name in existing_short_names:
+        raise InvalidArgumentValueError(
+            f"IoT Hub '{new_short_name}' is already linked to DPS '{dps_name}'. "
+            "Remove the existing link with 'az iot dps linked-hub delete' "
+            "before re-linking under a different hostname type or authentication method."
+        )
 
     dps["properties"]["iotHubs"].append(linked_hub_entry)
 
