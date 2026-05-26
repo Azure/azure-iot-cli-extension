@@ -98,6 +98,15 @@ FP_HANDLERS_REQUIRE_CRITERIA: List[str] = [
 
 
 SYSTEM_IDENTITY_ARG = "[system]"
+
+
+class ADUDownloadSecurityType(Enum):
+    """
+    ADU download security (protocol) type for update payload downloads.
+    """
+
+    HTTPS = "https"
+    HTTP = "http"
 AUTH_RESOURCE_ID = "https://api.adu.microsoft.com/"
 CACHE_RESOURCE_TYPE = "DeviceUpdate"
 

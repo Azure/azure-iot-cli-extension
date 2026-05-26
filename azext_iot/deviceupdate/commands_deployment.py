@@ -52,6 +52,7 @@ def create_deployment(
     rollback_update_version: Optional[str] = None,
     devices_failed_percentage: Optional[str] = None,
     devices_failed_count: Optional[str] = None,
+    download_security: Optional[str] = None,
     resource_group_name: Optional[str] = None,
 ):
     if any(
@@ -105,6 +106,7 @@ def create_deployment(
         group_id=device_group_id,
         update=update_info,
         rollback_policy=rollback_policy,
+        download_security=download_security,
     )
     try:
         return data_manager.data_client.device_management.create_or_update_deployment(

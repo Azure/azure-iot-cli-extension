@@ -199,6 +199,9 @@ class Deployment(_serialization.Model):
     :ivar is_cloud_initiated_rollback: Boolean flag indicating whether the deployment is a rollback
      deployment.
     :vartype is_cloud_initiated_rollback: bool
+    :ivar download_security: Protocol used for update payload downloads. Known values are: "https"
+     and "http". Defaults to "https".
+    :vartype download_security: str or ~deviceupdateclient.models.DownloadSecurity
     """
 
     _validation = {
@@ -218,6 +221,7 @@ class Deployment(_serialization.Model):
         "is_retried": {"key": "isRetried", "type": "bool"},
         "rollback_policy": {"key": "rollbackPolicy", "type": "CloudInitiatedRollbackPolicy"},
         "is_cloud_initiated_rollback": {"key": "isCloudInitiatedRollback", "type": "bool"},
+        "download_security": {"key": "downloadSecurity", "type": "str"},
     }
 
     def __init__(
@@ -232,6 +236,7 @@ class Deployment(_serialization.Model):
         is_retried: Optional[bool] = None,
         rollback_policy: Optional["_models.CloudInitiatedRollbackPolicy"] = None,
         is_cloud_initiated_rollback: Optional[bool] = None,
+        download_security: Optional[Union[str, "_models.DownloadSecurity"]] = None,
         **kwargs
     ):
         """
@@ -260,6 +265,9 @@ class Deployment(_serialization.Model):
         :keyword is_cloud_initiated_rollback: Boolean flag indicating whether the deployment is a
          rollback deployment.
         :paramtype is_cloud_initiated_rollback: bool
+        :keyword download_security: Protocol used for update payload downloads. Known values are:
+         "https" and "http". Defaults to "https".
+        :paramtype download_security: str or ~deviceupdateclient.models.DownloadSecurity
         """
         super().__init__(**kwargs)
         self.deployment_id = deployment_id
@@ -271,6 +279,7 @@ class Deployment(_serialization.Model):
         self.is_retried = is_retried
         self.rollback_policy = rollback_policy
         self.is_cloud_initiated_rollback = is_cloud_initiated_rollback
+        self.download_security = download_security
 
 
 class DeploymentDeviceState(_serialization.Model):

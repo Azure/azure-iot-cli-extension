@@ -74,6 +74,7 @@ from ._device_update_client_enums import DeploymentState
 from ._device_update_client_enums import DeviceClassSubgroupDeploymentState
 from ._device_update_client_enums import DeviceDeploymentState
 from ._device_update_client_enums import DeviceHealthState
+from ._device_update_client_enums import DownloadSecurity
 from ._device_update_client_enums import GroupType
 from ._device_update_client_enums import HealthCheckResult
 from ._device_update_client_enums import ImportType
@@ -152,6 +153,7 @@ __all__ = [
     'DeviceClassSubgroupDeploymentState',
     'DeviceDeploymentState',
     'DeviceHealthState',
+    'DownloadSecurity',
     'GroupType',
     'HealthCheckResult',
     'ImportType',

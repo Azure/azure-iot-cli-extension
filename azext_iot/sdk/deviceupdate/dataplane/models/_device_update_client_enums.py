@@ -91,6 +91,15 @@ class ImportType(str, Enum, metaclass=CaseInsensitiveEnumMeta):
     #: Import both devices and modules.
     ALL = "All"
 
+class DownloadSecurity(str, Enum, metaclass=CaseInsensitiveEnumMeta):
+    """Protocol used for update payload downloads.
+    """
+
+    #: Update payloads are downloaded using HTTPS (TLS). This is the default.
+    HTTPS = "https"
+    #: Update payloads are downloaded using HTTP.
+    HTTP = "http"
+
 class OperationFilterStatus(str, Enum, metaclass=CaseInsensitiveEnumMeta):
     """Operation status filter.
     """

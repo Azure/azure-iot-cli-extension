@@ -18,6 +18,7 @@ from azext_iot.deviceupdate.common import (
     ADUPublicNetworkAccessType,
     ADUPrivateLinkServiceConnectionStatus,
     ADUAccountSKUType,
+    ADUDownloadSecurityType,
     ADUManageDeviceImportType,
     ADUValidHashAlgorithmType,
 )
@@ -425,6 +426,12 @@ def load_deviceupdate_arguments(self, _):
             help="Integer representing the percentage of failed devices in a deployment before a cloud initated rollback occurs. "
             "Required when defining rollback policy.",
             arg_group="Update Rollback Policy",
+        )
+        context.argument(
+            "download_security",
+            options_list=["--download-security"],
+            help="Protocol used for update payload downloads. Defaults to https for new deployments.",
+            arg_type=get_enum_type(ADUDownloadSecurityType),
         )
 
     with self.argument_context("iot du device log") as context:

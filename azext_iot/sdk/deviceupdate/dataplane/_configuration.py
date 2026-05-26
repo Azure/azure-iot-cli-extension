@@ -29,7 +29,7 @@ class DeviceUpdateClientConfiguration(Configuration):  # pylint: disable=too-man
     :type endpoint: str
     :param instance_id: The Device Update for IoT Hub account instance identifier. Required.
     :type instance_id: str
-    :keyword api_version: Api Version. Default value is "2022-10-01". Note that overriding this
+    :keyword api_version: Api Version. Default value is "2026-06-01". Note that overriding this
      default value may result in unsupported behavior.
     :paramtype api_version: str
     """
@@ -42,7 +42,7 @@ class DeviceUpdateClientConfiguration(Configuration):  # pylint: disable=too-man
         **kwargs: Any
     ) -> None:
         super(DeviceUpdateClientConfiguration, self).__init__(**kwargs)
-        api_version = kwargs.pop('api_version', "2022-10-01")  # type: str
+        api_version = kwargs.pop('api_version', "2026-06-01")  # type: str
 
         if credential is None:
             raise ValueError("Parameter 'credential' must not be None.")
