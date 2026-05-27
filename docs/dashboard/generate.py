@@ -89,7 +89,7 @@ def generate_dashboard_data(pat: str, gh_token: str) -> dict:
             any_failure = True
             error_msg = f"Failed to fetch data from {wf['repo']}"
             if not wf["same_repo"]:
-                error_msg += " — check that the GitHub App is installed on this repo with Actions:read permission."
+                error_msg += " — DASHBOARD_PAT may have expired (90-day limit). Please renew the secret."
             workflows_data.append({
                 "id": wf["id"],
                 "title": escape(wf["title"]),
@@ -520,17 +520,17 @@ __DASHBOARD_DATA__
 
 
 def main():
-    # DASHBOARD_TOKEN: GitHub App installation token (auto-generated, no expiry)
-    # GITHUB_TOKEN: automatic workflow token for same-repo fallback
-    pat = os.environ.get("DASHBOARD_TOKEN", "")
+    # DASHBOARD_PAT: PAT with Actions:read for cross-repo access (renew every 90 days)
+    # GITHUB_TOKEN: automatic workflow token for same-repo fallback (never expires)
+    pat = os.environ.get("DASHBOARD_PAT", "")
     gh_token = os.environ.get("GITHUB_TOKEN", "")
 
     if not pat and not gh_token:
-        print("ERROR: At least one of DASHBOARD_TOKEN or GITHUB_TOKEN must be set")
+        print("ERROR: At least one of DASHBOARD_PAT or GITHUB_TOKEN must be set")
         sys.exit(1)
 
     if not pat:
-        print("WARNING: DASHBOARD_TOKEN not set. Cross-repo data will not be available.")
+        print("WARNING: DASHBOARD_PAT not set. Cross-repo data will not be available.")
         print("  Only same-repo (azure-iot-cli-extension) data will be shown.")
 
     output_dir = os.environ.get("OUTPUT_DIR", ".")
