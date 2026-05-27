@@ -14,7 +14,6 @@ from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 
 
-# "same_repo" marks the repo where this workflow runs — can use GITHUB_TOKEN as fallback
 WORKFLOWS = [
     {
         "id": "iot-cli-int-test",
@@ -70,14 +69,13 @@ def generate_dashboard_data(pat: str, gh_token: str) -> dict:
     """Fetch data for all workflows and return structured dashboard data.
 
     Uses pat (DASHBOARD_PAT) for all repos. If pat fails for cross-repo
-    requests (e.g. expired after 90 days), those repos show an error.
+    requests, those repos show an error.
     For same-repo workflows, falls back to gh_token (GITHUB_TOKEN).
     """
     workflows_data = []
     any_failure = False
 
     for wf in WORKFLOWS:
-        # Try PAT first (works for all repos), fall back to GITHUB_TOKEN for same-repo
         token = pat or gh_token
         runs = fetch_runs(wf["repo"], wf["workflowFile"], token)
 
@@ -89,7 +87,7 @@ def generate_dashboard_data(pat: str, gh_token: str) -> dict:
             any_failure = True
             error_msg = f"Failed to fetch data from {wf['repo']}"
             if not wf["same_repo"]:
-                error_msg += " — DASHBOARD_PAT may have expired (90-day limit). Please renew the secret."
+                error_msg += " — DASHBOARD_PAT may have expired. Please renew the secret."
             workflows_data.append({
                 "id": wf["id"],
                 "title": escape(wf["title"]),
