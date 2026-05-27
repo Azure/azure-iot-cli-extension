@@ -350,7 +350,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 </head>
 <body>
   <div class="header">
-    <h1>🧪 Integration Tests Dashboard</h1>
+    <h1>Integration Tests Dashboard</h1>
     <p>Azure IoT CLI Extensions — Last 10 workflow runs</p>
   </div>
 

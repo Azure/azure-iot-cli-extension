@@ -76,7 +76,7 @@ jobs:
 
       - name: Add dashboard link to workflow summary
         run: |
-          echo "## 🧪 Integration Tests Dashboard" >> $GITHUB_STEP_SUMMARY
+          echo "## Integration Tests Dashboard" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "✅ Dashboard deployed successfully!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
