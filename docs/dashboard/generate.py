@@ -123,16 +123,16 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   <title>Integration Tests Dashboard</title>
   <style>
     :root {
-      --bg: #0d1117;
-      --surface: #161b22;
-      --border: #30363d;
-      --text: #e6edf3;
-      --text-muted: #8b949e;
-      --success: #3fb950;
-      --failure: #f85149;
-      --in-progress: #d29922;
-      --cancelled: #8b949e;
-      --link: #58a6ff;
+      --bg: #ffffff;
+      --surface: #f6f8fa;
+      --border: #d0d7de;
+      --text: #1f2328;
+      --text-muted: #656d76;
+      --success: #1a7f37;
+      --failure: #cf222e;
+      --in-progress: #9a6700;
+      --cancelled: #656d76;
+      --link: #0969da;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -260,7 +260,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       bottom: calc(100% + 10px);
       left: 50%;
       transform: translateX(-50%);
-      background: #1c2128;
+      background: #ffffff;
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 12px 16px;
