@@ -73,3 +73,11 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Add dashboard link to workflow summary
+        run: |
+          echo "## 🧪 Integration Tests Dashboard" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Dashboard deployed successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 **[View Dashboard](${{ steps.deployment.outputs.page_url }})**" >> $GITHUB_STEP_SUMMARY
