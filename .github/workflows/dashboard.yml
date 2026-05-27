@@ -1,0 +1,75 @@
+name: Integration Tests Dashboard
+
+on:
+  # Run every 2 hours
+  schedule:
+    - cron: '0 */2 * * *'
+
+  # Manual trigger
+  workflow_dispatch:
+
+  # Refresh after integration tests complete (same repo)
+  workflow_run:
+    workflows: ["Integration Tests"]
+    types: [completed]
+
+  # Refresh triggered by azure-iot-ops-cli-extension after its integration tests
+  repository_dispatch:
+    types: [refresh-dashboard]
+
+# Prevent overlapping deployments
+concurrency:
+  group: dashboard-pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  generate-and-deploy:
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.DASHBOARD_APP_ID }}
+          private-key: ${{ secrets.DASHBOARD_APP_PRIVATE_KEY }}
+          owner: Azure
+          repositories: azure-iot-cli-extension,azure-iot-ops-cli-extension
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Generate dashboard
+        env:
+          # App token: auto-generated, short-lived, no 90-day expiry
+          DASHBOARD_TOKEN: ${{ steps.app-token.outputs.token }}
+          # Fallback for same-repo if app token fails
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OUTPUT_DIR: _site
+        run: python docs/dashboard/generate.py
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
