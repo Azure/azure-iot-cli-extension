@@ -148,11 +148,9 @@ def render_table_html(title, runs, error):
 def generate_dashboard(token, gh_token):
     """Fetch data and return dashboard markdown/HTML."""
     sections = []
-    sections.append("# Azure IoT CLI Dashboard")
-    sections.append("")
-    sections.append("## Integration Tests")
-    sections.append("*Last 10 runs per branch*")
-    sections.append("")
+    sections.append("<h1>Azure IoT CLI Dashboard</h1>")
+    sections.append("<h2>Integration Tests</h2>")
+    sections.append("<p><em>Last 10 runs per branch</em></p>")
 
     any_failure = False
     all_failed = True
@@ -202,9 +200,9 @@ def generate_dashboard(token, gh_token):
         sections.append(t)
         sections.append("")
 
-    sections.append("---")
+    sections.append("<hr>")
     gen_time = datetime.now(timezone.utc).strftime("%b %d, %Y %H:%M UTC")
-    sections.append(f"*Dashboard generated: {gen_time} · Updates after each integration test run*")
+    sections.append(f"<p><em>Dashboard generated: {gen_time} · Updates after each integration test run</em></p>")
 
     if all_failed and any_failure:
         return None
