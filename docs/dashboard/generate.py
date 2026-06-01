@@ -126,7 +126,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Integration Tests Dashboard</title>
+  <title>Azure IoT CLI Dashboard</title>
   <style>
     :root {
       --bg: #ffffff; --surface: #f6f8fa; --border: #d0d7de;
@@ -213,7 +213,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 </head>
 <body>
   <div class="header">
-    <h1>Integration Tests Dashboard</h1>
+    <h1>Azure IoT CLI Dashboard</h1>
     <p>Azure IoT CLI Extensions &mdash; Last 10 runs per branch</p>
   </div>
   <div class="dashboard" id="dashboard"></div>
