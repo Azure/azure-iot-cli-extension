@@ -18,9 +18,6 @@ concurrency:
   group: dashboard
   cancel-in-progress: true
 
-permissions:
-  contents: write
-
 jobs:
   generate-dashboard:
     runs-on: ubuntu-latest
@@ -47,17 +44,4 @@ jobs:
         env:
           DASHBOARD_TOKEN: ${{ steps.app-token.outputs.token }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OUTPUT_DIR: docs/dashboard
         run: python docs/dashboard/generate.py
-
-      - name: Commit and push dashboard
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/dashboard/index.html
-          if git diff --cached --quiet; then
-            echo "No changes to dashboard"
-          else
-            git commit -m "Update dashboard [skip ci]"
-            git push
-          fi
