@@ -2,7 +2,7 @@
 
 Fetches the last 10 workflow runs from configured GitHub repos
 and produces an index.html with data embedded as JSON.
-No client-side API calls or PAT tokens required for viewers.
+No client-side API calls or tokens required for viewers.
 """
 
 import json
@@ -68,9 +68,8 @@ def sanitize_run(run: dict) -> dict:
 def generate_dashboard_data(pat: str, gh_token: str) -> dict:
     """Fetch data for all workflows and return structured dashboard data.
 
-    Uses pat (DASHBOARD_PAT) for all repos. If pat fails for cross-repo
-    requests, those repos show an error.
-    For same-repo workflows, falls back to gh_token (GITHUB_TOKEN).
+    Uses token (DASHBOARD_TOKEN from GitHub App) for all repos.
+    Falls back to gh_token (GITHUB_TOKEN) for same-repo workflows.
     """
     workflows_data = []
     any_failure = False
@@ -80,14 +79,14 @@ def generate_dashboard_data(pat: str, gh_token: str) -> dict:
         runs = fetch_runs(wf["repo"], wf["workflowFile"], token)
 
         if runs is None and pat and gh_token and wf["same_repo"]:
-            print(f"  Retrying {wf['repo']} with GITHUB_TOKEN (PAT may be expired)...")
+            print(f"  Retrying {wf['repo']} with GITHUB_TOKEN...")
             runs = fetch_runs(wf["repo"], wf["workflowFile"], gh_token)
 
         if runs is None:
             any_failure = True
             error_msg = f"Failed to fetch data from {wf['repo']}"
             if not wf["same_repo"]:
-                error_msg += " — DASHBOARD_PAT may have expired. Please renew the secret."
+                error_msg += " — check GitHub App token configuration."
             workflows_data.append({
                 "id": wf["id"],
                 "title": escape(wf["title"]),
@@ -518,17 +517,17 @@ __DASHBOARD_DATA__
 
 
 def main():
-    # DASHBOARD_PAT: PAT with Actions:read for cross-repo access (renew every 90 days)
+    # DASHBOARD_TOKEN: GitHub App token with Actions:read for all repos (auto-generated per run)
     # GITHUB_TOKEN: automatic workflow token for same-repo fallback (never expires)
-    pat = os.environ.get("DASHBOARD_PAT", "")
+    pat = os.environ.get("DASHBOARD_TOKEN", "")
     gh_token = os.environ.get("GITHUB_TOKEN", "")
 
     if not pat and not gh_token:
-        print("ERROR: At least one of DASHBOARD_PAT or GITHUB_TOKEN must be set")
+        print("ERROR: At least one of DASHBOARD_TOKEN or GITHUB_TOKEN must be set")
         sys.exit(1)
 
     if not pat:
-        print("WARNING: DASHBOARD_PAT not set. Cross-repo data will not be available.")
+        print("WARNING: DASHBOARD_TOKEN not set. Cross-repo data will not be available.")
         print("  Only same-repo (azure-iot-cli-extension) data will be shown.")
 
     output_dir = os.environ.get("OUTPUT_DIR", ".")

@@ -39,6 +39,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.DASHBOARD_APP_ID }}
+          private-key: ${{ secrets.DASHBOARD_APP_PRIVATE_KEY }}
+          owner: Azure
+          repositories: azure-iot-cli-extension,azure-iot-ops-cli-extension
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -46,9 +55,7 @@ jobs:
 
       - name: Generate dashboard
         env:
-          # DASHBOARD_PAT: PAT with Actions:read for both repos (renew every 90 days)
-          # GITHUB_TOKEN: same-repo fallback (auto-provided, never expires)
-          DASHBOARD_PAT: ${{ secrets.DASHBOARD_PAT }}
+          DASHBOARD_TOKEN: ${{ steps.app-token.outputs.token }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OUTPUT_DIR: _site
         run: python docs/dashboard/generate.py
