@@ -13,23 +13,17 @@ on:
   repository_dispatch:
     types: [refresh-dashboard]
 
-# Prevent overlapping deployments
+# Prevent overlapping runs
 concurrency:
-  group: dashboard-pages
+  group: dashboard
   cancel-in-progress: true
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 jobs:
-  generate-and-deploy:
+  generate-dashboard:
     runs-on: ubuntu-latest
-
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout repository
@@ -53,25 +47,17 @@ jobs:
         env:
           DASHBOARD_TOKEN: ${{ steps.app-token.outputs.token }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OUTPUT_DIR: _site
+          OUTPUT_DIR: docs/dashboard
         run: python docs/dashboard/generate.py
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-
-      - name: Add dashboard link to workflow summary
+      - name: Commit and push dashboard
         run: |
-          echo "## Integration Tests Dashboard" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Dashboard deployed successfully!" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "🔗 **[View Dashboard](${{ steps.deployment.outputs.page_url }})**" >> $GITHUB_STEP_SUMMARY
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/dashboard/index.html
+          if git diff --cached --quiet; then
+            echo "No changes to dashboard"
+          else
+            git commit -m "Update dashboard [skip ci]"
+            git push
+          fi
