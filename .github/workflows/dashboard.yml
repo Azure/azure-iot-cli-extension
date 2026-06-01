@@ -1,10 +1,6 @@
 name: Integration Tests Dashboard
 
 on:
-  # Run every 2 hours
-  schedule:
-    - cron: '0 */2 * * *'
-
   # Manual trigger
   workflow_dispatch:
 

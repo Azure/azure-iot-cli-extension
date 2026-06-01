@@ -443,7 +443,7 @@ __DASHBOARD_DATA__
 
     const t = new Date(DATA.generated_at);
     document.getElementById('lastUpdated').textContent =
-      `Dashboard generated: ${t.toLocaleString()} (auto-refreshes after each integration test run)`;
+      `Dashboard generated: ${t.toLocaleString()} (updates after each integration test run)`;
   </script>
 </body>
 </html>"""
