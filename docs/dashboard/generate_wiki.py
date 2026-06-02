@@ -341,13 +341,13 @@ def generate_dashboard(token):
 
 
 def main():
-    app_id = os.environ.get("GITHUB_APP_ID", "")
-    private_key = os.environ.get("GITHUB_APP_PRIVATE_KEY", "")
-    installation_id = os.environ.get("GITHUB_APP_INSTALLATION_ID", "")
+    app_id = os.environ.get("DASHBOARD_APP_ID", "")
+    private_key = os.environ.get("DASHBOARD_APP_PRIVATE_KEY", "")
+    installation_id = os.environ.get("DASHBOARD_APP_INSTALLATION_ID", "")
 
     if not all([app_id, private_key, installation_id]):
-        print("ERROR: GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, and "
-              "GITHUB_APP_INSTALLATION_ID must all be set")
+        print("ERROR: DASHBOARD_APP_ID, DASHBOARD_APP_PRIVATE_KEY, and "
+              "DASHBOARD_APP_INSTALLATION_ID must all be set")
         sys.exit(1)
 
     print("Generating GitHub App installation token...")

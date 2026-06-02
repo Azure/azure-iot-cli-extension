@@ -37,9 +37,9 @@ steps:
       python docs/dashboard/generate_wiki.py
     displayName: "Generate dashboard markdown"
     env:
-      GITHUB_APP_ID: $(GITHUB_APP_ID)
-      GITHUB_APP_PRIVATE_KEY: $(GITHUB_APP_PRIVATE_KEY)
-      GITHUB_APP_INSTALLATION_ID: $(GITHUB_APP_INSTALLATION_ID)
+      DASHBOARD_APP_ID: $(DASHBOARD_APP_ID)
+      DASHBOARD_APP_PRIVATE_KEY: $(DASHBOARD_APP_PRIVATE_KEY)
+      DASHBOARD_APP_INSTALLATION_ID: $(DASHBOARD_APP_INSTALLATION_ID)
       OUTPUT_DIR: $(Build.ArtifactStagingDirectory)
 
   - script: |
