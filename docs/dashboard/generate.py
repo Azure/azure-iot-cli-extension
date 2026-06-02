@@ -1,8 +1,7 @@
 """Generate Azure IoT CLI Dashboard as workflow summary.
 
 Fetches the last 10 workflow runs per branch from configured GitHub repos
-and writes markdown/HTML to GITHUB_STEP_SUMMARY.
-Structured with sections for future expansion (customer usage, commands, etc.).
+and writes HTML tables to GITHUB_STEP_SUMMARY.
 """
 
 import json
@@ -15,7 +14,6 @@ from urllib.error import HTTPError
 
 WORKFLOWS = [
     {
-        "id": "iot-cli-dev",
         "title": "azure-iot-cli-extension — dev",
         "repo": "Azure/azure-iot-cli-extension",
         "workflowFile": "int_test.yml",
@@ -24,7 +22,6 @@ WORKFLOWS = [
         "group": "cli-ext",
     },
     {
-        "id": "iot-cli-preview",
         "title": "azure-iot-cli-extension — preview",
         "repo": "Azure/azure-iot-cli-extension",
         "workflowFile": "int_test.yml",
@@ -33,7 +30,6 @@ WORKFLOWS = [
         "group": "cli-ext",
     },
     {
-        "id": "iot-ops-dev",
         "title": "azure-iot-ops-cli-extension — dev",
         "repo": "Azure/azure-iot-ops-cli-extension",
         "workflowFile": "int_test.yml",
@@ -88,14 +84,6 @@ def compute_duration(created_at, updated_at):
         return "—"
 
 
-def count_failed_tests(run):
-    """Extract failed test count from run name if available."""
-    name = run.get("name", "")
-    # Some workflows encode test counts in the name
-    # For now return — if not available
-    return "—"
-
-
 def render_table_html(title, runs, error):
     """Generate an HTML table for a single workflow."""
     lines = []
@@ -112,7 +100,7 @@ def render_table_html(title, runs, error):
     lines.append('<table>')
     lines.append('<tr><th>Status</th><th>Date</th><th>Duration</th><th>Run</th></tr>')
 
-    for run in reversed(runs):
+    for run in runs:
         conclusion = run.get("conclusion", "unknown")
         emoji = STATUS_EMOJI.get(conclusion, "⚪")
         num = run.get("run_number", "—")
@@ -146,16 +134,13 @@ def render_table_html(title, runs, error):
 
 
 def generate_dashboard(token, gh_token):
-    """Fetch data and return dashboard markdown/HTML."""
+    """Fetch data and return dashboard HTML."""
     sections = []
     sections.append("<h1>Azure IoT CLI Dashboard</h1>")
     sections.append("<h2>Integration Tests</h2>")
     sections.append("<p><em>Last 10 runs per branch</em></p>")
 
-    any_failure = False
     all_failed = True
-
-    # Group workflows
     cli_ext_tables = []
     ops_ext_tables = []
 
@@ -169,7 +154,6 @@ def generate_dashboard(token, gh_token):
 
         error = None
         if runs is None:
-            any_failure = True
             error = f"Failed to fetch data from {wf['repo']}"
             if not wf["same_repo"]:
                 error += " — check GitHub App token configuration."
@@ -183,17 +167,17 @@ def generate_dashboard(token, gh_token):
         else:
             ops_ext_tables.append(table_html)
 
-    # Side-by-side layout for CLI ext dev + preview using HTML table
+    # Side-by-side layout for CLI ext dev + preview
     if len(cli_ext_tables) == 2:
         sections.append('<table><tr>')
         sections.append(f'<td valign="top">\n{cli_ext_tables[0]}\n</td>')
         sections.append(f'<td valign="top">\n{cli_ext_tables[1]}\n</td>')
         sections.append('</tr></table>')
-        sections.append("")
     else:
         for t in cli_ext_tables:
             sections.append(t)
-            sections.append("")
+
+    sections.append("")
 
     # Ops ext full width
     for t in ops_ext_tables:
@@ -204,7 +188,7 @@ def generate_dashboard(token, gh_token):
     gen_time = datetime.now(timezone.utc).strftime("%b %d, %Y %H:%M UTC")
     sections.append(f"<p><em>Dashboard generated: {gen_time} · Updates after each integration test run</em></p>")
 
-    if all_failed and any_failure:
+    if all_failed:
         return None
 
     return "\n".join(sections)

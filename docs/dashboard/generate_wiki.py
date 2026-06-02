@@ -1,7 +1,7 @@
-"""Generate Azure IoT CLI Dashboard as ADO Wiki markdown with SVG bar charts.
+"""Generate Azure IoT CLI Dashboard for ADO Wiki.
 
 Fetches the last 10 workflow runs per branch from configured GitHub repos
-and outputs Markdown with colored SVG bar charts for ADO Wiki.
+and outputs Markdown with HTML tables for ADO Wiki.
 Uses GitHub App authentication (JWT → installation token).
 """
 
@@ -22,7 +22,6 @@ except ImportError:
 
 WORKFLOWS = [
     {
-        "id": "iot-cli-dev",
         "title": "azure-iot-cli-extension — dev",
         "repo": "Azure/azure-iot-cli-extension",
         "workflowFile": "int_test.yml",
@@ -30,7 +29,6 @@ WORKFLOWS = [
         "group": "cli-ext",
     },
     {
-        "id": "iot-cli-preview",
         "title": "azure-iot-cli-extension — preview",
         "repo": "Azure/azure-iot-cli-extension",
         "workflowFile": "int_test.yml",
@@ -38,7 +36,6 @@ WORKFLOWS = [
         "group": "cli-ext",
     },
     {
-        "id": "iot-ops-dev",
         "title": "azure-iot-ops-cli-extension — dev",
         "repo": "Azure/azure-iot-ops-cli-extension",
         "workflowFile": "int_test.yml",
@@ -60,7 +57,6 @@ def generate_github_app_token(app_id, private_key, installation_id):
     }
     encoded_jwt = jwt.encode(payload, private_key, algorithm="RS256")
 
-    # Exchange JWT for installation token
     url = f"https://api.github.com/app/installations/{installation_id}/access_tokens"
     req = Request(url, method="POST")
     req.add_header("Accept", "application/vnd.github.v3+json")
@@ -108,9 +104,9 @@ def compute_duration(created_at, updated_at):
         end = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
         total_secs = int((end - start).total_seconds())
         mins, secs = divmod(total_secs, 60)
-        return total_secs, f"{mins}m {secs}s" if mins > 0 else f"{secs}s"
+        return f"{mins}m {secs}s" if mins > 0 else f"{secs}s"
     except (ValueError, AttributeError):
-        return 0, "—"
+        return "—"
 
 
 def render_table(title, runs, error):
@@ -146,14 +142,13 @@ def render_table(title, runs, error):
     lines.append('<table>')
     lines.append('<tr><th>Status</th><th>Date</th><th>Duration</th><th>Run</th></tr>')
 
-    # Newest first (API returns newest first)
     for run in runs:
         conclusion = run.get("conclusion", "unknown")
         emoji = STATUS_EMOJI.get(conclusion, "⚪")
         num = run.get("run_number", "—")
         url = run.get("html_url", "#")
         date = format_date(run.get("created_at", ""))
-        _, dur_str = compute_duration(
+        dur_str = compute_duration(
             run.get("created_at", ""), run.get("updated_at", "")
         )
         lines.append(
@@ -176,8 +171,8 @@ def generate_dashboard(token):
     sections.append("")
 
     all_failed = True
-    cli_ext_charts = []
-    ops_ext_charts = []
+    cli_ext_tables = []
+    ops_ext_tables = []
 
     for wf in WORKFLOWS:
         runs = fetch_runs(wf["repo"], wf["workflowFile"], token, wf.get("branch"))
@@ -188,27 +183,27 @@ def generate_dashboard(token):
         else:
             all_failed = False
 
-        chart = render_table(wf["title"], runs, error)
+        table = render_table(wf["title"], runs, error)
 
         if wf["group"] == "cli-ext":
-            cli_ext_charts.append(chart)
+            cli_ext_tables.append(table)
         else:
-            ops_ext_charts.append(chart)
+            ops_ext_tables.append(table)
 
     # Side-by-side for CLI ext dev + preview
-    if len(cli_ext_charts) == 2:
+    if len(cli_ext_tables) == 2:
         sections.append('<table><tr>')
-        sections.append(f'<td valign="top">\n\n{cli_ext_charts[0]}\n\n</td>')
-        sections.append(f'<td valign="top">\n\n{cli_ext_charts[1]}\n\n</td>')
+        sections.append(f'<td valign="top">\n\n{cli_ext_tables[0]}\n\n</td>')
+        sections.append(f'<td valign="top">\n\n{cli_ext_tables[1]}\n\n</td>')
         sections.append('</tr></table>')
     else:
-        for c in cli_ext_charts:
-            sections.append(c)
+        for t in cli_ext_tables:
+            sections.append(t)
     sections.append("")
 
     # Ops ext full width
-    for c in ops_ext_charts:
-        sections.append(c)
+    for t in ops_ext_tables:
+        sections.append(t)
         sections.append("")
 
     sections.append("---")
