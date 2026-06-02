@@ -157,7 +157,7 @@ def render_table(title, runs, error):
         )
 
     lines.append('</table>')
-    lines.append("")
+    lines.append("<br>")
     lines.append(f"<em>Summary: {summary}</em>")
     lines.append("")
     return "\n".join(lines)
