@@ -11,7 +11,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from urllib.request import Request, urlopen
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 try:
     import jwt  # PyJWT
@@ -57,12 +57,16 @@ def generate_github_app_token(app_id, private_key, installation_id):
     }
     encoded_jwt = jwt.encode(payload, private_key, algorithm="RS256")
 
-    url = f"https://api.github.com/app/installations/{installation_id}/access_tokens"
+    url = (
+        f"https://api.github.com/app/installations/"
+        f"{installation_id}/access_tokens"
+    )
     req = Request(url, method="POST")
     req.add_header("Accept", "application/vnd.github.v3+json")
     req.add_header("Authorization", f"Bearer {encoded_jwt}")
+    req.add_header("User-Agent", "azure-iot-cli-dashboard")
 
-    with urlopen(req) as resp:
+    with urlopen(req, timeout=30) as resp:
         data = json.loads(resp.read().decode())
         return data["token"]
 
@@ -79,14 +83,15 @@ def fetch_runs(repo, workflow_file, token, branch=None):
     req = Request(url)
     req.add_header("Accept", "application/vnd.github.v3+json")
     req.add_header("Authorization", f"Bearer {token}")
+    req.add_header("User-Agent", "azure-iot-cli-dashboard")
 
     try:
-        with urlopen(req) as resp:
+        with urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read().decode())
             return data.get("workflow_runs", [])
-    except HTTPError as e:
+    except (HTTPError, URLError) as e:
         print(f"ERROR: Failed to fetch {repo}/{workflow_file} "
-              f"(branch={branch}): {e.code} {e.reason}")
+              f"(branch={branch}): {e}")
         return None
 
 

@@ -9,7 +9,7 @@ import os
 import sys
 from datetime import datetime, timezone
 from urllib.request import Request, urlopen
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 
 WORKFLOWS = [
@@ -54,14 +54,15 @@ def fetch_runs(repo, workflow_file, token, branch=None):
     req = Request(url)
     req.add_header("Accept", "application/vnd.github.v3+json")
     req.add_header("Authorization", f"Bearer {token}")
+    req.add_header("User-Agent", "azure-iot-cli-dashboard")
 
     try:
-        with urlopen(req) as resp:
+        with urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read().decode())
             return data.get("workflow_runs", [])
-    except HTTPError as e:
+    except (HTTPError, URLError) as e:
         print(f"ERROR: Failed to fetch {repo}/{workflow_file} "
-              f"(branch={branch}): {e.code} {e.reason}")
+              f"(branch={branch}): {e}")
         return None
 
 
@@ -125,7 +126,11 @@ def render_table_html(title, runs, error):
     for status, emoji in STATUS_EMOJI.items():
         count = conclusions.count(status)
         if count:
-            label = {"success": "passed", "failure": "failed", "cancelled": "cancelled"}[status]
+            label = {
+                "success": "passed",
+                "failure": "failed",
+                "cancelled": "cancelled",
+            }[status]
             parts.append(f"{emoji} {count} {label}")
     if parts:
         lines.append(f"<p><em>Summary: {'  ·  '.join(parts)}</em></p>")
@@ -188,7 +193,10 @@ def generate_dashboard(token, gh_token):
 
     sections.append("<hr>")
     gen_time = datetime.now(timezone.utc).strftime("%b %d, %Y %H:%M UTC")
-    sections.append(f"<p><em>Dashboard generated: {gen_time} · Updates after each integration test run</em></p>")
+    sections.append(
+        f"<p><em>Dashboard generated: {gen_time}"
+        f" · Updates after each integration test run</em></p>"
+    )
 
     if all_failed:
         return None

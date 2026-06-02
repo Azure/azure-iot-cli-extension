@@ -9,18 +9,21 @@ import sys
 import json
 import base64
 from urllib.request import Request, urlopen
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 
 def get_wiki_id(org_url, project, token):
     """Get the first project wiki ID."""
     url = f"{org_url}/{project}/_apis/wiki/wikis?api-version=7.1"
+    auth = base64.b64encode(
+        (':' + token).encode()
+    ).decode()
     req = Request(url)
-    req.add_header("Authorization", f"Basic {base64.b64encode((':' + token).encode()).decode()}")
+    req.add_header("Authorization", f"Basic {auth}")
     req.add_header("Content-Type", "application/json")
 
     try:
-        with urlopen(req) as resp:
+        with urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read().decode())
             wikis = data.get("value", [])
             for wiki in wikis:
@@ -28,8 +31,8 @@ def get_wiki_id(org_url, project, token):
                     return wiki["id"]
             if wikis:
                 return wikis[0]["id"]
-    except HTTPError as e:
-        print(f"ERROR: Failed to list wikis: {e.code} {e.reason}")
+    except (HTTPError, URLError) as e:
+        print(f"ERROR: Failed to list wikis: {e}")
     return None
 
 
@@ -42,25 +45,30 @@ def update_wiki_page(org_url, project, wiki_id, page_path, content, token):
 
     # Try to get existing page for ETag (needed for update)
     etag = None
+    auth = base64.b64encode((':' + token).encode()).decode()
     req = Request(url)
-    req.add_header("Authorization",
-                   f"Basic {base64.b64encode((':' + token).encode()).decode()}")
+    req.add_header("Authorization", f"Basic {auth}")
     try:
-        with urlopen(req) as resp:
-            etag = resp.headers.get("ETag", "").strip('"')
-    except HTTPError:
-        pass  # Page doesn't exist yet — will create
+        with urlopen(req, timeout=30) as resp:
+            etag = resp.headers.get("ETag", "")
+    except HTTPError as e:
+        if e.code != 404:
+            print(f"ERROR: Failed to check wiki page: {e.code} {e.reason}")
+            return False
+        # 404 = page doesn't exist yet, will create
+    except URLError as e:
+        print(f"ERROR: Network error checking wiki page: {e}")
+        return False
 
     body = json.dumps({"content": content}).encode("utf-8")
     req = Request(url, data=body, method="PUT")
-    req.add_header("Authorization",
-                   f"Basic {base64.b64encode((':' + token).encode()).decode()}")
+    req.add_header("Authorization", f"Basic {auth}")
     req.add_header("Content-Type", "application/json")
     if etag:
         req.add_header("If-Match", etag)
 
     try:
-        with urlopen(req) as resp:
+        with urlopen(req, timeout=30) as resp:
             print(f"Wiki page updated: {resp.status}")
             return True
     except HTTPError as e:

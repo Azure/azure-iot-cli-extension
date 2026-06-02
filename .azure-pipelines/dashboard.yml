@@ -20,8 +20,6 @@ variables:
     value: "https://dev.azure.com/msazure"
   - name: wikiProject
     value: "One"
-  - name: wikiId
-    value: ""  # Will be set after wiki is created — see Step 4 in setup instructions
 
 steps:
   - task: UsePythonVersion@0

@@ -13,6 +13,8 @@ on:
   repository_dispatch:
     types: [refresh-dashboard]
 
+permissions: {}
+
 # Prevent overlapping runs
 concurrency:
   group: dashboard
@@ -21,6 +23,9 @@ concurrency:
 jobs:
   generate-dashboard:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
 
     steps:
       - name: Checkout repository
