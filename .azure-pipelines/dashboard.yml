@@ -1,0 +1,57 @@
+# Azure IoT CLI Dashboard — ADO Pipeline
+# Fetches GitHub workflow run data and updates ADO Wiki page.
+# Triggered on schedule, or manually.
+
+trigger: none  # No CI trigger — this is a utility pipeline
+
+schedules:
+  - cron: "0 */6 * * *"  # Every 6 hours
+    displayName: "Refresh dashboard every 6 hours"
+    branches:
+      include:
+        - dev
+    always: true
+
+pool:
+  vmImage: "ubuntu-latest"
+
+variables:
+  - name: wikiOrgUrl
+    value: "https://dev.azure.com/msazure"
+  - name: wikiProject
+    value: "One"
+  - name: wikiId
+    value: ""  # Will be set after wiki is created — see Step 4 in setup instructions
+
+steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: "3.10"
+    displayName: "Use Python 3.10"
+
+  - script: |
+      pip install PyJWT cryptography
+    displayName: "Install dependencies"
+
+  - script: |
+      python docs/dashboard/generate_wiki.py
+    displayName: "Generate dashboard markdown"
+    env:
+      GITHUB_APP_ID: $(GITHUB_APP_ID)
+      GITHUB_APP_PRIVATE_KEY: $(GITHUB_APP_PRIVATE_KEY)
+      GITHUB_APP_INSTALLATION_ID: $(GITHUB_APP_INSTALLATION_ID)
+      OUTPUT_DIR: $(Build.ArtifactStagingDirectory)
+
+  - script: |
+      cat $(Build.ArtifactStagingDirectory)/dashboard.md
+    displayName: "Print generated dashboard (debug)"
+
+  - script: |
+      # Update ADO Wiki page via REST API
+      python docs/dashboard/update_wiki.py
+    displayName: "Update ADO Wiki page"
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+      WIKI_ORG_URL: $(wikiOrgUrl)
+      WIKI_PROJECT: $(wikiProject)
+      DASHBOARD_FILE: $(Build.ArtifactStagingDirectory)/dashboard.md
