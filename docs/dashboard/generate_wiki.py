@@ -48,7 +48,6 @@ WORKFLOWS = [
 ]
 
 STATUS_EMOJI = {"success": "✅", "failure": "❌", "cancelled": "⏹️"}
-STATUS_COLORS = {"success": "#2da44e", "failure": "#cf222e", "cancelled": "#6e7781"}
 
 
 def generate_github_app_token(app_id, private_key, installation_id):
@@ -114,139 +113,8 @@ def compute_duration(created_at, updated_at):
         return 0, "—"
 
 
-def collect_run_data(runs):
-    """Extract duration and status data from workflow runs."""
-    data = []
-    for run in reversed(runs):
-        conclusion = run.get("conclusion", "unknown")
-        date = format_date(run.get("created_at", ""))
-        total_secs, dur_str = compute_duration(
-            run.get("created_at", ""), run.get("updated_at", "")
-        )
-        data.append({
-            "date": date,
-            "minutes": round(total_secs / 60, 1),
-            "dur_str": dur_str,
-            "conclusion": conclusion,
-            "run_number": run.get("run_number", "—"),
-            "url": run.get("html_url", "#"),
-        })
-    return data
-
-
-def render_svg_bar_chart(title, data):
-    """Generate an inline SVG bar chart with colored bars per status."""
-    if not data:
-        return ""
-
-    n = len(data)
-    bar_width = 40
-    bar_gap = 12
-    chart_left = 50
-    chart_top = 10
-    chart_height = 160
-    chart_width = n * (bar_width + bar_gap) + bar_gap
-    total_width = chart_left + chart_width + 10
-    label_area = 50
-    legend_area = 30
-    total_height = chart_top + chart_height + label_area + legend_area
-
-    mins = [d["minutes"] for d in data]
-    max_val = max(mins) if mins else 100
-    if max_val == 0:
-        max_val = 10
-
-    svg_lines = []
-    svg_lines.append(
-        f'<svg xmlns="http://www.w3.org/2000/svg" '
-        f'width="{total_width}" height="{total_height}" '
-        f'style="font-family: -apple-system, BlinkMacSystemFont, Segoe UI, '
-        f'Helvetica, Arial, sans-serif; font-size: 11px;">'
-    )
-
-    # Y-axis labels and grid lines
-    for i in range(5):
-        y_val = max_val * i / 4
-        y_pos = chart_top + chart_height - (chart_height * i / 4)
-        svg_lines.append(
-            f'<text x="{chart_left - 5}" y="{y_pos + 4}" '
-            f'text-anchor="end" fill="#656d76">{int(y_val)}</text>'
-        )
-        svg_lines.append(
-            f'<line x1="{chart_left}" y1="{y_pos}" '
-            f'x2="{chart_left + chart_width}" y2="{y_pos}" '
-            f'stroke="#e1e4e8" stroke-width="1"/>'
-        )
-
-    # Y-axis label
-    svg_lines.append(
-        f'<text x="12" y="{chart_top + chart_height / 2}" '
-        f'text-anchor="middle" fill="#656d76" font-size="10" '
-        f'transform="rotate(-90, 12, {chart_top + chart_height / 2})">Minutes</text>'
-    )
-
-    # Bars
-    for i, d in enumerate(data):
-        x = chart_left + bar_gap + i * (bar_width + bar_gap)
-        bar_h = (d["minutes"] / max_val) * chart_height if max_val > 0 else 0
-        bar_h = max(bar_h, 2)  # minimum visible height
-        y = chart_top + chart_height - bar_h
-        color = STATUS_COLORS.get(d["conclusion"], "#6e7781")
-
-        # Bar
-        svg_lines.append(
-            f'<rect x="{x}" y="{y}" width="{bar_width}" height="{bar_h}" '
-            f'fill="{color}" rx="2"/>'
-        )
-
-        # Duration label on top of bar
-        svg_lines.append(
-            f'<text x="{x + bar_width / 2}" y="{y - 4}" '
-            f'text-anchor="middle" fill="#1f2328" font-size="9">'
-            f'{int(d["minutes"])}m</text>'
-        )
-
-        # Date label below
-        svg_lines.append(
-            f'<text x="{x + bar_width / 2}" '
-            f'y="{chart_top + chart_height + 14}" '
-            f'text-anchor="middle" fill="#656d76" font-size="10">'
-            f'{d["date"]}</text>'
-        )
-
-        # Run number below date
-        svg_lines.append(
-            f'<text x="{x + bar_width / 2}" '
-            f'y="{chart_top + chart_height + 28}" '
-            f'text-anchor="middle" fill="#656d76" font-size="9">'
-            f'#{d["run_number"]}</text>'
-        )
-
-    # Legend
-    legend_y = chart_top + chart_height + label_area + 5
-    legend_items = [
-        ("Success", STATUS_COLORS["success"]),
-        ("Failure", STATUS_COLORS["failure"]),
-        ("Cancelled", STATUS_COLORS["cancelled"]),
-    ]
-    lx = chart_left
-    for label, color in legend_items:
-        svg_lines.append(
-            f'<rect x="{lx}" y="{legend_y}" width="12" height="12" '
-            f'fill="{color}" rx="2"/>'
-        )
-        svg_lines.append(
-            f'<text x="{lx + 16}" y="{legend_y + 10}" '
-            f'fill="#1f2328" font-size="11">{label}</text>'
-        )
-        lx += len(label) * 7 + 30
-
-    svg_lines.append("</svg>")
-    return "\n".join(svg_lines)
-
-
-def render_bar_chart(title, runs, error):
-    """Generate an SVG bar chart with summary for a workflow."""
+def render_table(title, runs, error):
+    """Generate an HTML table for a workflow."""
     lines = []
 
     if error:
@@ -260,8 +128,6 @@ def render_bar_chart(title, runs, error):
         lines.append("_No completed runs found_")
         lines.append("")
         return "\n".join(lines)
-
-    data = collect_run_data(runs)
 
     # Summary counts
     conclusions = [r.get("conclusion", "unknown") for r in runs]
@@ -277,9 +143,26 @@ def render_bar_chart(title, runs, error):
 
     lines.append(f"**{title}** — {summary}")
     lines.append("")
-    lines.append(render_svg_bar_chart(title, data))
-    lines.append("")
+    lines.append('<table>')
+    lines.append('<tr><th>Status</th><th>Date</th><th>Duration</th><th>Run</th></tr>')
 
+    # Newest first (API returns newest first)
+    for run in runs:
+        conclusion = run.get("conclusion", "unknown")
+        emoji = STATUS_EMOJI.get(conclusion, "⚪")
+        num = run.get("run_number", "—")
+        url = run.get("html_url", "#")
+        date = format_date(run.get("created_at", ""))
+        _, dur_str = compute_duration(
+            run.get("created_at", ""), run.get("updated_at", "")
+        )
+        lines.append(
+            f'<tr><td>{emoji} {conclusion}</td><td>{date}</td>'
+            f'<td>{dur_str}</td><td><a href="{url}">#{num}</a></td></tr>'
+        )
+
+    lines.append('</table>')
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -305,7 +188,7 @@ def generate_dashboard(token):
         else:
             all_failed = False
 
-        chart = render_bar_chart(wf["title"], runs, error)
+        chart = render_table(wf["title"], runs, error)
 
         if wf["group"] == "cli-ext":
             cli_ext_charts.append(chart)
