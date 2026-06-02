@@ -13,7 +13,7 @@ from urllib.error import HTTPError, URLError
 
 
 def get_wiki_id(org_url, project, token):
-    """Get the first project wiki ID."""
+    """Get the aio-wiki code wiki ID, falling back to first available."""
     url = f"{org_url}/{project}/_apis/wiki/wikis?api-version=7.1"
     auth = base64.b64encode(
         (':' + token).encode()
@@ -26,6 +26,12 @@ def get_wiki_id(org_url, project, token):
         with urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read().decode())
             wikis = data.get("value", [])
+            # Prefer aio-wiki code wiki
+            for wiki in wikis:
+                name = wiki.get("name", "").lower()
+                if "aio-wiki" in name:
+                    return wiki["id"]
+            # Fallback to first project wiki
             for wiki in wikis:
                 if wiki.get("type") == "projectWiki":
                     return wiki["id"]
@@ -106,7 +112,7 @@ def main():
     print(f"Using wiki: {wiki_id}")
 
     # Update the page
-    page_path = "/Azure IoT CLI Dashboard"
+    page_path = "/Digital-Operations-Services/Azure IoT Operations CLI/Integration Tests Dashboard"
     success = update_wiki_page(org_url, project, wiki_id, page_path, content, token)
     if not success:
         sys.exit(1)
