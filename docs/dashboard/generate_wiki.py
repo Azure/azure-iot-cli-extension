@@ -169,7 +169,7 @@ def generate_dashboard(token):
     sections.append("# Azure IoT CLI Dashboard")
     sections.append("")
     sections.append("## Integration Tests")
-    sections.append("_Last 10 runs per branch_")
+    sections.append("<em>Last 10 runs per branch</em>")
     sections.append("")
 
     all_failed = True
@@ -192,11 +192,11 @@ def generate_dashboard(token):
         else:
             ops_ext_tables.append(table)
 
-    # Side-by-side for CLI ext dev + preview
+    # Side-by-side for CLI ext dev + preview (borderless layout)
     if len(cli_ext_tables) == 2:
-        sections.append('<table><tr>')
-        sections.append(f'<td valign="top">\n\n{cli_ext_tables[0]}\n\n</td>')
-        sections.append(f'<td valign="top">\n\n{cli_ext_tables[1]}\n\n</td>')
+        sections.append('<table style="border: none; border-collapse: collapse;"><tr>')
+        sections.append(f'<td valign="top" style="border: none; padding-right: 40px;">\n\n{cli_ext_tables[0]}\n\n</td>')
+        sections.append(f'<td valign="top" style="border: none;">\n\n{cli_ext_tables[1]}\n\n</td>')
         sections.append('</tr></table>')
     else:
         for t in cli_ext_tables:

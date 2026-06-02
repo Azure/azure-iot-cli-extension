@@ -167,11 +167,11 @@ def generate_dashboard(token, gh_token):
         else:
             ops_ext_tables.append(table_html)
 
-    # Side-by-side layout for CLI ext dev + preview
+    # Side-by-side layout for CLI ext dev + preview (borderless layout)
     if len(cli_ext_tables) == 2:
-        sections.append('<table><tr>')
-        sections.append(f'<td valign="top">\n{cli_ext_tables[0]}\n</td>')
-        sections.append(f'<td valign="top">\n{cli_ext_tables[1]}\n</td>')
+        sections.append('<table style="border: none; border-collapse: collapse;"><tr>')
+        sections.append(f'<td valign="top" style="border: none; padding-right: 40px;">\n{cli_ext_tables[0]}\n</td>')
+        sections.append(f'<td valign="top" style="border: none;">\n{cli_ext_tables[1]}\n</td>')
         sections.append('</tr></table>')
     else:
         for t in cli_ext_tables:
