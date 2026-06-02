@@ -128,7 +128,7 @@ def render_table_html(title, runs, error):
             label = {"success": "passed", "failure": "failed", "cancelled": "cancelled"}[status]
             parts.append(f"{emoji} {count} {label}")
     if parts:
-        lines.append(f"<p>{'  ·  '.join(parts)}</p>")
+        lines.append(f"<p><em>Summary: {'  ·  '.join(parts)}</em></p>")
 
     return "\n".join(lines)
 

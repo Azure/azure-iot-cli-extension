@@ -138,7 +138,7 @@ def render_table(title, runs, error):
     summary = "  ·  ".join(parts) if parts else ""
 
     lines.append(f"<strong>{title}</strong>")
-    lines.append("")
+    lines.append("<br>")
     lines.append('<table border="1" cellpadding="6" cellspacing="0">')
     lines.append('<tr><th>Status</th><th>Date</th><th>Duration</th><th>Run</th></tr>')
 
@@ -158,7 +158,7 @@ def render_table(title, runs, error):
 
     lines.append('</table>')
     lines.append("")
-    lines.append(f"<em>{summary}</em>")
+    lines.append(f"<em>Summary: {summary}</em>")
     lines.append("")
     return "\n".join(lines)
 
