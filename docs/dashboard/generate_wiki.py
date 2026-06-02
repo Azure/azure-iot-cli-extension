@@ -139,7 +139,7 @@ def render_table(title, runs, error):
 
     lines.append(f"<strong>{title}</strong>")
     lines.append("")
-    lines.append('<table>')
+    lines.append('<table border="1" cellpadding="6" cellspacing="0">')
     lines.append('<tr><th>Status</th><th>Date</th><th>Duration</th><th>Run</th></tr>')
 
     for run in runs:
@@ -202,6 +202,8 @@ def generate_dashboard(token):
         for t in cli_ext_tables:
             sections.append(t)
     sections.append("")
+    sections.append("<br>")
+    sections.append("")
 
     # Ops ext full width
     for t in ops_ext_tables:
@@ -211,7 +213,7 @@ def generate_dashboard(token):
     sections.append("---")
     gen_time = datetime.now(timezone.utc).strftime("%b %d, %Y %H:%M UTC")
     sections.append(
-        f"_Dashboard generated: {gen_time} · Auto-updates every 6 hours_"
+        f"<em>Dashboard generated: {gen_time} · Auto-updates every 6 hours</em>"
     )
 
     if all_failed:
