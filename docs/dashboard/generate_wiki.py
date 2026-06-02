@@ -114,14 +114,14 @@ def render_table(title, runs, error):
     lines = []
 
     if error:
-        lines.append(f"**{title}**")
+        lines.append(f"<strong>{title}</strong>")
         lines.append(f"> ⚠️ {error}")
         lines.append("")
         return "\n".join(lines)
 
     if not runs:
-        lines.append(f"**{title}**")
-        lines.append("_No completed runs found_")
+        lines.append(f"<strong>{title}</strong>")
+        lines.append("<em>No completed runs found</em>")
         lines.append("")
         return "\n".join(lines)
 
@@ -137,7 +137,7 @@ def render_table(title, runs, error):
 
     summary = "  ·  ".join(parts) if parts else ""
 
-    lines.append(f"**{title}** — {summary}")
+    lines.append(f"<strong>{title}</strong>")
     lines.append("")
     lines.append('<table>')
     lines.append('<tr><th>Status</th><th>Date</th><th>Duration</th><th>Run</th></tr>')
@@ -157,6 +157,8 @@ def render_table(title, runs, error):
         )
 
     lines.append('</table>')
+    lines.append("")
+    lines.append(f"<em>{summary}</em>")
     lines.append("")
     return "\n".join(lines)
 
