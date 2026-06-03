@@ -15,12 +15,6 @@ schedules:
 pool:
   vmImage: "ubuntu-latest"
 
-variables:
-  - name: wikiOrgUrl
-    value: "https://dev.azure.com/msazure"
-  - name: wikiProject
-    value: "One"
-
 steps:
   - task: UsePythonVersion@0
     inputs:
@@ -45,11 +39,9 @@ steps:
     displayName: "Print generated dashboard (debug)"
 
   - script: |
-      # Update ADO Wiki page via REST API
-      python docs/dashboard/update_wiki.py
-    displayName: "Update ADO Wiki page"
+      # Update ADO Dashboard widget via REST API
+      python docs/dashboard/update_dashboard.py
+    displayName: "Update ADO Dashboard widget"
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-      WIKI_ORG_URL: $(wikiOrgUrl)
-      WIKI_PROJECT: $(wikiProject)
       DASHBOARD_FILE: $(Build.ArtifactStagingDirectory)/dashboard.md
