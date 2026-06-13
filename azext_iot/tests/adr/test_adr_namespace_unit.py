@@ -114,6 +114,55 @@ def test_create_namespace(
             fixture_policy_provider.create.assert_not_called()
 
 
+def test_create_namespace_resolves_location_and_tags(
+    fixture_namespace_provider, mock_poller
+):
+    """When location is omitted it is resolved; tags are passed through."""
+    ns_name, rg = "test-namespace", "test-rg"
+    fixture_namespace_provider._ensure_location = Mock(return_value="resolvedloc")
+    fixture_namespace_provider.client.namespaces.begin_create_or_replace.return_value = mock_poller(
+        {"name": ns_name}
+    )
+
+    fixture_namespace_provider.create(
+        namespace_name=ns_name,
+        resource_group_name=rg,
+        location=None,
+        tags={"env": "test"},
+    )
+
+    fixture_namespace_provider._ensure_location.assert_called_once()
+    call_args = fixture_namespace_provider.client.namespaces.begin_create_or_replace.call_args[1]
+    assert call_args["resource"]["location"] == "resolvedloc"
+    assert call_args["resource"]["tags"] == {"env": "test"}
+
+
+def test_create_namespace_credential_and_policy_errors_logged(
+    fixture_namespace_provider, fixture_credential_provider, fixture_policy_provider, mock_poller
+):
+    """Credential/policy creation failures are caught and logged, not raised."""
+    ns_name, rg, location = "test-namespace", "test-rg", "eastus"
+    fixture_credential_provider.create = Mock(side_effect=Exception("cred boom"))
+    fixture_policy_provider.create = Mock(side_effect=Exception("policy boom"))
+    fixture_namespace_provider.client.namespaces.begin_create_or_replace.return_value = mock_poller(
+        {"name": ns_name, "resourceGroup": rg}
+    )
+
+    with patch(
+        "azext_iot.adr.providers.credential.CredentialProvider", return_value=fixture_credential_provider
+    ), patch("azext_iot.adr.providers.policy.PolicyProvider", return_value=fixture_policy_provider):
+        result = fixture_namespace_provider.create(
+            namespace_name=ns_name,
+            resource_group_name=rg,
+            location=location,
+            enable_certificate_management=True,
+        )
+
+    assert result["name"] == ns_name
+    fixture_credential_provider.create.assert_called_once()
+    fixture_policy_provider.create.assert_called_once()
+
+
 # ==================== Show ====================
 
 

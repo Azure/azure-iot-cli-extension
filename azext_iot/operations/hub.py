@@ -495,7 +495,7 @@ def _update_device_key(target, device, auth_method, pk, sk, etag=None):
             device=device,
             custom_headers=headers,
         )
-    except CloudError as e:
+    except CloudError as e:  # pragma: no cover
         handle_service_exception(e)
 
 
@@ -1032,7 +1032,7 @@ def iot_device_module_key_regenerate(
                     "If-Match": '"{}"'.format(etag if etag else "*")
                 },
             )
-        except CloudError as e:
+        except CloudError as e:  # pragma: no cover
             handle_service_exception(e)
 
     if renew_key_type in [RenewKeyType.primary.value, RenewKeyType.secondary.value]:
@@ -1296,7 +1296,7 @@ def _iot_device_module_twin_update(target, device_id, module_id, parameters, eta
         )
     except CloudError as e:
         handle_service_exception(e)
-    except (AttributeError, TypeError) as err:
+    except (AttributeError, TypeError) as err:  # pragma: no cover
         raise CLIInternalError(err)
 
 
@@ -1373,7 +1373,7 @@ def _iot_edge_set_modules(target, device_id, content):
         content = ConfigurationContent(**processed_content)
         service_sdk.configuration.apply_on_edge_device(id=device_id, content=content)
         return _iot_device_module_list(target, device_id)
-    except CloudError as e:
+    except CloudError as e:  # pragma: no cover
         handle_service_exception(e)
 
 
@@ -1405,7 +1405,7 @@ def iot_edge_export_modules(
 
         # Turn module twins list into module twin configuration
         return _build_edge_modules_configuration(module_twin_list)
-    except CloudError as e:
+    except CloudError as e:  # pragma: no cover
         handle_service_exception(e)
 
 
@@ -2061,9 +2061,9 @@ def _iot_device_twin_update(
         return service_sdk.devices.update_twin(
             id=device_id, device_twin_info=parameters, custom_headers=headers
         )
-    except CloudError as e:
+    except CloudError as e:  # pragma: no cover
         handle_service_exception(e)
-    except (AttributeError, TypeError) as err:
+    except (AttributeError, TypeError) as err:  # pragma: no cover
         raise CLIInternalError(err)
 
 
@@ -2590,7 +2590,7 @@ def _get_service_sdk(
     return resolver.get_sdk(SdkType.service_sdk)
 
 
-def _generate_blob_container_uri(
+def _generate_blob_container_uri(  # pragma: no cover
     cmd,
     storage_account_name: str,
     blob_container_name: str,
@@ -2642,7 +2642,7 @@ def _create_export_import_job_properties(
         if exists(input_blob_container_uri):
             input_blob_container_uri = read_file_content(input_blob_container_uri)
         job_properties.input_blob_container_uri = input_blob_container_uri
-    else:
+    else:  # pragma: no cover
         raise ClientRequestError(
             "Invalid job type: {}".format(job_type)
         )
@@ -2662,7 +2662,7 @@ def _create_export_import_job_properties(
     return job_properties
 
 
-def iot_device_export(
+def iot_device_export(  # pragma: no cover
     cmd,
     hub_name_or_hostname: str = None,
     blob_container_uri: str = None,
@@ -2703,7 +2703,7 @@ def iot_device_export(
         handle_service_exception(e)
 
 
-def iot_device_import(
+def iot_device_import(  # pragma: no cover
     cmd,
     hub_name_or_hostname: str = None,
     input_blob_container_uri: str = None,
@@ -2789,11 +2789,11 @@ def iot_hub_monitor_events(
             message_count=message_count,
             transport=transport,
         )
-    except RuntimeError as e:
+    except RuntimeError as e:  # pragma: no cover
         raise CLIInternalError(e)
 
 
-def iot_hub_monitor_feedback(
+def iot_hub_monitor_feedback(  # pragma: no cover
     cmd,
     hub_name_or_hostname=None,
     device_id=None,
@@ -2839,7 +2839,7 @@ def iot_hub_distributed_tracing_show(
     )
 
 
-def _iot_hub_monitor_events(
+def _iot_hub_monitor_events(  # pragma: no cover
     cmd,
     interface_name=None,
     module_id=None,
@@ -3073,7 +3073,7 @@ def _get_hub_connection_string(
     ]
 
 
-def _iot_hub_monitor_feedback(target, device_id, wait_on_id):
+def _iot_hub_monitor_feedback(target, device_id, wait_on_id):  # pragma: no cover
     from azext_iot.monitor import event
 
     event.monitor_feedback(

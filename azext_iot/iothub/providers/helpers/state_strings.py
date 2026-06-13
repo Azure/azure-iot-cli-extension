@@ -52,7 +52,7 @@ UPLOAD_EDGE_MODULE_MSG = "Failed to upload edge modules for the device {0}. Proc
 UPLOAD_DEVICE_RELATIONSHIP_MSG = "Failed to set parent-child relationship for the parent device {0} to the child device {1}. \
 Error Message: {2}"
 MISSING_HUB_ASPECTS_MSG = " Some hub aspects ({0}) were not uploaded because the necessary aspects were not found in the file."
-BAD_DEVICE_AUTHORIZATION_MSG = "Authorization type for module '{0}' in device '{1}' not recognized."
+BAD_DEVICE_AUTHORIZATION_MSG = "Authorization type for device '{0}' not recognized."
 BAD_DEVICE_MODULE_AUTHORIZATION_MSG = "Authorization type for module '{0}' in device '{1}' not recognized."
 SKIP_CONFIGURATION_DELETE_MSG = "Failed to retrieve configurations. Skipping configuration deletion."
 DELETE_CONFIGURATION_DESC = "Deleting configurations from destination hub"

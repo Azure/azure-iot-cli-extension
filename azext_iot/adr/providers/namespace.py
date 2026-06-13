@@ -75,10 +75,6 @@ class NamespaceProvider(ADRProvider):
 
         # TODO - CMS Preview - support messaging endpoints create
 
-        properties = {}
-        if properties:
-            namespace_resource["properties"] = properties
-
         with console.status(f"Creating namespace {namespace_name}..."):
             poller = self.client.namespaces.begin_create_or_replace(
                 resource_group_name=resource_group_name,

@@ -271,3 +271,14 @@ class TestPnPRuntimeUpdateDigitalTwin(object):
 
         # Result from get twin
         assert result == json.loads(generic_result)
+
+    def test_pnp_runtime_update_digital_twin_error(
+        self, fixture_cmd, service_client_generic_errors
+    ):
+        with pytest.raises(CLIError):
+            subject.patch_digital_twin(
+                cmd=fixture_cmd,
+                device_id=device_id,
+                hub_name_or_hostname=mock_target["entity"],
+                json_patch='{"op":"add", "path":"/thermostat1/targetTemperature", "value": 54}',
+            )

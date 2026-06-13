@@ -7,7 +7,7 @@
 from unittest.mock import Mock
 
 import pytest
-from azure.cli.core.azclierror import ResourceNotFoundError
+from azure.cli.core.azclierror import AzureResponseError, ResourceNotFoundError
 from azure.core.exceptions import HttpResponseError
 
 from azext_iot.adr.common import DEFAULT_NS_POLICY_CERT_KEY_TYPE, DEFAULT_NS_POLICY_CERT_VALIDITY_DAYS
@@ -127,6 +127,16 @@ def test_create_byor_with_custom_options(fixture_policy_provider, mock_poller):
 # ==================== Show ====================
 
 
+def test_create_policy_namespace_missing_location(fixture_policy_provider):
+    """Create raises when parent namespace has no location to inherit."""
+    fixture_policy_provider.client.namespaces.get.return_value = {}
+
+    with pytest.raises(AzureResponseError):
+        fixture_policy_provider.create(
+            policy_name="p", namespace_name="ns", resource_group_name="rg", location=None,
+        )
+
+
 def test_show_policy(fixture_policy_provider):
     """Show returns the serialized policy and calls the correct SDK methods."""
     expected = {"name": "p", "properties": {"provisioningState": "Succeeded"}}
@@ -140,6 +150,17 @@ def test_show_policy(fixture_policy_provider):
     fixture_policy_provider.client.policies.get.assert_called_once_with(
         resource_group_name="rg", namespace_name="ns", policy_name="p",
     )
+
+
+def test_show_policy_reraises_non_parent_error(fixture_policy_provider):
+    """Show re-raises HttpResponseError when not a ParentResourceNotFound 404."""
+    fixture_policy_provider.client.namespaces.get.return_value = {}
+    fixture_policy_provider.client.policies.get.side_effect = HttpResponseError(
+        response=Mock(status_code=500)
+    )
+
+    with pytest.raises(HttpResponseError):
+        fixture_policy_provider.show(policy_name="p", namespace_name="ns", resource_group_name="rg")
 
 
 # ==================== List ====================
@@ -156,6 +177,17 @@ def test_list_policies(fixture_policy_provider):
     result = fixture_policy_provider.list(namespace_name="ns", resource_group_name="rg")
 
     assert result == [{"name": "a"}, {"name": "b"}]
+
+
+def test_list_policies_reraises_non_parent_error(fixture_policy_provider):
+    """List re-raises HttpResponseError when not a ParentResourceNotFound 404."""
+    fixture_policy_provider.client.namespaces.get.return_value = {}
+    fixture_policy_provider.client.policies.list_by_resource_group.side_effect = HttpResponseError(
+        response=Mock(status_code=500)
+    )
+
+    with pytest.raises(HttpResponseError):
+        fixture_policy_provider.list(namespace_name="ns", resource_group_name="rg")
 
 # ==================== Delete ====================
 
@@ -196,6 +228,19 @@ def test_update_policy(fixture_policy_provider, mock_poller, days):
         assert cert_config["leafCertificateConfiguration"]["validityPeriodInDays"] == days
     else:
         assert "certificate" not in resource.get("properties", {})
+
+
+def test_update_policy_with_tags(fixture_policy_provider, mock_poller):
+    """Update passes tags through in the resource body."""
+    fixture_policy_provider.client.policies.begin_update.return_value = mock_poller(Mock())
+    _setup_show(fixture_policy_provider, {"name": "p"})
+
+    fixture_policy_provider.update(
+        policy_name="p", namespace_name="ns", resource_group_name="rg", tags={"env": "test"},
+    )
+
+    resource = fixture_policy_provider.client.policies.begin_update.call_args[1]["properties"]
+    assert resource["tags"] == {"env": "test"}
 
 
 # ==================== Revoke Issuer ====================

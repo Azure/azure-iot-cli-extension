@@ -7,11 +7,20 @@
 from unittest.mock import Mock, patch
 
 import pytest
-from azure.cli.core.azclierror import ResourceNotFoundError
+from azure.cli.core.azclierror import AzureResponseError, ResourceNotFoundError
 from azure.core.exceptions import HttpResponseError
 
-
 # ==================== Create ====================
+
+
+def test_create_credential_namespace_missing_location(fixture_credential_provider):
+    """Create raises when parent namespace has no location to inherit."""
+    fixture_credential_provider.client.namespaces.get.return_value = {}
+
+    with pytest.raises(AzureResponseError):
+        fixture_credential_provider.create(
+            namespace_name="test-namespace", resource_group_name="test-rg", location=None,
+        )
 
 
 @pytest.mark.parametrize(
@@ -101,6 +110,19 @@ def test_show_credential_not_found(fixture_credential_provider, ns_exists, expec
     else:
         assert exc_info.value.response.status_code == 404
         fixture_credential_provider.client.credentials.get.assert_not_called()
+
+
+def test_show_credential_reraises_non_404(fixture_credential_provider):
+    """Show re-raises HttpResponseError when status code is not 404."""
+    fixture_credential_provider.client.namespaces.get.return_value = Mock()
+    fixture_credential_provider.client.credentials.get.side_effect = HttpResponseError(
+        response=Mock(status_code=500)
+    )
+
+    with pytest.raises(HttpResponseError) as exc_info:
+        fixture_credential_provider.show(namespace_name="test-namespace", resource_group_name="test-rg")
+
+    assert exc_info.value.response.status_code == 500
 
 
 # ==================== Delete ====================

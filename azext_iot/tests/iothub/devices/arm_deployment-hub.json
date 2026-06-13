@@ -1,0 +1,1 @@
+{"resources": [{"name": "hub", "type": "Microsoft.Devices/IotHubs", "location": "westus", "sku": {}, "identity": {}, "properties": {"eventHubEndpoints": {"events": {"partitionCount": 4}}, "features": "None", "routing": {"endpoints": {}, "routes": []}, "storageEndpoints": {}}}]}

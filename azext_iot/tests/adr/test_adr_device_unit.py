@@ -249,6 +249,28 @@ def test_device_update_clear_attributes_json_string(fixture_device_provider, moc
     )
 
 
+def test_device_update_clear_attributes_empty_string(fixture_device_provider, mock_poller):
+    """--attributes '' (empty string) clears attributes by sending None."""
+    mock_device = Mock()
+    poller = mock_poller(mock_device)
+    fixture_device_provider.client.namespace_devices.begin_update.return_value = poller
+
+    result = fixture_device_provider.update(
+        device_name="test-device",
+        namespace_name="test-namespace",
+        resource_group_name="test-rg",
+        attributes="",
+    )
+
+    assert result == mock_device
+    fixture_device_provider.client.namespace_devices.begin_update.assert_called_once_with(
+        resource_group_name="test-rg",
+        namespace_name="test-namespace",
+        device_name="test-device",
+        properties={"properties": {"attributes": None}},
+    )
+
+
 def test_device_update_clear_os_version(fixture_device_provider, mock_poller):
     """--os-version '' sends an empty string to clear the OS version."""
     mock_device = Mock()

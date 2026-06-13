@@ -93,6 +93,28 @@ def generate_cs(
     return result.lower() if lower_case else result
 
 
+@pytest.fixture(autouse=True)
+def disable_cli_version_check(mocker):
+    """Prevent the Azure CLI version-update check from issuing real HTTP calls.
+
+    When a command is invoked, azure-cli-core may fetch the latest CLI version
+    from AME storage (https://azcliprod.blob.core.windows.net/cli). Under an
+    active ``responses`` mock this network call is recorded as the first
+    captured request, shifting the service request the tests assert on and
+    causing spurious failures. Patch the leaf functions that perform the HTTP
+    so no real or recorded network activity occurs.
+    """
+    for target in (
+        "azure.cli.core.util.check_connectivity",
+        "azure.cli.core.util.get_latest_version_from_ame_storage",
+    ):
+        try:
+            mocker.patch(target, return_value=False)
+        except (AttributeError, ModuleNotFoundError):
+            # Older/newer azure-cli versions may not expose these symbols.
+            pass
+
+
 # Sets current working directory to the directory of the executing file
 @pytest.fixture()
 def set_cwd(request):
