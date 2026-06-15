@@ -8,6 +8,8 @@ Release History
 
 **Bug fixes**
 
+* ``az iot du account create`` no longer fails with ``TypeError: unhashable type: 'dict'`` when assigning a single user-assigned managed identity via ``--assign-identity``.
+
 * ``az iot hub device-identity connection-string show`` and ``az iot hub module-identity connection-string show`` now reject ``--hostname-type service``. Use ``auto``, ``device`` or ``classic`` instead.
 
 * ``az iot hub generate-sas-token`` gains a ``--hostname-type`` parameter to control the SAS token audience:
