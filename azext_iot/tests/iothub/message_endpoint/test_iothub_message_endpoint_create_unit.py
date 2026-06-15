@@ -225,7 +225,7 @@ class TestCreate:
         assert coll[0]["collectionName"] == "cont"
 
     def test_create_cosmos_missing_key(self, provider, mocker):
-        p, hub = provider()
+        p, _ = provider()
         # Fetched connection string is None -> no keys derivable.
         mocker.patch(f"{me_path}.get_cosmos_db_cstring", return_value=None)
         with pytest.raises(RequiredArgumentMissingError):
@@ -239,7 +239,7 @@ class TestCreate:
             )
 
     def test_create_cosmos_identity_missing_uri(self, provider):
-        p, hub = provider()
+        p, _ = provider()
         with pytest.raises(RequiredArgumentMissingError):
             p.create(
                 endpoint_name="ep1",
@@ -274,7 +274,7 @@ class TestCreate:
         assert sc["connectionString"] == "storage-cstring"
 
     def test_create_storage_missing_container(self, provider):
-        p, hub = provider()
+        p, _ = provider()
         with pytest.raises(RequiredArgumentMissingError):
             p.create(
                 endpoint_name="ep1",
@@ -294,7 +294,7 @@ class TestCreate:
         assert eh[0]["authenticationType"] == AuthenticationType.IdentityBased.value
 
     def test_create_mutually_exclusive(self, provider):
-        p, hub = provider()
+        p, _ = provider()
         with pytest.raises(MutuallyExclusiveArgumentError):
             p.create(
                 endpoint_name="ep1",
@@ -304,7 +304,7 @@ class TestCreate:
             )
 
     def test_create_error(self, provider, mocker):
-        p, hub = provider()
+        p, _ = provider()
         handler = mocker.patch(f"{me_path}.handle_service_exception")
         p.discovery.client.begin_create_or_update.side_effect = HttpResponseError("boom")
         p.create(
@@ -317,12 +317,12 @@ class TestCreate:
 
 class TestConnectionStringArgsCheck:
     def test_missing_args_messaging(self, provider):
-        p, hub = provider()
+        p, _ = provider()
         with pytest.raises(ArgumentUsageError):
             p._connection_string_retrieval_args_check(endpoint_type=EndpointType.EventHub.value)
 
     def test_missing_args_storage(self, provider):
-        p, hub = provider()
+        p, _ = provider()
         with pytest.raises(ArgumentUsageError):
             p._connection_string_retrieval_args_check(
                 endpoint_type=EndpointType.AzureStorageContainer.value
@@ -415,7 +415,7 @@ class TestShowListDelete:
         assert eps["cosmosDBSqlContainers"] == []
 
     def test_delete_cosmos_no_support(self, provider):
-        p, hub = provider(cosmos_version=IoTHubSDKVersion.NoCosmos.value)
+        p, _ = provider(cosmos_version=IoTHubSDKVersion.NoCosmos.value)
         with pytest.raises(InvalidArgumentValueError):
             p.delete(endpoint_type=EndpointType.CosmosDBContainer.value)
 

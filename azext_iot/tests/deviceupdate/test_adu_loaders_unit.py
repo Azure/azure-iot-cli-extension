@@ -51,8 +51,10 @@ def test_reload_modules_full(mocker, tmp_path):
     core_dir = os.path.join(ext_azure_dir, "core")
     os.makedirs(core_dir)
     # Minimal azure.core package layout so init_internal_azure_core can resolve specs.
-    open(os.path.join(core_dir, "__init__.py"), "w").close()
-    open(os.path.join(core_dir, "exceptions.py"), "w").close()
+    with open(os.path.join(core_dir, "__init__.py"), "w", encoding="utf-8"):
+        pass
+    with open(os.path.join(core_dir, "exceptions.py"), "w", encoding="utf-8"):
+        pass
 
     mocker.patch("azure.cli.core.extension.get_extension_path", return_value=ext_path)
     mocker.patch.object(subject, "ensure_azure_namespace_path")

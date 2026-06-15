@@ -28,11 +28,11 @@ def mock_device_client(mocker):
 
 
 def _make_provider(mock_device_client, **kwargs):
-    defaults = dict(
-        hub_hostname="myhub.azure-devices.net",
-        device_id="dev1",
-        device_conn_string="HostName=h;DeviceId=dev1;SharedAccessKey=key",
-    )
+    defaults = {
+        "hub_hostname": "myhub.azure-devices.net",
+        "device_id": "dev1",
+        "device_conn_string": "HostName=h;DeviceId=dev1;SharedAccessKey=key",
+    }
     defaults.update(kwargs)
     return MQTTProvider(**defaults)
 
@@ -44,7 +44,7 @@ class TestInit:
         mock_device_client.create_from_connection_string.assert_called_once()
 
     def test_init_x509(self, mock_device_client):
-        provider = _make_provider(
+        _make_provider(
             mock_device_client,
             device_conn_string=None,
             x509_files={
@@ -127,7 +127,6 @@ class TestHandlers:
         )
         with pytest.raises(LookupError):
             provider.message_handler(message)
-
 
     def test_method_request_handler_defaults(self, mock_device_client, mocker):
         import azure.iot.device as iot_device

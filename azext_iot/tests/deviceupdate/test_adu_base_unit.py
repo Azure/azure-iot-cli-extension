@@ -45,13 +45,13 @@ def test_client_handler_get_mgmt_client(mocker):
 
 
 def test_client_handler_get_data_client(mocker):
-    mocker.patch.object(subject, "DeviceUpdateClient")
+    patched_client = mocker.patch.object(subject, "DeviceUpdateClient")
     profile_cls = mocker.patch("azure.cli.core._profile.Profile")
     profile_cls.return_value.get_login_credentials.return_value = (MagicMock(), "sub", "tenant")
     mocker.patch("azure.cli.core.commands.client_factory.prepare_client_kwargs_track2", return_value={})
     handler = DeviceUpdateClientHandler(cmd=MagicMock())
     client = handler.get_data_client(endpoint="https://host", instance_id="inst")
-    assert client is subject.DeviceUpdateClient.return_value
+    assert client is patched_client.return_value
 
 
 def test_client_handler_add_useragents_handles_exception():

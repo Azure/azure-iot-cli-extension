@@ -292,4 +292,3 @@ class TestCommandMapTransforms:
             return_value=result,
         )
         assert transform("poller") == ["r"]
-

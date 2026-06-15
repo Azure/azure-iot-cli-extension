@@ -238,7 +238,7 @@ class TestIotHubConnectionStringShow:
 # ---------------------------------------------------------------------------
 class TestCustomizeDeviceTracingOutput:
     def test_no_desired_tracing_returns_empty(self):
-        assert subject._customize_device_tracing_output("d1", {}, {}) == {}
+        assert not subject._customize_device_tracing_output("d1", {}, {})
 
     def test_synced(self):
         desired = {TRACING_PROPERTY: {"sampling_mode": 1, "sampling_rate": 50}}

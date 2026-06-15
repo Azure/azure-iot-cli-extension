@@ -17,7 +17,6 @@ from azure.cli.core.azclierror import (
 )
 
 from azext_iot._factory import CloudError
-from azext_iot.iothub.providers import device_messaging as dm_module
 from azext_iot.iothub.providers.device_messaging import (
     DeviceMessagingProvider,
     _simulate_get_default_properties,
@@ -453,4 +452,3 @@ class TestCommandLayer:
         provider_cls.assert_called_once()
         instance.device_upload_file.assert_called_once()
         assert result == instance.device_upload_file.return_value
-

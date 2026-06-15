@@ -224,7 +224,6 @@ class TestSaveState:
             p.save_state(state_file=bad_path)
 
 
-
 class TestUploadState:
     def test_upload_arm_with_login(self, mocker, tmp_path):
         p = _provider(mocker)
@@ -306,7 +305,6 @@ class TestMigrateState:
         assert p.rg == "rg2"
 
 
-
 class TestProcessHubToDict:
     def test_configurations_and_devices(self, mocker):
         p = _provider(mocker)
@@ -365,7 +363,6 @@ class TestProcessHubToDict:
         result = p.process_hub_to_dict(p.target, [HubAspects.Arm.value])
         assert result["arm"] == arm_json
         assert "rg-from-resource" in invoke.call_args[0][0]
-
 
     def test_arm_aspect_empty(self, mocker):
         p = _provider(mocker)
@@ -523,7 +520,6 @@ class TestDownloadDevices:
         mocker.patch(f"{sp}._iot_device_module_twin_show", side_effect=AzCLIError("boom"))
         result = p.download_devices(p.target)
         assert result["d1"]["modules"] == {}
-
 
 
 class TestUploadHubFromDict:
@@ -690,7 +686,6 @@ class TestUploadHubFromDict:
         mocker.patch(f"{sp}._iot_device_set_parent", side_effect=AzCLIError("boom"))
         p.upload_hub_from_dict(state, [HubAspects.Devices.value])
 
-
     def test_upload_no_target_raises(self, mocker):
         p = _provider(mocker, target=None)
         with pytest.raises(BadRequestError):
@@ -776,7 +771,6 @@ class TestUploadHubFromDict:
         cert = state["arm"]["resources"][-1]
         assert cert["name"] == "hub/cert1"
         assert cert["dependsOn"][0].split("'")[3] == "hub"
-
 
     def test_upload_arm_deployment_fails(self, mocker):
         p = _provider(mocker)
@@ -958,8 +952,8 @@ class TestCheckControlplane:
             state_module.cli, "invoke", return_value=self._invoke(mocker, success=False)
         )
         p.check_controlplane(hub)
-        assert hub["properties"]["routing"]["endpoints"]["cosmosDBSqlContainers"] == []
-        assert hub["properties"]["routing"]["routes"] == []
+        assert not hub["properties"]["routing"]["endpoints"]["cosmosDBSqlContainers"]
+        assert not hub["properties"]["routing"]["routes"]
 
         p = _provider(mocker)
         hub = self._hub_resource()
@@ -979,7 +973,7 @@ class TestCheckControlplane:
         )
         p.check_controlplane(hub)
         # endpoint stays in list but its route is removed
-        assert hub["properties"]["routing"]["routes"] == []
+        assert not hub["properties"]["routing"]["routes"]
 
     def test_eventhub_and_servicebus_cstring(self, mocker):
         p = _provider(mocker)
@@ -1132,7 +1126,7 @@ class TestCheckControlplane:
         invoke_result.as_json.side_effect = AzCLIError("boom")
         mocker.patch.object(state_module.cli, "invoke", return_value=invoke_result)
         p.check_controlplane(hub)
-        assert hub["properties"]["routing"]["endpoints"]["cosmosDBSqlContainers"] == []
+        assert not hub["properties"]["routing"]["endpoints"]["cosmosDBSqlContainers"]
 
     @pytest.mark.parametrize(
         "ep_type", ["eventHubs", "serviceBusQueues", "serviceBusTopics"]
@@ -1210,7 +1204,7 @@ class TestCheckControlplane:
         invoke_result.as_json.side_effect = AzCLIError("boom")
         mocker.patch.object(state_module.cli, "invoke", return_value=invoke_result)
         p.check_controlplane(hub)
-        assert hub["properties"]["routing"]["endpoints"]["storageContainers"] == []
+        assert not hub["properties"]["routing"]["endpoints"]["storageContainers"]
 
     @pytest.mark.parametrize(
         "ep_type", ["eventHubs", "serviceBusQueues", "serviceBusTopics", "storageContainers"]
@@ -1230,5 +1224,4 @@ class TestCheckControlplane:
         )
         p.check_controlplane(hub)
         # route referencing the UAI-removed endpoint is dropped
-        assert hub["properties"]["routing"]["routes"] == []
-
+        assert not hub["properties"]["routing"]["routes"]
