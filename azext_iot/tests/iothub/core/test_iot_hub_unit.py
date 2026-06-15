@@ -14,7 +14,7 @@ from azext_iot.common.shared import (
     JobType,
     AuthenticationType,
 )
-from azure.cli.core.azclierror import BadRequestError, ForbiddenError
+from azure.cli.core.azclierror import BadRequestError, ClientRequestError, ForbiddenError
 
 hub_name = "hubname"
 shared_access_key_name = "TEST_SAS_KEY_NAME"
@@ -165,6 +165,10 @@ class TestIoTHubDeviceIdentityExport(object):
         assert isinstance(e.value, importexport_service_client_error.expected_exception)
         # Ensures error body serialization works
         assert e.value.error_msg.get("Message")
+
+    def test_invalid_job_type(self):
+        with pytest.raises(ClientRequestError):
+            subject._create_export_import_job_properties(job_type="fake")
 
 
 class TestIoTHubDeviceIdentityImport(object):

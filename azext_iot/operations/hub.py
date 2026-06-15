@@ -2642,7 +2642,7 @@ def _create_export_import_job_properties(
         if exists(input_blob_container_uri):
             input_blob_container_uri = read_file_content(input_blob_container_uri)
         job_properties.input_blob_container_uri = input_blob_container_uri
-    else:  # pragma: no cover
+    else:
         raise ClientRequestError(
             "Invalid job type: {}".format(job_type)
         )
