@@ -51,33 +51,33 @@ def test_patch_core_help_with_existing_keys():
 
 
 def test_policy_update_result_transform(mocker):
-    transform = PolicyUpdateResultTransform.__new__(PolicyUpdateResultTransform)
+    transform = PolicyUpdateResultTransform(MagicMock())
     result = {"properties": {"authorizationPolicies": ["p"]}}
     mocker.patch(f"{cm_path}.LongRunningOperation.__call__", return_value=result)
     assert transform("poller") == ["p"]
 
 
 def test_endpoint_update_result_transform(mocker):
-    transform = EndpointUpdateResultTransform.__new__(EndpointUpdateResultTransform)
+    transform = EndpointUpdateResultTransform(MagicMock())
     result = {"properties": {"routing": {"endpoints": ["e"]}}}
     mocker.patch(f"{cm_path}.LongRunningOperation.__call__", return_value=result)
     assert transform("poller") == ["e"]
 
 
 def test_route_update_result_transform(mocker):
-    transform = RouteUpdateResultTransform.__new__(RouteUpdateResultTransform)
+    transform = RouteUpdateResultTransform(MagicMock())
     result = {"properties": {"routing": {"routes": ["r"]}}}
     mocker.patch(f"{cm_path}.LongRunningOperation.__call__", return_value=result)
     assert transform("poller") == ["r"]
 
 
 def test_hub_delete_result_transform_no_poller():
-    transform = HubDeleteResultTransform.__new__(HubDeleteResultTransform)
+    transform = HubDeleteResultTransform(MagicMock())
     assert transform(None) is None
 
 
 def test_hub_delete_result_transform_not_found_suppressed(mocker):
-    transform = HubDeleteResultTransform.__new__(HubDeleteResultTransform)
+    transform = HubDeleteResultTransform(MagicMock())
     mocker.patch(
         f"{cm_path}.LongRunningOperation.__call__",
         side_effect=CLIError("resource not found"),
@@ -87,7 +87,7 @@ def test_hub_delete_result_transform_not_found_suppressed(mocker):
 
 
 def test_hub_delete_result_transform_other_error_raised(mocker):
-    transform = HubDeleteResultTransform.__new__(HubDeleteResultTransform)
+    transform = HubDeleteResultTransform(MagicMock())
     mocker.patch(
         f"{cm_path}.LongRunningOperation.__call__",
         side_effect=CLIError("something else"),

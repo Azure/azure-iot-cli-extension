@@ -35,7 +35,7 @@ def test_load_iothub_arguments():
 def test_endpoint_update_result_transform(mocker):
     from azext_iot.iothub.command_map import EndpointUpdateResultTransform
 
-    transform = EndpointUpdateResultTransform.__new__(EndpointUpdateResultTransform)
+    transform = EndpointUpdateResultTransform(MagicMock())
     result = {"properties": {"routing": {"endpoints": ["e"]}}}
     mocker.patch(
         "azext_iot.iothub.command_map.LongRunningOperation.__call__",
@@ -47,7 +47,7 @@ def test_endpoint_update_result_transform(mocker):
 def test_route_update_result_transform(mocker):
     from azext_iot.iothub.command_map import RouteUpdateResultTransform
 
-    transform = RouteUpdateResultTransform.__new__(RouteUpdateResultTransform)
+    transform = RouteUpdateResultTransform(MagicMock())
     result = {"properties": {"routing": {"routes": ["r"]}}}
     mocker.patch(
         "azext_iot.iothub.command_map.LongRunningOperation.__call__",
