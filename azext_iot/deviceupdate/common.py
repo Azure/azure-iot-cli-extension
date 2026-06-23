@@ -69,6 +69,15 @@ class ADUValidHashAlgorithmType(Enum):
     SHA256 = "sha256"
 
 
+class ADUDownloadSecurityType(Enum):
+    """
+    ADU download security (protocol) type for update payload downloads.
+    """
+
+    HTTPS = "https"
+    HTTP = "http"
+
+
 class ADUContentHandlerType(Enum):
     """
     ADU first-party content handler types.
@@ -98,15 +107,6 @@ FP_HANDLERS_REQUIRE_CRITERIA: List[str] = [
 
 
 SYSTEM_IDENTITY_ARG = "[system]"
-
-
-class ADUDownloadSecurityType(Enum):
-    """
-    ADU download security (protocol) type for update payload downloads.
-    """
-
-    HTTPS = "https"
-    HTTP = "http"
 AUTH_RESOURCE_ID = "https://api.adu.microsoft.com/"
 CACHE_RESOURCE_TYPE = "DeviceUpdate"
 
