@@ -1467,7 +1467,7 @@ class DeviceUpdateOperations:
         content_type = content_type or "application/json"
         _json = None
         _content = None
-        if isinstance(update_to_import, (IO, bytes)):
+        if isinstance(update_to_import, (bytes, bytearray)) or hasattr(update_to_import, "read"):
             _content = update_to_import
         else:
             _json = self._serialize.body(update_to_import, '[ImportUpdateInputItem]')
