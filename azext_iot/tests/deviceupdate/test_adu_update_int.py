@@ -429,6 +429,10 @@ def test_instance_update_lifecycle(provisioned_instances_module: Dict[str, dict]
         f"iot du device deployment delete -n {account_name} -i {instance_name} "
         f"--deployment-id {rollback_deployment_id} --group-id {device_group_id} --class-id {device_class_id} -y").success()
 
+    # Validate default downloadSecurity behavior for deployments created without --download-security
+    assert basic_create_deployment["downloadSecurity"] == "https"
+    assert rollback_create_deployment["downloadSecurity"] == "https"
+
     # Create deployment with explicit --download-security https
     https_deployment_id = f"deployhttps_{generate_generic_id()}"
     https_create_deployment = cli.invoke(
