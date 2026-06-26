@@ -506,7 +506,7 @@ class DeviceUpdateOperations:
         error_map.update(kwargs.pop('error_map', {}) or {})
         def prepare_request(next_link=None):
             if not next_link:
-                
+
                 request = build_list_updates_request(
                     instance_id=self._config.instance_id,
                     search=search,
@@ -523,7 +523,7 @@ class DeviceUpdateOperations:
                 request.url = self._client.format_url(request.url, **path_format_arguments)  # type: ignore
 
             else:
-                
+
                 request = build_list_updates_request(
                     instance_id=self._config.instance_id,
                     search=search,
@@ -610,7 +610,7 @@ class DeviceUpdateOperations:
         error_map.update(kwargs.pop('error_map', {}) or {})
         def prepare_request(next_link=None):
             if not next_link:
-                
+
                 request = build_list_operation_statuses_request(
                     instance_id=self._config.instance_id,
                     filter=filter,
@@ -627,7 +627,7 @@ class DeviceUpdateOperations:
                 request.url = self._client.format_url(request.url, **path_format_arguments)  # type: ignore
 
             else:
-                
+
                 request = build_list_operation_statuses_request(
                     instance_id=self._config.instance_id,
                     filter=filter,
@@ -778,7 +778,7 @@ class DeviceUpdateOperations:
         error_map.update(kwargs.pop('error_map', {}) or {})
         def prepare_request(next_link=None):
             if not next_link:
-                
+
                 request = build_list_providers_request(
                     instance_id=self._config.instance_id,
                     api_version=api_version,
@@ -793,7 +793,7 @@ class DeviceUpdateOperations:
                 request.url = self._client.format_url(request.url, **path_format_arguments)  # type: ignore
 
             else:
-                
+
                 request = build_list_providers_request(
                     instance_id=self._config.instance_id,
                     api_version=api_version,
@@ -870,7 +870,7 @@ class DeviceUpdateOperations:
         error_map.update(kwargs.pop('error_map', {}) or {})
         def prepare_request(next_link=None):
             if not next_link:
-                
+
                 request = build_list_names_request(
                     provider=provider,
                     instance_id=self._config.instance_id,
@@ -886,7 +886,7 @@ class DeviceUpdateOperations:
                 request.url = self._client.format_url(request.url, **path_format_arguments)  # type: ignore
 
             else:
-                
+
                 request = build_list_names_request(
                     provider=provider,
                     instance_id=self._config.instance_id,
@@ -970,7 +970,7 @@ class DeviceUpdateOperations:
         error_map.update(kwargs.pop('error_map', {}) or {})
         def prepare_request(next_link=None):
             if not next_link:
-                
+
                 request = build_list_versions_request(
                     provider=provider,
                     name=name,
@@ -988,7 +988,7 @@ class DeviceUpdateOperations:
                 request.url = self._client.format_url(request.url, **path_format_arguments)  # type: ignore
 
             else:
-                
+
                 request = build_list_versions_request(
                     provider=provider,
                     name=name,
@@ -1138,7 +1138,7 @@ class DeviceUpdateOperations:
         api_version = kwargs.pop('api_version', _params.pop('api-version', self._config.api_version))  # type: str
         cls = kwargs.pop('cls', None)  # type: ClsType[None]
 
-        
+
         request = build_delete_update_request(
             provider=provider,
             name=name,
@@ -1293,7 +1293,7 @@ class DeviceUpdateOperations:
         error_map.update(kwargs.pop('error_map', {}) or {})
         def prepare_request(next_link=None):
             if not next_link:
-                
+
                 request = build_list_files_request(
                     provider=provider,
                     name=name,
@@ -1311,7 +1311,7 @@ class DeviceUpdateOperations:
                 request.url = self._client.format_url(request.url, **path_format_arguments)  # type: ignore
 
             else:
-                
+
                 request = build_list_files_request(
                     provider=provider,
                     name=name,
@@ -1508,7 +1508,7 @@ class DeviceUpdateOperations:
 
         if response.status_code == 202:
             response_headers['Operation-Location']=self._deserialize('str', response.headers.get('Operation-Location'))
-            
+
 
         if cls:
             return cls(pipeline_response, deserialized, response_headers)

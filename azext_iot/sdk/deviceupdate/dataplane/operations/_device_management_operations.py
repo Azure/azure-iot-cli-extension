@@ -1527,7 +1527,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         error_map.update(kwargs.pop('error_map', {}) or {})
         def prepare_request(next_link=None):
             if not next_link:
-                
+
                 request = build_list_device_classes_request(
                     instance_id=self._config.instance_id,
                     filter=filter,
@@ -1543,7 +1543,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
                 request.url = self._client.format_url(request.url, **path_format_arguments)  # type: ignore
 
             else:
-                
+
                 request = build_list_device_classes_request(
                     instance_id=self._config.instance_id,
                     filter=filter,
@@ -1620,7 +1620,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         api_version = kwargs.pop('api_version', _params.pop('api-version', self._config.api_version))  # type: str
         cls = kwargs.pop('cls', None)  # type: ClsType[_models.DeviceClass]
 
-        
+
         request = build_get_device_class_request(
             device_class_id=device_class_id,
             instance_id=self._config.instance_id,
@@ -1826,7 +1826,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         api_version = kwargs.pop('api_version', _params.pop('api-version', self._config.api_version))  # type: str
         cls = kwargs.pop('cls', None)  # type: ClsType[None]
 
-        
+
         request = build_delete_device_class_request(
             device_class_id=device_class_id,
             instance_id=self._config.instance_id,
@@ -1887,7 +1887,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         error_map.update(kwargs.pop('error_map', {}) or {})
         def prepare_request(next_link=None):
             if not next_link:
-                
+
                 request = build_list_installable_updates_for_device_class_request(
                     device_class_id=device_class_id,
                     instance_id=self._config.instance_id,
@@ -1903,7 +1903,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
                 request.url = self._client.format_url(request.url, **path_format_arguments)  # type: ignore
 
             else:
-                
+
                 request = build_list_installable_updates_for_device_class_request(
                     device_class_id=device_class_id,
                     instance_id=self._config.instance_id,
@@ -1982,7 +1982,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         error_map.update(kwargs.pop('error_map', {}) or {})
         def prepare_request(next_link=None):
             if not next_link:
-                
+
                 request = build_list_health_of_devices_request(
                     instance_id=self._config.instance_id,
                     filter=filter,
@@ -1998,7 +1998,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
                 request.url = self._client.format_url(request.url, **path_format_arguments)  # type: ignore
 
             else:
-                
+
                 request = build_list_health_of_devices_request(
                     instance_id=self._config.instance_id,
                     filter=filter,
@@ -2073,7 +2073,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         error_map.update(kwargs.pop('error_map', {}) or {})
         def prepare_request(next_link=None):
             if not next_link:
-                
+
                 request = build_list_log_collections_request(
                     instance_id=self._config.instance_id,
                     api_version=api_version,
@@ -2088,7 +2088,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
                 request.url = self._client.format_url(request.url, **path_format_arguments)  # type: ignore
 
             else:
-                
+
                 request = build_list_log_collections_request(
                     instance_id=self._config.instance_id,
                     api_version=api_version,
@@ -2164,7 +2164,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         api_version = kwargs.pop('api_version', _params.pop('api-version', self._config.api_version))  # type: str
         cls = kwargs.pop('cls', None)  # type: ClsType[_models.LogCollection]
 
-        
+
         request = build_get_log_collection_request(
             log_collection_id=log_collection_id,
             instance_id=self._config.instance_id,
@@ -2359,7 +2359,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         api_version = kwargs.pop('api_version', _params.pop('api-version', self._config.api_version))  # type: str
         cls = kwargs.pop('cls', None)  # type: ClsType[_models.LogCollectionOperationDetailedStatus]
 
-        
+
         request = build_get_log_collection_detailed_status_request(
             log_collection_id=log_collection_id,
             instance_id=self._config.instance_id,
@@ -2427,7 +2427,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         error_map.update(kwargs.pop('error_map', {}) or {})
         def prepare_request(next_link=None):
             if not next_link:
-                
+
                 request = build_list_devices_request(
                     instance_id=self._config.instance_id,
                     filter=filter,
@@ -2443,7 +2443,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
                 request.url = self._client.format_url(request.url, **path_format_arguments)  # type: ignore
 
             else:
-                
+
                 request = build_list_devices_request(
                     instance_id=self._config.instance_id,
                     filter=filter,
@@ -2521,7 +2521,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         api_version = kwargs.pop('api_version', _params.pop('api-version', self._config.api_version))  # type: str
         cls = kwargs.pop('cls', None)  # type: ClsType[_models.Device]
 
-        
+
         request = build_get_device_request(
             device_id=device_id,
             instance_id=self._config.instance_id,
@@ -2589,7 +2589,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         api_version = kwargs.pop('api_version', _params.pop('api-version', self._config.api_version))  # type: str
         cls = kwargs.pop('cls', None)  # type: ClsType[_models.Device]
 
-        
+
         request = build_get_device_module_request(
             device_id=device_id,
             module_id=module_id,
@@ -2792,7 +2792,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         error_map.update(kwargs.pop('error_map', {}) or {})
         def prepare_request(next_link=None):
             if not next_link:
-                
+
                 request = build_list_groups_request(
                     instance_id=self._config.instance_id,
                     order_by=order_by,
@@ -2808,7 +2808,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
                 request.url = self._client.format_url(request.url, **path_format_arguments)  # type: ignore
 
             else:
-                
+
                 request = build_list_groups_request(
                     instance_id=self._config.instance_id,
                     order_by=order_by,
@@ -2885,7 +2885,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         api_version = kwargs.pop('api_version', _params.pop('api-version', self._config.api_version))  # type: str
         cls = kwargs.pop('cls', None)  # type: ClsType[_models.Group]
 
-        
+
         request = build_get_group_request(
             group_id=group_id,
             instance_id=self._config.instance_id,
@@ -2955,7 +2955,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         api_version = kwargs.pop('api_version', _params.pop('api-version', self._config.api_version))  # type: str
         cls = kwargs.pop('cls', None)  # type: ClsType[None]
 
-        
+
         request = build_delete_group_request(
             group_id=group_id,
             instance_id=self._config.instance_id,
@@ -3019,7 +3019,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         error_map.update(kwargs.pop('error_map', {}) or {})
         def prepare_request(next_link=None):
             if not next_link:
-                
+
                 request = build_list_best_updates_for_group_request(
                     group_id=group_id,
                     instance_id=self._config.instance_id,
@@ -3035,7 +3035,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
                 request.url = self._client.format_url(request.url, **path_format_arguments)  # type: ignore
 
             else:
-                
+
                 request = build_list_best_updates_for_group_request(
                     group_id=group_id,
                     instance_id=self._config.instance_id,
@@ -3117,7 +3117,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         error_map.update(kwargs.pop('error_map', {}) or {})
         def prepare_request(next_link=None):
             if not next_link:
-                
+
                 request = build_list_deployments_for_group_request(
                     group_id=group_id,
                     instance_id=self._config.instance_id,
@@ -3134,7 +3134,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
                 request.url = self._client.format_url(request.url, **path_format_arguments)  # type: ignore
 
             else:
-                
+
                 request = build_list_deployments_for_group_request(
                     group_id=group_id,
                     instance_id=self._config.instance_id,
@@ -3215,7 +3215,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         api_version = kwargs.pop('api_version', _params.pop('api-version', self._config.api_version))  # type: str
         cls = kwargs.pop('cls', None)  # type: ClsType[_models.Deployment]
 
-        
+
         request = build_get_deployment_request(
             group_id=group_id,
             deployment_id=deployment_id,
@@ -3423,7 +3423,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         api_version = kwargs.pop('api_version', _params.pop('api-version', self._config.api_version))  # type: str
         cls = kwargs.pop('cls', None)  # type: ClsType[None]
 
-        
+
         request = build_delete_deployment_request(
             group_id=group_id,
             deployment_id=deployment_id,
@@ -3488,7 +3488,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         api_version = kwargs.pop('api_version', _params.pop('api-version', self._config.api_version))  # type: str
         cls = kwargs.pop('cls', None)  # type: ClsType[_models.DeploymentStatus]
 
-        
+
         request = build_get_deployment_status_request(
             group_id=group_id,
             deployment_id=deployment_id,
@@ -3561,7 +3561,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         error_map.update(kwargs.pop('error_map', {}) or {})
         def prepare_request(next_link=None):
             if not next_link:
-                
+
                 request = build_list_device_class_subgroups_for_group_request(
                     group_id=group_id,
                     instance_id=self._config.instance_id,
@@ -3578,7 +3578,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
                 request.url = self._client.format_url(request.url, **path_format_arguments)  # type: ignore
 
             else:
-                
+
                 request = build_list_device_class_subgroups_for_group_request(
                     group_id=group_id,
                     instance_id=self._config.instance_id,
@@ -3661,7 +3661,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         api_version = kwargs.pop('api_version', _params.pop('api-version', self._config.api_version))  # type: str
         cls = kwargs.pop('cls', None)  # type: ClsType[_models.DeviceClassSubgroup]
 
-        
+
         request = build_get_device_class_subgroup_request(
             group_id=group_id,
             device_class_id=device_class_id,
@@ -3736,7 +3736,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         api_version = kwargs.pop('api_version', _params.pop('api-version', self._config.api_version))  # type: str
         cls = kwargs.pop('cls', None)  # type: ClsType[None]
 
-        
+
         request = build_delete_device_class_subgroup_request(
             group_id=group_id,
             device_class_id=device_class_id,
@@ -3801,7 +3801,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         api_version = kwargs.pop('api_version', _params.pop('api-version', self._config.api_version))  # type: str
         cls = kwargs.pop('cls', None)  # type: ClsType[_models.DeviceClassSubgroupUpdatableDevices]
 
-        
+
         request = build_get_best_updates_for_device_class_subgroup_request(
             group_id=group_id,
             device_class_id=device_class_id,
@@ -3874,7 +3874,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         error_map.update(kwargs.pop('error_map', {}) or {})
         def prepare_request(next_link=None):
             if not next_link:
-                
+
                 request = build_list_deployments_for_device_class_subgroup_request(
                     group_id=group_id,
                     device_class_id=device_class_id,
@@ -3892,7 +3892,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
                 request.url = self._client.format_url(request.url, **path_format_arguments)  # type: ignore
 
             else:
-                
+
                 request = build_list_deployments_for_device_class_subgroup_request(
                     group_id=group_id,
                     device_class_id=device_class_id,
@@ -3977,7 +3977,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         api_version = kwargs.pop('api_version', _params.pop('api-version', self._config.api_version))  # type: str
         cls = kwargs.pop('cls', None)  # type: ClsType[_models.Deployment]
 
-        
+
         request = build_get_deployment_for_device_class_subgroup_request(
             group_id=group_id,
             device_class_id=device_class_id,
@@ -4049,7 +4049,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         api_version = kwargs.pop('api_version', _params.pop('api-version', self._config.api_version))  # type: str
         cls = kwargs.pop('cls', None)  # type: ClsType[None]
 
-        
+
         request = build_delete_deployment_for_device_class_subgroup_request(
             group_id=group_id,
             device_class_id=device_class_id,
@@ -4117,7 +4117,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         api_version = kwargs.pop('api_version', _params.pop('api-version', self._config.api_version))  # type: str
         cls = kwargs.pop('cls', None)  # type: ClsType[_models.Deployment]
 
-        
+
         request = build_stop_deployment_request(
             group_id=group_id,
             device_class_id=device_class_id,
@@ -4189,7 +4189,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         api_version = kwargs.pop('api_version', _params.pop('api-version', self._config.api_version))  # type: str
         cls = kwargs.pop('cls', None)  # type: ClsType[_models.Deployment]
 
-        
+
         request = build_retry_deployment_request(
             group_id=group_id,
             device_class_id=device_class_id,
@@ -4268,7 +4268,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         error_map.update(kwargs.pop('error_map', {}) or {})
         def prepare_request(next_link=None):
             if not next_link:
-                
+
                 request = build_list_device_states_for_device_class_subgroup_deployment_request(
                     group_id=group_id,
                     device_class_id=device_class_id,
@@ -4287,7 +4287,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
                 request.url = self._client.format_url(request.url, **path_format_arguments)  # type: ignore
 
             else:
-                
+
                 request = build_list_device_states_for_device_class_subgroup_deployment_request(
                     group_id=group_id,
                     device_class_id=device_class_id,
@@ -4374,7 +4374,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         api_version = kwargs.pop('api_version', _params.pop('api-version', self._config.api_version))  # type: str
         cls = kwargs.pop('cls', None)  # type: ClsType[_models.DeviceClassSubgroupDeploymentStatus]
 
-        
+
         request = build_get_device_class_subgroup_deployment_status_request(
             group_id=group_id,
             device_class_id=device_class_id,
@@ -4445,7 +4445,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         api_version = kwargs.pop('api_version', _params.pop('api-version', self._config.api_version))  # type: str
         cls = kwargs.pop('cls', None)  # type: ClsType[_models.UpdateCompliance]
 
-        
+
         request = build_get_device_class_subgroup_update_compliance_request(
             group_id=group_id,
             device_class_id=device_class_id,
@@ -4512,7 +4512,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         api_version = kwargs.pop('api_version', _params.pop('api-version', self._config.api_version))  # type: str
         cls = kwargs.pop('cls', None)  # type: ClsType[_models.UpdateCompliance]
 
-        
+
         request = build_get_update_compliance_for_group_request(
             group_id=group_id,
             instance_id=self._config.instance_id,
@@ -4584,7 +4584,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         error_map.update(kwargs.pop('error_map', {}) or {})
         def prepare_request(next_link=None):
             if not next_link:
-                
+
                 request = build_list_operation_statuses_request(
                     instance_id=self._config.instance_id,
                     filter=filter,
@@ -4601,7 +4601,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
                 request.url = self._client.format_url(request.url, **path_format_arguments)  # type: ignore
 
             else:
-                
+
                 request = build_list_operation_statuses_request(
                     instance_id=self._config.instance_id,
                     filter=filter,
@@ -4751,7 +4751,7 @@ class DeviceManagementOperations:  # pylint: disable=too-many-public-methods
         api_version = kwargs.pop('api_version', _params.pop('api-version', self._config.api_version))  # type: str
         cls = kwargs.pop('cls', None)  # type: ClsType[_models.UpdateCompliance]
 
-        
+
         request = build_get_update_compliance_request(
             instance_id=self._config.instance_id,
             api_version=api_version,

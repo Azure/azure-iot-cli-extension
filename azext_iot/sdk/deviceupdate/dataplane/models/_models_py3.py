@@ -27,7 +27,7 @@ class AccessCondition(_serialization.Model):
     """
 
     _attribute_map = {
-        "if_none_match": {"key": "ifNoneMatch", "type": "str"},
+        "if_none_match": {"key": "If-None-Match", "type": "str"},
     }
 
     def __init__(
