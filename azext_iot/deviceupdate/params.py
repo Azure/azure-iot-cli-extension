@@ -430,7 +430,8 @@ def load_deviceupdate_arguments(self, _):
         context.argument(
             "download_security",
             options_list=["--download-security"],
-            help="Protocol used for update payload downloads. Defaults to https (TLS). Use http only when the target environment does not support TLS.",
+            help="Protocol used for update payload downloads. Defaults to https (TLS). "
+            "Use http only when the target environment does not support TLS.",
             arg_type=get_enum_type(ADUDownloadSecurityType),
         )
 
