@@ -1020,3 +1020,106 @@ def compare_routes(routes1, routes2):
         assert route["endpointNames"] == target["endpointNames"]
         assert route["isEnabled"] == target["isEnabled"]
         assert route["source"] == target["source"]
+
+
+@pytest.mark.hub_infrastructure(count=1)
+def test_export_endpoint_resource_name_starting_with_scheme_char(
+    provisioned_only_iot_hubs_module, setup_file
+):
+    """Export must keep a routing endpoint"""
+    hub_name = provisioned_only_iot_hubs_module[0]["name"]
+    hub_rg = provisioned_only_iot_hubs_module[0]["rg"]
+    delete_system_endpoints(hub_name, hub_rg)
+
+    sb_namespace = ("sb" + generate_generic_id())[:24]
+    topic_name = "topic1"
+    endpoint_name = generate_generic_id()
+    try:
+        cli.invoke(
+            f"servicebus namespace create --name {sb_namespace} -g {hub_rg} --sku Standard"
+        )
+        cli.invoke(
+            f"servicebus topic create --namespace-name {sb_namespace} -g {hub_rg} --name {topic_name}"
+        )
+        cli.invoke(
+            f"servicebus topic authorization-rule create --namespace-name {sb_namespace} -g {hub_rg} "
+            f"--topic-name {topic_name} --name iothubroute --rights Send"
+        )
+        endpoint_cstring = cli.invoke(
+            f"servicebus topic authorization-rule keys list --namespace-name {sb_namespace} -g {hub_rg} "
+            f"--topic-name {topic_name} --name iothubroute"
+        ).as_json()["primaryConnectionString"]
+
+        # Key-based endpoint with resource group
+        cli.invoke(
+            f"iot hub message-endpoint create servicebus-topic -n {hub_name} -g {hub_rg} "
+            f"--en {endpoint_name} -c '{endpoint_cstring}' --erg {hub_rg}"
+        )
+        time.sleep(10)  # gives the hub time to update before the export
+
+        cli.invoke(
+            f"iot hub state export -n {hub_name} -f {setup_file} -g {hub_rg} -r --aspects {CONTROLPLANE}"
+        )
+
+        with open(setup_file, "r", encoding="utf-8") as f:
+            hub_info = json.load(f)
+        topics = hub_info["arm"]["resources"][0]["properties"]["routing"]["endpoints"]["serviceBusTopics"]
+
+        exported = [ep for ep in topics if ep["name"] == endpoint_name]
+        assert len(exported) == 1, "endpoint was dropped from export (namespace likely corrupted)"
+        assert sb_namespace in exported[0]["connectionString"]
+    finally:
+        cli.invoke(f"iot hub message-endpoint delete -n {hub_name} -g {hub_rg} --en {endpoint_name} -y")
+        cli.invoke(f"servicebus namespace delete --name {sb_namespace} -g {hub_rg}")
+
+
+@pytest.mark.hub_infrastructure(count=1)
+def test_export_cosmosdb_endpoint_resource_name_starting_with_scheme_char(
+    provisioned_only_iot_hubs_module, setup_file
+):
+    """Export must keep a Cosmos DB routing endpoint"""
+    hub_name = provisioned_only_iot_hubs_module[0]["name"]
+    hub_rg = provisioned_only_iot_hubs_module[0]["rg"]
+    delete_system_endpoints(hub_name, hub_rg)
+
+    cosmos_account = ("scos" + generate_generic_id())[:40]
+    database_name = "routedb"
+    container_name = "routecontainer"
+    endpoint_name = generate_generic_id()
+    try:
+        cli.invoke(
+            f"cosmosdb create --name {cosmos_account} -g {hub_rg}"
+        )
+        cli.invoke(
+            f"cosmosdb sql database create --account-name {cosmos_account} -g {hub_rg} --name {database_name}"
+        )
+        cli.invoke(
+            f"cosmosdb sql container create --account-name {cosmos_account} -g {hub_rg} "
+            f"--database-name {database_name} --name {container_name} -p /deviceid"
+        )
+        endpoint_cstring = cli.invoke(
+            f"cosmosdb keys list --name {cosmos_account} -g {hub_rg} --type connection-strings"
+        ).as_json()["connectionStrings"][0]["connectionString"]
+
+        # Key-based endpoint with resource group
+        cli.invoke(
+            f"iot hub message-endpoint create cosmosdb-container -n {hub_name} -g {hub_rg} "
+            f"--en {endpoint_name} --db {database_name} --container {container_name} "
+            f"-c '{endpoint_cstring}' --erg {hub_rg}"
+        )
+        time.sleep(10)  # gives the hub time to update before the export
+
+        cli.invoke(
+            f"iot hub state export -n {hub_name} -f {setup_file} -g {hub_rg} -r --aspects {CONTROLPLANE}"
+        )
+
+        with open(setup_file, "r", encoding="utf-8") as f:
+            hub_info = json.load(f)
+        containers = hub_info["arm"]["resources"][0]["properties"]["routing"]["endpoints"]["cosmosDBSqlContainers"]
+
+        exported = [ep for ep in containers if ep["name"] == endpoint_name]
+        assert len(exported) == 1, "endpoint was dropped from export (account name likely corrupted)"
+        assert cosmos_account in exported[0]["endpointUri"]
+    finally:
+        cli.invoke(f"iot hub message-endpoint delete -n {hub_name} -g {hub_rg} --en {endpoint_name} -y")
+        cli.invoke(f"cosmosdb delete --name {cosmos_account} -g {hub_rg} -y")

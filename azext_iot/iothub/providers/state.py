@@ -50,6 +50,12 @@ logger = get_logger(__name__)
 cli = EmbeddedCLI()
 
 
+def _endpoint_host_name(endpoint_uri: str) -> str:
+    """Return the resource host name from a routing endpoint URI, dropping the scheme."""
+    from urllib.parse import urlparse
+    return (urlparse(endpoint_uri).hostname or "").split(".")[0]
+
+
 class StateProvider(IoTHubProvider):
     def __init__(
         self,
@@ -643,7 +649,7 @@ class StateProvider(IoTHubProvider):
         # Cosmos Db
         cosmos_endpoints = []
         for ep in endpoints.get("cosmosDBSqlContainers", []):
-            account_name = ep["endpointUri"].strip("https://").split(".")[0]
+            account_name = _endpoint_host_name(ep["endpointUri"])
             if ep.get("primaryKey") or ep.get("secondaryKey"):
                 try:
                     cosmos_keys = cli.invoke(
@@ -698,7 +704,7 @@ class StateProvider(IoTHubProvider):
         for ep in endpoints["eventHubs"]:
             if ep.get("connectionString"):
                 endpoint_props = parse_iot_hub_message_endpoint_connection_string(ep["connectionString"])
-                namespace = endpoint_props["Endpoint"].strip("sb://").split(".")[0]
+                namespace = _endpoint_host_name(endpoint_props["Endpoint"])
                 try:
                     ep["connectionString"] = cli.invoke(
                         "eventhubs eventhub authorization-rule keys list --namespace-name {} --resource-group {} "
@@ -722,7 +728,7 @@ class StateProvider(IoTHubProvider):
                 )
                 removed_endpoints.append(ep["name"])
             else:
-                namespace = ep["endpointUri"].strip("sb://").split(".")[0]
+                namespace = _endpoint_host_name(ep["endpointUri"])
                 success = cli.invoke(
                     "eventhubs eventhub show --namespace-name {} --resource-group {} "
                     "--name {} --subscription {}".format(
@@ -744,7 +750,7 @@ class StateProvider(IoTHubProvider):
         for ep in endpoints["serviceBusQueues"]:
             if ep.get("connectionString"):
                 endpoint_props = parse_iot_hub_message_endpoint_connection_string(ep["connectionString"])
-                namespace = endpoint_props["Endpoint"].strip("sb://").split(".")[0]
+                namespace = _endpoint_host_name(endpoint_props["Endpoint"])
                 try:
                     ep["connectionString"] = cli.invoke(
                         "servicebus queue authorization-rule keys list --namespace-name {} --resource-group {} "
@@ -768,7 +774,7 @@ class StateProvider(IoTHubProvider):
                 )
                 removed_endpoints.append(ep["name"])
             else:
-                namespace = ep["endpointUri"].strip("sb://").split(".")[0]
+                namespace = _endpoint_host_name(ep["endpointUri"])
                 success = cli.invoke(
                     "servicebus queue show --namespace-name {} --resource-group {} "
                     "--name {} --subscription {}".format(
@@ -790,7 +796,7 @@ class StateProvider(IoTHubProvider):
         for ep in endpoints["serviceBusTopics"]:
             if ep.get("connectionString"):
                 endpoint_props = parse_iot_hub_message_endpoint_connection_string(ep["connectionString"])
-                namespace = endpoint_props["Endpoint"].strip("sb://").split(".")[0]
+                namespace = _endpoint_host_name(endpoint_props["Endpoint"])
                 try:
                     ep["connectionString"] = cli.invoke(
                         "servicebus topic authorization-rule keys list --namespace-name {} --resource-group {} "
@@ -816,7 +822,7 @@ class StateProvider(IoTHubProvider):
                 )
                 removed_endpoints.append(ep["name"])
             else:
-                namespace = ep["endpointUri"].strip("sb://").split(".")[0]
+                namespace = _endpoint_host_name(ep["endpointUri"])
                 success = cli.invoke(
                     "servicebus topic show --namespace-name {} --resource-group {} "
                     "--name {} --subscription {}".format(
@@ -862,7 +868,7 @@ class StateProvider(IoTHubProvider):
                 )
                 removed_endpoints.append(ep["name"])
             else:
-                account_name = ep["endpointUri"].strip("https://").split(".")[0]
+                account_name = _endpoint_host_name(ep["endpointUri"])
                 success = cli.invoke(
                     "storage account show --name {} --subscription {}".format(
                         account_name,
