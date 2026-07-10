@@ -15,7 +15,7 @@ from azure.cli.core.azclierror import (
 import azext_iot.iothub.providers.helpers.state_strings as constants
 
 from azext_iot.tests.conftest import generate_cs
-from azext_iot.iothub.providers.state import _endpoint_host_name
+from azext_iot.iothub.providers.state import _endpoint_resource_name
 
 hub_name = "hubname"
 hub_rg = "hubrg"
@@ -129,4 +129,4 @@ class TestEndpointHostNameParsing:
         ],
     )
     def test_host_name_not_corrupted(self, endpoint_uri, expected):
-        assert _endpoint_host_name(endpoint_uri) == expected
+        assert _endpoint_resource_name(endpoint_uri) == expected
