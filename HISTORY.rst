@@ -3,6 +3,13 @@
 Release History
 ===============
 
+0.31.0b3 (Preview)
++++++++++++++++
+
+**DPS updates**
+
+* Removed ``--hostname-type`` from ``az iot dps linked-hub update``. A linked hub's endpoint hostname (classic vs device) is now fixed at creation and can no longer be changed in place; to move a link to a different endpoint, create a new link at the desired endpoint and delete the old one. ``--hostname-type`` remains available on ``az iot dps linked-hub create``, and ``az iot dps linked-hub update`` continues to support ``--authentication-type``, ``--connection-string``, ``--user-assigned-identity``, ``--allocation-weight`` and ``--apply-allocation-policy``.
+
 0.31.0b2 (Preview)
 +++++++++++++++
 
