@@ -26,7 +26,7 @@ from azext_iot.tests.iothub import (
     set_cmd_auth_type,
 )
 from azext_iot.common._azure import parse_iot_hub_message_endpoint_connection_string, parse_storage_container_connection_string
-from azure.cli.core.azclierror import ResourceNotFoundError, RequiredArgumentMissingError
+from azure.cli.core.azclierror import ResourceNotFoundError, RequiredArgumentMissingError, CLIInternalError
 
 settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL)
 CWD = os.path.dirname(os.path.abspath(__file__))
@@ -719,6 +719,42 @@ def compare_hub_dataplane_to_file(filename: str, cstring: str):
             assert file_device["parent"] == device_parent[:device_parent.rfind("-")]
 
 
+def get_hub_resource_id_with_retry(hub_name: str, rg: str, tries: int = 6, delay: int = 15) -> str:
+    """
+    Return the ARM resource id for the hub, polling `iot hub show` until the control plane GET
+    is consistent.
+
+    A hub created via `iot hub state import`/`migrate` can be briefly unqueryable right after its
+    ARM deployment reports success (control plane read-after-write lag), which makes `iot hub show`
+    return an empty payload. Retry rather than relying on a fixed sleep. If the hub is still not
+    queryable after all attempts, the raised error surfaces the last CLI error so a genuine control
+    plane failure is distinguishable from a short propagation delay.
+    """
+    last_output = ""
+    last_error = None
+    for attempt in range(tries):
+        result = cli.invoke(f"iot hub show -n {hub_name} -g {rg}")
+        last_output = (result.output or "").strip()
+        last_error = result.get_error()
+        if result.success() and last_output:
+            try:
+                payload = json.loads(last_output)
+            except ValueError:
+                payload = None  # control plane may briefly return an empty/partial payload after create
+            if isinstance(payload, dict) and payload.get("id"):
+                return payload["id"]
+        if attempt < tries - 1:
+            time.sleep(delay)
+    waited = max(0, tries - 1) * delay
+    payload_snippet = (last_output[:500] + "...") if len(last_output) > 500 else last_output
+    raise CLIInternalError(
+        f"IoT Hub '{hub_name}' (rg '{rg}') was not queryable via 'iot hub show' after "
+        f"{tries} attempts (~{waited}s). Last error: {last_error!r}. "
+        f"Last payload: '{payload_snippet}'. "
+        "The control plane GET was not consistent after hub creation."
+    )
+
+
 # Controlplane main compare commands
 def compare_hub_controlplane_to_file(filename: str, hub_name: str, rg: str):
     with open(filename, 'r', encoding='utf-8') as f:
@@ -726,7 +762,7 @@ def compare_hub_controlplane_to_file(filename: str, hub_name: str, rg: str):
     file_hub = file_hub_info[0]
 
     # get the hub info
-    hub_resource_id = cli.invoke(f"iot hub show -n {hub_name} -g {rg}").as_json()["id"]
+    hub_resource_id = get_hub_resource_id_with_retry(hub_name, rg)
     arm_hub_info = cli.invoke(
         f"group export -n {rg} --resource-ids {hub_resource_id} --skip-all-params"
     ).as_json()["resources"]
@@ -824,13 +860,13 @@ def compare_hub_controlplane_to_file(filename: str, hub_name: str, rg: str):
 
 
 def compare_hubs_controlplane(origin_hub_name: str, dest_hub_name: str, rg: str):
-    orig_hub_resource_id = cli.invoke(f"iot hub show -n {origin_hub_name} -g {rg}").as_json()["id"]
+    orig_hub_resource_id = get_hub_resource_id_with_retry(origin_hub_name, rg)
     orig_hub_info = cli.invoke(
         f"group export -n {rg} --resource-ids {orig_hub_resource_id} --skip-all-params"
     ).as_json()["resources"]
     orig_hub = orig_hub_info[0]
 
-    dest_hub_resource_id = cli.invoke(f"iot hub show -n {dest_hub_name} -g {rg}").as_json()["id"]
+    dest_hub_resource_id = get_hub_resource_id_with_retry(dest_hub_name, rg)
     dest_hub_info = cli.invoke(
         f"group export -n {rg} --resource-ids {dest_hub_resource_id} --skip-all-params"
     ).as_json()["resources"]
