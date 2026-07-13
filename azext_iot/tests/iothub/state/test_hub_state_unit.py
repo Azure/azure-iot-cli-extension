@@ -15,6 +15,7 @@ from azure.cli.core.azclierror import (
 import azext_iot.iothub.providers.helpers.state_strings as constants
 
 from azext_iot.tests.conftest import generate_cs
+from azext_iot.iothub.providers.state import _endpoint_resource_name
 
 hub_name = "hubname"
 hub_rg = "hubrg"
@@ -104,3 +105,28 @@ class TestHubStateMigrate:
                 orig_hub_login=generate_cs()
             )
         assert constants.LOGIN_WITH_ARM_ERROR == str(error.value)
+
+
+class TestEndpointHostNameParsing:
+    """routing-endpoint host-name extraction used by state export."""
+
+    @pytest.mark.parametrize(
+        "endpoint_uri, expected",
+        [
+            # Service Bus / Event Hub (sb://)
+            ("sb://scyhbus.servicebus.windows.net/", "scyhbus"),
+            ("sb://bhub.servicebus.windows.net/", "bhub"),
+            ("sb://sbnamespace.servicebus.windows.net/", "sbnamespace"),
+            ("sb://normal.servicebus.windows.net/", "normal"),
+            # Cosmos DB / Storage (https://)
+            ("https://sstorage.blob.core.windows.net/", "sstorage"),
+            ("https://tcosmos.documents.azure.com:443/", "tcosmos"),
+            ("https://httpsaccount.blob.core.windows.net/", "httpsaccount"),
+            ("https://plainaccount.documents.azure.com:443/", "plainaccount"),
+            # Port must be stripped
+            ("sb://sbwithport.servicebus.windows.net:5671/", "sbwithport"),
+            ("sb://MixedCase.servicebus.windows.net/", "mixedcase"),
+        ],
+    )
+    def test_host_name_not_corrupted(self, endpoint_uri, expected):
+        assert _endpoint_resource_name(endpoint_uri) == expected
