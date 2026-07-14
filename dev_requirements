@@ -5,7 +5,7 @@ pytest-env
 responses==0.22.0
 black
 setuptools==70.0.0
-wheel==0.30.0
+wheel==0.45.1
 pre-commit
 pylint==3.0.3
 flake8
