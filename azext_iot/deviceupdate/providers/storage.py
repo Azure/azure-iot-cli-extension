@@ -36,5 +36,6 @@ class StorageAccountManager(object):
         storage_rg = parse_resource_id(account.id)["resource_group"]
         storage_keys = self.client.storage_accounts.list_keys(
             resource_group_name=storage_rg, account_name=account.name)
+        keys = storage_keys.keys() if callable(storage_keys.keys) else storage_keys.keys
         return BlobServiceClient(
-            account_url=account.primary_endpoints.blob, credential=storage_keys.keys[0].value)
+            account_url=account.primary_endpoints.blob, credential=keys[0].value)
