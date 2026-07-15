@@ -36,6 +36,9 @@ class StorageAccountManager(object):
         storage_rg = parse_resource_id(account.id)["resource_group"]
         storage_keys = self.client.storage_accounts.list_keys(
             resource_group_name=storage_rg, account_name=account.name)
-        keys = storage_keys.keys() if callable(storage_keys.keys) else storage_keys.keys
+        # azure-mgmt-storage returns a model object (older SDK) or dict (newer SDK/Python 3.13+)
+        key_list = storage_keys['keys'] if isinstance(storage_keys, dict) else storage_keys.keys
+        first_key = key_list[0]
+        credential = first_key['value'] if isinstance(first_key, dict) else first_key.value
         return BlobServiceClient(
-            account_url=account.primary_endpoints.blob, credential=keys[0].value)
+            account_url=account.primary_endpoints.blob, credential=credential)
