@@ -53,6 +53,7 @@ jobs:
   int_test:
     permissions:
       contents: read
+      id-token: write
     needs: [build]
     if: always() && !cancelled() && !failure() && (github.event.inputs.run_int_tests == 'true')
     uses: ./.github/workflows/int_test.yml
