@@ -429,6 +429,52 @@ def test_instance_update_lifecycle(provisioned_instances_module: Dict[str, dict]
         f"iot du device deployment delete -n {account_name} -i {instance_name} "
         f"--deployment-id {rollback_deployment_id} --group-id {device_group_id} --class-id {device_class_id} -y").success()
 
+    # Validate default downloadSecurity behavior for deployments created without --download-security
+    assert basic_create_deployment["downloadSecurity"] == "https"
+    assert rollback_create_deployment["downloadSecurity"] == "https"
+
+    # Create deployment with explicit --download-security https
+    https_deployment_id = f"deployhttps_{generate_generic_id()}"
+    https_create_deployment = cli.invoke(
+        f"iot du device deployment create -n {account_name} -i {instance_name} "
+        f"--deployment-id {https_deployment_id} --group-id {device_group_id} "
+        f"--update-name {simple_manifest_id['name']} "
+        f"--update-provider {simple_manifest_id['provider']} "
+        f"--update-version {simple_manifest_id['version']} "
+        f"--download-security https").as_json()
+    assert https_create_deployment["deploymentId"] == https_deployment_id
+    assert https_create_deployment["downloadSecurity"] == "https"
+
+    show_https_deployment = cli.invoke(
+        f"iot du device deployment show -n {account_name} -i {instance_name} "
+        f"--deployment-id {https_deployment_id} --group-id {device_group_id}").as_json()
+    assert show_https_deployment["downloadSecurity"] == "https"
+
+    assert cli.invoke(
+        f"iot du device deployment delete -n {account_name} -i {instance_name} "
+        f"--deployment-id {https_deployment_id} --group-id {device_group_id} -y").success()
+
+    # Create deployment with explicit --download-security http
+    http_deployment_id = f"deployhttp_{generate_generic_id()}"
+    http_create_deployment = cli.invoke(
+        f"iot du device deployment create -n {account_name} -i {instance_name} "
+        f"--deployment-id {http_deployment_id} --group-id {device_group_id} "
+        f"--update-name {simple_manifest_id['name']} "
+        f"--update-provider {simple_manifest_id['provider']} "
+        f"--update-version {simple_manifest_id['version']} "
+        f"--download-security http").as_json()
+    assert http_create_deployment["deploymentId"] == http_deployment_id
+    assert http_create_deployment["downloadSecurity"] == "http"
+
+    show_http_deployment = cli.invoke(
+        f"iot du device deployment show -n {account_name} -i {instance_name} "
+        f"--deployment-id {http_deployment_id} --group-id {device_group_id}").as_json()
+    assert show_http_deployment["downloadSecurity"] == "http"
+
+    assert cli.invoke(
+        f"iot du device deployment delete -n {account_name} -i {instance_name} "
+        f"--deployment-id {http_deployment_id} --group-id {device_group_id} -y").success()
+
     # Clean-up device class subgroup and group
     # TODO : Deleting a class Id does not work today, but you are able to delete a class subgroup.
 

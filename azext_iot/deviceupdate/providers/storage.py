@@ -36,5 +36,15 @@ class StorageAccountManager(object):
         storage_rg = parse_resource_id(account.id)["resource_group"]
         storage_keys = self.client.storage_accounts.list_keys(
             resource_group_name=storage_rg, account_name=account.name)
+        # azure-mgmt-storage v23/v24: plain Model, keys is a list attribute (not callable)
+        # azure-mgmt-storage v25+: MutableMapping, keys is the dict method (callable),
+        #   use subscript access to get the actual field value
+        raw_keys_attr = storage_keys.keys
+        if callable(raw_keys_attr):
+            key_list = storage_keys['keys']
+        else:
+            key_list = raw_keys_attr
+        first_key = key_list[0]
+        credential = first_key['value'] if isinstance(first_key, dict) else first_key.value
         return BlobServiceClient(
-            account_url=account.primary_endpoints.blob, credential=storage_keys.keys[0].value)
+            account_url=account.primary_endpoints.blob, credential=credential)

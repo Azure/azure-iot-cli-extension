@@ -589,6 +589,11 @@ def load_deviceupdate_help():
             --update-name {update_name} --update-provider {update_provider} --update-version {update_version}
             --failed-count 10 --failed-percentage 5 --rollback-update-name {rollback_update_name} --rollback-update-provider {rollback_update_provider}
             --rollback-update-version {rollback_update_version}
+
+        - name: Create a device group deployment using HTTP (not recommended; compatibility only) for update payload downloads.
+          text: >
+            az iot du device deployment create -n {account_name} -i {instance_name} --group-id {device_group_id} --deployment-id {deployment_id}
+            --update-name {update_name} --update-provider {update_provider} --update-version {update_version} --download-security http
     """
 
     helps["iot du device deployment list"] = """

@@ -29,8 +29,7 @@ def import_devices(
     )
 
     try:
-        # @digimaun - There is a mismatch between spec and implementation expectation.
-        return data_manager.data_client.device_management.begin_import_devices(import_type={"importType": import_type})
+        return data_manager.data_client.device_management.begin_import_devices(import_type=import_type)
     except AzureError as e:
         handle_service_exception(e)
 
