@@ -116,6 +116,7 @@ def fixture_provision_existing_hub_role(request):
 @pytest.fixture(scope="module")
 def setup_hub_controlplane_states(
     request,
+    provisioned_user_identity_module,
     provisioned_iot_hubs_with_storage_user_module,
     provisioned_event_hub_module,
     provisioned_service_bus_module,
@@ -151,10 +152,8 @@ def setup_hub_controlplane_states(
     hub_principal_ids = [
         hub_obj["hub"]["identity"]["principalId"] for hub_obj in provisioned_iot_hubs_with_storage_user_module
     ]
-    user_identities = list(
-        provisioned_iot_hubs_with_storage_user_module[0]["hub"]["identity"]["userAssignedIdentities"].values()
-    )
-    user_principal_id = user_identities[0]["principalId"]
+    # principalId under userAssignedIdentities isn't populated on the hub create response; use the identity resource.
+    user_principal_id = provisioned_user_identity_module["principalId"]
     user_id = list(
         provisioned_iot_hubs_with_storage_user_module[0]["hub"]["identity"]["userAssignedIdentities"].keys()
     )[0]
@@ -368,13 +367,16 @@ def _user_identity_removal(name):
 # Storage Account fixtures
 @pytest.fixture(scope="module")
 def provisioned_storage_with_identity_module(
-    request, provisioned_iot_hubs_with_user_module, provisioned_storage_module
+    request,
+    provisioned_user_identity_module,
+    provisioned_iot_hubs_with_user_module,
+    provisioned_storage_module,
 ):
     role = "Storage Blob Data Contributor"
     scope = provisioned_storage_module["storage"]["id"]
     hub_principal_id = provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["principalId"]
-    user_identities = list(provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["userAssignedIdentities"].values())
-    user_id = user_identities[0]["principalId"]
+    # principalId under userAssignedIdentities isn't populated on the hub create response; use the identity resource.
+    user_id = provisioned_user_identity_module["principalId"]
     assign_role_assignment(
         assignee=hub_principal_id,
         scope=scope,
@@ -460,13 +462,13 @@ def _storage_removal(account_name: str):
 # Event Hub fixtures
 @pytest.fixture(scope="module")
 def provisioned_event_hub_with_identity_module(
-    provisioned_iot_hubs_with_user_module, provisioned_event_hub_module
+    provisioned_user_identity_module, provisioned_iot_hubs_with_user_module, provisioned_event_hub_module
 ):
     role = "Azure Event Hubs Data Sender"
     scope = provisioned_event_hub_module["eventhub"]["id"]
     hub_principal_id = provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["principalId"]
-    user_identities = list(provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["userAssignedIdentities"].values())
-    user_id = user_identities[0]["principalId"]
+    # principalId under userAssignedIdentities isn't populated on the hub create response; use the identity resource.
+    user_id = provisioned_user_identity_module["principalId"]
     assign_role_assignment(
         assignee=hub_principal_id,
         scope=scope,
@@ -541,14 +543,14 @@ def _event_hub_removal(account_name: str):
 # Service Bus fixtures
 @pytest.fixture(scope="module")
 def provisioned_service_bus_with_identity_module(
-    provisioned_iot_hubs_with_user_module, provisioned_service_bus_module
+    provisioned_user_identity_module, provisioned_iot_hubs_with_user_module, provisioned_service_bus_module
 ):
     role = "Azure Service Bus Data Sender"
     queue_scope = provisioned_service_bus_module["queue"]["id"]
     topic_scope = provisioned_service_bus_module["topic"]["id"]
     hub_principal_id = provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["principalId"]
-    user_identities = list(provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["userAssignedIdentities"].values())
-    user_id = user_identities[0]["principalId"]
+    # principalId under userAssignedIdentities isn't populated on the hub create response; use the identity resource.
+    user_id = provisioned_user_identity_module["principalId"]
     assign_role_assignment(
         assignee=hub_principal_id,
         scope=queue_scope,
@@ -662,14 +664,14 @@ def _service_bus_removal(account_name: str):
 # Cosmos Db fixtures
 @pytest.fixture(scope="module")
 def provisioned_cosmosdb_with_identity_module(
-    provisioned_iot_hubs_with_user_module, provisioned_cosmos_db_module
+    provisioned_user_identity_module, provisioned_iot_hubs_with_user_module, provisioned_cosmos_db_module
 ):
     role = "Cosmos DB Built-in Data Reader"
     cosmosdb_rg = provisioned_cosmos_db_module["cosmosdb"]["resourceGroup"]
     cosmosdb_account = provisioned_cosmos_db_module["cosmosdb"]["name"]
     hub_principal_id = provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["principalId"]
-    user_identities = list(provisioned_iot_hubs_with_user_module[0]["hub"]["identity"]["userAssignedIdentities"].values())
-    user_id = user_identities[0]["principalId"]
+    # principalId under userAssignedIdentities isn't populated on the hub create response; use the identity resource.
+    user_id = provisioned_user_identity_module["principalId"]
     assign_cosmos_db_role(principal_id=hub_principal_id, cosmos_db_account=cosmosdb_account, role=role, rg=cosmosdb_rg)
     assign_cosmos_db_role(principal_id=user_id, cosmos_db_account=cosmosdb_account, role=role, rg=cosmosdb_rg)
     yield provisioned_iot_hubs_with_user_module, provisioned_cosmos_db_module

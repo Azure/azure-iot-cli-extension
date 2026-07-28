@@ -48,8 +48,7 @@ class TestFactoryCredentialScopes:
         mock_client_cls.assert_called_once()
         call_kwargs = mock_client_cls.call_args.kwargs
         assert call_kwargs["credential_scopes"] == cloud_config["expected_scopes"]
-        # TODO: Revert to cloud_config["resource_manager"] once 2026-05-01-preview is global
-        assert call_kwargs["base_url"] == "https://centraluseuap.management.azure.com"
+        assert call_kwargs["base_url"] == cloud_config["resource_manager"]
 
     def test_dps_factory(self, mocker, cloud_config):
         mocker.patch("azext_iot._factory.AZURE_CLI_CREDENTIAL")
@@ -64,8 +63,7 @@ class TestFactoryCredentialScopes:
         mock_client_cls.assert_called_once()
         call_kwargs = mock_client_cls.call_args.kwargs
         assert call_kwargs["credential_scopes"] == cloud_config["expected_scopes"]
-        # TODO: Revert to cloud_config["resource_manager"] once 2026-05-01-preview is global
-        assert call_kwargs["endpoint"] == "https://centraluseuap.management.azure.com"
+        assert call_kwargs["endpoint"] == cloud_config["resource_manager"]
 
     def test_adr_factory(self, mocker, cloud_config):
         mocker.patch("azext_iot._factory.AZURE_CLI_CREDENTIAL")

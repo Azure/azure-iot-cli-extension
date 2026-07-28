@@ -160,61 +160,6 @@ def test_linked_hub_list_shows_hostname(provisioned_iot_dps_no_hub_module, provi
         _cleanup_linked_hub(dps_name, dps_rg, device_hostname)
 
 
-def test_linked_hub_update_combined_migration(provisioned_iot_dps_no_hub_module, provisioned_only_iot_hubs_session):
-    """Migrate a hub link from KeyBased + classic endpoint to
-    SystemAssigned + device endpoint in a single update call.
-    """
-    dps_name = provisioned_iot_dps_no_hub_module["name"]
-    dps_rg = provisioned_iot_dps_no_hub_module["resourceGroup"]
-
-    gwv2_hub = _require_gwv2_hub(provisioned_only_iot_hubs_session)
-
-    hub_name = gwv2_hub["name"]
-    classic_hostname = gwv2_hub["properties"]["hostName"]
-    device_hostname = gwv2_hub["properties"]["deviceHostName"]
-
-    # Ensure DPS has SystemAssigned MI for the swap target
-    cli.invoke(f"iot dps identity assign --name {dps_name} -g {dps_rg} --system-assigned")
-
-    # Cleanup state for both possible end-state hostnames
-    cleanup_targets = [classic_hostname, device_hostname]
-
-    try:
-        # Initial state: link with KeyBased + classic
-        cli.invoke(
-            f"iot dps linked-hub create --dps-name {dps_name} -g {dps_rg} "
-            f"--hub-name {hub_name} --hostname-type classic"
-        )
-        initial = cli.invoke(
-            f"iot dps linked-hub list --dps-name {dps_name} -g {dps_rg}"
-        ).as_json()
-        assert any(
-            h["name"] == classic_hostname and h["authenticationType"] == "KeyBased"
-            for h in initial
-        ), f"Pre-condition failed; got: {[(h['name'], h['authenticationType']) for h in initial]}"
-
-        # Combined update: classic -> device endpoint + KeyBased -> SystemAssigned
-        cli.invoke(
-            f"iot dps linked-hub update --dps-name {dps_name} -g {dps_rg} "
-            f"--hub-name {hub_name} --hostname-type device "
-            f"--authentication-type SystemAssigned"
-        )
-
-        after = cli.invoke(
-            f"iot dps linked-hub list --dps-name {dps_name} -g {dps_rg}"
-        ).as_json()
-        matching = [h for h in after if h["name"] == device_hostname]
-        assert len(matching) == 1, (
-            f"Expected single entry at device hostname '{device_hostname}', "
-            f"got: {[h['name'] for h in after]}"
-        )
-        assert matching[0]["authenticationType"] == "SystemAssigned"
-        assert matching[0].get("connectionString", "") == ""
-    finally:
-        for hostname in cleanup_targets:
-            _cleanup_linked_hub(dps_name, dps_rg, hostname)
-
-
 def test_linked_hub_create_keybased_then_switch_to_mi(provisioned_iot_dps_no_hub_module, provisioned_only_iot_hubs_session):
     """KeyBased create -> auth-only SystemAssigned swap (no hostname change)."""
     dps_name = provisioned_iot_dps_no_hub_module["name"]

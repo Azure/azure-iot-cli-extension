@@ -170,13 +170,6 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
                    help='IoT Hub short name. Preferred over --linked-hub; resolves to the correct '
                    'entry regardless of classic/device hostname.',
                    arg_group='Linked Hub Identifier')
-        c.argument('hostname_type',
-                   options_list=['--hostname-type', '--ht'],
-                   arg_type=get_enum_type(["auto", "device", "classic"]),
-                   help="Switch the linked hub to a different endpoint hostname. "
-                   "'auto' uses the TLS 1.3 device hostname when available, classic otherwise. "
-                   "'device' uses the TLS 1.3 device hostname (errors on non-GWv2 hubs). "
-                   "'classic' uses the classic hostname.")
         c.argument('authentication_type',
                    options_list=['--authentication-type', '--auth-type'],
                    arg_type=get_enum_type(IotHubAuthenticationType),

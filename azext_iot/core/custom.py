@@ -540,7 +540,6 @@ def iot_dps_linked_hub_update(
     dps_name,
     linked_hub=None,
     hub_name=None,
-    hostname_type=None,
     authentication_type=None,
     user_assigned_identity=None,
     connection_string=None,
@@ -549,8 +548,8 @@ def iot_dps_linked_hub_update(
     allocation_weight=None,
     no_wait=False,
 ):
-    """Update a linked IoT Hub on a DPS — allocation policy/weight, endpoint hostname type,
-    and/or authentication type.
+    """Update a linked IoT Hub on a DPS — allocation policy/weight and/or
+    authentication type.
     """
     if not hub_name and not linked_hub:
         raise RequiredArgumentMissingError(
@@ -562,7 +561,6 @@ def iot_dps_linked_hub_update(
         )
 
     mutation_args = {
-        "--hostname-type": hostname_type,
         "--authentication-type": authentication_type,
         "--connection-string": connection_string,
         "--user-assigned-identity": user_assigned_identity,
@@ -619,18 +617,12 @@ def iot_dps_linked_hub_update(
 
     hub = None
     hub_client = None
-    needs_hub_fetch = hostname_type or (
+    needs_hub_fetch = (
         authentication_type == IotHubAuthenticationType.KEY_BASED.value and not connection_string
     )
     if needs_hub_fetch:
         hub_client = iot_hub_service_factory(cmd.cli_ctx)
         hub = iot_hub_get(cmd, hub_client, hub_name=hub_name)
-
-    new_hostname = None
-    if hostname_type:
-        new_hostname = _resolve_linked_hub_hostname(hub, hostname_type)
-        target_entry["name"] = new_hostname
-        target_entry["hostName"] = new_hostname
 
     if authentication_type:
         target_entry["authenticationType"] = authentication_type
@@ -651,7 +643,7 @@ def iot_dps_linked_hub_update(
 
     cs_needs_rebuild = (
         target_auth == IotHubAuthenticationType.KEY_BASED.value
-        and (authentication_type or new_hostname or connection_string)
+        and (authentication_type or connection_string)
     )
     if cs_needs_rebuild:
         if connection_string:
@@ -753,7 +745,9 @@ def iot_dps_certificate_create(client, dps_name, certificate_name, certificate_p
     if not certificate:
         raise CLIError("Error uploading certificate '{0}'.".format(certificate_path))
     certificate_bytes = certificate.encode('utf-8')
-    properties = {"certificate": certificate_bytes, "isVerified": is_verified}
+    properties = {"certificate": certificate_bytes}
+    if is_verified is not None:
+        properties["isVerified"] = is_verified
     certificate_description = {"properties": properties}
     return client.dps_certificate.create_or_update(
         resource_group_name=resource_group_name,
@@ -775,7 +769,9 @@ def iot_dps_certificate_update(client, dps_name, certificate_name, certificate_p
             if not certificate:
                 raise CLIError("Error uploading certificate '{0}'.".format(certificate_path))
             certificate_bytes = certificate.encode('utf-8')
-            properties = {"certificate": certificate_bytes, "isVerified": is_verified}
+            properties = {"certificate": certificate_bytes}
+            if is_verified is not None:
+                properties["isVerified"] = is_verified
             certificate_description = {"properties": properties}
             return client.dps_certificate.create_or_update(
                 resource_group_name=resource_group_name,
@@ -859,7 +855,9 @@ def iot_hub_certificate_create(client, hub_name, certificate_name, certificate_p
     certificate = open_certificate(certificate_path)
     if not certificate:
         raise CLIError("Error uploading certificate '{0}'.".format(certificate_path))
-    cert_properties = {"certificate": certificate, "isVerified": is_verified}
+    cert_properties = {"certificate": certificate}
+    if is_verified is not None:
+        cert_properties["isVerified"] = is_verified
 
     cert_description = {"properties": cert_properties}
     return client.certificates.create_or_update(
@@ -881,7 +879,9 @@ def iot_hub_certificate_update(client, hub_name, certificate_name, certificate_p
             certificate = open_certificate(certificate_path)
             if not certificate:
                 raise CLIError("Error uploading certificate '{0}'.".format(certificate_path))
-            cert_properties = {"certificate": certificate, "isVerified": is_verified}
+            cert_properties = {"certificate": certificate}
+            if is_verified is not None:
+                cert_properties["isVerified"] = is_verified
 
             cert_description = {"properties": cert_properties}
             return client.certificates.create_or_update(

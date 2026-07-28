@@ -283,16 +283,6 @@ class TestLinkedHubUpdate:
                 hub_name="myhub", linked_hub="myhub.azure-devices.net",
             )
 
-    def test_hostname_type_works_with_linked_hub(self, fixture_cmd, mock_deps, existing_entries):
-        """--linked-hub + --hostname-type derives the hub short name from the hostname."""
-        from azext_iot.core.custom import iot_dps_linked_hub_update
-        iot_dps_linked_hub_update(
-            cmd=fixture_cmd, client=mock_deps, dps_name="dps",
-            linked_hub="myhub.azure-devices.net", hostname_type="device",
-        )
-        assert existing_entries[0]["name"] == "myhub.device.azure-devices.net"
-        assert existing_entries[0]["hostName"] == "myhub.device.azure-devices.net"
-
     def test_user_assigned_requires_identity(self, fixture_cmd, mock_deps):
         from azext_iot.core.custom import iot_dps_linked_hub_update
         with pytest.raises(RequiredArgumentMissingError, match="--user-assigned-identity"):
@@ -381,8 +371,8 @@ class TestLinkedHubUpdate:
                 cmd=fixture_cmd, client=mock_deps, dps_name="dps", hub_name="myhub",
             )
 
-    def test_hostname_swap_preserves_existing_policy(self, fixture_cmd, mock_deps, existing_entries, mocker):
-        """Hostname swap on KeyBased must re-fetch using the EXISTING policy (e.g., 'service'
+    def test_keybased_refresh_preserves_existing_policy(self, fixture_cmd, mock_deps, existing_entries, mocker):
+        """Re-fetching the key on a KeyBased link must reuse the EXISTING policy (e.g., 'service'
         for least-privilege setups) — must not silently downgrade to iothubowner."""
         from azext_iot.core.custom import iot_dps_linked_hub_update
         existing_entries[0]["connectionString"] = (
@@ -396,7 +386,7 @@ class TestLinkedHubUpdate:
 
         iot_dps_linked_hub_update(
             cmd=fixture_cmd, client=mock_deps, dps_name="dps",
-            hub_name="myhub", hostname_type="device",
+            hub_name="myhub", authentication_type="KeyBased",
         )
 
         assert policy_spy.call_args.args[2] == "service", (
@@ -451,20 +441,6 @@ class TestLinkedHubUpdate:
         assert entry["authenticationType"] == "KeyBased"
         assert entry["name"] == "myhub.azure-devices.net"
 
-    def test_hostname_swap_only_refetches_key(self, fixture_cmd, mock_deps, existing_entries):
-        """Hostname-only swap on KeyBased: re-fetch key (GET masks the existing one)."""
-        from azext_iot.core.custom import iot_dps_linked_hub_update
-        iot_dps_linked_hub_update(
-            cmd=fixture_cmd, client=mock_deps, dps_name="dps",
-            hub_name="myhub", hostname_type="device",
-        )
-        entry = existing_entries[0]
-        assert entry["name"] == "myhub.device.azure-devices.net"
-        assert entry["hostName"] == "myhub.device.azure-devices.net"
-        assert "HostName=myhub.device.azure-devices.net" in entry["connectionString"]
-        assert "fresh-key" in entry["connectionString"]
-        assert entry["authenticationType"] == "KeyBased"
-
     def test_keybased_to_system_assigned(self, fixture_cmd, mock_deps, existing_entries):
         from azext_iot.core.custom import iot_dps_linked_hub_update
         iot_dps_linked_hub_update(
@@ -518,16 +494,3 @@ class TestLinkedHubUpdate:
             user_assigned_identity=uami_new,
         )
         assert ua_entries[0]["selectedUserAssignedIdentityResourceId"] == uami_new
-
-    def test_combined_keybased_classic_to_system_assigned_device(self, fixture_cmd, mock_deps, existing_entries):
-        from azext_iot.core.custom import iot_dps_linked_hub_update
-        iot_dps_linked_hub_update(
-            cmd=fixture_cmd, client=mock_deps, dps_name="dps",
-            hub_name="myhub", hostname_type="device",
-            authentication_type="SystemAssigned",
-        )
-        entry = existing_entries[0]
-        assert entry["name"] == "myhub.device.azure-devices.net"
-        assert entry["hostName"] == "myhub.device.azure-devices.net"
-        assert entry["authenticationType"] == "SystemAssigned"
-        assert entry["connectionString"] == ""
