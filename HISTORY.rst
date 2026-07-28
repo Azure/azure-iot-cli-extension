@@ -3,6 +3,23 @@
 Release History
 ===============
 
+0.30.0
++++++++++++++++
+
+**Device Update (ADU) updates**
+
+* Added ``--download-security`` parameter to ``az iot du device deployment create`` to select the protocol used for update payload downloads. Defaults to ``https`` (TLS); use ``http`` only when the target environment does not support TLS.
+
+* Updated the Device Update data plane SDK to API version ``2026-06-01``.
+
+* Fixed ``az iot du device import`` where the ``import_type`` payload did not match the service expectation.
+
+* Fixed ``az iot du`` storage access to support newer ``azure-mgmt-storage`` releases (v25+) when retrieving storage account keys.
+
+**IoT Hub updates**
+
+* Fixed ``az iot hub state export`` to preserve routing endpoint resource names (Event Hub / Service Bus namespaces, Cosmos DB / Storage accounts) whose names begin with characters found in the URI scheme. Endpoints are no longer dropped or corrupted during export.
+
 0.29.0
 +++++++++++++++
 
