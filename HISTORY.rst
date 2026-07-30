@@ -20,6 +20,8 @@ Release History
 
 * Fixed ``az iot hub state export`` to preserve routing endpoint resource names (Event Hub / Service Bus namespaces, Cosmos DB / Storage accounts) whose names begin with characters found in the URI scheme. Endpoints are no longer dropped or corrupted during export.
 
+* Fixed ``az iot hub state export`` failing with ``KeyError: 'x509Thumbprint'`` when a device twin does not include an ``x509Thumbprint`` property. Affected devices are now exported with an empty thumbprint pair instead of aborting the entire export.
+
 0.29.0
 +++++++++++++++
 

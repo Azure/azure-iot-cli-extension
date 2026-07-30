@@ -15,11 +15,29 @@ from azure.cli.core.azclierror import (
 import azext_iot.iothub.providers.helpers.state_strings as constants
 
 from azext_iot.tests.conftest import generate_cs
-from azext_iot.iothub.providers.state import _endpoint_resource_name
+from azext_iot.iothub.providers.state import StateProvider, _endpoint_resource_name
 
 hub_name = "hubname"
 hub_rg = "hubrg"
 resource_not_found_error = "Resource not found."
+
+
+def _build_device_twin(device_id="device1", auth_type="sas", include_thumbprint=True):
+    """Minimal device twin shaped like the output of `_iot_device_twin_list`."""
+    twin = {
+        "deviceId": device_id,
+        "authenticationType": auth_type,
+        "properties": {
+            "desired": {"$metadata": {}, "$version": 1},
+            "reported": {},
+        },
+    }
+    if include_thumbprint:
+        twin["x509Thumbprint"] = {
+            "primaryThumbprint": "AAAA",
+            "secondaryThumbprint": "BBBB",
+        }
+    return twin
 
 
 class TestHubStateExport:
@@ -105,6 +123,57 @@ class TestHubStateMigrate:
                 orig_hub_login=generate_cs()
             )
         assert constants.LOGIN_WITH_ARM_ERROR == str(error.value)
+
+
+class TestDownloadDevicesThumbprint:
+    """`state export` must not crash on twins that lack an x509Thumbprint (issue #746)."""
+
+    def _patch_device_calls(self, mocker, twins):
+        mocker.patch(
+            "azext_iot.iothub.providers.state._iot_device_twin_list", return_value=twins
+        )
+        mocker.patch(
+            "azext_iot.iothub.providers.state._iot_device_show",
+            return_value={"authentication": {"symmetricKey": {"primaryKey": "pk", "secondaryKey": "sk"}}},
+        )
+        mocker.patch(
+            "azext_iot.iothub.providers.state._iot_device_module_list", return_value=[]
+        )
+
+    def test_missing_thumbprint_does_not_raise(self, mocker):
+        # a twin without the x509Thumbprint key previously raised KeyError: 'x509Thumbprint'
+        self._patch_device_calls(mocker, [_build_device_twin(include_thumbprint=False)])
+
+        provider = StateProvider.__new__(StateProvider)
+        devices = provider.download_devices(target={})
+
+        assert "device1" in devices
+        thumbprint = devices["device1"]["identity"]["authentication"]["x509Thumbprint"]
+        assert thumbprint == {"primaryThumbprint": None, "secondaryThumbprint": None}
+
+    def test_present_thumbprint_is_preserved(self, mocker):
+        self._patch_device_calls(mocker, [_build_device_twin(include_thumbprint=True)])
+
+        provider = StateProvider.__new__(StateProvider)
+        devices = provider.download_devices(target={})
+
+        thumbprint = devices["device1"]["identity"]["authentication"]["x509Thumbprint"]
+        assert thumbprint == {"primaryThumbprint": "AAAA", "secondaryThumbprint": "BBBB"}
+
+    def test_mixed_devices_all_exported(self, mocker):
+        # one bad device must not abort the export of the rest
+        self._patch_device_calls(
+            mocker,
+            [
+                _build_device_twin(device_id="withThumbprint", include_thumbprint=True),
+                _build_device_twin(device_id="noThumbprint", include_thumbprint=False),
+            ],
+        )
+
+        provider = StateProvider.__new__(StateProvider)
+        devices = provider.download_devices(target={})
+
+        assert set(devices.keys()) == {"withThumbprint", "noThumbprint"}
 
 
 class TestEndpointHostNameParsing:
