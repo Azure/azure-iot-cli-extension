@@ -21,7 +21,18 @@ from azext_iot.adr.params_adr_management import load_adr_management_arguments
 
 
 def test_load_adr_commands():
-    load_adr_commands(MagicMock(), None)
+    loader = MagicMock()
+
+    load_adr_commands(loader, None)
+
+    expected_preview_groups = [
+        "iot adr ns",
+        "iot adr ns credential",
+        "iot adr ns policy",
+        "iot adr ns device",
+    ]
+    assert [command_call.args[0] for command_call in loader.command_group.call_args_list] == expected_preview_groups
+    assert all(command_call.kwargs.get("is_preview") is True for command_call in loader.command_group.call_args_list)
 
 
 def test_load_adr_management_arguments():
