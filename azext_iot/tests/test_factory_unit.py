@@ -78,3 +78,70 @@ class TestFactoryCredentialScopes:
         mock_client_cls.assert_called_once()
         call_kwargs = mock_client_cls.call_args.kwargs
         assert call_kwargs["credential_scopes"] == cloud_config["expected_scopes"]
+
+
+class TestSdkResolverHostnames:
+    def _target(self, **overrides):
+        target = {
+            "entity": "myhub.device.azure-devices.net",
+            "serviceHostName": "myhub.service.azure-devices.net",
+            "deviceHostName": "myhub.device.azure-devices.net",
+            "policy": "policy",
+            "primarykey": "key",
+        }
+        target.update(overrides)
+        return target
+
+    def test_device_sdk_uses_device_hostname(self, mocker):
+        from azext_iot._factory import SdkResolver
+
+        auth = mocker.patch("azext_iot._factory.SasTokenAuthentication")
+        client = mocker.patch("azext_iot.sdk.iothub.device.IotHubGatewayDeviceAPIs")
+
+        SdkResolver(self._target(), device_id="device1")._get_iothub_device_sdk()
+
+        assert auth.call_args.kwargs["uri"] == "myhub.device.azure-devices.net/devices/device1"
+        assert client.call_args.kwargs["base_url"] == "https://myhub.device.azure-devices.net"
+
+    def test_service_sdk_uses_service_hostname(self, mocker):
+        from azext_iot._factory import SdkResolver
+
+        auth = mocker.patch("azext_iot._factory.SasTokenAuthentication")
+        client = mocker.patch("azext_iot.sdk.iothub.service.IotHubGatewayServiceAPIs")
+
+        SdkResolver(self._target())._get_iothub_service_sdk()
+
+        assert auth.call_args.kwargs["uri"] == "myhub.service.azure-devices.net"
+        assert client.call_args.kwargs["base_url"] == "https://myhub.service.azure-devices.net"
+
+    def test_device_sdk_falls_back_to_classic_hostname(self, mocker):
+        from azext_iot._factory import SdkResolver
+
+        auth = mocker.patch("azext_iot._factory.SasTokenAuthentication")
+        client = mocker.patch("azext_iot.sdk.iothub.device.IotHubGatewayDeviceAPIs")
+
+        target = {
+            "entity": "myhub.azure-devices.net",
+            "policy": "policy",
+            "primarykey": "key",
+        }
+        SdkResolver(target, device_id="device1")._get_iothub_device_sdk()
+
+        assert auth.call_args.kwargs["uri"] == "myhub.azure-devices.net/devices/device1"
+        assert client.call_args.kwargs["base_url"] == "https://myhub.azure-devices.net"
+
+    def test_service_sdk_falls_back_to_classic_hostname(self, mocker):
+        from azext_iot._factory import SdkResolver
+
+        auth = mocker.patch("azext_iot._factory.SasTokenAuthentication")
+        client = mocker.patch("azext_iot.sdk.iothub.service.IotHubGatewayServiceAPIs")
+
+        target = {
+            "entity": "myhub.azure-devices.net",
+            "policy": "policy",
+            "primarykey": "key",
+        }
+        SdkResolver(target)._get_iothub_service_sdk()
+
+        assert auth.call_args.kwargs["uri"] == "myhub.azure-devices.net"
+        assert client.call_args.kwargs["base_url"] == "https://myhub.azure-devices.net"

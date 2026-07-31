@@ -182,17 +182,22 @@ class SdkResolver(object):
     def _get_iothub_device_sdk(self):
         from azext_iot.sdk.iothub.device import IotHubGatewayDeviceAPIs
 
+        hostname = self.target.get("deviceHostName") or self.target["entity"]
+        sas_uri = hostname
+        if self.device_id:
+            sas_uri = "{}/devices/{}".format(hostname, self.device_id)
         credentials = SasTokenAuthentication(
-            uri=self.sas_uri,
+            uri=sas_uri,
             shared_access_policy_name=self.target["policy"],
             shared_access_key=self.target["primarykey"],
         )
 
-        return IotHubGatewayDeviceAPIs(credentials=credentials, base_url=self.endpoint)
+        return IotHubGatewayDeviceAPIs(credentials=credentials, base_url="https://{}".format(hostname))
 
     def _get_iothub_service_sdk(self):
         from azext_iot.sdk.iothub.service import IotHubGatewayServiceAPIs
 
+        hostname = self.target.get("serviceHostName") or self.target["entity"]
         credentials = None
 
         if self.auth_override:
@@ -201,12 +206,12 @@ class SdkResolver(object):
             credentials = IoTOAuth(cli_ctx=self.target["cmd"].cli_ctx, resource_id=IOTHUB_RESOURCE_ID)
         else:
             credentials = SasTokenAuthentication(
-                uri=self.sas_uri,
+                uri=hostname,
                 shared_access_policy_name=self.target["policy"],
                 shared_access_key=self.target["primarykey"],
             )
 
-        return IotHubGatewayServiceAPIs(credentials=credentials, base_url=self.endpoint)
+        return IotHubGatewayServiceAPIs(credentials=credentials, base_url="https://{}".format(hostname))
 
     def _get_dps_service_sdk(self):
         from azext_iot.sdk.dps.service import ProvisioningServiceClient

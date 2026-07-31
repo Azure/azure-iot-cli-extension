@@ -41,6 +41,7 @@ from azext_iot.common.shared import (
     EntityStatusType,
     JobType
 )
+from azext_iot.iothub.common import transform_iot_hub_hostname as _transform_hostname
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.utility import (
     assemble_nargs_to_dict,
@@ -2418,22 +2419,6 @@ def _iot_build_sas_token(
         key = target["primarykey"] if key_type == "primary" else target["secondarykey"]
 
     return SasTokenAuthentication(uri, policy, key, duration)
-
-
-def _transform_hostname(hostname, hostname_type):
-    """Transform a hostname to the requested type via string manipulation."""
-    parts = hostname.split(".")
-    hub_name = parts[0]
-    if parts[1] in (HostnameType.DEVICE.value, HostnameType.SERVICE.value):
-        domain = ".".join(parts[2:])
-    else:
-        domain = ".".join(parts[1:])
-    hostname_map = {
-        HostnameType.CLASSIC.value: f"{hub_name}.{domain}",
-        HostnameType.DEVICE.value: f"{hub_name}.device.{domain}",
-        HostnameType.SERVICE.value: f"{hub_name}.service.{domain}",
-    }
-    return hostname_map.get(hostname_type, hostname)
 
 
 def _resolve_sas_audience(target, hostname_type, device_id=None, login=None):

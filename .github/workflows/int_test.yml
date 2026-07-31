@@ -95,10 +95,9 @@ jobs:
       - name: "Build test matrix"
         id: matrix
         env:
-          INPUT_SERVICES: ${{ inputs['test-services'] || 'auto' }}
+          INPUT_SERVICES: ${{ inputs['test-services'] }}
           INPUT_PYTHON_VERSIONS: ${{ inputs['python-versions'] || '3.13' }}
           INPUT_REGIONS: ${{ inputs.regions || 'westus' }}
-          INPUT_EVENT: ${{ github.event_name }}
           INPUT_TEST_DPS: ${{ inputs.testDPS }}
           INPUT_TEST_HUB_MGMT: ${{ inputs.testHubMgmt }}
           INPUT_TEST_HUB_DATA: ${{ inputs.testHubData }}
@@ -119,8 +118,8 @@ jobs:
           input_services="$INPUT_SERVICES"
           services=""
 
-          if [ "$INPUT_EVENT" = "workflow_dispatch" ]; then
-            # workflow_dispatch: filter by boolean toggles + directory existence
+          if [ -z "$input_services" ]; then
+            # Direct workflow_dispatch: filter by boolean toggles + directory existence
             declare -A toggles=(
               [DPS]="$INPUT_TEST_DPS"
               [HubMgmt]="$INPUT_TEST_HUB_MGMT"

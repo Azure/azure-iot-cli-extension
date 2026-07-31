@@ -18,7 +18,9 @@ from azext_iot.central.providers import (
 from azext_iot.central.models.v2022_06_30_preview import TemplatePreview
 from azext_iot.central.models.ga_2022_07_31 import DeviceGa
 from azext_iot.monitor import telemetry
+from azext_iot.monitor import event
 from azext_iot.monitor.builders import _common
+from azext_iot.monitor.builders import hub_target_builder
 from azext_iot.monitor.models.target import Target
 from azext_iot.monitor.parsers import common_parser, central_parser
 from azext_iot.monitor.parsers import strings
@@ -27,6 +29,46 @@ from azext_iot.monitor.models.enum import Severity
 from azext_iot.monitor.utility import get_http_proxy_settings
 from azext_iot.tests.helpers import load_json
 from azext_iot.tests.test_constants import FileNames
+
+
+class TestGwV2MonitorRouting:
+    @staticmethod
+    def _target():
+        return {
+            "entity": "hub.device.azure-devices.net",
+            "serviceHostName": "hub.service.azure-devices.net",
+            "policy": "iothubowner",
+            "primarykey": "key",
+        }
+
+    def test_c2d_send_uses_service_hostname(self, mocker):
+        mocker.patch.object(
+            event, "_get_endpoint_and_token_auth_pyamqp", return_value=("/messages/devicebound", object())
+        )
+        client = mocker.patch.object(event, "PyAMQPSendClient")
+        mocker.patch.object(event, "PyAMQPMessage")
+        mocker.patch("azure.eventhub._pyamqp.message.Properties")
+
+        event.send_c2d_message(self._target(), "device1", "message")
+
+        assert client.call_args.kwargs["hostname"] == "hub.service.azure-devices.net"
+
+    def test_c2d_sas_audience_uses_service_hostname(self, mocker):
+        sas = mocker.patch("azext_iot.common.sas_token_auth.SasTokenAuthentication")
+        auth = mocker.patch.object(event, "PyAMQPCBSAuth")
+
+        event._get_endpoint_and_token_auth_pyamqp(
+            self._target(), "/messages/devicebound"
+        )
+
+        assert sas.call_args.kwargs["uri"] == "hub.service.azure-devices.net"
+        assert auth.call_args.kwargs["audience"] == "hub.service.azure-devices.net"
+
+    def test_event_redirect_uses_service_hostname(self):
+        assert (
+            hub_target_builder._service_hostname(self._target())
+            == "hub.service.azure-devices.net"
+        )
 
 
 def _encode_app_props(app_props: dict):

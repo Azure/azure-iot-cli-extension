@@ -40,7 +40,7 @@ def dm(manager):
 
 def test_import_devices(manager):
     subject.import_devices(cmd=_cmd(), name="acct", instance_name="inst", import_type="All")
-    dm(manager).begin_import_devices.assert_called_once_with(import_type={"importType": "All"})
+    dm(manager).begin_import_devices.assert_called_once_with(import_type="All")
 
 
 def test_import_devices_error(manager, handle_exc):

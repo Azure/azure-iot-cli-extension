@@ -69,6 +69,15 @@ class ADUValidHashAlgorithmType(Enum):
     SHA256 = "sha256"
 
 
+class ADUDownloadSecurityType(Enum):
+    """
+    ADU download security (protocol) type for update payload downloads.
+    """
+
+    HTTPS = "https"
+    HTTP = "http"
+
+
 class ADUContentHandlerType(Enum):
     """
     ADU first-party content handler types.

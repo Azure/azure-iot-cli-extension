@@ -27,6 +27,10 @@ DEBUG = False
 logger = get_logger(__name__)
 
 
+def _service_hostname(target):
+    return target.get("serviceHostName") or target["entity"]
+
+
 def send_c2d_message(
     target,
     device_id,
@@ -110,7 +114,7 @@ def send_c2d_message(
     )
 
     client = PyAMQPSendClient(
-        hostname=target['entity'],
+        hostname=_service_hostname(target),
         target=endpoint_target,
         auth=token_auth,
         network_trace=DEBUG,
@@ -167,7 +171,7 @@ def monitor_feedback(target, device_id, wait_on_id=None, token_duration=3600):
 
     try:
         client = PyAMQPReceiveClient(
-            hostname=target['entity'],
+            hostname=_service_hostname(target),
             source=endpoint_target,
             auth=token_auth,
             client_name=_get_container_id(),
@@ -237,6 +241,7 @@ def _get_endpoint_and_token_auth_pyamqp(
 
     AccessToken = namedtuple("AccessToken", ["token", "expires_on"])
     endpoint_with_op = operation  # pyamqp uses relative path
+    hostname = _service_hostname(target)
     auth = None
 
     if target["policy"] == AuthenticationTypeDataplane.login.value:
@@ -250,7 +255,7 @@ def _get_endpoint_and_token_auth_pyamqp(
 
         auth = PyAMQPJWTTokenAuth(
             audience=IOTHUB_RESOURCE_ID,
-            uri=f"amqps://{target['entity']}{operation}",
+            uri=f"amqps://{hostname}{operation}",
             get_token=token_provider,
             token_type=b"Bearer"
         )
@@ -258,7 +263,7 @@ def _get_endpoint_and_token_auth_pyamqp(
         # Generate IoT Hub-compatible SAS token using our SasTokenAuthentication
         # which correctly uses base64-decoded keys for HMAC (unlike PyAMQP's generate_sas_token)
         sas_generator = SasTokenAuthentication(
-            uri=target['entity'],
+            uri=hostname,
             shared_access_policy_name=target['policy'],
             shared_access_key=target['primarykey'],
             expiry=token_duration
@@ -271,8 +276,8 @@ def _get_endpoint_and_token_auth_pyamqp(
 
         # Use CBS authentication with our pre-generated SAS token
         auth = PyAMQPCBSAuth(
-            uri=f"amqps://{target['entity']}{operation}",
-            audience=target['entity'],
+            uri=f"amqps://{hostname}{operation}",
+            audience=hostname,
             token_type=b"servicebus.windows.net:sastoken",
             get_token=sas_token_provider,
             expires_in=token_duration

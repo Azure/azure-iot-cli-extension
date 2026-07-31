@@ -342,7 +342,9 @@ def _storage_provisioner(request):
         desired_instance_diagnostics_user_storage = acct_marker.kwargs.get("instance_diagnostics_user_storage", False)
         if desired_scope == "storage" or desired_instance_diagnostics_user_storage:
             target_name = generate_linked_storage_id()
-            create_result = cli.invoke(f"storage account create -g {ACCOUNT_RG} -n {target_name}")
+            create_result = cli.invoke(
+                f"storage account create -g {ACCOUNT_RG} -n {target_name} --allow-shared-key-access true"
+            )
             if not create_result.success():
                 raise RuntimeError(f"Failed to provision storage account resource {target_name}.")
             return create_result.as_json()

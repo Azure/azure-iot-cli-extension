@@ -124,7 +124,7 @@ def create_storage_account(
 
         if not target_storage:
             cmd(
-                "storage account create -n {} -g {} --tags iot_resource={}".format(
+                "storage account create -n {} -g {} --allow-shared-key-access true --tags iot_resource={}".format(
                     account_name, rg, resource_name
                 )
             )

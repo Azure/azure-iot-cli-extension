@@ -10,7 +10,7 @@ from azext_iot.common._azure import IOT_SERVICE_CS_TEMPLATE
 from azext_iot.common.base_discovery import BaseDiscovery
 from azext_iot.common.shared import DiscoveryResourceType, AuthenticationTypeDataplane, GatewayVersion
 from azext_iot.common.utility import trim_from_start, is_eventhub_connection_string
-from azext_iot.iothub.models.iothub_target import IotHubTarget
+from azext_iot.iothub.models.iothub_target import IotHubTarget, derive_iot_hub_hostnames
 from azext_iot._factory import iot_hub_service_factory
 from typing import Any, Dict
 
@@ -59,6 +59,7 @@ class IotHubDiscovery(BaseDiscovery):
 
     def _build_target_from_hostname(self, resource_hostname: str) -> Dict[str, str]:
         login = AuthenticationTypeDataplane.login.value
+        service_hostname, device_hostname = derive_iot_hub_hostnames(resource_hostname)
         target = {}
         target["cs"] = IOT_SERVICE_CS_TEMPLATE.format(
             resource_hostname,
@@ -71,6 +72,9 @@ class IotHubDiscovery(BaseDiscovery):
         target["primarykey"] = login
         target["secondarykey"] = login
         target["subscription"] = self.sub_id
+        if service_hostname:
+            target["serviceHostName"] = service_hostname
+            target["deviceHostName"] = device_hostname
 
         target["cmd"] = self.cmd
         return target

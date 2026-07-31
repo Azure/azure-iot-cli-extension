@@ -11,6 +11,7 @@ import pytest
 from azure.cli.core.azclierror import InvalidArgumentValueError
 
 from azext_iot.iothub._validators import validate_device_model_id
+from azext_iot.iothub.models.iothub_target import IotHubTarget
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot.common.shared import GatewayVersion
 
@@ -88,6 +89,39 @@ class TestGetTargetByCstring:
         result = IotHubDiscovery.get_target_by_cstring("HostName=hub.azure-devices.net;...")
         assert result == {"name": "hub"}
 
+    @pytest.mark.parametrize(
+        "hostname,entity,service_hostname,device_hostname",
+        [
+            (
+                "hub.device.azure-devices.net",
+                "hub.device.azure-devices.net",
+                "hub.service.azure-devices.net",
+                "hub.device.azure-devices.net",
+            ),
+            (
+                "hub.service.azure-devices.net",
+                "hub.service.azure-devices.net",
+                "hub.service.azure-devices.net",
+                "hub.device.azure-devices.net",
+            ),
+        ],
+    )
+    def test_iot_hub_target_hostnames(self, hostname, entity, service_hostname, device_hostname):
+        target = IotHubTarget.from_connection_string(
+            f"HostName={hostname};SharedAccessKeyName=policy;SharedAccessKey=key"
+        ).as_dict()
+        assert target["entity"] == entity
+        assert target["serviceHostName"] == service_hostname
+        assert target["deviceHostName"] == device_hostname
+
+    def test_iot_hub_target_classic_hostname_is_unchanged(self):
+        target = IotHubTarget.from_connection_string(
+            "HostName=hub.azure-devices.net;SharedAccessKeyName=policy;SharedAccessKey=key"
+        ).as_dict()
+        assert target["entity"] == "hub.azure-devices.net"
+        assert "serviceHostName" not in target
+        assert "deviceHostName" not in target
+
 
 class TestBuildTargetFromHostname:
     def test_build(self, mocker):
@@ -96,6 +130,19 @@ class TestBuildTargetFromHostname:
         assert result["name"] == "myhub"
         assert result["entity"] == "myhub.azure-devices.net"
         assert result["subscription"] == "sub-123"
+        assert "serviceHostName" not in result
+        assert "deviceHostName" not in result
+
+    @pytest.mark.parametrize(
+        "hostname",
+        ["myhub.device.azure-devices.net", "myhub.service.azure-devices.net"],
+    )
+    def test_build_split_hostname(self, mocker, hostname):
+        disc = _disc(mocker)
+        result = disc._build_target_from_hostname(hostname)
+        assert result["entity"] == hostname
+        assert result["serviceHostName"] == "myhub.service.azure-devices.net"
+        assert result["deviceHostName"] == "myhub.device.azure-devices.net"
 
 
 class TestBuildTarget:
