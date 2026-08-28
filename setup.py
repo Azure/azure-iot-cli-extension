@@ -62,6 +62,9 @@ DEPENDENCIES = [
     # aiohttp is required by azure-eventhub for async AMQP over WebSocket transport (used when proxy is configured).
     # azure-eventhub does not include it as an extras dependency, so it must be declared explicitly.
     "aiohttp>=3.9,<4.0",
+    # Terminal UI (`az iot adr ui`). Imported lazily so no other command pays the cost.
+    # Capped below 7 because textual 7+ requires rich>=14, which conflicts with the pin above.
+    "textual>=6.0,<7.0",
 ]
 EXTRAS = {}
 

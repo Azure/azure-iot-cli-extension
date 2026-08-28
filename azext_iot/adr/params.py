@@ -942,7 +942,8 @@ def load_adr_arguments(self, _):
             "update_provider",
             arg_group="Update",
             options_list=["--update-id-provider", "--update-provider", "--up"],
-            help="Software Update updateId.provider (e.g. 'Contoso'). The update identity is a {provider, name, version} triple.",
+            help="Software Update updateId.provider (e.g. 'Contoso'). The update identity "
+                 "is a {provider, name, version} triple.",
         )
         context.argument(
             "update_name",
@@ -1052,4 +1053,36 @@ def load_adr_arguments(self, _):
             "group_name",
             options_list=["--group-name", "--gn"],
             help="Group target. Required for group report types.",
+        )
+
+    with self.argument_context("iot adr ns ui") as context:
+        context.argument("resource_group_name", arg_type=resource_group_name_type)
+        context.argument(
+            "namespace_name",
+            options_list=["--namespace", "--ns"],
+            help="Device Registry namespace to open. Omit to pick one interactively.",
+        )
+        context.argument(
+            "read_only",
+            options_list=["--read-only"],
+            arg_type=get_three_state_flag(),
+            help="Disable every state-changing action for the session.",
+        )
+        context.argument(
+            "refresh_interval",
+            options_list=["--refresh-interval", "--ri"],
+            type=int,
+            help="Seconds between automatic refreshes. Values below the enforced floor are raised to it.",
+        )
+        context.argument(
+            "theme",
+            options_list=["--theme"],
+            help="UI theme: dark, light, or high-contrast. Press Ctrl+T inside the UI "
+                 "to switch between dark and light.",
+        )
+        context.argument(
+            "log_file",
+            options_list=["--log-file"],
+            help="Write diagnostics to this file. A full-screen UI cannot print, so this "
+                 "is how failures are inspected. Implied by --debug.",
         )

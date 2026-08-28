@@ -172,7 +172,10 @@ def test_2026_command_surface_is_registered():
         "adr_job_run_delete",
         {"confirmation": True, "supports_no_wait": True},
     )
-    assert len(commands) == 104
+    # Scoped to the service surface: `iot adr ns ui` is a client-side terminal UI, not a
+    # namespace API operation, so it must not perturb this count.
+    service_commands = {name for name in commands if name != "iot adr ns ui"}
+    assert len(service_commands) == 104
     assert commands[
         "iot adr ns registry-device auth revoke-certs"
     ][2] == {"confirmation": True, "supports_no_wait": True}

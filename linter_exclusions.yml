@@ -295,7 +295,13 @@ iot hub:
 iot adr ns registry-device auth-profile:
   rule_exclusions:
     - require_wait_command_if_no_wait
+iot adr ns registry-device auth:
+  rule_exclusions:
+    - require_wait_command_if_no_wait
 iot adr ns report:
+  rule_exclusions:
+    - require_wait_command_if_no_wait
+iot adr ns su update:
   rule_exclusions:
     - require_wait_command_if_no_wait
 
