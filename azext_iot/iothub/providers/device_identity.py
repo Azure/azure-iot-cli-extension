@@ -6,7 +6,7 @@
 from pathlib import PurePath
 from knack.prompting import prompt_y_n
 from os import makedirs
-from os.path import exists, abspath
+from os.path import exists, abspath, commonpath, realpath
 from shutil import rmtree
 from azext_iot.common.certops import (
     create_self_signed_certificate,
@@ -52,6 +52,33 @@ from azext_iot.operations.hub import _assemble_device
 from azext_iot.sdk.iothub.service.models import Device
 
 logger = get_logger(__name__)
+
+
+def _resolve_device_bundle_directory(
+    bundle_output_directory: PurePath, device_id: str
+) -> PurePath:
+    """
+    Join a device Id onto the bundle output directory, ensuring the result stays within that
+    directory. Device Ids originate from user supplied config files and are validated when the
+    config is parsed - this is a final guard before destructive file system operations run.
+    """
+    device_directory = bundle_output_directory.joinpath(device_id)
+    bundle_root = realpath(str(bundle_output_directory))
+    resolved_device_directory = realpath(str(device_directory))
+    try:
+        contained = (
+            resolved_device_directory != bundle_root
+            and commonpath([bundle_root, resolved_device_directory]) == bundle_root
+        )
+    except ValueError:
+        # paths reside on different drives (Windows)
+        contained = False
+    if not contained:
+        raise InvalidArgumentValueError(
+            f"Device Id '{device_id}' is invalid, it resolves to a path outside of the "
+            f"output directory '{bundle_output_directory}'."
+        )
+    return device_directory
 
 
 class DeviceIdentityProvider(IoTHubProvider):
@@ -247,7 +274,9 @@ class DeviceIdentityProvider(IoTHubProvider):
             device_id = device.device_id
             device_cert_output_directory = None
             if bundle_output_directory:
-                device_cert_output_directory = bundle_output_directory.joinpath(device_id)
+                device_cert_output_directory = _resolve_device_bundle_directory(
+                    bundle_output_directory, device_id
+                )
                 # if the device's folder already exists, remove it
                 if exists(device_cert_output_directory):
                     rmtree(device_cert_output_directory)

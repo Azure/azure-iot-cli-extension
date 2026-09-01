@@ -33,6 +33,8 @@ Release History
 
 **IoT Hub updates**
 
+* Fixed ``az iot edge devices create`` where a device Id supplied via ``--cfg`` or ``--device`` was used unvalidated as a file system path segment, allowing a malicious configuration file to remove or write files outside of the ``--out`` directory. Device Ids are now validated before use.
+
 * Fixed ``az iot hub state export`` to preserve routing endpoint resource names (Event Hub / Service Bus namespaces, Cosmos DB / Storage accounts) whose names begin with characters found in the URI scheme. Endpoints are no longer dropped or corrupted during export.
 
 0.29.0
