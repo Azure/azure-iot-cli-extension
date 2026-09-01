@@ -2,6 +2,15 @@
 
 Release History
 ===============
+0.33.0b9 (Preview)
+++++++++++++++++++++
+
+**Azure Device Registry updates**
+
+* Regenerated the synchronous and asynchronous ``2026-11-02-preview`` Device Registry SDK from the latest ``release-adr-development`` specification.
+* Updated namespace report generation and migration LROs to poll the service's ``Azure-AsyncOperation`` endpoint instead of the ``Location`` endpoint.
+* Updated the Device Registry regeneration scripts for the specification's unified resource-manager folder layout.
+
 0.33.0b8 (Preview)
 ++++++++++++++++++++
 
