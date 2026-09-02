@@ -35,6 +35,10 @@ def load_adr_help():
     By default, a namespace is created with a system-assigned managed identity.
     When replacing an existing namespace, omit --observability-enabled to preserve
     its observability configuration.
+    Endpoint dictionaries follow the namespace link topology rules: a submitted
+    Hub messaging endpoint requires a DPS provisioning endpoint in the same
+    full namespace PUT, only one DPS endpoint may be submitted, and at most one
+    Software Updates updating endpoint may be submitted.
   examples:
     - name: Create a basic Device Registry namespace
       text: az iot adr ns create -n myNamespace -g myResourceGroup
@@ -102,6 +106,13 @@ def load_adr_help():
     ] = """
   type: command
   short-summary: Update a Device Registry namespace.
+  long-summary: |
+    Raw endpoint updates follow the same topology rules as 'az iot adr ns link':
+    adding a new Hub or retrying a failed Hub requires a currently linked DPS or
+    a DPS supplied in the same update. Only one DPS may be linked. A successfully
+    linked Hub remains operational and updateable after DPS deletion. At most one
+    Software Updates updating endpoint may be linked; remove the existing endpoint
+    in the same update before adding a replacement.
   examples:
     - name: Update namespace tags
       text: az iot adr ns update -n myNamespace -g myResourceGroup --tags key=value
@@ -323,8 +334,10 @@ def load_adr_help():
   type: group
   short-summary: Manage IoT Hub links (messaging endpoints) on a Device Registry namespace.
   long-summary: |
-    A namespace must have at least one linked DPS before a Hub can be linked (DPS-first ordering).
-    Links live on the namespace, not on the IoT Hub resource.
+    A namespace must have a linked DPS before a new Hub can be linked or a failed
+    Hub link can be retried (DPS-first ordering). A successfully linked Hub remains
+    operational and updateable after DPS deletion. Links live on the namespace,
+    not on the IoT Hub resource.
   """
 
     helps[
@@ -366,7 +379,9 @@ def load_adr_help():
   short-summary: Update an existing IoT Hub messaging endpoint on a Device Registry namespace.
   long-summary: |
     Only the inbound caller identity can be updated. The linked Hub resource and provisioning
-    settings cannot be changed in place.
+    settings cannot be changed in place. Retrying an endpoint whose linkingState is Failed
+    requires a linked DPS. An endpoint whose linkingState is Succeeded remains updateable
+    after DPS deletion.
   examples:
     - name: Switch a Hub link to a system-assigned identity
       text: az iot adr ns link hub update -n primary --ns myNamespace -g myResourceGroup --mi-system-assigned
@@ -390,6 +405,22 @@ def load_adr_help():
   examples:
     - name: List all Hub links on a namespace
       text: az iot adr ns link hub list --ns myNamespace -g myResourceGroup
+  """
+
+    helps[
+        "iot adr ns link hub delete"
+    ] = """
+  type: command
+  short-summary: Permanently delete a linked IoT Hub and update the namespace.
+  long-summary: |
+    Permanently deletes the actual IoT Hub resource referenced by the named link,
+    then removes that messaging endpoint from the Device Registry namespace. Role
+    assignments are not deleted. This operation cannot be undone.
+  examples:
+    - name: Delete the linked IoT Hub and update the namespace without prompting
+      text: az iot adr ns link hub delete -n primary --ns myNamespace -g myResourceGroup --yes
+    - name: Start both deletion updates without waiting for completion
+      text: az iot adr ns link hub delete -n primary --ns myNamespace -g myResourceGroup --yes --no-wait
   """
 
     helps[
@@ -477,6 +508,25 @@ def load_adr_help():
   """
 
     helps[
+        "iot adr ns link dps delete"
+    ] = """
+  type: command
+  short-summary: Permanently delete a linked DPS and update the namespace.
+  long-summary: |
+    Permanently deletes the actual Device Provisioning Service resource referenced
+    by the named link, then removes that provisioning endpoint from the Device
+    Registry namespace. Hub links do not block this command. Role assignments are
+    not deleted. Successfully linked Hubs remain operational and updateable, but
+    adding a new Hub or retrying a failed Hub requires linking another DPS first.
+    This operation cannot be undone.
+  examples:
+    - name: Delete the linked DPS and update the namespace without prompting
+      text: az iot adr ns link dps delete -n primary --ns myNamespace -g myResourceGroup --yes
+    - name: Start both deletion updates without waiting for completion
+      text: az iot adr ns link dps delete -n primary --ns myNamespace -g myResourceGroup --yes --no-wait
+  """
+
+    helps[
         "iot adr ns link dps wait"
     ] = """
   type: command
@@ -494,8 +544,9 @@ def load_adr_help():
   long-summary: |
     Links a 'Microsoft.DeviceUpdate/updateInstances' resource to the namespace as an
     updating endpoint under properties.updating.endpoints. Links live on the namespace, not on
-    the Update Instance. Linking is asynchronous; read-only address fields (serviceAddress,
-    deviceAddress, legacyDeviceAddress) are resolved once linking succeeds.
+    the Update Instance. Only one Software Updates instance may be linked per namespace.
+    Linking is asynchronous; read-only address fields (serviceAddress, deviceAddress,
+    legacyDeviceAddress) are resolved once linking succeeds.
   """
 
     helps[
@@ -505,6 +556,8 @@ def load_adr_help():
   short-summary: Link an Update Instance to a Device Registry namespace.
   long-summary: |
     Adds a Software Updates updating endpoint entry under the namespace's properties.updating.endpoints.
+    Only one Software Updates instance may be linked per namespace. If one is already
+    linked, use 'link su update' to modify it or destructive 'link su delete' to replace it.
     Exactly one of --mi-system-assigned or --mi-user-assigned must be provided to set the
     inbound caller identity that the update instance will use to call back into the namespace.
   examples:
@@ -551,6 +604,23 @@ def load_adr_help():
   examples:
     - name: List all Software Updates links on a namespace
       text: az iot adr ns link su list --ns myNamespace -g myResourceGroup
+  """
+
+    helps[
+        "iot adr ns link su delete"
+    ] = """
+  type: command
+  short-summary: Permanently delete a linked Update Instance and update the namespace.
+  long-summary: |
+    Permanently deletes the actual Microsoft.DeviceUpdate/updateInstances resource
+    referenced by the named link, then removes that updating endpoint from the
+    Device Registry namespace. Role assignments are not deleted. This operation
+    cannot be undone.
+  examples:
+    - name: Delete the linked Update Instance and update the namespace without prompting
+      text: az iot adr ns link su delete -n my-su --ns myNamespace -g myResourceGroup --yes
+    - name: Start both deletion updates without waiting for completion
+      text: az iot adr ns link su delete -n my-su --ns myNamespace -g myResourceGroup --yes --no-wait
   """
 
     helps[

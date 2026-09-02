@@ -63,7 +63,7 @@ def _get_arm_endpoint(cli_ctx):
     return cli_ctx.cloud.endpoints.resource_manager
 
 
-def iot_hub_service_factory(cli_ctx, *_):
+def iot_hub_service_factory(cli_ctx, *_, subscription_id=None):
     """
     Factory for importing deps and getting service client resources.
 
@@ -79,7 +79,7 @@ def iot_hub_service_factory(cli_ctx, *_):
 
     from azext_iot.sdk.iothub.mgmt import IotHubClient
 
-    subscription_id = get_subscription_id(cli_ctx)
+    subscription_id = subscription_id or get_subscription_id(cli_ctx)
 
     return IotHubClient(
         credential=AZURE_CLI_CREDENTIAL,
@@ -91,7 +91,7 @@ def iot_hub_service_factory(cli_ctx, *_):
     )
 
 
-def iot_service_provisioning_factory(cli_ctx, *_):
+def iot_service_provisioning_factory(cli_ctx, *_, subscription_id=None):
     """
     Factory for importing deps and getting service client resources.
 
@@ -107,7 +107,7 @@ def iot_service_provisioning_factory(cli_ctx, *_):
 
     from azext_iot.sdk.dps.mgmt import IotDpsClient
 
-    subscription_id = get_subscription_id(cli_ctx)
+    subscription_id = subscription_id or get_subscription_id(cli_ctx)
 
     return IotDpsClient(
         credential=AZURE_CLI_CREDENTIAL,
@@ -147,7 +147,7 @@ def adr_service_factory(cli_ctx, *_):
     )
 
 
-def adr_update_instance_service_factory(cli_ctx, *_):
+def adr_update_instance_service_factory(cli_ctx, *_, subscription_id=None):
     """Create the Software Updates Update Instance management client."""
     from azure.cli.core.commands.client_factory import get_subscription_id
 
@@ -157,7 +157,7 @@ def adr_update_instance_service_factory(cli_ctx, *_):
 
     return DeviceUpdateRegistryClient(
         credential=AZURE_CLI_CREDENTIAL,
-        subscription_id=get_subscription_id(cli_ctx),
+        subscription_id=subscription_id or get_subscription_id(cli_ctx),
         endpoint=_ADR_CANARY_ARM_ENDPOINT,
         credential_scopes=_get_credential_scopes(cli_ctx),
         user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),

@@ -34,11 +34,13 @@ What is intentionally NOT covered here (covered by unit tests):
 """
 
 import os
+import re
 import sys
 import time
 from typing import Optional
 
 import pytest
+from azure.cli.core.azclierror import ArgumentUsageError
 from msrestazure.tools import parse_resource_id
 
 from azext_iot.tests import CaptureOutputLiveScenarioTest
@@ -54,6 +56,7 @@ from azext_iot.tests.adr.conftest import (
     generate_hub_name,
     generate_identity_name,
 )
+from azext_iot.adr.topology import DPS_REQUIRED_MSG, SU_CAP_EXCEEDED_MSG
 
 
 _SU_UPDATE_INSTANCE_ENV = "azext_iot_adr_update_instance_id"
@@ -69,6 +72,14 @@ _ADU_FPA_OBJECT_ID = os.getenv(
     "azext_iot_adr_adu_fpa_object_id",
     "e6c17e40-1542-4a44-9e8e-971232625ea8",
 ).strip()
+
+
+def _assert_cli_failure(test_case, command: str, expected_message: str):
+    with pytest.raises(
+        ArgumentUsageError,
+        match=re.escape(expected_message),
+    ):
+        test_case.cmd(command)
 
 
 def _wait_for_linking_succeeded(
@@ -136,6 +147,10 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, CaptureOutputLiveScenarioTest):
     5. Step 5-6: tertiary Hub linked with **SAMI** + multi-hub list assertion
     6. Step 7-8: ``link hub update`` rotates inbound identities
     7. Step 9: ``link dps update`` rotates DPS identity
+    8. Step 10: ``link dps delete`` permanently deletes the disposable DPS
+       while Hub links remain, then removes only the DPS endpoint
+    9. Step 11: ``link hub delete`` permanently deletes both disposable Hubs
+       and removes their namespace endpoints
     """
 
     def test_adr_link_lifecycle(self):
@@ -458,6 +473,84 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, CaptureOutputLiveScenarioTest):
                 )
                 _log(LogKind.OK, "DPS link identity rotated (idempotent)")
 
+            with timed_step(
+                "Step 10 ❯ link dps delete while Hub links remain"
+            ):
+                self.cmd(
+                    f"iot adr ns link dps delete --ns {namespace_name} "
+                    f"-g {rg} -n {dps_endpoint} --yes"
+                )
+                self.cmd(
+                    f"iot dps show --name {dps_name} -g {rg}",
+                    expect_failure=True,
+                )
+                assert self.cmd(
+                    f"iot adr ns link dps list --ns {namespace_name} -g {rg}"
+                ).get_output_in_json() == []
+                remaining_hubs = _names_in(
+                    self.cmd(
+                        f"iot adr ns link hub list --ns {namespace_name} -g {rg}"
+                    ).get_output_in_json()
+                )
+                assert {
+                    secondary_endpoint,
+                    tertiary_endpoint,
+                }.issubset(remaining_hubs)
+
+                succeeded_hub = self.cmd(
+                    f"iot adr ns link hub show --ns {namespace_name} "
+                    f"-g {rg} -n {secondary_endpoint}"
+                ).get_output_in_json()
+                assert succeeded_hub.get("name") == secondary_endpoint
+                assert succeeded_hub.get("resourceId") == hub_id
+
+                for command in (
+                    (
+                        f"iot adr ns link hub add --ns {namespace_name} -g {rg} "
+                        f"-n rejected-after-dps-delete --hub-id {hub_id}"
+                    ),
+                    (
+                        f"iot adr ns update --namespace {namespace_name} -g {rg} "
+                        "--messaging-endpoints "
+                        f"'{{\"rejected-raw\":{{\"endpointType\":"
+                        "\"Microsoft.Devices/IotHubs\","
+                        f"\"resourceId\":\"{hub_id}\"}}}}'"
+                    ),
+                ):
+                    _assert_cli_failure(self, command, DPS_REQUIRED_MSG)
+                _log(
+                    LogKind.OK,
+                    "DPS deleted; successful Hubs remain readable while new "
+                    "atomic and raw Hub additions are rejected",
+                )
+
+            with timed_step(
+                "Step 11 ❯ link hub delete (disposable linked resources)"
+            ):
+                for endpoint, hub_name in (
+                    (secondary_endpoint, secondary_hub),
+                    (tertiary_endpoint, tertiary_hub),
+                ):
+                    self.cmd(
+                        f"iot adr ns link hub delete --ns {namespace_name} "
+                        f"-g {rg} -n {endpoint} --yes"
+                    )
+                    self.cmd(
+                        f"iot hub show -n {hub_name} -g {rg}",
+                        expect_failure=True,
+                    )
+                remaining_hubs = _names_in(
+                    self.cmd(
+                        f"iot adr ns link hub list --ns {namespace_name} -g {rg}"
+                    ).get_output_in_json()
+                )
+                assert secondary_endpoint not in remaining_hubs
+                assert tertiary_endpoint not in remaining_hubs
+                _log(
+                    LogKind.OK,
+                    "Both linked Hub resources and selected endpoints deleted",
+                )
+
             _log(LogKind.OK, "Link lifecycle passed")
 
         finally:
@@ -613,7 +706,6 @@ class TestADRLinkSU(ADRFullInfraHelper, CaptureOutputLiveScenarioTest):
     6. Step 4: ``link su update`` rotates the inbound caller identity UAMI → SAMI.
 
     What is intentionally NOT covered here (covered by unit tests):
-    - Duplicate endpoint-name rejection
     - MI mutually-exclusive rejection
     - Invalid / wrong-type Update Instance resource id rejection
     """
@@ -627,6 +719,7 @@ class TestADRLinkSU(ADRFullInfraHelper, CaptureOutputLiveScenarioTest):
         denied_namespace_name = generate_adr_namespace_name()
         su_endpoint = "su-primary"
         denied_endpoint = "su-no-role"
+        su_deleted = False
 
         def _names_in(listed):
             assert isinstance(listed, list)
@@ -754,6 +847,28 @@ class TestADRLinkSU(ADRFullInfraHelper, CaptureOutputLiveScenarioTest):
                     f"-g {rg} --updated"
                 )
                 self.cmd(add_cmd, expect_failure=True)
+                for cap_command in (
+                    (
+                        f"iot adr ns link su add --ns {namespace_name} -g {rg} "
+                        f"-n su-cap-rejected-link --su-id {su_id} "
+                        "--mi-system-assigned"
+                    ),
+                    (
+                        f"iot adr ns update --namespace {namespace_name} -g {rg} "
+                        "--updating-endpoints "
+                        f"'{{\"su-cap-rejected-raw\":{{\"endpointType\":"
+                        "\"Microsoft.DeviceUpdate/updateInstances\","
+                        f"\"resourceId\":\"{su_id}\"}}}}'"
+                    ),
+                ):
+                    _assert_cli_failure(
+                        self, cap_command, SU_CAP_EXCEEDED_MSG
+                    )
+                assert _names_in(
+                    self.cmd(
+                        f"iot adr ns link su list --ns {namespace_name} -g {rg}"
+                    ).get_output_in_json()
+                ) == {su_endpoint}
                 _log(LogKind.OK, "Software Updates link '%s' created (UAMI)", su_endpoint)
 
             with timed_step("Step 2 > link su show / list (single entry)"):
@@ -813,6 +928,26 @@ class TestADRLinkSU(ADRFullInfraHelper, CaptureOutputLiveScenarioTest):
                 )
                 _log(LogKind.OK, "Rotated UAMI to SAMI")
 
+            with timed_step(
+                "Step 5 > link su delete (disposable Update Instance)"
+            ):
+                self.cmd(
+                    f"iot adr ns link su delete --ns {namespace_name} -g {rg} "
+                    f"-n {su_endpoint} --yes"
+                )
+                su_deleted = True
+                assert self.cmd(
+                    f"iot adr ns link su list --ns {namespace_name} -g {rg}"
+                ).get_output_in_json() == []
+                self.cmd(
+                    f"resource show --ids {su_id}",
+                    expect_failure=True,
+                )
+                _log(
+                    LogKind.OK,
+                    "Update Instance resource and namespace endpoint deleted",
+                )
+
             _log(LogKind.OK, "Software Updates link lifecycle passed")
 
         finally:
@@ -826,22 +961,28 @@ class TestADRLinkSU(ADRFullInfraHelper, CaptureOutputLiveScenarioTest):
                     cleanup_failures.append(("namespace", error))
                     _log(LogKind.WARN, "Namespace cleanup failed: %s", error)
             with timed_step("Cleanup ❯ Delete disposable Update Instance"):
-                try:
-                    parsed_su_id = parse_resource_id(su_id)
-                    instance_name = parsed_su_id["name"]
-                    instance_rg = parsed_su_id["resource_group"]
-                    self.cmd(
-                        f"iot adr ns su instance delete -n {instance_name} "
-                        f"-g {instance_rg} --yes --no-wait"
+                if su_deleted:
+                    _log(
+                        LogKind.RESULT,
+                        "Disposable Update Instance already deleted by link su delete",
                     )
-                    self.cmd(
-                        f"iot adr ns su instance wait -n {instance_name} "
-                        f"-g {instance_rg} --deleted"
-                    )
-                    _log(LogKind.RESULT, "Disposable Update Instance deleted")
-                except Exception as error:  # noqa: BLE001 - report after all cleanup
-                    cleanup_failures.append(("Update Instance", error))
-                    _log(LogKind.WARN, "Update Instance cleanup failed: %s", error)
+                else:
+                    try:
+                        parsed_su_id = parse_resource_id(su_id)
+                        instance_name = parsed_su_id["name"]
+                        instance_rg = parsed_su_id["resource_group"]
+                        self.cmd(
+                            f"iot adr ns su instance delete -n {instance_name} "
+                            f"-g {instance_rg} --yes --no-wait"
+                        )
+                        self.cmd(
+                            f"iot adr ns su instance wait -n {instance_name} "
+                            f"-g {instance_rg} --deleted"
+                        )
+                        _log(LogKind.RESULT, "Disposable Update Instance deleted")
+                    except Exception as error:  # noqa: BLE001 - report after all cleanup
+                        cleanup_failures.append(("Update Instance", error))
+                        _log(LogKind.WARN, "Update Instance cleanup failed: %s", error)
             if cleanup_failures and active_error is None:
                 detail = ", ".join(
                     f"{resource}: {error}"

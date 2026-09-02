@@ -72,7 +72,8 @@ def load_adr_arguments(self, _):
             context.argument(
                 "updating_endpoints",
                 options_list=["--updating-endpoints"],
-                help="Software Updates endpoint dictionary as inline JSON or a JSON file path.",
+                help="Updating endpoint dictionary as inline JSON or a JSON file path. "
+                     "At most one Software Updates endpoint may be linked per namespace.",
             )
 
     with self.argument_context("iot adr ns migrate") as context:

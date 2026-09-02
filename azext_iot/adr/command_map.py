@@ -67,6 +67,21 @@ adr_software_update_ops = CliCommandType(
     client_factory=adr_software_update_data_service_factory,
 )
 
+_HUB_DELETE_CONFIRMATION = (
+    "This operation will permanently delete the linked IoT Hub resource and "
+    "update the Device Registry namespace. This cannot be undone. Continue?"
+)
+_DPS_DELETE_CONFIRMATION = (
+    "This operation will permanently delete the linked Device Provisioning "
+    "Service resource and update the Device Registry namespace. This cannot "
+    "be undone. Continue?"
+)
+_SU_DELETE_CONFIRMATION = (
+    "This operation will permanently delete the linked Update Instance "
+    "resource and update the Device Registry namespace. This cannot be "
+    "undone. Continue?"
+)
+
 
 def load_adr_commands(self, _):
     # Namespace commands
@@ -183,6 +198,12 @@ def load_adr_commands(self, _):
     ) as cmd_group:
         cmd_group.command("add", "adr_link_hub_add", supports_no_wait=True)
         cmd_group.command("update", "adr_link_hub_update", supports_no_wait=True)
+        cmd_group.command(
+            "delete",
+            "adr_link_hub_delete",
+            confirmation=_HUB_DELETE_CONFIRMATION,
+            supports_no_wait=True,
+        )
         cmd_group.show_command("show", "adr_link_hub_show")
         cmd_group.command("list", "adr_link_hub_list")
         cmd_group.wait_command(
@@ -194,6 +215,12 @@ def load_adr_commands(self, _):
     ) as cmd_group:
         cmd_group.command("add", "adr_link_dps_add", supports_no_wait=True)
         cmd_group.command("update", "adr_link_dps_update", supports_no_wait=True)
+        cmd_group.command(
+            "delete",
+            "adr_link_dps_delete",
+            confirmation=_DPS_DELETE_CONFIRMATION,
+            supports_no_wait=True,
+        )
         cmd_group.show_command("show", "adr_link_dps_show")
         cmd_group.command("list", "adr_link_dps_list")
         cmd_group.wait_command(
@@ -205,6 +232,12 @@ def load_adr_commands(self, _):
     ) as cmd_group:
         cmd_group.command("add", "adr_link_su_add", supports_no_wait=True)
         cmd_group.command("update", "adr_link_su_update", supports_no_wait=True)
+        cmd_group.command(
+            "delete",
+            "adr_link_su_delete",
+            confirmation=_SU_DELETE_CONFIRMATION,
+            supports_no_wait=True,
+        )
         cmd_group.show_command("show", "adr_link_su_show")
         cmd_group.command("list", "adr_link_su_list")
         cmd_group.wait_command(

@@ -466,6 +466,26 @@ def test_hub_update_surface_is_identity_only(mocker, cmd):
     )
 
 
+@pytest.mark.parametrize("kind", ["hub", "dps", "su"])
+def test_link_delete_delegates_no_wait(mocker, cmd, kind):
+    provider = _patch_provider(mocker, commands_link, "LinkProvider")
+
+    getattr(commands_link, f"adr_link_{kind}_delete")(
+        cmd,
+        endpoint_name="endpoint",
+        namespace_name=NS,
+        resource_group_name=RG,
+        no_wait=True,
+    )
+
+    getattr(provider, f"{kind}_delete").assert_called_once_with(
+        endpoint_name="endpoint",
+        namespace_name=NS,
+        resource_group_name=RG,
+        no_wait=True,
+    )
+
+
 def test_certificate_authority_command_still_delegates(mocker, cmd):
     provider = _patch_provider(
         mocker, commands_certificate_authority, "CertificateAuthorityProvider"

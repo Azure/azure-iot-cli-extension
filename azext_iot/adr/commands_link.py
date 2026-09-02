@@ -55,6 +55,21 @@ def adr_link_hub_update(
     )
 
 
+def adr_link_hub_delete(
+    cmd,
+    endpoint_name: str,
+    namespace_name: str,
+    resource_group_name: str,
+    no_wait: bool = False,
+):
+    return LinkProvider(cmd).hub_delete(
+        endpoint_name=endpoint_name,
+        namespace_name=namespace_name,
+        resource_group_name=resource_group_name,
+        no_wait=no_wait,
+    )
+
+
 def adr_link_hub_show(cmd, endpoint_name: str, namespace_name: str, resource_group_name: str):
     provider = LinkProvider(cmd)
     return provider.hub_show(
@@ -117,6 +132,21 @@ def adr_link_dps_update(
     )
 
 
+def adr_link_dps_delete(
+    cmd,
+    endpoint_name: str,
+    namespace_name: str,
+    resource_group_name: str,
+    no_wait: bool = False,
+):
+    return LinkProvider(cmd).dps_delete(
+        endpoint_name=endpoint_name,
+        namespace_name=namespace_name,
+        resource_group_name=resource_group_name,
+        no_wait=no_wait,
+    )
+
+
 def adr_link_dps_show(cmd, endpoint_name: str, namespace_name: str, resource_group_name: str):
     provider = LinkProvider(cmd)
     return provider.dps_show(
@@ -175,6 +205,21 @@ def adr_link_su_update(
         resource_group_name=resource_group_name,
         mi_system_assigned=mi_system_assigned,
         mi_user_assigned=mi_user_assigned,
+        no_wait=no_wait,
+    )
+
+
+def adr_link_su_delete(
+    cmd,
+    endpoint_name: str,
+    namespace_name: str,
+    resource_group_name: str,
+    no_wait: bool = False,
+):
+    return LinkProvider(cmd).su_delete(
+        endpoint_name=endpoint_name,
+        namespace_name=namespace_name,
+        resource_group_name=resource_group_name,
         no_wait=no_wait,
     )
 

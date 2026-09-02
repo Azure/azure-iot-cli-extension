@@ -50,6 +50,27 @@ class TestFactoryCredentialScopes:
         assert call_kwargs["credential_scopes"] == cloud_config["expected_scopes"]
         assert call_kwargs["base_url"] == cloud_config["resource_manager"]
 
+    def test_iot_hub_factory_honors_subscription_override(
+        self, mocker, cloud_config
+    ):
+        mocker.patch("azext_iot._factory.AZURE_CLI_CREDENTIAL")
+        mock_client_cls = mocker.patch(
+            "azext_iot.sdk.iothub.mgmt.IotHubClient"
+        )
+        get_subscription = mocker.patch(
+            "azure.cli.core.commands.client_factory.get_subscription_id"
+        )
+
+        from azext_iot._factory import iot_hub_service_factory
+
+        iot_hub_service_factory(
+            _build_cli_ctx(mocker, cloud_config),
+            subscription_id="linked-sub",
+        )
+
+        assert mock_client_cls.call_args.kwargs["subscription_id"] == "linked-sub"
+        get_subscription.assert_not_called()
+
     def test_dps_factory(self, mocker, cloud_config):
         mocker.patch("azext_iot._factory.AZURE_CLI_CREDENTIAL")
         mock_client_cls = mocker.patch("azext_iot.sdk.dps.mgmt.IotDpsClient")
@@ -64,6 +85,49 @@ class TestFactoryCredentialScopes:
         call_kwargs = mock_client_cls.call_args.kwargs
         assert call_kwargs["credential_scopes"] == cloud_config["expected_scopes"]
         assert call_kwargs["endpoint"] == cloud_config["resource_manager"]
+
+    def test_dps_factory_honors_subscription_override(
+        self, mocker, cloud_config
+    ):
+        mocker.patch("azext_iot._factory.AZURE_CLI_CREDENTIAL")
+        mock_client_cls = mocker.patch(
+            "azext_iot.sdk.dps.mgmt.IotDpsClient"
+        )
+        get_subscription = mocker.patch(
+            "azure.cli.core.commands.client_factory.get_subscription_id"
+        )
+
+        from azext_iot._factory import iot_service_provisioning_factory
+
+        iot_service_provisioning_factory(
+            _build_cli_ctx(mocker, cloud_config),
+            subscription_id="linked-sub",
+        )
+
+        assert mock_client_cls.call_args.kwargs["subscription_id"] == "linked-sub"
+        get_subscription.assert_not_called()
+
+    def test_update_instance_factory_honors_subscription_override(
+        self, mocker, cloud_config
+    ):
+        mocker.patch("azext_iot._factory.AZURE_CLI_CREDENTIAL")
+        mock_client_cls = mocker.patch(
+            "azext_iot.sdk.deviceupdate.duregistry."
+            "DeviceRegistryLinkedDeviceUpdatingServiceUnderMicrosoftDeviceUpdate"
+        )
+        get_subscription = mocker.patch(
+            "azure.cli.core.commands.client_factory.get_subscription_id"
+        )
+
+        from azext_iot._factory import adr_update_instance_service_factory
+
+        adr_update_instance_service_factory(
+            _build_cli_ctx(mocker, cloud_config),
+            subscription_id="linked-sub",
+        )
+
+        assert mock_client_cls.call_args.kwargs["subscription_id"] == "linked-sub"
+        get_subscription.assert_not_called()
 
     def test_adr_factory(self, mocker, cloud_config):
         mocker.patch("azext_iot._factory.AZURE_CLI_CREDENTIAL")

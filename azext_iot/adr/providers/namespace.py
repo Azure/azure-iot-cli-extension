@@ -23,6 +23,11 @@ from azext_iot.adr.common import (
     validate_uami_resource_id,
 )
 from azext_iot.adr.providers.base import ADRProvider, console, parse_json_object
+from azext_iot.adr.topology import (
+    update_topology_validation_required,
+    validate_create_endpoint_topology,
+    validate_update_endpoint_topology,
+)
 
 logger = get_logger(__name__)
 
@@ -101,8 +106,8 @@ def _build_endpoint_properties(
 ) -> dict:
     properties = {}
     endpoint_inputs = (
-        ("messaging", "--messaging-endpoints", messaging_endpoints),
         ("provisioning", "--provisioning-endpoints", provisioning_endpoints),
+        ("messaging", "--messaging-endpoints", messaging_endpoints),
         ("updating", "--updating-endpoints", updating_endpoints),
     )
     for property_name, argument_name, value in endpoint_inputs:
@@ -213,6 +218,7 @@ class NamespaceProvider(ADRProvider):
             provisioning_endpoints=provisioning_endpoints,
             updating_endpoints=updating_endpoints,
         )
+        validate_create_endpoint_topology(properties)
         if outbound_identity is not None:
             properties["outboundIdentity"] = outbound_identity
         namespace_resource["identity"] = _build_namespace_identity(
@@ -352,11 +358,18 @@ class NamespaceProvider(ADRProvider):
             updating_endpoints=updating_endpoints,
         )
         namespace = None
-        if observability_enabled is not None:
+        if update_topology_validation_required(properties):
             namespace = self.client.namespaces.get(
                 resource_group_name=resource_group_name,
                 namespace_name=namespace_name,
             )
+            validate_update_endpoint_topology(properties, namespace)
+        if observability_enabled is not None:
+            if namespace is None:
+                namespace = self.client.namespaces.get(
+                    resource_group_name=resource_group_name,
+                    namespace_name=namespace_name,
+                )
             existing_observability = (
                 ((namespace or {}).get("properties") or {}).get("observability") or {}
             )
