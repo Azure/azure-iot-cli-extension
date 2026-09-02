@@ -111,8 +111,9 @@ def load_adr_help():
     adding a new Hub or retrying a failed Hub requires a currently linked DPS or
     a DPS supplied in the same update. Only one DPS may be linked. A successfully
     linked Hub remains operational and updateable after DPS deletion. At most one
-    Software Updates updating endpoint may be linked; remove the existing endpoint
-    in the same update before adding a replacement.
+    Software Updates updating endpoint may be linked. Namespace PATCH does not support
+    unlinking it; use 'az iot adr ns link su delete' to permanently delete the linked
+    Update Instance before adding another.
   examples:
     - name: Update namespace tags
       text: az iot adr ns update -n myNamespace -g myResourceGroup --tags key=value

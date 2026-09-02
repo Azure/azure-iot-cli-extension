@@ -771,32 +771,34 @@ def test_namespace_update_failed_existing_su_counts(
     fixture_namespace_provider.client.namespaces.begin_update.assert_not_called()
 
 
-def test_namespace_update_allows_removing_and_replacing_su_in_same_patch(
-    fixture_namespace_provider, mock_poller
+@pytest.mark.parametrize(
+    "updating_endpoints",
+    [
+        {"old": None},
+        {
+            "old": None,
+            "new": _endpoint(SU_ENDPOINT_TYPE),
+        },
+    ],
+)
+def test_namespace_update_rejects_null_su_endpoint(
+    fixture_namespace_provider, updating_endpoints
 ):
     fixture_namespace_provider.client.namespaces.get.return_value = _namespace(
         su={"old": _endpoint(SU_ENDPOINT_TYPE, linkingState="Failed")}
     )
-    fixture_namespace_provider.client.namespaces.begin_update.return_value = (
-        mock_poller({})
-    )
 
-    fixture_namespace_provider.update(
-        "namespace",
-        "rg",
-        updating_endpoints={
-            "old": None,
-            "new": _endpoint(SU_ENDPOINT_TYPE),
-        },
-    )
+    with pytest.raises(
+        InvalidArgumentValueError,
+        match="must be an object.*does not support unlinking",
+    ):
+        fixture_namespace_provider.update(
+            "namespace",
+            "rg",
+            updating_endpoints=updating_endpoints,
+        )
 
-    body = fixture_namespace_provider.client.namespaces.begin_update.call_args.kwargs[
-        "properties"
-    ]
-    assert body["properties"]["updating"]["endpoints"] == {
-        "old": None,
-        "new": {"endpointType": SU_ENDPOINT_TYPE},
-    }
+    fixture_namespace_provider.client.namespaces.begin_update.assert_not_called()
 
 
 def test_namespace_update_ignores_non_su_updating_endpoints(

@@ -32,11 +32,8 @@ DPS_CAP_EXCEEDED_MSG = (
 SU_CAP_EXCEEDED_MSG = (
     "Namespace already has a linked Software Updates instance; only one may be "
     "linked per namespace. Use 'az iot adr ns link su update' to modify the "
-    "existing link. To unlink it without deleting the Update Instance, run "
-    "'az iot adr ns update --updating-endpoints "
-    "\"{\\\"<endpoint-name>\\\": null}\"'. Use destructive "
-    "'az iot adr ns link su delete' only to permanently delete the linked "
-    "Update Instance."
+    "existing link, or 'az iot adr ns link su delete' to permanently delete "
+    "the linked Update Instance before adding another."
 )
 
 
@@ -193,9 +190,13 @@ def validate_update_endpoint_topology(properties: dict, namespace: dict):
         if endpoint_is_type(endpoint, SU_ENDPOINT_TYPE)
     }
     for name, endpoint in updating_patch.items():
-        if endpoint is None:
-            effective_su_names.discard(name)
-            continue
+        if not isinstance(endpoint, dict):
+            raise InvalidArgumentValueError(
+                f"Updating endpoint '{name}' must be an object. Namespace PATCH "
+                "does not support unlinking Software Updates. Use "
+                "'az iot adr ns link su delete' to permanently delete the "
+                "linked Update Instance and remove its endpoint."
+            )
         patched_type = _patched_endpoint_type(
             name, endpoint, existing_updating
         )
