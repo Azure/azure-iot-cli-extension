@@ -79,6 +79,8 @@ def group_membership_ready(resource) -> WaitEvaluation:
             "(membershipState='FailedToResolveMembers').",
             f"membershipState={state!r}",
         )
+    # Creating, Resolving, and the older RefreshingMembers value are all
+    # non-terminal membership calculation states.
     return WaitEvaluation(
         normalized == "ready",
         observation=f"membershipState={state!r}",

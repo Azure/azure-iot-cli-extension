@@ -88,8 +88,8 @@ _SU_TARGET = TargetLookup(
 
 
 class LinkProvider(ADRProvider):
-    def __init__(self, cmd):
-        super(LinkProvider, self).__init__(cmd)
+    def __init__(self, cmd, client=None):
+        super(LinkProvider, self).__init__(cmd, client=client)
         self._rbac = None
 
     # Helpers

@@ -268,6 +268,8 @@ def test_rbac_scope_query_passes_real_azure_cli_validation(mocker):
     command = recording_cli.invoke.call_args.args[0]
     assert "--scope" in command
     assert "--include-inherited" in command
+    assert "--assignee-object-id 'principal-id'" in command
+    assert "--fill-principal-name false" in command
     assert "--all" not in command
     assert not manager._caller_can_assign("caller", TARGET_SCOPE)
     privilege_command = recording_cli.invoke.call_args.args[0]

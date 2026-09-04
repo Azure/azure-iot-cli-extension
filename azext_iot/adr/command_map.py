@@ -69,6 +69,11 @@ adr_wait_ops = CliCommandType(
     operations_tmpl="azext_iot.adr.commands_wait#{}",
 )
 
+adr_link_wait_ops = CliCommandType(
+    operations_tmpl="azext_iot.adr.commands_wait#{}",
+    client_factory=adr_service_factory,
+)
+
 _HUB_DELETE_CONFIRMATION = (
     "This operation will permanently delete the linked IoT Hub resource and "
     "update the Device Registry namespace. This cannot be undone. Continue?"
@@ -204,7 +209,7 @@ def load_adr_commands(self, _):
     ) as cmd_group:
         cmd_group.command("add", "adr_link_add", supports_no_wait=True)
         cmd_group.command(
-            "wait", "adr_link_wait", command_type=adr_wait_ops
+            "wait", "adr_link_wait", command_type=adr_link_wait_ops
         )
 
     with self.command_group(
@@ -221,7 +226,7 @@ def load_adr_commands(self, _):
         cmd_group.show_command("show", "adr_link_hub_show")
         cmd_group.command("list", "adr_link_hub_list")
         cmd_group.command(
-            "wait", "adr_link_hub_wait", command_type=adr_wait_ops
+            "wait", "adr_link_hub_wait", command_type=adr_link_wait_ops
         )
 
     with self.command_group(
@@ -238,7 +243,7 @@ def load_adr_commands(self, _):
         cmd_group.show_command("show", "adr_link_dps_show")
         cmd_group.command("list", "adr_link_dps_list")
         cmd_group.command(
-            "wait", "adr_link_dps_wait", command_type=adr_wait_ops
+            "wait", "adr_link_dps_wait", command_type=adr_link_wait_ops
         )
 
     with self.command_group(
@@ -255,7 +260,7 @@ def load_adr_commands(self, _):
         cmd_group.show_command("show", "adr_link_su_show")
         cmd_group.command("list", "adr_link_su_list")
         cmd_group.command(
-            "wait", "adr_link_su_wait", command_type=adr_wait_ops
+            "wait", "adr_link_su_wait", command_type=adr_link_wait_ops
         )
 
     with self.command_group(

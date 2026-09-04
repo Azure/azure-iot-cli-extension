@@ -118,15 +118,15 @@ def load_adr_arguments(self, _):
             "location",
             arg_type=get_location_type(self.cli_ctx),
         )
-    for cmd in ["iot adr ns create", "iot adr ns update"]:
-        with self.argument_context(cmd) as context:
-            context.argument(
-                "observability_enabled",
-                options_list=["--observability-enabled"],
-                arg_type=get_three_state_flag(),
-                help="Enable or disable namespace observability. When omitted, create "
-                     "preserves the existing setting and update leaves it unchanged.",
-            )
+    with self.argument_context("iot adr ns update") as context:
+        context.argument(
+            "observability_enabled",
+            options_list=["--observability-enabled"],
+            arg_type=get_three_state_flag(),
+            help="Enable or disable an existing namespace observability configuration. "
+                 "The namespace must already have a service-configured observability "
+                 "endpoint, which is preserved by this operation.",
+        )
 
     with self.argument_context("iot adr ns migrate") as context:
         context.argument(
@@ -211,7 +211,8 @@ def load_adr_arguments(self, _):
             "validity_days",
             options_list=["--validity-days", "--vd"],
             type=int,
-            help="Leaf certificate validity period in days.",
+            help="Leaf certificate validity period in days. Must be between 7 and "
+                 "90 days, inclusive.",
         )
         context.argument(
             "location",
@@ -223,7 +224,8 @@ def load_adr_arguments(self, _):
             "validity_days",
             options_list=["--validity-days", "--vd"],
             type=int,
-            help="Updated leaf certificate validity period in days.",
+            help="Updated leaf certificate validity period in days. Must be between "
+                 "7 and 90 days, inclusive.",
         )
 
     # Registry Device arguments
@@ -447,6 +449,9 @@ def load_adr_arguments(self, _):
                      "for outbound calls.",
             )
 
+    # --subscription is registered by Azure CLI as the global _subscription
+    # action. Link handlers receive the namespace client from their command
+    # factory, so a command-local argument here would only create a collision.
     with self.argument_context("iot adr ns link") as context:
         context.argument(
             "namespace_name",

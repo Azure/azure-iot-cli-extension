@@ -165,6 +165,20 @@ def _namespace_for_delete():
     }
 
 
+def test_link_provider_reuses_injected_namespace_client(mocker):
+    fallback_factory = mocker.patch(
+        "azext_iot.adr.providers.base.adr_service_factory"
+    )
+    cmd = Mock(cli_ctx=Mock())
+    namespace_client = Mock()
+
+    provider = LinkProvider(cmd, client=namespace_client)
+
+    assert provider.cmd is cmd
+    assert provider.client is namespace_client
+    fallback_factory.assert_not_called()
+
+
 def test_identity_body_treats_whitespace_uami_as_unset():
     assert (
         build_mi_body(
@@ -1189,6 +1203,10 @@ def test_link_delete_waits_and_routes_using_linked_resource_id(
     resource_poller = Mock()
     operations.begin_delete.return_value = resource_poller
     operations.get.side_effect = [{}, _http_error(404)]
+    lro_adapter = mocker.patch(
+        "azext_iot.adr.providers.link_persistence.adapt_modeless_lro_poller",
+        side_effect=lambda poller: poller,
+    )
     fixture_link_provider._wait_for_linked_resource_deleted = (
         LinkProvider._wait_for_linked_resource_deleted
     )
@@ -1218,6 +1236,7 @@ def test_link_delete_waits_and_routes_using_linked_resource_id(
         namespace_poller, wait_sec=0
     )
     resource_poller.result.assert_called_once_with()
+    lro_adapter.assert_called_once_with(resource_poller)
 
     namespace_call = (
         fixture_link_provider.client.namespaces.begin_create_or_replace.call_args

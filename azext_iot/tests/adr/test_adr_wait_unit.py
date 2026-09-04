@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 import pytest
 from azure.cli.core.azclierror import (
@@ -71,6 +71,7 @@ def test_exists_default():
     "state,complete,failure",
     [
         ("Ready", True, None),
+        ("Resolving", False, None),
         ("RefreshingMembers", False, None),
         ("FailedToResolveMembers", False, "membership refresh failed"),
     ],
@@ -453,6 +454,7 @@ def test_all_wait_command_wrappers_bind_their_resource_getters(mocker):
         "_get_namespace",
     ):
         getattr(provider, method_name).return_value = resource
+    provider_types = {}
     for provider_name in (
         "NamespaceProvider",
         "CertificateAuthorityProvider",
@@ -465,7 +467,11 @@ def test_all_wait_command_wrappers_bind_their_resource_getters(mocker):
         "UpdateInstanceProvider",
         "SoftwareUpdateProvider",
     ):
-        mocker.patch.object(commands_wait, provider_name, return_value=provider)
+        provider_types[provider_name] = mocker.patch.object(
+            commands_wait,
+            provider_name,
+            return_value=provider,
+        )
 
     captured_conditions = []
 
@@ -476,6 +482,7 @@ def test_all_wait_command_wrappers_bind_their_resource_getters(mocker):
 
     mocker.patch.object(commands_wait, "_wait", side_effect=run_getter)
     cmd = MagicMock()
+    namespace_client = MagicMock()
 
     assert commands_wait.adr_namespace_wait(cmd, "ns", "rg") is resource
     assert commands_wait.adr_ca_wait(cmd, "ca", "ns", "rg") is resource
@@ -503,6 +510,7 @@ def test_all_wait_command_wrappers_bind_their_resource_getters(mocker):
     assert (
         commands_wait.adr_link_wait(
             cmd,
+            namespace_client,
             "ns",
             "rg",
             hub_endpoint_name="hub",
@@ -511,19 +519,19 @@ def test_all_wait_command_wrappers_bind_their_resource_getters(mocker):
     )
     assert (
         commands_wait.adr_link_hub_wait(
-            cmd, "hub", "ns", "rg"
+            cmd, namespace_client, "hub", "ns", "rg"
         )
         is resource
     )
     assert (
         commands_wait.adr_link_dps_wait(
-            cmd, "endpoint", "ns", "rg"
+            cmd, namespace_client, "endpoint", "ns", "rg"
         )
         is resource
     )
     assert (
         commands_wait.adr_link_su_wait(
-            cmd, "endpoint", "ns", "rg"
+            cmd, namespace_client, "endpoint", "ns", "rg"
         )
         is resource
     )
@@ -556,6 +564,12 @@ def test_all_wait_command_wrappers_bind_their_resource_getters(mocker):
         "default", "device", "ns", "rg"
     )
     assert provider._get_namespace.call_count == 4
+    assert provider_types["LinkProvider"].call_args_list == [
+        call(cmd, client=namespace_client),
+        call(cmd, client=namespace_client),
+        call(cmd, client=namespace_client),
+        call(cmd, client=namespace_client),
+    ]
     provider.hub_show.assert_not_called()
     provider.dps_show.assert_not_called()
     provider.su_show.assert_not_called()
@@ -578,6 +592,7 @@ def test_endpoint_wait_keeps_custom_predicates_on_namespace(mocker):
 
     assert (
         commands_wait.adr_link_hub_wait(
+            MagicMock(),
             MagicMock(),
             "hub",
             "ns",
@@ -603,7 +618,7 @@ def test_endpoint_wait_uses_projected_endpoint_for_exists(mocker):
 
     assert (
         commands_wait.adr_link_hub_wait(
-            MagicMock(), "hub", "ns", "rg", exists=True
+            MagicMock(), MagicMock(), "hub", "ns", "rg", exists=True
         )
         is endpoint
     )

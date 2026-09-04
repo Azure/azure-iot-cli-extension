@@ -170,6 +170,53 @@ class TestFactoryCredentialScopes:
         assert client.call_args.kwargs["subscription_id"] == "namespace-sub"
         get_subscription.assert_not_called()
 
+    def test_adr_command_factory_uses_cli_selected_subscription(
+        self, mocker, cloud_config
+    ):
+        mocker.patch("azext_iot._factory.AZURE_CLI_CREDENTIAL")
+        client = mocker.patch(
+            "azext_iot.sdk.deviceregistry.DeviceRegistryMgmtClient"
+        )
+        profile_fallback = mocker.patch(
+            "azure.cli.core._profile.Profile.get_subscription_id"
+        )
+        from azext_iot._factory import adr_service_factory
+
+        cli_ctx = _build_cli_ctx(mocker, cloud_config)
+        cli_ctx.data["subscription_id"] = "explicit-namespace-sub"
+
+        # CommandOperation passes its argument dictionary as the second
+        # positional value. The global --subscription action has already put
+        # the selected namespace subscription on cli_ctx.
+        adr_service_factory(cli_ctx, {"namespace_name": "namespace"})
+
+        assert (
+            client.call_args.kwargs["subscription_id"]
+            == "explicit-namespace-sub"
+        )
+        profile_fallback.assert_not_called()
+
+    def test_adr_command_factory_uses_current_subscription_by_default(
+        self, mocker, cloud_config
+    ):
+        mocker.patch("azext_iot._factory.AZURE_CLI_CREDENTIAL")
+        client = mocker.patch(
+            "azext_iot.sdk.deviceregistry.DeviceRegistryMgmtClient"
+        )
+        get_subscription = mocker.patch(
+            "azure.cli.core.commands.client_factory.get_subscription_id",
+            return_value="current-sub",
+        )
+        from azext_iot._factory import adr_service_factory
+
+        cli_ctx = _build_cli_ctx(mocker, cloud_config)
+        cli_ctx.data.clear()
+
+        adr_service_factory(cli_ctx, {"namespace_name": "namespace"})
+
+        assert client.call_args.kwargs["subscription_id"] == "current-sub"
+        get_subscription.assert_called_once_with(cli_ctx)
+
     @pytest.mark.parametrize(
         "factory_name,client_path",
         [

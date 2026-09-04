@@ -257,6 +257,8 @@ def test_namespace_update_observability_preserves_endpoints(
 ):
     endpoint = {
         "endpointType": "Microsoft.EventGrid/namespaces",
+        "address": "eventgrid.example",
+        "scopeId": "scope",
         "resourceId": "/subscriptions/sub/resourceGroups/rg/providers/"
                       "Microsoft.EventGrid/namespaces/eg",
     }
@@ -288,6 +290,78 @@ def test_namespace_update_observability_preserves_endpoints(
             }
         },
     )
+
+
+@pytest.mark.parametrize(
+    "observability",
+    [
+        None,
+        {"enabled": False},
+        {"enabled": False, "endpoints": {}},
+        {"enabled": False, "endpoints": {"site": {"resourceId": "incomplete"}}},
+    ],
+)
+@pytest.mark.parametrize("enabled", [True, False])
+def test_namespace_update_observability_requires_complete_existing_endpoint(
+    fixture_namespace_provider, observability, enabled
+):
+    fixture_namespace_provider.client.namespaces.get.return_value = {
+        "properties": {"observability": observability}
+    }
+
+    with pytest.raises(
+        InvalidArgumentValueError,
+        match="complete service-configured observability endpoint",
+    ):
+        fixture_namespace_provider.update(
+            "namespace", "rg", observability_enabled=enabled
+        )
+
+    fixture_namespace_provider.client.namespaces.begin_update.assert_not_called()
+
+
+def test_namespace_update_observability_and_outbound_identity_share_lookup(
+    fixture_namespace_provider, mock_poller
+):
+    endpoint = {
+        "endpointType": "Microsoft.EventGrid/namespaces",
+        "address": "eventgrid.example",
+        "scopeId": "scope",
+        "resourceId": "/subscriptions/sub/resourceGroups/rg/providers/"
+                      "Microsoft.EventGrid/namespaces/eg",
+    }
+    fixture_namespace_provider.client.namespaces.get.return_value = {
+        "identity": {"type": "SystemAssigned"},
+        "properties": {
+            "observability": {
+                "enabled": False,
+                "endpoints": {"event-grid": endpoint},
+            }
+        },
+    }
+    fixture_namespace_provider.client.namespaces.begin_update.return_value = mock_poller(
+        {"name": "namespace"}
+    )
+
+    fixture_namespace_provider.update(
+        "namespace",
+        "rg",
+        observability_enabled=True,
+        outbound_mi_system_assigned=True,
+    )
+
+    fixture_namespace_provider.client.namespaces.get.assert_called_once_with(
+        resource_group_name="rg",
+        namespace_name="namespace",
+    )
+    body = fixture_namespace_provider.client.namespaces.begin_update.call_args.kwargs[
+        "properties"
+    ]
+    assert body["identity"] == {"type": "SystemAssigned"}
+    assert body["properties"]["observability"] == {
+        "enabled": True,
+        "endpoints": {"event-grid": endpoint},
+    }
 
 
 def test_namespace_update_outbound_uami_preserves_identity_assignments(
@@ -602,6 +676,8 @@ def test_namespace_create_observability_overrides_enabled_and_preserves_endpoint
 ):
     endpoint = {
         "endpointType": "Microsoft.EventGrid/namespaces",
+        "address": "eventgrid.example",
+        "scopeId": "scope",
         "resourceId": "/subscriptions/sub/resourceGroups/rg/providers/"
                       "Microsoft.EventGrid/namespaces/eg",
     }
@@ -631,6 +707,28 @@ def test_namespace_create_observability_overrides_enabled_and_preserves_endpoint
         "enabled": enabled,
         "endpoints": {"event-grid": endpoint},
     }
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+def test_namespace_create_observability_requires_existing_endpoint(
+    fixture_namespace_provider, enabled
+):
+    fixture_namespace_provider.client.namespaces.get.side_effect = (
+        _namespace_not_found()
+    )
+
+    with pytest.raises(
+        InvalidArgumentValueError,
+        match="complete service-configured observability endpoint",
+    ):
+        fixture_namespace_provider.create(
+            "namespace",
+            "rg",
+            location="eastus",
+            observability_enabled=enabled,
+        )
+
+    fixture_namespace_provider.client.namespaces.begin_create_or_replace.assert_not_called()
 
 
 def test_namespace_create_propagates_existing_namespace_lookup_error(

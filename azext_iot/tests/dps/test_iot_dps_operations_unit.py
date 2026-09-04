@@ -634,16 +634,18 @@ def test_get_show_keys_warning_and_symmetric_replacement(mocker, caplog):
 def test_connection_string_listing_and_key_selection(mocker, caplog):
     discovery = mocker.patch.object(subject, "DPSDiscovery").return_value
     active = {
+        "id": "/subscriptions/sub/resourceGroups/rg/providers/"
+              "Microsoft.Devices/provisioningServices/active",
         "name": "active",
-        "resourcegroup": "rg",
         "properties": {
             "state": "Active",
             "serviceOperationsHostName": "active.example.test",
         },
     }
     inactive = {
+        "id": "/subscriptions/sub/resourceGroups/rg/providers/"
+              "Microsoft.Devices/provisioningServices/inactive",
         "name": "inactive",
-        "resourcegroup": "rg",
         "properties": {
             "state": "Suspended",
             "serviceOperationsHostName": "inactive.example.test",
@@ -670,8 +672,9 @@ def test_connection_string_listing_and_key_selection(mocker, caplog):
 def test_connection_string_single_and_missing_resource(mocker):
     discovery = mocker.patch.object(subject, "DPSDiscovery").return_value
     resource = {
+        "id": "/subscriptions/sub/resourceGroups/rg/providers/"
+              "Microsoft.Devices/provisioningServices/dps",
         "name": "dps",
-        "resourcegroup": "rg",
         "properties": {"serviceOperationsHostName": "dps.example.test"},
     }
     discovery.find_resource.side_effect = [resource, None]
@@ -856,8 +859,9 @@ def test_connection_string_listing_missing_and_policy_failure(mocker, caplog):
         None,
         [
             {
+                "id": "/subscriptions/sub/resourceGroups/rg/providers/"
+                      "Microsoft.Devices/provisioningServices/dps",
                 "name": "dps",
-                "resourcegroup": "rg",
                 "properties": {
                     "state": "Active",
                     "serviceOperationsHostName": "dps.example.test",

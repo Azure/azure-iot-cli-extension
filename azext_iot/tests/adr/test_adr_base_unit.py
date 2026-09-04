@@ -455,17 +455,33 @@ def test_post_lro_ignores_sdk_done_state_for_accepted_response(
 
 
 @pytest.mark.parametrize("method", ["POST", "PATCH"])
-def test_inline_mutation_returns_poller_result(
+def test_inline_mutation_returns_initial_response_body(
     fixture_adr_provider, method
 ):
     poller = _resource_poller(method)
-    poller._polling_method._initial_response.http_response.status_code = 200
-    poller.result.return_value = {"status": "complete"}
+    response = poller._polling_method._initial_response.http_response
+    response.status_code = 200
+    response.content = b'{"status":"complete"}'
+    response.json.return_value = {"status": "complete"}
 
     assert fixture_adr_provider._poll_provisioning_state(
         poller, wait_sec=0
     ) == {"status": "complete"}
-    poller.result.assert_called_once_with()
+    response.json.assert_called_once_with()
+    poller.result.assert_not_called()
+
+
+def test_inline_mutation_without_body_returns_none(fixture_adr_provider):
+    poller = _resource_poller("PATCH")
+    response = poller._polling_method._initial_response.http_response
+    response.status_code = 204
+    response.content = b""
+
+    assert fixture_adr_provider._poll_provisioning_state(
+        poller, wait_sec=0
+    ) is None
+    response.json.assert_not_called()
+    poller.result.assert_not_called()
     fixture_adr_provider.client.send_request.assert_not_called()
 
 

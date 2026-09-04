@@ -18,7 +18,13 @@ from azure.core.exceptions import HttpResponseError
 
 from azext_iot.adr.providers.link_helpers import namespace_replace_body
 from azext_iot.adr.topology import get_endpoints
+from azext_iot.common.arm import adapt_modeless_lro_poller
 from azext_iot.constants import LRO_POLL_RETRIES, LRO_POLL_WAIT_SEC
+
+
+_MODELLESS_ARM_OPERATION_GROUPS = frozenset(
+    {"iot_hub_resource", "iot_dps_resource", "update_instances"}
+)
 
 
 def get_typed_endpoint(
@@ -148,6 +154,14 @@ def delete_linked_resource_and_endpoint(  # pylint: disable=too-many-arguments,t
     resource_poller = begin_linked_resource_delete(
         lambda: operations.begin_delete(**resource_arguments)
     )
+    # Linked Hub, DPS, and Update Instance targets use the same defective
+    # generated callback. The ADR namespace poller below retains its custom
+    # polling path.
+    if (
+        resource_poller is not None
+        and operation_group_name in _MODELLESS_ARM_OPERATION_GROUPS
+    ):
+        resource_poller = adapt_modeless_lro_poller(resource_poller)
 
     if resource_poller is not None:
         try:

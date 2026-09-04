@@ -17,10 +17,12 @@ from azext_iot.adr.command_map import (
     _DPS_DELETE_CONFIRMATION,
     _HUB_DELETE_CONFIRMATION,
     _SU_DELETE_CONFIRMATION,
+    adr_link_ops,
+    adr_link_wait_ops,
     load_adr_commands,
 )
 from azext_iot.adr.params import load_adr_arguments
-from azext_iot.adr import commands_wait
+from azext_iot.adr import commands_link, commands_wait
 
 
 class _CommandGroup:
@@ -235,6 +237,53 @@ def test_2026_command_surface_is_registered():
         assert commands[command][0:2] == ("command", operation)
 
 
+def test_all_link_commands_receive_factory_client_without_subscription_arg():
+    commands = _registered_commands()
+    link_commands = {
+        name: metadata
+        for name, metadata in commands.items()
+        if name == "iot adr ns link add"
+        or name == "iot adr ns link wait"
+        or name.startswith("iot adr ns link hub ")
+        or name.startswith("iot adr ns link dps ")
+        or name.startswith("iot adr ns link su ")
+    }
+
+    assert len(link_commands) == 20
+    for _, operation, _ in link_commands.values():
+        module = commands_wait if operation.endswith("_wait") else commands_link
+        parameters = inspect.signature(getattr(module, operation)).parameters
+        assert "client" in parameters
+        # --subscription remains Azure CLI's single global _subscription
+        # action; registering either spelling here would collide with it.
+        assert "subscription" not in parameters
+        assert "_subscription" not in parameters
+
+
+def test_all_link_groups_and_waits_use_namespace_client_factory():
+    loader = _CommandLoader()
+    load_adr_commands(loader, None)
+    groups = dict(loader.groups)
+    for group_name in (
+        "iot adr ns link",
+        "iot adr ns link hub",
+        "iot adr ns link dps",
+        "iot adr ns link su",
+    ):
+        assert groups[group_name]["command_type"] is adr_link_ops
+
+    link_waits = [
+        kwargs
+        for group, _, name, _, kwargs in loader.records
+        if group.startswith("iot adr ns link") and name == "wait"
+    ]
+    assert len(link_waits) == 4
+    assert all(
+        kwargs["command_type"] is adr_link_wait_ops
+        for kwargs in link_waits
+    )
+
+
 def test_unsupported_command_surfaces_are_not_registered():
     commands = _registered_commands()
 
@@ -329,6 +378,8 @@ def test_load_adr_arguments():
             "--provisioning-endpoints",
             "--updating-endpoints",
         }.isdisjoint(registered_options)
+    assert "observability_enabled" not in arguments["iot adr ns create"]
+    assert "observability_enabled" in arguments["iot adr ns update"]
     assert {
         "enablement_state",
         "external_device_id",
@@ -372,6 +423,14 @@ def test_load_adr_arguments():
         "--den",
     ]
     assert "--dps-name" in bundled["dps_endpoint_name"]["options_list"]
+    for scope, registered in arguments.items():
+        if not scope.startswith("iot adr ns link"):
+            continue
+        assert {"subscription", "_subscription"}.isdisjoint(registered)
+        assert not any(
+            "--subscription" in settings.get("options_list", [])
+            for settings in registered.values()
+        )
     # Group is a plain TrackedResource in 2026-11-02-preview: no identity.
     assert "mi_system_assigned" not in arguments["iot adr ns group create"]
     assert "mi_system_assigned" not in arguments["iot adr ns group update"]
@@ -380,6 +439,14 @@ def test_load_adr_arguments():
     assert "order_by" in arguments["iot adr ns job run results"]
     assert "order_by" in arguments["iot adr ns job run list"]
     assert "validity_days" in arguments["iot adr ns ca policy update"]
+    for command in (
+        "iot adr ns ca policy create",
+        "iot adr ns ca policy update",
+    ):
+        validity_help = arguments[command]["validity_days"]["help"]
+        assert "7" in validity_help
+        assert "90" in validity_help
+        assert "inclusive" in validity_help
     for name in ("reported_by", "schema", "properties"):
         assert name in arguments["iot adr ns registry-device attribute create"]
     reported_by = arguments[
@@ -687,6 +754,18 @@ def test_help_surface_matches_2026_commands_and_su_type():
             "--updating-endpoints",
         ):
             assert option not in helps[command]
+    assert "--observability-enabled" not in helps["iot adr ns create"]
+    assert "--observability-enabled" in helps["iot adr ns update"]
+    policy_create_help = " ".join(
+        helps["iot adr ns ca policy create"].split()
+    )
+    assert "between 7 and 90 days" in policy_create_help
+    assert "--validity-days 7" in helps["iot adr ns ca policy create"]
+    assert "--validity-days 90" in helps["iot adr ns ca policy update"]
+    assert "starts its initial membership calculation" in helps[
+        "iot adr ns group create"
+    ]
+    assert "once per hour" in helps["iot adr ns group refresh"]
 
     assert not any(
         command.startswith(

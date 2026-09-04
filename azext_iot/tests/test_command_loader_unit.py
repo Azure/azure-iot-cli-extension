@@ -12,7 +12,66 @@ service command groups (command_map.py, params.py, _help.py).
 """
 
 import pytest
+from azure.cli.core import AzCommandsLoader
+from azure.cli.core.commands.events import EVENT_INVOKER_PRE_LOAD_ARGUMENTS
 from azure.cli.core.mock import DummyCli
+from azure.cli.core.parser import AzCliCommandParser
+
+
+_NAMESPACE_ARGUMENTS = [
+    "--namespace",
+    "namespace",
+    "--resource-group",
+    "resource-group",
+]
+_ENDPOINT_ARGUMENTS = [
+    "--endpoint-name",
+    "endpoint",
+    *_NAMESPACE_ARGUMENTS,
+]
+_HUB_ID = (
+    "/subscriptions/hub-sub/resourceGroups/hub-rg/providers/"
+    "Microsoft.Devices/IotHubs/hub"
+)
+_DPS_ID = (
+    "/subscriptions/dps-sub/resourceGroups/dps-rg/providers/"
+    "Microsoft.Devices/provisioningServices/dps"
+)
+_SU_ID = (
+    "/subscriptions/su-sub/resourceGroups/su-rg/providers/"
+    "Microsoft.DeviceUpdate/updateInstances/su"
+)
+_LINK_PARSER_CASES = {
+    "iot adr ns link add": [
+        *_NAMESPACE_ARGUMENTS,
+        "--hub-endpoint-name",
+        "hub",
+        "--hub-resource-id",
+        _HUB_ID,
+        "--dps-endpoint-name",
+        "dps",
+        "--dps-resource-id",
+        _DPS_ID,
+    ],
+    "iot adr ns link wait": _NAMESPACE_ARGUMENTS,
+}
+for _kind, _resource_option, _resource_id in (
+    ("hub", "--hub-resource-id", _HUB_ID),
+    ("dps", "--dps-resource-id", _DPS_ID),
+    ("su", "--su-resource-id", _SU_ID),
+):
+    _LINK_PARSER_CASES[f"iot adr ns link {_kind} add"] = [
+        *_ENDPOINT_ARGUMENTS,
+        _resource_option,
+        _resource_id,
+    ]
+    for _action in ("update", "delete", "show", "wait"):
+        _LINK_PARSER_CASES[
+            f"iot adr ns link {_kind} {_action}"
+        ] = _ENDPOINT_ARGUMENTS
+    _LINK_PARSER_CASES[
+        f"iot adr ns link {_kind} list"
+    ] = _NAMESPACE_ARGUMENTS
 
 
 @pytest.fixture(scope="module")
@@ -28,6 +87,34 @@ def loader():
 def command_table(loader):
     table = loader.load_command_table(None)
     return table
+
+
+@pytest.fixture(scope="module")
+def link_command_parser():
+    from azext_iot import IoTExtCommandsLoader
+
+    cli_ctx = DummyCli(commands_loader_cls=IoTExtCommandsLoader)
+    loader = cli_ctx.commands_loader
+    loader.skip_applicability = True
+    loader.load_command_table(None)
+    loader.command_table = {
+        name: loader.command_table[name]
+        for name in _LINK_PARSER_CASES
+    }
+
+    # Azure CLI contributes --subscription as a private global argument before
+    # extension signatures and argument overrides are loaded.
+    cli_ctx.raise_event(
+        EVENT_INVOKER_PRE_LOAD_ARGUMENTS,
+        commands_loader=loader,
+    )
+    for command_name in _LINK_PARSER_CASES:
+        loader.load_arguments(command_name)
+        AzCommandsLoader.load_arguments(loader, command_name)
+
+    parser = AzCliCommandParser(cli_ctx=cli_ctx)
+    parser.load_command_table(loader)
+    return parser
 
 
 def test_command_table_loads(command_table):
@@ -95,6 +182,10 @@ def test_load_arguments_for_all_commands(loader, command_table):
             "--provisioning-endpoints",
             "--updating-endpoints",
         }.isdisjoint(options)
+        if command_name.endswith(" create"):
+            assert "--observability-enabled" not in options
+        else:
+            assert "--observability-enabled" in options
 
     for command_name in (
         "iot dps enrollment create",
@@ -236,3 +327,49 @@ def test_load_arguments_for_all_commands(loader, command_table):
         "iot device registration report-update-status",
     ):
         assert command_name not in command_table
+
+
+@pytest.mark.parametrize("command_name", sorted(_LINK_PARSER_CASES))
+def test_all_link_commands_parse_one_global_subscription_without_collision(
+    mocker,
+    link_command_parser,
+    command_name,
+):
+    subscription = "namespace-sub"
+    mocker.patch(
+        "azure.cli.core._profile.Profile.load_cached_subscriptions",
+        return_value=[{"id": subscription, "name": "namespace-subscription"}],
+    )
+    parsed = link_command_parser.parse_args(
+        [
+            *command_name.split(),
+            *_LINK_PARSER_CASES[command_name],
+            "--subscription",
+            subscription,
+        ]
+    )
+
+    assert parsed._subscription == subscription  # pylint: disable=protected-access
+    subscription_actions = [
+        action
+        for action in link_command_parser.subparser_map[
+            command_name
+        ]._actions  # pylint: disable=protected-access
+        if "--subscription" in action.option_strings
+    ]
+    assert len(subscription_actions) == 1
+    assert subscription_actions[0].dest == "_subscription"
+
+
+def test_link_command_parser_leaves_subscription_for_current_account_default(
+    link_command_parser,
+):
+    command_name = "iot adr ns link su add"
+    parsed = link_command_parser.parse_args(
+        [
+            *command_name.split(),
+            *_LINK_PARSER_CASES[command_name],
+        ]
+    )
+
+    assert parsed._subscription is None  # pylint: disable=protected-access

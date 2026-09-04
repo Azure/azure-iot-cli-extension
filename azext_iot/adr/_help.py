@@ -34,15 +34,14 @@ def load_adr_help():
   short-summary: Create a Device Registry namespace.
   long-summary: |
     A new namespace is created with a system-assigned managed identity by default.
-    Re-running create for an existing namespace preserves its managed identity and
-    observability configuration unless the corresponding options request a change.
+    Observability is disabled by default for a new namespace. This command does not
+    accept observability endpoint input. Re-running create for an existing namespace
+    preserves its complete observability configuration.
   examples:
     - name: Create a basic Device Registry namespace
       text: az iot adr ns create -n myNamespace -g myResourceGroup
     - name: Create a Device Registry namespace with system-assigned outbound identity
       text: az iot adr ns create -n myNamespace -g myResourceGroup --outbound-system-assigned-mi
-    - name: Create a namespace with observability enabled
-      text: az iot adr ns create -n myNamespace -g myResourceGroup --observability-enabled true
     - name: Create a namespace with a user-assigned outbound identity
       text: |
         az iot adr ns create -n myNamespace -g myResourceGroup \\
@@ -103,6 +102,10 @@ def load_adr_help():
     ] = """
   type: command
   short-summary: Update a Device Registry namespace.
+  long-summary: |
+    Observability can only be enabled or disabled when the namespace already has a
+    service-configured observability endpoint. The existing endpoint configuration
+    is preserved. Raw observability endpoint input is not accepted by this command.
   examples:
     - name: Update namespace tags
       text: az iot adr ns update -n myNamespace -g myResourceGroup --tags key=value
@@ -242,9 +245,15 @@ def load_adr_help():
     ] = """
   type: command
   short-summary: Create a certificate policy for a certificate authority.
+  long-summary: |
+    Certificate policies can only be created under an issuing certificate
+    authority with type ICA. Create the ICA under a Root CA, then pass the ICA
+    name to --ca-name. The leaf certificate validity period must be between 7
+    and 90 days, inclusive. During the current preview rollout, Central US EUAP
+    may reject values below 30 days even though the contract allows them.
   examples:
-    - name: Create a certificate policy with a 10 day leaf certificate validity period
-      text: az iot adr ns ca policy create -n myPolicy --ca-name myCA --ns myNamespace -g myResourceGroup --validity-days 10
+    - name: Create a certificate policy with a 30 day leaf certificate validity period
+      text: az iot adr ns ca policy create -n myPolicy --ca-name myICA --ns myNamespace -g myResourceGroup --validity-days 30
   """
 
     helps[
@@ -272,11 +281,14 @@ def load_adr_help():
     ] = """
   type: command
   short-summary: Update a certificate policy for a certificate authority.
+  long-summary: |
+    When supplied, the leaf certificate validity period must be between 7 and
+    90 days, inclusive.
   examples:
     - name: Update certificate policy tags
       text: az iot adr ns ca policy update -n myPolicy --ca-name myCA --ns myNamespace -g myResourceGroup --tags env=prod
-    - name: Update leaf certificate validity
-      text: az iot adr ns ca policy update -n myPolicy --ca-name myCA --ns myNamespace -g myResourceGroup --validity-days 15
+    - name: Update leaf certificate validity to the maximum supported period
+      text: az iot adr ns ca policy update -n myPolicy --ca-name myCA --ns myNamespace -g myResourceGroup --validity-days 90
   """
 
     helps[
@@ -1087,6 +1099,10 @@ def load_adr_help():
 
     --query-string is passed to the service verbatim. Use '*' to include every device in
     the namespace.
+
+    Creating a group starts its initial membership calculation. Use
+    'az iot adr ns group wait' without a predicate to wait for that calculation.
+    Manual membership refresh is rate-limited to once per hour.
   examples:
     - name: Create a group containing every device in the namespace
       text: |
@@ -1154,7 +1170,10 @@ def load_adr_help():
   long-summary: |
     Refreshing membership is a long-running operation. Use 'az iot adr ns group wait'
     to wait for the refresh to complete, or 'az iot adr ns group show' to poll
-    the 'membershipState' field.
+    the 'membershipState' field. If a membership calculation is already in
+    progress, this command reuses that calculation instead of starting another.
+    The service allows membership refresh at most once per hour, including the
+    initial membership calculation triggered by group creation.
   examples:
     - name: Refresh group membership
       text: az iot adr ns group refresh -n myGroup --ns myNamespace -g myResourceGroup
@@ -1189,9 +1208,9 @@ def load_adr_help():
   type: command
   short-summary: Wait for a Device Registry group to reach a desired state.
   long-summary: |
-    Without an explicit wait predicate, waits for membershipState Ready and
-    fails immediately on FailedToResolveMembers. Explicit standard wait
-    predicates remain available.
+    Without an explicit wait predicate, waits through membershipState Resolving
+    until Ready and fails immediately on FailedToResolveMembers. Explicit
+    standard wait predicates remain available.
   examples:
     - name: Wait until a group's membership refresh completes
       text: az iot adr ns group wait -n myGroup --ns myNamespace -g myResourceGroup

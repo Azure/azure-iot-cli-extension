@@ -11,7 +11,34 @@ from typing import Optional
 
 from azure.cli.core.azclierror import CLIInternalError
 from azure.core import MatchConditions
+from azure.core.polling import AsyncLROPoller, LROPoller
 from msrestazure.tools import parse_resource_id
+
+
+def _deserialize_modeless_lro_response(pipeline_response):
+    response = pipeline_response.http_response
+    if not response.content:
+        return None
+    return response.json()
+
+
+def adapt_modeless_lro_poller(poller):
+    """Repair generated modeless ARM LRO result deserialization in place.
+
+    Some generated Hub and DPS management operations close over an undefined
+    ``response`` variable in their final-response callback. Keep the original
+    azure-core poller (and therefore its complete public interface), replacing
+    only that callback with JSON deserialization from the pipeline response.
+    Legacy msrest pollers are returned unchanged.
+    """
+    if not isinstance(poller, (LROPoller, AsyncLROPoller)):
+        return poller
+
+    polling_method = poller.polling_method()
+    polling_method._deserialization_callback = (  # pylint: disable=protected-access
+        _deserialize_modeless_lro_response
+    )
+    return poller
 
 
 def _resource_id_parts(resource: Optional[dict]) -> dict:

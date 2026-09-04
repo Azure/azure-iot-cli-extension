@@ -25,8 +25,7 @@ class TestADRNamespaceCrud(CaptureOutputLiveScenarioTest):
         with CleanupLedger() as cleanup:
             self.cmd(
                 f"iot adr ns create -n {namespace_name} -g {TEST_RG} "
-                f"--location {TEST_LOCATION} --observability-enabled true "
-                "--no-wait"
+                f"--location {TEST_LOCATION} --no-wait"
             )
             cleanup.register(
                 "namespace",
@@ -44,25 +43,17 @@ class TestADRNamespaceCrud(CaptureOutputLiveScenarioTest):
             assert created["name"] == namespace_name
             assert created["location"] == TEST_LOCATION
             assert created["properties"]["provisioningState"] == "Succeeded"
-            assert created["properties"]["observability"]["enabled"] is True
+            created_observability = created["properties"].get("observability")
+            assert (created_observability or {}).get("enabled", False) is False
 
-            updated_observability = self.cmd(
-                f"iot adr ns update -n {namespace_name} -g {TEST_RG} "
-                "--observability-enabled false"
-            ).get_output_in_json()
-            assert (
-                updated_observability["properties"]["observability"]["enabled"]
-                is False
-            )
-            self.cmd(
-                f"iot adr ns wait -n {namespace_name} -g {TEST_RG} "
-                "--custom \"properties.observability.enabled==`false`\""
-            )
             replaced = self.cmd(
                 f"iot adr ns create -n {namespace_name} -g {TEST_RG} "
                 f"--location {TEST_LOCATION} --tags phase=replaced"
             ).get_output_in_json()
-            assert replaced["properties"]["observability"]["enabled"] is False
+            assert (
+                replaced["properties"].get("observability")
+                == created_observability
+            )
 
             self.cmd(
                 f"iot adr ns wait -n {namespace_name} -g {TEST_RG} "

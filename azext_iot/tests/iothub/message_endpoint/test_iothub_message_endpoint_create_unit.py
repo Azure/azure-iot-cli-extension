@@ -153,6 +153,10 @@ class TestCreate:
         assert result == generic_response
         eh = hub["properties"]["routing"]["endpoints"]["eventHubs"]
         assert eh[0]["connectionString"] == "eh-cstring"
+        assert eh[0]["resourceGroup"] == "test-rg"
+        assert eh[0]["subscriptionId"] == "test-sub"
+        assert "resourcegroup" not in hub
+        assert "subscriptionid" not in hub
 
     def test_create_event_hub_with_entity_path(self, provider):
         p, hub = provider()

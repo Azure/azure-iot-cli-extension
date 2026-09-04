@@ -21,7 +21,6 @@ def adr_namespace_create(
     tags: Optional[Dict[str, str]] = None,
     outbound_mi_system_assigned: Optional[bool] = None,
     outbound_mi_user_assigned: Optional[str] = None,
-    observability_enabled: Optional[bool] = None,
     no_wait: bool = False,
 ):
     provider = NamespaceProvider(cmd)
@@ -30,7 +29,6 @@ def adr_namespace_create(
         resource_group_name=resource_group_name,
         location=location,
         tags=tags,
-        observability_enabled=observability_enabled,
         outbound_mi_system_assigned=outbound_mi_system_assigned,
         outbound_mi_user_assigned=outbound_mi_user_assigned,
         no_wait=no_wait,

@@ -36,6 +36,18 @@ _OUTBOUND_MI_MUTEX_MSG = (
     "are mutually exclusive)."
 )
 
+_OBSERVABILITY_ENDPOINT_FIELDS = (
+    "endpointType",
+    "address",
+    "scopeId",
+    "resourceId",
+)
+_OBSERVABILITY_ENDPOINT_REQUIRED_MSG = (
+    "Namespace observability can only be enabled or disabled when the namespace "
+    "already has a complete service-configured observability endpoint. The CLI "
+    "does not accept raw observability endpoint values."
+)
+
 
 def _normalize_resource_id(resource_id: str) -> str:
     return resource_id.rstrip("/").casefold()
@@ -103,6 +115,17 @@ def _build_observability(
     existing_observability: Optional[dict], enabled: bool
 ) -> dict:
     observability = dict(existing_observability or {})
+    endpoints = observability.get("endpoints")
+    if (
+        not isinstance(endpoints, dict)
+        or not endpoints
+        or any(
+            not isinstance(endpoint, dict)
+            or any(not endpoint.get(field) for field in _OBSERVABILITY_ENDPOINT_FIELDS)
+            for endpoint in endpoints.values()
+        )
+    ):
+        raise InvalidArgumentValueError(_OBSERVABILITY_ENDPOINT_REQUIRED_MSG)
     observability["enabled"] = enabled
     return observability
 

@@ -163,9 +163,13 @@ def _poll_with_deadline(
 
 
 class ADRProvider(object):
-    def __init__(self, cmd):
+    def __init__(self, cmd, client=None):
         self.cmd = cmd
-        self.client = adr_service_factory(cmd.cli_ctx)
+        self.client = (
+            client
+            if client is not None
+            else adr_service_factory(cmd.cli_ctx)
+        )
 
     def _wait(self, poller, status_message: str, **kwargs):
         """Block on a long-running-operation poller, honoring ``--no-wait``.
@@ -240,6 +244,13 @@ class ADRProvider(object):
             or headers.get("Location")
             or headers.get("location")
         )
+
+    @staticmethod
+    def _initial_response_body(response):
+        """Deserialize an inline LRO response without generated callback bugs."""
+        if response is None or not getattr(response, "content", None):
+            return None
+        return response.json()
 
     @staticmethod
     def _extract_failure_detail(body):
@@ -339,7 +350,7 @@ class ADRProvider(object):
         initial_response = self._poller_initial_http_response(poller)
         if method == _ACTION_METHOD:
             if initial_response is not None and not self._poller_is_async(poller):
-                return poller.result()
+                return self._initial_response_body(initial_response)
             return self._poll_location(
                 poller,
                 wait_sec=wait_sec,
@@ -349,7 +360,7 @@ class ADRProvider(object):
             )
         if url and method in _RESOURCE_MUTATION_METHODS:
             if initial_response is not None and not self._poller_is_async(poller):
-                return poller.result()
+                return self._initial_response_body(initial_response)
         else:
             if poller.done():
                 return poller.result()

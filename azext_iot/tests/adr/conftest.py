@@ -485,7 +485,17 @@ class RoleAssignmentHelper:
         from azext_iot.tests.adr._log import LogKind, _log
 
         try:
-            check_cmd = f"role assignment list --assignee '{assignee_id}' --scope '{scope}' --role '{role}'"
+            if assignee_type == "auto":
+                assignee_filter = f"--assignee '{assignee_id}'"
+            else:
+                assignee_filter = (
+                    f"--assignee-object-id '{assignee_id}' "
+                    "--fill-principal-name false"
+                )
+            check_cmd = (
+                f"role assignment list {assignee_filter} --scope '{scope}' "
+                f"--role '{role}'"
+            )
             _log(LogKind.CMD, "az %s", check_cmd)
             existing = self.cmd(check_cmd).get_output_in_json()
             if existing:
@@ -497,7 +507,7 @@ class RoleAssignmentHelper:
             else:
                 create_cmd = (
                     f"role assignment create --assignee-object-id '{assignee_id}' --role '{role}' "
-                    f"--scope '{scope}' --assignee-principal-type '{assignee_type}'"
+                    f"--scope '{scope}' --assignee-principal-type {assignee_type}"
                 )
             _log(LogKind.CMD, "az %s", create_cmd)
             result = self.cmd(create_cmd).get_output_in_json()
@@ -517,4 +527,13 @@ class RoleAssignmentHelper:
     def assign_adr_roles_to_identity(self, principal_id: str, scope: str):
         """Assign ADR Contributor + Onboarding roles to a managed identity."""
         for role in ["Azure Device Registry Contributor", "Azure Device Registry Onboarding"]:
-            self.assign_role(principal_id, role, scope)
+            assignment_id = self.assign_role(
+                principal_id,
+                role,
+                scope,
+                assignee_type="ServicePrincipal",
+            )
+            if assignment_id is None:
+                raise AssertionError(
+                    f"Failed to assign required ADR role '{role}'."
+                )

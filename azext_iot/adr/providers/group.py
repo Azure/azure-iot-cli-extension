@@ -11,9 +11,17 @@ from azure.cli.core.azclierror import (
     InvalidArgumentValueError,
     RequiredArgumentMissingError,
 )
+from azure.core.exceptions import HttpResponseError
 
 from azext_iot.adr.common import GroupType
 from azext_iot.adr.providers.base import ADRProvider
+from azext_iot.adr.providers.wait import (
+    group_membership_ready,
+    wait_for_resource,
+)
+
+
+_GROUP_REFRESH_ALREADY_IN_PROGRESS = "GroupRefreshAlreadyInProgress"
 
 
 class GroupProvider(ADRProvider):
@@ -121,14 +129,36 @@ class GroupProvider(ADRProvider):
         resource_group_name: str,
         **kwargs,
     ):
-        poller = self.client.groups.begin_refresh_members(
-            resource_group_name=resource_group_name,
-            namespace_name=namespace_name,
-            group_name=group_name,
-        )
+        no_wait = kwargs.pop("no_wait", False)
+        try:
+            poller = self.client.groups.begin_refresh_members(
+                resource_group_name=resource_group_name,
+                namespace_name=namespace_name,
+                group_name=group_name,
+            )
+        except HttpResponseError as error:
+            error_code = getattr(getattr(error, "error", None), "code", None)
+            if (
+                error.status_code != 409
+                or error_code != _GROUP_REFRESH_ALREADY_IN_PROGRESS
+            ):
+                raise
+            if no_wait:
+                return self.show(group_name, namespace_name, resource_group_name)
+            wait_for_resource(
+                self.cmd.cli_ctx,
+                lambda: self.show(
+                    group_name, namespace_name, resource_group_name
+                ),
+                group_membership_ready,
+            )
+            return self.show(
+                group_name, namespace_name, resource_group_name
+            )
         return self._wait(
             poller,
             f"Refreshing members of group '{group_name}' in namespace {namespace_name}...",
+            no_wait=no_wait,
             **kwargs,
         )
 

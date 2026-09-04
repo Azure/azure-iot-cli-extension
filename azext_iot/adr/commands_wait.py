@@ -217,6 +217,7 @@ def adr_registry_device_auth_wait(
 
 def adr_link_wait(
     cmd,
+    client,
     namespace_name: str,
     resource_group_name: str,
     hub_endpoint_name: Optional[str] = None,
@@ -230,7 +231,7 @@ def adr_link_wait(
     exists: bool = False,
     custom: Optional[str] = None,
 ):
-    provider = LinkProvider(cmd)
+    provider = LinkProvider(cmd, client=client)
     return _wait(
         cmd,
         lambda: provider._get_namespace(  # pylint: disable=protected-access
@@ -291,6 +292,7 @@ def _endpoint_wait(
 
 def adr_link_hub_wait(
     cmd,
+    client,
     endpoint_name: str,
     namespace_name: str,
     resource_group_name: str,
@@ -302,7 +304,7 @@ def adr_link_hub_wait(
     exists: bool = False,
     custom: Optional[str] = None,
 ):
-    provider = LinkProvider(cmd)
+    provider = LinkProvider(cmd, client=client)
     return _endpoint_wait(
         cmd,
         lambda: provider.hub_show(
@@ -326,6 +328,7 @@ def adr_link_hub_wait(
 
 def adr_link_dps_wait(
     cmd,
+    client,
     endpoint_name: str,
     namespace_name: str,
     resource_group_name: str,
@@ -337,7 +340,7 @@ def adr_link_dps_wait(
     exists: bool = False,
     custom: Optional[str] = None,
 ):
-    provider = LinkProvider(cmd)
+    provider = LinkProvider(cmd, client=client)
     return _endpoint_wait(
         cmd,
         lambda: provider.dps_show(
@@ -361,6 +364,7 @@ def adr_link_dps_wait(
 
 def adr_link_su_wait(
     cmd,
+    client,
     endpoint_name: str,
     namespace_name: str,
     resource_group_name: str,
@@ -372,7 +376,7 @@ def adr_link_su_wait(
     exists: bool = False,
     custom: Optional[str] = None,
 ):
-    provider = LinkProvider(cmd)
+    provider = LinkProvider(cmd, client=client)
     return _endpoint_wait(
         cmd,
         lambda: provider.su_show(

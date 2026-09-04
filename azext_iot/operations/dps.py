@@ -25,6 +25,7 @@ from azext_iot.common.shared import (
     KeyType,
     IoTDPSStateType
 )
+from azext_iot.common.arm import get_resource_group
 from azext_iot.common.utility import compute_device_key, handle_service_exception, shell_safe_json_parse
 from azext_iot.common.certops import open_certificate
 from azext_iot.dps.providers.discovery import DPSDiscovery
@@ -940,14 +941,23 @@ def iot_dps_connection_string_show(
 
         def conn_str_getter(dps):
             return _get_dps_connection_string(
-                discovery, dps, policy_name, key_type, show_all
+                discovery,
+                dps,
+                policy_name,
+                key_type,
+                show_all,
+                resource_group_name=resource_group_name,
             )
 
         connection_strings = []
         for dps in dps:
+            dps_resource_group = get_resource_group(
+                dps,
+                fallback=resource_group_name,
+                resource_label="DPS",
+            )
             if dps["properties"]["state"] == IoTDPSStateType.Active.value:
                 try:
-                    dps_resource_group = dps["resourcegroup"]
                     connection_strings.append(
                         {
                             "name": dps["name"],
@@ -963,7 +973,6 @@ def iot_dps_connection_string_show(
                         + f"not have the target policy {policy_name}."
                     )
             else:
-                dps_resource_group = dps["resourcegroup"]
                 logger.warning(
                     f"Warning: The DPS {dps['name']} in resource group "
                     + f"{dps_resource_group} is skipped "
@@ -974,16 +983,30 @@ def iot_dps_connection_string_show(
     dps = discovery.find_resource(dps_name, resource_group_name)
     if dps:
         conn_str = _get_dps_connection_string(
-            discovery, dps, policy_name, key_type, show_all
+            discovery,
+            dps,
+            policy_name,
+            key_type,
+            show_all,
+            resource_group_name=resource_group_name,
         )
         return {"connectionString": conn_str if show_all else conn_str[0]}
 
 
 def _get_dps_connection_string(
-    discovery, dps, policy_name, key_type, show_all
+    discovery,
+    dps,
+    policy_name,
+    key_type,
+    show_all,
+    resource_group_name=None,
 ):
     policies = []
-    dps_resource_group = dps["resourcegroup"]
+    dps_resource_group = get_resource_group(
+        dps,
+        fallback=resource_group_name,
+        resource_label="DPS",
+    )
     if show_all:
         policies.extend(
             discovery.get_policies(dps["name"], dps_resource_group)

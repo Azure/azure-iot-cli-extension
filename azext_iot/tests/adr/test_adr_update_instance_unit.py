@@ -4,6 +4,9 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import ast
+import inspect
+from textwrap import dedent
 from unittest.mock import Mock, patch
 
 import pytest
@@ -18,6 +21,9 @@ from azure.core.exceptions import HttpResponseError
 from azext_iot import _factory
 from azext_iot.adr.common import build_managed_service_identity
 from azext_iot.adr.providers.update_instance import UpdateInstanceProvider
+from azext_iot.sdk.deviceupdate.duregistry.operations import (
+    UpdateInstancesOperations,
+)
 
 RG = "test-rg"
 INSTANCE = "test-update-instance"
@@ -130,6 +136,130 @@ def test_wait_uses_standard_arm_poller(update_instance_provider):
         }
 
     wait.assert_called_once_with(poller, wait_sec=0)
+
+
+@pytest.mark.parametrize(
+    "method_name,begin_name,kwargs",
+    [
+        (
+            "create",
+            "begin_create",
+            {"location": "eastus2"},
+        ),
+        (
+            "update",
+            "begin_update",
+            {"tags": {"env": "test"}},
+        ),
+        (
+            "delete",
+            "begin_delete",
+            {},
+        ),
+    ],
+)
+def test_all_update_instance_mutations_return_adapted_poller_for_no_wait(
+    update_instance_provider,
+    method_name,
+    begin_name,
+    kwargs,
+):
+    raw_poller = object()
+    adapted_poller = object()
+    begin_operation = getattr(
+        update_instance_provider.client.update_instances,
+        begin_name,
+    )
+    begin_operation.return_value = raw_poller
+
+    with patch(
+        "azext_iot.adr.providers.update_instance.adapt_modeless_lro_poller",
+        return_value=adapted_poller,
+    ) as adapter:
+        result = getattr(update_instance_provider, method_name)(
+            INSTANCE,
+            RG,
+            no_wait=True,
+            **kwargs,
+        )
+
+    assert result is adapted_poller
+    begin_operation.assert_called_once()
+    adapter.assert_called_once_with(raw_poller)
+
+
+def test_every_update_instance_begin_call_is_wrapped_by_modeless_adapter():
+    import azext_iot.adr.providers.update_instance as module
+
+    tree = ast.parse(inspect.getsource(module))
+    parents = {
+        child: parent
+        for parent in ast.walk(tree)
+        for child in ast.iter_child_nodes(parent)
+    }
+    begin_calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr in {"begin_create", "begin_update", "begin_delete"}
+        and isinstance(node.func.value, ast.Attribute)
+        and node.func.value.attr == "update_instances"
+    ]
+
+    assert {node.func.attr for node in begin_calls} == {
+        "begin_create",
+        "begin_update",
+        "begin_delete",
+    }
+    assert all(
+        isinstance(parents.get(node), ast.Call)
+        and isinstance(parents[node].func, ast.Name)
+        and parents[node].func.id == "adapt_modeless_lro_poller"
+        for node in begin_calls
+    )
+
+
+def test_generated_update_instance_callbacks_remain_unpatched():
+    """Keep the temporary repair at CLI call sites, outside generated SDK code."""
+    tree = ast.parse(dedent(inspect.getsource(UpdateInstancesOperations)))
+    operation_class = next(
+        node for node in tree.body if isinstance(node, ast.ClassDef)
+    )
+    callbacks = {}
+    for method in operation_class.body:
+        if not isinstance(method, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        if method.name not in {"begin_create", "begin_update", "begin_delete"}:
+            continue
+        callbacks[method.name] = next(
+            node
+            for node in method.body
+            if isinstance(node, ast.FunctionDef)
+            and node.name == "get_long_running_output"
+        )
+
+    assert set(callbacks) == {
+        "begin_create",
+        "begin_update",
+        "begin_delete",
+    }
+    for callback in callbacks.values():
+        assert [argument.arg for argument in callback.args.args] == [
+            "pipeline_response"
+        ]
+    for operation_name in ("begin_create", "begin_update"):
+        assert any(
+            isinstance(node, ast.Name)
+            and node.id == "response"
+            and isinstance(node.ctx, ast.Load)
+            for node in ast.walk(callbacks[operation_name])
+        )
+    assert not any(
+        isinstance(node, ast.Name)
+        and node.id == "adapt_modeless_lro_poller"
+        for node in ast.walk(operation_class)
+    )
 
 
 def test_create_builds_complete_resource_and_waits(update_instance_provider):

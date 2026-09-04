@@ -241,8 +241,9 @@ class LinkRbacManager:
     ) -> bool:
         assignments = self._invoke_json(
             "role assignment list "
-            f"--assignee '{principal_id}' --role '{role}' --scope '{scope}' "
-            "--include-inherited",
+            f"--assignee-object-id '{principal_id}' "
+            f"--role '{role}' --scope '{scope}' "
+            "--include-inherited --fill-principal-name false",
             subscription=_scope_subscription(scope),
         )
         return bool(assignments)
