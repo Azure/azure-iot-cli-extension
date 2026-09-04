@@ -4,12 +4,11 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from inspect import getsource
+import importlib.util
 
 import pytest
 
-from azext_iot.sdk.deviceregistry.aio import operations as aio_operations
-from azext_iot.sdk.deviceregistry import operations
+from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient, operations
 
 
 @pytest.mark.parametrize(
@@ -19,10 +18,6 @@ from azext_iot.sdk.deviceregistry import operations
         operations.NamespaceDevicesOperations,
         operations.NamespaceDiscoveredAssetsOperations,
         operations.NamespaceDiscoveredDevicesOperations,
-        aio_operations.NamespaceAssetsOperations,
-        aio_operations.NamespaceDevicesOperations,
-        aio_operations.NamespaceDiscoveredAssetsOperations,
-        aio_operations.NamespaceDiscoveredDevicesOperations,
     ],
 )
 def test_namespace_child_lists_use_namespace_operation_name(operation_group):
@@ -30,24 +25,19 @@ def test_namespace_child_lists_use_namespace_operation_name(operation_group):
     assert not hasattr(operation_group, "list_by_resource_group")
 
 
-@pytest.mark.parametrize(
-    "operation_group",
-    [
-        operations.NamespacesOperations,
-        aio_operations.NamespacesOperations,
-    ],
-)
-@pytest.mark.parametrize(
-    "method_name",
-    [
-        "begin_generate_report",
-        "begin_migrate",
-    ],
-)
-def test_namespace_action_lros_use_azure_async_operation(
-    operation_group, method_name
-):
-    source = getsource(getattr(operation_group, method_name))
+def test_adr_sdk_is_modeless_and_synchronous():
+    assert importlib.util.find_spec("azext_iot.sdk.deviceregistry.aio") is None
+    assert importlib.util.find_spec("azext_iot.sdk.deviceregistry.models") is None
 
-    assert '"final-state-via": "azure-async-operation"' in source
-    assert '"final-state-via": "location"' not in source
+
+def test_adr_client_and_api_version_match_preview_contract():
+    client = DeviceRegistryMgmtClient(
+        credential=object(),
+        subscription_id="00000000-0000-0000-0000-000000000000",
+        base_url="https://centraluseuap.management.azure.com",
+    )
+
+    assert client._config.api_version == "2026-11-02-preview"
+    assert hasattr(client, "namespaces")
+    assert hasattr(client, "certificate_authorities")
+    assert hasattr(client, "certificate_policies")

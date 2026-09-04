@@ -7,6 +7,7 @@
 import logging
 import pytest
 from azure.cli.core.azclierror import ResourceNotFoundError
+from azure.core import MatchConditions
 from azure.core.exceptions import HttpResponseError
 
 import azext_iot.iothub.commands_message_route as subject
@@ -46,10 +47,12 @@ def fixture_route_ops(mocker):
     find_resource = mocker.patch(path_find_resource, autospec=True)
 
     hub_mock = {
+        "id": (
+            "/subscriptions/test-sub/resourceGroups/test-rg/providers/"
+            "Microsoft.Devices/IotHubs/test-hub"
+        ),
         "name": "test-hub",
         "etag": "test-etag",
-        "resourcegroup": "test-rg",
-        "subscriptionid": "test-sub",
         "properties": {
             "routing": {
                 "routes": _routes(),
@@ -93,6 +96,34 @@ class TestMessageRouteCreate:
             route_name="r", source_type="DeviceMessages", endpoint_name="ep", enabled=True, condition="true"
         )
         handler.assert_called_once()
+
+    def test_route_put_is_conditional_and_preserves_adr_projection_locally(
+        self, fixture_route_ops
+    ):
+        from azext_iot.iothub.providers.message_route import MessageRoute
+
+        fixture_route_ops["identity"] = {
+            "type": "SystemAssigned",
+            "principalId": "principal",
+        }
+        fixture_route_ops["properties"]["deviceRegistry"] = {
+            "namespaceResourceId": "/subscriptions/sub/resourceGroups/rg/"
+            "providers/Microsoft.DeviceRegistry/namespaces/ns"
+        }
+        provider = MessageRoute(cmd=None, hub_name=hub_name, rg=hub_rg)
+
+        provider.create("new", "DeviceMessages", "events")
+
+        kwargs = provider.discovery.client.begin_create_or_update.call_args.kwargs
+        assert kwargs["etag"] == "test-etag"
+        assert kwargs["match_condition"] == MatchConditions.IfNotModified
+        assert "deviceRegistry" not in kwargs[
+            "iot_hub_description"
+        ]["properties"]
+        assert kwargs["iot_hub_description"]["identity"] == {
+            "type": "SystemAssigned"
+        }
+        assert "deviceRegistry" in fixture_route_ops["properties"]
 
 
 class TestMessageRouteUpdate:
@@ -252,6 +283,25 @@ class TestMessageFallbackRoute:
             cmd=None, hub_name=hub_name, enabled=False, resource_group_name=hub_rg
         )
         assert result["isEnabled"] is False
+
+    def test_set_fallback_uses_conditional_sanitized_put(
+        self, fixture_route_ops
+    ):
+        from azext_iot.iothub.providers.message_route import MessageRoute
+
+        fixture_route_ops["properties"]["deviceRegistry"] = {
+            "namespaceResourceId": "/namespaces/ns"
+        }
+        provider = MessageRoute(cmd=None, hub_name=hub_name, rg=hub_rg)
+
+        provider.set_fallback(False)
+
+        kwargs = provider.discovery.client.begin_create_or_update.call_args.kwargs
+        assert kwargs["etag"] == "test-etag"
+        assert kwargs["match_condition"] == MatchConditions.IfNotModified
+        assert "deviceRegistry" not in kwargs[
+            "iot_hub_description"
+        ]["properties"]
 
 
 class TestCommonEnumLists:

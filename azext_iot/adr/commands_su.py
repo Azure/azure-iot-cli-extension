@@ -229,6 +229,71 @@ def adr_su_software_update_file_show(
     )
 
 
+def adr_su_software_update_operation_status_list(
+    cmd,
+    namespace_name: str,
+    resource_group_name: str,
+):
+    return SoftwareUpdateProvider(cmd).list_operation_statuses(
+        namespace_name=namespace_name,
+        resource_group_name=resource_group_name,
+    )
+
+
+def adr_su_software_update_operation_status_show(
+    cmd,
+    namespace_name: str,
+    resource_group_name: str,
+    operation_id: str,
+):
+    return SoftwareUpdateProvider(cmd).show_operation_status(
+        namespace_name=namespace_name,
+        resource_group_name=resource_group_name,
+        operation_id=operation_id,
+    )
+
+
+def adr_su_software_update_provider_list(
+    cmd,
+    namespace_name: str,
+    resource_group_name: str,
+):
+    return SoftwareUpdateProvider(cmd).list_providers(
+        namespace_name=namespace_name,
+        resource_group_name=resource_group_name,
+    )
+
+
+def adr_su_software_update_name_list(
+    cmd,
+    namespace_name: str,
+    resource_group_name: str,
+    update_provider: str,
+):
+    return SoftwareUpdateProvider(cmd).list_names(
+        namespace_name=namespace_name,
+        resource_group_name=resource_group_name,
+        update_provider=update_provider,
+    )
+
+
+def adr_su_software_update_version_list(
+    cmd,
+    namespace_name: str,
+    resource_group_name: str,
+    update_provider: str,
+    update_name: str,
+    filter: Optional[str] = None,
+):
+    return SoftwareUpdateProvider(cmd).list_versions(
+        namespace_name=namespace_name,
+        resource_group_name=resource_group_name,
+        update_provider=update_provider,
+        update_name=update_name,
+        filter=filter,
+    )
+
+
 def adr_su_software_update_calculate_hash(
     file_paths: List[str],
     hash_algo: str = ADUValidHashAlgorithmType.SHA256.value,

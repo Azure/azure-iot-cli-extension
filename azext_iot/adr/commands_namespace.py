@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from knack.log import get_logger
 
@@ -21,9 +21,6 @@ def adr_namespace_create(
     tags: Optional[Dict[str, str]] = None,
     outbound_mi_system_assigned: Optional[bool] = None,
     outbound_mi_user_assigned: Optional[str] = None,
-    messaging_endpoints: Any = None,
-    provisioning_endpoints: Any = None,
-    updating_endpoints: Any = None,
     observability_enabled: Optional[bool] = None,
     no_wait: bool = False,
 ):
@@ -36,9 +33,6 @@ def adr_namespace_create(
         observability_enabled=observability_enabled,
         outbound_mi_system_assigned=outbound_mi_system_assigned,
         outbound_mi_user_assigned=outbound_mi_user_assigned,
-        messaging_endpoints=messaging_endpoints,
-        provisioning_endpoints=provisioning_endpoints,
-        updating_endpoints=updating_endpoints,
         no_wait=no_wait,
     )
 
@@ -85,9 +79,6 @@ def adr_namespace_update(
     tags: Optional[Dict[str, str]] = None,
     outbound_mi_system_assigned: Optional[bool] = None,
     outbound_mi_user_assigned: Optional[str] = None,
-    messaging_endpoints: Any = None,
-    provisioning_endpoints: Any = None,
-    updating_endpoints: Any = None,
     observability_enabled: Optional[bool] = None,
     no_wait: bool = False,
 ):
@@ -99,9 +90,6 @@ def adr_namespace_update(
         observability_enabled=observability_enabled,
         outbound_mi_system_assigned=outbound_mi_system_assigned,
         outbound_mi_user_assigned=outbound_mi_user_assigned,
-        messaging_endpoints=messaging_endpoints,
-        provisioning_endpoints=provisioning_endpoints,
-        updating_endpoints=updating_endpoints,
         no_wait=no_wait,
     )
 

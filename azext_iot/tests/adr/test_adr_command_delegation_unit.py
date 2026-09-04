@@ -24,7 +24,6 @@ from azext_iot.adr import (
 
 RG = "test-rg"
 NS = "test-namespace"
-ENDPOINTS = '{"outbound":{"assigned":{}}}'
 
 
 @pytest.fixture()
@@ -39,6 +38,19 @@ def _patch_provider(mocker, module, attr):
 
 
 class TestNamespaceCommands:
+    def test_create_and_update_surfaces_exclude_raw_endpoint_parameters(self):
+        removed = {
+            "messaging_endpoints",
+            "provisioning_endpoints",
+            "updating_endpoints",
+        }
+
+        for command in (
+            commands_namespace.adr_namespace_create,
+            commands_namespace.adr_namespace_update,
+        ):
+            assert removed.isdisjoint(inspect.signature(command).parameters)
+
     def test_create(self, mocker, cmd):
         provider = _patch_provider(mocker, commands_namespace, "NamespaceProvider")
         commands_namespace.adr_namespace_create(
@@ -59,9 +71,6 @@ class TestNamespaceCommands:
             observability_enabled=False,
             outbound_mi_system_assigned=True,
             outbound_mi_user_assigned=None,
-            messaging_endpoints=None,
-            provisioning_endpoints=None,
-            updating_endpoints=None,
             no_wait=True,
         )
 
@@ -82,9 +91,6 @@ class TestNamespaceCommands:
             observability_enabled=True,
             outbound_mi_system_assigned=None,
             outbound_mi_user_assigned=None,
-            messaging_endpoints=None,
-            provisioning_endpoints=None,
-            updating_endpoints=None,
             no_wait=True,
         )
 
@@ -178,7 +184,7 @@ class TestGroupCommands:
 
     @pytest.mark.parametrize("operation", ["create", "update"])
     def test_rejects_identity_and_no_wait(self, cmd, operation):
-        """--mi-system-assigned and --no-wait were dropped for groups."""
+        """--system-assigned-mi and --no-wait were dropped for groups."""
         command = getattr(commands_group, f"adr_group_{operation}")
         signature = inspect.signature(command)
         assert "mi_system_assigned" not in signature.parameters

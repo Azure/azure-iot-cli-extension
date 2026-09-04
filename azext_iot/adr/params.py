@@ -15,7 +15,6 @@ from azure.cli.core.commands.parameters import (
     get_enum_type,
     get_three_state_flag,
 )
-from azure.cli.core.commands.validators import get_default_location_from_resource_group
 from azext_iot.deviceupdate.common import ADUValidHashAlgorithmType
 from azext_iot.adr.common import (
     CertificateAuthorityKeyType,
@@ -33,6 +32,76 @@ from azext_iot.adr.common import (
 def load_adr_arguments(self, _):
     """Load arguments for ADR namespace commands."""
 
+    wait_commands = (
+        "iot adr ns wait",
+        "iot adr ns ca wait",
+        "iot adr ns ca policy wait",
+        "iot adr ns registry-device wait",
+        "iot adr ns registry-device auth wait",
+        "iot adr ns identity wait",
+        "iot adr ns link wait",
+        "iot adr ns link hub wait",
+        "iot adr ns link dps wait",
+        "iot adr ns link su wait",
+        "iot adr ns su instance wait",
+        "iot adr ns su software-update wait",
+        "iot adr ns group wait",
+        "iot adr ns job wait",
+        "iot adr ns job run wait",
+    )
+    for command in wait_commands:
+        with self.argument_context(command) as context:
+            context.argument(
+                "timeout",
+                options_list=["--timeout"],
+                type=int,
+                default=3600,
+                arg_group="Wait Condition",
+                help="Maximum wait in seconds.",
+            )
+            context.argument(
+                "interval",
+                options_list=["--interval"],
+                type=int,
+                default=30,
+                arg_group="Wait Condition",
+                help="Polling interval in seconds.",
+            )
+            context.argument(
+                "created",
+                options_list=["--created"],
+                action="store_true",
+                arg_group="Wait Condition",
+                help="Wait until provisioningState is Succeeded.",
+            )
+            context.argument(
+                "updated",
+                options_list=["--updated"],
+                action="store_true",
+                arg_group="Wait Condition",
+                help="Wait until provisioningState is Succeeded.",
+            )
+            context.argument(
+                "deleted",
+                options_list=["--deleted"],
+                action="store_true",
+                arg_group="Wait Condition",
+                help="Wait until the resource is deleted.",
+            )
+            context.argument(
+                "exists",
+                options_list=["--exists"],
+                action="store_true",
+                arg_group="Wait Condition",
+                help="Wait until the resource exists.",
+            )
+            context.argument(
+                "custom",
+                options_list=["--custom"],
+                arg_group="Wait Condition",
+                help="Wait until a custom JMESPath expression evaluates to true.",
+            )
+
     # Common arguments
     with self.argument_context("iot adr ns") as context:
         context.argument("resource_group_name", arg_type=resource_group_name_type)
@@ -48,7 +117,6 @@ def load_adr_arguments(self, _):
         context.argument(
             "location",
             arg_type=get_location_type(self.cli_ctx),
-            validator=get_default_location_from_resource_group,
         )
     for cmd in ["iot adr ns create", "iot adr ns update"]:
         with self.argument_context(cmd) as context:
@@ -58,22 +126,6 @@ def load_adr_arguments(self, _):
                 arg_type=get_three_state_flag(),
                 help="Enable or disable namespace observability. When omitted, create "
                      "preserves the existing setting and update leaves it unchanged.",
-            )
-            context.argument(
-                "messaging_endpoints",
-                options_list=["--messaging-endpoints"],
-                help="Messaging endpoint dictionary as inline JSON or a JSON file path.",
-            )
-            context.argument(
-                "provisioning_endpoints",
-                options_list=["--provisioning-endpoints"],
-                help="Provisioning endpoint dictionary as inline JSON or a JSON file path.",
-            )
-            context.argument(
-                "updating_endpoints",
-                options_list=["--updating-endpoints"],
-                help="Updating endpoint dictionary as inline JSON or a JSON file path. "
-                     "At most one Software Updates endpoint may be linked per namespace.",
             )
 
     with self.argument_context("iot adr ns migrate") as context:
@@ -222,6 +274,19 @@ def load_adr_arguments(self, _):
             help="Software revision of the Registry Device.",
         )
 
+    for cmd in (
+        "iot adr ns registry-device show",
+        "iot adr ns registry-device wait",
+    ):
+        with self.argument_context(cmd) as context:
+            context.argument(
+                "external_device_id",
+                options_list=["--external-device-id", "--ext-id"],
+                help="Customer-provided external device ID. Specify exactly one "
+                "of this option or --name. The wait command polls across all "
+                "result pages to allow for registration materialization.",
+            )
+
     with self.argument_context("iot adr ns registry-device update") as context:
         context.argument("tags", arg_type=tags_type)
         context.argument(
@@ -297,9 +362,10 @@ def load_adr_arguments(self, _):
         context.argument(
             "reported_by",
             options_list=["--reported-by", "--rb"],
-            arg_type=get_enum_type(DeviceAttributeReportedType),
-            help="The cloud service that reports this attribute. 'Microsoft.DeviceUpdate' "
-            "attributes are service-materialized; author your own metadata with 'User'.",
+            arg_type=get_enum_type([DeviceAttributeReportedType.user.value]),
+            deprecate_info=context.deprecate(hide=True),
+            help="Deprecated compatibility option. Customer-authored attributes "
+            "always use the 'User' provenance value.",
         )
         context.argument(
             "schema",
@@ -310,8 +376,9 @@ def load_adr_arguments(self, _):
         context.argument(
             "properties",
             options_list=["--properties", "--props"],
-            help="Attribute property bag as inline JSON or a path to a JSON file "
-            "prefixed with '@'. The service stores and returns the bag verbatim.",
+            help="Attribute property bag as inline JSON or a path to a JSON file. "
+            "Both plain paths and paths with one leading '@' are accepted. The "
+            "service stores and returns the bag verbatim.",
         )
 
     with self.argument_context(
@@ -351,7 +418,15 @@ def load_adr_arguments(self, _):
             context.argument(
                 "outbound_mi_system_assigned",
                 arg_group="Outbound Identity",
-                options_list=["--outbound-mi-system-assigned", "--omi-sa"],
+                options_list=[
+                    "--outbound-system-assigned-mi",
+                    "--omi-sa",
+                    context.deprecate(
+                        target="--outbound-mi-system-assigned",
+                        redirect="--outbound-system-assigned-mi",
+                        hide=True,
+                    ),
+                ],
                 arg_type=get_three_state_flag(),
                 help="Enable the system-assigned managed identity as the outbound identity used by "
                      "this namespace when calling linked Hub/DPS resources.",
@@ -359,7 +434,15 @@ def load_adr_arguments(self, _):
             context.argument(
                 "outbound_mi_user_assigned",
                 arg_group="Outbound Identity",
-                options_list=["--outbound-mi-user-assigned", "--omi-ua"],
+                options_list=[
+                    "--outbound-user-assigned-mi",
+                    "--omi-ua",
+                    context.deprecate(
+                        target="--outbound-mi-user-assigned",
+                        redirect="--outbound-user-assigned-mi",
+                        hide=True,
+                    ),
+                ],
                 help="User-assigned managed identity resource ID to assign to the namespace and use "
                      "for outbound calls.",
             )
@@ -369,6 +452,25 @@ def load_adr_arguments(self, _):
             "namespace_name",
             options_list=["--namespace", "--ns"],
             help="Name of the Device Registry namespace that owns the link.",
+        )
+
+    with self.argument_context("iot adr ns link wait") as context:
+        context.argument(
+            "hub_endpoint_name",
+            options_list=["--hub-endpoint-name", "--hen"],
+            help="Hub endpoint to include in the wait scope.",
+        )
+        context.argument(
+            "dps_endpoint_name",
+            options_list=["--dps-endpoint-name", "--den"],
+            help="DPS endpoint to include in the wait scope.",
+        )
+        context.argument(
+            "su_endpoint_name",
+            options_list=["--su-endpoint-name", "--sen"],
+            help="Software Updates endpoint to include in the wait scope. When "
+            "no scoped endpoint name is supplied, all configured namespace "
+            "links are included.",
         )
 
     # Link hub arguments
@@ -389,7 +491,15 @@ def load_adr_arguments(self, _):
             context.argument(
                 "mi_system_assigned",
                 arg_group="Inbound Caller Identity",
-                options_list=["--mi-system-assigned", "--mi-sa"],
+                options_list=[
+                    "--system-assigned-mi",
+                    "--mi-sa",
+                    context.deprecate(
+                        target="--mi-system-assigned",
+                        redirect="--system-assigned-mi",
+                        hide=True,
+                    ),
+                ],
                 arg_type=get_three_state_flag(),
                 help="Use the linked IoT Hub's system-assigned identity as the inbound caller "
                      "identity. The Hub must have that identity enabled.",
@@ -397,7 +507,15 @@ def load_adr_arguments(self, _):
             context.argument(
                 "mi_user_assigned",
                 arg_group="Inbound Caller Identity",
-                options_list=["--mi-user-assigned", "--mi-ua"],
+                options_list=[
+                    "--user-assigned-mi",
+                    "--mi-ua",
+                    context.deprecate(
+                        target="--mi-user-assigned",
+                        redirect="--user-assigned-mi",
+                        hide=True,
+                    ),
+                ],
                 help="Resource ID of a user-assigned identity attached to the linked IoT Hub.",
             )
 
@@ -440,7 +558,15 @@ def load_adr_arguments(self, _):
             context.argument(
                 "mi_system_assigned",
                 arg_group="Inbound Caller Identity",
-                options_list=["--mi-system-assigned", "--mi-sa"],
+                options_list=[
+                    "--system-assigned-mi",
+                    "--mi-sa",
+                    context.deprecate(
+                        target="--mi-system-assigned",
+                        redirect="--system-assigned-mi",
+                        hide=True,
+                    ),
+                ],
                 arg_type=get_three_state_flag(),
                 help="Use the linked DPS resource's system-assigned identity as the inbound caller "
                      "identity. DPS must have that identity enabled.",
@@ -448,7 +574,15 @@ def load_adr_arguments(self, _):
             context.argument(
                 "mi_user_assigned",
                 arg_group="Inbound Caller Identity",
-                options_list=["--mi-user-assigned", "--mi-ua"],
+                options_list=[
+                    "--user-assigned-mi",
+                    "--mi-ua",
+                    context.deprecate(
+                        target="--mi-user-assigned",
+                        redirect="--user-assigned-mi",
+                        hide=True,
+                    ),
+                ],
                 help="Resource ID of a user-assigned identity attached to the linked DPS resource.",
             )
 
@@ -477,7 +611,15 @@ def load_adr_arguments(self, _):
             context.argument(
                 "mi_system_assigned",
                 arg_group="Inbound Caller Identity",
-                options_list=["--mi-system-assigned", "--mi-sa"],
+                options_list=[
+                    "--system-assigned-mi",
+                    "--mi-sa",
+                    context.deprecate(
+                        target="--mi-system-assigned",
+                        redirect="--system-assigned-mi",
+                        hide=True,
+                    ),
+                ],
                 arg_type=get_three_state_flag(),
                 help="Use the linked Update Instance's system-assigned "
                      "identity. The instance must have that identity enabled.",
@@ -485,7 +627,15 @@ def load_adr_arguments(self, _):
             context.argument(
                 "mi_user_assigned",
                 arg_group="Inbound Caller Identity",
-                options_list=["--mi-user-assigned", "--mi-ua"],
+                options_list=[
+                    "--user-assigned-mi",
+                    "--mi-ua",
+                    context.deprecate(
+                        target="--mi-user-assigned",
+                        redirect="--user-assigned-mi",
+                        hide=True,
+                    ),
+                ],
                 help="Resource ID of a user-assigned identity attached to the "
                      "linked Update Instance.",
             )
@@ -509,7 +659,6 @@ def load_adr_arguments(self, _):
         context.argument(
             "location",
             arg_type=get_location_type(self.cli_ctx),
-            validator=get_default_location_from_resource_group,
         )
         context.argument("tags", arg_type=tags_type)
 
@@ -523,17 +672,35 @@ def load_adr_arguments(self, _):
         with self.argument_context(cmd) as context:
             context.argument(
                 "mi_system_assigned",
-                options_list=["--mi-system-assigned", "--mi-sa"],
+                options_list=[
+                    "--system-assigned-mi",
+                    "--mi-sa",
+                    context.deprecate(
+                        target="--mi-system-assigned",
+                        redirect="--system-assigned-mi",
+                        hide=True,
+                    ),
+                ],
                 arg_type=get_three_state_flag(),
-                help="Include or remove the system-assigned managed identity in the "
-                     "complete desired identity state.",
+                help="Include or remove the system-assigned managed identity. "
+                     "On create-or-update, omitting all managed identity options "
+                     "preserves the existing identity.",
             )
             context.argument(
                 "mi_user_assigned",
-                options_list=["--mi-user-assigned", "--mi-ua"],
+                options_list=[
+                    "--user-assigned-mi",
+                    "--mi-ua",
+                    context.deprecate(
+                        target="--mi-user-assigned",
+                        redirect="--user-assigned-mi",
+                        hide=True,
+                    ),
+                ],
                 nargs="+",
-                help="One or more user-assigned managed identity resource IDs in the "
-                     "complete desired identity state.",
+                help="Complete desired set of user-assigned managed identity "
+                     "resource IDs. On create-or-update, omitting all managed "
+                     "identity options preserves the existing identity.",
             )
 
     for command in (
@@ -546,6 +713,15 @@ def load_adr_arguments(self, _):
                 options_list=["--namespace", "--ns", "--name", "-n"],
                 help="Name of the Device Registry namespace.",
             )
+
+    with self.argument_context(
+        "iot adr ns su software-update operation-status"
+    ) as context:
+        context.argument(
+            "operation_id",
+            options_list=["--operation-id", "--id"],
+            help="Software Update import or delete operation identifier.",
+        )
 
     with self.argument_context("iot adr ns su software-update") as context:
         context.argument(
@@ -772,8 +948,14 @@ def load_adr_arguments(self, _):
         context.argument(
             "hub_endpoint_name",
             arg_group="Hub",
-            options_list=["--hub-name", "--hn"],
-            help="Logical name of the Hub messaging endpoint entry on the namespace.",
+            options_list=[
+                "--hub-endpoint-name",
+                "--hen",
+                "--hub-name",
+                "--hn",
+            ],
+            help="Logical name of the Hub messaging endpoint entry on the namespace. "
+            "--hub-name and --hn are deprecated aliases.",
         )
         context.argument(
             "hub_resource_id",
@@ -784,14 +966,30 @@ def load_adr_arguments(self, _):
         context.argument(
             "hub_mi_system_assigned",
             arg_group="Hub",
-            options_list=["--hub-mi-system-assigned", "--hub-mi-sa"],
+            options_list=[
+                "--hub-system-assigned-mi",
+                "--hub-mi-sa",
+                context.deprecate(
+                    target="--hub-mi-system-assigned",
+                    redirect="--hub-system-assigned-mi",
+                    hide=True,
+                ),
+            ],
             arg_type=get_three_state_flag(),
             help="Use the linked IoT Hub's system-assigned identity as its inbound caller identity.",
         )
         context.argument(
             "hub_mi_user_assigned",
             arg_group="Hub",
-            options_list=["--hub-mi-user-assigned", "--hub-mi-ua"],
+            options_list=[
+                "--hub-user-assigned-mi",
+                "--hub-mi-ua",
+                context.deprecate(
+                    target="--hub-mi-user-assigned",
+                    redirect="--hub-user-assigned-mi",
+                    hide=True,
+                ),
+            ],
             help="User-assigned identity resource ID attached to the linked IoT Hub.",
         )
         context.argument(
@@ -811,8 +1009,14 @@ def load_adr_arguments(self, _):
         context.argument(
             "dps_endpoint_name",
             arg_group="DPS",
-            options_list=["--dps-name", "--dn"],
-            help="Logical name of the DPS provisioning endpoint entry on the namespace.",
+            options_list=[
+                "--dps-endpoint-name",
+                "--den",
+                "--dps-name",
+                "--dn",
+            ],
+            help="Logical name of the DPS provisioning endpoint entry on the namespace. "
+            "--dps-name and --dn are deprecated aliases.",
         )
         context.argument(
             "dps_resource_id",
@@ -823,14 +1027,30 @@ def load_adr_arguments(self, _):
         context.argument(
             "dps_mi_system_assigned",
             arg_group="DPS",
-            options_list=["--dps-mi-system-assigned", "--dps-mi-sa"],
+            options_list=[
+                "--dps-system-assigned-mi",
+                "--dps-mi-sa",
+                context.deprecate(
+                    target="--dps-mi-system-assigned",
+                    redirect="--dps-system-assigned-mi",
+                    hide=True,
+                ),
+            ],
             arg_type=get_three_state_flag(),
             help="Use the linked DPS resource's system-assigned identity as its inbound caller identity.",
         )
         context.argument(
             "dps_mi_user_assigned",
             arg_group="DPS",
-            options_list=["--dps-mi-user-assigned", "--dps-mi-ua"],
+            options_list=[
+                "--dps-user-assigned-mi",
+                "--dps-mi-ua",
+                context.deprecate(
+                    target="--dps-mi-user-assigned",
+                    redirect="--dps-user-assigned-mi",
+                    hide=True,
+                ),
+            ],
             help="User-assigned identity resource ID attached to the linked DPS resource.",
         )
 

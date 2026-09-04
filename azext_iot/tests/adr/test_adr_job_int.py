@@ -181,11 +181,11 @@ class TestADRJobLifecycle(ADRFullInfraHelper, CaptureOutputLiveScenarioTest):
                     f"--ns {namespace_name} -g {rg} -y"
                 )
 
-            with timed_step("Step 8 ❯ job wait --created"):
+            with timed_step("Step 8 ❯ job wait"):
                 self.cmd(
-                    f"iot adr ns job wait -n {job_name} --ns {namespace_name} -g {rg} --created"
+                    f"iot adr ns job wait -n {job_name} --ns {namespace_name} -g {rg}"
                 )
-                _log(LogKind.OK, "wait --created returned")
+                _log(LogKind.OK, "default success wait returned")
 
             with timed_step("Step 9 ❯ job delete"):
                 self.cmd(

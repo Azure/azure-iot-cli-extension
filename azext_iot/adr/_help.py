@@ -9,6 +9,7 @@ Help documentation for Azure Device Registry (ADR) namespace commands.
 """
 
 from knack.help_files import helps
+from azext_iot.adr.rbac import format_role_requirements
 
 
 def load_adr_help():
@@ -32,24 +33,20 @@ def load_adr_help():
   type: command
   short-summary: Create a Device Registry namespace.
   long-summary: |
-    By default, a namespace is created with a system-assigned managed identity.
-    When replacing an existing namespace, omit --observability-enabled to preserve
-    its observability configuration.
-    Endpoint dictionaries follow the namespace link topology rules: a submitted
-    Hub messaging endpoint requires a DPS provisioning endpoint in the same
-    full namespace PUT, only one DPS endpoint may be submitted, and at most one
-    Software Updates updating endpoint may be submitted.
+    A new namespace is created with a system-assigned managed identity by default.
+    Re-running create for an existing namespace preserves its managed identity and
+    observability configuration unless the corresponding options request a change.
   examples:
     - name: Create a basic Device Registry namespace
       text: az iot adr ns create -n myNamespace -g myResourceGroup
     - name: Create a Device Registry namespace with system-assigned outbound identity
-      text: az iot adr ns create -n myNamespace -g myResourceGroup --outbound-mi-system-assigned
+      text: az iot adr ns create -n myNamespace -g myResourceGroup --outbound-system-assigned-mi
     - name: Create a namespace with observability enabled
       text: az iot adr ns create -n myNamespace -g myResourceGroup --observability-enabled true
     - name: Create a namespace with a user-assigned outbound identity
       text: |
         az iot adr ns create -n myNamespace -g myResourceGroup \\
-          --outbound-mi-user-assigned /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.ManagedIdentity/userAssignedIdentities/<id>
+          --outbound-user-assigned-mi /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.ManagedIdentity/userAssignedIdentities/<id>
   """
 
     helps[
@@ -106,27 +103,19 @@ def load_adr_help():
     ] = """
   type: command
   short-summary: Update a Device Registry namespace.
-  long-summary: |
-    Raw endpoint updates follow the same topology rules as 'az iot adr ns link':
-    adding a new Hub or retrying a failed Hub requires a currently linked DPS or
-    a DPS supplied in the same update. Only one DPS may be linked. A successfully
-    linked Hub remains operational and updateable after DPS deletion. At most one
-    Software Updates updating endpoint may be linked. Namespace PATCH does not support
-    unlinking it; use 'az iot adr ns link su delete' to permanently delete the linked
-    Update Instance before adding another.
   examples:
     - name: Update namespace tags
       text: az iot adr ns update -n myNamespace -g myResourceGroup --tags key=value
     - name: Disable namespace observability
       text: az iot adr ns update -n myNamespace -g myResourceGroup --observability-enabled false
     - name: Switch outbound identity to system-assigned managed identity
-      text: az iot adr ns update -n myNamespace -g myResourceGroup --outbound-mi-system-assigned
+      text: az iot adr ns update -n myNamespace -g myResourceGroup --outbound-system-assigned-mi
     - name: Switch outbound identity to a user-assigned managed identity
       text: |
         az iot adr ns update -n myNamespace -g myResourceGroup \\
-          --outbound-mi-user-assigned /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.ManagedIdentity/userAssignedIdentities/<id>
+          --outbound-user-assigned-mi /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.ManagedIdentity/userAssignedIdentities/<id>
     - name: Clear the explicit outbound identity and use the namespace default
-      text: az iot adr ns update -n myNamespace -g myResourceGroup --outbound-mi-system-assigned false
+      text: az iot adr ns update -n myNamespace -g myResourceGroup --outbound-system-assigned-mi false
   """
 
     helps[
@@ -233,9 +222,10 @@ def load_adr_help():
     ] = """
   type: command
   short-summary: Wait for a certificate authority to reach a desired state.
+  long-summary: Without an explicit wait predicate, waits for provisioningState Succeeded.
   examples:
-    - name: Wait until a certificate authority is updated
-      text: az iot adr ns ca wait -n myCA --ns myNamespace -g myResourceGroup --updated
+    - name: Wait until certificate authority provisioning succeeds
+      text: az iot adr ns ca wait -n myCA --ns myNamespace -g myResourceGroup
   """
 
     helps[
@@ -304,9 +294,10 @@ def load_adr_help():
     ] = """
   type: command
   short-summary: Wait for a certificate policy to reach a desired state.
+  long-summary: Without an explicit wait predicate, waits for provisioningState Succeeded.
   examples:
-    - name: Wait until a certificate policy is updated
-      text: az iot adr ns ca policy wait -n myPolicy --ca-name myCA --ns myNamespace -g myResourceGroup --updated
+    - name: Wait until certificate policy provisioning succeeds
+      text: az iot adr ns ca policy wait -n myPolicy --ca-name myCA --ns myNamespace -g myResourceGroup
   """
 
     helps[
@@ -314,9 +305,10 @@ def load_adr_help():
     ] = """
   type: command
   short-summary: Wait for a Device Registry namespace to reach a desired state.
+  long-summary: Without an explicit wait predicate, waits for provisioningState Succeeded.
   examples:
-    - name: Wait until a namespace is created.
-      text: az iot adr ns wait -n myNamespace -g myResourceGroup --created
+    - name: Wait until namespace provisioning succeeds
+      text: az iot adr ns wait -n myNamespace -g myResourceGroup
   """
 
     helps[
@@ -325,8 +317,10 @@ def load_adr_help():
   type: group
   short-summary: Manage links between a Device Registry namespace and downstream resources.
   long-summary: |
-    Links live on the namespace, not on the linked IoT Hub or DPS resources. All link operations
-    mutate the namespace via PATCH and require the namespace to already exist.
+    Links live on the namespace, not on the linked IoT Hub, DPS, or Update Instance.
+    Add and update use namespace PATCH. Destructive delete removes the linked Azure
+    resource first and then uses the generated namespace replacement operation because
+    this API exposes no narrow endpoint remove.
   """
 
     helps[
@@ -343,24 +337,28 @@ def load_adr_help():
 
     helps[
         "iot adr ns link hub add"
-    ] = """
+    ] = f"""
   type: command
   short-summary: Link an IoT Hub to a Device Registry namespace.
   long-summary: |
     Adds a Hub messaging endpoint entry under the namespace's properties.messaging.endpoints.
     Requires the namespace to already have at least one linked DPS (DPS-first ordering).
-    --mi-system-assigned and --mi-user-assigned are optional. When supplied, exactly one may be
+    --system-assigned-mi and --user-assigned-mi are optional. When supplied, exactly one may be
     used to set the inbound caller identity that the Hub will use to call back into the namespace.
-    Prerequisite role assignments (otherwise linking fails with AdrMiNotAuthorized): the
-    namespace's managed identity needs Contributor AND 'IoT Hub Data Contributor' on the Hub,
-    and the Hub's own managed identity needs Contributor on the namespace. Creating these role
-    assignments requires Owner or User Access Administrator on the scope.
+    Required service-to-service roles: {format_role_requirements("hub")}.
+    The command reuses inherited assignments and automatically creates only missing assignments
+    when the signed-in principal is inherited Owner or User Access Administrator. Otherwise it
+    stops before namespace mutation and prints exact remediation commands. A newly created
+    assignment must become visible within the 180-second preflight deadline before PATCH.
+    IoT Hub Data
+    Contributor is canonical for this implementation; final service-owner confirmation remains
+    an external product decision.
   examples:
     - name: Link a Hub using the Hub's system-assigned identity for inbound calls
       text: |
         az iot adr ns link hub add -n primary --ns myNamespace -g myResourceGroup \\
           --hub-id /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Devices/IotHubs/<hub> \\
-          --mi-system-assigned
+          --system-assigned-mi
     - name: Link a Hub without configuring an inbound caller identity
       text: |
         az iot adr ns link hub add -n primary --ns myNamespace -g myResourceGroup \\
@@ -369,7 +367,7 @@ def load_adr_help():
       text: |
         az iot adr ns link hub add -n secondary --ns myNamespace -g myResourceGroup \\
           --hub-id /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Devices/IotHubs/<hub> \\
-          --mi-user-assigned /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.ManagedIdentity/userAssignedIdentities/<id> \\
+          --user-assigned-mi /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.ManagedIdentity/userAssignedIdentities/<id> \\
           --availability Available --allocation-weight 1
   """
 
@@ -382,10 +380,13 @@ def load_adr_help():
     Only the inbound caller identity can be updated. The linked Hub resource and provisioning
     settings cannot be changed in place. Retrying an endpoint whose linkingState is Failed
     requires a linked DPS. An endpoint whose linkingState is Succeeded remains updateable
-    after DPS deletion.
+    after DPS deletion. Before PATCH, update repeats add's target existence, region,
+    provisioning-state, Standard SKU, selected identity attachment, namespace outbound
+    principal, and automatic RBAC preflight. Newly created assignments must become visible
+    before namespace mutation.
   examples:
     - name: Switch a Hub link to a system-assigned identity
-      text: az iot adr ns link hub update -n primary --ns myNamespace -g myResourceGroup --mi-system-assigned
+      text: az iot adr ns link hub update -n primary --ns myNamespace -g myResourceGroup --system-assigned-mi
   """
 
     helps[
@@ -416,11 +417,15 @@ def load_adr_help():
   long-summary: |
     Permanently deletes the actual IoT Hub resource referenced by the named link,
     then removes that messaging endpoint from the Device Registry namespace. Role
-    assignments are not deleted. This operation cannot be undone.
+    assignments are not deleted. Immediately before namespace replacement, the command
+    re-reads the namespace, preserves its latest unrelated state, and aborts if the named
+    endpoint was repointed. The generated API exposes no ETag/If-Match for this replacement,
+    so a narrower race after that final read cannot be eliminated. This operation cannot
+    be undone.
   examples:
     - name: Delete the linked IoT Hub and update the namespace without prompting
       text: az iot adr ns link hub delete -n primary --ns myNamespace -g myResourceGroup --yes
-    - name: Start both deletion updates without waiting for completion
+    - name: Complete Hub deletion, then submit namespace cleanup without waiting
       text: az iot adr ns link hub delete -n primary --ns myNamespace -g myResourceGroup --yes --no-wait
   """
 
@@ -428,10 +433,13 @@ def load_adr_help():
         "iot adr ns link hub wait"
     ] = """
   type: command
-  short-summary: Wait for an IoT Hub link namespace update to complete.
+  short-summary: Wait for an IoT Hub endpoint to link successfully.
+  long-summary: |
+    The endpoint name is required. Without an explicit wait predicate, this command
+    polls that endpoint's linkingState and fails immediately if it reaches Failed.
   examples:
-    - name: Wait until the namespace update completes
-      text: az iot adr ns link hub wait --ns myNamespace -g myResourceGroup --updated
+    - name: Wait until a Hub endpoint reaches linkingState Succeeded
+      text: az iot adr ns link hub wait -n primary --ns myNamespace -g myResourceGroup
   """
 
     helps[
@@ -446,28 +454,29 @@ def load_adr_help():
 
     helps[
         "iot adr ns link dps add"
-    ] = """
+    ] = f"""
   type: command
   short-summary: Link a Device Provisioning Service (DPS) to a Device Registry namespace.
   long-summary: |
     Adds a DPS provisioning endpoint entry under the namespace's properties.provisioning.endpoints.
     Rejected if the namespace already has a linked DPS (one DPS per namespace).
-    Exactly one of --mi-system-assigned or --mi-user-assigned must be provided.
-    Prerequisite role assignments (otherwise linking fails with AdrMiNotAuthorized): the
-    namespace's managed identity needs Contributor on the DPS, and the DPS's own managed identity
-    needs Contributor on the namespace. Creating these role assignments requires Owner or User
-    Access Administrator on the scope.
+    Exactly one of --system-assigned-mi or --user-assigned-mi must be provided.
+    Required service-to-service roles: {format_role_requirements("dps")}.
+    The command reuses inherited assignments and automatically creates only missing assignments
+    when the signed-in principal is inherited Owner or User Access Administrator. Otherwise it
+    stops before namespace mutation and prints exact remediation commands. A newly created
+    assignment must become visible within the 180-second preflight deadline before PATCH.
   examples:
     - name: Link a DPS using the DPS resource's system-assigned identity
       text: |
         az iot adr ns link dps add -n primary --ns myNamespace -g myResourceGroup \\
           --dps-id /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Devices/provisioningServices/<dps> \\
-          --mi-system-assigned
+          --system-assigned-mi
     - name: Link a DPS with a user-assigned identity
       text: |
         az iot adr ns link dps add -n primary --ns myNamespace -g myResourceGroup \\
           --dps-id /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Devices/provisioningServices/<dps> \\
-          --mi-user-assigned /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.ManagedIdentity/userAssignedIdentities/<id>
+          --user-assigned-mi /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.ManagedIdentity/userAssignedIdentities/<id>
   """
 
     helps[
@@ -477,10 +486,12 @@ def load_adr_help():
   short-summary: Update an existing DPS provisioning endpoint on a Device Registry namespace.
   long-summary: |
     Only the inbound caller identity may be updated. The linked DPS resource cannot be changed
-    in place.
+    in place. Before PATCH, update repeats add's target existence, region,
+    provisioning-state, selected identity attachment, namespace outbound principal,
+    automatic RBAC, and assignment-visibility preflight.
   examples:
     - name: Rotate to a system-assigned identity on an existing DPS link
-      text: az iot adr ns link dps update -n primary --ns myNamespace -g myResourceGroup --mi-system-assigned
+      text: az iot adr ns link dps update -n primary --ns myNamespace -g myResourceGroup --system-assigned-mi
   """
 
     helps[
@@ -519,11 +530,13 @@ def load_adr_help():
     Registry namespace. Hub links do not block this command. Role assignments are
     not deleted. Successfully linked Hubs remain operational and updateable, but
     adding a new Hub or retrying a failed Hub requires linking another DPS first.
-    This operation cannot be undone.
+    The namespace is re-read immediately before replacement; latest unrelated state
+    is preserved and a repointed endpoint causes an abort. The generated API has no
+    ETag/If-Match, so a narrower post-read race remains. This operation cannot be undone.
   examples:
     - name: Delete the linked DPS and update the namespace without prompting
       text: az iot adr ns link dps delete -n primary --ns myNamespace -g myResourceGroup --yes
-    - name: Start both deletion updates without waiting for completion
+    - name: Complete DPS deletion, then submit namespace cleanup without waiting
       text: az iot adr ns link dps delete -n primary --ns myNamespace -g myResourceGroup --yes --no-wait
   """
 
@@ -531,10 +544,13 @@ def load_adr_help():
         "iot adr ns link dps wait"
     ] = """
   type: command
-  short-summary: Wait for a DPS link namespace update to complete.
+  short-summary: Wait for a DPS endpoint to link successfully.
+  long-summary: |
+    The endpoint name is required. Without an explicit wait predicate, this command
+    polls that endpoint's linkingState and fails immediately if it reaches Failed.
   examples:
-    - name: Wait until the namespace update completes
-      text: az iot adr ns link dps wait --ns myNamespace -g myResourceGroup --updated
+    - name: Wait until a DPS endpoint reaches linkingState Succeeded
+      text: az iot adr ns link dps wait -n primary --ns myNamespace -g myResourceGroup
   """
 
     helps[
@@ -552,26 +568,30 @@ def load_adr_help():
 
     helps[
         "iot adr ns link su add"
-    ] = """
+    ] = f"""
   type: command
   short-summary: Link an Update Instance to a Device Registry namespace.
   long-summary: |
     Adds a Software Updates updating endpoint entry under the namespace's properties.updating.endpoints.
     Only one Software Updates instance may be linked per namespace. If one is already
     linked, use 'link su update' to modify it or destructive 'link su delete' to replace it.
-    Exactly one of --mi-system-assigned or --mi-user-assigned must be provided to set the
+    Exactly one of --system-assigned-mi or --user-assigned-mi must be provided to set the
     inbound caller identity that the update instance will use to call back into the namespace.
+    Required service-to-service roles: {format_role_requirements("su")}.
+    Missing assignments are created only for an inherited Owner or User Access Administrator.
+    A newly created assignment must become visible within the 180-second preflight deadline
+    before PATCH. This link workflow never grants the signed-in user Software Updates content roles.
   examples:
     - name: Link an Update Instance using its system-assigned identity for inbound calls
       text: |
         az iot adr ns link su add -n my-su --ns myNamespace -g myResourceGroup \\
           --su-id /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.DeviceUpdate/updateInstances/<instance> \\
-          --mi-system-assigned
+          --system-assigned-mi
     - name: Link an Update Instance with a user-assigned identity
       text: |
         az iot adr ns link su add -n my-su --ns myNamespace -g myResourceGroup \\
           --su-id /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.DeviceUpdate/updateInstances/<instance> \\
-          --mi-user-assigned /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.ManagedIdentity/userAssignedIdentities/<id>
+          --user-assigned-mi /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.ManagedIdentity/userAssignedIdentities/<id>
   """
 
     helps[
@@ -581,10 +601,12 @@ def load_adr_help():
   short-summary: Update an existing Software Updates updating endpoint on a Device Registry namespace.
   long-summary: |
     Only the inbound caller identity may be updated. The linked update instance cannot be changed
-    in place.
+    in place. Before PATCH, update repeats add's target existence, region,
+    provisioning-state, selected identity attachment, namespace outbound principal,
+    automatic RBAC, and assignment-visibility preflight.
   examples:
     - name: Rotate to a system-assigned identity on an existing Software Updates link
-      text: az iot adr ns link su update -n my-su --ns myNamespace -g myResourceGroup --mi-system-assigned
+      text: az iot adr ns link su update -n my-su --ns myNamespace -g myResourceGroup --system-assigned-mi
   """
 
     helps[
@@ -615,12 +637,14 @@ def load_adr_help():
   long-summary: |
     Permanently deletes the actual Microsoft.DeviceUpdate/updateInstances resource
     referenced by the named link, then removes that updating endpoint from the
-    Device Registry namespace. Role assignments are not deleted. This operation
-    cannot be undone.
+    Device Registry namespace. Role assignments are not deleted. The namespace is
+    re-read immediately before replacement; latest unrelated state is preserved and
+    a repointed endpoint causes an abort. The generated API has no ETag/If-Match, so
+    a narrower post-read race remains. This operation cannot be undone.
   examples:
     - name: Delete the linked Update Instance and update the namespace without prompting
       text: az iot adr ns link su delete -n my-su --ns myNamespace -g myResourceGroup --yes
-    - name: Start both deletion updates without waiting for completion
+    - name: Complete Update Instance deletion, then submit namespace cleanup without waiting
       text: az iot adr ns link su delete -n my-su --ns myNamespace -g myResourceGroup --yes --no-wait
   """
 
@@ -628,10 +652,13 @@ def load_adr_help():
         "iot adr ns link su wait"
     ] = """
   type: command
-  short-summary: Wait for a Software Updates link namespace update to complete.
+  short-summary: Wait for a Software Updates endpoint to link successfully.
+  long-summary: |
+    The endpoint name is required. Without an explicit wait predicate, this command
+    polls that endpoint's linkingState and fails immediately if it reaches Failed.
   examples:
-    - name: Wait until the namespace update completes
-      text: az iot adr ns link su wait --ns myNamespace -g myResourceGroup --updated
+    - name: Wait until a Software Updates endpoint reaches linkingState Succeeded
+      text: az iot adr ns link su wait -n my-su --ns myNamespace -g myResourceGroup
   """
 
     helps[
@@ -672,14 +699,20 @@ def load_adr_help():
   short-summary: Create an Update Instance.
   long-summary: |
     Creates a Microsoft.DeviceUpdate/updateInstances resource. Managed identity
-    arguments describe the complete desired identity state and can be combined.
+    arguments can be combined and describe the complete desired identity state
+    when supplied. Re-running create without either identity option preserves an
+    existing instance's SAMI/UAMI configuration, tags, and service-managed state.
   examples:
     - name: Create an instance with a system-assigned identity
-      text: az iot adr ns su instance create -n myUpdateInstance -g myResourceGroup --location eastus2 --mi-system-assigned
+      text: az iot adr ns su instance create -n myUpdateInstance -g myResourceGroup --location eastus2 --system-assigned-mi
     - name: Create an instance with system- and user-assigned identities
       text: |
         az iot adr ns su instance create -n myUpdateInstance -g myResourceGroup \\
-          --mi-system-assigned --mi-user-assigned /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.ManagedIdentity/userAssignedIdentities/<identity>
+          --system-assigned-mi --user-assigned-mi /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.ManagedIdentity/userAssignedIdentities/<identity>
+    - name: Replace an existing instance identity with a user-assigned-only configuration
+      text: |
+        az iot adr ns su instance create -n myUpdateInstance -g myResourceGroup \\
+          --user-assigned-mi /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.ManagedIdentity/userAssignedIdentities/<identity>
   """
 
     helps[
@@ -709,11 +742,15 @@ def load_adr_help():
     ] = """
   type: command
   short-summary: Update an Update Instance's tags or managed identity.
+  long-summary: |
+    Identity options describe the complete desired identity state when supplied:
+    --system-assigned-mi controls SAMI and --user-assigned-mi supplies the UAMI
+    set. Omit both identity options to leave the existing identity unchanged.
   examples:
     - name: Update tags
       text: az iot adr ns su instance update -n myUpdateInstance -g myResourceGroup --tags environment=test
     - name: Set the identity to system-assigned
-      text: az iot adr ns su instance update -n myUpdateInstance -g myResourceGroup --mi-system-assigned
+      text: az iot adr ns su instance update -n myUpdateInstance -g myResourceGroup --system-assigned-mi
   """
 
     helps[
@@ -731,9 +768,10 @@ def load_adr_help():
     ] = """
   type: command
   short-summary: Wait for an Update Instance condition.
+  long-summary: Without an explicit wait predicate, waits for provisioningState Succeeded.
   examples:
     - name: Wait until provisioning succeeds
-      text: az iot adr ns su instance wait -n myUpdateInstance -g myResourceGroup --custom "properties.provisioningState=='Succeeded'"
+      text: az iot adr ns su instance wait -n myUpdateInstance -g myResourceGroup
   """
 
     helps["iot adr ns su software-update"] = """
@@ -804,11 +842,14 @@ def load_adr_help():
     helps["iot adr ns su software-update wait"] = """
   type: command
   short-summary: Wait for an imported Software Update condition.
+  long-summary: |
+    The Software Update model has no lifecycle status. Without an explicit wait
+    predicate, a successful GET means the imported update is materialized and ready.
   examples:
     - name: Wait until an imported update exists
       text: |
         az iot adr ns su software-update wait --ns myNamespace -g myResourceGroup \\
-          --update-provider Contoso --update-name Thermostat --update-version 1.0 --exists
+          --update-provider Contoso --update-name Thermostat --update-version 1.0
   """
 
     helps["iot adr ns su software-update delete"] = """
@@ -853,6 +894,77 @@ def load_adr_help():
         az iot adr ns su software-update file show --ns myNamespace -g myResourceGroup \\
           --update-provider Contoso --update-name Thermostat --update-version 1.0 \\
           --update-file-id payload
+  """
+
+    helps["iot adr ns su software-update operation-status"] = """
+  type: group
+  short-summary: Inspect asynchronous Software Updates operations.
+  """
+
+    helps["iot adr ns su software-update operation-status list"] = """
+  type: command
+  short-summary: List retained Software Updates operation statuses.
+  examples:
+    - name: List import operation statuses
+      text: az iot adr ns su software-update operation-status list --ns myNamespace -g myResourceGroup
+  """
+
+    helps["iot adr ns su software-update operation-status show"] = """
+  type: command
+  short-summary: Show a Software Updates operation status.
+  examples:
+    - name: Follow up a no-wait import
+      text: |
+        az iot adr ns su software-update operation-status show --ns myNamespace \\
+          -g myResourceGroup --operation-id 00000000-0000-0000-0000-000000000000
+  """
+
+    helps["iot adr ns su software-update catalog"] = """
+  type: group
+  short-summary: Discover Software Updates catalog identifiers.
+  """
+
+    helps["iot adr ns su software-update catalog provider"] = """
+  type: group
+  short-summary: Discover update providers.
+  """
+
+    helps["iot adr ns su software-update catalog provider list"] = """
+  type: command
+  short-summary: List update providers in the catalog.
+  examples:
+    - name: List providers
+      text: az iot adr ns su software-update catalog provider list --ns myNamespace -g myResourceGroup
+  """
+
+    helps["iot adr ns su software-update catalog name"] = """
+  type: group
+  short-summary: Discover update names for a provider.
+  """
+
+    helps["iot adr ns su software-update catalog name list"] = """
+  type: command
+  short-summary: List update names for a provider.
+  examples:
+    - name: List names
+      text: |
+        az iot adr ns su software-update catalog name list --ns myNamespace \\
+          -g myResourceGroup --update-provider Contoso
+  """
+
+    helps["iot adr ns su software-update catalog version"] = """
+  type: group
+  short-summary: Discover update versions for a provider and name.
+  """
+
+    helps["iot adr ns su software-update catalog version list"] = """
+  type: command
+  short-summary: List update versions for a provider and name.
+  examples:
+    - name: List versions
+      text: |
+        az iot adr ns su software-update catalog version list --ns myNamespace \\
+          -g myResourceGroup --update-provider Contoso --update-name Thermostat
   """
 
     helps["iot adr ns su software-update init"] = """
@@ -907,7 +1019,7 @@ def load_adr_help():
 
     helps[
         "iot adr ns link add"
-    ] = """
+    ] = f"""
   type: command
   short-summary: Link a Hub and a DPS to a Device Registry namespace in a single operation.
   long-summary: |
@@ -915,33 +1027,46 @@ def load_adr_help():
     messaging endpoint. The DPS entry is serialized first to satisfy DPS-first ordering.
     Equivalent to running 'link dps add' followed by 'link hub add' but as one round-trip.
     Rejected if the namespace already has a linked DPS.
+    Required roles are taken from the same authoritative matrices used by atomic adds:
+    {format_role_requirements("dps")}; {format_role_requirements("hub")}.
   examples:
     - name: Link both a Hub and a DPS using system-assigned identity for both inbound callers
       text: |
         az iot adr ns link add --ns myNamespace -g myResourceGroup \\
-          --hub-name primary-hub --hub-id /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Devices/IotHubs/<hub> --hub-mi-system-assigned \\
-          --dps-name primary-dps --dps-id /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Devices/provisioningServices/<dps> --dps-mi-system-assigned
+          --hub-endpoint-name primary-hub --hub-id /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Devices/IotHubs/<hub> --hub-system-assigned-mi \\
+          --dps-endpoint-name primary-dps --dps-id /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Devices/provisioningServices/<dps> --dps-system-assigned-mi
     - name: Link both resources without configuring a Hub inbound caller identity
       text: |
         az iot adr ns link add --ns myNamespace -g myResourceGroup \\
-          --hub-name primary-hub --hub-id <hub-id> \\
-          --dps-name primary-dps --dps-id <dps-id> --dps-mi-system-assigned
+          --hub-endpoint-name primary-hub --hub-id <hub-id> \\
+          --dps-endpoint-name primary-dps --dps-id <dps-id> --dps-system-assigned-mi
     - name: Link both with custom Hub availability and weight
       text: |
         az iot adr ns link add --ns myNamespace -g myResourceGroup \\
-          --hub-name primary-hub --hub-id <hub-id> --hub-mi-system-assigned \\
+          --hub-endpoint-name primary-hub --hub-id <hub-id> --hub-system-assigned-mi \\
           --hub-availability Available --hub-allocation-weight 1 \\
-          --dps-name primary-dps --dps-id <dps-id> --dps-mi-system-assigned
+          --dps-endpoint-name primary-dps --dps-id <dps-id> --dps-system-assigned-mi
   """
 
     helps[
         "iot adr ns link wait"
     ] = """
   type: command
-  short-summary: Wait for a namespace link update to complete.
+  short-summary: Wait for selected or all namespace links to succeed.
+  long-summary: |
+    Without an explicit wait predicate, waits until every selected endpoint has
+    linkingState Succeeded and fails immediately if any reaches Failed. Scope the
+    wait with --hub-endpoint-name, --dps-endpoint-name, and/or
+    --su-endpoint-name. If none is supplied, all currently configured Hub, DPS,
+    and Software Updates links are included. Explicit Azure CLI wait predicates
+    inspect the namespace resource and retain their standard behavior.
   examples:
-    - name: Wait until the namespace update completes
-      text: az iot adr ns link wait --ns myNamespace -g myResourceGroup --updated
+    - name: Wait until all configured namespace links succeed
+      text: az iot adr ns link wait --ns myNamespace -g myResourceGroup
+    - name: Wait for the Hub and DPS created by bundled link add
+      text: |
+        az iot adr ns link wait --ns myNamespace -g myResourceGroup \\
+          --hub-endpoint-name primary-hub --dps-endpoint-name primary-dps
   """
 
     helps[
@@ -1064,11 +1189,12 @@ def load_adr_help():
   type: command
   short-summary: Wait for a Device Registry group to reach a desired state.
   long-summary: |
-    Group create and update are synchronous, so this command is primarily useful for
-    waiting on membership refresh or deletion.
+    Without an explicit wait predicate, waits for membershipState Ready and
+    fails immediately on FailedToResolveMembers. Explicit standard wait
+    predicates remain available.
   examples:
     - name: Wait until a group's membership refresh completes
-      text: az iot adr ns group wait -n myGroup --ns myNamespace -g myResourceGroup --custom "properties.membershipState=='Ready'"
+      text: az iot adr ns group wait -n myGroup --ns myNamespace -g myResourceGroup
     - name: Wait until a group is deleted
       text: az iot adr ns group wait -n myGroup --ns myNamespace -g myResourceGroup --deleted
   """
@@ -1190,11 +1316,10 @@ def load_adr_help():
     ] = """
   type: command
   short-summary: Wait for a Device Registry job to reach a desired state.
+  long-summary: Without an explicit wait predicate, waits for provisioningState Succeeded.
   examples:
-    - name: Wait until a job is created
-      text: az iot adr ns job wait -n myJob --ns myNamespace -g myResourceGroup --created
-    - name: Wait until a job reaches a terminal provisioning state
-      text: az iot adr ns job wait -n myJob --ns myNamespace -g myResourceGroup --custom "properties.provisioningState=='Succeeded'"
+    - name: Wait until job provisioning succeeds
+      text: az iot adr ns job wait -n myJob --ns myNamespace -g myResourceGroup
   """
 
     helps[
@@ -1297,8 +1422,13 @@ def load_adr_help():
     ] = """
   type: command
   short-summary: Wait for a Device Registry job run to reach a desired state.
+  long-summary: |
+    Without an explicit wait predicate, waits for status Succeeded. Failed,
+    Canceled, and TimedOut are surfaced immediately as unsuccessful terminal states.
   examples:
-    - name: Wait until a job run is canceled
+    - name: Wait until a job run succeeds
+      text: az iot adr ns job run wait -n myRun --job-name myJob --ns myNamespace -g myResourceGroup
+    - name: Explicitly wait for cancellation
       text: az iot adr ns job run wait -n myRun --job-name myJob --ns myNamespace -g myResourceGroup --custom "properties.status=='Canceled'"
   """
 
@@ -1350,10 +1480,15 @@ def load_adr_help():
   """,
             "iot adr ns registry-device show": """
   type: command
-  short-summary: Show a Registry Device.
+  short-summary: Show a Registry Device by resource name or external device ID.
+  long-summary: |
+    Specify exactly one of --name or --external-device-id. External-ID lookup
+    follows every page and fails if the value is missing or is not unique.
   examples:
     - name: Show a Registry Device
       text: az iot adr ns registry-device show -n myDevice --ns myNamespace -g myResourceGroup
+    - name: Show a Registry Device by external device ID
+      text: az iot adr ns registry-device show --external-device-id edge-01 --ns myNamespace -g myResourceGroup
   """,
             "iot adr ns registry-device list": """
   type: command
@@ -1379,9 +1514,16 @@ def load_adr_help():
             "iot adr ns registry-device wait": """
   type: command
   short-summary: Wait for a Registry Device to reach a desired state.
+  long-summary: |
+    Specify exactly one of --name or --external-device-id. Without an explicit
+    predicate, waits for provisioningState Succeeded. Using
+    --external-device-id provides a bounded materialization wait controlled by
+    --timeout and --interval.
   examples:
-    - name: Wait until a Registry Device is created
-      text: az iot adr ns registry-device wait -n myDevice --ns myNamespace -g myResourceGroup --created
+    - name: Wait until a Registry Device succeeds
+      text: az iot adr ns registry-device wait -n myDevice --ns myNamespace -g myResourceGroup
+    - name: Wait for a registration-created device to materialize
+      text: az iot adr ns registry-device wait --external-device-id edge-01 --ns myNamespace -g myResourceGroup --timeout 300 --interval 10
   """,
             "iot adr ns registry-device auth": """
   type: group
@@ -1423,17 +1565,19 @@ def load_adr_help():
             "iot adr ns registry-device auth wait": """
   type: command
   short-summary: Wait for a Registry Device authentication profile condition.
+  long-summary: Without an explicit wait predicate, waits until the profile exists.
   examples:
     - name: Wait until an authentication profile exists
-      text: az iot adr ns registry-device auth wait -n default --registry-device-name myDevice --ns myNamespace -g myResourceGroup --exists
+      text: az iot adr ns registry-device auth wait -n default --registry-device-name myDevice --ns myNamespace -g myResourceGroup
   """,
             "iot adr ns registry-device attribute": """
   type: group
   short-summary: Manage Registry Device attributes.
   long-summary: >
     Attributes store cloud-side metadata for a device, separate from live telemetry.
-    Attributes reported by 'Microsoft.DeviceUpdate' are service-materialized and should
-    be treated as read-only; author your own metadata with --reported-by User.
+    Customer-authored attributes are always serialized with reportedBy='User'.
+    Microsoft.DeviceUpdate is reserved for backend-materialized attributes, which
+    remain readable through list and show.
   examples:
     - name: List attributes
       text: az iot adr ns registry-device attribute list --registry-device-name myDevice --ns myNamespace -g myResourceGroup
@@ -1443,7 +1587,9 @@ def load_adr_help():
   short-summary: Create or replace a Registry Device attribute.
   long-summary: >
     The command performs a full replace (PUT). Any property omitted from --properties is
-    removed. --reported-by is immutable after create.
+    removed. --properties accepts inline JSON, a plain JSON file path, or a file path
+    with one leading '@'. reportedBy is always 'User'; attempts to author the
+    service-owned Microsoft.DeviceUpdate value are rejected before mutation.
   examples:
     - name: Create a user-authored attribute from inline JSON
       text: >
@@ -1538,10 +1684,11 @@ def load_adr_help():
   """,
             "iot adr ns identity wait": """
   type: command
-  short-summary: Wait for a namespace identity update to complete.
+  short-summary: Wait for a namespace identity update to succeed.
+  long-summary: Without an explicit wait predicate, waits for namespace provisioningState Succeeded.
   examples:
     - name: Wait until the namespace update completes
-      text: az iot adr ns identity wait -n myNamespace -g myResourceGroup --updated
+      text: az iot adr ns identity wait -n myNamespace -g myResourceGroup
   """,
         }
     )

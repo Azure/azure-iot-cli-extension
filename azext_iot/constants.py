@@ -7,7 +7,7 @@
 
 import os
 
-VERSION = "0.33.0b9"
+VERSION = "0.33.0b10"
 EXTENSION_NAME = "azure-iot"
 EXTENSION_ROOT = os.path.dirname(os.path.abspath(__file__))
 EXTENSION_CONFIG_ROOT_KEY = "iotext"
@@ -51,5 +51,5 @@ PNP_DTDLV2_COMPONENT_MARKER = "__t"
 LRO_POLL_WAIT_SEC = 30
 LRO_POLL_RETRIES = 10
 
-IOTHUB_PREVIEW_API_VERSION = "2026-03-01-preview"
+IOTHUB_PREVIEW_API_VERSION = "2026-10-01-preview"
 IOT_HUB_DEFAULT_POLICY = "iothubowner"

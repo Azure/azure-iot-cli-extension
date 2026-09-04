@@ -58,12 +58,38 @@ class TestADRNamespaceIdentity(CaptureOutputLiveScenarioTest):
                 f"-g {TEST_RG} --system true"
             ).get_output_in_json()
             assert removed["type"] == "None"
+            no_identity_upsert = self.cmd(
+                f"iot adr ns create -n {namespace_name} -g {TEST_RG}"
+            ).get_output_in_json()
+            assert no_identity_upsert["identity"]["type"] == "None"
 
             assigned = self.cmd(
                 f"iot adr ns identity assign -n {namespace_name} "
                 f"-g {TEST_RG} --system true"
             ).get_output_in_json()
             assert assigned["type"] == "SystemAssigned"
+            user_only = self.cmd(
+                f"iot adr ns identity remove -n {namespace_name} "
+                f"-g {TEST_RG} --system true"
+            ).get_output_in_json()
+            assert user_only["type"] == "UserAssigned"
+            user_only_upsert = self.cmd(
+                f"iot adr ns create -n {namespace_name} -g {TEST_RG}"
+            ).get_output_in_json()
+            assert user_only_upsert["identity"]["type"] == "UserAssigned"
+            assert UAMI_RESOURCE_ID.casefold() in {
+                resource_id.casefold()
+                for resource_id in (
+                    user_only_upsert["identity"].get(
+                        "userAssignedIdentities"
+                    ) or {}
+                )
+            }
+            self.cmd(
+                f"iot adr ns identity assign -n {namespace_name} "
+                f"-g {TEST_RG} --system true"
+            )
+
             self.cmd(
                 f"iot adr ns identity assign -n {namespace_name} "
                 f"-g {TEST_RG} --system true",

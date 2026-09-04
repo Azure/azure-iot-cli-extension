@@ -47,16 +47,20 @@ def adr_registry_device_create(
 
 def adr_registry_device_show(
     cmd,
-    registry_device_name: str,
     namespace_name: str,
     resource_group_name: str,
+    registry_device_name: Optional[str] = None,
+    external_device_id: Optional[str] = None,
 ):
     provider = RegistryDeviceProvider(cmd)
-    return provider.show(
-        registry_device_name=registry_device_name,
-        namespace_name=namespace_name,
-        resource_group_name=resource_group_name,
-    )
+    kwargs = {
+        "registry_device_name": registry_device_name,
+        "namespace_name": namespace_name,
+        "resource_group_name": resource_group_name,
+    }
+    if external_device_id is not None:
+        kwargs["external_device_id"] = external_device_id
+    return provider.show(**kwargs)
 
 
 def adr_registry_device_list(

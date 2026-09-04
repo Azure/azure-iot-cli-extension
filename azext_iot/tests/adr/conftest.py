@@ -262,6 +262,7 @@ _SPECCED_OPERATION_GROUPS = (
     "groups",
     "jobs",
     "job_runs",
+    "job_runs_by_namespace",
     "registry_devices",
     "registry_device_attributes",
     "registry_device_authentication_profiles",
@@ -275,11 +276,9 @@ def _real_adr_client():
     """Instantiate the real management client once per session (no network I/O)."""
     global _REAL_ADR_CLIENT
     if _REAL_ADR_CLIENT is None:
-        from azext_iot.sdk.deviceregistry import (
-            MicrosoftDeviceRegistryManagementService,
-        )
+        from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
 
-        _REAL_ADR_CLIENT = MicrosoftDeviceRegistryManagementService(
+        _REAL_ADR_CLIENT = DeviceRegistryMgmtClient(
             credential=MagicMock(),
             subscription_id="00000000-0000-0000-0000-000000000000",
         )
@@ -367,6 +366,22 @@ def fixture_link_provider(fixture_cmd):
         mock_factory.return_value = mock_client
         provider = LinkProvider(fixture_cmd)
         provider.client = mock_client
+        provider._rbac = MagicMock()  # pylint: disable=protected-access
+        # Existing endpoint-shape tests isolate namespace mutation from the
+        # cross-RP/RBAC preflight. Dedicated preflight/RBAC tests exercise the
+        # real helpers with strictly controlled clients.
+        provider._preflight_link = MagicMock(  # pylint: disable=protected-access
+            return_value={
+                "location": "centraluseuap",
+                "sku": {"name": "S1"},
+                "properties": {
+                    "provisioningState": "Succeeded",
+                    "hostName": "hub.azure-devices.net",
+                },
+            }
+        )
+        provider._warn_if_hub_classically_linked = MagicMock()  # pylint: disable=protected-access
+        provider._wait_for_linked_resource_deleted = MagicMock()  # pylint: disable=protected-access
         return provider
 
 

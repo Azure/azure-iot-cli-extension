@@ -11,7 +11,30 @@ from azure.cli.core.azclierror import (
     RequiredArgumentMissingError,
     ResourceNotFoundError,
 )
-from azext_iot.core.custom import _resolve_linked_hub_hostname, _warn_mixed_endpoint_types
+from azext_iot.core.custom import (
+    _resolve_linked_hub_hostname,
+    _warn_mixed_endpoint_types,
+    _warn_namespace_linked_dps,
+)
+
+
+def test_classic_linked_hub_warns_for_namespace_linked_dps(caplog):
+    _warn_namespace_linked_dps(
+        {
+            "properties": {
+                "deviceRegistryNamespaces": [
+                    {"resourceId": "/subscriptions/sub/namespaces/ns"}
+                ]
+            }
+        }
+    )
+    assert "classic DPS properties.iotHubs" in caplog.text
+    assert "authoritative" in caplog.text
+
+
+def test_classic_linked_hub_does_not_warn_for_unlinked_dps(caplog):
+    _warn_namespace_linked_dps({"properties": {"deviceRegistryNamespaces": []}})
+    assert not caplog.text
 
 
 class TestResolveLinkedHubHostname:
@@ -48,9 +71,12 @@ class TestLinkedHubCreateValidation:
     def mock_deps(self, mocker):
         mocker.patch("azext_iot.core.custom.iot_hub_service_factory")
         mocker.patch("azext_iot.core.custom.iot_hub_get", return_value={
+            "id": (
+                "/subscriptions/sub/resourceGroups/test-rg/providers/"
+                "Microsoft.Devices/IotHubs/hub"
+            ),
             "properties": {"deviceHostName": "hub.device.azure-devices.net", "hostName": "hub.azure-devices.net"},
             "location": "eastus2euap",
-            "resourcegroup": "test-rg",
         })
         mocker.patch("azext_iot.core.custom.iot_hub_policy_get", return_value={
             "keyName": "iothubowner", "primaryKey": "testkey"
@@ -247,13 +273,16 @@ class TestLinkedHubUpdate:
     def mock_deps(self, mocker, existing_entries):
         mocker.patch("azext_iot.core.custom.iot_hub_service_factory")
         mocker.patch("azext_iot.core.custom.iot_hub_get", return_value={
+            "id": (
+                "/subscriptions/sub/resourceGroups/test-rg/providers/"
+                "Microsoft.Devices/IotHubs/myhub"
+            ),
             "name": "myhub",
             "properties": {
                 "deviceHostName": "myhub.device.azure-devices.net",
                 "hostName": "myhub.azure-devices.net",
             },
             "location": "eastus2euap",
-            "resourcegroup": "test-rg",
         })
         mocker.patch("azext_iot.core.custom.iot_hub_policy_get", return_value={
             "keyName": "iothubowner", "primaryKey": "fresh-key"
@@ -515,13 +544,16 @@ class TestLegacyLinkedHubHostNameBackfill:
     def mock_deps(self, mocker, legacy_entries):
         mocker.patch("azext_iot.core.custom.iot_hub_service_factory")
         mocker.patch("azext_iot.core.custom.iot_hub_get", return_value={
+            "id": (
+                "/subscriptions/sub/resourceGroups/test-rg/providers/"
+                "Microsoft.Devices/IotHubs/myhub"
+            ),
             "name": "myhub",
             "properties": {
                 "deviceHostName": "myhub.device.azure-devices.net",
                 "hostName": "myhub.azure-devices.net",
             },
             "location": "eastus2euap",
-            "resourcegroup": "test-rg",
         })
         mocker.patch("azext_iot.core.custom.iot_hub_policy_get", return_value={
             "keyName": "iothubowner", "primaryKey": "fresh-key"

@@ -5,6 +5,12 @@
 # --------------------------------------------------------------------------------------------
 
 from typing import Optional
+from azext_iot.common.arm import (
+    get_resource_group,
+    get_subscription_id,
+    hub_description_for_write,
+    hub_etag_arguments,
+)
 from azext_iot.iothub.providers.discovery import IotHubDiscovery
 from azext_iot._factory import SdkResolver
 from msrest.exceptions import SerializationError
@@ -35,9 +41,34 @@ class IoTHubProvider(object):
                 login=login,
                 auth_type=auth_type_dataplane,
             )
+            if not self.rg:
+                self.rg = self.discovery.last_resource_group
             self.resolver = SdkResolver(self.target)
         else:
             self.hub_resource = self.discovery.find_resource(hub_name, rg)
+            self.rg = get_resource_group(
+                self.hub_resource,
+                fallback=rg,
+                resource_label="IoT Hub",
+            )
+            self.subscription_id = get_subscription_id(
+                self.hub_resource,
+                fallback=(
+                    self.discovery.sub_id
+                    if self.discovery.sub_id != "unknown"
+                    else None
+                ),
+                resource_label="IoT Hub",
+            )
 
     def get_sdk(self, sdk_type):
         return self.resolver.get_sdk(sdk_type)
+
+    def _begin_hub_update(self):
+        """Submit the current Hub state as a sanitized, conditional full PUT."""
+        return self.discovery.client.begin_create_or_update(
+            resource_group_name=self.rg,
+            resource_name=self.hub_resource["name"],
+            iot_hub_description=hub_description_for_write(self.hub_resource),
+            **hub_etag_arguments(self.hub_resource),
+        )

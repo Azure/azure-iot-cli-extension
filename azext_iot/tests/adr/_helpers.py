@@ -246,7 +246,8 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
         with timed_step("Setup 3/5 > Create ADR Namespace"):
             ns_cmd = (
                 f"iot adr ns create -n {namespace_name} -g {resource_group} "
-                f"--location {TEST_LOCATION}"
+                f"--location {TEST_LOCATION} "
+                f"--outbound-user-assigned-mi {identity_resource_id}"
             )
             _log(LogKind.CMD, "az %s", ns_cmd)
             namespace = self.cmd(ns_cmd).get_output_in_json()
@@ -265,14 +266,12 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
             )
 
         with timed_step(
-            "Setup 5/5 > Create IoT Hub Gen2 (may take 3-5 min)"
+            "Setup 5/5 > Create Standard IoT Hub (may take 3-5 min)"
         ):
             hub_cmd = (
                 f"iot hub create -n {hub_name} -g {resource_group} "
-                f"--sku GEN2 --location {TEST_LOCATION} "
-                f"--mi-user-assigned {identity_resource_id} "
-                f"--ns-resource-id {adr_resource_id} "
-                f"--ns-identity-id {identity_resource_id}"
+                f"--sku S1 --location {TEST_LOCATION} "
+                f"--user-assigned-mi {identity_resource_id}"
             )
             _log(LogKind.CMD, "az %s", hub_cmd)
             _log(
@@ -287,14 +286,11 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
                 f"iot hub show -n {hub_name} -g {resource_group}"
             )
             _log(LogKind.CMD, "az %s", hub_show_cmd)
-            hub_show = self.cmd(hub_show_cmd).get_output_in_json()
-            adr_props = hub_show.get("properties", {}).get(
-                "deviceRegistry", {}
-            )
+            self.cmd(hub_show_cmd).get_output_in_json()
             _log(
                 LogKind.RESULT,
-                "ADR config: nsResourceId=%s",
-                adr_props.get("namespaceResourceId"),
+                "Standard Hub created independently; namespace links are added "
+                "only through az iot adr ns link.",
             )
 
         _log(

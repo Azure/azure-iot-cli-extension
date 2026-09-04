@@ -4,11 +4,12 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import inspect
 from unittest.mock import Mock
 
 import pytest
 from azure.cli.core.azclierror import (
-    ArgumentUsageError,
+    AzureResponseError,
     InvalidArgumentValueError,
     MutuallyExclusiveArgumentError,
     RequiredArgumentMissingError,
@@ -16,14 +17,10 @@ from azure.cli.core.azclierror import (
 from azure.core.exceptions import HttpResponseError
 
 from azext_iot.adr.providers.namespace import (
+    NamespaceProvider,
     _build_namespace_identity,
     _clean_migrate_resource_ids,
     _managed_identity_type,
-)
-from azext_iot.adr.common import (
-    DPS_ENDPOINT_TYPE,
-    IOT_HUB_ENDPOINT_TYPE,
-    SU_ENDPOINT_TYPE,
 )
 
 
@@ -33,27 +30,21 @@ UAMI_ID = (
 )
 
 
-def _endpoint(endpoint_type=None, **extra):
-    endpoint = dict(extra)
-    if endpoint_type is not None:
-        endpoint["endpointType"] = endpoint_type
-    return endpoint
-
-
-def _namespace(*, hubs=None, dps=None, su=None):
-    return {
-        "properties": {
-            "messaging": {"endpoints": hubs or {}},
-            "provisioning": {"endpoints": dps or {}},
-            "updating": {"endpoints": su or {}},
-        }
-    }
-
-
 def _namespace_not_found():
     error = HttpResponseError(message="Namespace not found")
     error.status_code = 404
     return error
+
+
+def test_namespace_provider_surfaces_exclude_raw_endpoint_parameters():
+    removed = {
+        "messaging_endpoints",
+        "provisioning_endpoints",
+        "updating_endpoints",
+    }
+
+    for operation in (NamespaceProvider.create, NamespaceProvider.update):
+        assert removed.isdisjoint(inspect.signature(operation).parameters)
 
 
 def test_namespace_create_basic(fixture_namespace_provider, mock_poller):
@@ -394,130 +385,24 @@ def test_namespace_delete_propagates_unrelated_service_error(
         fixture_namespace_provider.delete("namespace", "rg")
 
 
-def test_namespace_create_accepts_direct_endpoint_configuration(
-    fixture_namespace_provider, mock_poller
+def test_namespace_delete_not_empty_lists_safe_destructive_cleanup(
+    fixture_namespace_provider,
 ):
-    fixture_namespace_provider.client.namespaces.get.side_effect = (
-        _namespace_not_found()
+    error = HttpResponseError(
+        message="NamespaceNotEmpty: child resources remain\nbackend detail"
     )
-    fixture_namespace_provider.client.namespaces.begin_create_or_replace.return_value = (
-        mock_poller({"name": "namespace", "resourceGroup": "rg"})
-    )
+    fixture_namespace_provider.client.namespaces.begin_delete.side_effect = error
 
-    fixture_namespace_provider.create(
-        "namespace",
-        "rg",
-        location="eastus",
-        provisioning_endpoints={
-            "dps": {"endpointType": "Microsoft.Devices/ProvisioningServices"},
-            "future": {"endpointType": "Microsoft.Future/endpoints"},
-        },
-        messaging_endpoints={"hub": {"endpointType": "Microsoft.Devices/IotHubs"}},
-    )
+    with pytest.raises(AzureResponseError) as raised:
+        fixture_namespace_provider.delete("namespace", "rg")
 
-    resource = fixture_namespace_provider.client.namespaces.begin_create_or_replace.call_args.kwargs[
-        "resource"
-    ]
-    assert resource["properties"] == {
-        "provisioning": {
-            "endpoints": {
-                "dps": {"endpointType": "Microsoft.Devices/ProvisioningServices"},
-                "future": {"endpointType": "Microsoft.Future/endpoints"},
-            }
-        },
-        "messaging": {
-            "endpoints": {
-                "hub": {"endpointType": "Microsoft.Devices/IotHubs"}
-            }
-        },
-    }
-
-
-def test_namespace_create_rejects_hub_without_dps(
-    fixture_namespace_provider
-):
-    with pytest.raises(
-        ArgumentUsageError,
-        match="before adding a new Hub or retrying a failed Hub",
-    ):
-        fixture_namespace_provider.create(
-            "namespace",
-            "rg",
-            location="eastus",
-            messaging_endpoints={
-                "hub": _endpoint(IOT_HUB_ENDPOINT_TYPE.lower())
-            },
-        )
-
-    fixture_namespace_provider.client.namespaces.get.assert_not_called()
-    fixture_namespace_provider.client.namespaces.begin_create_or_replace.assert_not_called()
-
-
-def test_namespace_create_rejects_multiple_dps(
-    fixture_namespace_provider
-):
-    with pytest.raises(ArgumentUsageError, match="Only one DPS"):
-        fixture_namespace_provider.create(
-            "namespace",
-            "rg",
-            location="eastus",
-            provisioning_endpoints={
-                "one": _endpoint(DPS_ENDPOINT_TYPE),
-                "two": _endpoint(DPS_ENDPOINT_TYPE.upper()),
-            },
-        )
-
-    fixture_namespace_provider.client.namespaces.begin_create_or_replace.assert_not_called()
-
-
-def test_namespace_create_rejects_multiple_su(
-    fixture_namespace_provider
-):
-    with pytest.raises(
-        ArgumentUsageError,
-        match="only one may be linked per namespace",
-    ):
-        fixture_namespace_provider.create(
-            "namespace",
-            "rg",
-            location="eastus",
-            updating_endpoints={
-                "one": _endpoint(SU_ENDPOINT_TYPE),
-                "two": _endpoint(SU_ENDPOINT_TYPE.upper()),
-            },
-        )
-
-    fixture_namespace_provider.client.namespaces.get.assert_not_called()
-    fixture_namespace_provider.client.namespaces.begin_create_or_replace.assert_not_called()
-
-
-def test_namespace_create_allows_one_su_and_non_su_updating_endpoint(
-    fixture_namespace_provider, mock_poller
-):
-    fixture_namespace_provider.client.namespaces.get.side_effect = (
-        _namespace_not_found()
-    )
-    fixture_namespace_provider.client.namespaces.begin_create_or_replace.return_value = (
-        mock_poller({"name": "namespace", "resourceGroup": "rg"})
-    )
-
-    fixture_namespace_provider.create(
-        "namespace",
-        "rg",
-        location="eastus",
-        updating_endpoints={
-            "su": _endpoint(SU_ENDPOINT_TYPE),
-            "future": _endpoint("Microsoft.Future/updatingEndpoints"),
-        },
-    )
-
-    resource = fixture_namespace_provider.client.namespaces.begin_create_or_replace.call_args.kwargs[
-        "resource"
-    ]
-    assert set(resource["properties"]["updating"]["endpoints"]) == {
-        "su",
-        "future",
-    }
+    message = str(raised.value)
+    assert "job run delete" in message
+    assert "ca policy delete" in message
+    assert "link hub delete" in message
+    assert "link dps delete" in message
+    assert "link su delete" in message
+    assert "permanently deletes" in message
 
 
 def test_namespace_create_preserves_existing_observability(
@@ -556,6 +441,159 @@ def test_namespace_create_preserves_existing_observability(
         "resource"
     ]
     assert resource["properties"]["observability"] == observability
+
+
+def test_namespace_create_upsert_preserves_unspecified_namespace_state(
+    fixture_namespace_provider, mock_poller
+):
+    existing = {
+        "location": "centraluseuap",
+        "tags": {"existing": "tag"},
+        "identity": {
+            "type": "SystemAssigned,UserAssigned",
+            "userAssignedIdentities": {UAMI_ID: {}},
+        },
+        "properties": {
+            "uuid": "read-only",
+            "provisioningState": "Succeeded",
+            "outboundIdentity": {"type": "SystemAssigned"},
+            "management": {"endpoints": {"management": {"resourceId": "/management"}}},
+            "provisioning": {"endpoints": {"dps": {"resourceId": "/dps"}}},
+            "messaging": {"endpoints": {"hub": {"resourceId": "/hub"}}},
+            "updating": {"endpoints": {"su": {"resourceId": "/su"}}},
+        },
+    }
+    fixture_namespace_provider.client.namespaces.get.return_value = existing
+    fixture_namespace_provider.client.namespaces.begin_create_or_replace.return_value = (
+        mock_poller({"name": "namespace", "resourceGroup": "rg"})
+    )
+
+    fixture_namespace_provider.create("namespace", "rg")
+
+    resource = fixture_namespace_provider.client.namespaces.begin_create_or_replace.call_args.kwargs[
+        "resource"
+    ]
+    assert resource["location"] == "centraluseuap"
+    assert resource["tags"] == {"existing": "tag"}
+    assert resource["identity"] == {
+        "type": "SystemAssigned,UserAssigned",
+        "userAssignedIdentities": {UAMI_ID: {}},
+    }
+    assert resource["properties"] == {
+        key: value
+        for key, value in existing["properties"].items()
+        if key not in {"uuid", "provisioningState"}
+    }
+
+
+@pytest.mark.parametrize(
+    "existing_identity",
+    [
+        {
+            "type": "UserAssigned",
+            "userAssignedIdentities": {
+                UAMI_ID: {
+                    "principalId": "server-owned",
+                    "clientId": "server-owned",
+                }
+            },
+        },
+        {"type": "None"},
+        None,
+    ],
+)
+def test_namespace_create_upsert_preserves_identity_exactly_when_unspecified(
+    fixture_namespace_provider, mock_poller, existing_identity
+):
+    existing = {
+        "location": "centraluseuap",
+        "properties": {"observability": {"enabled": True}},
+    }
+    if existing_identity is not None:
+        existing["identity"] = existing_identity
+    fixture_namespace_provider.client.namespaces.get.return_value = existing
+    fixture_namespace_provider.client.namespaces.begin_create_or_replace.return_value = (
+        mock_poller({"name": "namespace", "resourceGroup": "rg"})
+    )
+
+    fixture_namespace_provider.create("namespace", "rg")
+
+    body = fixture_namespace_provider.client.namespaces.begin_create_or_replace.call_args.kwargs[
+        "resource"
+    ]
+    if existing_identity is None:
+        assert "identity" not in body
+    elif existing_identity["type"] == "None":
+        assert body["identity"] == {"type": "None"}
+    else:
+        assert body["identity"] == {
+            "type": "UserAssigned",
+            "userAssignedIdentities": {UAMI_ID: {}},
+        }
+
+
+def test_namespace_create_upsert_outbound_uami_does_not_add_sami(
+    fixture_namespace_provider, mock_poller
+):
+    existing_uami = UAMI_ID.replace("identity", "existing")
+    fixture_namespace_provider.client.namespaces.get.return_value = {
+        "location": "centraluseuap",
+        "identity": {
+            "type": "UserAssigned",
+            "userAssignedIdentities": {existing_uami: {}},
+        },
+        "properties": {},
+    }
+    fixture_namespace_provider.client.namespaces.begin_create_or_replace.return_value = (
+        mock_poller({"name": "namespace", "resourceGroup": "rg"})
+    )
+
+    fixture_namespace_provider.create(
+        "namespace",
+        "rg",
+        outbound_mi_user_assigned=UAMI_ID,
+    )
+
+    body = fixture_namespace_provider.client.namespaces.begin_create_or_replace.call_args.kwargs[
+        "resource"
+    ]
+    assert body["identity"] == {
+        "type": "UserAssigned",
+        "userAssignedIdentities": {
+            existing_uami: {},
+            UAMI_ID: {},
+        },
+    }
+    assert body["properties"]["outboundIdentity"] == {
+        "type": "UserAssigned",
+        "userAssignedIdentity": UAMI_ID,
+    }
+
+
+def test_namespace_create_upsert_can_clear_outbound_identity(
+    fixture_namespace_provider, mock_poller
+):
+    fixture_namespace_provider.client.namespaces.get.return_value = {
+        "location": "centraluseuap",
+        "identity": {"type": "SystemAssigned"},
+        "properties": {
+            "outboundIdentity": {"type": "SystemAssigned"},
+        },
+    }
+    fixture_namespace_provider.client.namespaces.begin_create_or_replace.return_value = (
+        mock_poller({"name": "namespace", "resourceGroup": "rg"})
+    )
+
+    fixture_namespace_provider.create(
+        "namespace",
+        "rg",
+        outbound_mi_system_assigned=False,
+    )
+
+    resource = fixture_namespace_provider.client.namespaces.begin_create_or_replace.call_args.kwargs[
+        "resource"
+    ]
+    assert resource["properties"]["outboundIdentity"] is None
 
 
 @pytest.mark.parametrize("enabled", [True, False])
@@ -663,513 +701,6 @@ def test_clean_migrate_resource_ids_preserves_first_casing():
     assert _clean_migrate_resource_ids([resource_id, resource_id.upper()]) == [
         resource_id
     ]
-
-
-def test_namespace_update_accepts_direct_endpoint_configuration(
-    fixture_namespace_provider, mock_poller
-):
-    fixture_namespace_provider.client.namespaces.get.return_value = _namespace()
-    fixture_namespace_provider.client.namespaces.begin_update.return_value = mock_poller(
-        {}
-    )
-
-    fixture_namespace_provider.update(
-        "namespace",
-        "rg",
-        provisioning_endpoints={},
-        updating_endpoints='{"su":{"endpointType":"Microsoft.DeviceUpdate/updateInstances"}}',
-    )
-
-    body = fixture_namespace_provider.client.namespaces.begin_update.call_args.kwargs[
-        "properties"
-    ]
-    assert body == {
-        "properties": {
-            "provisioning": {"endpoints": {}},
-            "updating": {
-                "endpoints": {
-                    "su": {
-                        "endpointType": "Microsoft.DeviceUpdate/updateInstances"
-                    }
-                }
-            },
-        }
-    }
-
-
-def test_namespace_update_rejects_second_su(
-    fixture_namespace_provider
-):
-    fixture_namespace_provider.client.namespaces.get.return_value = _namespace(
-        su={"existing": _endpoint(SU_ENDPOINT_TYPE)}
-    )
-
-    with pytest.raises(
-        ArgumentUsageError,
-        match="only one may be linked per namespace",
-    ):
-        fixture_namespace_provider.update(
-            "namespace",
-            "rg",
-            updating_endpoints={
-                "second": _endpoint(SU_ENDPOINT_TYPE.swapcase())
-            },
-        )
-
-    fixture_namespace_provider.client.namespaces.begin_update.assert_not_called()
-
-
-def test_namespace_update_allows_same_su_update_with_omitted_type(
-    fixture_namespace_provider, mock_poller
-):
-    fixture_namespace_provider.client.namespaces.get.return_value = _namespace(
-        su={"su": _endpoint(SU_ENDPOINT_TYPE, linkingState="Succeeded")}
-    )
-    fixture_namespace_provider.client.namespaces.begin_update.return_value = (
-        mock_poller({})
-    )
-    endpoint_patch = {
-        "inboundCallerIdentity": {"type": "SystemAssigned"}
-    }
-
-    fixture_namespace_provider.update(
-        "namespace",
-        "rg",
-        updating_endpoints={"su": endpoint_patch},
-    )
-
-    body = fixture_namespace_provider.client.namespaces.begin_update.call_args.kwargs[
-        "properties"
-    ]
-    assert body["properties"]["updating"]["endpoints"]["su"] == endpoint_patch
-
-
-def test_namespace_update_failed_existing_su_counts(
-    fixture_namespace_provider
-):
-    fixture_namespace_provider.client.namespaces.get.return_value = _namespace(
-        su={
-            "failed": _endpoint(
-                SU_ENDPOINT_TYPE,
-                linkingState="Failed",
-            )
-        }
-    )
-
-    with pytest.raises(
-        ArgumentUsageError,
-        match="only one may be linked per namespace",
-    ):
-        fixture_namespace_provider.update(
-            "namespace",
-            "rg",
-            updating_endpoints={
-                "new": _endpoint(SU_ENDPOINT_TYPE)
-            },
-        )
-
-    fixture_namespace_provider.client.namespaces.begin_update.assert_not_called()
-
-
-@pytest.mark.parametrize(
-    "updating_endpoints",
-    [
-        {"old": None},
-        {
-            "old": None,
-            "new": _endpoint(SU_ENDPOINT_TYPE),
-        },
-    ],
-)
-def test_namespace_update_rejects_null_su_endpoint(
-    fixture_namespace_provider, updating_endpoints
-):
-    fixture_namespace_provider.client.namespaces.get.return_value = _namespace(
-        su={"old": _endpoint(SU_ENDPOINT_TYPE, linkingState="Failed")}
-    )
-
-    with pytest.raises(
-        InvalidArgumentValueError,
-        match="must be an object.*does not support unlinking",
-    ):
-        fixture_namespace_provider.update(
-            "namespace",
-            "rg",
-            updating_endpoints=updating_endpoints,
-        )
-
-    fixture_namespace_provider.client.namespaces.begin_update.assert_not_called()
-
-
-def test_namespace_update_ignores_non_su_updating_endpoints(
-    fixture_namespace_provider, mock_poller
-):
-    fixture_namespace_provider.client.namespaces.get.return_value = _namespace(
-        su={
-            "future-existing": _endpoint(
-                "Microsoft.Future/updatingEndpoints"
-            ),
-            "malformed-service-value": {"endpointType": 1},
-        }
-    )
-    fixture_namespace_provider.client.namespaces.begin_update.return_value = (
-        mock_poller({})
-    )
-
-    fixture_namespace_provider.update(
-        "namespace",
-        "rg",
-        updating_endpoints={
-            "future-new": _endpoint("Microsoft.Other/updatingEndpoints"),
-            "su": _endpoint(SU_ENDPOINT_TYPE),
-        },
-    )
-
-    fixture_namespace_provider.client.namespaces.begin_update.assert_called_once()
-
-
-def test_namespace_update_empty_updating_endpoints_does_not_get_namespace(
-    fixture_namespace_provider, mock_poller
-):
-    fixture_namespace_provider.client.namespaces.begin_update.return_value = (
-        mock_poller({})
-    )
-
-    fixture_namespace_provider.update(
-        "namespace",
-        "rg",
-        updating_endpoints={},
-    )
-
-    fixture_namespace_provider.client.namespaces.get.assert_not_called()
-    fixture_namespace_provider.client.namespaces.begin_update.assert_called_once()
-
-
-@pytest.mark.parametrize(
-    "endpoint",
-    [
-        {"resourceId": "/future"},
-        {"endpointType": None},
-        {"endpointType": 1},
-    ],
-)
-def test_namespace_update_rejects_invalid_new_updating_endpoint_type(
-    fixture_namespace_provider, endpoint
-):
-    fixture_namespace_provider.client.namespaces.get.return_value = _namespace()
-
-    with pytest.raises(
-        InvalidArgumentValueError,
-        match="endpointType",
-    ):
-        fixture_namespace_provider.update(
-            "namespace",
-            "rg",
-            updating_endpoints={"new": endpoint},
-        )
-
-    fixture_namespace_provider.client.namespaces.begin_update.assert_not_called()
-
-
-def test_namespace_update_rejects_new_hub_without_dps(
-    fixture_namespace_provider
-):
-    fixture_namespace_provider.client.namespaces.get.return_value = _namespace()
-
-    with pytest.raises(ArgumentUsageError, match="DPS link is required"):
-        fixture_namespace_provider.update(
-            "namespace",
-            "rg",
-            messaging_endpoints={
-                "new-hub": _endpoint(IOT_HUB_ENDPOINT_TYPE)
-            },
-        )
-
-    fixture_namespace_provider.client.namespaces.begin_update.assert_not_called()
-
-
-@pytest.mark.parametrize("dps_source", ["existing", "patch"])
-def test_namespace_update_allows_new_hub_with_dps(
-    fixture_namespace_provider, mock_poller, dps_source
-):
-    existing_dps = (
-        {"dps": _endpoint(DPS_ENDPOINT_TYPE)}
-        if dps_source == "existing"
-        else {}
-    )
-    fixture_namespace_provider.client.namespaces.get.return_value = _namespace(
-        dps=existing_dps
-    )
-    fixture_namespace_provider.client.namespaces.begin_update.return_value = (
-        mock_poller({})
-    )
-    provisioning_endpoints = (
-        {"dps": _endpoint(DPS_ENDPOINT_TYPE)}
-        if dps_source == "patch"
-        else None
-    )
-
-    fixture_namespace_provider.update(
-        "namespace",
-        "rg",
-        messaging_endpoints={
-            "new-hub": _endpoint(IOT_HUB_ENDPOINT_TYPE)
-        },
-        provisioning_endpoints=provisioning_endpoints,
-    )
-
-    fixture_namespace_provider.client.namespaces.begin_update.assert_called_once()
-    if dps_source == "patch":
-        properties = fixture_namespace_provider.client.namespaces.begin_update.call_args.kwargs[
-            "properties"
-        ]["properties"]
-        assert list(properties)[:2] == ["provisioning", "messaging"]
-
-
-@pytest.mark.parametrize(
-    "argument_name,kwargs",
-    [
-        (
-            "--messaging-endpoints",
-            {"messaging_endpoints": {"hub": {"endpointType": 1}}},
-        ),
-        (
-            "--provisioning-endpoints",
-            {"provisioning_endpoints": {"dps": {"endpointType": True}}},
-        ),
-    ],
-)
-def test_namespace_create_rejects_non_string_endpoint_type(
-    fixture_namespace_provider, argument_name, kwargs
-):
-    with pytest.raises(
-        InvalidArgumentValueError,
-        match="property 'endpointType' must be a string",
-    ):
-        fixture_namespace_provider.create(
-            "namespace",
-            "rg",
-            location="eastus",
-            **kwargs,
-        )
-
-    fixture_namespace_provider.client.namespaces.begin_create_or_replace.assert_not_called()
-
-
-@pytest.mark.parametrize(
-    "linking_state,endpoint_patch",
-    [
-        ("Failed", {"inboundCallerIdentity": {"type": "SystemAssigned"}}),
-        ("FAILED", {}),
-    ],
-)
-def test_namespace_update_rejects_failed_hub_without_dps(
-    fixture_namespace_provider, linking_state, endpoint_patch
-):
-    fixture_namespace_provider.client.namespaces.get.return_value = _namespace(
-        hubs={
-            "hub": _endpoint(
-                IOT_HUB_ENDPOINT_TYPE,
-                linkingState=linking_state,
-            )
-        }
-    )
-
-    with pytest.raises(ArgumentUsageError, match="retrying a failed Hub"):
-        fixture_namespace_provider.update(
-            "namespace",
-            "rg",
-            messaging_endpoints={"hub": endpoint_patch},
-        )
-
-    fixture_namespace_provider.client.namespaces.begin_update.assert_not_called()
-
-
-def test_namespace_update_allows_succeeded_hub_without_dps(
-    fixture_namespace_provider, mock_poller
-):
-    fixture_namespace_provider.client.namespaces.get.return_value = _namespace(
-        hubs={
-            "hub": _endpoint(
-                IOT_HUB_ENDPOINT_TYPE,
-                linkingState="Succeeded",
-            )
-        }
-    )
-    fixture_namespace_provider.client.namespaces.begin_update.return_value = (
-        mock_poller({})
-    )
-
-    fixture_namespace_provider.update(
-        "namespace",
-        "rg",
-        messaging_endpoints={
-            "hub": {"inboundCallerIdentity": {"type": "SystemAssigned"}}
-        },
-    )
-
-    fixture_namespace_provider.client.namespaces.begin_update.assert_called_once()
-
-
-def test_namespace_update_rejects_second_dps(
-    fixture_namespace_provider
-):
-    fixture_namespace_provider.client.namespaces.get.return_value = _namespace(
-        dps={"existing": _endpoint(DPS_ENDPOINT_TYPE)}
-    )
-
-    with pytest.raises(ArgumentUsageError, match="Only one DPS"):
-        fixture_namespace_provider.update(
-            "namespace",
-            "rg",
-            provisioning_endpoints={
-                "second": _endpoint(DPS_ENDPOINT_TYPE.upper())
-            },
-        )
-
-    fixture_namespace_provider.client.namespaces.begin_update.assert_not_called()
-
-
-def test_namespace_update_allows_same_dps_endpoint_update(
-    fixture_namespace_provider, mock_poller
-):
-    fixture_namespace_provider.client.namespaces.get.return_value = _namespace(
-        dps={"dps": _endpoint(DPS_ENDPOINT_TYPE)}
-    )
-    fixture_namespace_provider.client.namespaces.begin_update.return_value = (
-        mock_poller({})
-    )
-
-    fixture_namespace_provider.update(
-        "namespace",
-        "rg",
-        provisioning_endpoints={
-            "dps": {"inboundCallerIdentity": {"type": "SystemAssigned"}},
-            "future": _endpoint("Microsoft.Future/endpoints"),
-        },
-    )
-
-    body = fixture_namespace_provider.client.namespaces.begin_update.call_args.kwargs[
-        "properties"
-    ]
-    assert body["properties"]["provisioning"]["endpoints"]["dps"] == {
-        "inboundCallerIdentity": {"type": "SystemAssigned"}
-    }
-    assert body["properties"]["provisioning"]["endpoints"]["future"] == {
-        "endpointType": "Microsoft.Future/endpoints"
-    }
-
-
-def test_namespace_update_ignores_invalid_existing_endpoint_type_for_topology(
-    fixture_namespace_provider, mock_poller
-):
-    fixture_namespace_provider.client.namespaces.get.return_value = _namespace(
-        dps={"service-defined": {"endpointType": 1}}
-    )
-    fixture_namespace_provider.client.namespaces.begin_update.return_value = (
-        mock_poller({})
-    )
-
-    fixture_namespace_provider.update(
-        "namespace",
-        "rg",
-        provisioning_endpoints={
-            "service-defined": {
-                "inboundCallerIdentity": {"type": "SystemAssigned"}
-            }
-        },
-    )
-
-    fixture_namespace_provider.client.namespaces.begin_update.assert_called_once()
-
-
-def test_namespace_update_requires_type_for_new_endpoint(
-    fixture_namespace_provider
-):
-    fixture_namespace_provider.client.namespaces.get.return_value = _namespace()
-
-    with pytest.raises(
-        InvalidArgumentValueError,
-        match="must include a string 'endpointType'",
-    ):
-        fixture_namespace_provider.update(
-            "namespace",
-            "rg",
-            messaging_endpoints={"new-endpoint": {"resourceId": "/hub"}},
-        )
-
-    fixture_namespace_provider.client.namespaces.begin_update.assert_not_called()
-
-
-def test_namespace_update_passes_through_new_null_endpoint_body(
-    fixture_namespace_provider, mock_poller
-):
-    fixture_namespace_provider.client.namespaces.get.return_value = _namespace()
-    fixture_namespace_provider.client.namespaces.begin_update.return_value = (
-        mock_poller({})
-    )
-
-    fixture_namespace_provider.update(
-        "namespace",
-        "rg",
-        messaging_endpoints={"service-defined": None},
-    )
-
-    body = fixture_namespace_provider.client.namespaces.begin_update.call_args.kwargs[
-        "properties"
-    ]
-    assert body["properties"]["messaging"]["endpoints"] == {
-        "service-defined": None
-    }
-
-
-def test_namespace_update_allows_removing_failed_hub_without_dps(
-    fixture_namespace_provider, mock_poller
-):
-    fixture_namespace_provider.client.namespaces.get.return_value = _namespace(
-        hubs={
-            "failed-hub": _endpoint(
-                IOT_HUB_ENDPOINT_TYPE,
-                linkingState="Failed",
-            )
-        }
-    )
-    fixture_namespace_provider.client.namespaces.begin_update.return_value = (
-        mock_poller({})
-    )
-
-    fixture_namespace_provider.update(
-        "namespace",
-        "rg",
-        messaging_endpoints={"failed-hub": None},
-    )
-
-    body = fixture_namespace_provider.client.namespaces.begin_update.call_args.kwargs[
-        "properties"
-    ]
-    assert body["properties"]["messaging"]["endpoints"] == {
-        "failed-hub": None
-    }
-
-
-def test_namespace_update_rejects_new_hub_when_same_patch_removes_dps(
-    fixture_namespace_provider
-):
-    fixture_namespace_provider.client.namespaces.get.return_value = _namespace(
-        dps={"dps": _endpoint(DPS_ENDPOINT_TYPE)}
-    )
-
-    with pytest.raises(ArgumentUsageError, match="DPS link is required"):
-        fixture_namespace_provider.update(
-            "namespace",
-            "rg",
-            provisioning_endpoints={"dps": None},
-            messaging_endpoints={
-                "new-hub": _endpoint(IOT_HUB_ENDPOINT_TYPE)
-            },
-        )
-
-    fixture_namespace_provider.client.namespaces.begin_update.assert_not_called()
 
 
 def test_namespace_update_can_clear_explicit_outbound_identity(
@@ -1351,7 +882,33 @@ def test_namespace_identity_removal_compares_ids_case_insensitively(
     assert body == {
         "identity": {
             "type": "None",
-            "userAssignedIdentities": {UAMI_ID: None},
+        }
+    }
+
+
+def test_namespace_identity_remove_last_uami_retains_system_identity(
+    fixture_namespace_provider, mock_poller
+):
+    fixture_namespace_provider.client.namespaces.get.return_value = {
+        "identity": {
+            "type": "SystemAssigned,UserAssigned",
+            "userAssignedIdentities": {UAMI_ID: {}},
+        }
+    }
+    fixture_namespace_provider.client.namespaces.begin_update.return_value = (
+        mock_poller({"identity": {"type": "SystemAssigned"}})
+    )
+
+    fixture_namespace_provider.identity_remove(
+        "namespace", "rg", user_assigned_identities=[UAMI_ID]
+    )
+
+    body = fixture_namespace_provider.client.namespaces.begin_update.call_args.kwargs[
+        "properties"
+    ]
+    assert body == {
+        "identity": {
+            "type": "SystemAssigned",
         }
     }
 

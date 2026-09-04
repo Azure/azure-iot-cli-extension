@@ -59,6 +59,7 @@ def provider():
         data_factory.return_value = data_client
         registry_client.namespaces.get.return_value = _namespace()
         value = SoftwareUpdateProvider(MagicMock(cli_ctx=MagicMock()))
+        value.client = data_client
         yield value
 
 
@@ -73,9 +74,9 @@ def test_provider_uses_registry_and_data_factories():
         value = SoftwareUpdateProvider(cmd)
 
     assert value.registry_client is registry_factory.return_value
-    assert value.client is data_factory.return_value
+    assert value.client is None
     registry_factory.assert_called_once_with(cmd.cli_ctx)
-    data_factory.assert_called_once_with(cmd.cli_ctx)
+    data_factory.assert_not_called()
 
 
 def test_wait_uses_standard_sdk_poller(provider):
@@ -275,14 +276,13 @@ def test_calculate_url_metadata_redacts_url_errors(source_error):
 
 def test_list_updates(provider):
     expected = MagicMock()
-    provider.client.device_update.list_updates.return_value = expected
+    provider.client.software_update.list_updates.return_value = expected
 
     assert (
         provider.list_updates(NAMESPACE, RG, search="term", filter="filter")
         is expected
     )
-    provider.client.device_update.list_updates.assert_called_once_with(
-        endpoint=ENDPOINT,
+    provider.client.software_update.list_updates.assert_called_once_with(
         search="term",
         filter="filter",
     )
@@ -290,11 +290,10 @@ def test_list_updates(provider):
 
 def test_show_update(provider):
     expected = {"updateId": {"provider": PROVIDER}}
-    provider.client.device_update.get_update.return_value = expected
+    provider.client.software_update.get_update.return_value = expected
 
     assert provider.show_update(NAMESPACE, RG, PROVIDER, UPDATE, VERSION) == expected
-    provider.client.device_update.get_update.assert_called_once_with(
-        endpoint=ENDPOINT,
+    provider.client.software_update.get_update.assert_called_once_with(
         provider=PROVIDER,
         name=UPDATE,
         version=VERSION,
@@ -303,7 +302,7 @@ def test_show_update(provider):
 
 def test_delete_update_waits(provider):
     poller = MagicMock()
-    provider.client.device_update.begin_delete_update.return_value = poller
+    provider.client.software_update.begin_delete_update.return_value = poller
     provider._wait = MagicMock(return_value=None)
 
     assert (
@@ -317,8 +316,7 @@ def test_delete_update_waits(provider):
         )
         is None
     )
-    provider.client.device_update.begin_delete_update.assert_called_once_with(
-        endpoint=ENDPOINT,
+    provider.client.software_update.begin_delete_update.assert_called_once_with(
         provider=PROVIDER,
         name=UPDATE,
         version=VERSION,
@@ -332,7 +330,7 @@ def test_delete_update_waits(provider):
 
 def test_import_update_builds_complete_request(provider):
     poller = MagicMock()
-    provider.client.device_update.begin_import_update.return_value = poller
+    provider.client.software_update.begin_import_update.return_value = poller
     provider._calculate_url_metadata = MagicMock()
     provider._wait = MagicMock(return_value={"status": "Succeeded"})
 
@@ -355,8 +353,7 @@ def test_import_update_builds_complete_request(provider):
 
     assert result == {"status": "Succeeded"}
     provider._calculate_url_metadata.assert_not_called()
-    provider.client.device_update.begin_import_update.assert_called_once_with(
-        endpoint=ENDPOINT,
+    provider.client.software_update.begin_import_update.assert_called_once_with(
         import_update_request={
             "importUpdateInput": [
                 {
@@ -398,7 +395,7 @@ def test_import_update_calculates_missing_metadata(provider):
     provider._calculate_url_metadata.assert_called_once_with(
         "https://example.test/manifest"
     )
-    request = provider.client.device_update.begin_import_update.call_args.kwargs[
+    request = provider.client.software_update.begin_import_update.call_args.kwargs[
         "import_update_request"
     ]
     assert request == {
@@ -425,7 +422,7 @@ def test_import_update_uses_calculated_size_with_supplied_hash(provider):
         hashes=["sha256=supplied"],
     )
 
-    request = provider.client.device_update.begin_import_update.call_args.kwargs[
+    request = provider.client.software_update.begin_import_update.call_args.kwargs[
         "import_update_request"
     ]
     assert request["importUpdateInput"][0]["importManifest"]["sizeInBytes"] == 12
@@ -443,7 +440,7 @@ def test_import_update_requires_sha256(provider):
             size=1,
             hashes=["sha1=digest"],
         )
-    provider.client.device_update.begin_import_update.assert_not_called()
+    provider.client.software_update.begin_import_update.assert_not_called()
 
 
 @pytest.mark.parametrize("size", [0, -1])
@@ -456,7 +453,7 @@ def test_import_update_requires_positive_size(provider, size):
             size=size,
             hashes=["sha256=digest"],
         )
-    provider.client.device_update.begin_import_update.assert_not_called()
+    provider.client.software_update.begin_import_update.assert_not_called()
 
 
 def test_stage_update_returns_summary_without_import(provider):
@@ -488,13 +485,13 @@ def test_stage_update_returns_summary_without_import(provider):
         sas_expiry_hours=4,
         friendly_name=None,
     )
-    provider.client.device_update.begin_import_update.assert_not_called()
+    provider.client.software_update.begin_import_update.assert_not_called()
 
 
 def test_stage_update_imports_batch(provider):
     items = [{"importManifest": {"url": "https://example.test/one?sig=secret"}}]
     poller = MagicMock()
-    provider.client.device_update.begin_import_update.return_value = poller
+    provider.client.software_update.begin_import_update.return_value = poller
     provider._wait = MagicMock(return_value={"status": "Succeeded"})
     with patch(
         "azext_iot.adr.providers.software_update.SoftwareUpdateStager"
@@ -513,8 +510,7 @@ def test_stage_update_imports_batch(provider):
         )
 
     assert result == {"status": "Succeeded"}
-    provider.client.device_update.begin_import_update.assert_called_once_with(
-        endpoint=ENDPOINT,
+    provider.client.software_update.begin_import_update.assert_called_once_with(
         import_update_request={
             "importUpdateInput": items,
             "enableScan": False,
@@ -556,14 +552,13 @@ def test_stage_update_rejects_enable_scan_without_import(provider):
 
 def test_list_update_files(provider):
     expected = MagicMock()
-    provider.client.device_update.list_files.return_value = expected
+    provider.client.software_update.list_files.return_value = expected
 
     assert (
         provider.list_update_files(NAMESPACE, RG, PROVIDER, UPDATE, VERSION)
         is expected
     )
-    provider.client.device_update.list_files.assert_called_once_with(
-        endpoint=ENDPOINT,
+    provider.client.software_update.list_files.assert_called_once_with(
         provider=PROVIDER,
         name=UPDATE,
         version=VERSION,
@@ -572,7 +567,7 @@ def test_list_update_files(provider):
 
 def test_show_update_file(provider):
     expected = {"fileId": "file-id"}
-    provider.client.device_update.get_file.return_value = expected
+    provider.client.software_update.get_file.return_value = expected
 
     assert (
         provider.show_update_file(
@@ -585,8 +580,7 @@ def test_show_update_file(provider):
         )
         == expected
     )
-    provider.client.device_update.get_file.assert_called_once_with(
-        endpoint=ENDPOINT,
+    provider.client.software_update.get_file.assert_called_once_with(
         provider=PROVIDER,
         name=UPDATE,
         version=VERSION,
@@ -594,17 +588,59 @@ def test_show_update_file(provider):
     )
 
 
+def test_operation_status_list_and_show(provider):
+    statuses = MagicMock()
+    provider.client.software_update.list_operation_statuses.return_value = statuses
+    provider.client.software_update.get_operation_status.return_value = {
+        "operationId": "operation"
+    }
+
+    assert provider.list_operation_statuses(NAMESPACE, RG) is statuses
+    assert provider.show_operation_status(
+        NAMESPACE, RG, "operation"
+    ) == {"operationId": "operation"}
+    provider.client.software_update.list_operation_statuses.assert_called_once_with()
+    provider.client.software_update.get_operation_status.assert_called_once_with(
+        operation_id="operation"
+    )
+
+
+def test_catalog_provider_name_and_version_discovery(provider):
+    provider.client.software_update.list_providers.return_value = ["Contoso"]
+    provider.client.software_update.list_names.return_value = ["Thermostat"]
+    provider.client.software_update.list_versions.return_value = ["1.0"]
+
+    assert provider.list_providers(NAMESPACE, RG) == ["Contoso"]
+    assert provider.list_names(NAMESPACE, RG, PROVIDER) == ["Thermostat"]
+    assert provider.list_versions(
+        NAMESPACE, RG, PROVIDER, UPDATE, filter="filter"
+    ) == ["1.0"]
+    provider.client.software_update.list_providers.assert_called_once_with()
+    provider.client.software_update.list_names.assert_called_once_with(
+        provider=PROVIDER
+    )
+    provider.client.software_update.list_versions.assert_called_once_with(
+        provider=PROVIDER,
+        name=UPDATE,
+        filter="filter",
+    )
+
+
 def test_software_update_data_factory_uses_generated_sdk():
     cli_ctx = MagicMock()
     client_path = (
-        "azext_iot.sdk.deviceupdate.duregistrydata.DeviceRegistryUpdateClient"
+        "azext_iot.sdk.deviceupdate.duregistrydata."
+        "DeviceRegistrySoftwareUpdateClient"
     )
     with patch(client_path) as client_type:
         assert (
-            _factory.adr_software_update_data_service_factory(cli_ctx)
+            _factory.adr_software_update_data_service_factory(
+                cli_ctx, endpoint=ENDPOINT
+            )
             is client_type.return_value
         )
 
+    assert client_type.call_args.kwargs["endpoint"] == ENDPOINT
     assert client_type.call_args.kwargs["credential"] is _factory.AZURE_CLI_CREDENTIAL
     assert "user_agent_policy" in client_type.call_args.kwargs
     assert "http_logging_policy" in client_type.call_args.kwargs

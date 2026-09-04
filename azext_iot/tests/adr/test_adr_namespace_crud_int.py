@@ -36,7 +36,7 @@ class TestADRNamespaceCrud(CaptureOutputLiveScenarioTest):
                 ),
             )
             self.cmd(
-                f"iot adr ns wait -n {namespace_name} -g {TEST_RG} --created"
+                f"iot adr ns wait -n {namespace_name} -g {TEST_RG}"
             )
             created = self.cmd(
                 f"iot adr ns show -n {namespace_name} -g {TEST_RG}"

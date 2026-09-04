@@ -64,7 +64,7 @@ class TestADRCertificateAuthorityLifecycle(CaptureOutputLiveScenarioTest):
                 created = ca_cmd(f"create -n {ca_name} --type Root").get_output_in_json()
                 assert created["name"] == ca_name
                 assert props(created).get("certificateAuthorityType") == "Root"
-                ca_cmd(f"wait -n {ca_name} --created")
+                ca_cmd(f"wait -n {ca_name}")
                 _log(LogKind.OK, "Root CA '%s' created", ca_name)
 
             # --- Step 2: Show round-trips the CA ---
@@ -138,7 +138,7 @@ class TestADRCertificateAuthorityLifecycle(CaptureOutputLiveScenarioTest):
                     "validityPeriodInDays"
                 ] == 1
                 policy_cmd(
-                    f"wait -n {boundary_policy_name} --created"
+                    f"wait -n {boundary_policy_name}"
                 )
                 policy_cmd(f"delete -n {boundary_policy_name} -y")
 

@@ -201,7 +201,7 @@ class JobRunProvider(ADRProvider):
                 **kwargs,
             )
         else:
-            result = self.client.job_runs.list_by_namespace(
+            result = self.client.job_runs_by_namespace.list_by_namespace(
                 resource_group_name=resource_group_name,
                 namespace_name=namespace_name,
                 **kwargs,

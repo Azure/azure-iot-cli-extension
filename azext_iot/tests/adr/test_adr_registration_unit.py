@@ -6,6 +6,7 @@
 
 """Command, argument, and help registration contracts for ADR."""
 
+import inspect
 from unittest.mock import MagicMock
 
 import yaml
@@ -19,6 +20,7 @@ from azext_iot.adr.command_map import (
     load_adr_commands,
 )
 from azext_iot.adr.params import load_adr_arguments
+from azext_iot.adr import commands_wait
 
 
 class _CommandGroup:
@@ -72,6 +74,10 @@ class _ArgumentContext:
 
     def argument(self, name, **kwargs):
         self.records.setdefault(self.name, {})[name] = kwargs
+
+    @staticmethod
+    def deprecate(**kwargs):
+        return kwargs
 
 
 class _ArgumentLoader:
@@ -153,6 +159,11 @@ def test_2026_command_surface_is_registered():
         "iot adr ns su software-update calculate-hash",
         "iot adr ns su software-update file list",
         "iot adr ns su software-update file show",
+        "iot adr ns su software-update operation-status list",
+        "iot adr ns su software-update operation-status show",
+        "iot adr ns su software-update catalog provider list",
+        "iot adr ns su software-update catalog name list",
+        "iot adr ns su software-update catalog version list",
         "iot adr ns su software-update init v5",
         "iot adr ns su software-update wait",
         "iot adr ns su device-class list",
@@ -180,7 +191,7 @@ def test_2026_command_surface_is_registered():
         "adr_job_run_delete",
         {"confirmation": True, "supports_no_wait": True},
     )
-    assert len(commands) == 107
+    assert len(commands) == 112
     confirmations = {
         "hub": _HUB_DELETE_CONFIRMATION,
         "dps": _DPS_DELETE_CONFIRMATION,
@@ -203,10 +214,25 @@ def test_2026_command_surface_is_registered():
         "adr_namespace_migrate",
         {"supports_no_wait": True},
     )
-    assert commands["iot adr ns link wait"][:2] == (
-        "wait",
-        "adr_namespace_show",
-    )
+    expected_wait_operations = {
+        "iot adr ns wait": "adr_namespace_wait",
+        "iot adr ns ca wait": "adr_ca_wait",
+        "iot adr ns ca policy wait": "adr_ca_policy_wait",
+        "iot adr ns registry-device wait": "adr_registry_device_wait",
+        "iot adr ns registry-device auth wait": "adr_registry_device_auth_wait",
+        "iot adr ns identity wait": "adr_namespace_wait",
+        "iot adr ns link wait": "adr_link_wait",
+        "iot adr ns link hub wait": "adr_link_hub_wait",
+        "iot adr ns link dps wait": "adr_link_dps_wait",
+        "iot adr ns link su wait": "adr_link_su_wait",
+        "iot adr ns su instance wait": "adr_su_instance_wait",
+        "iot adr ns su software-update wait": "adr_su_software_update_wait",
+        "iot adr ns group wait": "adr_group_wait",
+        "iot adr ns job wait": "adr_job_wait",
+        "iot adr ns job run wait": "adr_job_run_wait",
+    }
+    for command, operation in expected_wait_operations.items():
+        assert commands[command][0:2] == ("command", operation)
 
 
 def test_unsupported_command_surfaces_are_not_registered():
@@ -285,11 +311,24 @@ def test_load_adr_arguments():
     assert "status_filter" in arguments["iot adr ns job run results"]
     assert {"report_type", "group_name"} <= set(arguments["iot adr ns report"])
 
-    assert {
+    removed_endpoint_arguments = {
         "messaging_endpoints",
         "provisioning_endpoints",
         "updating_endpoints",
-    } <= set(arguments["iot adr ns update"])
+    }
+    for command in ("iot adr ns create", "iot adr ns update"):
+        assert removed_endpoint_arguments.isdisjoint(arguments[command])
+        registered_options = {
+            option
+            for settings in arguments[command].values()
+            for option in settings.get("options_list", [])
+            if isinstance(option, str)
+        }
+        assert {
+            "--messaging-endpoints",
+            "--provisioning-endpoints",
+            "--updating-endpoints",
+        }.isdisjoint(registered_options)
     assert {
         "enablement_state",
         "external_device_id",
@@ -299,6 +338,14 @@ def test_load_adr_arguments():
     assert "external_device_id" not in arguments[
         "iot adr ns registry-device update"
     ]
+    for command in (
+        "iot adr ns registry-device show",
+        "iot adr ns registry-device wait",
+    ):
+        assert arguments[command]["external_device_id"]["options_list"] == [
+            "--external-device-id",
+            "--ext-id",
+        ]
     for command in (
         "iot adr ns registry-device create",
         "iot adr ns registry-device update",
@@ -314,6 +361,17 @@ def test_load_adr_arguments():
         arguments["iot adr ns identity assign"]
     )
     assert "--ns" in arguments["iot adr ns link"]["namespace_name"]["options_list"]
+    bundled = arguments["iot adr ns link add"]
+    assert bundled["hub_endpoint_name"]["options_list"][:2] == [
+        "--hub-endpoint-name",
+        "--hen",
+    ]
+    assert "--hub-name" in bundled["hub_endpoint_name"]["options_list"]
+    assert bundled["dps_endpoint_name"]["options_list"][:2] == [
+        "--dps-endpoint-name",
+        "--den",
+    ]
+    assert "--dps-name" in bundled["dps_endpoint_name"]["options_list"]
     # Group is a plain TrackedResource in 2026-11-02-preview: no identity.
     assert "mi_system_assigned" not in arguments["iot adr ns group create"]
     assert "mi_system_assigned" not in arguments["iot adr ns group update"]
@@ -324,6 +382,10 @@ def test_load_adr_arguments():
     assert "validity_days" in arguments["iot adr ns ca policy update"]
     for name in ("reported_by", "schema", "properties"):
         assert name in arguments["iot adr ns registry-device attribute create"]
+    reported_by = arguments[
+        "iot adr ns registry-device attribute create"
+    ]["reported_by"]
+    assert reported_by["deprecate_info"]["hide"] is True
     assert {
         "mi_system_assigned",
         "mi_user_assigned",
@@ -416,6 +478,163 @@ def test_load_adr_arguments():
         for command in arguments
     )
 
+    for command in (
+        "iot adr ns wait",
+        "iot adr ns link hub wait",
+        "iot adr ns group wait",
+        "iot adr ns job run wait",
+    ):
+        assert {
+            "timeout",
+            "interval",
+            "created",
+            "updated",
+            "deleted",
+            "exists",
+            "custom",
+        } <= set(arguments[command])
+
+    assert {
+        "hub_endpoint_name",
+        "dps_endpoint_name",
+        "su_endpoint_name",
+    } <= set(arguments["iot adr ns link wait"])
+
+
+def test_every_adr_identity_option_has_canonical_compact_and_hidden_legacy_names():
+    loader = _ArgumentLoader()
+    load_adr_arguments(loader, None)
+    arguments = loader.records
+
+    cases = []
+    for command in ("iot adr ns create", "iot adr ns update"):
+        cases.extend(
+            [
+                (
+                    command,
+                    "outbound_mi_system_assigned",
+                    "--outbound-system-assigned-mi",
+                    "--omi-sa",
+                    "--outbound-mi-system-assigned",
+                ),
+                (
+                    command,
+                    "outbound_mi_user_assigned",
+                    "--outbound-user-assigned-mi",
+                    "--omi-ua",
+                    "--outbound-mi-user-assigned",
+                ),
+            ]
+        )
+    for resource in ("hub", "dps", "su"):
+        for action in ("add", "update"):
+            command = f"iot adr ns link {resource} {action}"
+            cases.extend(
+                [
+                    (
+                        command,
+                        "mi_system_assigned",
+                        "--system-assigned-mi",
+                        "--mi-sa",
+                        "--mi-system-assigned",
+                    ),
+                    (
+                        command,
+                        "mi_user_assigned",
+                        "--user-assigned-mi",
+                        "--mi-ua",
+                        "--mi-user-assigned",
+                    ),
+                ]
+            )
+    for action in ("create", "update"):
+        command = f"iot adr ns su instance {action}"
+        cases.extend(
+            [
+                (
+                    command,
+                    "mi_system_assigned",
+                    "--system-assigned-mi",
+                    "--mi-sa",
+                    "--mi-system-assigned",
+                ),
+                (
+                    command,
+                    "mi_user_assigned",
+                    "--user-assigned-mi",
+                    "--mi-ua",
+                    "--mi-user-assigned",
+                ),
+            ]
+        )
+    cases.extend(
+        [
+            (
+                "iot adr ns link add",
+                "hub_mi_system_assigned",
+                "--hub-system-assigned-mi",
+                "--hub-mi-sa",
+                "--hub-mi-system-assigned",
+            ),
+            (
+                "iot adr ns link add",
+                "hub_mi_user_assigned",
+                "--hub-user-assigned-mi",
+                "--hub-mi-ua",
+                "--hub-mi-user-assigned",
+            ),
+            (
+                "iot adr ns link add",
+                "dps_mi_system_assigned",
+                "--dps-system-assigned-mi",
+                "--dps-mi-sa",
+                "--dps-mi-system-assigned",
+            ),
+            (
+                "iot adr ns link add",
+                "dps_mi_user_assigned",
+                "--dps-user-assigned-mi",
+                "--dps-mi-ua",
+                "--dps-mi-user-assigned",
+            ),
+        ]
+    )
+
+    for command, argument, canonical, compact, legacy in cases:
+        options = arguments[command][argument]["options_list"]
+        assert options[:2] == [canonical, compact]
+        assert any(
+            isinstance(option, dict)
+            and option.get("target") == legacy
+            and option.get("redirect") == canonical
+            and option.get("hide") is True
+            for option in options
+        ), (command, argument)
+
+    for command in (
+        "iot adr ns identity assign",
+        "iot adr ns identity remove",
+    ):
+        assert arguments[command]["system_assigned"]["options_list"] == [
+            "--system-assigned",
+            "--system",
+        ]
+        assert arguments[command]["user_assigned_identities"][
+            "options_list"
+        ] == ["--user-assigned-identity", "--user"]
+
+
+def test_endpoint_wait_wrappers_require_an_endpoint_name():
+    for function_name in (
+        "adr_link_hub_wait",
+        "adr_link_dps_wait",
+        "adr_link_su_wait",
+    ):
+        parameter = inspect.signature(
+            getattr(commands_wait, function_name)
+        ).parameters["endpoint_name"]
+        assert parameter.default is inspect.Parameter.empty
+
 
 def test_help_surface_matches_2026_commands_and_su_type():
     load_adr_help()
@@ -461,6 +680,13 @@ def test_help_surface_matches_2026_commands_and_su_type():
 
     assert "Microsoft.DeviceUpdate/updateInstances" in helps["iot adr ns link su"]
     assert "linkedAccounts" not in helps["iot adr ns link su"]
+    for command in ("iot adr ns create", "iot adr ns update"):
+        for option in (
+            "--messaging-endpoints",
+            "--provisioning-endpoints",
+            "--updating-endpoints",
+        ):
+            assert option not in helps[command]
 
     assert not any(
         command.startswith(

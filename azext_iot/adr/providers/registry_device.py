@@ -7,8 +7,11 @@
 from typing import Dict, Optional
 
 from azure.cli.core.azclierror import (
+    AzureResponseError,
     InvalidArgumentValueError,
+    MutuallyExclusiveArgumentError,
     RequiredArgumentMissingError,
+    ResourceNotFoundError as CLIResourceNotFoundError,
 )
 from azure.core.exceptions import ResourceNotFoundError
 from knack.log import get_logger
@@ -89,15 +92,71 @@ class RegistryDeviceProvider(ADRProvider):
 
     def show(
         self,
-        registry_device_name: str,
-        namespace_name: str,
-        resource_group_name: str,
+        registry_device_name: Optional[str] = None,
+        namespace_name: Optional[str] = None,
+        resource_group_name: Optional[str] = None,
+        external_device_id: Optional[str] = None,
     ):
+        if registry_device_name and external_device_id:
+            raise MutuallyExclusiveArgumentError(
+                "Specify exactly one of --name or --external-device-id."
+            )
+        if not registry_device_name and not external_device_id:
+            raise RequiredArgumentMissingError(
+                "Specify exactly one of --name or --external-device-id."
+            )
+        if external_device_id:
+            return self._show_by_external_device_id(
+                external_device_id=external_device_id,
+                namespace_name=namespace_name,
+                resource_group_name=resource_group_name,
+            )
         return self.client.registry_devices.get(
             resource_group_name=resource_group_name,
             namespace_name=namespace_name,
             registry_device_name=registry_device_name,
         )
+
+    def _show_by_external_device_id(
+        self,
+        external_device_id: str,
+        namespace_name: str,
+        resource_group_name: str,
+    ):
+        """Resolve an external ID over the SDK's pageable namespace listing.
+
+        The selected 2026-11-02-preview contract does not expose a server-side
+        filter parameter for RegistryDevices_ListByNamespace. Iterating the
+        ItemPaged result still follows every nextLink and prevents a match on a
+        later page from being missed.
+        """
+        matches = []
+        for device in self.client.registry_devices.list_by_namespace(
+            resource_group_name=resource_group_name,
+            namespace_name=namespace_name,
+        ):
+            properties = (device or {}).get("properties") or {}
+            if properties.get("externalDeviceId") == external_device_id:
+                matches.append(device)
+
+        if not matches:
+            raise CLIResourceNotFoundError(
+                f"No Registry Device with external device ID "
+                f"'{external_device_id}' was found in namespace "
+                f"'{namespace_name}'. If registration just completed, use "
+                "'az iot adr ns registry-device wait --external-device-id ...' "
+                "to allow for materialization."
+            )
+        if len(matches) > 1:
+            names = ", ".join(
+                sorted(str(device.get("name") or "<unnamed>") for device in matches)
+            )
+            raise AzureResponseError(
+                f"External device ID '{external_device_id}' matched multiple "
+                f"Registry Devices in namespace '{namespace_name}': {names}. "
+                "Use --name to select one resource."
+            )
+        return matches[0]
 
     def list(self, namespace_name: str, resource_group_name: str):
         return list(
@@ -337,10 +396,16 @@ class RegistryDeviceProvider(ADRProvider):
         schema: Optional[str] = None,
         properties: Optional[str] = None,
     ):
-        supported = {member.value for member in DeviceAttributeReportedType}
-        if reported_by not in supported:
+        if reported_by != DeviceAttributeReportedType.user.value:
+            if reported_by != DeviceAttributeReportedType.adu.value:
+                raise InvalidArgumentValueError(
+                    "The hidden --reported-by compatibility option accepts "
+                    "only 'User'. Omit it for customer-authored attributes."
+                )
             raise InvalidArgumentValueError(
-                f"--reported-by must be one of {', '.join(sorted(supported))}."
+                "'Microsoft.DeviceUpdate' is service-owned attribute provenance "
+                "and cannot be authored with this command. Customer-authored "
+                "attributes always use reportedBy='User'."
             )
 
         attribute_properties: Dict[str, object] = {}
@@ -348,18 +413,25 @@ class RegistryDeviceProvider(ADRProvider):
             attribute_properties.update(
                 parse_json_object(properties, "--properties")
             )
+        supplied_provenance = attribute_properties.get("reportedBy")
+        if (
+            supplied_provenance is not None
+            and supplied_provenance != DeviceAttributeReportedType.user.value
+        ):
+            if supplied_provenance != DeviceAttributeReportedType.adu.value:
+                raise InvalidArgumentValueError(
+                    "The --properties reportedBy value must be 'User'. Remove "
+                    "reportedBy to use the customer-authored default."
+                )
+            raise InvalidArgumentValueError(
+                "The --properties value cannot set service-owned "
+                "reportedBy='Microsoft.DeviceUpdate'. Remove reportedBy or set "
+                "it to 'User'."
+            )
 
-        attribute_properties["reportedBy"] = reported_by
+        attribute_properties["reportedBy"] = DeviceAttributeReportedType.user.value
         if schema is not None:
             attribute_properties["schema"] = schema
-
-        if reported_by == DeviceAttributeReportedType.adu.value:
-            logger.warning(
-                "Attributes reported by '%s' are materialized and owned by Azure Device "
-                "Update. Overwriting one can clobber service-reported state and may be "
-                "reverted without notice. Use --reported-by User for your own metadata.",
-                DeviceAttributeReportedType.adu.value,
-            )
 
         return self.client.registry_device_attributes.create_or_replace(
             resource_group_name=resource_group_name,

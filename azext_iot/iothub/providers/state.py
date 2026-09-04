@@ -20,6 +20,7 @@ from tqdm import tqdm
 
 import azext_iot.iothub.providers.helpers.state_strings as usr_msgs
 from azext_iot._factory import iot_hub_service_factory
+from azext_iot.common.arm import get_resource_group
 from azext_iot.common._azure import (
     parse_cosmos_db_connection_string,
     parse_iot_hub_message_endpoint_connection_string,
@@ -86,8 +87,6 @@ class StateProvider(IoTHubProvider):
 
         if self.target:
             self.hub_name = self.target["name"]
-        if not self.rg and self.target:
-            self.rg = self.target.get("resourcegroup")
 
     def _get_client(self):
         return iot_hub_service_factory(self.cmd.cli_ctx)
@@ -164,7 +163,12 @@ class StateProvider(IoTHubProvider):
         if HubAspects.Arm.value not in hub_aspects and not self.target:
             raise ResourceNotFoundError(usr_msgs.TARGET_HUB_NOT_FOUND_MSG.format(self.hub_name))
         if not self.rg and not self.target:
-            self.rg = orig_hub_target.get("resourcegroup")
+            original_resource = self.discovery.find_resource(orig_hub, orig_rg)
+            self.rg = get_resource_group(
+                original_resource,
+                fallback=orig_rg,
+                resource_label="IoT Hub",
+            )
 
         # Command modifies hub_aspect - make copy so we can reuse for upload
         hub_state = self.process_hub_to_dict(orig_hub_target, hub_aspects[:])
@@ -248,12 +252,14 @@ class StateProvider(IoTHubProvider):
         if HubAspects.Arm.value in hub_aspects:
             try:
                 hub_name = target.get("entity").split(".")[0]
-                hub_rg = target.get("resourcegroup")
+                hub_rg = self.rg if target is self.target else None
 
                 control_plane_obj = self.discovery.find_resource(hub_name, hub_rg)
-
-                if not hub_rg:
-                    hub_rg = control_plane_obj["resourcegroup"]
+                hub_rg = get_resource_group(
+                    control_plane_obj,
+                    fallback=hub_rg,
+                    resource_label="IoT Hub",
+                )
                 hub_resource_id = control_plane_obj["id"]
                 hub_arm = cli.invoke(f"group export -n {hub_rg} --resource-ids '{hub_resource_id}' --skip-all-params").as_json()
                 if hub_arm and hub_arm["resources"]:
@@ -279,7 +285,10 @@ class StateProvider(IoTHubProvider):
                 # remove/overwrite attributes that cannot be changed
                 current_hub_resource = self.discovery.find_resource(self.hub_name, self.rg)
                 if not self.rg:
-                    self.rg = current_hub_resource["resourcegroup"]
+                    self.rg = get_resource_group(
+                        current_hub_resource,
+                        resource_label="IoT Hub",
+                    )
                 # location
                 hub_resource["location"] = current_hub_resource["location"]
                 # sku

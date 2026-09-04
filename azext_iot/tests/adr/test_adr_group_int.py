@@ -84,6 +84,10 @@ class TestADRGroupLifecycle(ADRFullInfraHelper, CaptureOutputLiveScenarioTest):
                     f"iot adr ns group refresh -n {group_name} "
                     f"--ns {namespace_name} -g {rg}"
                 )
+                self.cmd(
+                    f"iot adr ns group wait -n {group_name} "
+                    f"--ns {namespace_name} -g {rg}"
+                )
                 members = self.cmd(
                     f"iot adr ns group list-members -n {group_name} "
                     f"--ns {namespace_name} -g {rg} --page-size 1"

@@ -13,23 +13,17 @@ from knack.help_files import helps
 # Help additions for core commands
 def patch_core_help():
 
-    # add Hub create examples for ADR properties
+    # Resource creation is separate from canonical namespace linking.
     if "iot hub create" in helps:
         helps[
             "iot hub create"
         ] += """
-  - name: Create a Generation2 IoT Hub with Device Registry namespace properties.
+  - name: Create a Standard IoT Hub, then link it from a Device Registry namespace.
     text: >
-        az iot hub create --resource-group MyResourceGroup --name MyHub --sku GEN2 --ns-resource-id NamespaceResourceId
-        --ns-identity-id UserIdentityResourceId
-  - name: Create a Generation2 IoT Hub with Device Registry namespace properties and custom role assignment.
-    text: >
-        az iot hub create --resource-group MyResourceGroup --name MyHub --sku GEN2 --ns-resource-id NamespaceResourceId
-        --ns-identity-id UserIdentityResourceId --custom-ns-role-id RoleResourceId
-  - name: Create a Generation2 IoT Hub with Device Registry namespace properties and skip role assignment.
-    text: >
-        az iot hub create --resource-group MyResourceGroup --name MyHub --sku GEN2 --ns-resource-id NamespaceResourceId
-        --ns-identity-id UserIdentityResourceId --skip-ns-ra
+        az iot hub create --resource-group MyResourceGroup --name MyHub --sku S1 --system-assigned-mi;
+        az iot adr ns link hub add --namespace MyNamespace --resource-group MyResourceGroup
+        --endpoint-name primary --hub-id $(az iot hub show --name MyHub --resource-group
+        MyResourceGroup --query id -o tsv) --system-assigned-mi
 """
 
     # add DPS create examples for ADR properties
@@ -37,13 +31,12 @@ def patch_core_help():
         helps[
             "iot dps create"
         ] += """
-  - name: Create an Azure IoT Hub Device Provisioning Service with system identity and Device Registry namespace properties
+  - name: Create DPS with a system identity, then link it from the namespace.
     text: >
-        az iot dps create --name MyDps --resource-group MyResourceGroup --mi-system-assigned --ns-resource-id NamespaceResourceId
-  - name: Create an Azure IoT Hub Device Provisioning Service with user-managed identity and Device Registry namespace properties
-    text: >
-        az iot dps create --name MyDps --resource-group MyResourceGroup --mi-user-assigned IdentityResourceId
-        --ns-resource-id NamespaceResourceId --ns-identity-id IdentityResourceId
+        az iot dps create --name MyDps --resource-group MyResourceGroup --system-assigned-mi;
+        az iot adr ns link dps add --namespace MyNamespace --resource-group MyResourceGroup
+        --endpoint-name primary --dps-id $(az iot dps show --name MyDps --resource-group
+        MyResourceGroup --query id -o tsv) --system-assigned-mi
 """
 
     # add DPS identity help

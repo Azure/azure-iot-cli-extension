@@ -10,11 +10,18 @@ from unittest.mock import Mock, patch
 import pytest
 from azure.cli.core.azclierror import (
     AzureResponseError,
+    InvalidArgumentValueError,
+    RequiredArgumentMissingError,
     ResourceNotFoundError,
 )
 from azure.core.exceptions import HttpResponseError
 
-from azext_iot.adr.providers.base import ADRProvider
+from azext_iot.adr.providers.base import (
+    ADRProvider,
+    _poll_with_deadline,
+    _retry_after_seconds,
+    parse_json_object,
+)
 
 
 @pytest.mark.parametrize("input_location", ["location", None])
@@ -43,6 +50,21 @@ def test_ensure_location(fixture_adr_provider, fixture_cmd, input_location):
         assert result == input_location
 
 
+def test_parse_json_object_rejects_unsupported_and_missing_properties():
+    with pytest.raises(InvalidArgumentValueError, match="unsupported"):
+        parse_json_object(
+            {"known": 1, "unknown": 2},
+            "--body",
+            allowed_keys=frozenset({"known"}),
+        )
+    with pytest.raises(RequiredArgumentMissingError, match="required"):
+        parse_json_object(
+            {"required": None},
+            "--body",
+            required_keys=frozenset({"required"}),
+        )
+
+
 def test_provider_initialization(fixture_cmd):
     """Test that ADRProvider initializes correctly."""
     with patch("azext_iot.adr.providers.base.adr_service_factory") as mock_factory:
@@ -67,6 +89,20 @@ def _resource_poller(method="PATCH", location=None):
     )
     poller._polling_method._initial_response.http_response.status_code = 202
     return poller
+
+
+def _fake_time():
+    now = [0]
+    sleeps = []
+
+    def clock():
+        return now[0]
+
+    def sleeper(delay):
+        sleeps.append(delay)
+        now[0] += delay
+
+    return clock, sleeper, sleeps
 
 
 def test_poll_provisioning_state_raises_4xx_immediately(
@@ -108,12 +144,15 @@ def test_poll_provisioning_state_timeout_is_an_error(
     expected_message,
 ):
     fixture_adr_provider.client.send_request.return_value = response
+    clock, sleeper, _ = _fake_time()
 
-    with patch(
-        "azext_iot.adr.providers.base.LRO_POLL_RETRIES", 2
-    ), pytest.raises(AzureResponseError, match=expected_message):
+    with pytest.raises(AzureResponseError, match=expected_message):
         fixture_adr_provider._poll_provisioning_state(
-            _resource_poller(), wait_sec=0
+            _resource_poller(),
+            wait_sec=1,
+            timeout_sec=3,
+            clock=clock,
+            sleeper=sleeper,
         )
 
     assert fixture_adr_provider.client.send_request.call_count == 2
@@ -328,7 +367,8 @@ def test_format_failure_includes_authorization_guidance_and_correlation_id(
     )
 
     assert "Managed identity is not authorized." in message
-    assert "grant the namespace's managed identity" in message
+    assert "automatic RBAC preflight" in message
+    assert "exact remediation commands" in message
     assert "Correlation id: correlation-id." in message
 
 
@@ -496,14 +536,148 @@ def test_post_lro_timeout_is_an_error(
     fixture_adr_provider, response, expected
 ):
     fixture_adr_provider.client.send_request.return_value = response
+    clock, sleeper, _ = _fake_time()
 
-    with patch(
-        "azext_iot.adr.providers.base.LRO_POLL_RETRIES", 2
-    ), pytest.raises(AzureResponseError, match=expected):
+    with pytest.raises(AzureResponseError, match=expected):
         fixture_adr_provider._poll_provisioning_state(
-            _resource_poller("POST", location="https://management.azure.com/status"),
-            wait_sec=0,
+            _resource_poller(
+                "POST", location="https://management.azure.com/status"
+            ),
+            wait_sec=1,
+            timeout_sec=3,
+            clock=clock,
+            sleeper=sleeper,
         )
+
+
+def test_workaround_waiter_honors_initial_and_subsequent_retry_after(
+    fixture_adr_provider,
+):
+    poller = _resource_poller()
+    poller._polling_method._initial_response.http_response.headers = {
+        "rEtRy-AfTeR": "2"
+    }
+    body = {"properties": {"provisioningState": "Succeeded"}}
+    fixture_adr_provider.client.send_request.side_effect = [
+        Mock(status_code=429, headers={"RETRY-AFTER": "4"}),
+        Mock(status_code=200, headers={}, json=Mock(return_value=body)),
+    ]
+    clock, sleeper, sleeps = _fake_time()
+
+    assert fixture_adr_provider._poll_provisioning_state(
+        poller,
+        timeout_sec=20,
+        clock=clock,
+        sleeper=sleeper,
+    ) == body
+
+    assert sleeps == [2, 4]
+
+
+@pytest.mark.parametrize(
+    "headers,fallback,expected",
+    [
+        ({"Retry-After": "45"}, 2, 30),
+        ({"retry-after": "invalid"}, 7, 7),
+        ({"ReTrY-AfTeR": 3}, 7, 3),
+        ({"Retry-After": 0}, 4, 4),
+    ],
+)
+def test_retry_after_is_case_insensitive_integer_and_capped(
+    headers, fallback, expected
+):
+    assert (
+        _retry_after_seconds(
+            SimpleNamespace(headers=headers), fallback=fallback
+        )
+        == expected
+    )
+
+
+def test_deadline_waiter_clamps_sleep_to_remaining_time():
+    clock, sleeper, sleeps = _fake_time()
+    request = Mock()
+
+    with pytest.raises(AzureResponseError, match="deadline"):
+        _poll_with_deadline(
+            request,
+            Mock(),
+            lambda: "deadline expired",
+            initial_response=SimpleNamespace(
+                headers={"Retry-After": "30"}
+            ),
+            timeout_sec=5,
+            clock=clock,
+            sleeper=sleeper,
+        )
+
+    assert sleeps == [5]
+    request.assert_not_called()
+
+
+def test_deadline_waiter_rejects_already_expired_deadline():
+    request = Mock()
+
+    with pytest.raises(AzureResponseError, match="already expired"):
+        _poll_with_deadline(
+            request,
+            Mock(),
+            lambda: "deadline already expired",
+            timeout_sec=0,
+            clock=lambda: 1,
+            sleeper=Mock(),
+        )
+
+    request.assert_not_called()
+
+
+@pytest.mark.parametrize("method", ["PATCH", "POST"])
+def test_workaround_waiter_tolerates_unexpected_redirect_response(
+    fixture_adr_provider, method
+):
+    body = (
+        {"properties": {"provisioningState": "Succeeded"}}
+        if method == "PATCH"
+        else {"status": "Succeeded"}
+    )
+    fixture_adr_provider.client.send_request.side_effect = [
+        Mock(status_code=302, headers={}),
+        Mock(status_code=200, headers={}, json=Mock(return_value=body)),
+    ]
+    poller = _resource_poller(
+        method,
+        location=(
+            "https://management.azure.com/status"
+            if method == "POST"
+            else None
+        ),
+    )
+
+    assert fixture_adr_provider._poll_provisioning_state(
+        poller, wait_sec=0
+    ) == body
+
+
+def test_no_wait_returns_before_workaround_polling(fixture_adr_provider):
+    poller = Mock()
+    fixture_adr_provider._await_terminal = Mock()
+
+    assert (
+        fixture_adr_provider._wait(
+            poller, "Working...", no_wait=True
+        )
+        is poller
+    )
+    fixture_adr_provider._await_terminal.assert_not_called()
+
+
+def test_resolve_location_rejects_parent_without_location(
+    fixture_adr_provider,
+):
+    fixture_adr_provider.client.namespaces.get.return_value = {}
+
+    with pytest.raises(AzureResponseError, match="does not contain a location"):
+        fixture_adr_provider._resolve_location("namespace", "rg")
 
 
 def test_poll_provisioning_state_treats_delete_404_as_success(

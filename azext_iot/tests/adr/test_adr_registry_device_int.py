@@ -43,6 +43,7 @@ def _create_registry_device(
     *,
     no_wait: bool,
 ) -> dict:
+    external_device_id = f"external-{device_name}"
     test.cmd(
         f"iot adr ns create -n {namespace_name} -g {TEST_RG} "
         f"--location {TEST_LOCATION}"
@@ -50,7 +51,7 @@ def _create_registry_device(
     create_command = (
         f"iot adr ns registry-device create -n {device_name} "
         f"--ns {namespace_name} -g {TEST_RG} "
-        "--enablement-state Enabled --external-device-id external-device "
+        f"--enablement-state Enabled --external-device-id {external_device_id} "
         "--manufacturer Contoso --model Ignite --tags env=integration"
     )
     show_command = (
@@ -60,8 +61,9 @@ def _create_registry_device(
     if no_wait:
         test.cmd(f"{create_command} --no-wait")
         test.cmd(
-            f"iot adr ns registry-device wait -n {device_name} "
-            f"--ns {namespace_name} -g {TEST_RG} --created"
+            "iot adr ns registry-device wait "
+            f"--external-device-id {external_device_id} "
+            f"--ns {namespace_name} -g {TEST_RG}"
         )
         return wait_for_resource_succeeded(test, show_command)
     return test.cmd(create_command).get_output_in_json()
@@ -92,10 +94,29 @@ class TestADRRegistryDeviceLifecycle(CaptureOutputLiveScenarioTest):
             )
             assert created["name"] == device_name
             assert created["properties"]["enablementState"] == "Enabled"
-            assert created["properties"]["externalDeviceId"] == "external-device"
+            external_device_id = f"external-{device_name}"
+            assert created["properties"]["externalDeviceId"] == external_device_id
 
             shown = self.cmd(show_command).get_output_in_json()
             assert shown["name"] == device_name
+            shown_by_external_id = self.cmd(
+                "iot adr ns registry-device show "
+                f"--external-device-id {external_device_id} "
+                f"--ns {namespace_name} -g {TEST_RG}"
+            ).get_output_in_json()
+            assert shown_by_external_id["name"] == device_name
+            self.cmd(
+                "iot adr ns registry-device show "
+                f"-n {device_name} --external-device-id {external_device_id} "
+                f"--ns {namespace_name} -g {TEST_RG}",
+                expect_failure=True,
+            )
+            self.cmd(
+                "iot adr ns registry-device show "
+                "--external-device-id does-not-exist "
+                f"--ns {namespace_name} -g {TEST_RG}",
+                expect_failure=True,
+            )
 
             listed = self.cmd(
                 f"iot adr ns registry-device list --ns {namespace_name} "
@@ -177,6 +198,11 @@ class TestADRRegistryDeviceLifecycle(CaptureOutputLiveScenarioTest):
             if configured_profile and configured_profile not in profile_names:
                 profile_names.append(configured_profile)
             for profile_name in profile_names:
+                self.cmd(
+                    "iot adr ns registry-device auth wait "
+                    f"-n {profile_name} --registry-device-name {device_name} "
+                    f"--ns {namespace_name} -g {TEST_RG}"
+                )
                 profile = self.cmd(
                     "iot adr ns registry-device auth show "
                     f"-n {profile_name} --registry-device-name {device_name} "
@@ -337,7 +363,6 @@ class TestADRRegistryDeviceLifecycle(CaptureOutputLiveScenarioTest):
             )
             created = self.cmd(
                 f"iot adr ns registry-device attribute create -n {attribute_name} {scope} "
-                f"--reported-by User "
                 f"--schema https://contoso.com/schemas/site.json "
                 f'--properties \'{{"site": "plant-3", "rack": 12}}\''
             ).get_output_in_json()
@@ -433,7 +458,13 @@ class TestADRRegistryDeviceLifecycle(CaptureOutputLiveScenarioTest):
         self.cmd(
             f"iot adr ns registry-device attribute create -n bad "
             f"--registry-device-name nonexistent --ns {namespace_name} -g {TEST_RG} "
-            f"--reported-by NotAService",
+            f"--reported-by Microsoft.DeviceUpdate",
+            expect_failure=True,
+        )
+        self.cmd(
+            f"iot adr ns registry-device attribute create -n bad "
+            f"--registry-device-name nonexistent --ns {namespace_name} -g {TEST_RG} "
+            f"--properties '{{\"reportedBy\":\"Microsoft.DeviceUpdate\"}}'",
             expect_failure=True,
         )
         self.cmd(

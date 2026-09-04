@@ -44,7 +44,7 @@ def test_job_run_list_by_job(fixture_job_run_provider):
         namespace_name="namespace",
         job_name="job",
     )
-    fixture_job_run_provider.client.job_runs.list_by_namespace.assert_not_called()
+    fixture_job_run_provider.client.job_runs_by_namespace.list_by_namespace.assert_not_called()
 
 
 def test_job_run_list_by_job_with_filter(fixture_job_run_provider):
@@ -84,7 +84,7 @@ def test_job_run_list_by_job_with_order_by(fixture_job_run_provider):
 
 
 def test_job_run_list_by_namespace_with_filter(fixture_job_run_provider):
-    fixture_job_run_provider.client.job_runs.list_by_namespace.return_value = iter(
+    fixture_job_run_provider.client.job_runs_by_namespace.list_by_namespace.return_value = iter(
         [{"name": "one"}]
     )
 
@@ -95,7 +95,7 @@ def test_job_run_list_by_namespace_with_filter(fixture_job_run_provider):
     )
 
     assert result == [{"name": "one"}]
-    fixture_job_run_provider.client.job_runs.list_by_namespace.assert_called_once_with(
+    fixture_job_run_provider.client.job_runs_by_namespace.list_by_namespace.assert_called_once_with(
         resource_group_name="rg",
         namespace_name="namespace",
         filter="status eq 'Active'",
@@ -104,7 +104,7 @@ def test_job_run_list_by_namespace_with_filter(fixture_job_run_provider):
 
 
 def test_job_run_list_by_namespace_with_order_by(fixture_job_run_provider):
-    fixture_job_run_provider.client.job_runs.list_by_namespace.return_value = iter([])
+    fixture_job_run_provider.client.job_runs_by_namespace.list_by_namespace.return_value = iter([])
 
     fixture_job_run_provider.list(
         "namespace",
@@ -112,7 +112,7 @@ def test_job_run_list_by_namespace_with_order_by(fixture_job_run_provider):
         order_by="status asc",
     )
 
-    fixture_job_run_provider.client.job_runs.list_by_namespace.assert_called_once_with(
+    fixture_job_run_provider.client.job_runs_by_namespace.list_by_namespace.assert_called_once_with(
         resource_group_name="rg",
         namespace_name="namespace",
         order_by="status asc",
@@ -145,14 +145,14 @@ def test_job_run_list_wrapper_forwards_order_by(mocker):
 
 def test_job_run_list_accepts_status_in(fixture_job_run_provider):
     status_filter = "status in ('Active', 'Scheduled')"
-    fixture_job_run_provider.client.job_runs.list_by_namespace.return_value = iter([])
+    fixture_job_run_provider.client.job_runs_by_namespace.list_by_namespace.return_value = iter([])
 
     fixture_job_run_provider.list(
         "namespace", "rg", status_filter=status_filter
     )
 
     assert (
-        fixture_job_run_provider.client.job_runs.list_by_namespace.call_args.kwargs[
+        fixture_job_run_provider.client.job_runs_by_namespace.list_by_namespace.call_args.kwargs[
             "filter"
         ]
         == status_filter

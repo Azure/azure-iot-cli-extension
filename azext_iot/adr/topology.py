@@ -4,12 +4,9 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""Shared namespace endpoint-topology validation."""
+"""Shared helpers and diagnostics for atomic namespace link operations."""
 
-from azure.cli.core.azclierror import (
-    ArgumentUsageError,
-    InvalidArgumentValueError,
-)
+from copy import deepcopy
 
 from azext_iot.adr.common import (
     DPS_ENDPOINT_TYPE,
@@ -34,6 +31,11 @@ SU_CAP_EXCEEDED_MSG = (
     "linked per namespace. Use 'az iot adr ns link su update' to modify the "
     "existing link, or 'az iot adr ns link su delete' to permanently delete "
     "the linked Update Instance before adding another."
+)
+
+HUB_CAP_EXCEEDED_MSG = (
+    "Namespace already has the maximum of 10 linked IoT Hubs. Delete a linked "
+    "Hub resource before adding another endpoint."
 )
 
 
@@ -71,6 +73,13 @@ def has_su_endpoint(namespace: dict) -> bool:
     )
 
 
+def hub_endpoint_count(namespace: dict) -> int:
+    return sum(
+        endpoint_is_type(endpoint, IOT_HUB_ENDPOINT_TYPE)
+        for endpoint in get_endpoints(namespace, "messaging").values()
+    )
+
+
 def is_failed_hub_endpoint(endpoint) -> bool:
     """Return whether an endpoint is a Hub whose linking state is Failed."""
     return endpoint_is_type(endpoint, IOT_HUB_ENDPOINT_TYPE) and (
@@ -78,132 +87,20 @@ def is_failed_hub_endpoint(endpoint) -> bool:
     ).casefold() == "failed"
 
 
-def validate_create_endpoint_topology(properties: dict):
-    """Validate endpoint dictionaries submitted in a namespace full PUT."""
-    messaging = ((properties.get("messaging") or {}).get("endpoints")) or {}
-    provisioning = (
-        (properties.get("provisioning") or {}).get("endpoints")
-    ) or {}
-    updating = ((properties.get("updating") or {}).get("endpoints")) or {}
-    dps_count = sum(
-        _patched_endpoint_type(name, endpoint, {}).casefold()
-        == DPS_ENDPOINT_TYPE.casefold()
-        for name, endpoint in provisioning.items()
-    )
-    if dps_count > 1:
-        raise ArgumentUsageError(DPS_CAP_EXCEEDED_MSG)
-    if any(
-        _patched_endpoint_type(name, endpoint, {}).casefold()
-        == IOT_HUB_ENDPOINT_TYPE.casefold()
-        for name, endpoint in messaging.items()
-    ) and not dps_count:
-        raise ArgumentUsageError(DPS_REQUIRED_MSG)
-    su_count = sum(
-        _patched_endpoint_type(name, endpoint, {}).casefold()
-        == SU_ENDPOINT_TYPE.casefold()
-        for name, endpoint in updating.items()
-    )
-    if su_count > 1:
-        raise ArgumentUsageError(SU_CAP_EXCEEDED_MSG)
-
-
-def update_topology_validation_required(properties: dict) -> bool:
-    """Return whether a namespace endpoint PATCH requires current endpoint state."""
-    return any(
-        ((properties.get(section) or {}).get("endpoints")) or {}
-        for section in ("messaging", "provisioning", "updating")
-    )
-
-
-def _patched_endpoint_type(endpoint_name: str, endpoint, existing: dict) -> str:
-    if isinstance(endpoint, dict) and "endpointType" in endpoint:
-        endpoint_type = endpoint["endpointType"]
-        if not isinstance(endpoint_type, str):
-            raise InvalidArgumentValueError(
-                f"Endpoint '{endpoint_name}' property 'endpointType' must be "
-                "a string."
-            )
-        return endpoint_type
-    current = existing.get(endpoint_name)
-    if isinstance(current, dict):
-        current_type = current.get("endpointType")
-        return current_type if isinstance(current_type, str) else ""
-    raise InvalidArgumentValueError(
-        f"Endpoint '{endpoint_name}' must include a string 'endpointType' "
-        "when adding a new endpoint."
-    )
-
-
-def validate_update_endpoint_topology(properties: dict, namespace: dict):
-    """Validate the effective DPS/Hub/SU topology for an endpoint PATCH."""
-    existing_messaging = get_endpoints(namespace, "messaging")
-    existing_provisioning = get_endpoints(namespace, "provisioning")
-    existing_updating = get_endpoints(namespace, "updating")
-    messaging_patch = (
-        (properties.get("messaging") or {}).get("endpoints")
-    ) or {}
-    provisioning_patch = (
-        (properties.get("provisioning") or {}).get("endpoints")
-    ) or {}
-    updating_patch = (
-        (properties.get("updating") or {}).get("endpoints")
-    ) or {}
-
-    effective_dps_names = {
-        name
-        for name, endpoint in existing_provisioning.items()
-        if endpoint_is_type(endpoint, DPS_ENDPOINT_TYPE)
-    }
-    for name, endpoint in provisioning_patch.items():
-        if endpoint is None:
-            effective_dps_names.discard(name)
+def writable_namespace_properties(properties: dict) -> dict:
+    """Copy replaceable namespace state without dropping established links."""
+    result = deepcopy(properties or {})
+    result.pop("provisioningState", None)
+    result.pop("uuid", None)
+    for section in ("provisioning", "messaging", "updating"):
+        if section not in result:
             continue
-        patched_type = _patched_endpoint_type(
-            name, endpoint, existing_provisioning
-        )
-        if patched_type.casefold() == DPS_ENDPOINT_TYPE.casefold():
-            effective_dps_names.add(name)
-        else:
-            effective_dps_names.discard(name)
-
-    if len(effective_dps_names) > 1:
-        raise ArgumentUsageError(DPS_CAP_EXCEEDED_MSG)
-
-    has_dps = bool(effective_dps_names)
-    for name, endpoint in messaging_patch.items():
-        if endpoint is None:
-            continue
-        current = existing_messaging.get(name)
-        is_new_hub = (
-            not endpoint_is_type(current, IOT_HUB_ENDPOINT_TYPE)
-            and _patched_endpoint_type(
-                name, endpoint, existing_messaging
-            ).casefold()
-            == IOT_HUB_ENDPOINT_TYPE.casefold()
-        )
-        if (is_new_hub or is_failed_hub_endpoint(current)) and not has_dps:
-            raise ArgumentUsageError(DPS_REQUIRED_MSG)
-
-    effective_su_names = {
-        name
-        for name, endpoint in existing_updating.items()
-        if endpoint_is_type(endpoint, SU_ENDPOINT_TYPE)
-    }
-    for name, endpoint in updating_patch.items():
-        if not isinstance(endpoint, dict):
-            raise InvalidArgumentValueError(
-                f"Updating endpoint '{name}' must be an object. Namespace PATCH "
-                "does not support unlinking Software Updates. Use "
-                "'az iot adr ns link su delete' to permanently delete the "
-                "linked Update Instance and remove its endpoint."
-            )
-        patched_type = _patched_endpoint_type(
-            name, endpoint, existing_updating
-        )
-        if patched_type.casefold() == SU_ENDPOINT_TYPE.casefold():
-            effective_su_names.add(name)
-        else:
-            effective_su_names.discard(name)
-
-    if len(effective_su_names) > 1:
-        raise ArgumentUsageError(SU_CAP_EXCEEDED_MSG)
+        section_body = result.get(section) or {}
+        endpoints = section_body.get("endpoints") or {}
+        section_body["endpoints"] = {
+            name: deepcopy(endpoint)
+            for name, endpoint in endpoints.items()
+            if isinstance(endpoint, dict)
+        }
+        result[section] = section_body
+    return result

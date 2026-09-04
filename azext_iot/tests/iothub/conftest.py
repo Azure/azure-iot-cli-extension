@@ -59,7 +59,7 @@ def assign_iot_hub_dataplane_rbac_role(hub_results):
 
 
 @pytest.fixture(scope='session', autouse=True)
-def _cleanup_dynamic_hub():
+def _cleanup_dynamic_hub(request):
     """Session-scoped fixture to delete dynamically created hubs after all tests complete.
 
     This runs once per xdist worker session, ensuring the hub is not deleted
@@ -67,7 +67,15 @@ def _cleanup_dynamic_hub():
     the same hub on the same worker).
     """
     yield
-    if not iothub_settings.env.azext_iot_testhub:
+    live = os.getenv("AZURE_TEST_RUN_LIVE", "").casefold() == "true"
+    integration_selected = any(
+        "_int.py" in item.nodeid for item in request.session.items
+    )
+    if (
+        live
+        and integration_selected
+        and not iothub_settings.env.azext_iot_testhub
+    ):
         logger.info("Deleting dynamically created hub: %s", ENTITY_NAME)
         from time import sleep
         for attempt in range(3):
@@ -303,10 +311,10 @@ def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_s
         name = generate_hub_id()
         base_create_command = f"iot hub create -n {name} -g {RG} --sku S1"
         if desired_sys_identity:
-            base_create_command += " --mi-system-assigned"
+            base_create_command += " --system-assigned-mi"
         if desired_user_identity and provisioned_user_identity:
             user_identity_id = provisioned_user_identity["id"]
-            base_create_command += f" --mi-user-assigned {user_identity_id}"
+            base_create_command += f" --user-assigned-mi {user_identity_id}"
         if desired_tags:
             base_create_command += f" --tags {desired_tags}"
         if desired_location:

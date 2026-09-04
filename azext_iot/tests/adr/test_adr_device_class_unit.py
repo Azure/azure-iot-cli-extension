@@ -43,7 +43,9 @@ def provider():
                 }
             }
         }
-        yield DeviceClassProvider(MagicMock(cli_ctx=MagicMock()))
+        value = DeviceClassProvider(MagicMock(cli_ctx=MagicMock()))
+        value.client = data_client
+        yield value
 
 
 def test_list_device_classes(provider):
@@ -51,7 +53,7 @@ def test_list_device_classes(provider):
     provider.client.device_classes.list.return_value = expected
 
     assert provider.list(NAMESPACE, RG) == expected
-    provider.client.device_classes.list.assert_called_once_with(endpoint=ENDPOINT)
+    provider.client.device_classes.list.assert_called_once_with()
 
 
 def test_show_device_class(provider):
@@ -60,7 +62,6 @@ def test_show_device_class(provider):
 
     assert provider.show(NAMESPACE, RG, CLASS_ID) == expected
     provider.client.device_classes.get_device_class.assert_called_once_with(
-        endpoint=ENDPOINT,
         device_class_id=CLASS_ID,
     )
 
@@ -71,6 +72,5 @@ def test_delete_device_class(provider):
 
     assert provider.delete(NAMESPACE, RG, CLASS_ID) == expected
     provider.client.device_classes.delete.assert_called_once_with(
-        endpoint=ENDPOINT,
         device_class_id=CLASS_ID,
     )

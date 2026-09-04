@@ -8,9 +8,12 @@ from unittest.mock import Mock, patch
 
 import pytest
 from azure.cli.core.azclierror import (
+    ArgumentUsageError,
+    AzureResponseError,
     InvalidArgumentValueError,
     RequiredArgumentMissingError,
 )
+from azure.core.exceptions import HttpResponseError
 
 from azext_iot import _factory
 from azext_iot.adr.common import build_managed_service_identity
@@ -187,6 +190,143 @@ def test_create_resolves_location_and_supports_no_wait(
     poller.result.assert_not_called()
 
 
+def test_create_propagates_existing_instance_lookup_error(
+    update_instance_provider,
+):
+    error = HttpResponseError(message="service unavailable")
+    error.status_code = 503
+    operations = update_instance_provider.client.update_instances
+    operations.check_name_availability.return_value = {
+        "nameAvailable": False
+    }
+    operations.get.side_effect = error
+
+    with pytest.raises(HttpResponseError, match="service unavailable"):
+        update_instance_provider.create(INSTANCE, RG)
+
+    operations.begin_create.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "identity",
+    [
+        {
+            "type": "UserAssigned",
+            "userAssignedIdentities": {
+                UAMI_ID: {
+                    "principalId": "principal",
+                    "clientId": "client",
+                }
+            },
+        },
+        {"type": "SystemAssigned", "principalId": "principal"},
+        {"type": "None"},
+        None,
+    ],
+)
+def test_create_upsert_preserves_unspecified_identity_tags_and_state(
+    update_instance_provider, identity
+):
+    current = {
+        "id": (
+            "/subscriptions/sub/resourceGroups/rg/providers/"
+            "Microsoft.DeviceUpdate/updateInstances/test-update-instance"
+        ),
+        "location": "centraluseuap",
+        "tags": {"existing": "tag"},
+        "properties": {
+            "provisioningState": "Succeeded",
+            "serviceAddress": "https://service",
+            "linking": {"state": "Succeeded"},
+        },
+    }
+    if identity is not None:
+        current["identity"] = identity
+    operations = update_instance_provider.client.update_instances
+    operations.check_name_availability.return_value = {
+        "nameAvailable": False
+    }
+    operations.get.return_value = current
+    operations.begin_create.return_value.result.return_value = {
+        "name": INSTANCE
+    }
+    update_instance_provider._ensure_location = Mock()
+
+    update_instance_provider.create(INSTANCE, RG)
+
+    body = operations.begin_create.call_args.kwargs["resource"]
+    assert body["location"] == "centraluseuap"
+    assert body["tags"] == {"existing": "tag"}
+    assert body["properties"] == {}
+    if identity is None:
+        assert "identity" not in body
+    elif identity["type"] == "UserAssigned":
+        assert body["identity"] == {
+            "type": "UserAssigned",
+            "userAssignedIdentities": {UAMI_ID: {}},
+        }
+    else:
+        assert body["identity"] == {"type": identity["type"]}
+    update_instance_provider._ensure_location.assert_not_called()
+
+
+def test_create_upsert_blocks_replacing_active_identity(
+    update_instance_provider,
+):
+    namespace_id = (
+        "/subscriptions/sub/resourceGroups/rg/providers/"
+        "Microsoft.DeviceRegistry/namespaces/ns"
+    )
+    instance_id = (
+        "/subscriptions/sub/resourceGroups/rg/providers/"
+        "Microsoft.DeviceUpdate/updateInstances/test-update-instance"
+    )
+    operations = update_instance_provider.client.update_instances
+    operations.check_name_availability.return_value = {
+        "nameAvailable": False
+    }
+    operations.get.return_value = {
+        "id": instance_id,
+        "location": "centraluseuap",
+        "identity": {
+            "type": "UserAssigned",
+            "userAssignedIdentities": {UAMI_ID: {}},
+        },
+        "properties": {
+            "linking": {"namespaceResourceId": namespace_id}
+        },
+    }
+    registry = Mock()
+    registry.namespaces.get.return_value = {
+        "properties": {
+            "updating": {
+                "endpoints": {
+                    "su": {
+                        "resourceId": instance_id,
+                        "inboundCallerIdentity": {
+                            "type": "UserAssigned",
+                            "userAssignedIdentity": UAMI_ID,
+                        },
+                    }
+                }
+            }
+        }
+    }
+    replacement = UAMI_ID.replace("identity", "replacement")
+
+    with patch(
+        "azext_iot.adr.providers.update_instance.adr_service_factory",
+        return_value=registry,
+    ), pytest.raises(ArgumentUsageError, match="active ADR link"):
+        update_instance_provider.create(
+            INSTANCE,
+            RG,
+            mi_user_assigned=[replacement],
+        )
+
+    operations.begin_create.assert_not_called()
+
+
 @pytest.mark.parametrize(
     "kwargs, expected",
     [
@@ -211,6 +351,13 @@ def test_update_builds_patch_and_waits(update_instance_provider, kwargs, expecte
     poller.result.return_value = {"name": INSTANCE}
     operations = update_instance_provider.client.update_instances
     operations.begin_update.return_value = poller
+    operations.get.return_value = {
+        "id": (
+            "/subscriptions/sub/resourceGroups/rg/providers/"
+            "Microsoft.DeviceUpdate/updateInstances/test-update-instance"
+        ),
+        "properties": {},
+    }
 
     assert update_instance_provider.update(INSTANCE, RG, **kwargs) == {"name": INSTANCE}
     operations.begin_update.assert_called_once_with(
@@ -255,8 +402,7 @@ def test_delete_waits_and_supports_no_wait(update_instance_provider):
 def test_update_instance_factory_uses_generated_sdk_and_canary_arm_endpoint():
     cli_ctx = Mock()
     client_path = (
-        "azext_iot.sdk.deviceupdate.duregistry."
-        "DeviceRegistryLinkedDeviceUpdatingServiceUnderMicrosoftDeviceUpdate"
+        "azext_iot.sdk.deviceupdate.duregistry.DeviceUpdateClient"
     )
     with patch(
         "azure.cli.core.commands.client_factory.get_subscription_id",
@@ -274,7 +420,185 @@ def test_update_instance_factory_uses_generated_sdk_and_canary_arm_endpoint():
 
     assert client_type.call_args.kwargs["subscription_id"] == "subscription"
     assert (
-        client_type.call_args.kwargs["endpoint"]
+        client_type.call_args.kwargs["base_url"]
         == "https://centraluseuap.management.azure.com"
     )
     assert client_type.call_args.kwargs["credential_scopes"] == ["scope"]
+
+
+@pytest.mark.parametrize(
+    "selected, desired",
+    [
+        (
+            {"type": "SystemAssigned"},
+            {"type": "None"},
+        ),
+        (
+            {
+                "type": "UserAssigned",
+                "userAssignedIdentity": UAMI_ID,
+            },
+            {"type": "SystemAssigned"},
+        ),
+    ],
+)
+def test_update_protects_identity_selected_by_active_link(
+    update_instance_provider, selected, desired
+):
+    namespace_id = (
+        "/subscriptions/sub/resourceGroups/rg/providers/"
+        "Microsoft.DeviceRegistry/namespaces/ns"
+    )
+    instance_id = (
+        "/subscriptions/sub/resourceGroups/rg/providers/"
+        "Microsoft.DeviceUpdate/updateInstances/su"
+    )
+    instance = {
+        "id": instance_id,
+        "properties": {"linking": {"namespaceResourceId": namespace_id}},
+    }
+    registry = Mock()
+    registry.namespaces.get.return_value = {
+        "properties": {
+            "updating": {
+                "endpoints": {
+                    "su": {
+                        "resourceId": instance_id,
+                        "inboundCallerIdentity": selected,
+                    }
+                }
+            }
+        }
+    }
+    with patch(
+        "azext_iot.adr.providers.update_instance.adr_service_factory",
+        return_value=registry,
+    ), pytest.raises(ArgumentUsageError, match="link su update"):
+        update_instance_provider._protect_link_identity(instance, desired)
+
+
+def test_update_identity_guard_ignores_unlinked_instance(
+    update_instance_provider,
+):
+    update_instance_provider._protect_link_identity(
+        {"id": "/updateInstances/unlinked", "properties": {}},
+        {"type": "None"},
+    )
+
+
+def test_update_identity_guard_rejects_invalid_or_unreadable_namespace(
+    update_instance_provider,
+):
+    invalid = {
+        "id": "/updateInstances/instance",
+        "properties": {
+            "linking": {"namespaceResourceId": "not-an-arm-id"}
+        }
+    }
+    with pytest.raises(ArgumentUsageError, match="could not be validated"):
+        update_instance_provider._protect_link_identity(
+            invalid, {"type": "None"}
+        )
+
+    linked = {
+        "id": "/updateInstances/instance",
+        "properties": {
+            "linking": {
+                "namespaceResourceId": (
+                    "/subscriptions/sub/resourceGroups/rg/providers/"
+                    "Microsoft.DeviceRegistry/namespaces/ns"
+                )
+            }
+        }
+    }
+    with patch(
+        "azext_iot.adr.providers.update_instance.adr_service_factory",
+        side_effect=RuntimeError("forbidden"),
+    ), pytest.raises(ArgumentUsageError, match="could not be read"):
+        update_instance_provider._protect_link_identity(
+            linked, {"type": "None"}
+        )
+
+
+def test_update_identity_guard_fails_closed_when_instance_id_is_omitted(
+    update_instance_provider,
+):
+    linked = {
+        "properties": {
+            "linking": {
+                "namespaceResourceId": (
+                    "/subscriptions/sub/resourceGroups/rg/providers/"
+                    "Microsoft.DeviceRegistry/namespaces/ns"
+                )
+            }
+        }
+    }
+    with pytest.raises(
+        AzureResponseError, match="omitted its resource ID"
+    ) as raised:
+        update_instance_provider._protect_link_identity(
+            linked, {"type": "None"}
+        )
+
+    assert "No identity update was submitted" in str(raised.value)
+
+    # An identity-less, unlinked response does not require an ARM ID.
+    update_instance_provider._protect_link_identity(None, {"type": "None"})
+
+
+def test_update_with_missing_instance_id_fails_before_patch(
+    update_instance_provider,
+):
+    operations = update_instance_provider.client.update_instances
+    operations.get.return_value = {
+        "properties": {
+            "linking": {
+                "namespaceResourceId": (
+                    "/subscriptions/sub/resourceGroups/rg/providers/"
+                    "Microsoft.DeviceRegistry/namespaces/ns"
+                )
+            }
+        }
+    }
+
+    with pytest.raises(AzureResponseError, match="omitted its resource ID"):
+        update_instance_provider.update(
+            INSTANCE, RG, mi_system_assigned=False
+        )
+
+    operations.begin_update.assert_not_called()
+
+
+def test_update_identity_guard_ignores_other_update_instance(
+    update_instance_provider,
+):
+    namespace_id = (
+        "/subscriptions/sub/resourceGroups/rg/providers/"
+        "Microsoft.DeviceRegistry/namespaces/ns"
+    )
+    instance = {
+        "id": "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.DeviceUpdate/updateInstances/current",
+        "properties": {"linking": {"namespaceResourceId": namespace_id}},
+    }
+    registry = Mock()
+    registry.namespaces.get.return_value = {
+        "properties": {
+            "updating": {
+                "endpoints": {
+                    "other": {
+                        "resourceId": (
+                            "/subscriptions/sub/resourceGroups/rg/providers/"
+                            "Microsoft.DeviceUpdate/updateInstances/other"
+                        )
+                    }
+                }
+            }
+        }
+    }
+    with patch(
+        "azext_iot.adr.providers.update_instance.adr_service_factory",
+        return_value=registry,
+    ):
+        update_instance_provider._protect_link_identity(
+            instance, {"type": "None"}
+        )

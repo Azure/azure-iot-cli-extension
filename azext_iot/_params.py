@@ -1186,10 +1186,39 @@ def load_arguments(self, _):
             help="Optional device information.",
         )
         context.argument(
+            "adr_namespace",
+            options_list=["--adr-namespace"],
+            help="Device Registry namespace containing the certificate policy.",
+            arg_group="ADR Certificate Policy",
+        )
+        context.argument(
+            "adr_ca_name",
+            options_list=["--adr-ca-name"],
+            help="Certificate Authority name in the Device Registry namespace.",
+            arg_group="ADR Certificate Policy",
+        )
+        context.argument(
+            "adr_certificate_policy_name",
+            options_list=[
+                "--adr-cert-policy-name",
+                context.deprecate(
+                    target="--adr-certificate-policy-name",
+                    redirect="--adr-cert-policy-name",
+                    hide=True,
+                ),
+            ],
+            help="Certificate Policy name under the Device Registry Certificate Authority.",
+            arg_group="ADR Certificate Policy",
+        )
+        context.argument(
             "credential_policy_name",
             options_list=["--credential-policy-name", "--cpn"],
-            help="ADR Namespace Credential Policy Name.",
-            arg_group="ADR Credential Policy"
+            deprecate_info=context.deprecate(
+                redirect="--adr-cert-policy-name", hide=True
+            ),
+            help="Deprecated alias for --adr-cert-policy-name. "
+            "--adr-namespace and --adr-ca-name are also required.",
+            arg_group="ADR Certificate Policy",
         )
 
     with self.argument_context("iot dps enrollment create") as context:
@@ -1298,10 +1327,39 @@ def load_arguments(self, _):
             help="ID of device registration."
         )
         context.argument(
+            "adr_namespace",
+            options_list=["--adr-namespace"],
+            help="Device Registry namespace containing the certificate policy.",
+            arg_group="ADR Certificate Policy",
+        )
+        context.argument(
+            "adr_ca_name",
+            options_list=["--adr-ca-name"],
+            help="Certificate Authority name in the Device Registry namespace.",
+            arg_group="ADR Certificate Policy",
+        )
+        context.argument(
+            "adr_certificate_policy_name",
+            options_list=[
+                "--adr-cert-policy-name",
+                context.deprecate(
+                    target="--adr-certificate-policy-name",
+                    redirect="--adr-cert-policy-name",
+                    hide=True,
+                ),
+            ],
+            help="Certificate Policy name under the Device Registry Certificate Authority.",
+            arg_group="ADR Certificate Policy",
+        )
+        context.argument(
             "credential_policy_name",
             options_list=["--credential-policy-name", "--cpn"],
-            help="ADR Namespace Credential Policy Name.",
-            arg_group="ADR Credential Policy"
+            deprecate_info=context.deprecate(
+                redirect="--adr-cert-policy-name", hide=True
+            ),
+            help="Deprecated alias for --adr-cert-policy-name. "
+            "--adr-namespace and --adr-ca-name are also required.",
+            arg_group="ADR Certificate Policy",
         )
 
     with self.argument_context("iot dps enrollment-group show") as context:
