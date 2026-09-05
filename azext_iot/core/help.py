@@ -32,18 +32,17 @@ def patch_core_help():
         --ns-identity-id UserIdentityResourceId --skip-ns-ra
 """
 
-    # add DPS create examples for ADR properties
+    # add DPS create examples for managed identity
     if "iot dps create" in helps:
         helps[
             "iot dps create"
         ] += """
-  - name: Create an Azure IoT Hub Device Provisioning Service with system identity and Device Registry namespace properties
+  - name: Create an Azure IoT Hub Device Provisioning Service with a system-assigned managed identity
     text: >
-        az iot dps create --name MyDps --resource-group MyResourceGroup --mi-system-assigned --ns-resource-id NamespaceResourceId
-  - name: Create an Azure IoT Hub Device Provisioning Service with user-managed identity and Device Registry namespace properties
+        az iot dps create --name MyDps --resource-group MyResourceGroup --mi-system-assigned
+  - name: Create an Azure IoT Hub Device Provisioning Service with a user-assigned managed identity
     text: >
         az iot dps create --name MyDps --resource-group MyResourceGroup --mi-user-assigned IdentityResourceId
-        --ns-resource-id NamespaceResourceId --ns-identity-id IdentityResourceId
 """
 
     # add DPS identity help

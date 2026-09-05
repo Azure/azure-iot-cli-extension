@@ -40,7 +40,6 @@ from azext_iot.core.shared import (
     ADR_ROLE_ASSIGN_ERROR_MSG,
     AccessRights,
     AuthenticationType,
-    DeviceRegistryNamespaceAuthenticationType,
     EncodingFormat,
     EndpointType,
     IdentityType,
@@ -192,32 +191,17 @@ def iot_dps_create(
     unit=1,
     tags=None,
     enable_data_residency=None,
-    adr_ns_id=None,
-    adr_ns_identity_id=None,
     mi_system_assigned=None,
     mi_user_assigned=None,
 ):
     """
-    Create a DPS instance with support for Device Registry namespace.
+    Create a DPS instance with managed identity support.
     This is an enhanced version of the Azure CLI core command with additional features.
     """
     cli_ctx = cmd.cli_ctx
     _check_dps_name_availability(client.iot_dps_resource, dps_name)
     location = _ensure_location(cli_ctx, resource_group_name, location)
     dps_property = {"enableDataResidency": enable_data_residency}
-
-    # TODO - CMS Preview - DPS ADR properties
-    if adr_ns_id:
-        dps_property["deviceRegistryNamespace"] = _build_dps_adr_properties(
-            existing_namespace=None,
-            adr_ns_id=adr_ns_id,
-            adr_ns_identity_id=adr_ns_identity_id
-        )
-    elif adr_ns_identity_id:
-        # Error if identity provided without namespace ID
-        raise RequiredArgumentMissingError(
-            "Device Registry namespace id (--ns-resource-id) is required when specifying namespace user identity."
-        )
 
     dps_description = {
         "location": location,
@@ -240,22 +224,12 @@ def iot_dps_update(
     parameters,
     resource_group_name=None,
     tags=None,
-    adr_ns_id=None,
-    adr_ns_identity_id=None,
     mi_system_assigned=None,
     mi_user_assigned=None,
 ):
     resource_group_name = _ensure_dps_resource_group_name(client, resource_group_name, dps_name)
     if tags is not None:
         parameters["tags"] = tags
-
-    # Update ADR namespace configuration if provided
-    if adr_ns_id or adr_ns_identity_id:
-        parameters["properties"]["deviceRegistryNamespace"] = _build_dps_adr_properties(
-            parameters["properties"].get("deviceRegistryNamespace"),
-            adr_ns_id,
-            adr_ns_identity_id
-        )
 
     if mi_system_assigned is not None or mi_user_assigned:
         parameters["identity"] = _construct_identity_info(mi_system_assigned, mi_user_assigned)
@@ -2138,48 +2112,6 @@ def _setup_adr_hub_role_assignments(cmd, namespace_id: str, hub_id: str, custom_
 
     except Exception as e:
         logger.warning(f"Failed to set up ADR role assignments: {str(e)}.\n{ADR_ROLE_ASSIGN_ERROR_MSG}")
-
-
-def _build_dps_adr_properties(
-    existing_namespace: Optional[dict] = None,
-    adr_ns_id: Optional[str] = None,
-    adr_ns_identity_id: Optional[str] = None
-) -> Optional[dict]:
-    # Create new namespace object if it doesn't exist
-    if not existing_namespace:
-        # namespace id is required when creating a new object
-        if not adr_ns_id:
-            raise RequiredArgumentMissingError(
-                "Device Registry namespace resource ID (--ns-resource-id) is required."
-            )
-        adr_namespace_obj = {
-            "resourceId": adr_ns_id,
-            "authenticationType": DeviceRegistryNamespaceAuthenticationType.SYSTEM_ASSIGNED
-        }
-        # Set user identity and authentication type if provided
-        if adr_ns_identity_id:
-            adr_namespace_obj["selectedUserAssignedIdentityResourceId"] = adr_ns_identity_id
-            adr_namespace_obj["authenticationType"] = DeviceRegistryNamespaceAuthenticationType.USER_ASSIGNED
-    else:
-        # If resource ID is explicitly set to empty, remove all properties
-        if adr_ns_id is not None and not adr_ns_id:
-            return None
-        adr_namespace_obj = existing_namespace
-
-        # Update resource ID if provided
-        if adr_ns_id:
-            adr_namespace_obj["resourceId"] = adr_ns_id
-
-        # Update user identity ID if provided
-        if adr_ns_identity_id is not None:
-            if adr_ns_identity_id:
-                adr_namespace_obj["selectedUserAssignedIdentityResourceId"] = adr_ns_identity_id
-                adr_namespace_obj["authenticationType"] = DeviceRegistryNamespaceAuthenticationType.USER_ASSIGNED
-            else:
-                adr_namespace_obj["selectedUserAssignedIdentityResourceId"] = None
-                adr_namespace_obj["authenticationType"] = DeviceRegistryNamespaceAuthenticationType.SYSTEM_ASSIGNED
-
-    return adr_namespace_obj
 
 
 def _construct_identity_info(enable_system_identity, user_identities) -> Optional[dict]:

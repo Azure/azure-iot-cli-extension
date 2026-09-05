@@ -109,7 +109,7 @@ def iot_service_provisioning_factory(cli_ctx, *_):
     return IotDpsClient(
         credential=AZURE_CLI_CREDENTIAL,
         subscription_id=subscription_id,
-        endpoint=_get_arm_endpoint(cli_ctx),
+        base_url=_get_arm_endpoint(cli_ctx),
         credential_scopes=_get_credential_scopes(cli_ctx),
         user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
         http_logging_policy=_get_default_logging_policy(),

@@ -264,114 +264,6 @@ class ADRHubInfraHelper(RoleAssignmentHelper):
             "policy_name": policy_name,
         }
 
-    # --- DPS + enrollment + credential sync ---
-
-    def setup_dps_with_sync(
-        self,
-        infra: Dict[str, str],
-        resource_group: str,
-        namespace_name: str,
-        dps_name: str,
-        device_id: str,
-        enrollment_group_id: str,
-    ) -> Dict[str, str]:
-        """Create DPS with ADR link, hub link, enrollments, and credential sync.
-
-        Returns the *infra* dict augmented with ``id_scope`` and
-        ``policy_resource_id``.
-        """
-        hub_name = infra["hub_name"]
-        identity_resource_id = infra["identity_resource_id"]
-        adr_resource_id = infra["adr_resource_id"]
-        subscription_id = infra["subscription_id"]
-        policy_name = infra["policy_name"]
-
-        # Create DPS with ADR integration
-        with timed_step("Setup-DPS 1/4 ❯ Create DPS"):
-            dps_cmd = (
-                f"iot dps create --name {dps_name} -g {resource_group} --location {TEST_LOCATION} "
-                f"--mi-user-assigned {identity_resource_id} "
-                f"--ns-resource-id {adr_resource_id} "
-                f"--ns-identity-id {identity_resource_id}"
-            )
-            _log(LogKind.CMD, "az %s", dps_cmd)
-            dps = self.cmd(dps_cmd).get_output_in_json()
-            assert dps["properties"]["state"] == "Active"
-            _log(LogKind.RESULT, "DPS state=Active")
-
-        # Link hub to DPS
-        with timed_step("Setup-DPS 2/4 ❯ Link Hub to DPS"):
-            link_cmd = (
-                f"iot dps linked-hub create --dps-name {dps_name} -g {resource_group} "
-                f"--hub-name {hub_name}"
-            )
-            _log(LogKind.CMD, "az %s", link_cmd)
-            self.cmd(link_cmd)
-            _log(LogKind.RESULT, "ok")
-
-            dps_show_cmd = f"iot dps show --name {dps_name} -g {resource_group}"
-            _log(LogKind.CMD, "az %s", dps_show_cmd)
-            dps_show = self.cmd(dps_show_cmd).get_output_in_json()
-            infra["id_scope"] = dps_show["properties"]["idScope"]
-            _log(LogKind.RESULT, "idScope=%s", infra["id_scope"])
-
-        # Create enrollment group with credential policy
-        with timed_step("Setup-DPS 3/4 ❯ Create Enrollments"):
-            eg_cmd = (
-                f"iot dps enrollment-group create --dps-name {dps_name} -g {resource_group} "
-                f"--enrollment-id {enrollment_group_id} "
-                f"--credential-policy-name {policy_name}"
-            )
-            _log(LogKind.CMD, "az %s", eg_cmd)
-            self.cmd(eg_cmd)
-            _log(LogKind.RESULT, "Enrollment group '%s' created", enrollment_group_id)
-
-            # Create individual enrollment with credential policy (symmetric key)
-            ie_cmd = (
-                f"iot dps enrollment create --dps-name {dps_name} -g {resource_group} "
-                f"--enrollment-id {device_id} "
-                f"--credential-policy-name {policy_name} "
-                f"--attestation-type symmetrickey"
-            )
-            _log(LogKind.CMD, "az %s", ie_cmd)
-            self.cmd(ie_cmd)
-            _log(LogKind.RESULT, "Individual enrollment '%s' created", device_id)
-
-        # Credential sync
-        with timed_step("Setup-DPS 4/4 ❯ Credential Sync"):
-            sync_cmd = f"iot adr ns credential sync --ns {namespace_name} -g {resource_group}"
-            _log(LogKind.CMD, "az %s", sync_cmd)
-            sync_succeeded = False
-            try:
-                self.cmd(sync_cmd)
-                sync_succeeded = True
-                _log(LogKind.RESULT, "ok")
-            except Exception as e:
-                _log(
-                    LogKind.WARN,
-                    "Sync LRO failed (may be false negative): %s",
-                    str(e)[:300],
-                )
-
-            cert_list = self.get_hub_certificates(hub_name, resource_group)
-            assert len(cert_list) >= 1, (
-                f"No certificates on hub after sync (LRO succeeded={sync_succeeded}). "
-                "This indicates a real sync failure."
-            )
-            _log(LogKind.OK, "Certificates synced to hub")
-
-        infra["policy_resource_id"] = self.build_policy_resource_id(
-            subscription_id, resource_group, namespace_name, policy_name,
-        )
-        assert self.find_hub_cert_by_policy(
-            hub_name, resource_group, infra["policy_resource_id"],
-        ), (
-            f"Certificate for policy not found on hub. "
-            f"Expected PolicyResourceId={infra['policy_resource_id']}"
-        )
-
-        return infra
-
     # --- Hub certificate helpers ---
 
     def get_hub_certificates(self, hub_name: str, resource_group: str) -> List[dict]:
@@ -533,13 +425,11 @@ class ADRHubInfraHelper(RoleAssignmentHelper):
         hub_name: Optional[str] = None,
         namespace_name: Optional[str] = None,
         identity_name: Optional[str] = None,
-        dps_name: Optional[str] = None,
     ):
         """Best-effort cleanup of all infrastructure resources."""
         _log(LogKind.STEP, "Cleanup ❯ Delete All Infrastructure")
         cleanup_start = time.monotonic()
         for label, cmd in [
-            ("DPS", f"iot dps delete --name {dps_name} -g {resource_group}" if dps_name else None),
             ("IoT Hub", f"iot hub delete -n {hub_name} -g {resource_group}" if hub_name else None),
             ("ADR namespace", f"iot adr ns delete -n {namespace_name} -g {resource_group} -y" if namespace_name else None),
             ("UAMI", f"identity delete -n {identity_name} -g {resource_group}" if identity_name else None),
