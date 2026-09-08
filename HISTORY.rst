@@ -3,8 +3,8 @@
 Release History
 ===============
 
-Unreleased - September API alignment
-+++++++++++++++++++++++++++++++++++
+0.33.0b1 (Preview)
+++++++++++++++++++
 
 **API compatibility**
 
