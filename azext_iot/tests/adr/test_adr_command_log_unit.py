@@ -20,7 +20,7 @@ from azext_iot.tests.adr._log import _redact_command
 @pytest.fixture
 def scenario(monkeypatch):
     monkeypatch.delenv("PRETTY_LOG", raising=False)
-    test = ADRLiveScenarioTest.__new__(ADRLiveScenarioTest)
+    test = object.__new__(ADRLiveScenarioTest)
     test._testMethodName = "runTest"
     test.kwargs = {"namespace": "test-ns"}
     test.cli_ctx = object()

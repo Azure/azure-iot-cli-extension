@@ -152,7 +152,7 @@ def test_outcome_hook_preserves_standard_pytest_reporting(pretty, when, outcome,
 def test_namespace_lifecycle_logging_preserves_commands_and_cleanup(wait_fails, cleanup_fails, caplog, mocker):
     from azext_iot.tests.adr import test_adr_namespace_crud_int as scenario
 
-    test = scenario.TestADRNamespaceCrud.__new__(scenario.TestADRNamespaceCrud)
+    test = object.__new__(scenario.TestADRNamespaceCrud)
     test._testMethodName = "test_namespace_crud_lifecycle"
     test.kwargs = {}
     test.cli_ctx = Mock()
@@ -254,7 +254,7 @@ def test_pretty_step_without_arguments(monkeypatch, capsys):
 def test_namespace_scenario_requires_config(mocker):
     from azext_iot.tests.adr import test_adr_namespace_crud_int as scenario
     mocker.patch.object(scenario, "TEST_RG", None)
-    test = scenario.TestADRNamespaceCrud.__new__(scenario.TestADRNamespaceCrud)
+    test = object.__new__(scenario.TestADRNamespaceCrud)
     with pytest.raises(pytest.skip.Exception, match="azext_iot_testrg"):
         scenario.TestADRNamespaceCrud.test_namespace_crud_lifecycle(test)
 
@@ -265,7 +265,7 @@ def test_preflight_uses_explicit_configuration_and_does_not_provision(mocker):
     mocker.patch.object(scenario, "TEST_SUBSCRIPTION", "selected-sub")
     mocker.patch.object(scenario, "TEST_LOCATION", "selected-location")
     mocker.patch.object(scenario, "TEST_API_VERSION", "selected-api")
-    test = scenario.TestADRNamespaceCrud.__new__(scenario.TestADRNamespaceCrud)
+    test = object.__new__(scenario.TestADRNamespaceCrud)
     test.cmd = Mock()
     test.cmd.return_value.get_output_in_json.side_effect = [
         {"id": "selected-sub"},
