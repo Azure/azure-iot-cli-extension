@@ -52,18 +52,8 @@ def load_core_arguments(self, _):
             "Only applicable to Gen2 IoT Hubs.",
         )
 
-    # DPS create / update ADR and identity params
+    # DPS create / update identity params
     with self.argument_context("iot dps") as c:
-        c.argument(
-            "adr_ns_id",
-            options_list=["--ns-resource-id", "--ns-id"],
-            help="Device Registry namespace resource ID to link to this provisioning service.",
-        )
-        c.argument(
-            "adr_ns_identity_id",
-            options_list=["--ns-identity-id"],
-            help="User-managed identity resource ID to access Device Registry namespace.",
-        )
         c.argument(
             "mi_system_assigned",
             arg_type=get_three_state_flag(),

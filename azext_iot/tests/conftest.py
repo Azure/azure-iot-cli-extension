@@ -8,6 +8,7 @@ import re
 import responses
 import pytest
 import json
+import logging
 import os
 from functools import partial
 from urllib3.util.retry import Retry
@@ -81,6 +82,15 @@ mock_symmetric_key_attestation = {
 }
 
 generic_cs_template = "HostName={};SharedAccessKeyName={};SharedAccessKey={}"
+
+
+@pytest.fixture(autouse=True)
+def isolate_test_logging():
+    """Prevent module-level logging suppression from leaking between tests."""
+    previous_disable_level = logging.root.manager.disable
+    logging.disable(logging.NOTSET)
+    yield
+    logging.disable(previous_disable_level)
 
 
 def generate_cs(

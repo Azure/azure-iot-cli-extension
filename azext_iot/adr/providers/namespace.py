@@ -4,118 +4,89 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
 
-from azure.cli.core.azclierror import MutuallyExclusiveArgumentError
-from knack.log import get_logger
-from rich.console import Console
-
-from azext_iot.adr.common import (
-    DEFAULT_NS_POLICY_NAME,
-    DEFAULT_NS_POLICY_CERT_KEY_TYPE,
-    DEFAULT_NS_POLICY_CERT_VALIDITY_DAYS,
-    IdentityType,
+from azure.cli.core.azclierror import (
+    AzureResponseError,
+    InvalidArgumentValueError,
+    RequiredArgumentMissingError,
 )
-from azext_iot.adr.providers.base import ADRProvider
-from azext_iot.common.utility import wait_for_terminal_state
+from azure.core.exceptions import HttpResponseError
+from msrestazure.tools import is_valid_resource_id, parse_resource_id
 
-console = Console()
-logger = get_logger(__name__)
+from azext_iot.adr.common import IdentityType
+from azext_iot.adr.providers.base import ADRProvider, parse_json_object
+
+
+def _messaging_properties(value: Any) -> dict:
+    if value is None:
+        return {}
+    endpoints = parse_json_object(value, "--messaging-endpoints")
+    for name, endpoint in endpoints.items():
+        if not isinstance(name, str) or not name.strip() or not isinstance(endpoint, dict):
+            raise InvalidArgumentValueError(
+                "--messaging-endpoints must map nonempty endpoint names to JSON objects."
+            )
+        unsupported = set(endpoint) - {"address", "endpointType", "resourceId"}
+        if unsupported:
+            raise InvalidArgumentValueError(
+                f"Messaging endpoint '{name}' contains unsupported properties: "
+                f"{', '.join(sorted(unsupported))}."
+            )
+        if not isinstance(endpoint.get("address"), str) or not endpoint["address"].strip():
+            raise InvalidArgumentValueError(f"Messaging endpoint '{name}' requires a nonempty address.")
+        for key in ("endpointType", "resourceId"):
+            if key in endpoint and not isinstance(endpoint[key], str):
+                raise InvalidArgumentValueError(f"Messaging endpoint '{name}' property '{key}' must be a string.")
+    return {"messaging": {"endpoints": endpoints}}
+
+
+def _clean_migrate_resource_ids(resource_ids: Optional[List[str]]) -> List[str]:
+    if not resource_ids:
+        raise RequiredArgumentMissingError("Specify at least one legacy asset resource ID with --resource-ids.")
+    unique_ids = {}
+    for resource_id in resource_ids:
+        cleaned = resource_id.strip().rstrip("/") if isinstance(resource_id, str) else ""
+        if not cleaned or not is_valid_resource_id(cleaned):
+            raise InvalidArgumentValueError(f"'{resource_id}' is not a valid Azure resource ID.")
+        parsed = parse_resource_id(cleaned)
+        if (
+            (parsed.get("namespace") or "").casefold() != "microsoft.deviceregistry"
+            or (parsed.get("type") or "").casefold() != "assets"
+            or "child_name_1" in parsed
+        ):
+            raise InvalidArgumentValueError(f"'{resource_id}' is not a Microsoft.DeviceRegistry/assets resource ID.")
+        unique_ids.setdefault(cleaned.casefold(), cleaned)
+    return list(unique_ids.values())
 
 
 class NamespaceProvider(ADRProvider):
-    def __init__(self, cmd):
-        super(NamespaceProvider, self).__init__(cmd)
-
     def create(
         self,
         namespace_name: str,
         resource_group_name: str,
         location: Optional[str] = None,
         tags: Optional[Dict[str, str]] = None,
-        enable_certificate_management: Optional[bool] = None,
-        policy_name: Optional[str] = None,
-        certificate_key_type: Optional[str] = None,
-        certificate_subject: Optional[str] = None,
-        certificate_validity_days: Optional[int] = None,
+        system_assigned: bool = True,
+        messaging_endpoints: Any = None,
         **kwargs,
     ):
-        # If any policy arguments provided, create policy
-        should_create_credential_policy = any([
-            enable_certificate_management,
-            policy_name,
-            certificate_key_type,
-            certificate_subject,
-            certificate_validity_days,
-        ])
-
-        if should_create_credential_policy:
-            # user provided policy inputs but enable is strictly false
-            if enable_certificate_management is False:
-                raise MutuallyExclusiveArgumentError(
-                    "Cannot create a custom policy if `--enable-certificate-management` is false."
-                )
-
-            # Set defaults for certificate parameters if not provided
-            if certificate_key_type is None:
-                certificate_key_type = DEFAULT_NS_POLICY_CERT_KEY_TYPE
-            if certificate_validity_days is None:
-                certificate_validity_days = DEFAULT_NS_POLICY_CERT_VALIDITY_DAYS
-
-        if not location:
-            location = self._ensure_location(self.cmd.cli_ctx, resource_group_name, location)
-
-        namespace_resource = {"location": location}
-
-        # Default system assigned identity
-        namespace_resource["identity"] = {"type": IdentityType.system_assigned.value}
-
-        if tags:
-            namespace_resource["tags"] = tags
-
-        # TODO - CMS Preview - support messaging endpoints create
-
-        with console.status(f"Creating namespace {namespace_name}..."):
-            poller = self.client.namespaces.begin_create_or_replace(
-                resource_group_name=resource_group_name,
-                namespace_name=namespace_name,
-                resource=namespace_resource,
-            )
-            namespace_result = wait_for_terminal_state(poller, **kwargs)
-
-        # TODO - CMS Preview - create response does not include resource group
-        if not namespace_result.get("resourceGroup"):
-            namespace_result["resourceGroup"] = resource_group_name
-
-        if should_create_credential_policy:
-            try:
-                from azext_iot.adr.providers.credential import CredentialProvider
-
-                credential_provider = CredentialProvider(self.cmd)
-                credential_provider.create(
-                    namespace_name=namespace_name, resource_group_name=resource_group_name, location=location, **kwargs
-                )
-            except Exception as e:
-                logger.error("Error creating default namespace credential: %s", str(e))
-
-            try:
-                from azext_iot.adr.providers.policy import PolicyProvider
-
-                policy_provider = PolicyProvider(self.cmd)
-                policy_provider.create(
-                    policy_name=policy_name or DEFAULT_NS_POLICY_NAME,
-                    namespace_name=namespace_name,
-                    resource_group_name=resource_group_name,
-                    location=location,
-                    certificate_key_type=certificate_key_type,
-                    certificate_subject=certificate_subject,
-                    certificate_validity_days=certificate_validity_days,
-                    **kwargs,
-                )
-            except Exception as e:
-                logger.error("Error creating credential policy: %s", str(e))
-
-        return namespace_result
+        properties = _messaging_properties(messaging_endpoints)
+        resource = {
+            "location": self._ensure_location(self.cmd.cli_ctx, resource_group_name, location),
+            "identity": {"type": IdentityType.system_assigned.value if system_assigned else IdentityType.none.value},
+        }
+        if tags is not None:
+            resource["tags"] = tags
+        if properties:
+            resource["properties"] = properties
+        poller = self.client.namespaces.begin_create_or_replace(
+            resource_group_name=resource_group_name, namespace_name=namespace_name, resource=resource
+        )
+        result = self._wait(poller, f"Creating namespace {namespace_name}...", **kwargs)
+        if not kwargs.get("no_wait") and result and not result.get("resourceGroup"):
+            result["resourceGroup"] = resource_group_name
+        return result
 
     def show(self, namespace_name: str, resource_group_name: str):
         return self.client.namespaces.get(resource_group_name=resource_group_name, namespace_name=namespace_name)
@@ -128,31 +99,57 @@ class NamespaceProvider(ADRProvider):
         return list(result)
 
     def delete(self, namespace_name: str, resource_group_name: str, **kwargs):
-        logger.warning(
-            "All child resources (credentials, policies, devices) under namespace '%s' will be deleted.",
-            namespace_name,
-        )
-        logger.warning(
-            "Deletion will fail if there are DPS or IoT Hub instances linked to this namespace. Unlink them first."
-        )
-        with console.status(f"Deleting namespace {namespace_name}..."):
+        try:
             poller = self.client.namespaces.begin_delete(
                 resource_group_name=resource_group_name, namespace_name=namespace_name
             )
-            return wait_for_terminal_state(poller, **kwargs)
+            return self._wait(poller, f"Deleting namespace {namespace_name}...", **kwargs)
+        except HttpResponseError as error:
+            if "NamespaceNotEmpty" in str(error):
+                raise AzureResponseError(
+                    f"Namespace '{namespace_name}' is not empty. Delete its child resources before deleting "
+                    "the namespace; namespace deletion does not cascade."
+                ) from error
+            raise
 
-    def update(self, namespace_name: str, resource_group_name: str, tags: Optional[Dict[str, str]] = None, **kwargs):
-        properties = {}
+    def update(
+        self,
+        namespace_name: str,
+        resource_group_name: str,
+        tags: Optional[Dict[str, str]] = None,
+        system_assigned: Optional[bool] = None,
+        messaging_endpoints: Any = None,
+        **kwargs,
+    ):
+        properties = _messaging_properties(messaging_endpoints)
+        resource = {}
         if tags is not None:
-            properties["tags"] = tags
+            resource["tags"] = tags
+        if system_assigned is not None:
+            resource["identity"] = {
+                "type": IdentityType.system_assigned.value if system_assigned else IdentityType.none.value
+            }
+        if properties:
+            resource["properties"] = properties
+        poller = self.client.namespaces.begin_update(
+            resource_group_name=resource_group_name, namespace_name=namespace_name, properties=resource
+        )
+        return self._wait(poller, f"Updating namespace {namespace_name}...", **kwargs)
 
-        # TODO - CMS Preview - support messaging endpoints update
+    def migrate(self, namespace_name: str, resource_group_name: str, resource_ids: List[str], **kwargs):
+        body = {"scope": "Resources", "resourceIds": _clean_migrate_resource_ids(resource_ids)}
+        poller = self.client.namespaces.begin_migrate(
+            resource_group_name=resource_group_name, namespace_name=namespace_name, body=body
+        )
+        return self._wait(poller, f"Migrating assets into namespace {namespace_name}...", **kwargs)
 
-        with console.status(f"Updating namespace {namespace_name}..."):
-            poller = self.client.namespaces.begin_update(
-                resource_group_name=resource_group_name,
-                namespace_name=namespace_name,
-                properties=properties,
-            )
-            result = wait_for_terminal_state(poller, **kwargs)
-            return result
+    def identity_show(self, namespace_name: str, resource_group_name: str):
+        return self.show(namespace_name, resource_group_name).get("identity") or {}
+
+    def identity_assign(self, namespace_name: str, resource_group_name: str, **kwargs):
+        result = self.update(namespace_name, resource_group_name, system_assigned=True, **kwargs)
+        return result if kwargs.get("no_wait") or result is None else result.get("identity") or {}
+
+    def identity_remove(self, namespace_name: str, resource_group_name: str, **kwargs):
+        result = self.update(namespace_name, resource_group_name, system_assigned=False, **kwargs)
+        return result if kwargs.get("no_wait") or result is None else result.get("identity") or {}
