@@ -402,6 +402,139 @@ def test_namespace_update_outbound_uami_preserves_identity_assignments(
     }
 
 
+def test_namespace_update_preflights_all_existing_links_for_new_outbound_uami(
+    fixture_namespace_provider, mock_poller, mocker
+):
+    fixture_namespace_provider.client.namespaces.get.return_value = {
+        "id": "/subscriptions/sub/resourceGroups/rg/providers/"
+        "Microsoft.DeviceRegistry/namespaces/namespace",
+        "identity": {
+            "type": "SystemAssigned,UserAssigned",
+            "principalId": "namespace-system",
+            "userAssignedIdentities": {
+                UAMI_ID: {"principalId": "namespace-user"}
+            },
+        },
+        "properties": {
+            "provisioning": {
+                "endpoints": {
+                    "dps": {
+                        "endpointType": "Microsoft.Devices/provisioningServices",
+                        "resourceId": "/subscriptions/sub/resourceGroups/rg/"
+                        "providers/Microsoft.Devices/provisioningServices/dps",
+                        "inboundCallerIdentity": {"type": "SystemAssigned"},
+                    }
+                }
+            },
+            "messaging": {
+                "endpoints": {
+                    "hub": {
+                        "endpointType": "Microsoft.Devices/IotHubs",
+                        "resourceId": "/subscriptions/sub/resourceGroups/rg/"
+                        "providers/Microsoft.Devices/IotHubs/hub",
+                        "inboundCallerIdentity": {"type": "SystemAssigned"},
+                    }
+                }
+            },
+            "updating": {
+                "endpoints": {
+                    "su": {
+                        "endpointType": "Microsoft.DeviceUpdate/updateInstances",
+                        "resourceId": "/subscriptions/sub/resourceGroups/rg/"
+                        "providers/Microsoft.DeviceUpdate/updateInstances/su",
+                        "inboundCallerIdentity": {"type": "SystemAssigned"},
+                    }
+                }
+            },
+        },
+    }
+    fixture_namespace_provider.client.namespaces.begin_update.return_value = (
+        mock_poller({"name": "namespace"})
+    )
+    provider = mocker.patch(
+        "azext_iot.adr.providers.link.LinkProvider"
+    ).return_value
+    provider._preflight_link.side_effect = (  # pylint: disable=protected-access
+        lambda **kwargs: kwargs["rbac_requests"].append(
+            {"link_type": kwargs["link_type"]}
+        )
+    )
+
+    fixture_namespace_provider.update(
+        "namespace", "rg", outbound_mi_user_assigned=UAMI_ID
+    )
+
+    assert {
+        call.kwargs["link_type"]
+        for call in provider._preflight_link.call_args_list  # pylint: disable=protected-access
+    } == {"hub", "dps", "su"}
+    candidate = provider._preflight_link.call_args.kwargs[  # pylint: disable=protected-access
+        "namespace"
+    ]
+    assert candidate["properties"]["outboundIdentity"] == {
+        "type": "UserAssigned",
+        "userAssignedIdentity": UAMI_ID,
+    }
+    provider._rbac_manager.return_value.ensure_many.assert_called_once_with(  # pylint: disable=protected-access
+        [
+            {"link_type": "dps"},
+            {"link_type": "hub"},
+            {"link_type": "su"},
+        ]
+    )
+
+
+def test_namespace_update_resolves_new_outbound_uami_before_link_preflight(
+    fixture_namespace_provider, mock_poller, mocker
+):
+    fixture_namespace_provider.client.namespaces.get.return_value = {
+        "id": "/subscriptions/sub/resourceGroups/rg/providers/"
+        "Microsoft.DeviceRegistry/namespaces/namespace",
+        "identity": {
+            "type": "SystemAssigned",
+            "principalId": "namespace-system",
+        },
+        "properties": {
+            "messaging": {
+                "endpoints": {
+                    "hub": {
+                        "endpointType": "Microsoft.Devices/IotHubs",
+                        "resourceId": "/subscriptions/sub/resourceGroups/rg/"
+                        "providers/Microsoft.Devices/IotHubs/hub",
+                    }
+                }
+            }
+        },
+    }
+    fixture_namespace_provider.client.namespaces.begin_update.return_value = (
+        mock_poller({"name": "namespace"})
+    )
+    embedded = mocker.patch(
+        "azext_iot.common.embedded_cli.EmbeddedCLI"
+    ).return_value
+    embedded.invoke.return_value.as_json.return_value = {
+        "principalId": "namespace-user"
+    }
+    provider = mocker.patch(
+        "azext_iot.adr.providers.link.LinkProvider"
+    ).return_value
+
+    fixture_namespace_provider.update(
+        "namespace", "rg", outbound_mi_user_assigned=UAMI_ID
+    )
+
+    embedded.invoke.assert_called_once_with(
+        f"identity show --ids '{UAMI_ID}'",
+        subscription="sub",
+    )
+    candidate = provider._preflight_link.call_args.kwargs[  # pylint: disable=protected-access
+        "namespace"
+    ]
+    assert candidate["identity"]["userAssignedIdentities"][UAMI_ID] == {
+        "principalId": "namespace-user"
+    }
+
+
 def test_namespace_update_outbound_uami_deduplicates_id_casing(
     fixture_namespace_provider, mock_poller
 ):
@@ -804,6 +937,13 @@ def test_clean_migrate_resource_ids_preserves_first_casing():
 def test_namespace_update_can_clear_explicit_outbound_identity(
     fixture_namespace_provider, mock_poller
 ):
+    fixture_namespace_provider.client.namespaces.get.return_value = {
+        "identity": {
+            "type": "SystemAssigned",
+            "principalId": "namespace-principal",
+        },
+        "properties": {},
+    }
     fixture_namespace_provider.client.namespaces.begin_update.return_value = mock_poller(
         {}
     )
@@ -816,6 +956,10 @@ def test_namespace_update_can_clear_explicit_outbound_identity(
         "properties"
     ]
     assert body == {"properties": {"outboundIdentity": None}}
+    fixture_namespace_provider.client.namespaces.get.assert_called_once_with(
+        resource_group_name="rg",
+        namespace_name="namespace",
+    )
 
 
 def test_namespace_identity_show(fixture_namespace_provider):
@@ -1081,6 +1225,31 @@ def test_namespace_identity_remove_rejects_system_outbound_identity(
         "identity": {"type": "SystemAssigned"},
         "properties": {"outboundIdentity": {"type": "SystemAssigned"}},
     }
+    with pytest.raises(InvalidArgumentValueError, match="outbound"):
+        fixture_namespace_provider.identity_remove(
+            "namespace", "rg", system_assigned=True
+        )
+
+
+def test_namespace_identity_remove_rejects_implicit_system_outbound_with_links(
+    fixture_namespace_provider,
+):
+    fixture_namespace_provider.client.namespaces.get.return_value = {
+        "identity": {
+            "type": "SystemAssigned",
+            "principalId": "namespace-principal",
+        },
+        "properties": {
+            "messaging": {
+                "endpoints": {
+                    "hub": {
+                        "endpointType": "Microsoft.Devices/IotHubs",
+                    }
+                }
+            }
+        },
+    }
+
     with pytest.raises(InvalidArgumentValueError, match="outbound"):
         fixture_namespace_provider.identity_remove(
             "namespace", "rg", system_assigned=True

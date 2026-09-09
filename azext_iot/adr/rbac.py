@@ -6,10 +6,14 @@
 
 """Authoritative service-to-service RBAC policy for ADR namespace links."""
 
+import base64
+import binascii
 from dataclasses import dataclass
+import json
 from time import monotonic, sleep
 from typing import Dict, Iterable, Optional, Tuple
 
+import requests
 from azure.cli.core.azclierror import (
     AzureResponseError,
     InvalidArgumentValueError,
@@ -25,6 +29,9 @@ USER_ACCESS_ADMINISTRATOR_ROLE = "User Access Administrator"
 ADU_FIRST_PARTY_APP_ID = "6ee392c4-d339-4083-b04d-6b7947c6cf78"
 RBAC_PROPAGATION_TIMEOUT_SECONDS = 180
 RBAC_PROPAGATION_DELAYS = (2, 4, 8, 10)
+GRAPH_SERVICE_PRINCIPALS_URL = (
+    "https://graph.microsoft.com/v1.0/servicePrincipals"
+)
 
 
 @dataclass(frozen=True)
@@ -198,17 +205,31 @@ class LinkRbacManager:
         *,
         clock=None,
         sleeper=None,
+        graph_get=None,
         propagation_timeout: int = RBAC_PROPAGATION_TIMEOUT_SECONDS,
     ):
         self.cli = cli or EmbeddedCLI(cli_ctx=cli_ctx, capture_stderr=True)
-        self._adu_principal_id = None
+        self.tenant_cli = cli or EmbeddedCLI(capture_stderr=True)
+        self._graph_get = graph_get or requests.get
+        self._adu_principal_ids = {}
+        self._caller_object_ids = {}
         self._clock = clock or monotonic
         self._sleep = sleeper or sleep
         self._propagation_timeout = propagation_timeout
 
-    def _invoke_json(self, command: str, subscription: Optional[str] = None):
+    def _invoke_json(
+        self,
+        command: str,
+        subscription: Optional[str] = None,
+        *,
+        tenant: bool = False,
+    ):
         try:
-            result = self.cli.invoke(command, subscription=subscription)
+            cli = self.tenant_cli if tenant else self.cli
+            invoke_kwargs = (
+                {} if tenant else {"subscription": subscription}
+            )
+            result = cli.invoke(command, **invoke_kwargs)
             if not result.success():
                 raise AzureResponseError(
                     f"Azure CLI command failed during link RBAC preflight: az {command}"
@@ -222,19 +243,56 @@ class LinkRbacManager:
                 f"Detail: {error}"
             ) from error
 
-    def _resolve_adu_principal(self) -> str:
-        if self._adu_principal_id is None:
-            service_principal = self._invoke_json(
-                f"ad sp show --id '{ADU_FIRST_PARTY_APP_ID}'"
+    def _access_token(
+        self, subscription_id: str, resource_type: Optional[str] = None
+    ) -> str:
+        command = (
+            "account get-access-token "
+            f"--subscription '{subscription_id}'"
+        )
+        if resource_type:
+            command += f" --resource-type '{resource_type}'"
+        command += " --query accessToken"
+        access_token = self._invoke_json(command, tenant=True)
+        if not isinstance(access_token, str) or not access_token:
+            raise AzureResponseError(
+                f"Could not acquire an access token for subscription "
+                f"'{subscription_id}'."
             )
-            self._adu_principal_id = (service_principal or {}).get("id")
-            if not self._adu_principal_id:
+        return access_token
+
+    def _resolve_adu_principal(self, subscription_id: str) -> str:
+        if subscription_id not in self._adu_principal_ids:
+            access_token = self._access_token(
+                subscription_id, resource_type="ms-graph"
+            )
+            try:
+                response = self._graph_get(
+                    GRAPH_SERVICE_PRINCIPALS_URL,
+                    headers={"Authorization": f"Bearer {access_token}"},
+                    params={
+                        "$filter": f"appId eq '{ADU_FIRST_PARTY_APP_ID}'",
+                        "$select": "id",
+                    },
+                    timeout=30,
+                )
+                response.raise_for_status()
+                principals = response.json().get("value") or []
+            except (requests.RequestException, ValueError) as error:
+                raise AzureResponseError(
+                    "Could not query Microsoft Graph for the ADU first-party "
+                    "service principal."
+                ) from error
+            self._adu_principal_ids[subscription_id] = (
+                principals[0].get("id") if principals else None
+            )
+            if not self._adu_principal_ids[subscription_id]:
                 raise AzureResponseError(
                     "Could not resolve the ADU first-party service principal. "
                     f"Resolve application ID {ADU_FIRST_PARTY_APP_ID} and grant "
                     "it Contributor on the Update Instance."
                 )
-        return self._adu_principal_id
+        return self._adu_principal_ids[subscription_id]
 
     def _assignment_exists(
         self, principal_id: str, role: str, scope: str
@@ -248,22 +306,42 @@ class LinkRbacManager:
         )
         return bool(assignments)
 
-    def _current_assignee(self) -> str:
-        account = self._invoke_json("account show")
-        assignee = ((account or {}).get("user") or {}).get("name")
-        if not assignee:
+    def _current_assignee_object_id(self, subscription_id: str) -> str:
+        if subscription_id in self._caller_object_ids:
+            return self._caller_object_ids[subscription_id]
+        access_token = self._access_token(subscription_id)
+        try:
+            payload = str(access_token).split(".")[1]
+            payload += "=" * (-len(payload) % 4)
+            claims = json.loads(
+                base64.urlsafe_b64decode(payload).decode("utf-8")
+            )
+            object_id = claims.get("oid") if isinstance(claims, dict) else None
+        except (
+            binascii.Error,
+            IndexError,
+            TypeError,
+            UnicodeDecodeError,
+            ValueError,
+        ):
+            object_id = None
+        if not object_id:
             raise AzureResponseError(
-                "Could not resolve the signed-in principal for automatic RBAC. "
+                "Could not resolve the signed-in principal object ID from the "
+                "Azure access token for automatic RBAC. "
                 "Create the listed role assignments manually and retry."
             )
-        return assignee
+        self._caller_object_ids[subscription_id] = object_id
+        return object_id
 
-    def _caller_can_assign(self, assignee: str, scope: str) -> bool:
+    def _caller_can_assign(self, assignee_object_id: str, scope: str) -> bool:
         for role in (OWNER_ROLE, USER_ACCESS_ADMINISTRATOR_ROLE):
             assignments = self._invoke_json(
                 "role assignment list "
-                f"--assignee '{assignee}' --role '{role}' --scope '{scope}' "
-                "--include-inherited --include-groups",
+                f"--assignee-object-id '{assignee_object_id}' "
+                f"--role '{role}' --scope '{scope}' "
+                "--include-inherited --include-groups "
+                "--fill-principal-name false",
                 subscription=_scope_subscription(scope),
             )
             if assignments:
@@ -370,7 +448,9 @@ class LinkRbacManager:
             }
             for rule in LINK_ROLE_MATRIX[link_type]:
                 principal_id = (
-                    self._resolve_adu_principal()
+                    self._resolve_adu_principal(
+                        _scope_subscription(scopes["target"])
+                    )
                     if rule.principal == "adu_first_party"
                     else principals.get(rule.principal)
                 )
@@ -391,12 +471,14 @@ class LinkRbacManager:
         if not missing:
             return
 
-        assignee = self._current_assignee()
-        unauthorized_scopes = [
-            scope
-            for scope in dict.fromkeys(item[2] for item in missing)
-            if not self._caller_can_assign(assignee, scope)
-        ]
+        unauthorized_scopes = []
+        for scope in dict.fromkeys(item[2] for item in missing):
+            subscription_id = _scope_subscription(scope)
+            assignee_object_id = self._current_assignee_object_id(
+                subscription_id
+            )
+            if not self._caller_can_assign(assignee_object_id, scope):
+                unauthorized_scopes.append(scope)
         commands = self._manual_commands(missing)
         if unauthorized_scopes:
             scopes_text = ", ".join(unauthorized_scopes)

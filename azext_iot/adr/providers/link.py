@@ -181,7 +181,6 @@ class LinkProvider(ADRProvider):
         operations_factory: Callable,
         operation_group_name: str,
         delete_name_parameter: str,
-        no_wait: bool = False,
         **kwargs,
     ):
         return delete_linked_resource_and_endpoint(
@@ -200,7 +199,6 @@ class LinkProvider(ADRProvider):
             operations_factory=operations_factory,
             operation_group_name=operation_group_name,
             delete_name_parameter=delete_name_parameter,
-            no_wait=no_wait,
             **kwargs,
         )
 

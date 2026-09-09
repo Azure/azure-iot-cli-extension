@@ -437,8 +437,6 @@ def load_adr_help():
   examples:
     - name: Delete the linked IoT Hub and update the namespace without prompting
       text: az iot adr ns link hub delete -n primary --ns myNamespace -g myResourceGroup --yes
-    - name: Complete Hub deletion, then submit namespace cleanup without waiting
-      text: az iot adr ns link hub delete -n primary --ns myNamespace -g myResourceGroup --yes --no-wait
   """
 
     helps[
@@ -548,8 +546,6 @@ def load_adr_help():
   examples:
     - name: Delete the linked DPS and update the namespace without prompting
       text: az iot adr ns link dps delete -n primary --ns myNamespace -g myResourceGroup --yes
-    - name: Complete DPS deletion, then submit namespace cleanup without waiting
-      text: az iot adr ns link dps delete -n primary --ns myNamespace -g myResourceGroup --yes --no-wait
   """
 
     helps[
@@ -656,8 +652,6 @@ def load_adr_help():
   examples:
     - name: Delete the linked Update Instance and update the namespace without prompting
       text: az iot adr ns link su delete -n my-su --ns myNamespace -g myResourceGroup --yes
-    - name: Complete Update Instance deletion, then submit namespace cleanup without waiting
-      text: az iot adr ns link su delete -n my-su --ns myNamespace -g myResourceGroup --yes --no-wait
   """
 
     helps[

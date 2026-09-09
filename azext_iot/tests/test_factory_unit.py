@@ -50,8 +50,9 @@ class TestFactoryCredentialScopes:
 
         mock_client_cls.assert_called_once()
         call_kwargs = mock_client_cls.call_args.kwargs
+        assert call_kwargs["api_version"] == "2026-06-01-preview"
         assert call_kwargs["credential_scopes"] == cloud_config["expected_scopes"]
-        assert call_kwargs["base_url"] == CANARY_ARM
+        assert call_kwargs["base_url"] == cloud_config["resource_manager"]
 
     def test_iot_hub_factory_honors_subscription_override(
         self, mocker, cloud_config
@@ -87,7 +88,7 @@ class TestFactoryCredentialScopes:
         mock_client_cls.assert_called_once()
         call_kwargs = mock_client_cls.call_args.kwargs
         assert call_kwargs["credential_scopes"] == cloud_config["expected_scopes"]
-        assert call_kwargs["base_url"] == CANARY_ARM
+        assert call_kwargs["base_url"] == cloud_config["resource_manager"]
 
     def test_dps_factory_honors_subscription_override(
         self, mocker, cloud_config
@@ -245,6 +246,11 @@ class TestFactoryCredentialScopes:
         )
 
         assert client.call_args.kwargs["base_url"] == CANARY_ARM
+        if factory_name == "adr_iot_hub_service_factory":
+            assert (
+                client.call_args.kwargs["api_version"]
+                == "2026-06-01-preview"
+            )
         assert (
             client.call_args.kwargs["credential_scopes"]
             == cloud_config["expected_scopes"]

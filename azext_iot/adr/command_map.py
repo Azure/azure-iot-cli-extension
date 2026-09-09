@@ -221,7 +221,6 @@ def load_adr_commands(self, _):
             "delete",
             "adr_link_hub_delete",
             confirmation=_HUB_DELETE_CONFIRMATION,
-            supports_no_wait=True,
         )
         cmd_group.show_command("show", "adr_link_hub_show")
         cmd_group.command("list", "adr_link_hub_list")
@@ -238,7 +237,6 @@ def load_adr_commands(self, _):
             "delete",
             "adr_link_dps_delete",
             confirmation=_DPS_DELETE_CONFIRMATION,
-            supports_no_wait=True,
         )
         cmd_group.show_command("show", "adr_link_dps_show")
         cmd_group.command("list", "adr_link_dps_list")
@@ -255,7 +253,6 @@ def load_adr_commands(self, _):
             "delete",
             "adr_link_su_delete",
             confirmation=_SU_DELETE_CONFIRMATION,
-            supports_no_wait=True,
         )
         cmd_group.show_command("show", "adr_link_su_show")
         cmd_group.command("list", "adr_link_su_list")

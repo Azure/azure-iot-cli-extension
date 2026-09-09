@@ -8,9 +8,12 @@ from unittest.mock import Mock, call, patch
 
 import pytest
 
+from azext_iot.tests.adr import _helpers as subject
 from azext_iot.tests.adr._helpers import (
+    ADRFullInfraHelper,
     CleanupLedger,
     is_retryable_resource_error,
+    is_resource_not_found_error,
     wait_for_condition,
     wait_for_materialized_resources,
     wait_for_resource_succeeded,
@@ -26,7 +29,7 @@ def test_wait_for_resource_succeeded_retries_initial_not_found():
     }
     test.cmd.side_effect = [RuntimeError("ResourceNotFound (404)"), response]
 
-    with patch("azext_iot.tests.adr._helpers.time.sleep") as sleep:
+    with patch.object(subject.time, "sleep") as sleep:
         result = wait_for_resource_succeeded(
             test, "show resource", max_polls=2, poll_interval=0
         )
@@ -56,7 +59,7 @@ def test_wait_for_resource_succeeded_times_out_with_last_error():
     test = Mock()
     test.cmd.side_effect = RuntimeError("ResourceNotFound: still missing")
 
-    with patch("azext_iot.tests.adr._helpers.time.sleep"), pytest.raises(
+    with patch.object(subject.time, "sleep"), pytest.raises(
         AssertionError, match="still missing"
     ):
         wait_for_resource_succeeded(
@@ -68,7 +71,7 @@ def test_wait_for_resource_succeeded_propagates_non_retryable_error():
     test = Mock()
     test.cmd.side_effect = RuntimeError("invalid command argument")
 
-    with patch("azext_iot.tests.adr._helpers.time.sleep") as sleep, pytest.raises(
+    with patch.object(subject.time, "sleep") as sleep, pytest.raises(
         RuntimeError, match="invalid command argument"
     ):
         wait_for_resource_succeeded(
@@ -100,6 +103,13 @@ def test_retryable_resource_error_uses_structured_status(status_code):
 )
 def test_retryable_resource_error_uses_symbolic_code(message):
     assert is_retryable_resource_error(RuntimeError(message))
+
+
+def test_resource_not_found_error_is_specific():
+    missing = RuntimeError("ResourceNotFound (404)")
+    forbidden = RuntimeError("403 Forbidden")
+    assert is_resource_not_found_error(missing)
+    assert not is_resource_not_found_error(forbidden)
 
 
 def test_wait_for_condition_uses_bounded_clock_and_sanitized_observation():
@@ -215,6 +225,62 @@ def test_cleanup_ledger_raises_when_only_cleanup_fails():
     with pytest.raises(AssertionError, match="resource: cleanup error"):
         with CleanupLedger() as cleanup:
             cleanup.register("resource", fail_cleanup)
+
+
+def test_full_infra_cleanup_removes_links_before_namespace_and_identity():
+    helper = ADRFullInfraHelper()
+    commands = []
+
+    def invoke(command):
+        commands.append(command)
+        if "link dps list" in command:
+            response = Mock()
+            response.get_output_in_json.return_value = [{"name": "dps-primary"}]
+            return response
+        if command.startswith("iot dps show"):
+            raise RuntimeError("ResourceNotFound (404)")
+        return Mock()
+
+    helper.cmd = Mock(side_effect=invoke)
+    helper.cleanup_full_infra(
+        resource_group="rg",
+        namespace_name="ns",
+        identity_name="identity",
+        dps_name="dps",
+        linked_endpoints=[("dps", "dps-primary")],
+    )
+
+    link_delete = next(
+        index
+        for index, command in enumerate(commands)
+        if "link dps delete" in command
+    )
+    namespace_delete = next(
+        index
+        for index, command in enumerate(commands)
+        if command.startswith("iot adr ns delete")
+    )
+    identity_delete = next(
+        index
+        for index, command in enumerate(commands)
+        if command.startswith("identity delete")
+    )
+    assert link_delete < namespace_delete < identity_delete
+    assert not any(command.startswith("iot dps delete") for command in commands)
+
+
+def test_full_infra_cleanup_reports_probe_failures():
+    helper = ADRFullInfraHelper()
+    helper.cmd = Mock(side_effect=RuntimeError("403 Forbidden"))
+
+    with pytest.raises(AssertionError, match="lookup: 403 Forbidden"):
+        helper.cleanup_full_infra(
+            resource_group="rg",
+            namespace_name="ns",
+            identity_name="identity",
+            dps_name="dps",
+            linked_endpoints=[("dps", "dps-primary")],
+        )
 
 
 def test_known_object_role_assignment_bypasses_graph_resolution():

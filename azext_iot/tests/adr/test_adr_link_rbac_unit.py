@@ -4,11 +4,14 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import base64
 from io import StringIO
+import json
 import shlex
 from unittest.mock import MagicMock
 
 import pytest
+import requests
 from azure.cli.core.azclierror import (
     AzureResponseError,
     InvalidArgumentValueError,
@@ -16,6 +19,7 @@ from azure.cli.core.azclierror import (
 
 from azext_iot.adr.rbac import (
     ADU_FIRST_PARTY_APP_ID,
+    GRAPH_SERVICE_PRINCIPALS_URL,
     HUB_DATA_ROLE,
     LINK_ROLE_MATRIX,
     LinkRbacManager,
@@ -44,6 +48,19 @@ def _result(payload, success=True):
     result.success.return_value = success
     result.as_json.return_value = payload
     return result
+
+
+def _access_token(object_id="caller-object-id"):
+    claims = base64.urlsafe_b64encode(
+        json.dumps({"oid": object_id}).encode("utf-8")
+    ).decode("ascii").rstrip("=")
+    return f"header.{claims}.signature"
+
+
+def _graph_response(principals):
+    response = MagicMock()
+    response.json.return_value = {"value": principals}
+    return response
 
 
 def _namespace(outbound=None):
@@ -252,7 +269,7 @@ def test_rbac_reuses_inherited_assignments_without_privilege_check_or_create():
         call.kwargs["subscription"] == "sub"
         for call in cli.invoke.call_args_list
     )
-    assert not any("account show" in command for command in commands)
+    assert not any("account get-access-token" in command for command in commands)
     assert not any("role assignment create" in command for command in commands)
 
 
@@ -273,6 +290,8 @@ def test_rbac_scope_query_passes_real_azure_cli_validation(mocker):
     assert "--all" not in command
     assert not manager._caller_can_assign("caller", TARGET_SCOPE)
     privilege_command = recording_cli.invoke.call_args.args[0]
+    assert "--assignee-object-id 'caller'" in privilege_command
+    assert "--fill-principal-name false" in privilege_command
     assert "--include-inherited" in privilege_command
     assert "--include-groups" in privilege_command
     assert "--all" not in privilege_command
@@ -331,7 +350,7 @@ def test_rbac_authorized_caller_creates_only_missing_assignments():
         _result([]),  # namespace -> Contributor target
         _result([{"id": "existing-data-role"}]),
         _result([]),  # linked -> Contributor namespace
-        _result({"user": {"name": "caller@example.test"}}),
+        _result(_access_token()),
         _result([{"roleDefinitionName": "Owner"}]),  # target privilege
         _result([]),  # namespace Owner
         _result([{"roleDefinitionName": "User Access Administrator"}]),
@@ -358,7 +377,7 @@ def test_rbac_authorized_caller_creates_only_missing_assignments():
         call.args[0]
         for call in cli.invoke.call_args_list
         if "role assignment list" in call.args[0]
-        and "caller@example.test" in call.args[0]
+        and "caller-object-id" in call.args[0]
     ]
     assert privilege_queries
     assert all("--include-groups" in item for item in privilege_queries)
@@ -371,7 +390,7 @@ def test_rbac_unauthorized_fails_with_exact_remediation_before_create():
     cli.invoke.side_effect = [
         _result([]),
         _result([]),
-        _result({"user": {"name": "reader@example.test"}}),
+        _result(_access_token("reader-object-id")),
         _result([]),
         _result([]),
         _result([]),
@@ -398,8 +417,8 @@ def test_atomic_rbac_plan_checks_every_service_before_any_assignment():
     cli = MagicMock()
 
     def invoke(command, **_):
-        if command == "account show":
-            return _result({"user": {"name": "reader@example.test"}})
+        if command.startswith("account get-access-token"):
+            return _result(_access_token("reader-object-id"))
         return _result([])
 
     cli.invoke.side_effect = invoke
@@ -429,7 +448,11 @@ def test_atomic_rbac_plan_checks_every_service_before_any_assignment():
         manager.ensure_many(requests)
 
     commands = [call.args[0] for call in cli.invoke.call_args_list]
-    first_account = commands.index("account show")
+    first_account = next(
+        index
+        for index, command in enumerate(commands)
+        if command.startswith("account get-access-token")
+    )
     assert first_account >= 5
     assert not any("role assignment create" in command for command in commands)
 
@@ -439,9 +462,9 @@ def test_su_resolves_first_party_principal_and_includes_its_assignment():
     cli.invoke.side_effect = [
         _result([]),
         _result([]),
-        _result({"id": "adu-object-id"}),
+        _result("graph-access-token"),
         _result([]),
-        _result({"user": {"name": "owner@example.test"}}),
+        _result(_access_token("owner-object-id")),
         _result([{"id": "owner"}]),
         _result([{"id": "owner"}]),
         _result({"id": "created-1"}),
@@ -451,7 +474,10 @@ def test_su_resolves_first_party_principal_and_includes_its_assignment():
         _result([{"id": "visible-2"}]),
         _result([{"id": "visible-3"}]),
     ]
-    manager = LinkRbacManager(MagicMock(), cli=cli)
+    graph_get = MagicMock(
+        return_value=_graph_response([{"id": "adu-object-id"}])
+    )
+    manager = LinkRbacManager(MagicMock(), cli=cli, graph_get=graph_get)
 
     manager.ensure(
         "su", NS_SCOPE, TARGET_SCOPE, "ns-principal", "su-principal"
@@ -459,8 +485,18 @@ def test_su_resolves_first_party_principal_and_includes_its_assignment():
 
     commands = [call.args[0] for call in cli.invoke.call_args_list]
     assert any(
-        f"ad sp show --id '{ADU_FIRST_PARTY_APP_ID}'" in command
+        "account get-access-token" in command
+        and "--resource-type 'ms-graph'" in command
         for command in commands
+    )
+    graph_get.assert_called_once_with(
+        GRAPH_SERVICE_PRINCIPALS_URL,
+        headers={"Authorization": "Bearer graph-access-token"},
+        params={
+            "$filter": f"appId eq '{ADU_FIRST_PARTY_APP_ID}'",
+            "$select": "id",
+        },
+        timeout=30,
     )
     assert any(
         "role assignment create" in command
@@ -474,11 +510,47 @@ def test_su_reports_unresolvable_first_party_principal():
     cli.invoke.side_effect = [
         _result([{"id": "existing"}]),
         _result([{"id": "existing"}]),
-        _result({}),
+        _result("graph-access-token"),
     ]
-    manager = LinkRbacManager(MagicMock(), cli=cli)
+    manager = LinkRbacManager(
+        MagicMock(),
+        cli=cli,
+        graph_get=MagicMock(return_value=_graph_response([])),
+    )
 
     with pytest.raises(AzureResponseError, match="first-party"):
+        manager.ensure(
+            "su", NS_SCOPE, TARGET_SCOPE, "ns-principal", "su-principal"
+        )
+
+
+def test_access_token_requires_nonempty_string():
+    cli = MagicMock()
+    cli.invoke.return_value = _result(None)
+    manager = LinkRbacManager(MagicMock(), cli=cli)
+
+    with pytest.raises(AzureResponseError, match="acquire an access token"):
+        manager._access_token("sub")  # pylint: disable=protected-access
+
+
+def test_su_reports_graph_query_failure():
+    cli = MagicMock()
+    cli.invoke.side_effect = [
+        _result([{"id": "existing"}]),
+        _result([{"id": "existing"}]),
+        _result("graph-access-token"),
+    ]
+    response = _graph_response([])
+    response.raise_for_status.side_effect = requests.RequestException(
+        "graph unavailable"
+    )
+    manager = LinkRbacManager(
+        MagicMock(),
+        cli=cli,
+        graph_get=MagicMock(return_value=response),
+    )
+
+    with pytest.raises(AzureResponseError, match="query Microsoft Graph"):
         manager.ensure(
             "su", NS_SCOPE, TARGET_SCOPE, "ns-principal", "su-principal"
         )
@@ -489,7 +561,7 @@ def test_missing_current_assignee_stops_before_privilege_checks():
     cli.invoke.side_effect = [
         _result([]),
         _result([]),
-        _result({"user": {}}),
+        _result("not-a-jwt"),
     ]
     manager = LinkRbacManager(MagicMock(), cli=cli)
 
@@ -504,7 +576,7 @@ def test_rbac_creation_failure_lists_remaining_commands():
     cli.invoke.side_effect = [
         _result([]),
         _result([]),
-        _result({"user": {"name": "owner@example.test"}}),
+        _result(_access_token("owner-object-id")),
         _result([{"id": "owner"}]),
         _result([{"id": "owner"}]),
         RuntimeError("authorization changed"),
@@ -523,7 +595,7 @@ def test_rbac_creation_race_reuses_assignment_created_by_another_actor():
     cli.invoke.side_effect = [
         _result([]),
         _result([]),
-        _result({"user": {"name": "owner@example.test"}}),
+        _result(_access_token("owner-object-id")),
         _result([{"id": "owner"}]),
         _result([{"id": "owner"}]),
         RuntimeError("assignment already exists"),

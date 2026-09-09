@@ -191,6 +191,112 @@ class NamespaceProvider(ADRProvider):
     def __init__(self, cmd):
         super(NamespaceProvider, self).__init__(cmd)
 
+    def _preflight_outbound_identity_change(
+        self, namespace: dict, outbound_identity: Optional[dict]
+    ) -> None:
+        properties = (namespace or {}).get("properties") or {}
+        sections = {
+            "provisioning": "dps",
+            "messaging": "hub",
+            "updating": "su",
+        }
+        links = [
+            (kind, endpoint)
+            for section, kind in sections.items()
+            for endpoint in (
+                (properties.get(section) or {}).get("endpoints") or {}
+            ).values()
+            if endpoint
+        ]
+        if not links:
+            return
+
+        from azext_iot.adr.providers import link as link_provider
+
+        candidate = deepcopy(namespace)
+        candidate_properties = candidate.setdefault("properties", {})
+        candidate_properties["outboundIdentity"] = outbound_identity
+        candidate_identity = candidate.get("identity") or {}
+        outbound_type = (outbound_identity or {}).get("type")
+        if outbound_type == "UserAssigned":
+            resource_id = outbound_identity.get("userAssignedIdentity")
+            normalized_id = _normalize_resource_id(resource_id)
+            identities = candidate_identity.setdefault(
+                "userAssignedIdentities", {}
+            )
+            matching_id = next(
+                (
+                    identity_id
+                    for identity_id in identities
+                    if _normalize_resource_id(identity_id) == normalized_id
+                ),
+                None,
+            )
+            details = identities.get(matching_id) or {}
+            if not details.get("principalId"):
+                from azext_iot.common.embedded_cli import EmbeddedCLI
+
+                parsed = parse_resource_id(resource_id)
+                details = EmbeddedCLI(
+                    cli_ctx=self.cmd.cli_ctx,
+                    capture_stderr=True,
+                ).invoke(
+                    f"identity show --ids '{resource_id}'",
+                    subscription=parsed.get("subscription"),
+                ).as_json()
+            identities[matching_id or resource_id] = {
+                "principalId": details.get("principalId")
+            }
+            candidate_identity["type"] = _managed_identity_type(
+                "SystemAssigned" in str(candidate_identity.get("type") or ""),
+                identities,
+            )
+        candidate["identity"] = candidate_identity
+
+        provider = link_provider.LinkProvider(
+            self.cmd, client=self.client
+        )
+        requests = []
+        strategies = {
+            "hub": (
+                link_provider._parse_hub_resource_id,
+                link_provider._HUB_TARGET,
+            ),
+            "dps": (
+                link_provider._parse_dps_resource_id,
+                link_provider._DPS_TARGET,
+            ),
+            "su": (
+                link_provider._parse_su_resource_id,
+                link_provider._SU_TARGET,
+            ),
+        }
+        endpoint_types = {
+            "hub": "Microsoft.Devices/IotHubs",
+            "dps": "Microsoft.Devices/provisioningServices",
+            "su": "Microsoft.DeviceUpdate/updateInstances",
+        }
+        for kind, endpoint in links:
+            if (
+                str(endpoint.get("endpointType") or "").casefold()
+                != endpoint_types[kind].casefold()
+            ):
+                continue
+            resource_id = endpoint.get("resourceId")
+            parser, strategy = strategies[kind]
+            provider._preflight_link(  # pylint: disable=protected-access
+                link_type=kind,
+                namespace=candidate,
+                target_resource_id=resource_id,
+                inbound_identity=endpoint.get("inboundCallerIdentity"),
+                parsed=parser(resource_id),
+                strategy=strategy,
+                rbac_requests=requests,
+            )
+        provider._rbac_manager().ensure_many(  # pylint: disable=protected-access
+            requests
+        )
+
     def create(
         self,
         namespace_name: str,
@@ -273,6 +379,15 @@ class NamespaceProvider(ADRProvider):
 
         if properties:
             namespace_resource["properties"] = properties
+
+        if existing_namespace is not None and (
+            outbound_identity is not None
+            or outbound_mi_system_assigned is False
+        ):
+            self._preflight_outbound_identity_change(
+                existing_namespace,
+                outbound_identity,
+            )
 
         poller = self.client.namespaces.begin_create_or_replace(
             resource_group_name=resource_group_name,
@@ -412,12 +527,23 @@ class NamespaceProvider(ADRProvider):
             )
         elif outbound_mi_system_assigned is False:
             properties["outboundIdentity"] = None
+            if namespace is None:
+                namespace = self.client.namespaces.get(
+                    resource_group_name=resource_group_name,
+                    namespace_name=namespace_name,
+                )
         if properties:
             body["properties"] = properties
         if not body:
             raise RequiredArgumentMissingError(
                 "Nothing to update. Provide --tags, --observability-enabled, or "
                 "an outbound managed identity."
+            )
+
+        if outbound_identity is not None or outbound_mi_system_assigned is False:
+            self._preflight_outbound_identity_change(
+                namespace,
+                outbound_identity,
             )
 
         poller = self.client.namespaces.begin_update(
@@ -549,7 +675,16 @@ class NamespaceProvider(ADRProvider):
         outbound_identity = ((namespace or {}).get("properties") or {}).get(
             "outboundIdentity"
         ) or {}
-        if system_assigned and outbound_identity.get("type") == "SystemAssigned":
+        namespace_properties = (namespace or {}).get("properties") or {}
+        has_links = any(
+            ((namespace_properties.get(section) or {}).get("endpoints") or {})
+            for section in ("provisioning", "messaging", "updating")
+        )
+        outbound_type = outbound_identity.get("type")
+        if system_assigned and (
+            outbound_type == "SystemAssigned"
+            or not outbound_type and has_links
+        ):
             raise InvalidArgumentValueError(
                 "The system-assigned identity is configured as the outbound "
                 "identity. Change the outbound identity before removing it."

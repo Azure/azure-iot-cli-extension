@@ -479,25 +479,11 @@ def test_hub_update_surface_is_identity_only(mocker, cmd):
 
 
 @pytest.mark.parametrize("kind", ["hub", "dps", "su"])
-def test_link_delete_delegates_no_wait(mocker, cmd, kind):
-    provider = _patch_provider(mocker, commands_link, "LinkProvider")
-    namespace_client = Mock()
-
-    getattr(commands_link, f"adr_link_{kind}_delete")(
-        cmd,
-        namespace_client,
-        endpoint_name="endpoint",
-        namespace_name=NS,
-        resource_group_name=RG,
-        no_wait=True,
-    )
-
-    getattr(provider, f"{kind}_delete").assert_called_once_with(
-        endpoint_name="endpoint",
-        namespace_name=NS,
-        resource_group_name=RG,
-        no_wait=True,
-    )
+def test_link_delete_does_not_expose_unsafe_no_wait(kind):
+    parameters = inspect.signature(
+        getattr(commands_link, f"adr_link_{kind}_delete")
+    ).parameters
+    assert "no_wait" not in parameters
 
 
 @pytest.mark.parametrize(

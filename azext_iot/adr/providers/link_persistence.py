@@ -120,7 +120,6 @@ def delete_linked_resource_and_endpoint(  # pylint: disable=too-many-arguments,t
     operations_factory: Callable,
     operation_group_name: str,
     delete_name_parameter: str,
-    no_wait: bool = False,
     **kwargs,
 ):
     """Delete the target first, then safely remove the matching endpoint."""
@@ -240,9 +239,6 @@ def delete_linked_resource_and_endpoint(  # pylint: disable=too-many-arguments,t
             "this command to remove the stale link. Backend detail: "
             f"{error}"
         ) from error
-
-    if no_wait:
-        return namespace_poller
 
     try:
         await_terminal(namespace_poller, **kwargs)

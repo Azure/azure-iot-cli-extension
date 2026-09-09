@@ -1297,66 +1297,6 @@ def test_namespace_replace_body_requires_location():
         _namespace_replace_body({"properties": {}})
 
 
-@pytest.mark.parametrize(
-    "kind,section,endpoint_name,factory_name",
-    [
-        ("hub", "messaging", "hub", "adr_iot_hub_service_factory"),
-        ("dps", "provisioning", "dps", "adr_iot_service_provisioning_factory"),
-        ("su", "updating", "su", "adr_update_instance_service_factory"),
-    ],
-)
-def test_link_delete_no_wait_completes_resource_then_returns_namespace_poller(
-    fixture_link_provider,
-    mocker,
-    kind,
-    section,
-    endpoint_name,
-    factory_name,
-):
-    namespace = _namespace_for_delete()
-    fixture_link_provider.client.namespaces.get.side_effect = [
-        namespace,
-        namespace,
-    ]
-    namespace_poller = Mock()
-    fixture_link_provider.client.namespaces.begin_create_or_replace.return_value = (
-        namespace_poller
-    )
-    linked_client = Mock()
-    resource_poller = Mock()
-    operation_group = {
-        "hub": linked_client.iot_hub_resource,
-        "dps": linked_client.iot_dps_resource,
-        "su": linked_client.update_instances,
-    }[kind]
-    operation_group.begin_delete.return_value = resource_poller
-    mocker.patch(
-        f"azext_iot.adr.providers.link.{factory_name}",
-        return_value=linked_client,
-    )
-    fixture_link_provider._await_terminal = Mock()
-
-    result = getattr(fixture_link_provider, f"{kind}_delete")(
-        endpoint_name,
-        "namespace",
-        "namespace-rg",
-        no_wait=True,
-    )
-
-    assert result is namespace_poller
-    operation_group.begin_delete.assert_called_once()
-    fixture_link_provider.client.namespaces.begin_create_or_replace.assert_called_once()
-    fixture_link_provider._await_terminal.assert_not_called()
-    resource_poller.result.assert_called_once_with()
-    operation_group.get.assert_not_called()
-    assert (
-        endpoint_name
-        not in fixture_link_provider.client.namespaces.begin_create_or_replace.call_args.kwargs[
-            "resource"
-        ]["properties"][section]["endpoints"]
-    )
-
-
 def test_link_delete_retries_cleanup_when_linked_resource_is_already_gone(
     fixture_link_provider, mocker
 ):

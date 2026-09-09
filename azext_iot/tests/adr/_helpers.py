@@ -7,6 +7,7 @@
 """Shared helpers for ADR integration tests that require Azure infrastructure."""
 
 import re
+import sys
 import time
 from typing import Callable, Dict, Optional, TypeVar
 
@@ -40,6 +41,10 @@ RESOURCE_RETRYABLE_ERROR = re.compile(
     r"RequestTimeout|TooManyRequests|Conflict|"
     r"InternalServerError|BadGateway|ServiceUnavailable|GatewayTimeout|"
     r"\b(408|409|429|500|502|503|504)\b",
+    re.IGNORECASE,
+)
+RESOURCE_NOT_FOUND_ERROR = re.compile(
+    r"ResourceNotFound|ParentResourceNotFound|could not be found|\b404\b",
     re.IGNORECASE,
 )
 T = TypeVar("T")
@@ -94,6 +99,18 @@ def is_retryable_resource_error(error: Exception) -> bool:
     return (
         status_code in RESOURCE_RETRYABLE_STATUS_CODES
         or RESOURCE_RETRYABLE_ERROR.search(str(error)) is not None
+    )
+
+
+def is_resource_not_found_error(error: Exception) -> bool:
+    status_code = getattr(error, "status_code", None)
+    if status_code is None:
+        status_code = getattr(
+            getattr(error, "response", None), "status_code", None
+        )
+    return (
+        status_code == 404
+        or RESOURCE_NOT_FOUND_ERROR.search(str(error)) is not None
     )
 
 
@@ -221,8 +238,9 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
         namespace_name: str,
         hub_name: str,
         identity_name: str,
+        assign_setup_roles: bool = True,
     ) -> Dict[str, str]:
-        """Create UAMI, ADR namespace, RBAC, and an ADR-linked IoT Hub."""
+        """Create UAMI, ADR namespace, and a standalone IoT Hub."""
         with timed_step("Setup 1/5 > Create UAMI"):
             uami_cmd = (
                 f"identity create -n {identity_name} -g {resource_group} "
@@ -238,10 +256,11 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
             subscription_id = self.cmd("account show").get_output_in_json()["id"]
             _log(LogKind.RESULT, "subscription=%s", subscription_id)
 
-        with timed_step("Setup 2/5 > RBAC: Hub RP Contributor"):
-            self.assign_hub_rp_contributor_role(
-                subscription_id, resource_group
-            )
+        if assign_setup_roles:
+            with timed_step("Setup 2/5 > RBAC: Hub RP Contributor"):
+                self.assign_hub_rp_contributor_role(
+                    subscription_id, resource_group
+                )
 
         with timed_step("Setup 3/5 > Create ADR Namespace"):
             ns_cmd = (
@@ -260,10 +279,11 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
                 namespace.get("identity", {}).get("type"),
             )
 
-        with timed_step("Setup 4/5 > RBAC: ADR Roles for UAMI"):
-            self.assign_adr_roles_to_identity(
-                identity_principal_id, adr_resource_id
-            )
+        if assign_setup_roles:
+            with timed_step("Setup 4/5 > RBAC: ADR Roles for UAMI"):
+                self.assign_adr_roles_to_identity(
+                    identity_principal_id, adr_resource_id
+                )
 
         with timed_step(
             "Setup 5/5 > Create Standard IoT Hub (may take 3-5 min)"
@@ -271,7 +291,8 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
             hub_cmd = (
                 f"iot hub create -n {hub_name} -g {resource_group} "
                 f"--sku S1 --location {TEST_LOCATION} "
-                f"--user-assigned-mi {identity_resource_id}"
+                f"--user-assigned-mi {identity_resource_id} "
+                "--disable-local-auth true"
             )
             _log(LogKind.CMD, "az %s", hub_cmd)
             _log(
@@ -331,25 +352,76 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
         namespace_name: Optional[str] = None,
         identity_name: Optional[str] = None,
         dps_name: Optional[str] = None,
+        linked_endpoints: Optional[list] = None,
     ) -> None:
-        """Best-effort cleanup of infrastructure resources."""
+        """Clean up linked endpoints before their namespace and identities."""
         _log(LogKind.STEP, "Cleanup > Delete All Infrastructure")
         cleanup_start = time.monotonic()
+        active_error = sys.exc_info()[1]
+        failures = []
+
+        if namespace_name:
+            for kind, endpoint_name in linked_endpoints or []:
+                try:
+                    listed = self.cmd(
+                        f"iot adr ns link {kind} list "
+                        f"--ns {namespace_name} -g {resource_group}"
+                    ).get_output_in_json()
+                except Exception as error:  # noqa: BLE001 - inspect all cleanup paths
+                    if not is_resource_not_found_error(error):
+                        failures.append(
+                            (f"{kind} link list {endpoint_name}", error)
+                        )
+                    continue
+                if endpoint_name not in {
+                    endpoint.get("name") for endpoint in listed or []
+                }:
+                    continue
+                command = (
+                    f"iot adr ns link {kind} delete -n {endpoint_name} "
+                    f"--ns {namespace_name} -g {resource_group} --yes"
+                )
+                _log(LogKind.CMD, "az %s", command)
+                try:
+                    self.cmd(command)
+                    _log(
+                        LogKind.RESULT,
+                        "%s link and target deleted",
+                        kind.upper(),
+                    )
+                except Exception as error:  # noqa: BLE001
+                    failures.append((f"{kind} link {endpoint_name}", error))
+                    _log(
+                        LogKind.WARN,
+                        "%s link cleanup failed: %s",
+                        kind.upper(),
+                        error,
+                    )
+
         resources = [
             (
                 "DPS",
+                f"iot dps show --name {dps_name} -g {resource_group}"
+                if dps_name
+                else None,
                 f"iot dps delete --name {dps_name} -g {resource_group}"
                 if dps_name
                 else None,
             ),
             (
                 "IoT Hub",
+                f"iot hub show -n {hub_name} -g {resource_group}"
+                if hub_name
+                else None,
                 f"iot hub delete -n {hub_name} -g {resource_group}"
                 if hub_name
                 else None,
             ),
             (
                 "ADR namespace",
+                f"iot adr ns show -n {namespace_name} -g {resource_group}"
+                if namespace_name
+                else None,
                 f"iot adr ns delete -n {namespace_name} "
                 f"-g {resource_group} -y"
                 if namespace_name
@@ -357,21 +429,46 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
             ),
             (
                 "UAMI",
+                f"identity show -n {identity_name} -g {resource_group}"
+                if identity_name
+                else None,
                 f"identity delete -n {identity_name} -g {resource_group}"
                 if identity_name
                 else None,
             ),
         ]
-        for label, command in resources:
+        for label, show_command, command in resources:
             if command:
+                try:
+                    self.cmd(show_command)
+                except Exception as error:  # noqa: BLE001 - inspect all cleanup paths
+                    if is_resource_not_found_error(error):
+                        _log(LogKind.RESULT, "%s already absent", label)
+                    else:
+                        failures.append((f"{label} lookup", error))
+                        _log(
+                            LogKind.WARN,
+                            "%s cleanup lookup failed: %s",
+                            label,
+                            error,
+                        )
+                    continue
                 _log(LogKind.CMD, "az %s", command)
                 try:
                     self.cmd(command)
                     _log(LogKind.RESULT, "%s deleted", label)
                 except Exception as error:  # noqa: BLE001
+                    failures.append((label, error))
                     _log(LogKind.WARN, "%s cleanup failed: %s", label, error)
         _log(
             "_time",
             "(%s)",
             _fmt_duration(time.monotonic() - cleanup_start),
         )
+        if failures and active_error is None:
+            detail = ", ".join(
+                f"{label}: {error}" for label, error in failures
+            )
+            raise AssertionError(
+                f"ADR cleanup failed: {detail}"
+            ) from failures[0][1]

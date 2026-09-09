@@ -38,6 +38,8 @@ from azure.identity import AzureCliCredential
 
 AZURE_CLI_CREDENTIAL = AzureCliCredential()
 _ADR_CANARY_ARM_ENDPOINT = "https://centraluseuap.management.azure.com"
+_IOT_HUB_API_VERSION = "2026-06-01-preview"
+_ADR_IOT_HUB_API_VERSION = _IOT_HUB_API_VERSION
 
 logger = get_logger(__name__)
 
@@ -76,6 +78,10 @@ def _get_credential_scopes(cli_ctx):
     return resource_to_scopes(cli_ctx.cloud.endpoints.active_directory_resource_id)
 
 
+def _get_arm_endpoint(cli_ctx):
+    return cli_ctx.cloud.endpoints.resource_manager
+
+
 def _as_https_endpoint(hostname):
     hostname = hostname.rstrip("/")
     if hostname.casefold().startswith("https://"):
@@ -83,7 +89,9 @@ def _as_https_endpoint(hostname):
     return f"https://{hostname}"
 
 
-def _iot_hub_management_client(cli_ctx, subscription_id, base_url):
+def _iot_hub_management_client(
+    cli_ctx, subscription_id, base_url, api_version
+):
     from azure.cli.core.commands.client_factory import get_subscription_id
 
     from azext_iot.sdk.iothub.mgmt import IotHubClient
@@ -92,6 +100,7 @@ def _iot_hub_management_client(cli_ctx, subscription_id, base_url):
         credential=AZURE_CLI_CREDENTIAL,
         subscription_id=subscription_id or get_subscription_id(cli_ctx),
         base_url=base_url,
+        api_version=api_version,
         credential_scopes=_get_credential_scopes(cli_ctx),
         user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
         http_logging_policy=_get_default_logging_policy(),
@@ -113,7 +122,8 @@ def iot_hub_service_factory(cli_ctx, *_, subscription_id=None):
     return _iot_hub_management_client(
         cli_ctx,
         subscription_id,
-        _ADR_CANARY_ARM_ENDPOINT,
+        _get_arm_endpoint(cli_ctx),
+        _IOT_HUB_API_VERSION,
     )
 
 
@@ -123,6 +133,7 @@ def adr_iot_hub_service_factory(cli_ctx, *_, subscription_id=None):
         cli_ctx,
         subscription_id,
         _ADR_CANARY_ARM_ENDPOINT,
+        _ADR_IOT_HUB_API_VERSION,
     )
 
 
@@ -156,7 +167,7 @@ def iot_service_provisioning_factory(cli_ctx, *_, subscription_id=None):
     return _iot_dps_management_client(
         cli_ctx,
         subscription_id,
-        _ADR_CANARY_ARM_ENDPOINT,
+        _get_arm_endpoint(cli_ctx),
     )
 
 

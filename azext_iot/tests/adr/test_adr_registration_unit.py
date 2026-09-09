@@ -205,7 +205,6 @@ def test_2026_command_surface_is_registered():
             f"adr_link_{endpoint}_delete",
             {
                 "confirmation": confirmations[endpoint],
-                "supports_no_wait": True,
             },
         )
     assert commands[
@@ -760,7 +759,7 @@ def test_help_surface_matches_2026_commands_and_su_type():
         helps["iot adr ns ca policy create"].split()
     )
     assert "between 7 and 90 days" in policy_create_help
-    assert "--validity-days 7" in helps["iot adr ns ca policy create"]
+    assert "--validity-days 30" in helps["iot adr ns ca policy create"]
     assert "--validity-days 90" in helps["iot adr ns ca policy update"]
     assert "starts its initial membership calculation" in helps[
         "iot adr ns group create"
