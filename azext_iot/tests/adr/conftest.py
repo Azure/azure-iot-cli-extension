@@ -26,11 +26,11 @@ from azext_iot.tests.adr._log import _log, _pretty_log_enabled
 # ADR integration defaults mirror scripts/smoke_tests/adr_2026_11_02_full_e2e.sh.
 TEST_SUBSCRIPTION = os.getenv(
     "azext_iot_adr_subscription",
-    "efb15086-3322-405d-a9d0-c35715a9b722",
+    "a386d5ea-ea90-441a-8263-d816368c84a1",
 )
 TEST_RG = os.getenv(
     "azext_iot_adr_resource_group",
-    "adr-vnect-scale-rg-0",
+    "cli-int-test-rg",
 )
 TEST_LOCATION = os.getenv("azext_iot_adr_location", "centraluseuap")
 TEST_API_VERSION = os.getenv(

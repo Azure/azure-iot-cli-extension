@@ -264,7 +264,7 @@ def test_namespace_name_generation():
 @pytest.mark.parametrize(
     "adr_group,expected",
     [
-        (None, "adr-vnect-scale-rg-0"),
+        (None, "cli-int-test-rg"),
         ("", ""),
         ("adr-group", "adr-group"),
     ],

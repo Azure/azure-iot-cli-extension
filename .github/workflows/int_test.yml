@@ -25,6 +25,11 @@ on:
         description: "Resource group for test resources"
         type: string
         required: false
+        default: "cli-int-test-rg"
+      subscription-id:
+        description: "Azure subscription containing the test resource group"
+        type: string
+        required: false
         default: ""
     secrets:
       AZURE_CLIENT_ID:
@@ -70,7 +75,12 @@ on:
         description: "Resource group for test resources"
         type: string
         required: false
-        default: ""
+        default: "cli-int-test-rg"
+      subscription-id:
+        description: "Azure subscription containing the test resource group"
+        type: string
+        required: false
+        default: "a386d5ea-ea90-441a-8263-d816368c84a1"
 
 permissions:
   contents: "read"
@@ -78,6 +88,7 @@ permissions:
 
 env:
   RESOURCE_GROUP: "${{ inputs['resource-group'] || 'cli-int-test-rg' }}"
+  TEST_SUBSCRIPTION_ID: "${{ inputs['subscription-id'] || secrets.AZURE_SUBSCRIPTION_ID }}"
 
 jobs:
   setup:
@@ -280,12 +291,16 @@ jobs:
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          subscription-id: ${{ env.TEST_SUBSCRIPTION_ID }}
 
       - name: "Verify Azure access"
         run: |
+          az account set --subscription "${{ env.TEST_SUBSCRIPTION_ID }}"
           az account show -o table
-          az group show -n ${{ env.RESOURCE_GROUP }} -o table
+          az group show \
+            --subscription "${{ env.TEST_SUBSCRIPTION_ID }}" \
+            --name "${{ env.RESOURCE_GROUP }}" \
+            --output table
 
       - name: "OIDC Token refresh service"
         run: |
@@ -294,6 +309,7 @@ jobs:
             token_uri=$ACTIONS_ID_TOKEN_REQUEST_URL
             token=$(curl -sH "Authorization: bearer $token_request" "${token_uri}&audience=api://AzureADTokenExchange" | jq .value -r)
             az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -t ${{ secrets.AZURE_TENANT_ID }} --federated-token $token --output none
+            az account set --subscription "${{ env.TEST_SUBSCRIPTION_ID }}"
             sleep 240
           done &
 
@@ -302,6 +318,8 @@ jobs:
         env:
           AZURE_TEST_RUN_LIVE: "True"
           azext_iot_testrg: ${{ env.RESOURCE_GROUP }}
+          azext_iot_adr_subscription: ${{ env.TEST_SUBSCRIPTION_ID }}
+          azext_iot_adr_resource_group: ${{ env.RESOURCE_GROUP }}
           azext_iot_adr_location: ${{ matrix.config.region }}
         run: |
           set -o pipefail
