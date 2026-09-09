@@ -18,12 +18,8 @@ def patch_core_help():
         helps[
             "iot hub create"
         ] += """
-  - name: Create a Standard IoT Hub, then link it from a Device Registry namespace.
-    text: >
-        az iot hub create --resource-group MyResourceGroup --name MyHub --sku S1 --system-assigned-mi;
-        az iot adr ns link hub add --namespace MyNamespace --resource-group MyResourceGroup
-        --endpoint-name primary --hub-id $(az iot hub show --name MyHub --resource-group
-        MyResourceGroup --query id -o tsv) --system-assigned-mi
+  - name: Create a Standard IoT Hub with a system-assigned identity for later namespace linking.
+    text: az iot hub create --resource-group MyResourceGroup --name MyHub --sku S1 --system-assigned-mi
 """
 
     # add DPS create examples for ADR properties
@@ -31,12 +27,8 @@ def patch_core_help():
         helps[
             "iot dps create"
         ] += """
-  - name: Create DPS with a system identity, then link it from the namespace.
-    text: >
-        az iot dps create --name MyDps --resource-group MyResourceGroup --system-assigned-mi;
-        az iot adr ns link dps add --namespace MyNamespace --resource-group MyResourceGroup
-        --endpoint-name primary --dps-id $(az iot dps show --name MyDps --resource-group
-        MyResourceGroup --query id -o tsv) --system-assigned-mi
+  - name: Create DPS with a system-assigned identity for later namespace linking.
+    text: az iot dps create --name MyDps --resource-group MyResourceGroup --system-assigned-mi
 """
 
     # add DPS identity help

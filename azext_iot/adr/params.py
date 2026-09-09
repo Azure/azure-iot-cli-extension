@@ -759,6 +759,15 @@ def load_adr_arguments(self, _):
             arg_group="Filter",
         )
 
+    with self.argument_context(
+        "iot adr ns su software-update catalog version list"
+    ) as context:
+        context.argument(
+            "filter",
+            options_list=["--filter"],
+            help="Filter update versions by supported service properties.",
+        )
+
     with self.argument_context("iot adr ns su software-update import") as context:
         context.argument(
             "url",
