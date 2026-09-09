@@ -359,6 +359,7 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
         cleanup_start = time.monotonic()
         active_error = sys.exc_info()[1]
         failures = []
+        deleted_link_kinds = set()
 
         if namespace_name:
             for kind, endpoint_name in linked_endpoints or []:
@@ -384,6 +385,7 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
                 _log(LogKind.CMD, "az %s", command)
                 try:
                     self.cmd(command)
+                    deleted_link_kinds.add(kind)
                     _log(
                         LogKind.RESULT,
                         "%s link and target deleted",
@@ -439,6 +441,17 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
         ]
         for label, show_command, command in resources:
             if command:
+                resource_kind = {
+                    "DPS": "dps",
+                    "IoT Hub": "hub",
+                }.get(label)
+                if resource_kind in deleted_link_kinds:
+                    _log(
+                        LogKind.RESULT,
+                        "%s already deleted by link cleanup",
+                        label,
+                    )
+                    continue
                 try:
                     self.cmd(show_command)
                 except Exception as error:  # noqa: BLE001 - inspect all cleanup paths

@@ -24,13 +24,13 @@ from azure.cli.core.azclierror import (
     UnclassifiedUserFault,
 )
 from azure.cli.core.commands import LongRunningOperation
-from azure.cli.core.commands.arm import create_role_assignment
 from azure.core import MatchConditions
 from azure.core.exceptions import HttpResponseError
 from knack.log import get_logger
 from knack.util import CLIError
 
 from azext_iot._factory import iot_hub_service_factory, resource_service_factory
+from azext_iot.common.rbac import create_role_assignment
 from azext_iot.common.arm import (
     adapt_modeless_lro_poller,
     get_resource_group,

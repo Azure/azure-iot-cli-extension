@@ -12,8 +12,10 @@ import azext_iot._help  # noqa: F401
 # Core and Device Registry (ADR) command and argument loaders
 from azext_iot.core.command_map import load_core_commands
 from azext_iot.adr.command_map import load_adr_commands
+from azext_iot.adr.workflows.command_map import load_adr_workflow_commands
 from azext_iot.core.params import load_core_arguments
 from azext_iot.adr.params import load_adr_arguments
+from azext_iot.adr.workflows.params import load_adr_workflow_arguments
 
 iothub_ops = CliCommandType(operations_tmpl="azext_iot.operations.hub#{}")
 iotdps_ops = CliCommandType(operations_tmpl="azext_iot.operations.dps#{}")
@@ -41,6 +43,7 @@ class IoTExtCommandsLoader(AzCommandsLoader):
         # Core and Device Registry (ADR) commands
         load_core_commands(self, args)
         load_adr_commands(self, args)
+        load_adr_workflow_commands(self, args)
 
         return self.command_table
 
@@ -62,6 +65,7 @@ class IoTExtCommandsLoader(AzCommandsLoader):
         # Core and Device Registry (ADR) arguments
         load_core_arguments(self, command)
         load_adr_arguments(self, command)
+        load_adr_workflow_arguments(self, command)
 
 
 COMMAND_LOADER_CLS = IoTExtCommandsLoader

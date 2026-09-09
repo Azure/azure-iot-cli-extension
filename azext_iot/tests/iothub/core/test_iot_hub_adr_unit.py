@@ -40,6 +40,7 @@ from azext_iot.core.custom import (
     update_iot_hub_custom,
 )
 from azext_iot.core.shared import AuthenticationType, IotHubSku
+from azext_iot.common.rbac import create_role_assignment
 
 
 def _hub(link_state="Success", identity_type="SystemAssigned", uami=None):
@@ -90,6 +91,96 @@ def _hub(link_state="Success", identity_type="SystemAssigned", uami=None):
 
 def test_gen2_is_not_a_supported_cli_sku():
     assert "GEN2" not in {item.value for item in IotHubSku}
+
+
+def test_role_assignment_uses_authorization_client(mocker):
+    resolve_role_id = mocker.patch(
+        "azext_iot.common.rbac.resolve_role_id",
+        return_value="/roles/contributor",
+    )
+    client = MagicMock()
+    mocker.patch(
+        "azext_iot.common.rbac.get_mgmt_service_client",
+        return_value=client,
+    )
+    mocker.patch(
+        "azext_iot.common.rbac.uuid4",
+        return_value="assignment-id",
+    )
+    cli_ctx = MagicMock()
+
+    create_role_assignment(
+        cli_ctx,
+        "principal",
+        identity_role="Contributor",
+        identity_scope="/scope",
+    )
+
+    resolve_role_id.assert_called_once_with(
+        cli_ctx,
+        "Contributor",
+        "/scope",
+    )
+    call = client.role_assignments.create.call_args
+    assert call.kwargs["scope"] == "/scope"
+    assert call.kwargs["role_assignment_name"] == "assignment-id"
+    assert call.kwargs["parameters"].principal_id == "principal"
+    assert (
+        call.kwargs["parameters"].role_definition_id
+        == "/roles/contributor"
+    )
+
+
+def test_role_assignment_treats_existing_assignment_as_success(mocker):
+    existing = HttpResponseError(message="assignment exists")
+    existing.error = MagicMock(code="RoleAssignmentExists")
+    client = MagicMock()
+    client.role_assignments.create.side_effect = existing
+    mocker.patch(
+        "azext_iot.common.rbac.resolve_role_id",
+        return_value="/roles/contributor",
+    )
+    mocker.patch(
+        "azext_iot.common.rbac.get_mgmt_service_client",
+        return_value=client,
+    )
+
+    assert create_role_assignment(
+        MagicMock(),
+        "principal",
+        identity_role="Contributor",
+        identity_scope="/scope",
+    ) is None
+    client.role_assignments.create.assert_called_once()
+
+
+def test_role_assignment_retries_directory_propagation(mocker):
+    unavailable = HttpResponseError(
+        message="Principal does not exist in the directory tenant."
+    )
+    client = MagicMock()
+    client.role_assignments.create.side_effect = [
+        unavailable,
+        "assignment",
+    ]
+    mocker.patch(
+        "azext_iot.common.rbac.resolve_role_id",
+        return_value="/roles/contributor",
+    )
+    mocker.patch(
+        "azext_iot.common.rbac.get_mgmt_service_client",
+        return_value=client,
+    )
+    sleep = mocker.patch("azext_iot.common.rbac.time.sleep")
+
+    assert create_role_assignment(
+        MagicMock(),
+        "principal",
+        identity_role="Contributor",
+        identity_scope="/scope",
+    ) == "assignment"
+    assert client.role_assignments.create.call_count == 2
+    sleep.assert_called_once_with(5)
 
 
 def test_modeless_create_cleaner_and_resource_group_fallbacks():

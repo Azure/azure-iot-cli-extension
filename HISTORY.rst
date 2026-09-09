@@ -2,6 +2,17 @@
 
 Release History
 ===============
+0.33.0+workflow2 (Preview)
+++++++++++++++++++++++++++
+
+**Namespace workflow redesign**
+
+* Merged the ``0.33.0b10`` ADR namespace and cross-service link implementation into the workflow branch.
+* Changed ``az iot adr ns setup`` to delegate target validation, managed-identity checks, automatic service-to-service RBAC, assignment visibility, and namespace mutation to the atomic Hub, DPS, bundled DPS/Hub, and Software Updates link providers.
+* Removed the workflow-owned role matrix, permission probes, role-assignment creation, manual RBAC flags and resume path, and fixed workflow propagation sleep. Setup plans now describe the authoritative link requirements without maintaining a second RBAC implementation.
+* Added provider-owned access validation and repair for reused links, including identity-less Hub diagnostics and a service-authorization propagation delay after newly created or raced role assignments.
+* Split live setup coverage into standalone DPS, Hub-after-DPS, and Software Updates scenarios. DPS and Hub setup complete end to end with automatic RBAC for an authorized caller.
+
 0.33.0b10 (Preview)
 ++++++++++++++++++++
 
@@ -54,7 +65,7 @@ Release History
 
 **General updates**
 
-* Expanded ``az iot adr ns`` to 104 preview commands, using ``Microsoft.DeviceRegistry/2026-11-02-preview`` for ADR management and ``Microsoft.DeviceUpdate/2026-11-02-preview`` for Software Updates.
+* Expanded ``az iot adr ns`` to 106 preview commands (104 atomic commands plus ``ns check`` and ``ns setup`` workflows), using ``Microsoft.DeviceRegistry/2026-11-02-preview`` for ADR management and ``Microsoft.DeviceUpdate/2026-11-02-preview`` for Software Updates.
 * Regenerated the complete synchronous and asynchronous Device Registry SDK from the ``package-preview-2026-11-02`` specification tag. The generated clients expose all 25 operation groups and 118 operations in the source specification.
 * Generated a dedicated synchronous and asynchronous Device Update control-plane SDK from the ``package-2026-11-02-preview`` DuDeviceRegistry specification tag without replacing the existing ``az iot du`` SDK.
 * Added safer long-running-operation handling: resource mutations poll ``provisioningState`` and POST actions poll the authenticated ``Location`` URL instead of the service's unsupported ``Azure-AsyncOperation`` host.
@@ -62,6 +73,13 @@ Release History
 * Scoped ``az iot adr ns`` to cloud-only resources by removing every command that requires an Azure IoT Operations custom location.
 
 **Azure Device Registry updates**
+
+* **Namespace workflows**
+
+  - Added ``az iot adr ns check`` for read-only namespace, configured-link, linked-resource, identity, and RBAC readiness diagnostics with actionable remediation.
+  - Added ``az iot adr ns setup`` for idempotent namespace creation/adoption, outbound identity configuration, DPS-first Hub linking, optional Software Updates linking, plan-only review, config input, script export, and explicitly approved scoped role assignments.
+  - Refined guided setup with append-only aligned history, single-line glyph progress, context-specific hotkeys, compact plan rows, interactive plan JSON export, namespace tags, elapsed execution, and safe in-session retry or optional Software Updates continuation.
+  - Added an unframed hybrid terminal history with browse-or-exact resource selection, staged/skipped/revisitable configuration, default confirmed RBAC planning with manual resume guidance, measurable progress, persisted setup receipts, and append-only plain/automation output.
 
 * **Registry Devices and child resources**
 

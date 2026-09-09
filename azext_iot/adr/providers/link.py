@@ -141,6 +141,44 @@ class LinkProvider(ADRProvider):
             rbac_requests=rbac_requests,
         )
 
+    def ensure_link_access(
+        self,
+        link_type: str,
+        namespace_name: str,
+        resource_group_name: str,
+        target_resource_id: str,
+        mi_system_assigned: bool = False,
+        mi_user_assigned: Optional[str] = None,
+    ) -> None:
+        """Validate and repair access for an existing matching link."""
+        configurations = {
+            "hub": (
+                _parse_hub_resource_id,
+                _HUB_TARGET,
+            ),
+            "dps": (
+                _parse_dps_resource_id,
+                _DPS_TARGET,
+            ),
+            "su": (
+                _parse_su_resource_id,
+                _SU_TARGET,
+            ),
+        }
+        parser, strategy = configurations[link_type]
+        self._preflight_link(
+            link_type=link_type,
+            namespace=self._get_namespace(
+                namespace_name, resource_group_name
+            ),
+            target_resource_id=target_resource_id,
+            inbound_identity=_resolve_inbound_identity(
+                mi_system_assigned, mi_user_assigned
+            ),
+            parsed=parser(target_resource_id),
+            strategy=strategy,
+        )
+
     @staticmethod
     def _get_typed_endpoint(
         namespace: dict,
