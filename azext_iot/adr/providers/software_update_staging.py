@@ -42,7 +42,10 @@ class SoftwareUpdateStager:
             storage_account_subscription,
         )
         self.account_name = account_name
-        self.storage_manager = StorageAccountManager(subscription_id=subscription_id)
+        self.storage_manager = StorageAccountManager(
+            cli_ctx=cmd.cli_ctx,
+            subscription_id=subscription_id,
+        )
         self.blob_service_client = (
             self.storage_manager.get_sas_blob_service_client(
                 account_name=self.account_name

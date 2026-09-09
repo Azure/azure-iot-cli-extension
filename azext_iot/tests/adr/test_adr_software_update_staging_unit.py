@@ -300,15 +300,19 @@ def test_stage_accepts_storage_account_resource_id():
         "/subscriptions/storage-sub/resourceGroups/rg/providers/"
         "Microsoft.Storage/storageAccounts/storage"
     )
+    cli_ctx = MagicMock()
     with patch(
         "azext_iot.adr.providers.software_update_staging.StorageAccountManager"
     ) as manager_type:
         SoftwareUpdateStager(
-            cmd=MagicMock(cli_ctx=MagicMock()),
+            cmd=MagicMock(cli_ctx=cli_ctx),
             storage_account=resource_id,
         )
 
-    manager_type.assert_called_once_with(subscription_id="storage-sub")
+    manager_type.assert_called_once_with(
+        cli_ctx=cli_ctx,
+        subscription_id="storage-sub",
+    )
 
 
 def test_stage_tolerates_existing_container(stager, tmp_path):

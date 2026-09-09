@@ -15,7 +15,7 @@ from msrestazure.azure_exceptions import CloudError
 import requests
 from requests.adapters import HTTPAdapter
 
-from azext_iot.common.auth import IoTOAuth
+from azext_iot.common.auth import IoTOAuth, get_cli_credential
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
 from azext_iot.common.shared import AuthenticationTypeDataplane, SdkType
 from azext_iot.common.utility import ensure_azure_namespace_path
@@ -34,9 +34,6 @@ from azext_iot.dps.services.auth import get_dps_sas_auth_header
 ensure_azure_namespace_path()
 
 from azure.core.pipeline.policies import HttpLoggingPolicy, UserAgentPolicy
-from azure.identity import AzureCliCredential
-
-AZURE_CLI_CREDENTIAL = AzureCliCredential()
 _ADR_CANARY_ARM_ENDPOINT = "https://centraluseuap.management.azure.com"
 _IOT_HUB_API_VERSION = "2026-06-01-preview"
 _ADR_IOT_HUB_API_VERSION = _IOT_HUB_API_VERSION
@@ -96,9 +93,13 @@ def _iot_hub_management_client(
 
     from azext_iot.sdk.iothub.mgmt import IotHubClient
 
+    subscription_id = subscription_id or get_subscription_id(cli_ctx)
+
     return IotHubClient(
-        credential=AZURE_CLI_CREDENTIAL,
-        subscription_id=subscription_id or get_subscription_id(cli_ctx),
+        credential=get_cli_credential(
+            cli_ctx, subscription_id=subscription_id
+        ),
+        subscription_id=subscription_id,
         base_url=base_url,
         api_version=api_version,
         credential_scopes=_get_credential_scopes(cli_ctx),
@@ -142,9 +143,13 @@ def _iot_dps_management_client(cli_ctx, subscription_id, base_url):
 
     from azext_iot.sdk.dps.mgmt import IotDpsClient
 
+    subscription_id = subscription_id or get_subscription_id(cli_ctx)
+
     return IotDpsClient(
-        credential=AZURE_CLI_CREDENTIAL,
-        subscription_id=subscription_id or get_subscription_id(cli_ctx),
+        credential=get_cli_credential(
+            cli_ctx, subscription_id=subscription_id
+        ),
+        subscription_id=subscription_id,
         base_url=base_url,
         credential_scopes=_get_credential_scopes(cli_ctx),
         user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
@@ -201,7 +206,9 @@ def adr_service_factory(cli_ctx, *_, subscription_id=None):
     subscription_id = subscription_id or get_subscription_id(cli_ctx)
 
     return DeviceRegistryMgmtClient(
-        credential=AZURE_CLI_CREDENTIAL,
+        credential=get_cli_credential(
+            cli_ctx, subscription_id=subscription_id
+        ),
         subscription_id=subscription_id,
         base_url=_ADR_CANARY_ARM_ENDPOINT,
         credential_scopes=_get_credential_scopes(cli_ctx),
@@ -216,9 +223,13 @@ def adr_update_instance_service_factory(cli_ctx, *_, subscription_id=None):
 
     from azext_iot.sdk.deviceupdate.duregistry import DeviceUpdateClient
 
+    subscription_id = subscription_id or get_subscription_id(cli_ctx)
+
     return DeviceUpdateClient(
-        credential=AZURE_CLI_CREDENTIAL,
-        subscription_id=subscription_id or get_subscription_id(cli_ctx),
+        credential=get_cli_credential(
+            cli_ctx, subscription_id=subscription_id
+        ),
+        subscription_id=subscription_id,
         base_url=_ADR_CANARY_ARM_ENDPOINT,
         credential_scopes=_get_credential_scopes(cli_ctx),
         user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
@@ -238,7 +249,7 @@ def adr_software_update_data_service_factory(cli_ctx, *_, endpoint=None):
 
     return DeviceRegistrySoftwareUpdateClient(
         endpoint=endpoint,
-        credential=AZURE_CLI_CREDENTIAL,
+        credential=get_cli_credential(cli_ctx),
         user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
         http_logging_policy=_get_default_logging_policy(),
     )

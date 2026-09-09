@@ -100,6 +100,36 @@ def _registered_commands():
     }
 
 
+def test_root_loader_lazily_keeps_ignite_adr_and_du_surface(mocker):
+    from azure.cli.core.mock import DummyCli
+
+    from azext_iot import IoTExtCommandsLoader
+
+    loader = IoTExtCommandsLoader(DummyCli())
+    table = loader.load_command_table([])
+    assert "iot adr ns registry-device create" in table
+    assert "iot adr ns link dps add" in table
+    assert "iot adr ns su software-update import" in table
+    assert "iot du account create" in table
+
+    argument_loaders = [
+        "azext_iot._params.load_arguments",
+        "azext_iot.iothub.params.load_iothub_arguments",
+        "azext_iot.central.params.load_central_arguments",
+        "azext_iot.digitaltwins.params.load_digitaltwins_arguments",
+        "azext_iot.dps.params.load_dps_arguments",
+        "azext_iot.deviceupdate.params.load_deviceupdate_arguments",
+        "azext_iot.core.params.load_core_arguments",
+        "azext_iot.adr.params.load_adr_arguments",
+    ]
+    patched = [mocker.patch(path) for path in argument_loaders]
+
+    loader.load_arguments("iot adr ns create")
+
+    for argument_loader in patched:
+        argument_loader.assert_called_once_with(loader, "iot adr ns create")
+
+
 def test_2026_command_surface_is_registered():
     commands = _registered_commands()
 

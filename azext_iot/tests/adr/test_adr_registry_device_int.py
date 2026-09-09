@@ -11,7 +11,7 @@ import os
 
 import pytest
 
-from azext_iot.tests import CaptureOutputLiveScenarioTest
+from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import (
     wait_for_materialized_resources,
     wait_for_resource_succeeded,
@@ -79,7 +79,7 @@ def _cleanup_namespace(test, namespace_name: str) -> None:
 
 
 @pytest.mark.usefixtures("set_cwd")
-class TestADRRegistryDeviceLifecycle(CaptureOutputLiveScenarioTest):
+class TestADRRegistryDeviceLifecycle(ADRLiveScenarioTest):
     def test_registry_device_lifecycle(self):
         namespace_name = generate_adr_namespace_name()
         device_name = _registry_device_name()

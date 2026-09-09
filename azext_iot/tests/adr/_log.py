@@ -13,7 +13,7 @@ pytest log capture.
 
 Usage::
 
-    _log(L.CMD, "az %s", some_cmd)
+    # ADRLiveScenarioTest.cmd() logs commands automatically.
     _log(L.OK, "Device '%s' found", device_id)
 
 To change the visual style (prefix, color) for any log type, edit only
@@ -21,15 +21,16 @@ the ``_STYLES`` dict below.  Call sites never reference prefixes or colors.
 """
 
 import os
+import re
+import shlex
 import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from urllib.parse import unquote
 
 from knack.log import get_logger
 
 logger = get_logger(__name__)
-
-_PRETTY_LOG = os.environ.get("PRETTY_LOG")
 
 _ANSI_RESET = "\033[0m"
 _ANSI = {
@@ -62,8 +63,80 @@ _STYLES = {
     # internal-only styles (not exposed via L, used by helpers below)
     "_pass": ("✓ PASS ", "sage"),
     "_fail": ("✗ FAIL ", "terra"),
-    "_time": ("  ⏱ ", "dim"),
+    "_time": ("  Δ ", "dim"),
 }
+
+_SECRET_NAMES = {
+    "accesskey", "accesstoken", "accountkey", "apikey", "authenticationkey",
+    "authorization", "certificate", "clientsecret", "connectionstring",
+    "connectionstrings", "credential", "credentials", "key", "keys", "login",
+    "password", "primarykey", "privatekey", "sastoken", "sasurl", "secondarykey",
+    "secret", "secretkey", "secrets", "sharedaccesskey", "sig", "signature",
+    "symmetrickey", "token",
+}
+_OPAQUE_OPTIONS = {"body", "data", "headers", "parameters", "payload", "properties", "set"}
+_SECRET_ASSIGNMENT = re.compile(r"""(?:^|[?&;,\s{'"])([\w.-]+)['"]?\s*[:=]""")
+
+
+def _argument_name(name: str) -> str:
+    return name.rsplit(".", 1)[-1].lower().replace("-", "").replace("_", "")
+
+
+def _contains_secret(value: str) -> bool:
+    decoded = unquote(value)
+    return (
+        any(_argument_name(match[1]) in _SECRET_NAMES for match in _SECRET_ASSIGNMENT.finditer(decoded))
+        or re.search(r"(?i)(?:^|[\s:=])(?:Bearer|Basic|SharedAccessSignature)\s+", decoded) is not None
+        or re.search(r"://[^/\s]*@", decoded) is not None
+        or "PRIVATE KEY-----" in decoded
+    )
+
+
+def _redact_command(command: str) -> str:
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return "az [command omitted: invalid shell quoting]"
+
+    output = []
+    redact_next = False
+    redact_values = False
+    for token in tokens:
+        if redact_next:
+            output.append("***")
+            redact_next = False
+            continue
+        if token.startswith("-"):
+            option, separator, value = token.partition("=")
+            sensitive = (
+                _argument_name(option) in _SECRET_NAMES | _OPAQUE_OPTIONS
+                or option in {"-p", "-k", "--pk", "--sk"}
+            )
+            redact_values = sensitive
+            redact_next = sensitive and not separator
+            if separator and (sensitive or _contains_secret(value)):
+                output.append(f"{option}=***")
+            elif _contains_secret(token):
+                output.append("***")
+            else:
+                output.append(token)
+        elif redact_values or _contains_secret(token):
+            output.append("***")
+        else:
+            output.append(token)
+
+    if not output or output[0] != "az":
+        output.insert(0, "az")
+    return shlex.join(output).replace("\n", r"\n").replace("\r", r"\r").replace("\033", r"\x1b")
+
+
+def log_command(command: str, expect_failure: bool = False):
+    suffix = "  (expect failure)" if expect_failure else ""
+    _log(LogKind.CMD, "%s%s", _redact_command(command), suffix)
+
+
+def _pretty_log_enabled() -> bool:
+    return os.environ.get("PRETTY_LOG") == "1"
 
 
 def _ts() -> str:
@@ -103,17 +176,17 @@ def _log(kind: str, msg: str = "", *args):
         args = ()
 
     full = prefix + msg
-    if _PRETTY_LOG:
+    if _pretty_log_enabled():
         text = full % args if args else full
         ansi = _ANSI.get(color, "")
-        print(f"{ansi}{text}{_ANSI_RESET}", flush=True) if ansi else print(text, flush=True)
+        print(f"{ansi}{text}{_ANSI_RESET}" if ansi else text, flush=True)
     else:
         logger.warning(full, *args)
 
 
 def _raw_log(msg: str = "", *args):
     """Emit a plain log line with no prefix or color."""
-    if _PRETTY_LOG:
+    if _pretty_log_enabled():
         text = msg % args if args else msg
         print(text, flush=True)
     else:
@@ -132,6 +205,8 @@ def timed_step(label: str, *args):
     """
     _log(LogKind.STEP, label, *args)
     start = time.monotonic()
-    yield
-    elapsed = time.monotonic() - start
-    _log("_time", "(%s)", _fmt_duration(elapsed))
+    try:
+        yield
+    finally:
+        elapsed = time.monotonic() - start
+        _log("_time", "(%s)", _fmt_duration(elapsed))

@@ -541,6 +541,9 @@ def test_update_instance_factory_uses_generated_sdk_and_canary_arm_endpoint():
         "azext_iot._factory._get_credential_scopes",
         return_value=["scope"],
     ), patch(
+        "azext_iot._factory.get_cli_credential",
+        return_value="credential",
+    ), patch(
         client_path
     ) as client_type:
         assert (
@@ -554,6 +557,7 @@ def test_update_instance_factory_uses_generated_sdk_and_canary_arm_endpoint():
         == "https://centraluseuap.management.azure.com"
     )
     assert client_type.call_args.kwargs["credential_scopes"] == ["scope"]
+    assert client_type.call_args.kwargs["credential"] == "credential"
 
 
 @pytest.mark.parametrize(

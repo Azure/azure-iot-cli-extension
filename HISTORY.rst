@@ -34,6 +34,8 @@ Release History
 **Software Updates, quality, and delivery**
 
 * Added ``az iot adr ns su software-update operation-status list|show`` and catalog provider/name/version discovery, completing follow-up for no-wait imports and update-ID discovery.
+* Reused the hosting Azure CLI's login for Hub, DPS, Device Registry, Update Instance, Software Updates data-plane, and update-staging storage clients. Credentials are selected in process for each CLI context and subscription instead of using a global ``AzureCliCredential`` that spawns nested CLI processes.
+* Added secret-redacted ADR live-test command logging, optional ``PRETTY_LOG=1`` colored diagnostics, timed steps, and separate DPS/ADR integration JUnit reports.
 * Consolidated the temporary ADR resource/Location workaround on one deadline-based waiter with a ten-minute default, case-insensitive Retry-After handling, transient-read retries, and distinct timeout versus terminal-failure diagnostics.
 * Registry Device ``show`` accepts exactly one resource name or external device ID. External-ID lookup follows every SDK page, fails on zero or multiple matches, and can be paired with the bounded ``registry-device wait`` materialization flow.
 * Registry Device attribute JSON accepts inline objects, plain file paths, and one-leading-``@`` file paths. Customer writes always serialize ``reportedBy=User``; attempts to author service-owned ``Microsoft.DeviceUpdate`` provenance through either the hidden compatibility option or ``--properties`` are rejected locally before mutation, while backend-generated attributes remain readable.
@@ -124,6 +126,21 @@ Release History
 * Link-remove commands remain unregistered because no supported backing operation exists.
 * Direct customer invocation of the Update Instance internal ``linkPreflight``, ``linkInitiate``, ``linkNotify``, and ``linkUpdate`` actions is not registered. Supported Software Updates data-plane operations are exposed under ``az iot adr ns su software-update`` and ``su device-class``.
 * Removed the legacy ``az iot adr ns credential`` and ``az iot adr ns policy`` command groups.
+
+0.33.0b1 (Preview)
+++++++++++++++++++
+
+**API compatibility**
+
+* Regenerated the modeless synchronous DPS management SDK for ``2026-08-31`` and Device Registry management SDK for ``2026-04-01``.
+* Preserved the ``preview`` branch's IoT Hub management ``2026-05-01-preview``, IoT Hub service data ``2024-03-31``, and DPS service data ``2025-07-01-preview`` SDKs.
+* Restricted ``az iot adr ns`` to April-compatible namespace operations, migration, simple messaging configuration, and system-assigned identity management. Unsupported certificate, policy, device, registry-device, group, job, report, linking, and new ADR Software Updates command groups are not exposed.
+* Removed DPS namespace-association options because ``deviceRegistryNamespace`` is not part of the stable DPS contract. DPS linked-hub managed-identity authentication remains supported.
+
+**Authentication and diagnostics**
+
+* Reused the hosting Azure CLI's login for Hub, DPS, ADR, and update-staging storage clients instead of spawning nested ``az account get-access-token`` processes.
+* Added consistent ADR integration command logging before execution, with sensitive arguments redacted, colored step/result markers, and delta-symbol elapsed durations.
 
 0.32.0b2 (Preview)
 ++++++++++++++++++

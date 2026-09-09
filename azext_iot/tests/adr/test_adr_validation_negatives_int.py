@@ -21,7 +21,7 @@ under integration.
 
 import pytest
 
-from azext_iot.tests import CaptureOutputLiveScenarioTest
+from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._log import LogKind, _log, timed_step
 from azext_iot.tests.adr.conftest import TEST_LOCATION, TEST_RG
 
@@ -33,7 +33,7 @@ _UAMI_ID = (
 
 
 @pytest.mark.usefixtures("set_cwd")
-class TestADRValidationNegatives(CaptureOutputLiveScenarioTest):
+class TestADRValidationNegatives(ADRLiveScenarioTest):
     """Command-surface coverage of provider validation guards (no backend needed)."""
 
     def test_adr_validation_negatives(self):

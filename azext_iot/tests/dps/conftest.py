@@ -35,10 +35,16 @@ cli = EmbeddedCLI()
 # Test Environment Variables
 settings = DynamoSettings(
     req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED,
-    opt_env_set=list(set(ENV_SET_TEST_IOTHUB_OPTIONAL + ENV_SET_TEST_IOTDPS_OPTIONAL))
+    opt_env_set=list(set(
+        ENV_SET_TEST_IOTHUB_OPTIONAL + ENV_SET_TEST_IOTDPS_OPTIONAL + ["azext_iot_dps_test_location"]
+    ))
 )
 ENTITY_RG = settings.env.azext_iot_testrg
-ENTITY_LOCATION = "westus"
+ENTITY_LOCATION = (
+    "centraluseuap"
+    if settings.env.azext_iot_dps_test_location == "centraluseuap"
+    else "westus"
+)
 MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries if settings.env.azext_iot_rbac_max_tries else 10
 
 # DPS instance strategy (timestamp + run-tag + age-based GC)

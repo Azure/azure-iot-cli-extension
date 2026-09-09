@@ -42,7 +42,7 @@ import pytest
 from azure.cli.core.azclierror import ArgumentUsageError
 from msrestazure.tools import parse_resource_id
 
-from azext_iot.tests import CaptureOutputLiveScenarioTest
+from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import (
     ADRFullInfraHelper,
     wait_for_condition,
@@ -135,7 +135,7 @@ def _wait_for_linking_succeeded(
 
 
 @pytest.mark.usefixtures("set_cwd")
-class TestADRLinkLifecycle(ADRFullInfraHelper, CaptureOutputLiveScenarioTest):
+class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
     """End-to-end lifecycle of namespace-side Hub and DPS link entries.
 
     The flow follows the design's enforced DPS-first ordering and exercises
@@ -675,7 +675,7 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, CaptureOutputLiveScenarioTest):
 
 
 @pytest.mark.usefixtures("set_cwd")
-class TestADRLinkBundledAdd(ADRFullInfraHelper, CaptureOutputLiveScenarioTest):
+class TestADRLinkBundledAdd(ADRFullInfraHelper, ADRLiveScenarioTest):
     """``iot adr ns link add`` bundled Hub+DPS in one PATCH (P4).
 
     Tests the single round-trip variant that links both a Hub messaging endpoint
@@ -785,7 +785,7 @@ class TestADRLinkBundledAdd(ADRFullInfraHelper, CaptureOutputLiveScenarioTest):
 
 
 @pytest.mark.usefixtures("set_cwd")
-class TestADRLinkSU(ADRFullInfraHelper, CaptureOutputLiveScenarioTest):
+class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
     """End-to-end lifecycle of namespace-side Software Updates link entries.
 
     Mirrors the Hub/DPS link lifecycle for the ``iot adr ns link su`` surface:
@@ -1174,7 +1174,7 @@ class TestADRLinkSU(ADRFullInfraHelper, CaptureOutputLiveScenarioTest):
 
 
 @pytest.mark.usefixtures("set_cwd")
-class TestADRLinkValidationNegatives(CaptureOutputLiveScenarioTest):
+class TestADRLinkValidationNegatives(ADRLiveScenarioTest):
     """Client-side validation negatives for the ``iot adr ns link`` surface.
 
     These scenarios assert the provider's argument validation that runs *before*

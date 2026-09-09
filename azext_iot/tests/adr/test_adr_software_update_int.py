@@ -14,13 +14,13 @@ from tempfile import TemporaryDirectory
 import pytest
 from msrestazure.tools import parse_resource_id
 
-from azext_iot.tests import CaptureOutputLiveScenarioTest
+from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr.conftest import TEST_RG
 from azext_iot.tests.generators import generate_generic_id
 
 
 @pytest.mark.usefixtures("set_cwd")
-class TestADRSoftwareUpdateLocalCommands(CaptureOutputLiveScenarioTest):
+class TestADRSoftwareUpdateLocalCommands(ADRLiveScenarioTest):
     def test_software_update_local_commands(self):
         with TemporaryDirectory() as directory:
             payload_path = Path(directory) / "install.sh"
@@ -50,7 +50,7 @@ class TestADRSoftwareUpdateLocalCommands(CaptureOutputLiveScenarioTest):
 
 
 @pytest.mark.usefixtures("set_cwd")
-class TestADRSoftwareUpdateStage(CaptureOutputLiveScenarioTest):
+class TestADRSoftwareUpdateStage(ADRLiveScenarioTest):
     def test_software_update_stage_upload_and_reuse(self):
         namespace_name = os.getenv("azext_iot_adr_su_namespace")
         storage_account = os.getenv("azext_iot_adr_su_storage_account")
@@ -147,7 +147,7 @@ class TestADRSoftwareUpdateStage(CaptureOutputLiveScenarioTest):
 
 
 @pytest.mark.usefixtures("set_cwd")
-class TestADRSoftwareUpdateDiscovery(CaptureOutputLiveScenarioTest):
+class TestADRSoftwareUpdateDiscovery(ADRLiveScenarioTest):
     """Validate catalog and no-wait follow-up surfaces against a linked service."""
 
     def test_catalog_and_operation_status_discovery(self):

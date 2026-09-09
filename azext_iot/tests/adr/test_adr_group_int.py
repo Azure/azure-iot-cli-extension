@@ -8,7 +8,7 @@
 
 import pytest
 
-from azext_iot.tests import CaptureOutputLiveScenarioTest
+from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import ADRFullInfraHelper
 from azext_iot.tests.adr._log import LogKind, _log, timed_step
 from azext_iot.tests.adr.conftest import (
@@ -24,7 +24,7 @@ def _generate_group_name() -> str:
 
 
 @pytest.mark.usefixtures("set_cwd")
-class TestADRGroupLifecycle(ADRFullInfraHelper, CaptureOutputLiveScenarioTest):
+class TestADRGroupLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
     def test_adr_group_lifecycle(self):
         rg = TEST_RG
         namespace_name = generate_adr_namespace_name()

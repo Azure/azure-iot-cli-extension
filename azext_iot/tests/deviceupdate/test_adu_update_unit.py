@@ -535,7 +535,7 @@ def stage_mocks(mocker, tmp_path):
     blob_service_client.credential.account_key = "key"
     blob_service_client.get_container_client.return_value.upload_blob.return_value.url = "https://blob/x"
     storage_mgr.get_sas_blob_service_client.return_value = blob_service_client
-    mocker.patch(
+    storage_manager_type = mocker.patch(
         "azext_iot.deviceupdate.providers.storage.StorageAccountManager", return_value=storage_mgr
     )
     mocker.patch("azure.storage.blob.generate_account_sas", return_value="sas-token")
@@ -566,6 +566,7 @@ def stage_mocks(mocker, tmp_path):
     )
     return {
         "cli": cli,
+        "storage_manager_type": storage_manager_type,
         "blob_service_client": blob_service_client,
         "manifest_path": str(manifest_path),
     }
@@ -579,6 +580,23 @@ def test_stage_update_returns_import_command(stage_mocks):
     )
     assert "importCommand" in result
     assert result["importCommand"].startswith("az iot du update import")
+
+
+@pytest.mark.parametrize("storage_subscription", [None, "storage-sub"])
+def test_stage_update_passes_cli_context_and_storage_subscription(stage_mocks, storage_subscription):
+    cmd = MagicMock()
+    cmd.cli_ctx.data = {"subscription_id": "command-sub"}
+
+    subject.stage_update(
+        cmd=cmd, name="acct", instance_name="inst",
+        update_manifest_paths=[stage_mocks["manifest_path"]],
+        storage_account_name="stg", storage_container_name="cont",
+        storage_account_subscription=storage_subscription,
+    )
+
+    stage_mocks["storage_manager_type"].assert_called_once_with(
+        cli_ctx=cmd.cli_ctx, subscription_id=storage_subscription or "command-sub"
+    )
 
 
 def test_stage_update_then_import(stage_mocks):

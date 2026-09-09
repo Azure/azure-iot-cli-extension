@@ -21,6 +21,7 @@ from azext_iot.adr.providers.report import ReportProvider
 from azext_iot.adr.providers.job import JobProvider
 from azext_iot.adr.providers.job_run import JobRunProvider
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests.adr._log import _log, _pretty_log_enabled
 
 # ADR integration defaults mirror scripts/smoke_tests/adr_2026_11_02_full_e2e.sh.
 TEST_SUBSCRIPTION = os.getenv(
@@ -201,11 +202,10 @@ def adr_integration_preflight(request):
 
 def pytest_runtest_logreport(report):
     """In pretty mode, emit PASSED/FAILED via _log so colors work."""
-    if not os.environ.get("PRETTY_LOG"):
+    if not _pretty_log_enabled():
         return
     if report.when != "call":
         return
-    from azext_iot.tests.adr._log import _log
 
     test_name = report.nodeid.split("::")[-1]
     if report.passed:

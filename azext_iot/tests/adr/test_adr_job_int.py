@@ -25,7 +25,7 @@ import datetime
 
 import pytest
 
-from azext_iot.tests import CaptureOutputLiveScenarioTest
+from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import ADRFullInfraHelper
 from azext_iot.tests.adr._log import LogKind, _log, timed_step
 from azext_iot.tests.adr.conftest import (
@@ -45,7 +45,7 @@ def _generate_job_name() -> str:
 
 
 @pytest.mark.usefixtures("set_cwd")
-class TestADRJobLifecycle(ADRFullInfraHelper, CaptureOutputLiveScenarioTest):
+class TestADRJobLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
     """End-to-end Job CRUD + schedule + delete."""
 
     def test_adr_job_lifecycle(self):
@@ -290,7 +290,7 @@ class TestADRJobLifecycle(ADRFullInfraHelper, CaptureOutputLiveScenarioTest):
 
 
 @pytest.mark.usefixtures("set_cwd")
-class TestADRJobValidation(ADRFullInfraHelper, CaptureOutputLiveScenarioTest):
+class TestADRJobValidation(ADRFullInfraHelper, ADRLiveScenarioTest):
     """Negative / validation tests for ``job create`` and ``job update``.
 
     These do not require a real namespace for some paths (CLI-side arg parsing

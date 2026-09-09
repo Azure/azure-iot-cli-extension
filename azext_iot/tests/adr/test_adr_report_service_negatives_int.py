@@ -6,7 +6,7 @@
 
 import pytest
 
-from azext_iot.tests import CaptureOutputLiveScenarioTest
+from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import ADRFullInfraHelper
 from azext_iot.tests.adr.conftest import (
     TEST_LOCATION,
@@ -17,7 +17,7 @@ from azext_iot.tests.adr.conftest import (
 
 @pytest.mark.usefixtures("set_cwd")
 class TestADRReportServiceNegatives(
-    ADRFullInfraHelper, CaptureOutputLiveScenarioTest
+    ADRFullInfraHelper, ADRLiveScenarioTest
 ):
     def test_report_service_negatives(self):
         namespace_name = generate_adr_namespace_name()

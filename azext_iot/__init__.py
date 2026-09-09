@@ -9,12 +9,6 @@ from azure.cli.core.commands import CliCommandType
 from azext_iot.constants import VERSION
 import azext_iot._help  # noqa: F401
 
-# Core and Device Registry (ADR) command and argument loaders
-from azext_iot.core.command_map import load_core_commands
-from azext_iot.adr.command_map import load_adr_commands
-from azext_iot.core.params import load_core_arguments
-from azext_iot.adr.params import load_adr_arguments
-
 iothub_ops = CliCommandType(operations_tmpl="azext_iot.operations.hub#{}")
 iotdps_ops = CliCommandType(operations_tmpl="azext_iot.operations.dps#{}")
 
@@ -30,6 +24,8 @@ class IoTExtCommandsLoader(AzCommandsLoader):
         from azext_iot.digitaltwins.command_map import load_digitaltwins_commands
         from azext_iot.dps.command_map import load_dps_commands
         from azext_iot.deviceupdate.command_map import load_deviceupdate_commands
+        from azext_iot.core.command_map import load_core_commands
+        from azext_iot.adr.command_map import load_adr_commands
 
         load_command_table(self, args)
         load_deviceupdate_commands(self, args)
@@ -38,7 +34,6 @@ class IoTExtCommandsLoader(AzCommandsLoader):
         load_digitaltwins_commands(self, args)
         load_dps_commands(self, args)
 
-        # Core and Device Registry (ADR) commands
         load_core_commands(self, args)
         load_adr_commands(self, args)
 
@@ -51,6 +46,8 @@ class IoTExtCommandsLoader(AzCommandsLoader):
         from azext_iot.digitaltwins.params import load_digitaltwins_arguments
         from azext_iot.dps.params import load_dps_arguments
         from azext_iot.deviceupdate.params import load_deviceupdate_arguments
+        from azext_iot.core.params import load_core_arguments
+        from azext_iot.adr.params import load_adr_arguments
 
         load_arguments(self, command)
         load_iothub_arguments(self, command)
@@ -59,7 +56,6 @@ class IoTExtCommandsLoader(AzCommandsLoader):
         load_dps_arguments(self, command)
         load_deviceupdate_arguments(self, command)
 
-        # Core and Device Registry (ADR) arguments
         load_core_arguments(self, command)
         load_adr_arguments(self, command)
 

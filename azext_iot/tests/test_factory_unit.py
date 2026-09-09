@@ -34,12 +34,177 @@ def _build_cli_ctx(mocker, cloud_config):
     return cli_ctx
 
 
+@pytest.fixture
+def cli_profile(mocker):
+    profile = mocker.patch("azext_iot.common.auth.Profile")
+    profile.return_value.get_login_credentials.return_value = (
+        mocker.sentinel.credential,
+        "test-sub",
+        "test-tenant",
+    )
+    return profile
+
+
+def test_credential_is_selected_per_context_and_subscription(
+    mocker, cli_profile
+):
+    from azext_iot.common.auth import get_cli_credential
+
+    first_ctx = _build_cli_ctx(mocker, CLOUD_CONFIGS[0])
+    second_ctx = _build_cli_ctx(mocker, CLOUD_CONFIGS[1])
+    second_ctx.data["subscription_id"] = "second-sub"
+    cli_profile.return_value.get_login_credentials.side_effect = [
+        (mocker.sentinel.first, "test-sub-id", "first-tenant"),
+        (mocker.sentinel.second, "second-sub", "second-tenant"),
+    ]
+
+    assert get_cli_credential(first_ctx) is mocker.sentinel.first
+    assert get_cli_credential(second_ctx) is mocker.sentinel.second
+    assert cli_profile.call_args_list == [
+        mocker.call(cli_ctx=first_ctx),
+        mocker.call(cli_ctx=second_ctx),
+    ]
+    assert (
+        cli_profile.return_value.get_login_credentials.call_args_list
+        == [
+            mocker.call(subscription_id="test-sub-id"),
+            mocker.call(subscription_id="second-sub"),
+        ]
+    )
+
+
+def test_factory_propagates_login_failure(mocker, cli_profile):
+    from knack.util import CLIError
+
+    from azext_iot._factory import adr_service_factory
+
+    error = CLIError("Please run 'az login' to setup account.")
+    cli_profile.return_value.get_login_credentials.side_effect = error
+    client_type = mocker.patch(
+        "azext_iot.sdk.deviceregistry.DeviceRegistryMgmtClient"
+    )
+
+    with pytest.raises(CLIError) as raised:
+        adr_service_factory(_build_cli_ctx(mocker, CLOUD_CONFIGS[0]))
+
+    assert raised.value is error
+    client_type.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "cloud_config", CLOUD_CONFIGS, ids=[c["id"] for c in CLOUD_CONFIGS]
+)
+def test_adr_request_uses_in_process_auth_without_spawning_cli(
+    mocker, cli_profile, mocked_response, cloud_config
+):
+    import platform
+    from urllib.parse import parse_qs, urlsplit
+
+    from azure.cli.core.auth.credential_adaptor import CredentialAdaptor
+
+    from azext_iot._factory import adr_service_factory
+
+    platform.processor()
+    cli_ctx = _build_cli_ctx(mocker, cloud_config)
+    msal_credential = mocker.Mock()
+    msal_credential.acquire_token.return_value = {
+        "access_token": "test-token",
+        "expires_in": 3600,
+        "token_type": "Bearer",
+    }
+    cli_profile.return_value.get_login_credentials.return_value = (
+        CredentialAdaptor(msal_credential),
+        "test-sub-id",
+        "test-tenant",
+    )
+    spawn = mocker.patch(
+        "subprocess.Popen",
+        side_effect=AssertionError("Authentication must not spawn a CLI"),
+    )
+    mocked_response.add(
+        method="GET",
+        url=(
+            f"{CANARY_ARM}/subscriptions/test-sub-id/resourceGroups/rg/"
+            "providers/Microsoft.DeviceRegistry/namespaces/namespace"
+        ),
+        json={
+            "name": "namespace",
+            "location": "centraluseuap",
+            "properties": {"provisioningState": "Succeeded"},
+        },
+        status=200,
+    )
+
+    with adr_service_factory(cli_ctx) as client:
+        result = client.namespaces.get(
+            resource_group_name="rg", namespace_name="namespace"
+        )
+
+    assert result["name"] == "namespace"
+    spawn.assert_not_called()
+    assert parse_qs(urlsplit(mocked_response.calls[0].request.url).query)[
+        "api-version"
+    ] == ["2026-11-02-preview"]
+    assert msal_credential.acquire_token.call_args.args == (
+        cloud_config["expected_scopes"],
+    )
+
+
+@pytest.mark.parametrize(
+    "cloud_config", CLOUD_CONFIGS, ids=[c["id"] for c in CLOUD_CONFIGS]
+)
+def test_dps_factory_request_uses_retained_api(
+    mocker, cli_profile, mocked_response, cloud_config
+):
+    from urllib.parse import parse_qs, urlsplit
+
+    from azure.core.credentials import AccessToken
+
+    from azext_iot._factory import iot_service_provisioning_factory
+
+    credential = mocker.Mock(spec=["get_token"])
+    credential.get_token.return_value = AccessToken(
+        "test-token", 4102444800
+    )
+    cli_profile.return_value.get_login_credentials.return_value = (
+        credential,
+        "test-sub-id",
+        "tenant",
+    )
+    mocked_response.add(
+        method="GET",
+        url=(
+            f"{cloud_config['resource_manager']}/subscriptions/test-sub-id/"
+            "resourceGroups/rg/providers/Microsoft.Devices/"
+            "provisioningServices/test-dps"
+        ),
+        json={"name": "test-dps"},
+        status=200,
+    )
+
+    with iot_service_provisioning_factory(
+        _build_cli_ctx(mocker, cloud_config)
+    ) as client:
+        result = client.iot_dps_resource.get(
+            provisioning_service_name="test-dps",
+            resource_group_name="rg",
+        )
+
+    assert result == {"name": "test-dps"}
+    assert parse_qs(urlsplit(mocked_response.calls[0].request.url).query)[
+        "api-version"
+    ] == ["2026-06-01-preview"]
+    assert credential.get_token.call_args.args == tuple(
+        cloud_config["expected_scopes"]
+    )
+
+
 @pytest.mark.parametrize("cloud_config", CLOUD_CONFIGS, ids=[c["id"] for c in CLOUD_CONFIGS])
 class TestFactoryCredentialScopes:
     """Ensure management client factories pass cloud-specific credential_scopes."""
 
     def test_iot_hub_factory(self, mocker, cloud_config):
-        mocker.patch("azext_iot._factory.AZURE_CLI_CREDENTIAL")
+        mocker.patch("azext_iot._factory.get_cli_credential")
         mock_client_cls = mocker.patch("azext_iot.sdk.iothub.mgmt.IotHubClient")
         mocker.patch("azure.cli.core.commands.client_factory.get_subscription_id", return_value="test-sub")
 
@@ -57,7 +222,7 @@ class TestFactoryCredentialScopes:
     def test_iot_hub_factory_honors_subscription_override(
         self, mocker, cloud_config
     ):
-        mocker.patch("azext_iot._factory.AZURE_CLI_CREDENTIAL")
+        mocker.patch("azext_iot._factory.get_cli_credential")
         mock_client_cls = mocker.patch(
             "azext_iot.sdk.iothub.mgmt.IotHubClient"
         )
@@ -76,7 +241,7 @@ class TestFactoryCredentialScopes:
         get_subscription.assert_not_called()
 
     def test_dps_factory(self, mocker, cloud_config):
-        mocker.patch("azext_iot._factory.AZURE_CLI_CREDENTIAL")
+        mocker.patch("azext_iot._factory.get_cli_credential")
         mock_client_cls = mocker.patch("azext_iot.sdk.dps.mgmt.IotDpsClient")
         mocker.patch("azure.cli.core.commands.client_factory.get_subscription_id", return_value="test-sub")
 
@@ -93,7 +258,7 @@ class TestFactoryCredentialScopes:
     def test_dps_factory_honors_subscription_override(
         self, mocker, cloud_config
     ):
-        mocker.patch("azext_iot._factory.AZURE_CLI_CREDENTIAL")
+        mocker.patch("azext_iot._factory.get_cli_credential")
         mock_client_cls = mocker.patch(
             "azext_iot.sdk.dps.mgmt.IotDpsClient"
         )
@@ -114,7 +279,7 @@ class TestFactoryCredentialScopes:
     def test_update_instance_factory_honors_subscription_override(
         self, mocker, cloud_config
     ):
-        mocker.patch("azext_iot._factory.AZURE_CLI_CREDENTIAL")
+        mocker.patch("azext_iot._factory.get_cli_credential")
         mock_client_cls = mocker.patch(
             "azext_iot.sdk.deviceupdate.duregistry.DeviceUpdateClient"
         )
@@ -134,7 +299,7 @@ class TestFactoryCredentialScopes:
         get_subscription.assert_not_called()
 
     def test_adr_factory(self, mocker, cloud_config):
-        mocker.patch("azext_iot._factory.AZURE_CLI_CREDENTIAL")
+        mocker.patch("azext_iot._factory.get_cli_credential")
         mock_client_cls = mocker.patch(
             "azext_iot.sdk.deviceregistry.DeviceRegistryMgmtClient"
         )
@@ -153,7 +318,7 @@ class TestFactoryCredentialScopes:
     def test_adr_factory_honors_subscription_override(
         self, mocker, cloud_config
     ):
-        mocker.patch("azext_iot._factory.AZURE_CLI_CREDENTIAL")
+        mocker.patch("azext_iot._factory.get_cli_credential")
         client = mocker.patch(
             "azext_iot.sdk.deviceregistry.DeviceRegistryMgmtClient"
         )
@@ -174,7 +339,7 @@ class TestFactoryCredentialScopes:
     def test_adr_command_factory_uses_cli_selected_subscription(
         self, mocker, cloud_config
     ):
-        mocker.patch("azext_iot._factory.AZURE_CLI_CREDENTIAL")
+        mocker.patch("azext_iot._factory.get_cli_credential")
         client = mocker.patch(
             "azext_iot.sdk.deviceregistry.DeviceRegistryMgmtClient"
         )
@@ -200,7 +365,7 @@ class TestFactoryCredentialScopes:
     def test_adr_command_factory_uses_current_subscription_by_default(
         self, mocker, cloud_config
     ):
-        mocker.patch("azext_iot._factory.AZURE_CLI_CREDENTIAL")
+        mocker.patch("azext_iot._factory.get_cli_credential")
         client = mocker.patch(
             "azext_iot.sdk.deviceregistry.DeviceRegistryMgmtClient"
         )
@@ -236,7 +401,7 @@ class TestFactoryCredentialScopes:
     ):
         import azext_iot._factory as subject
 
-        mocker.patch.object(subject, "AZURE_CLI_CREDENTIAL")
+        mocker.patch.object(subject, "get_cli_credential")
         client = mocker.patch(client_path)
         factory = getattr(subject, factory_name)
 
@@ -403,6 +568,10 @@ def test_software_update_data_factory_requires_service_endpoint(mocker):
     with pytest.raises(RequiredArgumentMissingError, match="service-derived"):
         adr_software_update_data_service_factory(cli_ctx)
 
+    credential = mocker.patch(
+        "azext_iot._factory.get_cli_credential",
+        return_value=mocker.sentinel.credential,
+    )
     client = mocker.patch(
         "azext_iot.sdk.deviceupdate.duregistrydata."
         "DeviceRegistrySoftwareUpdateClient"
@@ -411,6 +580,11 @@ def test_software_update_data_factory_requires_service_endpoint(mocker):
         cli_ctx, endpoint="updates.example.test"
     )
     assert client.call_args.kwargs["endpoint"] == "updates.example.test"
+    assert (
+        client.call_args.kwargs["credential"]
+        is mocker.sentinel.credential
+    )
+    credential.assert_called_once_with(cli_ctx)
 
 
 def test_dps_device_factory_uses_service_endpoint(mocker):

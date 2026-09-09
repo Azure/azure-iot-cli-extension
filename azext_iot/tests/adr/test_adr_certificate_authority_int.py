@@ -18,7 +18,7 @@ Run via ``tox -e ADR-int``.
 
 import pytest
 
-from azext_iot.tests import CaptureOutputLiveScenarioTest
+from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._log import LogKind, _log, timed_step
 from azext_iot.tests.adr.conftest import (
     TEST_LOCATION,
@@ -28,7 +28,7 @@ from azext_iot.tests.adr.conftest import (
 
 
 @pytest.mark.usefixtures("set_cwd")
-class TestADRCertificateAuthorityLifecycle(CaptureOutputLiveScenarioTest):
+class TestADRCertificateAuthorityLifecycle(ADRLiveScenarioTest):
     """End-to-end certificate authority + certificate policy lifecycle through the CLI."""
 
     def test_adr_certificate_authority_lifecycle(self):

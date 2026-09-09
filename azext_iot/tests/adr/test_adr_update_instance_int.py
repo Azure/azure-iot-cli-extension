@@ -6,7 +6,7 @@
 
 import pytest
 
-from azext_iot.tests import CaptureOutputLiveScenarioTest
+from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import (
     CleanupLedger,
     wait_for_resource_succeeded,
@@ -23,7 +23,7 @@ def _update_instance_name() -> str:
 
 
 @pytest.mark.usefixtures("set_cwd")
-class TestADRUpdateInstanceLifecycle(CaptureOutputLiveScenarioTest):
+class TestADRUpdateInstanceLifecycle(ADRLiveScenarioTest):
     def test_update_instance_lifecycle(self):
         instance_name = _update_instance_name()
         identity_name = f"testsuid{generate_generic_id()[:8]}"
@@ -176,7 +176,7 @@ class TestADRUpdateInstanceLifecycle(CaptureOutputLiveScenarioTest):
 
 
 @pytest.mark.usefixtures("set_cwd")
-class TestADRUpdateInstanceValidation(CaptureOutputLiveScenarioTest):
+class TestADRUpdateInstanceValidation(ADRLiveScenarioTest):
     def test_update_instance_validation_negatives(self):
         self.cmd(
             "iot adr ns su instance update -n missing-instance " f"-g {TEST_RG}",
