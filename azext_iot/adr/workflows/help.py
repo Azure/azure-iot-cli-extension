@@ -32,10 +32,10 @@ def load_adr_workflow_help():
   long-summary: |
     Create or adopt a namespace and configure selected DPS, IoT Hub, or Software
     Updates links. The command plans from live state, skips satisfied work, and
-    plans missing standard scoped role assignments by default after checking
-    existing assignments and caller permission. The final typed confirmation
-    covers every planned mutation. Use --manual-rbac to print manual role commands
-    and resume guidance instead.
+    delegates each link to the atomic link command, which validates target
+    readiness and creates missing service-to-service role assignments for an
+    authorized caller before namespace mutation. The final typed confirmation
+    covers every planned mutation.
     When link inputs omit --outbound-identity, the current namespace outbound
     identity is reused and never replaced implicitly.
     Namespace tags can be supplied with --tags key=value and are included in
@@ -54,5 +54,5 @@ def load_adr_workflow_help():
     - name: Enter setup inputs interactively
       text: az iot adr ns setup
     - name: Apply setup from a config file
-      text: az iot adr ns setup -n factory-ns -g factory-rg --config setup.yaml --assign-roles --yes
+      text: az iot adr ns setup -n factory-ns -g factory-rg --config setup.yaml --yes
   """

@@ -4,7 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import fnmatch
 import shlex
 import time
 from typing import Any, Dict, Optional
@@ -30,13 +29,11 @@ from azext_iot._factory import (
 from azext_iot.adr.providers.link import LinkProvider
 from azext_iot.adr.providers.namespace import NamespaceProvider
 from azext_iot.adr.providers.update_instance import UpdateInstanceProvider
+from azext_iot.adr.rbac import LinkRbacManager
 from azext_iot.adr.workflows.models import EndpointSpec
 from azext_iot.common.embedded_cli import EmbeddedCLI
 
 
-HUB_ROLES = ("Contributor", "IoT Hub Data Contributor")
-DEFAULT_ROLE = "Contributor"
-ROLE_ASSIGNMENT_WRITE = "Microsoft.Authorization/roleAssignments/write"
 LINK_POLL_INTERVAL = 10
 LINK_POLL_ATTEMPTS = 240
 
@@ -71,73 +68,6 @@ def is_not_found(error: Exception) -> bool:
     )
 
 
-class WorkflowRbac:
-    def __init__(self, cli_ctx):
-        self.cli_ctx = cli_ctx
-        self.cli = EmbeddedCLI(cli_ctx=cli_ctx, capture_stderr=True)
-
-    def list_assignments(self, principal_id: str, role: str, scope: str):
-        command = (
-            "role assignment list "
-            f"--assignee {shlex.quote(principal_id)} "
-            f"--role {shlex.quote(role)} "
-            f"--scope {shlex.quote(scope)} --include-inherited"
-        )
-        return self.cli.invoke(command).as_json()
-
-    def has_assignment(self, principal_id: str, role: str, scope: str) -> bool:
-        return bool(self.list_assignments(principal_id, role, scope))
-
-    def create_assignment(self, principal_id: str, role: str, scope: str):
-        command = (
-            "role assignment create "
-            f"--assignee-object-id {shlex.quote(principal_id)} "
-            "--assignee-principal-type ServicePrincipal "
-            f"--role {shlex.quote(role)} --scope {shlex.quote(scope)}"
-        )
-        return self.cli.invoke(command).as_json()
-
-    def resolve_service_principal(self, application_id: str) -> str:
-        result = self.cli.invoke(
-            f"ad sp show --id {shlex.quote(application_id)}"
-        ).as_json()
-        object_id = value_of(result, "id", "objectId", "object_id")
-        if not object_id:
-            raise CLIInternalError(
-                f"Unable to resolve service principal for application "
-                f"'{application_id}'."
-            )
-        return object_id
-
-    def can_create_assignments(self, scope: str) -> Optional[bool]:
-        endpoint = self.cli_ctx.cloud.endpoints.resource_manager.rstrip("/")
-        url = (
-            f"{endpoint}{scope}/providers/Microsoft.Authorization/permissions"
-            "?api-version=2022-04-01"
-        )
-        try:
-            permissions = self.cli.invoke(
-                f"rest --method get --url {shlex.quote(url)}"
-            ).as_json()
-        except Exception:  # noqa: BLE001 - an unreadable permission probe is unknown
-            return None
-        entries = permissions.get("value", permissions) if isinstance(permissions, dict) else permissions
-        for permission in entries or []:
-            actions = permission.get("actions") or []
-            not_actions = permission.get("notActions") or []
-            allowed = any(
-                fnmatch.fnmatchcase(ROLE_ASSIGNMENT_WRITE.casefold(), action.casefold())
-                for action in actions
-            )
-            denied = any(
-                fnmatch.fnmatchcase(ROLE_ASSIGNMENT_WRITE.casefold(), action.casefold())
-                for action in not_actions
-            )
-            if allowed and not denied:
-                return True
-        return False
-
-
 class WorkflowServices:
     def __init__(self, cmd, sleep=time.sleep):
         self.cmd = cmd
@@ -148,7 +78,8 @@ class WorkflowServices:
         self.resources = get_mgmt_service_client(
             cmd.cli_ctx, ResourceManagementClient
         )
-        self.rbac = WorkflowRbac(cmd.cli_ctx)
+        self.cli = EmbeddedCLI(cli_ctx=cmd.cli_ctx, capture_stderr=True)
+        self.link_rbac = LinkRbacManager(cmd.cli_ctx)
         self.sleep = sleep
 
     @property
@@ -166,7 +97,7 @@ class WorkflowServices:
             raise
 
     def account_context(self):
-        account = self.rbac.cli.invoke("account show").as_json()
+        account = self.cli.invoke("account show").as_json()
         user = as_dict(account.get("user"))
         return {
             "subscriptionId": value_of(account, "id") or self.subscription_id,
@@ -190,7 +121,7 @@ class WorkflowServices:
         ]
 
     def resolve_subscription(self, value: str):
-        account = self.rbac.cli.invoke(
+        account = self.cli.invoke(
             "account show", subscription=value
         ).as_json()
         return {
@@ -411,7 +342,7 @@ class WorkflowServices:
         self._require_active_subscription(
             parse_resource_id(resource_id), "user-assigned identity"
         )
-        result = self.rbac.cli.invoke(
+        result = self.cli.invoke(
             f"identity show --ids {shlex.quote(resource_id)}"
         ).as_json()
         if not isinstance(result, dict):
@@ -548,6 +479,20 @@ class WorkflowServices:
             namespace_name=request.namespace_name,
             resource_group_name=request.resource_group_name,
             su_resource_id=endpoint.resource_id,
+            mi_system_assigned=endpoint.identity_type == "system-assigned",
+            mi_user_assigned=endpoint.user_assigned_identity,
+        )
+
+    def ensure_link_access(self, request, endpoint: EndpointSpec):
+        return self.links.ensure_link_access(
+            link_type=(
+                "su"
+                if endpoint.kind == "software-updates"
+                else endpoint.kind
+            ),
+            namespace_name=request.namespace_name,
+            resource_group_name=request.resource_group_name,
+            target_resource_id=endpoint.resource_id,
             mi_system_assigned=endpoint.identity_type == "system-assigned",
             mi_user_assigned=endpoint.user_assigned_identity,
         )

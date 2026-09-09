@@ -41,8 +41,6 @@ class SetupRequest:
     software_updates: Optional[EndpointSpec] = None
     create_update_instance: bool = False
     update_instance_name: Optional[str] = None
-    assign_roles: bool = True
-    manual_rbac: bool = False
     skipped: Tuple[str, ...] = ()
     check_status: bool = False
     subscription_id: Optional[str] = None

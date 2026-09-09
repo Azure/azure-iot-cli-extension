@@ -17,7 +17,6 @@ from azext_iot.adr.workflows import namespace as subject
 from azext_iot.adr.workflows.models import (
     STATE_BLOCKED,
     STATE_FAILED,
-    STATE_MANUAL,
     STATE_NOT_CONFIGURED,
     STATE_PLANNED,
     STATE_SATISFIED,
@@ -89,8 +88,8 @@ def services():
     service = MagicMock()
     service.namespace_outbound_principal.return_value = "namespace-principal"
     service.principal_for_identity.return_value = "target-principal"
-    service.rbac.has_assignment.return_value = True
-    service.rbac.can_create_assignments.return_value = True
+    service.link_rbac.assignment_exists.return_value = True
+    service.link_rbac.resolve_adu_principal.return_value = "adu-principal"
     return service
 
 
@@ -187,13 +186,31 @@ def test_check_detects_link_and_missing_role(services):
         "id": HUB_ID,
         "identity": {"principalId": "hub-principal"},
     }
-    services.rbac.has_assignment.side_effect = [True, False, True]
+    services.link_rbac.assignment_exists.side_effect = [True, False, True]
     result = subject.NamespaceWorkflow(services).check("ns", RG)
     assert result["state"] == STATE_BLOCKED
     assert any(
         item.get("message") == "Required role assignment is missing."
         for item in result["items"]
     )
+
+
+def test_check_identityless_hub_skips_reverse_identity_role(services):
+    hub = _link(HUB_ID)
+    hub.pop("inboundCallerIdentity")
+    services.show_namespace.return_value = _namespace(
+        hubs={"primary": hub}
+    )
+    services.resolve_resource.return_value = {
+        "id": HUB_ID,
+        "identity": {},
+    }
+
+    result = subject.NamespaceWorkflow(services).check("ns", RG)
+
+    assert result["state"] == STATE_SUCCEEDED
+    services.principal_for_identity.assert_not_called()
+    assert services.link_rbac.assignment_exists.call_count == 2
 
 
 def test_check_records_warning_and_resource_failure(services):
@@ -207,7 +224,7 @@ def test_check_records_warning_and_resource_failure(services):
         {"identity": {"principalId": "hub"}},
         InvalidArgumentValueError("missing"),
     ]
-    services.rbac.has_assignment.side_effect = RuntimeError("forbidden")
+    services.link_rbac.assignment_exists.side_effect = RuntimeError("forbidden")
     result = subject.NamespaceWorkflow(services).check("ns", RG)
     states = {item["state"] for item in result["items"]}
     assert STATE_WARNING in states
@@ -450,33 +467,6 @@ def test_setup_propagates_blocked_selected_status(services, mocker):
     assert result["state"] == STATE_BLOCKED
 
 
-def test_manual_rbac_still_runs_selected_status(services, mocker):
-    services.show_namespace.return_value = _namespace(
-        dps={"dps": _link(DPS_ID)}
-    )
-    services.resolve_resource.return_value = {
-        "identity": {"principalId": "dps"}
-    }
-    services.rbac.has_assignment.return_value = False
-    workflow = subject.NamespaceWorkflow(services)
-    mocker.patch.object(
-        workflow,
-        "check",
-        return_value={"state": STATE_BLOCKED},
-    )
-    result = workflow.setup(
-        SetupRequest(
-            "ns",
-            RG,
-            dps=_endpoint("dps", DPS_ID),
-            assign_roles=False,
-            check_status=True,
-        )
-    )
-    assert result["state"] == STATE_BLOCKED
-    assert result["resumeCommand"]
-
-
 def test_identity_refresh_failure_keeps_successful_mutation(services):
     services.show_namespace.side_effect = [
         _namespace(outbound=False),
@@ -505,7 +495,6 @@ def test_link_wait_failure_keeps_submitted_action(services):
     services.resolve_resource.return_value = {
         "identity": {"principalId": "hub"}
     }
-    services.rbac.has_assignment.return_value = True
     services.wait_for_link.side_effect = RuntimeError("wait failed")
     request = SetupRequest(
         "ns",
@@ -540,7 +529,6 @@ def test_plan_setup_matching_and_conflicting_links(services):
         outbound_identity_type="SystemAssigned",
         dps=_endpoint("dps", DPS_ID),
         hubs=(_endpoint("hub", HUB_ID),),
-        assign_roles=True,
     )
     result, items = subject.NamespaceWorkflow(services).plan_setup(request)
     assert result["state"] == STATE_SUCCEEDED
@@ -557,6 +545,29 @@ def test_plan_setup_matching_and_conflicting_links(services):
     }
     result, _ = subject.NamespaceWorkflow(services).plan_setup(request)
     assert result["state"] == STATE_BLOCKED
+
+
+def test_setup_reused_link_repairs_access_through_provider(services):
+    services.show_namespace.return_value = _namespace(
+        dps={"dps": _link(DPS_ID)}
+    )
+    services.resolve_resource.return_value = {
+        "identity": {"principalId": "dps"}
+    }
+    request = SetupRequest(
+        "ns",
+        RG,
+        outbound_identity_type="SystemAssigned",
+        dps=_endpoint("dps", DPS_ID),
+    )
+
+    result = subject.NamespaceWorkflow(services).setup(request)
+
+    assert result["state"] == STATE_SUCCEEDED
+    services.ensure_link_access.assert_called_once_with(
+        request, request.dps
+    )
+    services.add_dps.assert_not_called()
 
 
 def test_plan_setup_blocks_failed_dps_prerequisite(services):
@@ -617,51 +628,53 @@ def test_plan_setup_propagates_resource_failure(services):
         subject.NamespaceWorkflow(services).plan_setup(request)
 
 
-def test_plan_setup_records_role_planning_failure(services):
+def test_plan_setup_delegates_role_validation(services):
     services.show_namespace.return_value = _namespace(
         dps={"dps": _link(DPS_ID)}
     )
     services.resolve_resource.return_value = {
         "identity": {"principalId": "dps"}
     }
-    services.namespace_outbound_principal.side_effect = RuntimeError("identity")
     request = SetupRequest(
         "ns",
         RG,
         outbound_identity_type="SystemAssigned",
         dps=_endpoint("dps", DPS_ID),
     )
-    result, _ = subject.NamespaceWorkflow(services).plan_setup(request)
-    assert result["state"] == STATE_BLOCKED
+    result, items = subject.NamespaceWorkflow(services).plan_setup(request)
+    assert result["state"] == STATE_SUCCEEDED
+    access = next(
+        item for item in items if item.item_id.startswith("roles-")
+    )
+    assert access.state == STATE_SATISFIED
+    assert "atomic link command" in access.message
+    services.link_rbac.assignment_exists.assert_not_called()
 
 
-def test_plan_setup_role_states(services):
+def test_plan_setup_uses_authoritative_role_requirements(services):
     namespace = _namespace(dps={"dps": _link(DPS_ID)})
     services.show_namespace.return_value = namespace
     services.resolve_resource.return_value = {
         "identity": {"principalId": "dps"}
     }
-    services.rbac.has_assignment.side_effect = [True, False]
-    services.rbac.can_create_assignments.return_value = False
     request = SetupRequest(
         "ns",
         RG,
         outbound_identity_type="SystemAssigned",
         dps=_endpoint("dps", DPS_ID),
-        assign_roles=True,
     )
     result, items = subject.NamespaceWorkflow(services).plan_setup(request)
-    assert result["state"] == STATE_MANUAL
-    assert any(item.state == STATE_MANUAL for item in items)
+    assert result["state"] == STATE_SUCCEEDED
     role_index = next(
         index for index, item in enumerate(items)
-        if item.item_id.startswith("role-")
+        if item.item_id.startswith("roles-")
     )
     link_index = next(
         index for index, item in enumerate(items)
         if item.item_id.startswith("link-")
     )
     assert role_index < link_index
+    assert "namespace outbound MI" in items[role_index].message
 
 
 def test_check_skips_roles_without_outbound_principal(services):
@@ -677,7 +690,7 @@ def test_check_skips_roles_without_outbound_principal(services):
     }
     result = subject.NamespaceWorkflow(services).check("ns", RG)
     assert result["state"] == STATE_BLOCKED
-    services.rbac.has_assignment.assert_not_called()
+    services.link_rbac.assignment_exists.assert_not_called()
 
 
 def test_setup_rejects_blocked_plan(services):
@@ -710,64 +723,30 @@ def test_setup_creates_namespace_and_configures_identity(services):
     services.configure_outbound_identity.assert_called_once()
 
 
-def test_setup_returns_manual_when_roles_missing(services):
-    namespace = _namespace(dps={"dps": _link(DPS_ID)})
+def test_setup_surfaces_atomic_link_rbac_failure(services):
+    namespace = _namespace()
     services.show_namespace.return_value = namespace
     services.resolve_resource.return_value = {
         "identity": {"principalId": "dps"}
     }
-    services.rbac.has_assignment.return_value = False
+    services.add_dps.side_effect = RuntimeError(
+        "Missing link role assignments; no namespace mutation."
+    )
     request = SetupRequest(
         "ns",
         RG,
         outbound_identity_type="SystemAssigned",
         dps=_endpoint("dps", DPS_ID),
-        assign_roles=False,
     )
-    result = subject.NamespaceWorkflow(services).setup(request)
-    assert result["state"] == STATE_MANUAL
-    assert "--dps" in result["resumeCommand"]
-    assert f"resource-id={DPS_ID}" in result["resumeCommand"]
-    assert result["resumeCommand"].endswith("--yes")
-    services.add_dps.assert_not_called()
+    with pytest.raises(
+        subject.WorkflowExecutionError,
+        match="Missing link role assignments",
+    ):
+        subject.NamespaceWorkflow(services).setup(request)
+    services.add_dps.assert_called_once()
 
 
-def test_resume_command_preserves_all_setup_inputs():
-    request = SetupRequest(
-        "ns",
-        RG,
-        subscription_id=SUB,
-        location="eastus",
-        tags={"env": "prod", "team": "devices"},
-        outbound_identity_type="UserAssigned",
-        outbound_user_assigned_identity="/uami",
-        dps=_endpoint("dps", DPS_ID),
-        hubs=(
-            EndpointSpec(
-                "hub",
-                "weighted",
-                HUB_ID,
-                "user-assigned",
-                "/hub-uami",
-                availability="Available",
-                allocation_weight=5,
-            ),
-        ),
-        software_updates=_endpoint("software-updates", SU_ID),
-        manual_rbac=True,
-    )
-    command = subject.NamespaceWorkflow._resume_command(request)
-    assert "--location eastus" in command
-    assert "--tags env=prod team=devices" in command
-    assert f"--subscription {SUB}" in command
-    assert "--outbound-identity /uami" in command
-    assert "--dps" in command and "--hub" in command and "--su" in command
-    assert "availability=Available" in command
-    assert "allocation-weight=5" in command
-    assert "--manual-rbac" in command
-
-
-def test_setup_assigns_roles_and_bundles_links(services):
+def test_setup_delegates_bundled_link(services):
     initial = _namespace()
     linked = _namespace(
         dps={"dps": _link(DPS_ID)},
@@ -780,14 +759,12 @@ def test_setup_assigns_roles_and_bundles_links(services):
         {"identity": {"principalId": "dps"}},
         {"identity": {"principalId": "hub"}},
     ]
-    services.rbac.has_assignment.side_effect = [False] * 10
     request = SetupRequest(
         "ns",
         RG,
         outbound_identity_type="SystemAssigned",
         dps=_endpoint("dps", DPS_ID),
         hubs=(_endpoint("hub", HUB_ID),),
-        assign_roles=True,
     )
     result = subject.NamespaceWorkflow(services).setup(request)
     assert result["state"] == STATE_SUCCEEDED
@@ -795,7 +772,7 @@ def test_setup_assigns_roles_and_bundles_links(services):
     services.add_dps.assert_not_called()
     services.wait_for_link.assert_any_call("ns", RG, "provisioning", "dps")
     services.wait_for_link.assert_any_call("ns", RG, "messaging", "hub")
-    services.sleep.assert_called_with(subject.ROLE_PROPAGATION_WAIT_SECONDS)
+    services.link_rbac.assignment_exists.assert_not_called()
 
 
 def test_setup_applies_individual_existing_and_su_links(services):
@@ -816,7 +793,6 @@ def test_setup_applies_individual_existing_and_su_links(services):
         outbound_identity_type="SystemAssigned",
         hubs=(_endpoint("hub", HUB_ID),),
         software_updates=_endpoint("software-updates", SU_ID),
-        assign_roles=True,
     )
     result = subject.NamespaceWorkflow(services).setup(request)
     assert result["state"] == STATE_SUCCEEDED
@@ -835,7 +811,6 @@ def test_setup_creates_missing_update_instance(services):
     services.create_update_instance.return_value = {
         "identity": {"principalId": "su"}
     }
-    services.rbac.has_assignment.side_effect = [True, True, False]
     request = SetupRequest(
         "ns",
         RG,
@@ -844,8 +819,9 @@ def test_setup_creates_missing_update_instance(services):
         create_update_instance=True,
     )
     result = subject.NamespaceWorkflow(services).setup(request)
-    assert result["state"] == STATE_MANUAL
+    assert result["state"] == STATE_SUCCEEDED
     services.create_update_instance.assert_called_once()
+    services.add_su.assert_called_once()
 
 
 def test_update_instance_creation_is_scoped_as_mutation(services):
@@ -918,26 +894,6 @@ def test_setup_reports_partial_state_on_apply_failure(services):
     assert raised.value.result["items"][-1]["state"] == STATE_FAILED
 
 
-def test_setup_returns_manual_when_caller_cannot_assign(services):
-    namespace = _namespace(dps={"dps": _link(DPS_ID)})
-    services.show_namespace.return_value = namespace
-    services.resolve_resource.return_value = {
-        "identity": {"principalId": "dps"}
-    }
-    services.rbac.has_assignment.return_value = False
-    services.rbac.can_create_assignments.return_value = False
-    request = SetupRequest(
-        "ns",
-        RG,
-        outbound_identity_type="SystemAssigned",
-        dps=_endpoint("dps", DPS_ID),
-        assign_roles=True,
-    )
-    result = subject.NamespaceWorkflow(services).setup(request)
-    assert result["state"] == STATE_MANUAL
-    services.rbac.create_assignment.assert_not_called()
-
-
 def test_setup_adds_individual_dps_before_existing_hubs(services):
     namespace = _namespace(hubs={"existing": _link(HUB_ID)})
     linked = _namespace(
@@ -954,7 +910,6 @@ def test_setup_adds_individual_dps_before_existing_hubs(services):
         RG,
         outbound_identity_type="SystemAssigned",
         dps=_endpoint("dps", DPS_ID),
-        assign_roles=True,
     )
     result = subject.NamespaceWorkflow(services).setup(request)
     assert result["state"] == STATE_SUCCEEDED
@@ -987,7 +942,6 @@ def test_setup_preserves_existing_first_hub_when_adding_dps(services):
         outbound_identity_type="SystemAssigned",
         dps=_endpoint("dps", DPS_ID),
         hubs=(_endpoint("hub", HUB_ID),),
-        assign_roles=True,
     )
     result = subject.NamespaceWorkflow(services).setup(request)
     assert result["state"] == STATE_SUCCEEDED
@@ -1015,11 +969,14 @@ def test_role_helpers_and_endpoint_iteration(services):
     roles = workflow._roles_for(
         su, _namespace(), "namespace-principal", "su-principal"
     )
-    services.rbac.resolve_service_principal.assert_called_once_with(
-        subject.ADU_FIRST_PARTY_APPLICATION_ID
+    services.link_rbac.resolve_adu_principal.assert_called_once_with(
+        SU_ID
     )
-    assert any(role.get("manual") for role in roles)
-    assert "role assignment create" in workflow._role_command(roles[0])
+    assert {role["principalId"] for role in roles} == {
+        "namespace-principal",
+        "su-principal",
+        "adu-principal",
+    }
 
     request = SetupRequest(
         "ns",
@@ -1045,7 +1002,7 @@ def test_role_helpers_and_endpoint_iteration(services):
             allocation_weight=5,
         ),
     )
-    assert "--mi-user-assigned /uami" in command
+    assert "--user-assigned-mi /uami" in command
     assert "--allocation-weight 5" in command
 
     injected = workflow._link_command(

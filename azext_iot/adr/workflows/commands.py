@@ -177,13 +177,6 @@ def _validate_resource_group(services, renderer, resource_group_name):
             f"Resource group '{resource_group_name}' was not found in the "
             "active subscription."
         )
-    permission = services.rbac.can_create_assignments(
-        resource_group.get("id")
-        or (
-            f"/subscriptions/{services.subscription_id}"
-            f"/resourceGroups/{resource_group_name}"
-        )
-    )
     renderer.input_status(
         "Resource group",
         resource_group_name,
@@ -193,13 +186,6 @@ def _validate_resource_group(services, renderer, resource_group_name):
             for value in (
                 "Found",
                 resource_group.get("location"),
-                (
-                    "role grants allowed"
-                    if permission is True
-                    else "manual role grants required"
-                    if permission is False
-                    else None
-                ),
             )
             if value
         ),
@@ -462,7 +448,6 @@ def _prepare_namespace_setup(
         hubs=arguments["hubs"],
         software_updates=arguments["software_updates"],
         complete_connectivity=arguments["complete_connectivity"],
-        assign_roles=arguments["assign_roles"],
         config=arguments["config"],
         no_input=arguments["no_input"],
         interactive=interactive,
@@ -795,8 +780,6 @@ def adr_namespace_setup(
     hubs: Optional[List[List[str]]] = None,
     software_updates: Optional[List[str]] = None,
     complete_connectivity: bool = False,
-    assign_roles: Optional[bool] = None,
-    manual_rbac: bool = False,
     config: Optional[str] = None,
     no_input: bool = False,
     plan_only: bool = False,
@@ -840,9 +823,6 @@ def adr_namespace_setup(
         "hubs": hubs,
         "software_updates": software_updates,
         "complete_connectivity": complete_connectivity,
-        "assign_roles": (
-            False if manual_rbac else assign_roles
-        ),
         "config": config,
         "no_input": no_input,
         "initial_request": None,
@@ -959,7 +939,6 @@ def adr_namespace_setup(
                     "hubs": None,
                     "software_updates": None,
                     "complete_connectivity": False,
-                    "assign_roles": request.assign_roles,
                     "config": None,
                     "no_input": False,
                     "initial_request": request,

@@ -209,21 +209,19 @@ def test_build_setup_request_from_arguments():
             f"resource-id={HUB_ID}",
             "identity=system-assigned",
         ]],
-        assign_roles=True,
     )
     assert request.outbound_identity_type == "SystemAssigned"
     assert request.hubs[0].resource_id == HUB_ID
-    assert request.assign_roles
 
 
-def test_setup_defaults_to_assigning_missing_roles():
+def test_setup_request_leaves_role_ownership_to_link_provider():
     request = subject.build_setup_request(
         namespace_name="ns",
         resource_group_name=RG,
         subscription_id=SUB,
         namespace_outbound_identity="system-assigned",
     )
-    assert request.assign_roles
+    assert not hasattr(request, "assign_roles")
 
 
 def test_build_setup_request_runs_real_guided_configuration():
@@ -239,7 +237,7 @@ def test_build_setup_request_runs_real_guided_configuration():
     assert request.outbound_identity_type == "SystemAssigned"
 
 
-def test_config_defaults_to_assigning_roles(tmp_path):
+def test_config_builds_without_workflow_role_policy(tmp_path):
     config = tmp_path / "setup.yaml"
     config.write_text(
         """
@@ -252,9 +250,11 @@ links: {}
 """,
         encoding="utf-8",
     )
-    assert subject.build_setup_request(
+    request = subject.build_setup_request(
         None, None, SUB, config=str(config)
-    ).assign_roles
+    )
+    assert request.namespace_name == "ns"
+    assert not hasattr(request, "assign_roles")
 
 
 def test_build_setup_request_supports_uami_and_complete_connectivity():
@@ -300,7 +300,6 @@ links:
       resourceId: {HUB_ID}
       identity:
         type: SystemAssigned
-assignRoles: true
 """,
         encoding="utf-8",
     )
@@ -314,10 +313,9 @@ assignRoles: true
     assert request.resource_group_name == "config-rg"
     assert request.location == "eastus"
     assert request.hubs[0].endpoint_name == "primary"
-    assert request.assign_roles
 
 
-def test_config_preserves_cli_scope_and_validates_assign_roles(tmp_path):
+def test_config_preserves_cli_scope_and_rejects_assign_roles(tmp_path):
     config = tmp_path / "setup.yaml"
     config.write_text(
         """
@@ -328,7 +326,6 @@ namespace:
   outboundIdentity:
     type: SystemAssigned
 links: {}
-assignRoles: false
 """,
         encoding="utf-8",
     )
@@ -337,16 +334,14 @@ assignRoles: false
         resource_group_name="cli-rg",
         subscription_id=SUB,
         location="eastus",
-        assign_roles=True,
         config=str(config),
     )
     assert request.namespace_name == "cli-ns"
     assert request.resource_group_name == "cli-rg"
     assert request.location == "eastus"
-    assert request.assign_roles
 
-    config.write_text("assignRoles: 'false'\n", encoding="utf-8")
-    with pytest.raises(InvalidArgumentValueError, match="must be a boolean"):
+    config.write_text("assignRoles: false\n", encoding="utf-8")
+    with pytest.raises(InvalidArgumentValueError, match="no longer supported"):
         subject.build_setup_request("ns", RG, SUB, config=str(config))
 
 

@@ -1015,6 +1015,31 @@ def test_link_update_repeats_add_preflight_before_namespace_patch(
     )
 
 
+def test_existing_link_access_delegates_to_atomic_preflight(
+    fixture_link_provider,
+):
+    namespace = _namespace(
+        dps={"dps": _endpoint(DPS_ENDPOINT_TYPE, DPS_ID)}
+    )
+    fixture_link_provider.client.namespaces.get.return_value = namespace
+
+    fixture_link_provider.ensure_link_access(
+        "dps",
+        "namespace",
+        "rg",
+        DPS_ID,
+        mi_system_assigned=True,
+    )
+
+    preflight = fixture_link_provider._preflight_link.call_args  # pylint: disable=protected-access
+    assert preflight.kwargs["link_type"] == "dps"
+    assert preflight.kwargs["namespace"] == namespace
+    assert preflight.kwargs["target_resource_id"] == DPS_ID
+    assert preflight.kwargs["inbound_identity"] == {
+        "type": "SystemAssigned"
+    }
+
+
 @pytest.mark.parametrize(
     "kind,section,endpoint_type,resource_id",
     [

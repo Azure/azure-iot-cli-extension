@@ -81,48 +81,9 @@ def _cli_context():
     )
 
 
-def test_rbac_list_create_and_permissions(mocker):
-    embedded = mocker.patch.object(subject, "EmbeddedCLI").return_value
-    embedded.invoke.return_value.as_json.return_value = [{"id": "assignment"}]
-    rbac = subject.WorkflowRbac(_cli_context())
-
-    assert rbac.has_assignment("principal", "Contributor", HUB_ID)
-    assert rbac.create_assignment("principal", "Contributor", HUB_ID) == [
-        {"id": "assignment"}
-    ]
-    commands = [call.args[0] for call in embedded.invoke.call_args_list]
-    assert "role assignment list" in commands[0]
-    assert "role assignment create" in commands[1]
-
-    embedded.invoke.return_value.as_json.return_value = {
-        "value": [{"actions": ["*"], "notActions": []}]
-    }
-    assert rbac.can_create_assignments(HUB_ID) is True
-
-    embedded.invoke.return_value.as_json.return_value = {
-        "value": [{
-            "actions": ["Microsoft.Authorization/*"],
-            "notActions": ["Microsoft.Authorization/roleAssignments/write"],
-        }]
-    }
-    assert rbac.can_create_assignments(HUB_ID) is False
-
-    embedded.invoke.side_effect = RuntimeError("forbidden")
-    assert rbac.can_create_assignments(HUB_ID) is None
-
-
-def test_rbac_resolves_service_principal(mocker):
-    embedded = mocker.patch.object(subject, "EmbeddedCLI").return_value
-    embedded.invoke.return_value.as_json.return_value = {"id": "object-id"}
-    rbac = subject.WorkflowRbac(_cli_context())
-    assert rbac.resolve_service_principal("app-id") == "object-id"
-    embedded.invoke.return_value.as_json.return_value = {}
-    with pytest.raises(CLIInternalError, match="Unable to resolve"):
-        rbac.resolve_service_principal("app-id")
-
-
 @pytest.fixture
 def service_fixture(mocker):
+    embedded = mocker.patch.object(subject, "EmbeddedCLI").return_value
     namespace = mocker.patch.object(subject, "NamespaceProvider").return_value
     links = mocker.patch.object(subject, "LinkProvider").return_value
     update = mocker.patch.object(subject, "UpdateInstanceProvider").return_value
@@ -134,11 +95,14 @@ def service_fixture(mocker):
     resources = mocker.patch.object(
         subject, "get_mgmt_service_client"
     ).return_value
-    rbac = mocker.patch.object(subject, "WorkflowRbac").return_value
+    link_rbac = mocker.patch.object(
+        subject, "LinkRbacManager"
+    ).return_value
     cmd = SimpleNamespace(cli_ctx=_cli_context())
     service = subject.WorkflowServices(cmd, sleep=mocker.Mock())
+    service.cli = embedded
     service.resources = resources
-    return service, namespace, links, update, rbac
+    return service, namespace, links, update, link_rbac
 
 
 def test_subscription_and_namespace_operations(service_fixture, mocker):
@@ -174,7 +138,7 @@ def test_subscription_and_namespace_operations(service_fixture, mocker):
     with pytest.raises(ValueError):
         service.show_namespace("ns", RG)
 
-    service.rbac.cli.invoke.return_value.as_json.return_value = {
+    service.cli.invoke.return_value.as_json.return_value = {
         "id": SUB,
         "name": "Production",
         "tenantId": "tenant",
@@ -183,7 +147,7 @@ def test_subscription_and_namespace_operations(service_fixture, mocker):
     account = service.account_context()
     assert account["subscriptionName"] == "Production"
     assert account["userName"] == "user@example.com"
-    service.rbac.cli.invoke.return_value.as_json.return_value = {
+    service.cli.invoke.return_value.as_json.return_value = {
         "id": SUB,
         "name": "Production",
         "state": "Enabled",
@@ -349,8 +313,8 @@ def test_resolve_resource_rejects_cross_subscription(
 
 
 def test_identity_resolution(service_fixture):
-    service, _, _, _, rbac = service_fixture
-    rbac.cli.invoke.return_value.as_json.return_value = {
+    service, _, _, _, _ = service_fixture
+    service.cli.invoke.return_value.as_json.return_value = {
         "principalId": "uami-principal"
     }
     assert service.resolve_uami("/uami")["principalId"] == "uami-principal"
@@ -363,7 +327,7 @@ def test_identity_resolution(service_fixture):
         "system-assigned", None, {"identity": {"principalId": "system"}}
     ) == "system"
 
-    rbac.cli.invoke.return_value.as_json.return_value = []
+    service.cli.invoke.return_value.as_json.return_value = []
     with pytest.raises(CLIInternalError, match="Unable to resolve"):
         service.resolve_uami("/uami")
     with pytest.raises(InvalidArgumentValueError, match="principal ID"):
@@ -383,14 +347,14 @@ def test_uami_rejects_cross_subscription(service_fixture, mocker):
 
 
 def test_namespace_outbound_principal(service_fixture):
-    service, _, _, _, rbac = service_fixture
+    service, _, _, _, _ = service_fixture
     namespace = {
         "identity": {"principalId": "system"},
         "properties": {"outboundIdentity": {"type": "SystemAssigned"}},
     }
     assert service.namespace_outbound_principal(namespace) == "system"
 
-    rbac.cli.invoke.return_value.as_json.return_value = {
+    service.cli.invoke.return_value.as_json.return_value = {
         "principalId": "user"
     }
     namespace["properties"]["outboundIdentity"] = {
@@ -430,10 +394,19 @@ def test_link_provider_calls(service_fixture):
     service.add_hub(request, hub)
     service.add_su(request, su)
     service.add_dps_and_hub(request, dps, hub)
+    service.ensure_link_access(request, su)
     links.dps_add.assert_called_once()
     links.hub_add.assert_called_once()
     links.su_add.assert_called_once()
     links.link_add.assert_called_once()
+    links.ensure_link_access.assert_called_once_with(
+        link_type="su",
+        namespace_name="ns",
+        resource_group_name=RG,
+        target_resource_id=SU_ID,
+        mi_system_assigned=True,
+        mi_user_assigned=None,
+    )
 
 
 def test_wait_for_link_states(service_fixture):

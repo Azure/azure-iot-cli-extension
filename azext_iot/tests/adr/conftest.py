@@ -62,8 +62,6 @@ OPTIONAL_FIXTURE_ENV_VARS = (
     "azext_iot_adr_su_namespace",
     "azext_iot_adr_su_storage_account",
     "azext_iot_adr_su_storage_subscription",
-    "azext_iot_adr_workflow_dps_id",
-    "azext_iot_adr_workflow_hub_id",
 )
 
 

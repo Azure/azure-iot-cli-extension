@@ -47,7 +47,6 @@ def _request():
                 "/subscriptions/s/uami",
             ),
         ),
-        assign_roles=True,
     )
 
 
@@ -373,7 +372,7 @@ def test_rich_selection_supports_number_and_clears_menu(mocker):
         },
     )
     assert selected == "two"
-    assert renderer._body == []
+    assert not renderer._body
     assert prompt.call_args.kwargs["completer"]
 
     prompt.side_effect = ["invalid", "q"]
@@ -476,11 +475,11 @@ def test_plain_action_feedback_is_visible(mocker):
 def test_resource_choices_hidden_until_filtering():
     base = subject.FuzzyWordCompleter(["hub-one", "hub-two"])
     completer = subject.InputFilteredCompleter(base)
-    assert list(
+    assert not list(
         completer.get_completions(
             Document(""), CompleteEvent()
         )
-    ) == []
+    )
     completions = list(
         completer.get_completions(
             Document("one"), CompleteEvent()
@@ -742,8 +741,8 @@ def test_workspace_reset_preserves_scope():
 
     renderer.reset_setup()
 
-    assert renderer._tasks == []
-    assert renderer._body == []
+    assert not renderer._tasks
+    assert not renderer._body
     assert renderer._phase == "Configuration"
 
 
@@ -957,9 +956,9 @@ def test_failure_scope_and_retry_timing_are_cumulative(mocker):
     clock = mocker.patch.object(
         subject.time, "monotonic", side_effect=[10.0, 20.0]
     )
-    execution.__enter__()
+    execution.__enter__()  # pylint: disable=unnecessary-dunder-call
     renderer._execution_completed = 4
-    execution.__enter__()
+    execution.__enter__()  # pylint: disable=unnecessary-dunder-call
     assert renderer._execution_started == 10.0
     assert renderer._execution_completed == 0
     assert clock.call_count == 1
@@ -1026,7 +1025,7 @@ def test_workspace_confirmation_replaces_ephemeral_body():
     renderer.write("invalid answer")
     renderer.confirmation(_plan())
     assert renderer._body == [
-        "3 change(s) · No missing role assignments will be created.",
+        "3 change(s) · Atomic link commands own service role validation and creation.",
         "Successful operations are preserved if a later step fails.",
     ]
 

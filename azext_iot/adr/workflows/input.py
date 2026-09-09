@@ -741,9 +741,9 @@ def _guided_values(
 
     def namespace_identity():
         write(
-            "Missing standard role grants are detected during planning. "
-            "They are created only after final confirmation when permitted; "
-            "otherwise setup prints manual RBAC and resume commands."
+            "Atomic link commands validate and create missing service roles "
+            "after final confirmation. Unauthorized callers receive exact "
+            "remediation without namespace link mutation."
         )
         options = {
             "system": (
@@ -1116,7 +1116,6 @@ def build_setup_request(
     hubs: Optional[List[List[str]]] = None,
     software_updates: Optional[List[str]] = None,
     complete_connectivity: bool = False,
-    assign_roles: Optional[bool] = None,
     config: Optional[str] = None,
     no_input: bool = False,
     interactive: Optional[bool] = None,
@@ -1207,18 +1206,11 @@ def build_setup_request(
             if "softwareUpdates" in links
             else None
         )
-        config_assign_roles = raw.get("assignRoles")
-        if config_assign_roles is None:
-            config_assign_roles = True
-        if not isinstance(config_assign_roles, bool):
+        if "assignRoles" in raw:
             raise InvalidArgumentValueError(
-                "Workflow config 'assignRoles' must be a boolean."
+                "Workflow config 'assignRoles' is no longer supported. Atomic "
+                "link commands always validate and create required service roles."
             )
-        if assign_roles is None:
-            assign_roles = config_assign_roles
-
-    if assign_roles is None:
-        assign_roles = True
 
     namespace_is_fixed = bool(namespace_name)
     namespace_name, resource_group_name = resolve_scope_inputs(
@@ -1403,8 +1395,6 @@ def build_setup_request(
         software_updates=su_spec,
         create_update_instance=create_su,
         update_instance_name=update_instance_name,
-        assign_roles=assign_roles,
-        manual_rbac=not assign_roles,
         skipped=tuple(guided.get("skipped", ())) if guided_input else (),
         check_status=bool(guided.get("check_status")) if guided_input else False,
     )

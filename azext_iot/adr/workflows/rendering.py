@@ -587,7 +587,10 @@ class WorkflowRenderer:
         role_message = (
             f"{role_changes} missing role assignment(s) will be created."
             if role_changes
-            else "No missing role assignments will be created."
+            else (
+                "Atomic link commands own service role validation and "
+                "creation."
+            )
         )
         self._body[:] = [
             f"{changes} change(s) · {role_message}",

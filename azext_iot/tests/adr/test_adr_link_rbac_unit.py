@@ -24,6 +24,7 @@ from azext_iot.adr.rbac import (
     LINK_ROLE_MATRIX,
     LinkRbacManager,
     OWNER_ROLE,
+    SERVICE_AUTHORIZATION_PROPAGATION_SECONDS,
     _scope_subscription,
     format_role_requirements,
     resolve_linked_resource_principal,
@@ -255,7 +256,10 @@ def test_linked_principal_errors(resource, selected, error_type, message):
 def test_rbac_reuses_inherited_assignments_without_privilege_check_or_create():
     cli = MagicMock()
     cli.invoke.side_effect = [_result([{"id": "existing"}]) for _ in range(3)]
-    manager = LinkRbacManager(MagicMock(), cli=cli)
+    service_wait = MagicMock()
+    manager = LinkRbacManager(
+        MagicMock(), cli=cli, sleeper=service_wait
+    )
 
     manager.ensure(
         "hub", NS_SCOPE, TARGET_SCOPE, "ns-principal", "hub-principal"
@@ -337,7 +341,10 @@ def test_rbac_scope_query_passes_real_azure_cli_validation(mocker):
 def test_hub_without_inbound_identity_skips_reverse_assignment():
     cli = MagicMock()
     cli.invoke.side_effect = [_result([{"id": "existing"}]) for _ in range(2)]
-    manager = LinkRbacManager(MagicMock(), cli=cli)
+    service_wait = MagicMock()
+    manager = LinkRbacManager(
+        MagicMock(), cli=cli, sleeper=service_wait
+    )
 
     manager.ensure("hub", NS_SCOPE, TARGET_SCOPE, "ns-principal", None)
 
@@ -359,7 +366,10 @@ def test_rbac_authorized_caller_creates_only_missing_assignments():
         _result([{"id": "visible-target"}]),
         _result([{"id": "visible-namespace"}]),
     ]
-    manager = LinkRbacManager(MagicMock(), cli=cli)
+    service_wait = MagicMock()
+    manager = LinkRbacManager(
+        MagicMock(), cli=cli, sleeper=service_wait
+    )
 
     manager.ensure(
         "hub", NS_SCOPE, TARGET_SCOPE, "ns-principal", "hub-principal"
@@ -383,6 +393,9 @@ def test_rbac_authorized_caller_creates_only_missing_assignments():
     assert all("--include-groups" in item for item in privilege_queries)
     assert all("--include-inherited" in item for item in privilege_queries)
     assert all("--all" not in item for item in privilege_queries)
+    service_wait.assert_called_with(
+        SERVICE_AUTHORIZATION_PROPAGATION_SECONDS
+    )
 
 
 def test_rbac_unauthorized_fails_with_exact_remediation_before_create():
@@ -477,7 +490,12 @@ def test_su_resolves_first_party_principal_and_includes_its_assignment():
     graph_get = MagicMock(
         return_value=_graph_response([{"id": "adu-object-id"}])
     )
-    manager = LinkRbacManager(MagicMock(), cli=cli, graph_get=graph_get)
+    manager = LinkRbacManager(
+        MagicMock(),
+        cli=cli,
+        graph_get=graph_get,
+        sleeper=MagicMock(),
+    )
 
     manager.ensure(
         "su", NS_SCOPE, TARGET_SCOPE, "ns-principal", "su-principal"
@@ -603,7 +621,9 @@ def test_rbac_creation_race_reuses_assignment_created_by_another_actor():
         _result({"id": "created-second"}),
         _result([{"id": "visible-second"}]),
     ]
-    manager = LinkRbacManager(MagicMock(), cli=cli)
+    manager = LinkRbacManager(
+        MagicMock(), cli=cli, sleeper=MagicMock()
+    )
 
     manager.ensure(
         "dps", NS_SCOPE, TARGET_SCOPE, "ns-principal", "dps-principal"
@@ -615,6 +635,33 @@ def test_rbac_creation_race_reuses_assignment_created_by_another_actor():
         if "role assignment create" in call.args[0]
     ]
     assert len(creates) == 2
+
+
+def test_all_raced_assignments_wait_for_service_authorization():
+    cli = MagicMock()
+    cli.invoke.side_effect = [
+        _result([]),
+        _result([]),
+        _result(_access_token("owner-object-id")),
+        _result([{"id": "owner"}]),
+        _result([{"id": "owner"}]),
+        RuntimeError("assignment already exists"),
+        _result([{"id": "raced-target"}]),
+        RuntimeError("assignment already exists"),
+        _result([{"id": "raced-namespace"}]),
+    ]
+    service_wait = MagicMock()
+    manager = LinkRbacManager(
+        MagicMock(), cli=cli, sleeper=service_wait
+    )
+
+    manager.ensure(
+        "dps", NS_SCOPE, TARGET_SCOPE, "ns-principal", "dps-principal"
+    )
+
+    service_wait.assert_called_once_with(
+        SERVICE_AUTHORIZATION_PROPAGATION_SECONDS
+    )
 
 
 def test_created_assignments_wait_for_visibility_with_capped_backoff():

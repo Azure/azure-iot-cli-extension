@@ -4,6 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+# pylint: disable=no-member
+
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -102,8 +104,6 @@ def test_workflow_arguments_are_registered():
         "dps",
         "hubs",
         "software_updates",
-        "assign_roles",
-        "manual_rbac",
         "plan_only",
         "yes",
     } <= set(setup)
@@ -174,9 +174,9 @@ def test_resource_choice_loading_clears_busy_state():
     renderer.idle.assert_called_once_with()
 
     renderer.reset_mock()
-    assert command_subject._load_resource_choices(
+    assert not command_subject._load_resource_choices(
         renderer, "namespaces", lambda: []
-    ) == []
+    )
     renderer.clear_search_context.assert_called_once_with()
 
 
@@ -599,7 +599,6 @@ def test_no_input_config_does_not_prompt_for_namespace_create(mocker):
             "hubs": None,
             "software_updates": None,
             "complete_connectivity": False,
-            "assign_roles": True,
             "config": "setup.yaml",
             "no_input": True,
         },
@@ -932,13 +931,11 @@ def test_setup_command_back_reconfigures_and_replans(mocker):
         namespace_name="ns",
         resource_group_name="rg",
         location="eastus",
-        assign_roles=False,
     )
     second = SimpleNamespace(
         namespace_name="ns",
         resource_group_name="rg",
         location="eastus",
-        assign_roles=True,
     )
     builder = mocker.patch.object(
         command_subject,

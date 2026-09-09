@@ -9,10 +9,10 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from azure.cli.core.azclierror import ArgumentUsageError
 
+from azext_iot.adr.rbac import LINK_ROLE_MATRIX, format_role_requirements
 from azext_iot.adr.workflows.models import (
     STATE_BLOCKED,
     STATE_FAILED,
-    STATE_MANUAL,
     STATE_NOT_CONFIGURED,
     STATE_PLANNED,
     STATE_SATISFIED,
@@ -25,17 +25,11 @@ from azext_iot.adr.workflows.models import (
     workflow_result,
 )
 from azext_iot.adr.workflows.services import (
-    DEFAULT_ROLE,
-    HUB_ROLES,
     WorkflowServices,
     as_dict,
     is_not_found,
     value_of,
 )
-
-
-ADU_FIRST_PARTY_APPLICATION_ID = "6ee392c4-d339-4083-b04d-6b7947c6cf78"
-ROLE_PROPAGATION_WAIT_SECONDS = 60
 
 _SECTIONS = {
     "dps": "provisioning",
@@ -134,6 +128,8 @@ def _link_spec(kind: str, name: str, link: Dict[str, Any]) -> EndpointSpec:
             "user-assigned"
             if identity_type == "UserAssigned"
             else "system-assigned"
+            if identity_type == "SystemAssigned"
+            else ""
         ),
         user_assigned_identity=value_of(
             identity, "userAssignedIdentity", "user_assigned_identity"
@@ -635,38 +631,26 @@ class NamespaceWorkflow:
             )
 
         if request.requests_links:
-            if namespace and _outbound_matches(namespace, request):
-                try:
-                    items.extend(
-                        self._plan_roles(request, namespace, resources)
+            for endpoint in self._requested_endpoints(request):
+                link_type = (
+                    "su"
+                    if endpoint.kind == "software-updates"
+                    else endpoint.kind
+                )
+                items.append(
+                    PlanItem(
+                        f"roles-{self._endpoint_key(endpoint)}",
+                        "validate",
+                        endpoint.resource_id,
+                        STATE_SATISFIED,
+                        (
+                            "The atomic link command validates and creates "
+                            "missing service roles before namespace mutation. "
+                            f"Required roles: {format_role_requirements(link_type)}."
+                        ),
+                        dependencies=("namespace-outbound-identity",),
                     )
-                except Exception as error:  # noqa: BLE001 - plan surfaces validation
-                    items.append(
-                        PlanItem(
-                            "roles",
-                            "grant",
-                            request.namespace_name,
-                            STATE_BLOCKED,
-                            str(error),
-                        )
-                    )
-            else:
-                for endpoint in self._requested_endpoints(request):
-                    state = (
-                        STATE_PLANNED
-                        if request.assign_roles
-                        else STATE_MANUAL
-                    )
-                    items.append(
-                        PlanItem(
-                            f"roles-{self._endpoint_key(endpoint)}",
-                            "grant",
-                            endpoint.resource_id,
-                            state,
-                            "Principal IDs will be resolved after identity setup.",
-                            dependencies=("namespace-outbound-identity",),
-                        )
-                    )
+                )
 
         items.extend(link_items)
         for capability in request.skipped:
@@ -700,8 +684,6 @@ class NamespaceWorkflow:
         state = (
             STATE_BLOCKED
             if any(item.state == STATE_BLOCKED for item in items)
-            else STATE_MANUAL
-            if any(item.state == STATE_MANUAL for item in items)
             else STATE_PLANNED
             if any(item.state == STATE_PLANNED for item in items)
             else STATE_SUCCEEDED
@@ -824,31 +806,7 @@ class NamespaceWorkflow:
                 )
             )
 
-        resources = self._resolve_or_create_resources(request, namespace, items)
-        role_items, roles_ready = self._ensure_roles(
-            request, namespace, resources
-        )
-        items.extend(role_items)
-        if not roles_ready:
-            status_state = None
-            if request.check_status:
-                status_state = self._append_status_check(
-                    request, items
-                )
-            result = workflow_result(
-                "az iot adr ns setup",
-                (
-                    STATE_BLOCKED
-                    if status_state in {STATE_BLOCKED, STATE_FAILED}
-                    else STATE_MANUAL
-                ),
-                request.namespace_name,
-                request.resource_group_name,
-                items,
-            )
-            result["resumeCommand"] = self._resume_command(request)
-            return result
-
+        self._resolve_or_create_resources(request, namespace, items)
         self._apply_links(request, namespace, items)
         if request.check_status:
             self._append_status_check(request, items)
@@ -917,13 +875,17 @@ class NamespaceWorkflow:
                     STATE_SATISFIED,
                 )
             )
-            target_principal = self._run(
-                f"Resolve {endpoint.kind} identity",
-                self.services.principal_for_identity,
-                endpoint.identity_type,
-                endpoint.user_assigned_identity,
-                resource,
-                workflow_scope=endpoint.kind,
+            target_principal = (
+                self._run(
+                    f"Resolve {endpoint.kind} identity",
+                    self.services.principal_for_identity,
+                    endpoint.identity_type,
+                    endpoint.user_assigned_identity,
+                    resource,
+                    workflow_scope=endpoint.kind,
+                )
+                if endpoint.identity_type
+                else None
             )
         except Exception as error:  # noqa: BLE001 - readiness records the reason
             items.append(
@@ -943,12 +905,11 @@ class NamespaceWorkflow:
             namespace,
             outbound_principal,
             target_principal,
-            include_setup_only=False,
         ):
             try:
                 exists = self._run(
                     f"Check {role['role']} on {endpoint.endpoint_name}",
-                    self.services.rbac.has_assignment,
+                    self.services.link_rbac.assignment_exists,
                     role["principalId"],
                     role["role"],
                     role["scope"],
@@ -966,7 +927,6 @@ class NamespaceWorkflow:
                     role["scope"],
                     state,
                     message,
-                    command=self._role_command(role),
                     details={
                         "principalId": role["principalId"],
                         "role": role["role"],
@@ -1025,168 +985,6 @@ class NamespaceWorkflow:
                 )
             )
         return resources
-
-    def _plan_roles(
-        self,
-        request: SetupRequest,
-        namespace: Dict[str, Any],
-        resources: Dict[str, Dict[str, Any]],
-    ):
-        outbound_principal = self.services.namespace_outbound_principal(namespace)
-        items = []
-        for endpoint in self._requested_endpoints(request):
-            resource = resources.get(self._endpoint_key(endpoint))
-            if resource is None:
-                items.append(
-                    PlanItem(
-                        f"roles-{self._endpoint_key(endpoint)}",
-                        "grant",
-                        endpoint.resource_id,
-                        (
-                            STATE_PLANNED
-                            if request.assign_roles
-                            else STATE_MANUAL
-                        ),
-                        "Principal IDs will be resolved after resource creation.",
-                    )
-                )
-                continue
-            target_principal = self._run(
-                f"Resolve {endpoint.kind} identity",
-                self.services.principal_for_identity,
-                endpoint.identity_type,
-                endpoint.user_assigned_identity,
-                resource,
-                workflow_scope=endpoint.kind,
-            )
-            for role in self._roles_for(
-                endpoint, namespace, outbound_principal, target_principal
-            ):
-                exists = self._run(
-                    f"Check {role['role']} assignment",
-                    self.services.rbac.has_assignment,
-                    role["principalId"],
-                    role["role"],
-                    role["scope"],
-                    workflow_scope=endpoint.kind,
-                )
-                if exists:
-                    state = STATE_SATISFIED
-                    message = ""
-                elif role.get("manual") or not request.assign_roles:
-                    state = STATE_MANUAL
-                    message = "Apply this role assignment, then rerun setup."
-                elif self._run(
-                    "Check role-assignment permission",
-                    self.services.rbac.can_create_assignments,
-                    role["scope"],
-                    workflow_scope=endpoint.kind,
-                ) is not True:
-                    state = STATE_MANUAL
-                    message = (
-                        "The current caller cannot create this role assignment."
-                    )
-                else:
-                    state = STATE_PLANNED
-                    message = ""
-                items.append(
-                    PlanItem(
-                        role["id"],
-                        "grant",
-                        role["scope"],
-                        state,
-                        message,
-                        command=self._role_command(role),
-                        details={
-                            "principalId": role["principalId"],
-                            "role": role["role"],
-                        },
-                    )
-                )
-        return items
-
-    def _ensure_roles(
-        self,
-        request: SetupRequest,
-        namespace: Dict[str, Any],
-        resources: Dict[str, Dict[str, Any]],
-    ):
-        if not request.requests_links:
-            return [], True
-        outbound_principal = self.services.namespace_outbound_principal(namespace)
-        role_specs = []
-        for endpoint in self._requested_endpoints(request):
-            resource = resources[self._endpoint_key(endpoint)]
-            target_principal = self._run(
-                f"Resolve {endpoint.kind} identity",
-                self.services.principal_for_identity,
-                endpoint.identity_type,
-                endpoint.user_assigned_identity,
-                resource,
-                workflow_scope=endpoint.kind,
-            )
-            role_specs.extend(
-                self._roles_for(
-                    endpoint, namespace, outbound_principal, target_principal
-                )
-            )
-        items = []
-        created = False
-        ready = True
-        for role in role_specs:
-            if self._run(
-                f"Check {role['role']} assignment",
-                self.services.rbac.has_assignment,
-                role["principalId"],
-                role["role"],
-                role["scope"],
-                workflow_scope=role.get("workflowScope"),
-            ):
-                state = STATE_SATISFIED
-                message = ""
-            elif role.get("manual") or not request.assign_roles:
-                state = STATE_MANUAL
-                message = "Apply this role assignment, then rerun setup."
-                ready = False
-            elif self._run(
-                "Check role-assignment permission",
-                self.services.rbac.can_create_assignments,
-                role["scope"],
-                workflow_scope=role.get("workflowScope"),
-            ) is not True:
-                state = STATE_MANUAL
-                message = "The current caller cannot create this role assignment."
-                ready = False
-            else:
-                self._run(
-                    f"Create {role['role']} assignment",
-                    self.services.rbac.create_assignment,
-                    role["principalId"],
-                    role["role"],
-                    role["scope"],
-                    workflow_scope=role.get("workflowScope"),
-                    mutation=True,
-                )
-                state = STATE_SUCCEEDED
-                message = ""
-                created = True
-            items.append(
-                PlanItem(
-                    role["id"],
-                    "grant",
-                    role["scope"],
-                    state,
-                    message,
-                    command=self._role_command(role),
-                    details={
-                        "principalId": role["principalId"],
-                        "role": role["role"],
-                    },
-                )
-            )
-        if created:
-            self.services.sleep(ROLE_PROPAGATION_WAIT_SECONDS)
-        return items, ready
 
     def _apply_links(
         self,
@@ -1290,6 +1088,13 @@ class NamespaceWorkflow:
         item_id = f"link-{self._endpoint_key(endpoint)}"
         current = as_dict(existing.get(endpoint.endpoint_name))
         if current and _link_matches(current, endpoint):
+            self._run(
+                f"Validate access for {endpoint.endpoint_name}",
+                self.services.ensure_link_access,
+                request,
+                endpoint,
+                workflow_scope=endpoint.kind,
+            )
             if _link_state(current) != "Succeeded":
                 self._run(
                     f"Wait for {endpoint.endpoint_name}",
@@ -1362,138 +1167,51 @@ class NamespaceWorkflow:
         namespace: Dict[str, Any],
         outbound_principal: str,
         target_principal: str,
-        include_setup_only: bool = True,
     ):
+        link_type = (
+            "su" if endpoint.kind == "software-updates" else endpoint.kind
+        )
+        principals = {
+            "namespace": outbound_principal,
+            "linked": target_principal,
+        }
+        scopes = {
+            "namespace": namespace.get("id"),
+            "target": endpoint.resource_id,
+        }
         roles = []
-        outbound_roles = HUB_ROLES if endpoint.kind == "hub" else (DEFAULT_ROLE,)
-        for role in outbound_roles:
+        for rule in LINK_ROLE_MATRIX[link_type]:
+            principal_id = principals.get(rule.principal)
+            if rule.principal == "adu_first_party":
+                principal_id = self._run(
+                    "Resolve Software Updates service principal",
+                    self.services.link_rbac.resolve_adu_principal,
+                    endpoint.resource_id,
+                    workflow_scope=endpoint.kind,
+                )
+            if not principal_id:
+                continue
+            role_key = rule.role.replace(" ", "-").lower()
             roles.append(
                 {
                     "id": (
                         f"role-{endpoint.kind}-{endpoint.endpoint_name}"
-                        f"-namespace-{role.replace(' ', '-').lower()}"
+                        f"-{rule.principal}-{role_key}"
                     ),
-                    "principalId": outbound_principal,
-                    "role": role,
-                    "scope": endpoint.resource_id,
-                    "workflowScope": endpoint.kind,
-                }
-            )
-        roles.append(
-            {
-                "id": (
-                    f"role-{endpoint.kind}-{endpoint.endpoint_name}"
-                    "-target-contributor"
-                ),
-                "principalId": target_principal,
-                "role": DEFAULT_ROLE,
-                "scope": namespace.get("id"),
-                "workflowScope": endpoint.kind,
-            }
-        )
-        if endpoint.kind == "software-updates" and include_setup_only:
-            first_party_object_id = self._run(
-                "Resolve Software Updates service principal",
-                self.services.rbac.resolve_service_principal,
-                ADU_FIRST_PARTY_APPLICATION_ID,
-                workflow_scope="software-updates",
-            )
-            roles.append(
-                {
-                    "id": "role-software-updates-first-party",
-                    "principalId": first_party_object_id,
-                    "role": DEFAULT_ROLE,
-                    "scope": endpoint.resource_id,
-                    "manual": True,
+                    "principalId": principal_id,
+                    "role": rule.role,
+                    "scope": scopes[rule.scope],
                     "workflowScope": endpoint.kind,
                 }
             )
         return roles
 
     @staticmethod
-    def _role_command(role: Dict[str, str]) -> str:
-        return (
-            "az role assignment create "
-            f"--assignee-object-id {_quote(role['principalId'])} "
-            "--assignee-principal-type ServicePrincipal "
-            f"--role {_quote(role['role'])} --scope {_quote(role['scope'])}"
-        )
-
-    @classmethod
-    def _resume_command(cls, request: SetupRequest) -> str:
-        command = (
-            "az iot adr ns setup "
-            f"-n {_quote(request.namespace_name)} "
-            f"-g {_quote(request.resource_group_name)}"
-        )
-        if request.subscription_id:
-            command += (
-                f" --subscription {_quote(request.subscription_id)}"
-            )
-        if request.location:
-            command += f" --location {_quote(request.location)}"
-        if request.tags:
-            command += " --tags " + " ".join(
-                _quote(f"{key}={value}")
-                for key, value in sorted(request.tags.items())
-            )
-        if request.outbound_identity_type == "SystemAssigned":
-            command += " --outbound-identity system-assigned"
-        elif request.outbound_user_assigned_identity:
-            command += (
-                " --outbound-identity "
-                f"{_quote(request.outbound_user_assigned_identity)}"
-            )
-        for endpoint in cls._requested_endpoints(request):
-            option = {
-                "dps": "--dps",
-                "hub": "--hub",
-                "software-updates": "--su",
-            }[endpoint.kind]
-            identity = (
-                "system-assigned"
-                if endpoint.identity_type == "system-assigned"
-                else endpoint.user_assigned_identity
-            )
-            command += (
-                f" {option} endpoint={_quote(endpoint.endpoint_name)} "
-                f"resource-id={_quote(endpoint.resource_id)} "
-                f"identity={_quote(identity)}"
-            )
-            if endpoint.kind == "hub" and endpoint.availability:
-                command += (
-                    f" availability={_quote(endpoint.availability)}"
-                )
-            if (
-                endpoint.kind == "hub"
-                and endpoint.allocation_weight is not None
-            ):
-                command += (
-                    " allocation-weight="
-                    f"{endpoint.allocation_weight}"
-                )
-        if request.manual_rbac:
-            command += " --manual-rbac"
-        command += " --yes"
-        if request.check_status:
-            command += (
-                " && az iot adr ns check "
-                f"-n {_quote(request.namespace_name)} "
-                f"-g {_quote(request.resource_group_name)}"
-            )
-            if request.subscription_id:
-                command += (
-                    " --subscription "
-                    f"{_quote(request.subscription_id)}"
-                )
-        return command
-
-    @staticmethod
     def _link_command(request: SetupRequest, endpoint: EndpointSpec) -> str:
         identity = (
-            "--mi-system-assigned"
+            "--system-assigned-mi"
             if endpoint.identity_type == "system-assigned"
-            else "--mi-user-assigned "
+            else "--user-assigned-mi "
             f"{_quote(endpoint.user_assigned_identity)}"
         )
         resource_option = {

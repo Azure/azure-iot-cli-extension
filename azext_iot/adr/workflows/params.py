@@ -77,24 +77,6 @@ def load_adr_workflow_arguments(self, _):
             help="Require both a DPS and at least one IoT Hub input.",
         )
         context.argument(
-            "assign_roles",
-            options_list=["--assign-roles"],
-            arg_type=get_three_state_flag(),
-            help=(
-                "Create missing standard scoped role assignments. Defaults "
-                "to true for setup; pass false to require manual RBAC."
-            ),
-        )
-        context.argument(
-            "manual_rbac",
-            options_list=["--manual-rbac"],
-            arg_type=get_three_state_flag(),
-            help=(
-                "Do not create missing roles. Print manual RBAC commands "
-                "and resume guidance instead."
-            ),
-        )
-        context.argument(
             "config",
             options_list=["--config"],
             help="Workflow request as a JSON or YAML file.",
