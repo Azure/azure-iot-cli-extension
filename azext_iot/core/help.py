@@ -13,23 +13,13 @@ from knack.help_files import helps
 # Help additions for core commands
 def patch_core_help():
 
-    # add Hub create examples for ADR properties
+    # Resource creation is separate from canonical namespace linking.
     if "iot hub create" in helps:
         helps[
             "iot hub create"
         ] += """
-  - name: Create a Generation2 IoT Hub with Device Registry namespace properties.
-    text: >
-        az iot hub create --resource-group MyResourceGroup --name MyHub --sku GEN2 --ns-resource-id NamespaceResourceId
-        --ns-identity-id UserIdentityResourceId
-  - name: Create a Generation2 IoT Hub with Device Registry namespace properties and custom role assignment.
-    text: >
-        az iot hub create --resource-group MyResourceGroup --name MyHub --sku GEN2 --ns-resource-id NamespaceResourceId
-        --ns-identity-id UserIdentityResourceId --custom-ns-role-id RoleResourceId
-  - name: Create a Generation2 IoT Hub with Device Registry namespace properties and skip role assignment.
-    text: >
-        az iot hub create --resource-group MyResourceGroup --name MyHub --sku GEN2 --ns-resource-id NamespaceResourceId
-        --ns-identity-id UserIdentityResourceId --skip-ns-ra
+  - name: Create a Standard IoT Hub with a system-assigned identity for later namespace linking.
+    text: az iot hub create --resource-group MyResourceGroup --name MyHub --sku S1 --system-assigned-mi
 """
 
     # add DPS create examples for ADR properties
@@ -37,13 +27,8 @@ def patch_core_help():
         helps[
             "iot dps create"
         ] += """
-  - name: Create an Azure IoT Hub Device Provisioning Service with system identity and Device Registry namespace properties
-    text: >
-        az iot dps create --name MyDps --resource-group MyResourceGroup --mi-system-assigned --ns-resource-id NamespaceResourceId
-  - name: Create an Azure IoT Hub Device Provisioning Service with user-managed identity and Device Registry namespace properties
-    text: >
-        az iot dps create --name MyDps --resource-group MyResourceGroup --mi-user-assigned IdentityResourceId
-        --ns-resource-id NamespaceResourceId --ns-identity-id IdentityResourceId
+  - name: Create DPS with a system-assigned identity for later namespace linking.
+    text: az iot dps create --name MyDps --resource-group MyResourceGroup --system-assigned-mi
 """
 
     # add DPS identity help

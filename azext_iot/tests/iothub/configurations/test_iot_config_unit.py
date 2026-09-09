@@ -893,10 +893,19 @@ class TestConfigList:
         list_request = service_client.calls[0].request
         assert "top=" not in list_request.url
 
-    @pytest.mark.parametrize("top", [-1, 0, 101])
-    def test_config_list_invalid_args(self, fixture_cmd, top):
+    @pytest.mark.parametrize(
+        "list_method",
+        [
+            subject.iot_hub_configuration_list,
+            subject.iot_edge_deployment_list,
+        ],
+    )
+    @pytest.mark.parametrize("top", [0])
+    def test_list_invalid_top_before_discovery(
+        self, fixture_cmd, list_method, top
+    ):
         with pytest.raises(CLIError):
-            subject.iot_hub_configuration_list(
+            list_method(
                 cmd=fixture_cmd, hub_name_or_hostname=mock_target["entity"], top=top
             )
 

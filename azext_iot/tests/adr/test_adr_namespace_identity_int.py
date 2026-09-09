@@ -58,12 +58,17 @@ class TestADRNamespaceIdentity(CaptureOutputLiveScenarioTest):
                 f"-g {TEST_RG} --system true"
             ).get_output_in_json()
             assert removed["type"] == "None"
+            no_identity_upsert = self.cmd(
+                f"iot adr ns create -n {namespace_name} -g {TEST_RG}"
+            ).get_output_in_json()
+            assert no_identity_upsert["identity"]["type"] == "None"
 
             assigned = self.cmd(
                 f"iot adr ns identity assign -n {namespace_name} "
                 f"-g {TEST_RG} --system true"
             ).get_output_in_json()
             assert assigned["type"] == "SystemAssigned"
+
             self.cmd(
                 f"iot adr ns identity assign -n {namespace_name} "
                 f"-g {TEST_RG} --system true",

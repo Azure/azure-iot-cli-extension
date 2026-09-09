@@ -5,816 +5,901 @@
 # --------------------------------------------------------------------------------------------
 
 import base64
-import pytest
 from unittest.mock import MagicMock
 
+import pytest
 from azure.cli.core.azclierror import (
-    RequiredArgumentMissingError,
-    InvalidArgumentValueError,
     ArgumentUsageError,
-    MutuallyExclusiveArgumentError,
     BadRequestError,
-    AzureResponseError,
+    InvalidArgumentValueError,
+    MutuallyExclusiveArgumentError,
+    RequiredArgumentMissingError,
 )
+from azure.core import MatchConditions
 
 import azext_iot.operations.dps as subject
-from azext_iot.common.shared import AttestationType, ReprovisionType, AllocationType
+from azext_iot.common.shared import (
+    AllocationType,
+    AttestationType,
+    ReprovisionType,
+)
 
 
-# ---------------------------------------------------------------------------
-# _get_reprovision_policy
-# ---------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        (
+            None,
+            {"updateHubAssignment": True, "migrateDeviceData": True},
+        ),
+        (
+            ReprovisionType.reprovisionandmigratedata.value,
+            {"updateHubAssignment": True, "migrateDeviceData": True},
+        ),
+        (
+            ReprovisionType.reprovisionandresetdata.value,
+            {"updateHubAssignment": True, "migrateDeviceData": False},
+        ),
+        (
+            ReprovisionType.never.value,
+            {"updateHubAssignment": False, "migrateDeviceData": False},
+        ),
+    ],
+)
+def test_reprovision_policy_is_raw_mapping(value, expected):
+    assert subject._get_reprovision_policy(value) == expected
 
 
-def test_reprovision_migrate():
-    policy = subject._get_reprovision_policy(ReprovisionType.reprovisionandmigratedata.value)
-    assert policy.update_hub_assignment is True
-    assert policy.migrate_device_data is True
+def test_reprovision_policy_rejects_unknown_value():
+    with pytest.raises(InvalidArgumentValueError, match="Invalid"):
+        subject._get_reprovision_policy("unknown")
 
 
-def test_reprovision_reset():
-    policy = subject._get_reprovision_policy(ReprovisionType.reprovisionandresetdata.value)
-    assert policy.update_hub_assignment is True
-    assert policy.migrate_device_data is False
+def test_twin_helpers_build_and_preserve_raw_mappings():
+    assert subject._get_twin_collection("") == {}
+    assert subject._get_twin_collection(None) == {}
+    assert subject._get_twin_collection('{"site": "one"}') == {"site": "one"}
+    assert subject._get_initial_twin('{"tag": 1}', '{"desired": 2}') == {
+        "tags": {"tag": 1},
+        "properties": {"desired": {"desired": 2}},
+    }
+    record = {
+        "initialTwin": {
+            "tags": {"site": "one", "$metadata": {}},
+            "properties": {
+                "desired": {"interval": 5, "$version": 3}
+            },
+        }
+    }
+    assert subject._get_updated_inital_twin(record) == {
+        "tags": {"site": "one"},
+        "properties": {"desired": {"interval": 5}},
+    }
 
 
-def test_reprovision_never():
-    policy = subject._get_reprovision_policy(ReprovisionType.never.value)
-    assert policy.update_hub_assignment is False
-    assert policy.migrate_device_data is False
+def test_drop_none_and_readonly_enrollment_fields():
+    enrollment = {
+        "etag": "etag",
+        "createdDateTimeUtc": "now",
+        "registrationState": {},
+        "optional": None,
+        "attestation": {
+            "type": "x509",
+            "x509": {
+                "clientCertificates": {
+                    "primary": {"certificate": "cert", "info": {"version": 3}}
+                }
+            },
+        },
+        "initialTwin": {
+            "tags": {"site": "one", "metadata": {}},
+            "properties": {"desired": {"interval": 5, "version": 2}},
+        },
+        "optionalDeviceInformation": {
+            "manufacturer": "Contoso",
+            "count": 1,
+            "metadata": {},
+            "version": 2,
+        },
+    }
+
+    result = subject._drop_readonly_enrollment(enrollment)
+
+    assert {"etag", "createdDateTimeUtc", "registrationState", "optional"}.isdisjoint(result)
+    assert result["attestation"]["x509"]["clientCertificates"]["primary"] == {
+        "certificate": "cert"
+    }
+    assert result["initialTwin"]["tags"] == {"site": "one"}
+    assert result["initialTwin"]["properties"]["desired"] == {"interval": 5}
+    assert result["optionalDeviceInformation"] == {
+        "manufacturer": "Contoso"
+    }
 
 
-def test_reprovision_invalid():
-    with pytest.raises(InvalidArgumentValueError):
-        subject._get_reprovision_policy("bogus")
+def test_etag_arguments_use_azure_core_match_conditions():
+    assert subject._etag_arguments() == {
+        "match_condition": MatchConditions.IfPresent
+    }
+    assert subject._etag_arguments("etag") == {
+        "etag": "etag",
+        "match_condition": MatchConditions.IfNotModified,
+    }
 
 
-def test_reprovision_default():
-    policy = subject._get_reprovision_policy(None)
-    assert policy.update_hub_assignment is True
-    assert policy.migrate_device_data is True
+def test_modeless_query_follows_continuation_and_honors_top():
+    query = MagicMock()
+
+    def response(*_args, **kwargs):
+        callback = kwargs["cls"]
+        continuation = kwargs.get("x_ms_continuation")
+        if continuation is None:
+            return callback(None, [{"id": 1}, {"id": 2}], {"x-ms-continuation": "next"})
+        return callback(None, [{"id": 3}], {})
+
+    query.side_effect = response
+    assert subject._execute_dps_query(query, [{"query": "SELECT *"}]) == [
+        {"id": 1},
+        {"id": 2},
+        {"id": 3},
+    ]
+
+    query.reset_mock(side_effect=True)
+    query.side_effect = response
+    assert subject._execute_dps_query(query, ["group"], top=2) == [
+        {"id": 1},
+        {"id": 2},
+    ]
+    assert query.call_count == 1
 
 
-# ---------------------------------------------------------------------------
-# _get_twin_collection / _get_initial_twin
-# ---------------------------------------------------------------------------
+def test_adr_certificate_reference_requires_complete_authority():
+    assert not subject._validate_adr_certificate_reference()
+    assert subject._validate_adr_certificate_reference(
+        "namespace", "ca", "policy"
+    ) == {
+        "namespaceName": "namespace",
+        "certificateAuthorityName": "ca",
+        "certificatePolicyName": "policy",
+    }
+    assert subject._validate_adr_certificate_reference(
+        "namespace", "ca", credential_policy_name="legacy-alias"
+    )["certificatePolicyName"] == "legacy-alias"
+    with pytest.raises(RequiredArgumentMissingError, match="together"):
+        subject._validate_adr_certificate_reference(
+            adr_namespace="namespace", adr_certificate_policy_name="policy"
+        )
 
 
-def test_twin_collection_empty_string():
-    result = subject._get_twin_collection("")
-    assert result.additional_properties is None
-
-
-def test_twin_collection_none():
-    result = subject._get_twin_collection(None)
-    assert result.additional_properties is None
-
-
-def test_twin_collection_dict():
-    result = subject._get_twin_collection('{"key": "value"}')
-    assert result.additional_properties == {"key": "value"}
-
-
-def test_get_initial_twin():
-    twin = subject._get_initial_twin(initial_twin_tags='{"t": 1}', initial_twin_properties='{"p": 2}')
-    assert twin.tags.additional_properties == {"t": 1}
-    assert twin.properties.desired.additional_properties == {"p": 2}
-
-
-def test_get_updated_initial_twin_from_record():
-    record = MagicMock()
-    record.initial_twin.tags.as_dict.return_value = {"t": 1}
-    record.initial_twin.properties.desired.as_dict.return_value = {"p": 2}
-    twin = subject._get_updated_inital_twin(record)
-    assert twin.tags.additional_properties == {"t": 1}
-    assert twin.properties.desired.additional_properties == {"p": 2}
-
-
-# ---------------------------------------------------------------------------
-# x509 attestation helpers
-# ---------------------------------------------------------------------------
-
-
-def test_attestation_x509_client_cert_missing_paths():
-    with pytest.raises(RequiredArgumentMissingError):
+def test_x509_mapping_helpers(mocker):
+    mocker.patch.object(subject, "open_certificate", return_value="CERT")
+    assert subject._get_certificate_info(None) is None
+    assert subject._get_certificate_info("cert.pem") == {"certificate": "CERT"}
+    with pytest.raises(RequiredArgumentMissingError, match="certificate path"):
         subject._get_attestation_with_x509_client_cert(None, None)
 
+    client = subject._get_attestation_with_x509_client_cert("primary.pem", None)
+    assert client == {
+        "type": "x509",
+        "x509": {
+            "clientCertificates": {"primary": {"certificate": "CERT"}}
+        },
+    }
+    signing = subject._get_attestation_with_x509_signing_cert(
+        "primary.pem", None
+    )
+    assert signing["x509"]["signingCertificates"]["primary"]["certificate"] == "CERT"
+    ca = subject._get_attestation_with_x509_ca_cert("root", "secondary")
+    assert ca["x509"]["caReferences"] == {
+        "primary": "root",
+        "secondary": "secondary",
+    }
 
-def test_attestation_x509_client_cert(mocker):
-    mocker.patch.object(subject, "open_certificate", return_value="CERT")
-    attestation = subject._get_attestation_with_x509_client_cert("primary.pem", None)
-    assert attestation.type == AttestationType.x509.value
-    assert attestation.x509.client_certificates.primary.certificate == "CERT"
 
-
-def test_attestation_x509_signing_cert(mocker):
-    mocker.patch.object(subject, "open_certificate", return_value="CERT")
-    attestation = subject._get_attestation_with_x509_signing_cert("primary.pem", None)
-    assert attestation.x509.signing_certificates.primary.certificate == "CERT"
-
-
-def test_attestation_x509_ca_cert():
-    attestation = subject._get_attestation_with_x509_ca_cert("rootca", None)
-    assert attestation.x509.ca_references.primary == "rootca"
-
-
-def test_updated_attestation_x509_client_cert(mocker):
+def test_x509_update_helpers_add_remove_and_fallback(mocker):
     mocker.patch.object(subject, "open_certificate", return_value="NEW")
-    attestation = MagicMock()
+    client = {
+        "type": "x509",
+        "x509": {
+            "clientCertificates": {
+                "primary": {"certificate": "OLD"},
+                "secondary": {"certificate": "OLD2"},
+            }
+        },
+    }
     result = subject._get_updated_attestation_with_x509_client_cert(
-        attestation,
-        primary_certificate_path="p.pem",
-        secondary_certificate_path="s.pem",
-        remove_primary_certificate=False,
-        remove_secondary_certificate=False,
+        client, "new.pem", None, False, True
     )
-    assert result.x509.client_certificates.primary.certificate == "NEW"
+    assert result["x509"]["clientCertificates"] == {
+        "primary": {"certificate": "NEW"}
+    }
 
-
-# ---------------------------------------------------------------------------
-# _can_remove_primary/secondary_certificate
-# ---------------------------------------------------------------------------
-
-
-def test_can_remove_primary_certificate_no_remove():
-    assert subject._can_remove_primary_certificate(False, MagicMock()) is True
-
-
-def test_can_remove_primary_certificate_signing_no_secondary():
-    attestation = MagicMock()
-    attestation.x509.signing_certificates.secondary = None
-    # ca_references absent
-    del attestation.x509.ca_references
-    assert subject._can_remove_primary_certificate(True, attestation) is False
-
-
-def test_can_remove_secondary_certificate_signing_no_primary():
-    attestation = MagicMock()
-    attestation.x509.signing_certificates.primary = None
-    del attestation.x509.ca_references
-    assert subject._can_remove_secondary_certificate(True, attestation) is False
-
-
-def test_can_remove_primary_certificate_ca_no_secondary():
-    attestation = MagicMock()
-    del attestation.x509.signing_certificates
-    attestation.x509.ca_references.secondary = None
-    assert subject._can_remove_primary_certificate(True, attestation) is False
-
-
-def test_can_remove_secondary_certificate_ca_no_primary():
-    attestation = MagicMock()
-    del attestation.x509.signing_certificates
-    attestation.x509.ca_references.primary = None
-    assert subject._can_remove_secondary_certificate(True, attestation) is False
-
-
-def test_updated_attestation_x509_signing_cert(mocker):
-    mocker.patch.object(subject, "open_certificate", return_value="NEW")
-    attestation = MagicMock()
-    result = subject._get_updated_attestation_with_x509_signing_cert(
-        attestation,
-        primary_certificate_path="p.pem",
-        secondary_certificate_path="s.pem",
-        remove_primary_certificate=True,
-        remove_secondary_certificate=True,
+    signing = subject._get_updated_attestation_with_x509_signing_cert(
+        {"type": "x509", "x509": {"signingCertificates": {"primary": {}}}},
+        None,
+        "secondary.pem",
+        True,
+        False,
     )
-    assert result.x509.signing_certificates.primary.certificate == "NEW"
-
-
-def test_updated_attestation_x509_signing_cert_no_existing(mocker):
-    mocker.patch.object(subject, "open_certificate", return_value="NEW")
-    attestation = MagicMock()
-    del attestation.x509.signing_certificates
-    result = subject._get_updated_attestation_with_x509_signing_cert(
-        attestation,
-        primary_certificate_path="p.pem",
-        secondary_certificate_path=None,
-        remove_primary_certificate=False,
-        remove_secondary_certificate=False,
+    assert signing["x509"]["signingCertificates"] == {
+        "secondary": {"certificate": "NEW"}
+    }
+    fallback = subject._get_updated_attestation_with_x509_signing_cert(
+        {"type": "x509", "x509": {}}, "new.pem", None, False, False
     )
-    assert result.x509.signing_certificates.primary.certificate == "NEW"
+    assert "signingCertificates" in fallback["x509"]
 
-
-def test_updated_attestation_x509_ca_cert():
-    attestation = MagicMock()
-    attestation.x509.ca_references = MagicMock()
-    result = subject._get_updated_attestation_with_x509_ca_cert(
-        attestation,
-        root_ca_name="rootca",
-        secondary_root_ca_name="secondca",
-        remove_primary_certificate=True,
-        remove_secondary_certificate=True,
+    ca = subject._get_updated_attestation_with_x509_ca_cert(
+        {"type": "x509", "x509": {"caReferences": {"primary": "old"}}},
+        "new",
+        "secondary",
+        True,
+        False,
     )
-    assert result.x509.ca_references.primary == "rootca"
-    assert result.x509.ca_references.secondary == "secondca"
-
-
-def test_updated_attestation_x509_ca_cert_no_existing():
-    attestation = MagicMock()
-    attestation.x509.ca_references = None
-    result = subject._get_updated_attestation_with_x509_ca_cert(
-        attestation,
-        root_ca_name="rootca",
-        secondary_root_ca_name=None,
-        remove_primary_certificate=False,
-        remove_secondary_certificate=False,
+    assert ca["x509"]["caReferences"] == {
+        "primary": "new",
+        "secondary": "secondary",
+    }
+    fallback_ca = subject._get_updated_attestation_with_x509_ca_cert(
+        {"type": "x509", "x509": {}}, "root", None, False, False
     )
-    assert result.x509.ca_references.primary == "rootca"
+    assert fallback_ca["x509"]["caReferences"] == {"primary": "root"}
 
 
-# ---------------------------------------------------------------------------
-# _validate_arguments_for_attestation_mechanism
-# ---------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "helper, attestation",
+    [
+        (
+            subject._can_remove_primary_certificate,
+            {
+                "x509": {
+                    "signingCertificates": {
+                        "primary": {},
+                        "secondary": None,
+                    }
+                }
+            },
+        ),
+        (
+            subject._can_remove_secondary_certificate,
+            {
+                "x509": {
+                    "caReferences": {
+                        "primary": None,
+                        "secondary": "secondary",
+                    }
+                }
+            },
+        ),
+    ],
+)
+def test_certificate_removal_requires_the_other_certificate(helper, attestation):
+    assert helper(False, attestation) is True
+    assert helper(True, attestation) is False
 
 
-def test_validate_tpm_with_cert():
-    with pytest.raises(ArgumentUsageError):
+@pytest.mark.parametrize(
+    "attestation_type, values, message",
+    [
+        ("tpm", {"certificate_path": "cert"}, "certificate"),
+        ("tpm", {"remove_certificate": True}, "remove"),
+        ("tpm", {"primary_key": "key"}, "key"),
+        ("x509", {"endorsement_key": "key"}, "endorsement"),
+        ("x509", {"secondary_key": "key"}, "key"),
+        ("symmetricKey", {"certificate_path": "cert"}, "certificate"),
+        ("symmetricKey", {"remove_secondary_certificate": True}, "remove"),
+        ("symmetricKey", {"endorsement_key": "key"}, "endorsement"),
+    ],
+)
+def test_attestation_update_validation(attestation_type, values, message):
+    arguments = {
+        "endorsement_key": None,
+        "certificate_path": None,
+        "secondary_certificate_path": None,
+        "remove_certificate": False,
+        "remove_secondary_certificate": False,
+        "primary_key": None,
+        "secondary_key": None,
+        **values,
+    }
+    with pytest.raises(ArgumentUsageError, match=message):
         subject._validate_arguments_for_attestation_mechanism(
-            AttestationType.tpm.value, None, "cert.pem", None, False, False, None, None
+            attestation_type, **arguments
         )
 
 
-def test_validate_tpm_with_remove():
-    with pytest.raises(ArgumentUsageError):
-        subject._validate_arguments_for_attestation_mechanism(
-            AttestationType.tpm.value, None, None, None, True, False, None, None
-        )
-
-
-def test_validate_tpm_with_key():
-    with pytest.raises(ArgumentUsageError):
-        subject._validate_arguments_for_attestation_mechanism(
-            AttestationType.tpm.value, None, None, None, False, False, "pk", None
-        )
-
-
-def test_validate_x509_with_endorsement():
-    with pytest.raises(ArgumentUsageError):
-        subject._validate_arguments_for_attestation_mechanism(
-            AttestationType.x509.value, "ek", None, None, False, False, None, None
-        )
-
-
-def test_validate_x509_with_key():
-    with pytest.raises(ArgumentUsageError):
-        subject._validate_arguments_for_attestation_mechanism(
-            AttestationType.x509.value, None, None, None, False, False, "pk", None
-        )
-
-
-def test_validate_symmetric_with_cert():
-    with pytest.raises(ArgumentUsageError):
-        subject._validate_arguments_for_attestation_mechanism(
-            AttestationType.symmetricKey.value, None, "cert.pem", None, False, False, None, None
-        )
-
-
-def test_validate_symmetric_with_remove():
-    with pytest.raises(ArgumentUsageError):
-        subject._validate_arguments_for_attestation_mechanism(
-            AttestationType.symmetricKey.value, None, None, None, True, False, None, None
-        )
-
-
-def test_validate_symmetric_with_endorsement():
-    with pytest.raises(ArgumentUsageError):
-        subject._validate_arguments_for_attestation_mechanism(
-            AttestationType.symmetricKey.value, "ek", None, None, False, False, None, None
-        )
-
-
-def test_validate_symmetric_valid_noop():
-    # No raise expected.
+def test_symmetric_attestation_key_update_is_valid():
     subject._validate_arguments_for_attestation_mechanism(
-        AttestationType.symmetricKey.value, None, None, None, False, False, "pk", "sk"
+        AttestationType.symmetricKey.value,
+        None,
+        None,
+        None,
+        False,
+        False,
+        "primary",
+        "secondary",
     )
 
 
-# ---------------------------------------------------------------------------
-# _validate_allocation_policy_for_enrollment
-# ---------------------------------------------------------------------------
-
-
-def test_allocation_policy_mutually_exclusive():
-    with pytest.raises(MutuallyExclusiveArgumentError):
+@pytest.mark.parametrize(
+    "policy, hub_name, hubs, webhook, version, error_type",
+    [
+        ("static", "hub", None, None, None, MutuallyExclusiveArgumentError),
+        ("unknown", None, ["hub"], None, None, RequiredArgumentMissingError),
+        ("static", None, None, None, None, RequiredArgumentMissingError),
+        ("static", None, ["one", "two"], None, None, InvalidArgumentValueError),
+        ("custom", None, None, None, None, RequiredArgumentMissingError),
+        (None, None, ["hub"], None, None, RequiredArgumentMissingError),
+    ],
+)
+def test_allocation_policy_validation_errors(
+    policy, hub_name, hubs, webhook, version, error_type
+):
+    with pytest.raises(error_type):
         subject._validate_allocation_policy_for_enrollment(
-            AllocationType.static.value, "hub.host", None, None, None
+            policy, hub_name, hubs, webhook, version
         )
 
 
-def test_allocation_policy_invalid():
-    with pytest.raises(RequiredArgumentMissingError):
-        subject._validate_allocation_policy_for_enrollment("bogus", None, ["hub"], None, None)
-
-
-def test_allocation_policy_static_no_hub():
-    with pytest.raises(RequiredArgumentMissingError):
-        subject._validate_allocation_policy_for_enrollment(
-            AllocationType.static.value, None, None, None, None
-        )
-
-
-def test_allocation_policy_static_multiple_hubs():
-    with pytest.raises(InvalidArgumentValueError):
-        subject._validate_allocation_policy_for_enrollment(
-            AllocationType.static.value, None, ["hub1", "hub2"], None, None
-        )
-
-
-def test_allocation_policy_custom_missing_webhook():
-    with pytest.raises(RequiredArgumentMissingError):
-        subject._validate_allocation_policy_for_enrollment(
-            AllocationType.custom.value, None, None, None, None
-        )
-
-
-def test_allocation_policy_static_valid():
-    # No raise expected.
-    subject._validate_allocation_policy_for_enrollment(
-        AllocationType.static.value, None, ["hub1"], None, None
-    )
-
-
-def test_allocation_policy_hub_list_without_policy():
-    with pytest.raises(RequiredArgumentMissingError):
-        subject._validate_allocation_policy_for_enrollment(None, None, ["hub1"], None, None)
-
-
-def test_allocation_policy_from_current_enrollment():
-    current = MagicMock()
-    current.iot_hubs = ["hub1"]
-    current.allocation_policy = AllocationType.static.value
-    # No raise expected; policy derived from current enrollment.
+def test_allocation_policy_uses_current_mapping():
+    current = {
+        "allocationPolicy": AllocationType.custom.value,
+        "iotHubs": ["hub"],
+        "customAllocationDefinition": {
+            "webhookUrl": "https://example.test",
+            "apiVersion": "2026-11-02-preview",
+        },
+    }
     subject._validate_allocation_policy_for_enrollment(
         None, None, None, None, None, current_enrollment=current
     )
 
 
-# ---------------------------------------------------------------------------
-# iot_dps_compute_device_key
-# ---------------------------------------------------------------------------
-
-
-def test_compute_device_key_symmetric_provided():
-    key = base64.b64encode(b"secret").decode("utf-8")
-    result = subject.iot_dps_compute_device_key(
-        cmd=MagicMock(), registration_id="reg", symmetric_key=key
+def test_compute_device_key_paths(mocker):
+    key = base64.b64encode(b"secret").decode()
+    assert subject.iot_dps_compute_device_key(
+        MagicMock(), "registration", symmetric_key=key
     )
-    assert result
-
-
-def test_compute_device_key_missing_args():
     with pytest.raises(RequiredArgumentMissingError):
-        subject.iot_dps_compute_device_key(cmd=MagicMock(), registration_id="reg")
+        subject.iot_dps_compute_device_key(MagicMock(), "registration")
 
-
-def test_compute_device_key_from_enrollment(mocker):
-    key = base64.b64encode(b"secret").decode("utf-8")
     mocker.patch.object(subject, "DPSDiscovery")
     resolver = mocker.patch.object(subject, "SdkResolver")
-    sdk = resolver.return_value.get_sdk.return_value
-    sdk.enrollment_group.get_attestation_mechanism.return_value.response.json.return_value = {
-        "type": "symmetricKey",
-        "symmetricKey": {"primaryKey": key},
+    resolver.return_value.get_sdk.return_value.enrollment_group.get_attestation_mechanism.return_value = {
+        "type": "tpm"
     }
-    result = subject.iot_dps_compute_device_key(
-        cmd=MagicMock(), registration_id="reg", enrollment_id="grp", dps_name="dps"
-    )
-    assert result
-
-
-def test_compute_device_key_wrong_attestation(mocker):
-    mocker.patch.object(subject, "DPSDiscovery")
-    resolver = mocker.patch.object(subject, "SdkResolver")
-    sdk = resolver.return_value.get_sdk.return_value
-    sdk.enrollment_group.get_attestation_mechanism.return_value.response.json.return_value = {
-        "type": "tpm",
-    }
-    with pytest.raises(BadRequestError):
+    with pytest.raises(BadRequestError, match="symmetric key"):
         subject.iot_dps_compute_device_key(
-            cmd=MagicMock(), registration_id="reg", enrollment_id="grp", dps_name="dps"
+            MagicMock(), "registration", "group", "dps"
         )
 
 
-# ---------------------------------------------------------------------------
-# iot_dps_connection_string_show
-# ---------------------------------------------------------------------------
-
-
-def test_connection_string_show_single(mocker):
-    discovery = mocker.patch.object(subject, "DPSDiscovery").return_value
-    discovery.find_resource.return_value = {
-        "name": "mydps",
-        "resourcegroup": "rg",
-        "properties": {"serviceOperationsHostName": "host"},
-    }
-    discovery.find_policy.return_value = {"keyName": "pol", "primaryKey": "pk", "secondaryKey": "sk"}
-    result = subject.iot_dps_connection_string_show(cmd=MagicMock(), dps_name="mydps")
-    assert "connectionString" in result
-    assert "pk" in result["connectionString"]
-
-
-def test_connection_string_show_all_in_rg(mocker):
-    from azext_iot.common.shared import IoTDPSStateType
-
-    discovery = mocker.patch.object(subject, "DPSDiscovery").return_value
-    discovery.get_resources.return_value = [
-        {
-            "name": "active-dps",
-            "resourcegroup": "rg",
-            "properties": {"serviceOperationsHostName": "host", "state": IoTDPSStateType.Active.value},
-        },
-        {
-            "name": "inactive-dps",
-            "resourcegroup": "rg",
-            "properties": {"serviceOperationsHostName": "host", "state": "Disabled"},
-        },
-    ]
-    discovery.find_policy.return_value = {"keyName": "pol", "primaryKey": "pk", "secondaryKey": "sk"}
-    result = subject.iot_dps_connection_string_show(cmd=MagicMock())
-    assert len(result) == 1
-    assert result[0]["name"] == "active-dps"
-
-
-def test_connection_string_show_none_found(mocker):
-    from azure.cli.core.azclierror import ResourceNotFoundError
-
-    discovery = mocker.patch.object(subject, "DPSDiscovery").return_value
-    discovery.get_resources.return_value = None
-    with pytest.raises(ResourceNotFoundError):
-        subject.iot_dps_connection_string_show(cmd=MagicMock())
-
-
-# ---------------------------------------------------------------------------
-# iot_dps_registration_* error paths
-# ---------------------------------------------------------------------------
-
-
-def test_registration_delete(mocker):
-    mocker.patch.object(subject, "DPSDiscovery")
-    resolver = mocker.patch.object(subject, "SdkResolver")
-    sdk = resolver.return_value.get_sdk.return_value
-    subject.iot_dps_registration_delete(cmd=MagicMock(), registration_id="reg", dps_name="dps")
-    sdk.device_registration_state.delete.assert_called_once_with("reg", if_match="*")
-
-
-def test_registration_get(mocker):
-    mocker.patch.object(subject, "DPSDiscovery")
-    resolver = mocker.patch.object(subject, "SdkResolver")
-    sdk = resolver.return_value.get_sdk.return_value
-    sdk.device_registration_state.get.return_value.response.json.return_value = {"registrationId": "reg"}
-    result = subject.iot_dps_registration_get(cmd=MagicMock(), registration_id="reg", dps_name="dps")
-    assert result == {"registrationId": "reg"}
-
-
-# ---------------------------------------------------------------------------
-# Command function helpers: SDK mocking + service-exception handling
-# ---------------------------------------------------------------------------
-
-
-def _svc_exc():
-    """Build a ProvisioningServiceErrorDetailsException without invoking the
-    (deserialize, response) constructor so it can be raised as a side effect."""
-    return subject.ProvisioningServiceErrorDetailsException.__new__(
-        subject.ProvisioningServiceErrorDetailsException
-    )
-
-
-@pytest.fixture
-def dps_sdk(mocker):
+def _mock_sdk(mocker):
     mocker.patch.object(subject, "DPSDiscovery")
     resolver = mocker.patch.object(subject, "SdkResolver")
     return resolver.return_value.get_sdk.return_value
 
 
-@pytest.fixture
-def handle_exc(mocker):
-    return mocker.patch.object(subject, "handle_service_exception")
-
-
-# --- individual enrollment list/get error + warning paths -------------------
-
-
-def test_enrollment_list_service_error(mocker, dps_sdk, handle_exc):
-    mocker.patch.object(subject, "_execute_query", side_effect=_svc_exc())
-    subject.iot_dps_device_enrollment_list(cmd=MagicMock(), dps_name="dps")
-    handle_exc.assert_called_once()
-
-
-def test_enrollment_get_show_keys_non_symmetric_warns(mocker, dps_sdk):
-    warn = mocker.patch.object(subject.logger, "warning")
-    dps_sdk.individual_enrollment.get.return_value.response.json.return_value = {
-        "attestation": {"type": AttestationType.x509.value}
+def test_individual_update_covers_tpm_and_new_certificate_reference(mocker):
+    sdk = _mock_sdk(mocker)
+    sdk.individual_enrollment.get.return_value = {
+        "etag": "old",
+        "attestation": {
+            "type": "tpm",
+            "tpm": {"endorsementKey": "old"},
+        },
+        "allocationPolicy": "hashed",
+        "initialTwin": {"tags": {}, "properties": {"desired": {}}},
     }
+
+    subject.iot_dps_device_enrollment_update(
+        MagicMock(),
+        "enrollment",
+        dps_name="dps",
+        endorsement_key="new",
+        device_id="device",
+        provisioning_status="enabled",
+        reprovision_policy="never",
+        edge_enabled=True,
+        device_information='{"serial": "one"}',
+        adr_namespace="namespace",
+        adr_ca_name="ca",
+        adr_certificate_policy_name="policy",
+    )
+
+    body = sdk.individual_enrollment.create_or_update.call_args.args[1]
+    assert body["attestation"]["tpm"]["endorsementKey"] == "new"
+    assert body["deviceId"] == "device"
+    assert body["optionalDeviceInformation"] == {"serial": "one"}
+    assert body["namespaceName"] == "namespace"
+
+
+def test_individual_update_covers_symmetric_and_custom_allocation(mocker):
+    sdk = _mock_sdk(mocker)
+    sdk.individual_enrollment.get.return_value = {
+        "attestation": {"type": "symmetricKey"},
+        "allocationPolicy": "custom",
+        "customAllocationDefinition": {
+            "webhookUrl": "https://old",
+            "apiVersion": "old",
+        },
+        "namespaceName": "namespace",
+        "certificateAuthorityName": "ca",
+        "certificatePolicyName": "old-policy",
+        "initialTwin": {"tags": {}, "properties": {"desired": {}}},
+    }
+    sdk.individual_enrollment.get_attestation_mechanism.return_value = {
+        "type": "symmetricKey",
+        "symmetricKey": {"primaryKey": "old", "secondaryKey": "old"},
+    }
+
+    subject.iot_dps_device_enrollment_update(
+        MagicMock(),
+        "enrollment",
+        dps_name="dps",
+        primary_key="primary",
+        secondary_key="secondary",
+        webhook_url="https://new",
+        api_version="new",
+        adr_certificate_policy_name="new-policy",
+    )
+
+    body = sdk.individual_enrollment.create_or_update.call_args.args[1]
+    assert body["attestation"]["symmetricKey"] == {
+        "primaryKey": "primary",
+        "secondaryKey": "secondary",
+    }
+    assert body["customAllocationDefinition"] == {
+        "webhookUrl": "https://new",
+        "apiVersion": "new",
+    }
+    assert body["namespaceName"] == "namespace"
+    assert body["certificateAuthorityName"] == "ca"
+    assert body["certificatePolicyName"] == "new-policy"
+
+
+@pytest.mark.parametrize(
+    "attestation, kwargs, expected_container",
+    [
+        (
+            {
+                "type": "x509",
+                "x509": {
+                    "signingCertificates": {
+                        "primary": {"certificate": "old"},
+                        "secondary": {"certificate": "old"},
+                    }
+                },
+            },
+            {"certificate_path": "new.pem"},
+            "signingCertificates",
+        ),
+        (
+            {
+                "type": "x509",
+                "x509": {
+                    "caReferences": {
+                        "primary": "old",
+                        "secondary": "old-secondary",
+                    }
+                },
+            },
+            {"root_ca_name": "new-ca"},
+            "caReferences",
+        ),
+    ],
+)
+def test_group_update_covers_both_x509_authority_forms(
+    mocker, attestation, kwargs, expected_container
+):
+    sdk = _mock_sdk(mocker)
+    sdk.enrollment_group.get.return_value = {
+        "attestation": attestation,
+        "allocationPolicy": "hashed",
+        "initialTwin": {"tags": {}, "properties": {"desired": {}}},
+    }
+    mocker.patch.object(subject, "open_certificate", return_value="CERT")
+
+    subject.iot_dps_device_enrollment_group_update(
+        MagicMock(), "group", dps_name="dps", **kwargs
+    )
+
+    body = sdk.enrollment_group.create_or_update.call_args.args[1]
+    assert expected_container in body["attestation"]["x509"]
+
+
+def test_group_update_covers_symmetric_fields_and_reference(mocker):
+    sdk = _mock_sdk(mocker)
+    sdk.enrollment_group.get.return_value = {
+        "attestation": {"type": "symmetricKey"},
+        "allocationPolicy": "hashed",
+        "initialTwin": {"tags": {}, "properties": {"desired": {}}},
+    }
+    sdk.enrollment_group.get_attestation_mechanism.return_value = {
+        "type": "symmetricKey",
+        "symmetricKey": {"primaryKey": "old", "secondaryKey": "old"},
+    }
+
+    subject.iot_dps_device_enrollment_group_update(
+        MagicMock(),
+        "group",
+        dps_name="dps",
+        primary_key="primary",
+        secondary_key="secondary",
+        iot_hub_host_name="hub",
+        provisioning_status="enabled",
+        reprovision_policy="never",
+        edge_enabled=True,
+        adr_namespace="namespace",
+        adr_ca_name="ca",
+        adr_certificate_policy_name="policy",
+    )
+
+    body = sdk.enrollment_group.create_or_update.call_args.args[1]
+    assert body["iotHubs"] == ["hub"]
+    assert body["capabilities"] == {"iotEdge": True}
+    assert body["certificatePolicyName"] == "policy"
+
+
+@pytest.mark.parametrize(
+    "function_name, operation_path, kwargs",
+    [
+        (
+            "iot_dps_device_enrollment_list",
+            "individual_enrollment.query",
+            {},
+        ),
+        (
+            "iot_dps_device_enrollment_get",
+            "individual_enrollment.get",
+            {"enrollment_id": "enrollment"},
+        ),
+        (
+            "iot_dps_device_enrollment_delete",
+            "individual_enrollment.delete",
+            {"enrollment_id": "enrollment"},
+        ),
+        (
+            "iot_dps_device_enrollment_group_list",
+            "enrollment_group.query",
+            {},
+        ),
+        (
+            "iot_dps_device_enrollment_group_get",
+            "enrollment_group.get",
+            {"enrollment_id": "group"},
+        ),
+        (
+            "iot_dps_device_enrollment_group_delete",
+            "enrollment_group.delete",
+            {"enrollment_id": "group"},
+        ),
+        (
+            "iot_dps_registration_list",
+            "device_registration_state.query",
+            {"enrollment_id": "group"},
+        ),
+        (
+            "iot_dps_registration_get",
+            "device_registration_state.get",
+            {"registration_id": "registration"},
+        ),
+        (
+            "iot_dps_registration_delete",
+            "device_registration_state.delete",
+            {"registration_id": "registration"},
+        ),
+    ],
+)
+def test_service_http_errors_use_shared_handler(
+    mocker, function_name, operation_path, kwargs
+):
+    sdk = _mock_sdk(mocker)
+    operation = sdk
+    for part in operation_path.split("."):
+        operation = getattr(operation, part)
+    operation.side_effect = subject.HttpResponseError("failure")
+    handler = mocker.patch.object(
+        subject, "handle_service_exception", return_value="translated"
+    )
+
+    getattr(subject, function_name)(
+        MagicMock(), dps_name="dps", **kwargs
+    )
+
+    handler.assert_called_once()
+
+
+def test_get_show_keys_warning_and_symmetric_replacement(mocker, caplog):
+    sdk = _mock_sdk(mocker)
+    sdk.individual_enrollment.get.side_effect = [
+        {"attestation": {"type": "x509"}},
+        {"attestation": {"type": "symmetricKey"}},
+    ]
+    sdk.individual_enrollment.get_attestation_mechanism.return_value = {
+        "type": "symmetricKey",
+        "symmetricKey": {"primaryKey": "key"},
+    }
+
+    subject.iot_dps_device_enrollment_get(
+        MagicMock(), "one", dps_name="dps", show_keys=True
+    )
     result = subject.iot_dps_device_enrollment_get(
-        cmd=MagicMock(), enrollment_id="eid", dps_name="dps", show_keys=True
+        MagicMock(), "two", dps_name="dps", show_keys=True
     )
-    assert result["attestation"]["type"] == AttestationType.x509.value
-    warn.assert_called_once()
+
+    assert "only supported for symmetric key" in caplog.text
+    assert result["attestation"]["symmetricKey"]["primaryKey"] == "key"
 
 
-def test_enrollment_get_service_error(dps_sdk, handle_exc):
-    dps_sdk.individual_enrollment.get.side_effect = _svc_exc()
-    subject.iot_dps_device_enrollment_get(cmd=MagicMock(), enrollment_id="eid", dps_name="dps")
-    handle_exc.assert_called_once()
-
-
-# --- individual enrollment update branches ----------------------------------
-
-
-def _update_record(attestation_type):
-    record = MagicMock()
-    record.attestation.type = attestation_type
-    record.allocation_policy = AllocationType.static.value
-    record.iot_hubs = ["hub1"]
-    record.initial_twin.tags.as_dict.return_value = {}
-    record.initial_twin.properties.desired.as_dict.return_value = {}
-    return record
-
-
-def test_enrollment_update_tpm_and_device_info_and_credential(dps_sdk):
-    record = _update_record(AttestationType.tpm.value)
-    dps_sdk.individual_enrollment.get.return_value = record
-    subject.iot_dps_device_enrollment_update(
-        cmd=MagicMock(),
-        enrollment_id="eid",
-        dps_name="dps",
-        endorsement_key="ek",
-        device_information='{"k": "v"}',
-        credential_policy_name="cred",
-    )
-    assert record.attestation.tpm.endorsement_key == "ek"
-    assert record.credential_policy_name == "cred"
-
-
-def test_enrollment_update_symmetric_keys(dps_sdk):
-    record = _update_record(AttestationType.symmetricKey.value)
-    dps_sdk.individual_enrollment.get.return_value = record
-    subject.iot_dps_device_enrollment_update(
-        cmd=MagicMock(),
-        enrollment_id="eid",
-        dps_name="dps",
-        primary_key="pk",
-        secondary_key="sk",
-    )
-    assert record.attestation.symmetric_key.primary_key == "pk"
-    assert record.attestation.symmetric_key.secondary_key == "sk"
-
-
-def test_enrollment_update_service_error(dps_sdk, handle_exc):
-    dps_sdk.individual_enrollment.get.side_effect = _svc_exc()
-    subject.iot_dps_device_enrollment_update(cmd=MagicMock(), enrollment_id="eid", dps_name="dps")
-    handle_exc.assert_called_once()
-
-
-def test_enrollment_delete_service_error(dps_sdk, handle_exc):
-    dps_sdk.individual_enrollment.delete.side_effect = _svc_exc()
-    subject.iot_dps_device_enrollment_delete(cmd=MagicMock(), enrollment_id="eid", dps_name="dps")
-    handle_exc.assert_called_once()
-
-
-# --- enrollment group list/get error + warning paths ------------------------
-
-
-def test_enrollment_group_list_service_error(mocker, dps_sdk, handle_exc):
-    mocker.patch.object(subject, "_execute_query", side_effect=_svc_exc())
-    subject.iot_dps_device_enrollment_group_list(cmd=MagicMock(), dps_name="dps")
-    handle_exc.assert_called_once()
-
-
-def test_enrollment_group_get_show_keys_non_symmetric_warns(mocker, dps_sdk):
-    warn = mocker.patch.object(subject.logger, "warning")
-    dps_sdk.enrollment_group.get.return_value.response.json.return_value = {
-        "attestation": {"type": AttestationType.x509.value}
+def test_connection_string_listing_and_key_selection(mocker, caplog):
+    discovery = mocker.patch.object(subject, "DPSDiscovery").return_value
+    active = {
+        "id": "/subscriptions/sub/resourceGroups/rg/providers/"
+              "Microsoft.Devices/provisioningServices/active",
+        "name": "active",
+        "properties": {
+            "state": "Active",
+            "serviceOperationsHostName": "active.example.test",
+        },
     }
-    result = subject.iot_dps_device_enrollment_group_get(
-        cmd=MagicMock(), enrollment_id="gid", dps_name="dps", show_keys=True
+    inactive = {
+        "id": "/subscriptions/sub/resourceGroups/rg/providers/"
+              "Microsoft.Devices/provisioningServices/inactive",
+        "name": "inactive",
+        "properties": {
+            "state": "Suspended",
+            "serviceOperationsHostName": "inactive.example.test",
+        },
+    }
+    discovery.get_resources.return_value = [active, inactive]
+    discovery.get_policies.return_value = [
+        {
+            "keyName": "owner",
+            "primaryKey": "primary",
+            "secondaryKey": "secondary",
+        }
+    ]
+
+    result = subject.iot_dps_connection_string_show(
+        MagicMock(), show_all=True, key_type="secondary"
     )
-    assert result["attestation"]["type"] == AttestationType.x509.value
-    warn.assert_called_once()
+
+    assert result[0]["name"] == "active"
+    assert "secondary" in result[0]["connectionString"][0]
+    assert "skipped" in caplog.text
 
 
-def test_enrollment_group_get_service_error(dps_sdk, handle_exc):
-    dps_sdk.enrollment_group.get.side_effect = _svc_exc()
-    subject.iot_dps_device_enrollment_group_get(cmd=MagicMock(), enrollment_id="gid", dps_name="dps")
-    handle_exc.assert_called_once()
+def test_connection_string_single_and_missing_resource(mocker):
+    discovery = mocker.patch.object(subject, "DPSDiscovery").return_value
+    resource = {
+        "id": "/subscriptions/sub/resourceGroups/rg/providers/"
+              "Microsoft.Devices/provisioningServices/dps",
+        "name": "dps",
+        "properties": {"serviceOperationsHostName": "dps.example.test"},
+    }
+    discovery.find_resource.side_effect = [resource, None]
+    discovery.find_policy.return_value = {
+        "keyName": "owner",
+        "primaryKey": "primary",
+        "secondaryKey": "secondary",
+    }
+
+    result = subject.iot_dps_connection_string_show(
+        MagicMock(), dps_name="dps"
+    )
+    assert "primary" in result["connectionString"]
+    assert (
+        subject.iot_dps_connection_string_show(
+            MagicMock(), dps_name="missing"
+        )
+        is None
+    )
 
 
-# --- enrollment group create branches ---------------------------------------
+def test_group_show_keys_warning(mocker, caplog):
+    sdk = _mock_sdk(mocker)
+    sdk.enrollment_group.get.return_value = {
+        "attestation": {"type": "x509"}
+    }
+    subject.iot_dps_device_enrollment_group_get(
+        MagicMock(), "group", dps_name="dps", show_keys=True
+    )
+    assert "only supported for symmetric key enrollment groups" in caplog.text
 
 
-def test_enrollment_group_create_cert_and_root_ca_mutually_exclusive(mocker, dps_sdk):
-    mocker.patch.object(subject, "_get_attestation_with_x509_signing_cert")
+def test_group_create_rejects_mixed_certificate_sources(mocker):
+    _mock_sdk(mocker)
     with pytest.raises(MutuallyExclusiveArgumentError):
         subject.iot_dps_device_enrollment_group_create(
-            cmd=MagicMock(),
-            enrollment_id="gid",
+            MagicMock(),
+            "group",
             dps_name="dps",
-            certificate_path="cert.pem",
-            root_ca_name="rootca",
+            certificate_path="certificate.pem",
+            root_ca_name="root",
         )
 
 
-def test_enrollment_group_create_service_error(mocker, dps_sdk, handle_exc):
-    dps_sdk.enrollment_group.create_or_update.side_effect = _svc_exc()
-    subject.iot_dps_device_enrollment_group_create(
-        cmd=MagicMock(), enrollment_id="gid", dps_name="dps", primary_key="pk"
-    )
-    handle_exc.assert_called_once()
-
-
-# --- enrollment group update branches ---------------------------------------
-
-
-def test_enrollment_group_update_symmetric_keys(dps_sdk):
-    record = _update_record(AttestationType.symmetricKey.value)
-    dps_sdk.enrollment_group.get.return_value = record
-    subject.iot_dps_device_enrollment_group_update(
-        cmd=MagicMock(),
-        enrollment_id="gid",
-        dps_name="dps",
-        primary_key="pk",
-        secondary_key="sk",
-    )
-    assert record.attestation.symmetric_key.primary_key == "pk"
-    assert record.attestation.symmetric_key.secondary_key == "sk"
-
-
-def test_enrollment_group_update_remove_both_certs_requires_one(dps_sdk):
-    record = _update_record(AttestationType.x509.value)
-    dps_sdk.enrollment_group.get.return_value = record
-    with pytest.raises(RequiredArgumentMissingError):
-        subject.iot_dps_device_enrollment_group_update(
-            cmd=MagicMock(),
-            enrollment_id="gid",
-            dps_name="dps",
-            remove_certificate=True,
-            remove_secondary_certificate=True,
-        )
-
-
-def test_enrollment_group_update_cannot_remove_primary(mocker, dps_sdk):
-    record = _update_record(AttestationType.x509.value)
-    dps_sdk.enrollment_group.get.return_value = record
-    mocker.patch.object(subject, "_can_remove_primary_certificate", return_value=False)
-    with pytest.raises(RequiredArgumentMissingError):
-        subject.iot_dps_device_enrollment_group_update(
-            cmd=MagicMock(),
-            enrollment_id="gid",
-            dps_name="dps",
-            remove_certificate=True,
-        )
-
-
-def test_enrollment_group_update_cannot_remove_secondary(mocker, dps_sdk):
-    record = _update_record(AttestationType.x509.value)
-    dps_sdk.enrollment_group.get.return_value = record
-    mocker.patch.object(subject, "_can_remove_primary_certificate", return_value=True)
-    mocker.patch.object(subject, "_can_remove_secondary_certificate", return_value=False)
-    with pytest.raises(RequiredArgumentMissingError):
-        subject.iot_dps_device_enrollment_group_update(
-            cmd=MagicMock(),
-            enrollment_id="gid",
-            dps_name="dps",
-            remove_secondary_certificate=True,
-        )
-
-
-def test_enrollment_group_update_cert_and_root_ca_mutually_exclusive(dps_sdk):
-    record = _update_record(AttestationType.x509.value)
-    dps_sdk.enrollment_group.get.return_value = record
+def test_group_update_rejects_mixed_certificate_sources(mocker):
+    sdk = _mock_sdk(mocker)
+    sdk.enrollment_group.get.return_value = {
+        "attestation": {
+            "type": "x509",
+            "x509": {"signingCertificates": {"primary": {}}},
+        },
+        "initialTwin": {},
+    }
     with pytest.raises(MutuallyExclusiveArgumentError):
         subject.iot_dps_device_enrollment_group_update(
-            cmd=MagicMock(),
-            enrollment_id="gid",
+            MagicMock(),
+            "group",
             dps_name="dps",
-            certificate_path="cert.pem",
-            root_ca_name="rootca",
+            certificate_path="certificate.pem",
+            root_ca_name="root",
         )
 
 
-def test_enrollment_group_update_credential_policy(dps_sdk):
-    record = _update_record(AttestationType.symmetricKey.value)
-    dps_sdk.enrollment_group.get.return_value = record
-    subject.iot_dps_device_enrollment_group_update(
-        cmd=MagicMock(),
-        enrollment_id="gid",
-        dps_name="dps",
-        credential_policy_name="cred",
-    )
-    assert record.credential_policy_name == "cred"
-
-
-def test_enrollment_group_update_service_error(dps_sdk, handle_exc):
-    dps_sdk.enrollment_group.get.side_effect = _svc_exc()
-    subject.iot_dps_device_enrollment_group_update(cmd=MagicMock(), enrollment_id="gid", dps_name="dps")
-    handle_exc.assert_called_once()
-
-
-def test_enrollment_group_delete_service_error(dps_sdk, handle_exc):
-    dps_sdk.enrollment_group.delete.side_effect = _svc_exc()
-    subject.iot_dps_device_enrollment_group_delete(cmd=MagicMock(), enrollment_id="gid", dps_name="dps")
-    handle_exc.assert_called_once()
-
-
-# --- compute device key service error ---------------------------------------
-
-
-def test_compute_device_key_service_error(mocker):
-    mocker.patch.object(subject, "DPSDiscovery")
-    resolver = mocker.patch.object(subject, "SdkResolver")
-    sdk = resolver.return_value.get_sdk.return_value
-    sdk.enrollment_group.get_attestation_mechanism.side_effect = _svc_exc()
-    with pytest.raises(AzureResponseError):
-        subject.iot_dps_compute_device_key(
-            cmd=MagicMock(), registration_id="reg", enrollment_id="grp", dps_name="dps"
-        )
-
-
-# --- connection string show_all + warning paths -----------------------------
-
-
-def test_connection_string_show_all_policies(mocker):
-    discovery = mocker.patch.object(subject, "DPSDiscovery").return_value
-    discovery.find_resource.return_value = {
-        "name": "mydps",
-        "resourcegroup": "rg",
-        "properties": {"serviceOperationsHostName": "host"},
+@pytest.mark.parametrize(
+    "remove_primary, remove_secondary, attestation, message",
+    [
+        (
+            True,
+            True,
+            {
+                "type": "x509",
+                "x509": {"signingCertificates": {"primary": {}, "secondary": {}}},
+            },
+            "at least one certificate$",
+        ),
+        (
+            True,
+            False,
+            {
+                "type": "x509",
+                "x509": {"signingCertificates": {"primary": {}, "secondary": None}},
+            },
+            "only primary",
+        ),
+        (
+            False,
+            True,
+            {
+                "type": "x509",
+                "x509": {"caReferences": {"primary": None, "secondary": "ca"}},
+            },
+            "only secondary",
+        ),
+    ],
+)
+def test_group_update_rejects_removing_required_certificate(
+    mocker, remove_primary, remove_secondary, attestation, message
+):
+    sdk = _mock_sdk(mocker)
+    sdk.enrollment_group.get.return_value = {
+        "attestation": attestation,
+        "initialTwin": {},
     }
-    discovery.get_policies.return_value = [
-        {"keyName": "pol", "primaryKey": "pk", "secondaryKey": "sk"}
-    ]
-    result = subject.iot_dps_connection_string_show(cmd=MagicMock(), dps_name="mydps", show_all=True)
-    discovery.get_policies.assert_called_once()
-    assert isinstance(result["connectionString"], list)
+    with pytest.raises(RequiredArgumentMissingError, match=message):
+        subject.iot_dps_device_enrollment_group_update(
+            MagicMock(),
+            "group",
+            dps_name="dps",
+            remove_certificate=remove_primary,
+            remove_secondary_certificate=remove_secondary,
+        )
 
 
-def test_connection_string_show_all_in_rg_policy_missing_warns(mocker):
-    from azext_iot.common.shared import IoTDPSStateType
+@pytest.mark.parametrize(
+    "function_name, setup",
+    [
+        (
+            "iot_dps_device_enrollment_update",
+            lambda sdk: setattr(
+                sdk.individual_enrollment.get,
+                "side_effect",
+                subject.HttpResponseError("failure"),
+            ),
+        ),
+        (
+            "iot_dps_device_enrollment_group_update",
+            lambda sdk: setattr(
+                sdk.enrollment_group.get,
+                "side_effect",
+                subject.HttpResponseError("failure"),
+            ),
+        ),
+    ],
+)
+def test_update_http_errors_use_shared_handler(
+    mocker, function_name, setup
+):
+    sdk = _mock_sdk(mocker)
+    setup(sdk)
+    handler = mocker.patch.object(subject, "handle_service_exception")
+    getattr(subject, function_name)(
+        MagicMock(), "record", dps_name="dps"
+    )
+    handler.assert_called_once()
 
-    warn = mocker.patch.object(subject.logger, "warning")
+
+def test_group_create_http_error_uses_shared_handler(mocker):
+    sdk = _mock_sdk(mocker)
+    sdk.enrollment_group.create_or_update.side_effect = (
+        subject.HttpResponseError("failure")
+    )
+    handler = mocker.patch.object(subject, "handle_service_exception")
+    subject.iot_dps_device_enrollment_group_create(
+        MagicMock(), "group", dps_name="dps"
+    )
+    handler.assert_called_once()
+
+
+def test_compute_device_key_online_success_and_http_error(mocker):
+    key = base64.b64encode(b"secret").decode()
+    sdk = _mock_sdk(mocker)
+    sdk.enrollment_group.get_attestation_mechanism.return_value = {
+        "type": "symmetricKey",
+        "symmetricKey": {"primaryKey": key},
+    }
+    assert subject.iot_dps_compute_device_key(
+        MagicMock(), "registration", "group", "dps"
+    )
+
+    sdk.enrollment_group.get_attestation_mechanism.side_effect = (
+        subject.HttpResponseError("failure")
+    )
+    with pytest.raises(subject.AzureResponseError):
+        subject.iot_dps_compute_device_key(
+            MagicMock(), "registration", "group", "dps"
+        )
+
+
+def test_connection_string_listing_missing_and_policy_failure(mocker, caplog):
     discovery = mocker.patch.object(subject, "DPSDiscovery").return_value
-    discovery.get_resources.return_value = [
-        {
-            "name": "active-dps",
-            "resourcegroup": "rg",
-            "properties": {"serviceOperationsHostName": "host", "state": IoTDPSStateType.Active.value},
-        },
+    discovery.get_resources.side_effect = [
+        None,
+        [
+            {
+                "id": "/subscriptions/sub/resourceGroups/rg/providers/"
+                      "Microsoft.Devices/provisioningServices/dps",
+                "name": "dps",
+                "properties": {
+                    "state": "Active",
+                    "serviceOperationsHostName": "dps.example.test",
+                },
+            }
+        ],
     ]
-    discovery.find_policy.side_effect = Exception("no policy")
-    result = subject.iot_dps_connection_string_show(cmd=MagicMock())
-    assert result == []
-    warn.assert_called_once()
+    with pytest.raises(subject.ResourceNotFoundError):
+        subject.iot_dps_connection_string_show(MagicMock())
+
+    discovery.find_policy.side_effect = RuntimeError("missing policy")
+    assert subject.iot_dps_connection_string_show(MagicMock()) == []
+    assert "does not have the target policy" in caplog.text
 
 
-# --- updated x509 client cert remove secondary ------------------------------
-
-
-def test_updated_attestation_x509_client_cert_remove_secondary(mocker):
-    mocker.patch.object(subject, "open_certificate", return_value="NEW")
-    attestation = MagicMock()
-    result = subject._get_updated_attestation_with_x509_client_cert(
-        attestation,
-        primary_certificate_path=None,
-        secondary_certificate_path=None,
-        remove_primary_certificate=False,
-        remove_secondary_certificate=True,
+def test_certificate_helper_secondary_removals_and_alternate_checks():
+    signing = {
+        "x509": {
+            "signingCertificates": {
+                "primary": {"certificate": "one"},
+                "secondary": {"certificate": "two"},
+            }
+        }
+    }
+    subject._get_updated_attestation_with_x509_signing_cert(
+        signing, None, None, False, True
     )
-    assert result.x509.client_certificates.secondary is None
+    assert "secondary" not in signing["x509"]["signingCertificates"]
 
-
-# --- validate allocation policy from current custom enrollment --------------
-
-
-def test_allocation_policy_custom_from_current_enrollment():
-    current = MagicMock()
-    current.iot_hubs = None
-    current.allocation_policy = AllocationType.custom.value
-    current.custom_allocation_definition.webhook_url = "https://webhook"
-    current.custom_allocation_definition.api_version = "2021-10-01"
-    # No raise expected; webhook/api derived from current enrollment.
-    subject._validate_allocation_policy_for_enrollment(
-        None, None, None, None, None, current_enrollment=current
+    ca = {"x509": {"caReferences": {"primary": "one", "secondary": "two"}}}
+    subject._get_updated_attestation_with_x509_ca_cert(
+        ca, None, None, False, True
     )
+    assert "secondary" not in ca["x509"]["caReferences"]
 
-
-# --- registration command service-error paths -------------------------------
-
-
-def test_registration_list_service_error(mocker, dps_sdk, handle_exc):
-    mocker.patch.object(subject, "_execute_query", side_effect=_svc_exc())
-    subject.iot_dps_registration_list(cmd=MagicMock(), enrollment_id="eid", dps_name="dps")
-    handle_exc.assert_called_once()
-
-
-def test_registration_get_service_error(dps_sdk, handle_exc):
-    dps_sdk.device_registration_state.get.side_effect = _svc_exc()
-    subject.iot_dps_registration_get(cmd=MagicMock(), registration_id="reg", dps_name="dps")
-    handle_exc.assert_called_once()
-
-
-def test_registration_delete_service_error(dps_sdk, handle_exc):
-    dps_sdk.device_registration_state.delete.side_effect = _svc_exc()
-    subject.iot_dps_registration_delete(cmd=MagicMock(), registration_id="reg", dps_name="dps")
-    handle_exc.assert_called_once()
+    assert not subject._can_remove_primary_certificate(
+        True, {"x509": {"caReferences": {"secondary": None}}}
+    )
+    assert not subject._can_remove_secondary_certificate(
+        True, {"x509": {"signingCertificates": {"primary": None}}}
+    )

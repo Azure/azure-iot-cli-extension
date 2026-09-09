@@ -52,7 +52,7 @@ class TestADRUpdateInstanceLifecycle(CaptureOutputLiveScenarioTest):
             self.cmd(
                 f"iot adr ns su instance create -n {instance_name} "
                 f"-g {TEST_RG} --location {TEST_LOCATION} "
-                "--mi-system-assigned --tags env=integration --no-wait"
+                "--system-assigned-mi --tags env=integration --no-wait"
             )
             cleanup.register(
                 "UpdateInstance",
@@ -68,9 +68,15 @@ class TestADRUpdateInstanceLifecycle(CaptureOutputLiveScenarioTest):
             assert "SystemAssigned" in created["identity"]["type"]
 
             self.cmd(
-                f"iot adr ns su instance wait -n {instance_name} -g {TEST_RG} "
-                "--custom \"properties.provisioningState=='Succeeded'\""
+                f"iot adr ns su instance wait -n {instance_name} -g {TEST_RG}"
             )
+
+            sami_upsert = self.cmd(
+                f"iot adr ns su instance create -n {instance_name} "
+                f"-g {TEST_RG}"
+            ).get_output_in_json()
+            assert "SystemAssigned" in sami_upsert["identity"]["type"]
+            assert sami_upsert["tags"] == {"env": "integration"}
 
             unavailable = self.cmd(
                 f"iot adr ns su instance check-name -n {instance_name}"
@@ -97,8 +103,8 @@ class TestADRUpdateInstanceLifecycle(CaptureOutputLiveScenarioTest):
 
             combined = self.cmd(
                 f"iot adr ns su instance update -n {instance_name} "
-                f"-g {TEST_RG} --mi-system-assigned "
-                f"--mi-user-assigned {identity_id}"
+                f"-g {TEST_RG} --system-assigned-mi "
+                f"--user-assigned-mi {identity_id}"
             ).get_output_in_json()
             combined_types = {
                 value.strip()
@@ -114,13 +120,26 @@ class TestADRUpdateInstanceLifecycle(CaptureOutputLiveScenarioTest):
 
             user_only = self.cmd(
                 f"iot adr ns su instance update -n {instance_name} "
-                f"-g {TEST_RG} --mi-user-assigned {identity_id}"
+                f"-g {TEST_RG} --user-assigned-mi {identity_id}"
             ).get_output_in_json()
             assert user_only["identity"]["type"] == "UserAssigned"
+            uami_upsert = self.cmd(
+                f"iot adr ns su instance create -n {instance_name} "
+                f"-g {TEST_RG}"
+            ).get_output_in_json()
+            assert uami_upsert["identity"]["type"] == "UserAssigned"
+            assert identity_id.casefold() in {
+                resource_id.casefold()
+                for resource_id in (
+                    uami_upsert["identity"].get(
+                        "userAssignedIdentities"
+                    ) or {}
+                )
+            }
 
             system_only = self.cmd(
                 f"iot adr ns su instance update -n {instance_name} "
-                f"-g {TEST_RG} --mi-system-assigned"
+                f"-g {TEST_RG} --system-assigned-mi"
             ).get_output_in_json()
             assert system_only["identity"]["type"] == "SystemAssigned"
             assert not system_only["identity"].get("userAssignedIdentities")
@@ -133,9 +152,14 @@ class TestADRUpdateInstanceLifecycle(CaptureOutputLiveScenarioTest):
 
             no_identity = self.cmd(
                 f"iot adr ns su instance update -n {instance_name} "
-                f"-g {TEST_RG} --mi-system-assigned false"
+                f"-g {TEST_RG} --system-assigned-mi false"
             ).get_output_in_json()
             assert no_identity["identity"]["type"] == "None"
+            no_identity_upsert = self.cmd(
+                f"iot adr ns su instance create -n {instance_name} "
+                f"-g {TEST_RG}"
+            ).get_output_in_json()
+            assert no_identity_upsert["identity"]["type"] == "None"
 
             self.cmd(
                 f"iot adr ns su instance update -n {instance_name} " f"-g {TEST_RG}",
@@ -160,6 +184,6 @@ class TestADRUpdateInstanceValidation(CaptureOutputLiveScenarioTest):
         )
         self.cmd(
             "iot adr ns su instance update -n missing-instance "
-            f"-g {TEST_RG} --mi-user-assigned not-an-arm-id",
+            f"-g {TEST_RG} --user-assigned-mi not-an-arm-id",
             expect_failure=True,
         )

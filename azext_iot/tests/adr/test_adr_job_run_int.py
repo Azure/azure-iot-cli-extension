@@ -106,6 +106,12 @@ class TestADRJobRunSurface(ADRFullInfraHelper, CaptureOutputLiveScenarioTest):
                 ).get_output_in_json()
                 # --run-name is optional; a UTC-timestamped name is generated.
                 assert generated["name"].startswith("run-")
+                self.cmd(
+                    "iot adr ns job run wait "
+                    f"-n {generated['name']} --job-name {job_name} "
+                    f"--ns {namespace_name} -g {rg} "
+                    "--timeout 300 --interval 10"
+                )
                 _log(LogKind.OK, "generated run name=%s", generated["name"])
 
             with timed_step("Step 1b ❯ Explicit run name, summary, results, delete"):

@@ -4,10 +4,12 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import inspect
 from unittest.mock import Mock
 
 import pytest
 from azure.cli.core.azclierror import (
+    AzureResponseError,
     InvalidArgumentValueError,
     MutuallyExclusiveArgumentError,
     RequiredArgumentMissingError,
@@ -15,6 +17,7 @@ from azure.cli.core.azclierror import (
 from azure.core.exceptions import HttpResponseError
 
 from azext_iot.adr.providers.namespace import (
+    NamespaceProvider,
     _build_namespace_identity,
     _clean_migrate_resource_ids,
     _managed_identity_type,
@@ -31,6 +34,17 @@ def _namespace_not_found():
     error = HttpResponseError(message="Namespace not found")
     error.status_code = 404
     return error
+
+
+def test_namespace_provider_surfaces_exclude_raw_endpoint_parameters():
+    removed = {
+        "messaging_endpoints",
+        "provisioning_endpoints",
+        "updating_endpoints",
+    }
+
+    for operation in (NamespaceProvider.create, NamespaceProvider.update):
+        assert removed.isdisjoint(inspect.signature(operation).parameters)
 
 
 def test_namespace_create_basic(fixture_namespace_provider, mock_poller):
@@ -234,6 +248,7 @@ def test_namespace_update_tags(fixture_namespace_provider, mock_poller):
         namespace_name="namespace",
         properties={"tags": {"env": "production"}},
     )
+    fixture_namespace_provider.client.namespaces.get.assert_not_called()
 
 
 @pytest.mark.parametrize("enabled", [True, False])
@@ -242,6 +257,8 @@ def test_namespace_update_observability_preserves_endpoints(
 ):
     endpoint = {
         "endpointType": "Microsoft.EventGrid/namespaces",
+        "address": "eventgrid.example",
+        "scopeId": "scope",
         "resourceId": "/subscriptions/sub/resourceGroups/rg/providers/"
                       "Microsoft.EventGrid/namespaces/eg",
     }
@@ -273,6 +290,78 @@ def test_namespace_update_observability_preserves_endpoints(
             }
         },
     )
+
+
+@pytest.mark.parametrize(
+    "observability",
+    [
+        None,
+        {"enabled": False},
+        {"enabled": False, "endpoints": {}},
+        {"enabled": False, "endpoints": {"site": {"resourceId": "incomplete"}}},
+    ],
+)
+@pytest.mark.parametrize("enabled", [True, False])
+def test_namespace_update_observability_requires_complete_existing_endpoint(
+    fixture_namespace_provider, observability, enabled
+):
+    fixture_namespace_provider.client.namespaces.get.return_value = {
+        "properties": {"observability": observability}
+    }
+
+    with pytest.raises(
+        InvalidArgumentValueError,
+        match="complete service-configured observability endpoint",
+    ):
+        fixture_namespace_provider.update(
+            "namespace", "rg", observability_enabled=enabled
+        )
+
+    fixture_namespace_provider.client.namespaces.begin_update.assert_not_called()
+
+
+def test_namespace_update_observability_and_outbound_identity_share_lookup(
+    fixture_namespace_provider, mock_poller
+):
+    endpoint = {
+        "endpointType": "Microsoft.EventGrid/namespaces",
+        "address": "eventgrid.example",
+        "scopeId": "scope",
+        "resourceId": "/subscriptions/sub/resourceGroups/rg/providers/"
+                      "Microsoft.EventGrid/namespaces/eg",
+    }
+    fixture_namespace_provider.client.namespaces.get.return_value = {
+        "identity": {"type": "SystemAssigned"},
+        "properties": {
+            "observability": {
+                "enabled": False,
+                "endpoints": {"event-grid": endpoint},
+            }
+        },
+    }
+    fixture_namespace_provider.client.namespaces.begin_update.return_value = mock_poller(
+        {"name": "namespace"}
+    )
+
+    fixture_namespace_provider.update(
+        "namespace",
+        "rg",
+        observability_enabled=True,
+        outbound_mi_system_assigned=True,
+    )
+
+    fixture_namespace_provider.client.namespaces.get.assert_called_once_with(
+        resource_group_name="rg",
+        namespace_name="namespace",
+    )
+    body = fixture_namespace_provider.client.namespaces.begin_update.call_args.kwargs[
+        "properties"
+    ]
+    assert body["identity"] == {"type": "SystemAssigned"}
+    assert body["properties"]["observability"] == {
+        "enabled": True,
+        "endpoints": {"event-grid": endpoint},
+    }
 
 
 def test_namespace_update_outbound_uami_preserves_identity_assignments(
@@ -310,6 +399,139 @@ def test_namespace_update_outbound_uami_preserves_identity_assignments(
                 "userAssignedIdentity": UAMI_ID,
             }
         },
+    }
+
+
+def test_namespace_update_preflights_all_existing_links_for_new_outbound_uami(
+    fixture_namespace_provider, mock_poller, mocker
+):
+    fixture_namespace_provider.client.namespaces.get.return_value = {
+        "id": "/subscriptions/sub/resourceGroups/rg/providers/"
+        "Microsoft.DeviceRegistry/namespaces/namespace",
+        "identity": {
+            "type": "SystemAssigned,UserAssigned",
+            "principalId": "namespace-system",
+            "userAssignedIdentities": {
+                UAMI_ID: {"principalId": "namespace-user"}
+            },
+        },
+        "properties": {
+            "provisioning": {
+                "endpoints": {
+                    "dps": {
+                        "endpointType": "Microsoft.Devices/provisioningServices",
+                        "resourceId": "/subscriptions/sub/resourceGroups/rg/"
+                        "providers/Microsoft.Devices/provisioningServices/dps",
+                        "inboundCallerIdentity": {"type": "SystemAssigned"},
+                    }
+                }
+            },
+            "messaging": {
+                "endpoints": {
+                    "hub": {
+                        "endpointType": "Microsoft.Devices/IotHubs",
+                        "resourceId": "/subscriptions/sub/resourceGroups/rg/"
+                        "providers/Microsoft.Devices/IotHubs/hub",
+                        "inboundCallerIdentity": {"type": "SystemAssigned"},
+                    }
+                }
+            },
+            "updating": {
+                "endpoints": {
+                    "su": {
+                        "endpointType": "Microsoft.DeviceUpdate/updateInstances",
+                        "resourceId": "/subscriptions/sub/resourceGroups/rg/"
+                        "providers/Microsoft.DeviceUpdate/updateInstances/su",
+                        "inboundCallerIdentity": {"type": "SystemAssigned"},
+                    }
+                }
+            },
+        },
+    }
+    fixture_namespace_provider.client.namespaces.begin_update.return_value = (
+        mock_poller({"name": "namespace"})
+    )
+    provider = mocker.patch(
+        "azext_iot.adr.providers.link.LinkProvider"
+    ).return_value
+    provider._preflight_link.side_effect = (  # pylint: disable=protected-access
+        lambda **kwargs: kwargs["rbac_requests"].append(
+            {"link_type": kwargs["link_type"]}
+        )
+    )
+
+    fixture_namespace_provider.update(
+        "namespace", "rg", outbound_mi_user_assigned=UAMI_ID
+    )
+
+    assert {
+        call.kwargs["link_type"]
+        for call in provider._preflight_link.call_args_list  # pylint: disable=protected-access
+    } == {"hub", "dps", "su"}
+    candidate = provider._preflight_link.call_args.kwargs[  # pylint: disable=protected-access
+        "namespace"
+    ]
+    assert candidate["properties"]["outboundIdentity"] == {
+        "type": "UserAssigned",
+        "userAssignedIdentity": UAMI_ID,
+    }
+    provider._rbac_manager.return_value.ensure_many.assert_called_once_with(  # pylint: disable=protected-access
+        [
+            {"link_type": "dps"},
+            {"link_type": "hub"},
+            {"link_type": "su"},
+        ]
+    )
+
+
+def test_namespace_update_resolves_new_outbound_uami_before_link_preflight(
+    fixture_namespace_provider, mock_poller, mocker
+):
+    fixture_namespace_provider.client.namespaces.get.return_value = {
+        "id": "/subscriptions/sub/resourceGroups/rg/providers/"
+        "Microsoft.DeviceRegistry/namespaces/namespace",
+        "identity": {
+            "type": "SystemAssigned",
+            "principalId": "namespace-system",
+        },
+        "properties": {
+            "messaging": {
+                "endpoints": {
+                    "hub": {
+                        "endpointType": "Microsoft.Devices/IotHubs",
+                        "resourceId": "/subscriptions/sub/resourceGroups/rg/"
+                        "providers/Microsoft.Devices/IotHubs/hub",
+                    }
+                }
+            }
+        },
+    }
+    fixture_namespace_provider.client.namespaces.begin_update.return_value = (
+        mock_poller({"name": "namespace"})
+    )
+    embedded = mocker.patch(
+        "azext_iot.common.embedded_cli.EmbeddedCLI"
+    ).return_value
+    embedded.invoke.return_value.as_json.return_value = {
+        "principalId": "namespace-user"
+    }
+    provider = mocker.patch(
+        "azext_iot.adr.providers.link.LinkProvider"
+    ).return_value
+
+    fixture_namespace_provider.update(
+        "namespace", "rg", outbound_mi_user_assigned=UAMI_ID
+    )
+
+    embedded.invoke.assert_called_once_with(
+        f"identity show --ids '{UAMI_ID}'",
+        subscription="sub",
+    )
+    candidate = provider._preflight_link.call_args.kwargs[  # pylint: disable=protected-access
+        "namespace"
+    ]
+    assert candidate["identity"]["userAssignedIdentities"][UAMI_ID] == {
+        "principalId": "namespace-user"
     }
 
 
@@ -359,39 +581,35 @@ def test_namespace_update_no_wait(fixture_namespace_provider, mock_poller):
     poller.result.assert_not_called()
 
 
-def test_namespace_create_accepts_direct_endpoint_configuration(
-    fixture_namespace_provider, mock_poller
+def test_namespace_delete_propagates_unrelated_service_error(
+    fixture_namespace_provider,
 ):
-    fixture_namespace_provider.client.namespaces.get.side_effect = (
-        _namespace_not_found()
-    )
-    fixture_namespace_provider.client.namespaces.begin_create_or_replace.return_value = (
-        mock_poller({"name": "namespace", "resourceGroup": "rg"})
-    )
+    error = HttpResponseError(message="Service unavailable")
+    error.status_code = 503
+    fixture_namespace_provider.client.namespaces.begin_delete.side_effect = error
 
-    fixture_namespace_provider.create(
-        "namespace",
-        "rg",
-        location="eastus",
-        provisioning_endpoints='{"dps":{"endpointType":"Microsoft.Devices/ProvisioningServices"}}',
-        messaging_endpoints={"hub": {"endpointType": "Microsoft.Devices/IotHubs"}},
-    )
+    with pytest.raises(HttpResponseError, match="Service unavailable"):
+        fixture_namespace_provider.delete("namespace", "rg")
 
-    resource = fixture_namespace_provider.client.namespaces.begin_create_or_replace.call_args.kwargs[
-        "resource"
-    ]
-    assert resource["properties"] == {
-        "provisioning": {
-            "endpoints": {
-                "dps": {"endpointType": "Microsoft.Devices/ProvisioningServices"}
-            }
-        },
-        "messaging": {
-            "endpoints": {
-                "hub": {"endpointType": "Microsoft.Devices/IotHubs"}
-            }
-        },
-    }
+
+def test_namespace_delete_not_empty_lists_safe_destructive_cleanup(
+    fixture_namespace_provider,
+):
+    error = HttpResponseError(
+        message="NamespaceNotEmpty: child resources remain\nbackend detail"
+    )
+    fixture_namespace_provider.client.namespaces.begin_delete.side_effect = error
+
+    with pytest.raises(AzureResponseError) as raised:
+        fixture_namespace_provider.delete("namespace", "rg")
+
+    message = str(raised.value)
+    assert "job run delete" in message
+    assert "ca policy delete" in message
+    assert "link hub delete" in message
+    assert "link dps delete" in message
+    assert "link su delete" in message
+    assert "permanently deletes" in message
 
 
 def test_namespace_create_preserves_existing_observability(
@@ -432,12 +650,167 @@ def test_namespace_create_preserves_existing_observability(
     assert resource["properties"]["observability"] == observability
 
 
+def test_namespace_create_upsert_preserves_unspecified_namespace_state(
+    fixture_namespace_provider, mock_poller
+):
+    existing = {
+        "location": "centraluseuap",
+        "tags": {"existing": "tag"},
+        "identity": {
+            "type": "SystemAssigned,UserAssigned",
+            "userAssignedIdentities": {UAMI_ID: {}},
+        },
+        "properties": {
+            "uuid": "read-only",
+            "provisioningState": "Succeeded",
+            "outboundIdentity": {"type": "SystemAssigned"},
+            "management": {"endpoints": {"management": {"resourceId": "/management"}}},
+            "provisioning": {"endpoints": {"dps": {"resourceId": "/dps"}}},
+            "messaging": {"endpoints": {"hub": {"resourceId": "/hub"}}},
+            "updating": {"endpoints": {"su": {"resourceId": "/su"}}},
+        },
+    }
+    fixture_namespace_provider.client.namespaces.get.return_value = existing
+    fixture_namespace_provider.client.namespaces.begin_create_or_replace.return_value = (
+        mock_poller({"name": "namespace", "resourceGroup": "rg"})
+    )
+
+    fixture_namespace_provider.create("namespace", "rg")
+
+    resource = fixture_namespace_provider.client.namespaces.begin_create_or_replace.call_args.kwargs[
+        "resource"
+    ]
+    assert resource["location"] == "centraluseuap"
+    assert resource["tags"] == {"existing": "tag"}
+    assert resource["identity"] == {
+        "type": "SystemAssigned,UserAssigned",
+        "userAssignedIdentities": {UAMI_ID: {}},
+    }
+    assert resource["properties"] == {
+        key: value
+        for key, value in existing["properties"].items()
+        if key not in {"uuid", "provisioningState"}
+    }
+
+
+@pytest.mark.parametrize(
+    "existing_identity",
+    [
+        {
+            "type": "UserAssigned",
+            "userAssignedIdentities": {
+                UAMI_ID: {
+                    "principalId": "server-owned",
+                    "clientId": "server-owned",
+                }
+            },
+        },
+        {"type": "None"},
+        None,
+    ],
+)
+def test_namespace_create_upsert_preserves_identity_exactly_when_unspecified(
+    fixture_namespace_provider, mock_poller, existing_identity
+):
+    existing = {
+        "location": "centraluseuap",
+        "properties": {"observability": {"enabled": True}},
+    }
+    if existing_identity is not None:
+        existing["identity"] = existing_identity
+    fixture_namespace_provider.client.namespaces.get.return_value = existing
+    fixture_namespace_provider.client.namespaces.begin_create_or_replace.return_value = (
+        mock_poller({"name": "namespace", "resourceGroup": "rg"})
+    )
+
+    fixture_namespace_provider.create("namespace", "rg")
+
+    body = fixture_namespace_provider.client.namespaces.begin_create_or_replace.call_args.kwargs[
+        "resource"
+    ]
+    if existing_identity is None:
+        assert "identity" not in body
+    elif existing_identity["type"] == "None":
+        assert body["identity"] == {"type": "None"}
+    else:
+        assert body["identity"] == {
+            "type": "UserAssigned",
+            "userAssignedIdentities": {UAMI_ID: {}},
+        }
+
+
+def test_namespace_create_upsert_outbound_uami_does_not_add_sami(
+    fixture_namespace_provider, mock_poller
+):
+    existing_uami = UAMI_ID.replace("identity", "existing")
+    fixture_namespace_provider.client.namespaces.get.return_value = {
+        "location": "centraluseuap",
+        "identity": {
+            "type": "UserAssigned",
+            "userAssignedIdentities": {existing_uami: {}},
+        },
+        "properties": {},
+    }
+    fixture_namespace_provider.client.namespaces.begin_create_or_replace.return_value = (
+        mock_poller({"name": "namespace", "resourceGroup": "rg"})
+    )
+
+    fixture_namespace_provider.create(
+        "namespace",
+        "rg",
+        outbound_mi_user_assigned=UAMI_ID,
+    )
+
+    body = fixture_namespace_provider.client.namespaces.begin_create_or_replace.call_args.kwargs[
+        "resource"
+    ]
+    assert body["identity"] == {
+        "type": "UserAssigned",
+        "userAssignedIdentities": {
+            existing_uami: {},
+            UAMI_ID: {},
+        },
+    }
+    assert body["properties"]["outboundIdentity"] == {
+        "type": "UserAssigned",
+        "userAssignedIdentity": UAMI_ID,
+    }
+
+
+def test_namespace_create_upsert_can_clear_outbound_identity(
+    fixture_namespace_provider, mock_poller
+):
+    fixture_namespace_provider.client.namespaces.get.return_value = {
+        "location": "centraluseuap",
+        "identity": {"type": "SystemAssigned"},
+        "properties": {
+            "outboundIdentity": {"type": "SystemAssigned"},
+        },
+    }
+    fixture_namespace_provider.client.namespaces.begin_create_or_replace.return_value = (
+        mock_poller({"name": "namespace", "resourceGroup": "rg"})
+    )
+
+    fixture_namespace_provider.create(
+        "namespace",
+        "rg",
+        outbound_mi_system_assigned=False,
+    )
+
+    resource = fixture_namespace_provider.client.namespaces.begin_create_or_replace.call_args.kwargs[
+        "resource"
+    ]
+    assert resource["properties"]["outboundIdentity"] is None
+
+
 @pytest.mark.parametrize("enabled", [True, False])
 def test_namespace_create_observability_overrides_enabled_and_preserves_endpoints(
     fixture_namespace_provider, mock_poller, enabled
 ):
     endpoint = {
         "endpointType": "Microsoft.EventGrid/namespaces",
+        "address": "eventgrid.example",
+        "scopeId": "scope",
         "resourceId": "/subscriptions/sub/resourceGroups/rg/providers/"
                       "Microsoft.EventGrid/namespaces/eg",
     }
@@ -467,6 +840,28 @@ def test_namespace_create_observability_overrides_enabled_and_preserves_endpoint
         "enabled": enabled,
         "endpoints": {"event-grid": endpoint},
     }
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+def test_namespace_create_observability_requires_existing_endpoint(
+    fixture_namespace_provider, enabled
+):
+    fixture_namespace_provider.client.namespaces.get.side_effect = (
+        _namespace_not_found()
+    )
+
+    with pytest.raises(
+        InvalidArgumentValueError,
+        match="complete service-configured observability endpoint",
+    ):
+        fixture_namespace_provider.create(
+            "namespace",
+            "rg",
+            location="eastus",
+            observability_enabled=enabled,
+        )
+
+    fixture_namespace_provider.client.namespaces.begin_create_or_replace.assert_not_called()
 
 
 def test_namespace_create_propagates_existing_namespace_lookup_error(
@@ -539,40 +934,16 @@ def test_clean_migrate_resource_ids_preserves_first_casing():
     ]
 
 
-def test_namespace_update_accepts_direct_endpoint_configuration(
-    fixture_namespace_provider, mock_poller
-):
-    fixture_namespace_provider.client.namespaces.begin_update.return_value = mock_poller(
-        {}
-    )
-
-    fixture_namespace_provider.update(
-        "namespace",
-        "rg",
-        provisioning_endpoints={},
-        updating_endpoints='{"su":{"endpointType":"Microsoft.DeviceUpdate/updateInstances"}}',
-    )
-
-    body = fixture_namespace_provider.client.namespaces.begin_update.call_args.kwargs[
-        "properties"
-    ]
-    assert body == {
-        "properties": {
-            "provisioning": {"endpoints": {}},
-            "updating": {
-                "endpoints": {
-                    "su": {
-                        "endpointType": "Microsoft.DeviceUpdate/updateInstances"
-                    }
-                }
-            },
-        }
-    }
-
-
 def test_namespace_update_can_clear_explicit_outbound_identity(
     fixture_namespace_provider, mock_poller
 ):
+    fixture_namespace_provider.client.namespaces.get.return_value = {
+        "identity": {
+            "type": "SystemAssigned",
+            "principalId": "namespace-principal",
+        },
+        "properties": {},
+    }
     fixture_namespace_provider.client.namespaces.begin_update.return_value = mock_poller(
         {}
     )
@@ -585,6 +956,10 @@ def test_namespace_update_can_clear_explicit_outbound_identity(
         "properties"
     ]
     assert body == {"properties": {"outboundIdentity": None}}
+    fixture_namespace_provider.client.namespaces.get.assert_called_once_with(
+        resource_group_name="rg",
+        namespace_name="namespace",
+    )
 
 
 def test_namespace_identity_show(fixture_namespace_provider):
@@ -749,7 +1124,33 @@ def test_namespace_identity_removal_compares_ids_case_insensitively(
     assert body == {
         "identity": {
             "type": "None",
-            "userAssignedIdentities": {UAMI_ID: None},
+        }
+    }
+
+
+def test_namespace_identity_remove_last_uami_retains_system_identity(
+    fixture_namespace_provider, mock_poller
+):
+    fixture_namespace_provider.client.namespaces.get.return_value = {
+        "identity": {
+            "type": "SystemAssigned,UserAssigned",
+            "userAssignedIdentities": {UAMI_ID: {}},
+        }
+    }
+    fixture_namespace_provider.client.namespaces.begin_update.return_value = (
+        mock_poller({"identity": {"type": "SystemAssigned"}})
+    )
+
+    fixture_namespace_provider.identity_remove(
+        "namespace", "rg", user_assigned_identities=[UAMI_ID]
+    )
+
+    body = fixture_namespace_provider.client.namespaces.begin_update.call_args.kwargs[
+        "properties"
+    ]
+    assert body == {
+        "identity": {
+            "type": "SystemAssigned",
         }
     }
 
@@ -824,6 +1225,31 @@ def test_namespace_identity_remove_rejects_system_outbound_identity(
         "identity": {"type": "SystemAssigned"},
         "properties": {"outboundIdentity": {"type": "SystemAssigned"}},
     }
+    with pytest.raises(InvalidArgumentValueError, match="outbound"):
+        fixture_namespace_provider.identity_remove(
+            "namespace", "rg", system_assigned=True
+        )
+
+
+def test_namespace_identity_remove_rejects_implicit_system_outbound_with_links(
+    fixture_namespace_provider,
+):
+    fixture_namespace_provider.client.namespaces.get.return_value = {
+        "identity": {
+            "type": "SystemAssigned",
+            "principalId": "namespace-principal",
+        },
+        "properties": {
+            "messaging": {
+                "endpoints": {
+                    "hub": {
+                        "endpointType": "Microsoft.Devices/IotHubs",
+                    }
+                }
+            }
+        },
+    }
+
     with pytest.raises(InvalidArgumentValueError, match="outbound"):
         fixture_namespace_provider.identity_remove(
             "namespace", "rg", system_assigned=True

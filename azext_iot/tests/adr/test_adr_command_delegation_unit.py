@@ -24,7 +24,6 @@ from azext_iot.adr import (
 
 RG = "test-rg"
 NS = "test-namespace"
-ENDPOINTS = '{"outbound":{"assigned":{}}}'
 
 
 @pytest.fixture()
@@ -39,6 +38,25 @@ def _patch_provider(mocker, module, attr):
 
 
 class TestNamespaceCommands:
+    def test_create_and_update_surfaces_exclude_raw_endpoint_parameters(self):
+        removed = {
+            "messaging_endpoints",
+            "provisioning_endpoints",
+            "updating_endpoints",
+        }
+
+        for command in (
+            commands_namespace.adr_namespace_create,
+            commands_namespace.adr_namespace_update,
+        ):
+            assert removed.isdisjoint(inspect.signature(command).parameters)
+        assert "observability_enabled" not in inspect.signature(
+            commands_namespace.adr_namespace_create
+        ).parameters
+        assert "observability_enabled" in inspect.signature(
+            commands_namespace.adr_namespace_update
+        ).parameters
+
     def test_create(self, mocker, cmd):
         provider = _patch_provider(mocker, commands_namespace, "NamespaceProvider")
         commands_namespace.adr_namespace_create(
@@ -47,7 +65,6 @@ class TestNamespaceCommands:
             resource_group_name=RG,
             location="westus",
             tags={"a": "b"},
-            observability_enabled=False,
             outbound_mi_system_assigned=True,
             no_wait=True,
         )
@@ -56,12 +73,8 @@ class TestNamespaceCommands:
             resource_group_name=RG,
             location="westus",
             tags={"a": "b"},
-            observability_enabled=False,
             outbound_mi_system_assigned=True,
             outbound_mi_user_assigned=None,
-            messaging_endpoints=None,
-            provisioning_endpoints=None,
-            updating_endpoints=None,
             no_wait=True,
         )
 
@@ -82,9 +95,6 @@ class TestNamespaceCommands:
             observability_enabled=True,
             outbound_mi_system_assigned=None,
             outbound_mi_user_assigned=None,
-            messaging_endpoints=None,
-            provisioning_endpoints=None,
-            updating_endpoints=None,
             no_wait=True,
         )
 
@@ -178,7 +188,7 @@ class TestGroupCommands:
 
     @pytest.mark.parametrize("operation", ["create", "update"])
     def test_rejects_identity_and_no_wait(self, cmd, operation):
-        """--mi-system-assigned and --no-wait were dropped for groups."""
+        """--system-assigned-mi and --no-wait were dropped for groups."""
         command = getattr(commands_group, f"adr_group_{operation}")
         signature = inspect.signature(command)
         assert "mi_system_assigned" not in signature.parameters
@@ -448,8 +458,10 @@ class TestReportCommands:
 
 def test_hub_update_surface_is_identity_only(mocker, cmd):
     provider = _patch_provider(mocker, commands_link, "LinkProvider")
+    namespace_client = Mock()
     commands_link.adr_link_hub_update(
         cmd,
+        namespace_client,
         endpoint_name="hub",
         namespace_name=NS,
         resource_group_name=RG,
@@ -464,6 +476,187 @@ def test_hub_update_surface_is_identity_only(mocker, cmd):
         mi_user_assigned=None,
         no_wait=True,
     )
+
+
+@pytest.mark.parametrize("kind", ["hub", "dps", "su"])
+def test_link_delete_does_not_expose_unsafe_no_wait(kind):
+    parameters = inspect.signature(
+        getattr(commands_link, f"adr_link_{kind}_delete")
+    ).parameters
+    assert "no_wait" not in parameters
+
+
+@pytest.mark.parametrize(
+    "command_name,operation_name,kwargs",
+    [
+        (
+            "adr_link_add",
+            "link_add",
+            {
+                "namespace_name": NS,
+                "resource_group_name": RG,
+                "hub_endpoint_name": "hub",
+                "hub_resource_id": "hub-id",
+                "dps_endpoint_name": "dps",
+                "dps_resource_id": "dps-id",
+            },
+        ),
+        (
+            "adr_link_hub_add",
+            "hub_add",
+            {
+                "endpoint_name": "hub",
+                "namespace_name": NS,
+                "resource_group_name": RG,
+                "hub_resource_id": "hub-id",
+            },
+        ),
+        (
+            "adr_link_hub_update",
+            "hub_update",
+            {
+                "endpoint_name": "hub",
+                "namespace_name": NS,
+                "resource_group_name": RG,
+            },
+        ),
+        (
+            "adr_link_hub_delete",
+            "hub_delete",
+            {
+                "endpoint_name": "hub",
+                "namespace_name": NS,
+                "resource_group_name": RG,
+            },
+        ),
+        (
+            "adr_link_hub_show",
+            "hub_show",
+            {
+                "endpoint_name": "hub",
+                "namespace_name": NS,
+                "resource_group_name": RG,
+            },
+        ),
+        (
+            "adr_link_hub_list",
+            "hub_list",
+            {
+                "namespace_name": NS,
+                "resource_group_name": RG,
+            },
+        ),
+        (
+            "adr_link_dps_add",
+            "dps_add",
+            {
+                "endpoint_name": "dps",
+                "namespace_name": NS,
+                "resource_group_name": RG,
+                "dps_resource_id": "dps-id",
+            },
+        ),
+        (
+            "adr_link_dps_update",
+            "dps_update",
+            {
+                "endpoint_name": "dps",
+                "namespace_name": NS,
+                "resource_group_name": RG,
+            },
+        ),
+        (
+            "adr_link_dps_delete",
+            "dps_delete",
+            {
+                "endpoint_name": "dps",
+                "namespace_name": NS,
+                "resource_group_name": RG,
+            },
+        ),
+        (
+            "adr_link_dps_show",
+            "dps_show",
+            {
+                "endpoint_name": "dps",
+                "namespace_name": NS,
+                "resource_group_name": RG,
+            },
+        ),
+        (
+            "adr_link_dps_list",
+            "dps_list",
+            {
+                "namespace_name": NS,
+                "resource_group_name": RG,
+            },
+        ),
+        (
+            "adr_link_su_add",
+            "su_add",
+            {
+                "endpoint_name": "su",
+                "namespace_name": NS,
+                "resource_group_name": RG,
+                "su_resource_id": "su-id",
+            },
+        ),
+        (
+            "adr_link_su_update",
+            "su_update",
+            {
+                "endpoint_name": "su",
+                "namespace_name": NS,
+                "resource_group_name": RG,
+            },
+        ),
+        (
+            "adr_link_su_delete",
+            "su_delete",
+            {
+                "endpoint_name": "su",
+                "namespace_name": NS,
+                "resource_group_name": RG,
+            },
+        ),
+        (
+            "adr_link_su_show",
+            "su_show",
+            {
+                "endpoint_name": "su",
+                "namespace_name": NS,
+                "resource_group_name": RG,
+            },
+        ),
+        (
+            "adr_link_su_list",
+            "su_list",
+            {
+                "namespace_name": NS,
+                "resource_group_name": RG,
+            },
+        ),
+    ],
+)
+def test_all_link_commands_use_injected_namespace_client(
+    mocker,
+    cmd,
+    command_name,
+    operation_name,
+    kwargs,
+):
+    namespace_client = Mock()
+    provider = Mock()
+    provider_type = mocker.patch.object(
+        commands_link,
+        "LinkProvider",
+        return_value=provider,
+    )
+
+    getattr(commands_link, command_name)(cmd, namespace_client, **kwargs)
+
+    provider_type.assert_called_once_with(cmd, client=namespace_client)
+    getattr(provider, operation_name).assert_called_once()
 
 
 def test_certificate_authority_command_still_delegates(mocker, cmd):
@@ -869,12 +1062,17 @@ def test_simple_command_wrappers_delegate(
 ):
     provider = _patch_provider(mocker, module, provider_name)
     command = getattr(module, command_name)
+    signature = inspect.signature(command)
+    positional = [cmd]
+    if "client" in signature.parameters:
+        positional.append(Mock())
 
-    command(cmd, **kwargs)
+    command(*positional, **kwargs)
 
-    bound = inspect.signature(command).bind(cmd, **kwargs)
+    bound = signature.bind(*positional, **kwargs)
     bound.apply_defaults()
     expected = dict(bound.arguments)
     expected.pop("cmd")
+    expected.pop("client", None)
     expected.update(expected.pop("kwargs", {}))
     getattr(provider, provider_method).assert_called_once_with(**expected)

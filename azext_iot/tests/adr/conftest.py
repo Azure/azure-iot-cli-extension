@@ -264,6 +264,7 @@ _SPECCED_OPERATION_GROUPS = (
     "groups",
     "jobs",
     "job_runs",
+    "job_runs_by_namespace",
     "registry_devices",
     "registry_device_attributes",
     "registry_device_authentication_profiles",
@@ -277,11 +278,9 @@ def _real_adr_client():
     """Instantiate the real management client once per session (no network I/O)."""
     global _REAL_ADR_CLIENT
     if _REAL_ADR_CLIENT is None:
-        from azext_iot.sdk.deviceregistry import (
-            MicrosoftDeviceRegistryManagementService,
-        )
+        from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
 
-        _REAL_ADR_CLIENT = MicrosoftDeviceRegistryManagementService(
+        _REAL_ADR_CLIENT = DeviceRegistryMgmtClient(
             credential=MagicMock(),
             subscription_id="00000000-0000-0000-0000-000000000000",
         )
@@ -369,6 +368,22 @@ def fixture_link_provider(fixture_cmd):
         mock_factory.return_value = mock_client
         provider = LinkProvider(fixture_cmd)
         provider.client = mock_client
+        provider._rbac = MagicMock()  # pylint: disable=protected-access
+        # Existing endpoint-shape tests isolate namespace mutation from the
+        # cross-RP/RBAC preflight. Dedicated preflight/RBAC tests exercise the
+        # real helpers with strictly controlled clients.
+        provider._preflight_link = MagicMock(  # pylint: disable=protected-access
+            return_value={
+                "location": "centraluseuap",
+                "sku": {"name": "S1"},
+                "properties": {
+                    "provisioningState": "Succeeded",
+                    "hostName": "hub.azure-devices.net",
+                },
+            }
+        )
+        provider._warn_if_hub_classically_linked = MagicMock()  # pylint: disable=protected-access
+        provider._wait_for_linked_resource_deleted = MagicMock()  # pylint: disable=protected-access
         return provider
 
 
@@ -472,7 +487,17 @@ class RoleAssignmentHelper:
         from azext_iot.tests.adr._log import LogKind, _log
 
         try:
-            check_cmd = f"role assignment list --assignee '{assignee_id}' --scope '{scope}' --role '{role}'"
+            if assignee_type == "auto":
+                assignee_filter = f"--assignee '{assignee_id}'"
+            else:
+                assignee_filter = (
+                    f"--assignee-object-id '{assignee_id}' "
+                    "--fill-principal-name false"
+                )
+            check_cmd = (
+                f"role assignment list {assignee_filter} --scope '{scope}' "
+                f"--role '{role}'"
+            )
             _log(LogKind.CMD, "az %s", check_cmd)
             existing = self.cmd(check_cmd).get_output_in_json()
             if existing:
@@ -484,7 +509,7 @@ class RoleAssignmentHelper:
             else:
                 create_cmd = (
                     f"role assignment create --assignee-object-id '{assignee_id}' --role '{role}' "
-                    f"--scope '{scope}' --assignee-principal-type '{assignee_type}'"
+                    f"--scope '{scope}' --assignee-principal-type {assignee_type}"
                 )
             _log(LogKind.CMD, "az %s", create_cmd)
             result = self.cmd(create_cmd).get_output_in_json()
@@ -504,4 +529,13 @@ class RoleAssignmentHelper:
     def assign_adr_roles_to_identity(self, principal_id: str, scope: str):
         """Assign ADR Contributor + Onboarding roles to a managed identity."""
         for role in ["Azure Device Registry Contributor", "Azure Device Registry Onboarding"]:
-            self.assign_role(principal_id, role, scope)
+            assignment_id = self.assign_role(
+                principal_id,
+                role,
+                scope,
+                assignee_type="ServicePrincipal",
+            )
+            if assignment_id is None:
+                raise AssertionError(
+                    f"Failed to assign required ADR role '{role}'."
+                )

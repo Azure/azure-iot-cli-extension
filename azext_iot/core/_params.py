@@ -45,7 +45,7 @@ dps_name_type = CLIArgumentType(
     help='IoT Hub Device Provisioning Service name')
 
 mi_system_assigned_type = CLIArgumentType(
-    options_list=['--mi-system-assigned'],
+    options_list=['--system-assigned-mi'],
     help='Provide this flag to use system assigned identity.')
 
 system_assigned_type = CLIArgumentType(
@@ -303,12 +303,29 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
                    type=str, help='Specify the minimum TLS version to support for this hub. Can be set to '
                                   '"1.0" or "1.2". For example, minimum TLS version set to "1.2" '
                                   'results in clients that use a TLS version below 1.2 to be rejected.')
-        c.argument('system_identity', options_list=['--mi-system-assigned'],
-                   arg_type=get_three_state_flag(),
-                   help="Enable system-assigned managed identity for this hub")
-        c.argument('user_identities', options_list=['--mi-user-assigned'],
-                   nargs='*', help="Enable user-assigned managed identities for this hub. "
-                   "Accept space-separated list of identity resource IDs.")
+        c.argument(
+            'system_identity',
+            options_list=[
+                '--system-assigned-mi',
+                c.deprecate(
+                    target='--mi-system-assigned',
+                    redirect='--system-assigned-mi',
+                    hide=True),
+            ],
+            arg_type=get_three_state_flag(),
+            help="Enable system-assigned managed identity for this hub")
+        c.argument(
+            'user_identities',
+            options_list=[
+                '--user-assigned-mi',
+                c.deprecate(
+                    target='--mi-user-assigned',
+                    redirect='--user-assigned-mi',
+                    hide=True),
+            ],
+            nargs='*',
+            help="Enable user-assigned managed identities for this hub. "
+                 "Accept space-separated list of identity resource IDs.")
         c.argument('identity_role', options_list=['--role'],
                    help="Role to assign to the hub's system-assigned managed identity.")
         c.argument('identity_scopes', options_list=['--scopes'], nargs='*',

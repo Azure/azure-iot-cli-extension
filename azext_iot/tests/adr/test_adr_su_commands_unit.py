@@ -128,8 +128,21 @@ def test_software_update_commands_delegate_all_arguments():
         commands_su.adr_su_software_update_file_show(
             cmd, "ns", RG, "p", "n", "v", "file-id"
         )
+        commands_su.adr_su_software_update_operation_status_list(
+            cmd, "ns", RG
+        )
+        commands_su.adr_su_software_update_operation_status_show(
+            cmd, "ns", RG, "operation"
+        )
+        commands_su.adr_su_software_update_provider_list(cmd, "ns", RG)
+        commands_su.adr_su_software_update_name_list(
+            cmd, "ns", RG, "p"
+        )
+        commands_su.adr_su_software_update_version_list(
+            cmd, "ns", RG, "p", "n", filter="f"
+        )
 
-        assert provider_type.call_count == 7
+        assert provider_type.call_count == 12
         provider.list_updates.assert_called_once_with(
             namespace_name="ns",
             resource_group_name=RG,
@@ -191,6 +204,31 @@ def test_software_update_commands_delegate_all_arguments():
             update_name="n",
             update_version="v",
             update_file_id="file-id",
+        )
+        provider.list_operation_statuses.assert_called_once_with(
+            namespace_name="ns",
+            resource_group_name=RG,
+        )
+        provider.show_operation_status.assert_called_once_with(
+            namespace_name="ns",
+            resource_group_name=RG,
+            operation_id="operation",
+        )
+        provider.list_providers.assert_called_once_with(
+            namespace_name="ns",
+            resource_group_name=RG,
+        )
+        provider.list_names.assert_called_once_with(
+            namespace_name="ns",
+            resource_group_name=RG,
+            update_provider="p",
+        )
+        provider.list_versions.assert_called_once_with(
+            namespace_name="ns",
+            resource_group_name=RG,
+            update_provider="p",
+            update_name="n",
+            filter="f",
         )
 
 

@@ -4,7 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import Any, Dict, List, Optional
+from copy import deepcopy
+from typing import Dict, List, Optional
 
 from azure.cli.core.azclierror import (
     AzureResponseError,
@@ -22,15 +23,29 @@ from azext_iot.adr.common import (
     build_mi_body,
     validate_uami_resource_id,
 )
-from azext_iot.adr.providers.base import ADRProvider, console, parse_json_object
+from azext_iot.adr.providers.base import ADRProvider, console
+from azext_iot.adr.topology import writable_namespace_properties
 
 logger = get_logger(__name__)
 
 
 _OUTBOUND_MI_MUTEX_MSG = (
-    "Specify only one outbound identity: --outbound-mi-system-assigned uses the namespace's "
-    "system-assigned identity, --outbound-mi-user-assigned <uami-resource-id> uses a user-assigned "
-    "managed identity (the two options are mutually exclusive)."
+    "Specify only one outbound identity: --outbound-system-assigned-mi uses the "
+    "namespace's system-assigned identity, while --outbound-user-assigned-mi "
+    "<uami-resource-id> uses a user-assigned managed identity (the two options "
+    "are mutually exclusive)."
+)
+
+_OBSERVABILITY_ENDPOINT_FIELDS = (
+    "endpointType",
+    "address",
+    "scopeId",
+    "resourceId",
+)
+_OBSERVABILITY_ENDPOINT_REQUIRED_MSG = (
+    "Namespace observability can only be enabled or disabled when the namespace "
+    "already has a complete service-configured observability endpoint. The CLI "
+    "does not accept raw observability endpoint values."
 )
 
 
@@ -43,7 +58,7 @@ def _resolve_outbound_identity(
     outbound_mi_user_assigned: Optional[str],
 ) -> Optional[dict]:
     """Return the OutboundIdentity body (or None when no flag provided)."""
-    # An empty/whitespace UAMI (e.g. `--outbound-mi-user-assigned ""`) means the caller
+    # An empty/whitespace UAMI (e.g. `--outbound-user-assigned-mi ""`) means the caller
     # did not actually supply one. Clear it first so it neither trips the SAMI/UAMI
     # mutually-exclusive check below nor reaches build_mi_body as a malformed value.
     if outbound_mi_user_assigned is not None and not outbound_mi_user_assigned.strip():
@@ -83,8 +98,10 @@ def _build_namespace_identity(
         resolved_type = ManagedServiceIdentityType.system_assigned_user_assigned.value
     elif has_system_assigned:
         resolved_type = ManagedServiceIdentityType.system_assigned.value
-    else:
+    elif user_assigned_identities:
         resolved_type = ManagedServiceIdentityType.user_assigned.value
+    else:
+        resolved_type = "None"
 
     identity = {"type": resolved_type}
     if user_assigned_identities:
@@ -94,29 +111,21 @@ def _build_namespace_identity(
     return identity
 
 
-def _build_endpoint_properties(
-    messaging_endpoints: Any = None,
-    provisioning_endpoints: Any = None,
-    updating_endpoints: Any = None,
-) -> dict:
-    properties = {}
-    endpoint_inputs = (
-        ("messaging", "--messaging-endpoints", messaging_endpoints),
-        ("provisioning", "--provisioning-endpoints", provisioning_endpoints),
-        ("updating", "--updating-endpoints", updating_endpoints),
-    )
-    for property_name, argument_name, value in endpoint_inputs:
-        if value is not None:
-            properties[property_name] = {
-                "endpoints": parse_json_object(value, argument_name)
-            }
-    return properties
-
-
 def _build_observability(
     existing_observability: Optional[dict], enabled: bool
 ) -> dict:
     observability = dict(existing_observability or {})
+    endpoints = observability.get("endpoints")
+    if (
+        not isinstance(endpoints, dict)
+        or not endpoints
+        or any(
+            not isinstance(endpoint, dict)
+            or any(not endpoint.get(field) for field in _OBSERVABILITY_ENDPOINT_FIELDS)
+            for endpoint in endpoints.values()
+        )
+    ):
+        raise InvalidArgumentValueError(_OBSERVABILITY_ENDPOINT_REQUIRED_MSG)
     observability["enabled"] = enabled
     return observability
 
@@ -182,6 +191,112 @@ class NamespaceProvider(ADRProvider):
     def __init__(self, cmd):
         super(NamespaceProvider, self).__init__(cmd)
 
+    def _preflight_outbound_identity_change(
+        self, namespace: dict, outbound_identity: Optional[dict]
+    ) -> None:
+        properties = (namespace or {}).get("properties") or {}
+        sections = {
+            "provisioning": "dps",
+            "messaging": "hub",
+            "updating": "su",
+        }
+        links = [
+            (kind, endpoint)
+            for section, kind in sections.items()
+            for endpoint in (
+                (properties.get(section) or {}).get("endpoints") or {}
+            ).values()
+            if endpoint
+        ]
+        if not links:
+            return
+
+        from azext_iot.adr.providers import link as link_provider
+
+        candidate = deepcopy(namespace)
+        candidate_properties = candidate.setdefault("properties", {})
+        candidate_properties["outboundIdentity"] = outbound_identity
+        candidate_identity = candidate.get("identity") or {}
+        outbound_type = (outbound_identity or {}).get("type")
+        if outbound_type == "UserAssigned":
+            resource_id = outbound_identity.get("userAssignedIdentity")
+            normalized_id = _normalize_resource_id(resource_id)
+            identities = candidate_identity.setdefault(
+                "userAssignedIdentities", {}
+            )
+            matching_id = next(
+                (
+                    identity_id
+                    for identity_id in identities
+                    if _normalize_resource_id(identity_id) == normalized_id
+                ),
+                None,
+            )
+            details = identities.get(matching_id) or {}
+            if not details.get("principalId"):
+                from azext_iot.common.embedded_cli import EmbeddedCLI
+
+                parsed = parse_resource_id(resource_id)
+                details = EmbeddedCLI(
+                    cli_ctx=self.cmd.cli_ctx,
+                    capture_stderr=True,
+                ).invoke(
+                    f"identity show --ids '{resource_id}'",
+                    subscription=parsed.get("subscription"),
+                ).as_json()
+            identities[matching_id or resource_id] = {
+                "principalId": details.get("principalId")
+            }
+            candidate_identity["type"] = _managed_identity_type(
+                "SystemAssigned" in str(candidate_identity.get("type") or ""),
+                identities,
+            )
+        candidate["identity"] = candidate_identity
+
+        provider = link_provider.LinkProvider(
+            self.cmd, client=self.client
+        )
+        requests = []
+        strategies = {
+            "hub": (
+                link_provider._parse_hub_resource_id,
+                link_provider._HUB_TARGET,
+            ),
+            "dps": (
+                link_provider._parse_dps_resource_id,
+                link_provider._DPS_TARGET,
+            ),
+            "su": (
+                link_provider._parse_su_resource_id,
+                link_provider._SU_TARGET,
+            ),
+        }
+        endpoint_types = {
+            "hub": "Microsoft.Devices/IotHubs",
+            "dps": "Microsoft.Devices/provisioningServices",
+            "su": "Microsoft.DeviceUpdate/updateInstances",
+        }
+        for kind, endpoint in links:
+            if (
+                str(endpoint.get("endpointType") or "").casefold()
+                != endpoint_types[kind].casefold()
+            ):
+                continue
+            resource_id = endpoint.get("resourceId")
+            parser, strategy = strategies[kind]
+            provider._preflight_link(  # pylint: disable=protected-access
+                link_type=kind,
+                namespace=candidate,
+                target_resource_id=resource_id,
+                inbound_identity=endpoint.get("inboundCallerIdentity"),
+                parsed=parser(resource_id),
+                strategy=strategy,
+                rbac_requests=requests,
+            )
+        provider._rbac_manager().ensure_many(  # pylint: disable=protected-access
+            requests
+        )
+
     def create(
         self,
         namespace_name: str,
@@ -190,40 +305,9 @@ class NamespaceProvider(ADRProvider):
         tags: Optional[Dict[str, str]] = None,
         outbound_mi_system_assigned: Optional[bool] = None,
         outbound_mi_user_assigned: Optional[str] = None,
-        messaging_endpoints: Any = None,
-        provisioning_endpoints: Any = None,
-        updating_endpoints: Any = None,
         observability_enabled: Optional[bool] = None,
         **kwargs,
     ):
-        if not location:
-            location = self._ensure_location(self.cmd.cli_ctx, resource_group_name, location)
-
-        namespace_resource = {"location": location}
-
-        if tags is not None:
-            namespace_resource["tags"] = tags
-
-        outbound_identity = _resolve_outbound_identity(
-            outbound_mi_system_assigned, outbound_mi_user_assigned
-        )
-
-        properties = _build_endpoint_properties(
-            messaging_endpoints=messaging_endpoints,
-            provisioning_endpoints=provisioning_endpoints,
-            updating_endpoints=updating_endpoints,
-        )
-        if outbound_identity is not None:
-            properties["outboundIdentity"] = outbound_identity
-        namespace_resource["identity"] = _build_namespace_identity(
-            user_assigned_identity=(
-                outbound_identity.get("userAssignedIdentity") if outbound_identity else None
-            ),
-            ensure_system_assigned=True,
-        )
-
-        # CreateOrReplace is a PUT. Preserve the complete observability configuration
-        # across an upsert, changing only enabled when the caller explicitly requests it.
         try:
             existing_namespace = self.client.namespaces.get(
                 resource_group_name=resource_group_name,
@@ -233,17 +317,77 @@ class NamespaceProvider(ADRProvider):
             if error.status_code != 404:
                 raise
             existing_namespace = None
+
+        if not location:
+            location = (existing_namespace or {}).get("location")
+        if not location:
+            location = self._ensure_location(
+                self.cmd.cli_ctx, resource_group_name, location
+            )
+
+        namespace_resource = {"location": location}
+        if tags is not None:
+            namespace_resource["tags"] = tags
+        elif existing_namespace is not None and "tags" in existing_namespace:
+            namespace_resource["tags"] = deepcopy(existing_namespace["tags"])
+
+        outbound_identity = _resolve_outbound_identity(
+            outbound_mi_system_assigned, outbound_mi_user_assigned
+        )
+
         existing_properties = (existing_namespace or {}).get("properties") or {}
+        properties = writable_namespace_properties(existing_properties)
+        if outbound_identity is not None:
+            properties["outboundIdentity"] = outbound_identity
+        elif outbound_mi_system_assigned is False:
+            properties["outboundIdentity"] = None
+
+        if existing_namespace is None:
+            # Keep the established new-resource default while avoiding an
+            # implicit SAMI change on CreateOrReplace of an existing resource.
+            namespace_resource["identity"] = _build_namespace_identity(
+                user_assigned_identity=(
+                    outbound_identity.get("userAssignedIdentity")
+                    if outbound_identity
+                    else None
+                ),
+                ensure_system_assigned=True,
+            )
+        elif outbound_identity is not None:
+            namespace_resource["identity"] = _build_namespace_identity(
+                existing_identity=existing_namespace.get("identity"),
+                user_assigned_identity=outbound_identity.get(
+                    "userAssignedIdentity"
+                ),
+                ensure_system_assigned=bool(
+                    outbound_mi_system_assigned
+                ),
+            )
+        elif "identity" in existing_namespace:
+            existing_identity = existing_namespace.get("identity")
+            namespace_resource["identity"] = (
+                _build_namespace_identity(existing_identity)
+                if existing_identity
+                else existing_identity
+            )
+
         existing_observability = existing_properties.get("observability")
         if observability_enabled is not None:
             properties["observability"] = _build_observability(
                 existing_observability, observability_enabled
             )
-        elif existing_observability is not None:
-            properties["observability"] = existing_observability
 
         if properties:
             namespace_resource["properties"] = properties
+
+        if existing_namespace is not None and (
+            outbound_identity is not None
+            or outbound_mi_system_assigned is False
+        ):
+            self._preflight_outbound_identity_change(
+                existing_namespace,
+                outbound_identity,
+            )
 
         poller = self.client.namespaces.begin_create_or_replace(
             resource_group_name=resource_group_name,
@@ -321,11 +465,20 @@ class NamespaceProvider(ADRProvider):
         summary = (error.message or str(error)).strip().splitlines()[0].strip()
         raise AzureResponseError(
             f"{summary}\nNamespace deletion does not cascade. Delete the child resources "
-            f"first, for example:\n"
+            f"and links in this safe order:\n"
+            f"  az iot adr ns job run delete --ns {namespace_name} -g <rg> "
+            f"--job-name <job> --run-name <run>\n"
+            f"  az iot adr ns job delete --ns {namespace_name} -g <rg> -n <job>\n"
             f"  az iot adr ns registry-device delete --ns {namespace_name} -g <rg> -n <device>\n"
             f"  az iot adr ns group delete --ns {namespace_name} -g <rg> -n <group>\n"
-            f"  az iot adr ns job delete --ns {namespace_name} -g <rg> -n <job>\n"
-            f"  az iot adr ns ca delete --ns {namespace_name} -g <rg> -n <ca>"
+            f"  az iot adr ns ca policy delete --ns {namespace_name} -g <rg> "
+            f"--ca-name <ca> -n <policy>\n"
+            f"  az iot adr ns ca delete --ns {namespace_name} -g <rg> -n <ca>\n"
+            f"  az iot adr ns link hub delete --ns {namespace_name} -g <rg> -n <endpoint>\n"
+            f"  az iot adr ns link dps delete --ns {namespace_name} -g <rg> -n <endpoint>\n"
+            f"  az iot adr ns link su delete --ns {namespace_name} -g <rg> -n <endpoint>\n"
+            "Warning: each link delete command permanently deletes the linked "
+            "Azure Hub, DPS, or Update Instance resource; it is not a non-destructive unlink."
         )
 
     def update(
@@ -335,9 +488,6 @@ class NamespaceProvider(ADRProvider):
         tags: Optional[Dict[str, str]] = None,
         outbound_mi_system_assigned: Optional[bool] = None,
         outbound_mi_user_assigned: Optional[str] = None,
-        messaging_endpoints: Any = None,
-        provisioning_endpoints: Any = None,
-        updating_endpoints: Any = None,
         observability_enabled: Optional[bool] = None,
         **kwargs,
     ):
@@ -346,11 +496,7 @@ class NamespaceProvider(ADRProvider):
         if tags is not None:
             body["tags"] = tags
 
-        properties = _build_endpoint_properties(
-            messaging_endpoints=messaging_endpoints,
-            provisioning_endpoints=provisioning_endpoints,
-            updating_endpoints=updating_endpoints,
-        )
+        properties = {}
         namespace = None
         if observability_enabled is not None:
             namespace = self.client.namespaces.get(
@@ -381,12 +527,23 @@ class NamespaceProvider(ADRProvider):
             )
         elif outbound_mi_system_assigned is False:
             properties["outboundIdentity"] = None
+            if namespace is None:
+                namespace = self.client.namespaces.get(
+                    resource_group_name=resource_group_name,
+                    namespace_name=namespace_name,
+                )
         if properties:
             body["properties"] = properties
         if not body:
             raise RequiredArgumentMissingError(
-                "Nothing to update. Provide --tags, --observability-enabled, endpoint "
-                "configuration, or an outbound managed identity."
+                "Nothing to update. Provide --tags, --observability-enabled, or "
+                "an outbound managed identity."
+            )
+
+        if outbound_identity is not None or outbound_mi_system_assigned is False:
+            self._preflight_outbound_identity_change(
+                namespace,
+                outbound_identity,
             )
 
         poller = self.client.namespaces.begin_update(
@@ -518,7 +675,16 @@ class NamespaceProvider(ADRProvider):
         outbound_identity = ((namespace or {}).get("properties") or {}).get(
             "outboundIdentity"
         ) or {}
-        if system_assigned and outbound_identity.get("type") == "SystemAssigned":
+        namespace_properties = (namespace or {}).get("properties") or {}
+        has_links = any(
+            ((namespace_properties.get(section) or {}).get("endpoints") or {})
+            for section in ("provisioning", "messaging", "updating")
+        )
+        outbound_type = outbound_identity.get("type")
+        if system_assigned and (
+            outbound_type == "SystemAssigned"
+            or not outbound_type and has_links
+        ):
             raise InvalidArgumentValueError(
                 "The system-assigned identity is configured as the outbound "
                 "identity. Change the outbound identity before removing it."
@@ -538,7 +704,7 @@ class NamespaceProvider(ADRProvider):
         identity = {
             "type": _managed_identity_type(has_system_assigned, remaining_ids)
         }
-        if existing_ids:
+        if remaining_ids:
             identity["userAssignedIdentities"] = {
                 **{
                     existing_ids[identity_id]: {}

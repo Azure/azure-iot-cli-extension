@@ -56,8 +56,7 @@ class TestDPSIdentityAssign(object):
 
         # Verify the DPS identity was set correctly
         if not system_assigned and not user_assigned:
-            # no identity to set
-            assert mock_dps["identity"] is None
+            assert mock_dps["identity"]["type"] == ManagedServiceIdentityType.NONE
         else:
             assert mock_dps["identity"]["type"] == expected_type
 

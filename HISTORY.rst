@@ -2,8 +2,55 @@
 
 Release History
 ===============
-0.33.0+workflow1 (Preview)
-++++++++++++++++++++++++++
+0.33.0b10 (Preview)
+++++++++++++++++++++
+
+**Cross-service SDK and endpoint alignment**
+
+* Replaced the ADR/CMS, IoT Hub, DPS management, DPS service/device, and Software Updates control/data clients with seven pinned TypeSpec-generated ``1.0.0b1`` clients. They are modeless and synchronous-only; generated ``models`` and ``aio`` packages are intentionally absent.
+* Pinned preview management to ``Microsoft.DeviceRegistry/2026-11-02-preview``, ``Microsoft.Devices/IotHubs/2026-10-01-preview``, ``Microsoft.Devices/provisioningServices/2026-06-01-preview``, and ``Microsoft.DeviceUpdate/2026-11-02-preview`` through the Central US EUAP ARM endpoint. DPS and Software Updates data-plane calls use service-derived endpoints and ``2026-11-02-preview``.
+* Resource mutations poll ``provisioningState`` and POST actions follow authenticated ``Location`` URLs. This supersedes the b9 ``Azure-AsyncOperation`` polling change because that service host is not usable.
+
+**Canonical namespace links and resource management**
+
+* Made ``az iot adr ns link hub|dps|su`` the only namespace relationship model. Hub/DPS create and update no longer accept resource-side namespace inputs; namespace create/update do not expose raw messaging, provisioning, or updating endpoint bags.
+* Added target existence, region, provisioning-state, Standard Hub SKU, ARM ID, and selected SAMI/UAMI validation; DPS-first Hub ordering, one-DPS/one-SU cardinality, endpoint collision protection, cross-subscription DPS projection, and retry-safe partial-failure handling.
+* Link add now reuses inherited role assignments and, only for an inherited Owner or User Access Administrator, creates missing assignments from one shared role matrix. Unauthorized callers receive exact remediation commands before any namespace mutation. SU link setup includes the ADU first-party application assignment and never grants caller content roles.
+* Link update now runs the same target, selected-identity, namespace-principal, and automatic-RBAC preflight as add. Newly created assignments are polled for visibility for up to 180 seconds before namespace mutation; a timeout fails safely and can be retried.
+* Added destructive ``link hub|dps|su delete`` commands. Each permanently deletes the linked Azure resource and then removes its namespace endpoint while preserving unrelated endpoint state; there is no non-destructive unlink. Namespace cleanup re-reads and validates the endpoint immediately before replacement, but the generated API has no ETag/If-Match and cannot eliminate a narrower post-read race.
+* IoT Hub uses ``2026-10-01-preview`` Standard SKUs with no GEN2 path. Ordinary Hub/DPS updates omit read-only ADR projections, partial identity updates preserve unmentioned identities, and identities selected by active links cannot be removed until the link identity is rotated.
+* DPS generic update identity removals, including ``--system-assigned-mi false`` and ``--remove identity...``, now use the same active ADR-link identity guard as ``az iot dps identity remove``.
+* Standardized managed-identity options on all participating IoT commands: ``--system-assigned-mi`` / ``--user-assigned-mi`` are canonical for Hub, DPS, individual links, and Update Instances; namespace outbound and bundled-link options use the corresponding qualified forms. Existing ``--mi-*`` spellings remain hidden compatibility aliases. Dedicated identity assign/remove commands are unchanged.
+* ADR wait commands now retain the Azure CLI standard predicates but default to command-specific success. Endpoint waits require the endpoint name and evaluate its ``linkingState``; general link wait supports qualified Hub/DPS/SU names or all links and surfaces Failed links; group and job-run waits use their actual terminal models.
+* Incrementally decomposed ``LinkProvider`` into pure endpoint serialization/topology helpers, configured target lookup/RBAC preflight, namespace persistence, and destructive-delete coordination while retaining the command-facing facade and existing semantics.
+
+**DPS enrollment and registration**
+
+* Replaced ``credentialPolicyName`` enrollment data with ``namespaceName``, ``certificateAuthorityName``, and ``certificatePolicyName``. Individual and group create/update accept ``--adr-namespace``, ``--adr-ca-name``, and canonical ``--adr-cert-policy-name`` and preserve the reference on unrelated updates; ``--adr-certificate-policy-name`` remains a compatibility alias and the older credential-policy option remains hidden/deprecated.
+* Updated ``az iot device registration create`` to ``RegisterDeviceAndIssueCertificate`` and added operation-status lookup, issued certificate-chain and ``connectionProfile`` JSON output, and ``registryDeviceExternalId`` correlation to ``az iot adr ns registry-device show``. No certificate-file option was added: the generated TypeSpec contract describes ``issuedCertificateChain`` only as an array of bytes and defines neither wire encoding nor certificate order, so a TLS-ready PEM bundle cannot be constructed safely.
+* Kept generated DPS ``device_update`` methods for agent/SDK consumers, but removed the three operator CLI commands and their handwritten wrappers: ``request-software-updates``, ``request-onboarding-updates``, and ``report-update-status``.
+* Device registration now resolves a supplied DPS name/login even with an explicit ID scope, validates mixed or incomplete authentication inputs before discovery, safely distinguishes inline PEM CSRs from file paths, and polls HTTP 202 responses with Retry-After and a bounded deadline. TPM request fields remain visible, but TPM-only client authentication is explicitly unsupported.
+
+**Software Updates, quality, and delivery**
+
+* Added ``az iot adr ns su software-update operation-status list|show`` and catalog provider/name/version discovery, completing follow-up for no-wait imports and update-ID discovery.
+* Consolidated the temporary ADR resource/Location workaround on one deadline-based waiter with a ten-minute default, case-insensitive Retry-After handling, transient-read retries, and distinct timeout versus terminal-failure diagnostics.
+* Registry Device ``show`` accepts exactly one resource name or external device ID. External-ID lookup follows every SDK page, fails on zero or multiple matches, and can be paired with the bounded ``registry-device wait`` materialization flow.
+* Registry Device attribute JSON accepts inline objects, plain file paths, and one-leading-``@`` file paths. Customer writes always serialize ``reportedBy=User``; attempts to author service-owned ``Microsoft.DeviceUpdate`` provenance through either the hidden compatibility option or ``--properties`` are rejected locally before mutation, while backend-generated attributes remain readable.
+* Expanded focused tests for Standard Hub management, link validation/RBAC/topology, DPS ``2026-11-02-preview`` enrollments and device operations, Software Updates discovery, destructive deletion, and generated-client compatibility.
+* Updated public help, release documentation, design status, and local manual E2E runners. Dedicated Hub/DPS, CA/onboarding, and SU runners delegate to one full runner; live integration/E2E remains an explicit release-operator step.
+
+0.33.0b9 (Preview)
+++++++++++++++++++++
+
+**Azure Device Registry updates**
+
+* Regenerated the synchronous and asynchronous ``2026-11-02-preview`` Device Registry SDK from the latest ``release-adr-development`` specification.
+* Updated namespace report generation and migration LROs to poll the service's ``Azure-AsyncOperation`` endpoint instead of the ``Location`` endpoint.
+* Updated the Device Registry regeneration scripts for the specification's unified resource-manager folder layout.
+
+0.33.0b8 (Preview)
+++++++++++++++++++++
 
 **General updates**
 
@@ -78,7 +125,7 @@ Release History
   - The ``az iot adr ns asset``, ``discovered-asset``, and ``discovered-device`` groups are not registered. These resources require an ``extendedLocation`` pointing at an AIO custom location; use ``az iot ops ns asset`` and ``az iot ops ns discovered-*`` from the ``azure-iot-ops`` extension instead.
   - The ``az iot adr ns device`` group is not registered. ``Microsoft.DeviceRegistry/namespaces/devices`` is an edge/connector resource owned by ``az iot ops ns device``. Use ``az iot adr ns registry-device`` for cloud-managed devices.
   - The ``az iot adr ns management-endpoint`` group and the ``--management-endpoints`` argument are not registered. ``properties.management.endpoints`` is keyed by AIO custom-location resource ID and is written by ``az iot ops mgmt-actions enable``.
-* Authentication Profile create/update/delete and Capability mutation are not available in the management API. Attributes reported by ``Microsoft.DeviceUpdate`` are service-materialized and should be treated as read-only.
+* Authentication Profile create/update/delete and Capability mutation are not available in the management API. ``Microsoft.DeviceUpdate`` attribute provenance is service-owned and may be rejected or overwritten; the product decision on customer writes remains open, so the schema-permitted value is not removed.
 * Group system-assigned identity configuration was removed. ``Microsoft.DeviceRegistry/namespaces/groups`` is a plain tracked resource in ``2026-11-02-preview`` with no identity envelope.
 * A direct ``job run create`` command is intentionally not registered. ``az iot adr ns job schedule`` remains the friendly command and creates a run through ``JobRuns_CreateOrReplace`` because no ``Jobs_Schedule`` operation exists.
 * Link-remove commands remain unregistered because no supported backing operation exists.

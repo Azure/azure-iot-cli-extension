@@ -88,7 +88,10 @@ class IotHubDiscovery(BaseDiscovery):
         # but that will be better served aligning with vNext pattern for Iot Hub
 
         include_events = kwargs.get("include_events", False)
-        rg = resource.get("resourcegroup")
+        rg = self.resolve_resource_group(
+            resource, fallback=kwargs.get("resource_group_name")
+        )
+        subscription_id = self.resolve_subscription_id(resource)
 
         props = resource.get("properties", {})
         tls_device = props.get("deviceHostName")
@@ -108,7 +111,7 @@ class IotHubDiscovery(BaseDiscovery):
         target["policy"] = policy["keyName"]
         target["primarykey"] = policy["primaryKey"]
         target["secondarykey"] = policy["secondaryKey"]
-        target["subscription"] = self.sub_id
+        target["subscription"] = subscription_id
         target["resourcegroup"] = rg
         target["location"] = resource["location"]
         target["sku_tier"] = resource["sku"]["tier"]

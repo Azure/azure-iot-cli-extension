@@ -12,7 +12,7 @@ class DeviceClassProvider(SoftwareUpdateDataProvider):
 
     def list(self, namespace_name: str, resource_group_name: str):
         endpoint = self._resolve_endpoint(namespace_name, resource_group_name)
-        return self.client.device_classes.list(endpoint=endpoint)
+        return self._client_for_endpoint(endpoint).device_classes.list()
 
     def show(
         self,
@@ -21,8 +21,7 @@ class DeviceClassProvider(SoftwareUpdateDataProvider):
         device_class_id: str,
     ):
         endpoint = self._resolve_endpoint(namespace_name, resource_group_name)
-        return self.client.device_classes.get_device_class(
-            endpoint=endpoint,
+        return self._client_for_endpoint(endpoint).device_classes.get_device_class(
             device_class_id=device_class_id,
         )
 
@@ -33,7 +32,6 @@ class DeviceClassProvider(SoftwareUpdateDataProvider):
         device_class_id: str,
     ):
         endpoint = self._resolve_endpoint(namespace_name, resource_group_name)
-        return self.client.device_classes.delete(
-            endpoint=endpoint,
+        return self._client_for_endpoint(endpoint).device_classes.delete(
             device_class_id=device_class_id,
         )

@@ -36,7 +36,7 @@ class SoftwareUpdateDataProvider(ADRProvider):
     def __init__(self, cmd):
         self.cmd = cmd
         self.registry_client = adr_service_factory(cmd.cli_ctx)
-        self.client = adr_software_update_data_service_factory(cmd.cli_ctx)
+        self.client = None
 
     def _await_terminal(self, poller, **kwargs):
         return provider_base.wait_for_terminal_state(poller, **kwargs)
@@ -102,6 +102,13 @@ class SoftwareUpdateDataProvider(ADRProvider):
         endpoint = ready_endpoints[0][1]
         service_address = str(endpoint.get("serviceAddress") or "").strip()
         return self._normalize_endpoint(service_address)
+
+    def _client_for_endpoint(self, endpoint: str):
+        """Create a data client only after resolving the linked service host."""
+        self.client = adr_software_update_data_service_factory(
+            self.cmd.cli_ctx, endpoint=endpoint
+        )
+        return self.client
 
     @staticmethod
     def _normalize_endpoint(service_address: str) -> str:
@@ -198,8 +205,7 @@ class SoftwareUpdateProvider(SoftwareUpdateDataProvider):
         filter: Optional[str] = None,
     ):
         endpoint = self._resolve_endpoint(namespace_name, resource_group_name)
-        return self.client.device_update.list_updates(
-            endpoint=endpoint,
+        return self._client_for_endpoint(endpoint).software_update.list_updates(
             search=search,
             filter=filter,
         )
@@ -213,8 +219,7 @@ class SoftwareUpdateProvider(SoftwareUpdateDataProvider):
         update_version: str,
     ):
         endpoint = self._resolve_endpoint(namespace_name, resource_group_name)
-        return self.client.device_update.get_update(
-            endpoint=endpoint,
+        return self._client_for_endpoint(endpoint).software_update.get_update(
             provider=update_provider,
             name=update_name,
             version=update_version,
@@ -230,8 +235,7 @@ class SoftwareUpdateProvider(SoftwareUpdateDataProvider):
         **kwargs,
     ):
         endpoint = self._resolve_endpoint(namespace_name, resource_group_name)
-        poller = self.client.device_update.begin_delete_update(
-            endpoint=endpoint,
+        poller = self._client_for_endpoint(endpoint).software_update.begin_delete_update(
             provider=update_provider,
             name=update_name,
             version=update_version,
@@ -308,8 +312,7 @@ class SoftwareUpdateProvider(SoftwareUpdateDataProvider):
         endpoint = endpoint or self._resolve_endpoint(
             namespace_name, resource_group_name
         )
-        poller = self.client.device_update.begin_import_update(
-            endpoint=endpoint,
+        poller = self._client_for_endpoint(endpoint).software_update.begin_import_update(
             import_update_request=request,
             logging_enable=False,
         )
@@ -376,8 +379,7 @@ class SoftwareUpdateProvider(SoftwareUpdateDataProvider):
         update_version: str,
     ):
         endpoint = self._resolve_endpoint(namespace_name, resource_group_name)
-        return self.client.device_update.list_files(
-            endpoint=endpoint,
+        return self._client_for_endpoint(endpoint).software_update.list_files(
             provider=update_provider,
             name=update_name,
             version=update_version,
@@ -393,10 +395,58 @@ class SoftwareUpdateProvider(SoftwareUpdateDataProvider):
         update_file_id: str,
     ):
         endpoint = self._resolve_endpoint(namespace_name, resource_group_name)
-        return self.client.device_update.get_file(
-            endpoint=endpoint,
+        return self._client_for_endpoint(endpoint).software_update.get_file(
             provider=update_provider,
             name=update_name,
             version=update_version,
             file_id=update_file_id,
+        )
+
+    def list_operation_statuses(
+        self, namespace_name: str, resource_group_name: str
+    ):
+        endpoint = self._resolve_endpoint(namespace_name, resource_group_name)
+        return self._client_for_endpoint(
+            endpoint
+        ).software_update.list_operation_statuses()
+
+    def show_operation_status(
+        self,
+        namespace_name: str,
+        resource_group_name: str,
+        operation_id: str,
+    ):
+        endpoint = self._resolve_endpoint(namespace_name, resource_group_name)
+        return self._client_for_endpoint(
+            endpoint
+        ).software_update.get_operation_status(operation_id=operation_id)
+
+    def list_providers(self, namespace_name: str, resource_group_name: str):
+        endpoint = self._resolve_endpoint(namespace_name, resource_group_name)
+        return self._client_for_endpoint(endpoint).software_update.list_providers()
+
+    def list_names(
+        self,
+        namespace_name: str,
+        resource_group_name: str,
+        update_provider: str,
+    ):
+        endpoint = self._resolve_endpoint(namespace_name, resource_group_name)
+        return self._client_for_endpoint(endpoint).software_update.list_names(
+            provider=update_provider
+        )
+
+    def list_versions(
+        self,
+        namespace_name: str,
+        resource_group_name: str,
+        update_provider: str,
+        update_name: str,
+        filter: Optional[str] = None,
+    ):
+        endpoint = self._resolve_endpoint(namespace_name, resource_group_name)
+        return self._client_for_endpoint(endpoint).software_update.list_versions(
+            provider=update_provider,
+            name=update_name,
+            filter=filter,
         )

@@ -5,12 +5,16 @@
 # --------------------------------------------------------------------------------------------
 
 import inspect
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
 from azure.cli.core.azclierror import (
+    AzureResponseError,
     InvalidArgumentValueError,
+    MutuallyExclusiveArgumentError,
     RequiredArgumentMissingError,
+    ResourceNotFoundError as CLIResourceNotFoundError,
 )
 
 from azext_iot.adr import commands_registry_device
@@ -110,18 +114,26 @@ def test_create_defaults_enabled_and_inherits_namespace_location(
     }
 
 
-def test_external_device_id_is_create_only(registry_device_provider):
+def test_external_device_id_is_create_only_but_can_be_used_for_lookup(
+    registry_device_provider,
+):
     provider_create = inspect.signature(registry_device_provider.create).parameters
     provider_update = inspect.signature(registry_device_provider.update).parameters
+    provider_show = inspect.signature(registry_device_provider.show).parameters
     command_create = inspect.signature(
         commands_registry_device.adr_registry_device_create
     ).parameters
     command_update = inspect.signature(
         commands_registry_device.adr_registry_device_update
     ).parameters
+    command_show = inspect.signature(
+        commands_registry_device.adr_registry_device_show
+    ).parameters
 
     assert "external_device_id" in provider_create
     assert "external_device_id" in command_create
+    assert "external_device_id" in provider_show
+    assert "external_device_id" in command_show
     assert "external_device_id" not in provider_update
     assert "external_device_id" not in command_update
 
@@ -133,6 +145,90 @@ def test_external_device_id_is_create_only(registry_device_provider):
             external_device_id="not-updateable",
         )
     registry_device_provider.client.registry_devices.begin_update.assert_not_called()
+
+
+def test_show_by_external_id_follows_paged_iterator(
+    registry_device_provider,
+):
+    expected = {
+        "name": "materialized-device",
+        "properties": {"externalDeviceId": "external-42"},
+    }
+
+    def paged_results():
+        yield {
+            "name": "first-page",
+            "properties": {"externalDeviceId": "other"},
+        }
+        yield expected
+
+    registry_device_provider.client.registry_devices.list_by_namespace.return_value = (
+        paged_results()
+    )
+
+    assert registry_device_provider.show(
+        namespace_name=NS,
+        resource_group_name=RG,
+        external_device_id="external-42",
+    ) == expected
+
+
+@pytest.mark.parametrize(
+    "kwargs,error",
+    [
+        ({}, RequiredArgumentMissingError),
+        (
+            {
+                "registry_device_name": DEVICE,
+                "external_device_id": "external-42",
+            },
+            MutuallyExclusiveArgumentError,
+        ),
+    ],
+)
+def test_show_requires_exactly_one_lookup_key(
+    registry_device_provider, kwargs, error
+):
+    with pytest.raises(error, match="exactly one"):
+        registry_device_provider.show(
+            namespace_name=NS,
+            resource_group_name=RG,
+            **kwargs,
+        )
+
+
+def test_show_by_external_id_reports_zero_and_multiple_matches(
+    registry_device_provider,
+):
+    operations = registry_device_provider.client.registry_devices
+    operations.list_by_namespace.return_value = iter([])
+    with pytest.raises(CLIResourceNotFoundError, match="materialization"):
+        registry_device_provider.show(
+            namespace_name=NS,
+            resource_group_name=RG,
+            external_device_id="external-42",
+        )
+
+    operations.list_by_namespace.return_value = iter(
+        [
+            {
+                "name": "device-b",
+                "properties": {"externalDeviceId": "external-42"},
+            },
+            {
+                "name": "device-a",
+                "properties": {"externalDeviceId": "external-42"},
+            },
+        ]
+    )
+    with pytest.raises(
+        AzureResponseError, match="device-a, device-b.*Use --name"
+    ):
+        registry_device_provider.show(
+            namespace_name=NS,
+            resource_group_name=RG,
+            external_device_id="external-42",
+        )
 
 
 def test_update_builds_exact_body_for_all_writable_fields_and_waits(
@@ -714,6 +810,26 @@ def test_command_wrappers_have_explicit_typed_parameters():
         )
 
 
+def test_show_wrapper_forwards_external_device_id():
+    cmd = Mock()
+    with patch.object(
+        commands_registry_device, "RegistryDeviceProvider"
+    ) as provider_type:
+        commands_registry_device.adr_registry_device_show(
+            cmd,
+            namespace_name=NS,
+            resource_group_name=RG,
+            external_device_id="external-42",
+        )
+
+    provider_type.return_value.show.assert_called_once_with(
+        registry_device_name=None,
+        namespace_name=NS,
+        resource_group_name=RG,
+        external_device_id="external-42",
+    )
+
+
 def test_attribute_create_defaults_to_user_reported(registry_device_provider):
     operations = registry_device_provider.client.registry_device_attributes
     operations.create_or_replace.return_value = {"name": "siteInfo"}
@@ -757,22 +873,104 @@ def test_attribute_create_merges_property_bag_and_schema(registry_device_provide
     }
 
 
-def test_attribute_create_reported_by_wins_over_property_bag(registry_device_provider):
-    """reportedBy is the discriminator; the explicit flag must not be overridden."""
-    operations = registry_device_provider.client.registry_device_attributes
+@pytest.mark.parametrize("marker", ["", "@"])
+def test_attribute_properties_accept_plain_and_at_prefixed_real_file(
+    registry_device_provider, marker
+):
+    properties_path = (
+        Path(__file__).parents[1]
+        / "iothub"
+        / "core"
+        / "test_messaging_data.json"
+    )
 
     registry_device_provider.attribute_create(
-        attribute_name="agent",
+        attribute_name="siteInfo",
         registry_device_name=DEVICE,
         namespace_name=NS,
         resource_group_name=RG,
-        reported_by=DeviceAttributeReportedType.adu.value,
-        properties='{"reportedBy": "User", "deviceClassId": "abc"}',
+        properties=f"{marker}{properties_path}",
+    )
+
+    resource = (
+        registry_device_provider.client.registry_device_attributes
+        .create_or_replace.call_args.kwargs["resource"]
+    )
+    assert resource["properties"]["customJSONProperties"][0] == {
+        "key": "customProperty1",
+        "value": "customValue1",
+    }
+    assert resource["properties"]["reportedBy"] == "User"
+
+
+def test_attribute_create_rejects_service_owned_reported_by_option(
+    registry_device_provider,
+):
+    operations = registry_device_provider.client.registry_device_attributes
+
+    with pytest.raises(InvalidArgumentValueError, match="service-owned"):
+        registry_device_provider.attribute_create(
+            attribute_name="agent",
+            registry_device_name=DEVICE,
+            namespace_name=NS,
+            resource_group_name=RG,
+            reported_by=DeviceAttributeReportedType.adu.value,
+        )
+
+    operations.create_or_replace.assert_not_called()
+
+
+def test_attribute_create_rejects_service_owned_reported_by_in_properties(
+    registry_device_provider,
+):
+    operations = registry_device_provider.client.registry_device_attributes
+
+    with pytest.raises(InvalidArgumentValueError, match="service-owned"):
+        registry_device_provider.attribute_create(
+            attribute_name="agent",
+            registry_device_name=DEVICE,
+            namespace_name=NS,
+            resource_group_name=RG,
+            properties=(
+                '{"reportedBy": "Microsoft.DeviceUpdate", '
+                '"deviceClassId": "abc"}'
+            ),
+        )
+
+    operations.create_or_replace.assert_not_called()
+
+
+def test_attribute_create_rejects_unknown_reported_by_in_properties(
+    registry_device_provider,
+):
+    operations = registry_device_provider.client.registry_device_attributes
+
+    with pytest.raises(InvalidArgumentValueError, match="must be 'User'"):
+        registry_device_provider.attribute_create(
+            attribute_name="site",
+            registry_device_name=DEVICE,
+            namespace_name=NS,
+            resource_group_name=RG,
+            properties='{"reportedBy": "Other.Service"}',
+        )
+
+    operations.create_or_replace.assert_not_called()
+
+
+def test_attribute_create_accepts_user_reported_by_in_properties(
+    registry_device_provider,
+):
+    operations = registry_device_provider.client.registry_device_attributes
+    registry_device_provider.attribute_create(
+        attribute_name="site",
+        registry_device_name=DEVICE,
+        namespace_name=NS,
+        resource_group_name=RG,
+        properties='{"reportedBy": "User", "rack": 12}',
     )
 
     resource = operations.create_or_replace.call_args.kwargs["resource"]
-    assert resource["properties"]["reportedBy"] == DeviceAttributeReportedType.adu.value
-    assert resource["properties"]["deviceClassId"] == "abc"
+    assert resource["properties"] == {"reportedBy": "User", "rack": 12}
 
 
 @pytest.mark.parametrize("reported_by", ["user", "Microsoft.DeviceRegistry", ""])
@@ -881,22 +1079,6 @@ def test_attribute_command_wrappers_delegate(fixture_cmd):
             namespace_name=NS,
             resource_group_name=RG,
         )
-
-
-def test_attribute_create_warns_when_overwriting_adu_reported(
-    registry_device_provider, caplog
-):
-    """ADU owns the materialized 'update' attribute; overwriting it must be loud."""
-    with caplog.at_level("WARNING"):
-        registry_device_provider.attribute_create(
-            attribute_name="update",
-            registry_device_name=DEVICE,
-            namespace_name=NS,
-            resource_group_name=RG,
-            reported_by=DeviceAttributeReportedType.adu.value,
-        )
-
-    assert "Azure Device Update" in caplog.text
 
 
 def test_attribute_create_does_not_warn_for_user_reported(

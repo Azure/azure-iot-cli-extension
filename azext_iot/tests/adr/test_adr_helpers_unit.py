@@ -4,17 +4,21 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import pytest
 
+from azext_iot.tests.adr import _helpers as subject
 from azext_iot.tests.adr._helpers import (
+    ADRFullInfraHelper,
     CleanupLedger,
     is_retryable_resource_error,
+    is_resource_not_found_error,
     wait_for_condition,
     wait_for_materialized_resources,
     wait_for_resource_succeeded,
 )
+from azext_iot.tests.adr.conftest import RoleAssignmentHelper
 
 
 def test_wait_for_resource_succeeded_retries_initial_not_found():
@@ -25,7 +29,7 @@ def test_wait_for_resource_succeeded_retries_initial_not_found():
     }
     test.cmd.side_effect = [RuntimeError("ResourceNotFound (404)"), response]
 
-    with patch("azext_iot.tests.adr._helpers.time.sleep") as sleep:
+    with patch.object(subject.time, "sleep") as sleep:
         result = wait_for_resource_succeeded(
             test, "show resource", max_polls=2, poll_interval=0
         )
@@ -55,7 +59,7 @@ def test_wait_for_resource_succeeded_times_out_with_last_error():
     test = Mock()
     test.cmd.side_effect = RuntimeError("ResourceNotFound: still missing")
 
-    with patch("azext_iot.tests.adr._helpers.time.sleep"), pytest.raises(
+    with patch.object(subject.time, "sleep"), pytest.raises(
         AssertionError, match="still missing"
     ):
         wait_for_resource_succeeded(
@@ -67,7 +71,7 @@ def test_wait_for_resource_succeeded_propagates_non_retryable_error():
     test = Mock()
     test.cmd.side_effect = RuntimeError("invalid command argument")
 
-    with patch("azext_iot.tests.adr._helpers.time.sleep") as sleep, pytest.raises(
+    with patch.object(subject.time, "sleep") as sleep, pytest.raises(
         RuntimeError, match="invalid command argument"
     ):
         wait_for_resource_succeeded(
@@ -99,6 +103,13 @@ def test_retryable_resource_error_uses_structured_status(status_code):
 )
 def test_retryable_resource_error_uses_symbolic_code(message):
     assert is_retryable_resource_error(RuntimeError(message))
+
+
+def test_resource_not_found_error_is_specific():
+    missing = RuntimeError("ResourceNotFound (404)")
+    forbidden = RuntimeError("403 Forbidden")
+    assert is_resource_not_found_error(missing)
+    assert not is_resource_not_found_error(forbidden)
 
 
 def test_wait_for_condition_uses_bounded_clock_and_sanitized_observation():
@@ -214,3 +225,124 @@ def test_cleanup_ledger_raises_when_only_cleanup_fails():
     with pytest.raises(AssertionError, match="resource: cleanup error"):
         with CleanupLedger() as cleanup:
             cleanup.register("resource", fail_cleanup)
+
+
+def test_full_infra_cleanup_removes_links_before_namespace_and_identity():
+    helper = ADRFullInfraHelper()
+    commands = []
+
+    def invoke(command):
+        commands.append(command)
+        if "link dps list" in command:
+            response = Mock()
+            response.get_output_in_json.return_value = [{"name": "dps-primary"}]
+            return response
+        if command.startswith("iot dps show"):
+            raise RuntimeError("ResourceNotFound (404)")
+        return Mock()
+
+    helper.cmd = Mock(side_effect=invoke)
+    helper.cleanup_full_infra(
+        resource_group="rg",
+        namespace_name="ns",
+        identity_name="identity",
+        dps_name="dps",
+        linked_endpoints=[("dps", "dps-primary")],
+    )
+
+    link_delete = next(
+        index
+        for index, command in enumerate(commands)
+        if "link dps delete" in command
+    )
+    namespace_delete = next(
+        index
+        for index, command in enumerate(commands)
+        if command.startswith("iot adr ns delete")
+    )
+    identity_delete = next(
+        index
+        for index, command in enumerate(commands)
+        if command.startswith("identity delete")
+    )
+    assert link_delete < namespace_delete < identity_delete
+    assert not any(command.startswith("iot dps delete") for command in commands)
+
+
+def test_full_infra_cleanup_reports_probe_failures():
+    helper = ADRFullInfraHelper()
+    helper.cmd = Mock(side_effect=RuntimeError("403 Forbidden"))
+
+    with pytest.raises(AssertionError, match="lookup: 403 Forbidden"):
+        helper.cleanup_full_infra(
+            resource_group="rg",
+            namespace_name="ns",
+            identity_name="identity",
+            dps_name="dps",
+            linked_endpoints=[("dps", "dps-primary")],
+        )
+
+
+def test_known_object_role_assignment_bypasses_graph_resolution():
+    helper = RoleAssignmentHelper()
+    absent = Mock()
+    absent.get_output_in_json.return_value = []
+    created = Mock()
+    created.get_output_in_json.return_value = {"id": "assignment"}
+    helper.cmd = Mock(side_effect=[absent, created])
+
+    assert helper.assign_role(
+        "principal",
+        "role",
+        "scope",
+        assignee_type="ServicePrincipal",
+    ) == "assignment"
+
+    list_command, create_command = [
+        item.args[0] for item in helper.cmd.call_args_list
+    ]
+    assert "--assignee-object-id 'principal'" in list_command
+    assert "--fill-principal-name false" in list_command
+    assert "--assignee-object-id 'principal'" in create_command
+    assert "--assignee-principal-type ServicePrincipal" in create_command
+    assert "--assignee " not in list_command
+    assert "--assignee " not in create_command
+
+
+def test_auto_role_assignment_preserves_name_based_lookup():
+    helper = RoleAssignmentHelper()
+    existing = Mock()
+    existing.get_output_in_json.return_value = [{"id": "assignment"}]
+    helper.cmd = Mock(return_value=existing)
+
+    assert helper.assign_role("assignee", "role", "scope") == "assignment"
+
+    list_command = helper.cmd.call_args.args[0]
+    assert "--assignee 'assignee'" in list_command
+    assert "--assignee-object-id" not in list_command
+
+
+def test_adr_uami_roles_use_object_id_and_fail_setup_if_missing():
+    helper = RoleAssignmentHelper()
+    helper.assign_role = Mock(side_effect=["contributor", "onboarding"])
+
+    helper.assign_adr_roles_to_identity("principal", "scope")
+
+    assert helper.assign_role.call_args_list == [
+        call(
+            "principal",
+            "Azure Device Registry Contributor",
+            "scope",
+            assignee_type="ServicePrincipal",
+        ),
+        call(
+            "principal",
+            "Azure Device Registry Onboarding",
+            "scope",
+            assignee_type="ServicePrincipal",
+        ),
+    ]
+
+    helper.assign_role = Mock(return_value=None)
+    with pytest.raises(AssertionError, match="required ADR role"):
+        helper.assign_adr_roles_to_identity("principal", "scope")

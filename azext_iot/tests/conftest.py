@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import re
+import logging
 import responses
 import pytest
 import json
@@ -68,8 +69,11 @@ mock_target["resourcegroup"] = "myresourcegroup"
 
 # Mock Iot DPS Target
 mock_dps_target = {}
-mock_dps_target["cs"] = "HostName=mydps;SharedAccessKeyName=name;SharedAccessKey=value"
-mock_dps_target["entity"] = "mydps"
+mock_dps_target["cs"] = (
+    "HostName=mydps.azure-devices-provisioning.net;"
+    "SharedAccessKeyName=name;SharedAccessKey=value"
+)
+mock_dps_target["entity"] = "mydps.azure-devices-provisioning.net"
 mock_dps_target["primarykey"] = "rJx/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo="
 mock_dps_target["secondarykey"] = "aCd/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo="
 mock_dps_target["policy"] = "provisioningserviceowner"
@@ -81,6 +85,15 @@ mock_symmetric_key_attestation = {
 }
 
 generic_cs_template = "HostName={};SharedAccessKeyName={};SharedAccessKey={}"
+
+
+@pytest.fixture(autouse=True)
+def isolate_test_logging():
+    """Prevent module-level logging suppression from leaking between tests."""
+    previous_disable_level = logging.root.manager.disable
+    logging.disable(logging.NOTSET)
+    yield
+    logging.disable(previous_disable_level)
 
 
 def generate_cs(
