@@ -2,6 +2,17 @@
 
 Release History
 ===============
+0.33.0+workflow2 (Preview)
+++++++++++++++++++++++++++
+
+**Namespace workflow redesign**
+
+* Merged the ``0.33.0b10`` ADR namespace and cross-service link implementation into the workflow branch.
+* Changed ``az iot adr ns setup`` to delegate target validation, managed-identity checks, automatic service-to-service RBAC, assignment visibility, and namespace mutation to the atomic Hub, DPS, bundled DPS/Hub, and Software Updates link providers.
+* Removed the workflow-owned role matrix, permission probes, role-assignment creation, manual RBAC flags and resume path, and fixed workflow propagation sleep. Setup plans now describe the authoritative link requirements without maintaining a second RBAC implementation.
+* Added provider-owned access validation and repair for reused links, including identity-less Hub diagnostics and a service-authorization propagation delay after newly created or raced role assignments.
+* Split live setup coverage into standalone DPS, Hub-after-DPS, and Software Updates scenarios. DPS and Hub setup complete end to end with automatic RBAC for an authorized caller.
+
 0.33.0b10 (Preview)
 ++++++++++++++++++++
 

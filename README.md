@@ -9,7 +9,7 @@ The **Azure IoT extension for Azure CLI** aims to accelerate the development, ma
 
 - ❗ When upgrading your Azure CLI core version, for the best experience and to avoid breaking changes, we recommend updating your `azure-iot` extension to the [latest available](https://github.com/Azure/azure-iot-cli-extension/releases).
 
-- 🆕 **`0.33.0b10` Preview** expands `az iot adr ns` to 114 commands: 112 atomic commands plus the `ns check` and `ns setup` workflows. It completes the cross-service ADR experience with canonical namespace links, automatic service-to-service RBAC for authorized callers, command-specific success waits, canonical managed-identity options, Registry Device external-ID lookup, and Software Updates catalog/status discovery. This remains a cloud-only surface; AIO custom-location resources stay under `az iot ops ns`. See [HISTORY.rst](HISTORY.rst) for details. Install with `az extension add --name azure-iot --allow-preview`.
+- 🆕 **`0.33.0+workflow2` Preview** expands `az iot adr ns` to 114 commands: 112 atomic commands plus the `ns check` and `ns setup` workflows. Setup delegates Hub, DPS, and Software Updates validation, automatic service-to-service RBAC, propagation, and namespace mutation to the atomic link providers. This remains a cloud-only surface; AIO custom-location resources stay under `az iot ops ns`. See [HISTORY.rst](HISTORY.rst) for details. Install with `az extension add --name azure-iot --allow-preview`.
 
 - Azure CLI `2.24.0` requires an `azure-iot` extension update to `0.10.11` or later for IoT Hub commands to work properly. However **we recommend** at least `azure-iot` `0.10.14`. Updating the extension can be done with `az extension update --name azure-iot`.
 
