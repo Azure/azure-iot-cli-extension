@@ -3,6 +3,21 @@
 Release History
 ===============
 
+0.33.0b1 (Preview)
+++++++++++++++++++
+
+**API compatibility**
+
+* Regenerated the modeless synchronous DPS management SDK for ``2026-08-31`` and Device Registry management SDK for ``2026-04-01``.
+* Preserved the ``preview`` branch's IoT Hub management ``2026-05-01-preview``, IoT Hub service data ``2024-03-31``, and DPS service data ``2025-07-01-preview`` SDKs.
+* Restricted ``az iot adr ns`` to April-compatible namespace operations, migration, simple messaging configuration, and system-assigned identity management. Unsupported certificate, policy, device, registry-device, group, job, report, linking, and new ADR Software Updates command groups are not exposed.
+* Removed DPS namespace-association options because ``deviceRegistryNamespace`` is not part of the stable DPS contract. DPS linked-hub managed-identity authentication remains supported.
+
+**Authentication and diagnostics**
+
+* Reused the hosting Azure CLI's login for Hub, DPS, ADR, and update-staging storage clients instead of spawning nested ``az account get-access-token`` processes.
+* Added consistent ADR integration command logging before execution, with sensitive arguments redacted, colored step/result markers, and delta-symbol elapsed durations.
+
 0.32.0b2 (Preview)
 ++++++++++++++++++
 

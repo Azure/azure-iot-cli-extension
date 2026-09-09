@@ -494,7 +494,7 @@ def stage_update(
     # ensuring we have credentials and a subscription.
     az_account_info = cli.invoke("account show").as_json()
     target_storage_sub = storage_account_subscription or cmd.cli_ctx.data.get("subscription_id") or az_account_info.get("id")
-    storage_manager = StorageAccountManager(subscription_id=target_storage_sub)
+    storage_manager = StorageAccountManager(cli_ctx=cmd.cli_ctx, subscription_id=target_storage_sub)
     blob_service_client = storage_manager.get_sas_blob_service_client(account_name=storage_account_name)
 
     try:
