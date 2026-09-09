@@ -4,9 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from collections.abc import Mapping
 from time import monotonic, sleep
-from typing import Any, Callable, Dict, FrozenSet, Optional
+from typing import Any, Callable, Dict, FrozenSet, Mapping, Optional
 
 from azure.cli.core.azclierror import (
     AzureResponseError,
