@@ -7,6 +7,10 @@
             "_justification": "Client device simulation requires a SAS key extracted from IoT Hub to be passed in MQTT lib."
         },
         {
+            "file": "azext_iot\\tests\\adr\\test_adr_command_log_unit.py",
+            "_justification": "Fake URL password used to verify command redaction in unit tests."
+        },
+        {
             "file": "azext_iot\\tests\\iothub\\core\\test_iothub_discovery_unit.py",
             "placeholder": "SharedAccessKey=AB+c/+5nm2XpDXcffhnGhnxz/TVF4m5ag7AuVIGwchj=",
             "_justification": "Completely made up IoT Hub policy key for unit test."
