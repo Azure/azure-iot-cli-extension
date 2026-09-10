@@ -203,6 +203,62 @@ def test_group_removal_without_replacement(service, side, kind):
     assert len(sent) == 1
 
 
+@pytest.mark.parametrize("group", [False, True])
+@pytest.mark.parametrize("action", [
+    "metadata", "reference", "replace-primary", "replace-secondary", "remove-primary", "remove-secondary",
+])
+def test_update_retains_info_only_x509_certificates_on_wire(service, mocker, group, action):
+    path = "enrollmentGroups" if group else "enrollments"
+    kind = "signingCertificates" if group else "clientCertificates"
+    certificates = {
+        "primary": {"info": {"subjectName": "CN=primary", "sha1Thumbprint": "a" * 40, "sha256Thumbprint": "b" * 64}},
+        "secondary": {"info": {"subjectName": "CN=secondary", "sha1Thumbprint": "c" * 40, "sha256Thumbprint": "d" * 64}},
+    }
+    record = {
+        "attestation": {"type": "x509", "x509": {kind: certificates}},
+        "provisioningStatus": "enabled",
+        "etag": '"original"',
+        "createdDateTimeUtc": "server-owned",
+        **REFERENCES,
+    }
+    service.get(f"https://{HOST}/{path}/test", json=record)
+    service.put(f"https://{HOST}/{path}/test", json={})
+    certificate_reader = mocker.patch.object(dps, "open_certificate", return_value="replacement-pem")
+    expected = deepcopy(certificates)
+    kwargs = {"provisioning_status": "disabled"}
+    if action == "reference":
+        kwargs["credential_policy_name"] = "replacement-policy"
+    elif action.startswith("replace-"):
+        side = action.split("-", 1)[1]
+        kwargs["certificate_path" if side == "primary" else "secondary_certificate_path"] = "replacement.pem"
+        expected[side] = {"certificate": "replacement-pem"}
+    elif action.startswith("remove-"):
+        side = action.split("-", 1)[1]
+        kwargs["remove_certificate" if side == "primary" else "remove_secondary_certificate"] = True
+        del expected[side]
+
+    updater = dps.iot_dps_device_enrollment_group_update if group else dps.iot_dps_device_enrollment_update
+    updater(None, enrollment_id="test", etag='"original"', **kwargs)
+
+    assert [call.request.method for call in service.calls] == ["GET", "PUT"]
+    request = service.calls[-1].request
+    body = json.loads(request.body)
+    assert body["attestation"]["x509"][kind] == expected
+    assert body["provisioningStatus"] == "disabled"
+    assert body["namespaceName"] == REFERENCES["namespaceName"]
+    assert body["certificateAuthorityName"] == REFERENCES["certificateAuthorityName"]
+    assert body["certificatePolicyName"] == (
+        "replacement-policy" if action == "reference" else REFERENCES["certificatePolicyName"]
+    )
+    assert {"etag", "createdDateTimeUtc"}.isdisjoint(body)
+    assert request.headers["If-Match"] == '"original"'
+    assert "api-version=2026-11-02-preview" in request.url
+    if action.startswith("replace-"):
+        certificate_reader.assert_called_once_with("replacement.pem")
+    else:
+        certificate_reader.assert_not_called()
+
+
 def test_unchanged_reference_not_resolved():
     record = deepcopy(REFERENCES)
     record.update(dps._validate_adr_certificate_reference())

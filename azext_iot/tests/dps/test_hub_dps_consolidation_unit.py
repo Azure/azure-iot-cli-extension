@@ -229,7 +229,7 @@ def test_enrollment_unknown_nested_fields_and_input_are_preserved():
     assert result["initialTwin"] == {
         "future": 1, "tags": {"value": 1}, "properties": {"future": 2, "desired": {"setting": 4}},
     }
-    assert result["attestation"]["x509"]["clientCertificates"]["primary"] == {"certificate": "pem"}
+    assert result["attestation"] == original["attestation"]
     assert "etag" not in result
     updated = dps._get_updated_inital_twin(original, initial_twin_tags='{"new": "tag"}')
     assert updated["future"] == 1

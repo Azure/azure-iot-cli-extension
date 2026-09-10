@@ -62,7 +62,7 @@ def _clean_twin_collection(collection):
 
 
 def _drop_readonly_enrollment(enrollment):
-    """Remove service-owned fields before a modeless create-or-update call."""
+    """Remove service-owned fields, retaining info-only X.509 certificate identities."""
     result = deepcopy(enrollment)
     for key in (
         "createdDateTimeUtc",
@@ -83,13 +83,6 @@ def _drop_readonly_enrollment(enrollment):
             result.get("optionalDeviceInformation")
         )
 
-    attestation = result.get("attestation") or {}
-    x509 = attestation.get("x509") or {}
-    for certificate_set_name in ("clientCertificates", "signingCertificates"):
-        certificate_set = x509.get(certificate_set_name) or {}
-        for certificate in certificate_set.values():
-            if isinstance(certificate, dict):
-                certificate.pop("info", None)
     return _drop_none(result)
 
 

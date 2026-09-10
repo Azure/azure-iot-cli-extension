@@ -107,7 +107,7 @@ def test_drop_none_and_readonly_enrollment_fields():
 
     assert {"etag", "createdDateTimeUtc", "registrationState", "optional"}.isdisjoint(result)
     assert result["attestation"]["x509"]["clientCertificates"]["primary"] == {
-        "certificate": "cert"
+        "certificate": "cert", "info": {"version": 3}
     }
     assert result["initialTwin"]["tags"] == {"site": "one"}
     assert result["initialTwin"]["properties"]["desired"] == {"interval": 5}
