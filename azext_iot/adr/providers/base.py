@@ -357,16 +357,22 @@ class ADRProvider(object):
                 clock=clock,
                 sleeper=sleeper,
             )
+        is_delete = method == "DELETE"
+        last_body = None
         if url and method in _RESOURCE_MUTATION_METHODS:
             if initial_response is not None and not self._poller_is_async(poller):
-                return self._initial_response_body(initial_response)
+                last_body = self._initial_response_body(initial_response)
+                state = ((last_body or {}).get("properties") or {}).get("provisioningState")
+                if state in _PROVISIONING_FAILURES:
+                    raise AzureResponseError(self._format_failure(state, last_body, initial_response))
+                # A headerless PUT/PATCH may still be provisioning. Only
+                # completed inline responses can bypass resource polling.
+                if state == _PROVISIONING_SUCCEEDED or state is None:
+                    return last_body
         else:
             if poller.done():
                 return poller.result()
             return wait_for_terminal_state(poller, wait_sec=wait_sec)
-
-        is_delete = method == "DELETE"
-        last_body = None
 
         def inspect_response(response):
             nonlocal last_body
@@ -376,9 +382,11 @@ class ADRProvider(object):
                     return True, None  # resource removed -> delete complete
                 return False, None  # not readable yet -> retry
             if 200 <= code < 300:
-                last_body = response.json()
-                state = (last_body.get("properties") or {}).get("provisioningState")
-                if state == _PROVISIONING_SUCCEEDED or state is None:
+                last_body = response.json() if code != 204 else None
+                state = ((last_body or {}).get("properties") or {}).get("provisioningState")
+                # A readable resource can retain its old successful state
+                # after DELETE has been accepted. Only 404 confirms removal.
+                if not is_delete and (state == _PROVISIONING_SUCCEEDED or state is None):
                     return True, last_body
                 if state in _PROVISIONING_FAILURES:
                     raise AzureResponseError(self._format_failure(state, last_body, response))

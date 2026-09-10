@@ -14,6 +14,7 @@ from time import monotonic, sleep
 from typing import Dict, Iterable, Optional, Tuple
 
 import requests
+from azure.cli.core._profile import Profile
 from azure.cli.core.azclierror import (
     AzureResponseError,
     InvalidArgumentValueError,
@@ -208,8 +209,8 @@ class LinkRbacManager:
         graph_get=None,
         propagation_timeout: int = RBAC_PROPAGATION_TIMEOUT_SECONDS,
     ):
+        self._cli_ctx = cli_ctx
         self.cli = cli or EmbeddedCLI(cli_ctx=cli_ctx, capture_stderr=True)
-        self.tenant_cli = cli or EmbeddedCLI(capture_stderr=True)
         self._graph_get = graph_get or requests.get
         self._adu_principal_ids = {}
         self._caller_object_ids = {}
@@ -221,15 +222,9 @@ class LinkRbacManager:
         self,
         command: str,
         subscription: Optional[str] = None,
-        *,
-        tenant: bool = False,
     ):
         try:
-            cli = self.tenant_cli if tenant else self.cli
-            invoke_kwargs = (
-                {} if tenant else {"subscription": subscription}
-            )
-            result = cli.invoke(command, **invoke_kwargs)
+            result = self.cli.invoke(command, subscription=subscription)
             if not result.success():
                 raise AzureResponseError(
                     f"Azure CLI command failed during link RBAC preflight: az {command}"
@@ -244,16 +239,21 @@ class LinkRbacManager:
             ) from error
 
     def _access_token(
-        self, subscription_id: str, resource_type: Optional[str] = None
+        self, subscription_id: str, resource: Optional[str] = None
     ) -> str:
-        command = (
-            "account get-access-token "
-            f"--subscription '{subscription_id}'"
-        )
-        if resource_type:
-            command += f" --resource-type '{resource_type}'"
-        command += " --query accessToken"
-        access_token = self._invoke_json(command, tenant=True)
+        # Use the same profile API as `account get-access-token`, without
+        # passing its secret output through EmbeddedCLI's debug logging.
+        # The subscription selects the tenant; None retains the ARM audience.
+        try:
+            credentials, _, _ = Profile(cli_ctx=self._cli_ctx).get_raw_token(
+                subscription=subscription_id, resource=resource
+            )
+        except Exception as error:
+            raise AzureResponseError(
+                f"Could not acquire an access token for subscription "
+                f"'{subscription_id}'."
+            ) from error
+        access_token = credentials[1]
         if not isinstance(access_token, str) or not access_token:
             raise AzureResponseError(
                 f"Could not acquire an access token for subscription "
@@ -264,7 +264,8 @@ class LinkRbacManager:
     def _resolve_adu_principal(self, subscription_id: str) -> str:
         if subscription_id not in self._adu_principal_ids:
             access_token = self._access_token(
-                subscription_id, resource_type="ms-graph"
+                subscription_id,
+                resource=self._cli_ctx.cloud.endpoints.microsoft_graph_resource_id,
             )
             try:
                 response = self._graph_get(
