@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""Exercise handwritten DPS handlers against the real, synchronous stable SDK."""
+"""Retained wire tests against the real, synchronous June DPS management SDK."""
 
 import base64
 from copy import deepcopy
@@ -62,7 +62,7 @@ def dps_resource():
 def assert_stable_requests(mocked_response):
     assert mocked_response.calls
     for call in mocked_response.calls:
-        assert parse_qs(urlsplit(call.request.url).query)["api-version"] == ["2026-08-31"]
+        assert parse_qs(urlsplit(call.request.url).query)["api-version"] == ["2026-06-01-preview"]
 
 
 @pytest.mark.parametrize(
@@ -70,7 +70,7 @@ def assert_stable_requests(mocked_response):
     [
         ({}, None),
         ({"mi_system_assigned": False}, None),
-        ({"mi_system_assigned": True}, {"type": "SystemAssigned", "userAssignedIdentities": None}),
+        ({"mi_system_assigned": True}, {"type": "SystemAssigned"}),
         ({"mi_user_assigned": [USER_ID]}, {"type": "UserAssigned", "userAssignedIdentities": {USER_ID: {}}}),
         (
             {"mi_system_assigned": True, "mi_user_assigned": [USER_ID]},
@@ -96,7 +96,7 @@ def test_create_serializes_stable_resource(
     body = json.loads(mocked_response.calls[1].request.body)
     assert body["location"] == "westus2"
     assert body["sku"] == {"name": "S1", "capacity": 1}
-    assert body["properties"] == {"enableDataResidency": None}
+    assert body["properties"] == {}
     assert body.get("identity") == expected_identity
     if not identity_args:
         assert "identity" not in body

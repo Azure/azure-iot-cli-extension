@@ -90,6 +90,9 @@ class DPSDiscovery(BaseDiscovery):
         result["subscription"] = self.sub_id
         result["cmd"] = self.cmd
         result["idscope"] = resource["properties"]["idScope"]
+        result["deviceHostName"] = resource["properties"].get(
+            "deviceProvisioningHostName"
+        )
 
         return result
 

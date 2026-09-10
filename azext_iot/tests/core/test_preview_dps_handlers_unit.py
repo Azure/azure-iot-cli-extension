@@ -118,7 +118,7 @@ def test_dps_policy_mutations(preview_mgmt, action, no_wait):
         assert policies[1]["primaryKey"] == (None if action == "update" else "p")
         assert policies[1]["secondaryKey"] == (None if action == "update" else "s")
     client.iot_dps_resource.begin_create_or_update.assert_called_once_with(
-        resource_group_name="rg", provisioning_service_name="dps", iot_dps_description=dps
+        resource_group_name="rg", provisioning_service_name="dps", iot_dps_description=custom._dps_description_for_write(dps)
     )
     if no_wait:
         assert result is client.iot_dps_resource.begin_create_or_update.return_value
@@ -171,7 +171,7 @@ def test_dps_classic_link_creation_and_namespace_warning(mocker, preview_mgmt, n
     assert all("namespace-side" in call.args[0] for call in warning.call_args_list)
     assert warning.called
     client.iot_dps_resource.begin_create_or_update.assert_called_once_with(
-        resource_group_name="rg", provisioning_service_name="dps", iot_dps_description=dps
+        resource_group_name="rg", provisioning_service_name="dps", iot_dps_description=custom._dps_description_for_write(dps)
     )
     if no_wait:
         assert result is client.iot_dps_resource.begin_create_or_update.return_value
@@ -213,7 +213,7 @@ def test_dps_link_show_and_delete(preview_mgmt, short_name, no_wait):
     result = custom.iot_dps_linked_hub_delete(cmd, client, "dps", name, no_wait=no_wait)
     assert dps["properties"]["iotHubs"] == [keep]
     client.iot_dps_resource.begin_create_or_update.assert_called_once_with(
-        resource_group_name="rg", provisioning_service_name="dps", iot_dps_description=dps
+        resource_group_name="rg", provisioning_service_name="dps", iot_dps_description=custom._dps_description_for_write(dps)
     )
     if no_wait:
         assert result is client.iot_dps_resource.begin_create_or_update.return_value

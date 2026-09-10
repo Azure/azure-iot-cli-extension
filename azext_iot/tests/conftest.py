@@ -5,10 +5,10 @@
 # --------------------------------------------------------------------------------------------
 
 import re
+import logging
 import responses
 import pytest
 import json
-import logging
 import os
 from functools import partial
 from urllib3.util.retry import Retry
@@ -69,8 +69,11 @@ mock_target["resourcegroup"] = "myresourcegroup"
 
 # Mock Iot DPS Target
 mock_dps_target = {}
-mock_dps_target["cs"] = "HostName=mydps;SharedAccessKeyName=name;SharedAccessKey=value"
-mock_dps_target["entity"] = "mydps"
+mock_dps_target["cs"] = (
+    "HostName=mydps.azure-devices-provisioning.net;"
+    "SharedAccessKeyName=name;SharedAccessKey=value"
+)
+mock_dps_target["entity"] = "mydps.azure-devices-provisioning.net"
 mock_dps_target["primarykey"] = "rJx/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo="
 mock_dps_target["secondarykey"] = "aCd/6rJ6rmG4ak890+eW5MYGH+A0uzRvjGNjg3Ve8sfo="
 mock_dps_target["policy"] = "provisioningserviceowner"

@@ -129,6 +129,7 @@ def test_command_table_loads(command_table):
         "iot dps enrollment create",
         "iot hub device-identity create",
         "iot device registration create",
+        "iot device registration operation-status",
         "iot adr ns su software-update operation-status list",
         "iot adr ns su software-update catalog provider list",
         "iot adr ns su software-update catalog name list",
@@ -304,3 +305,63 @@ def test_link_command_parser_leaves_subscription_for_current_account_default(
     )
 
     assert parsed._subscription is None  # pylint: disable=protected-access
+
+
+@pytest.fixture(scope="module")
+def hub_dps_parser():
+    from azext_iot import IoTExtCommandsLoader
+
+    cli_ctx = DummyCli(commands_loader_cls=IoTExtCommandsLoader)
+    loader = cli_ctx.commands_loader
+    loader.skip_applicability = True
+    loader.load_command_table(None)
+    names = [
+        f"iot dps {kind} {action}"
+        for kind in ("enrollment", "enrollment-group") for action in ("create", "update")
+    ] + ["iot device registration create", "iot device registration operation-status"]
+    loader.command_table = {name: loader.command_table[name] for name in names}
+    cli_ctx.raise_event(EVENT_INVOKER_PRE_LOAD_ARGUMENTS, commands_loader=loader)
+    for name in names:
+        loader.load_arguments(name)
+        AzCommandsLoader.load_arguments(loader, name)
+    parser = AzCliCommandParser(cli_ctx=cli_ctx)
+    parser.load_command_table(loader)
+    return parser
+
+
+@pytest.mark.parametrize("kind", ["enrollment", "enrollment-group"])
+@pytest.mark.parametrize("action", ["create", "update"])
+@pytest.mark.parametrize("aliases", [False, True])
+def test_enrollment_canonical_and_child_aliases_parse_once(hub_dps_parser, kind, action, aliases):
+    name = f"iot dps {kind} {action}"
+    flags = (
+        ["--namespace-name", "namespace", "--certificate-authority-name", "authority", "--certificate-policy-name", "policy"]
+        if aliases else
+        ["--adr-namespace", "namespace", "--adr-ca-name", "authority", "--adr-cert-policy-name", "policy"]
+    )
+    arguments = [*name.split(), "--enrollment-id", "test", "--dps-name", "mydps", *flags]
+    if kind == "enrollment" and action == "create":
+        arguments += ["--attestation-type", "symmetricKey"]
+    parsed = hub_dps_parser.parse_args(arguments)
+    assert (parsed.adr_namespace, parsed.adr_ca_name, parsed.adr_certificate_policy_name) == (
+        "namespace", "authority", "policy",
+    )
+    options = [
+        option for entry in hub_dps_parser.subparser_map[name]._actions  # pylint: disable=protected-access
+        for option in entry.option_strings
+    ]
+    assert len(options) == len(set(options))
+
+
+@pytest.mark.parametrize("command", ["create", "operation-status"])
+def test_rest_registration_keeps_csr_timeout_and_operation_status(hub_dps_parser, command):
+    args = ["iot", "device", "registration", command, "--registration-id", "reg", "--id-scope", "scope"]
+    if command == "create":
+        args += ["--csr-file-path", "request.pem", "--timeout", "7"]
+    else:
+        args += ["--operation-id", "op"]
+    parsed = hub_dps_parser.parse_args(args)
+    if command == "create":
+        assert parsed.csr == "request.pem" and parsed.timeout == 7
+    else:
+        assert parsed.operation_id == "op"
