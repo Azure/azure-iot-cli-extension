@@ -68,6 +68,18 @@ def load_core_arguments(self, _):
             "Accepts space-separated list of identity resource IDs.",
         )
 
+    # DPS local authentication params
+    for scope in ["iot dps create", "iot dps update"]:
+        with self.argument_context(scope) as c:
+            c.argument(
+                "disable_local_auth",
+                arg_type=get_three_state_flag(),
+                options_list=["--disable-local-auth", "--dla"],
+                help="A boolean indicating whether or not to disable SAS key (shared access policy) "
+                "authentication for this provisioning service. When disabled, only Azure RBAC is "
+                "used to authorize data plane requests.",
+            )
+
     # DPS identity assignment params
     with self.argument_context("iot dps identity assign") as c:
         c.argument(

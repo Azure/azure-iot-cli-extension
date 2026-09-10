@@ -191,6 +191,7 @@ def iot_dps_create(
     unit=1,
     tags=None,
     enable_data_residency=None,
+    disable_local_auth=None,
     mi_system_assigned=None,
     mi_user_assigned=None,
 ):
@@ -199,6 +200,9 @@ def iot_dps_create(
     _check_dps_name_availability(client.iot_dps_resource, dps_name)
     location = _ensure_location(cli_ctx, resource_group_name, location)
     dps_property = {"enableDataResidency": enable_data_residency}
+
+    if disable_local_auth is not None:
+        dps_property["disableLocalAuth"] = disable_local_auth
 
     dps_description = {
         "location": location,
@@ -221,12 +225,16 @@ def iot_dps_update(
     parameters,
     resource_group_name=None,
     tags=None,
+    disable_local_auth=None,
     mi_system_assigned=None,
     mi_user_assigned=None,
 ):
     resource_group_name = _ensure_dps_resource_group_name(client, resource_group_name, dps_name)
     if tags is not None:
         parameters["tags"] = tags
+
+    if disable_local_auth is not None:
+        parameters["properties"]["disableLocalAuth"] = disable_local_auth
 
     if mi_system_assigned is not None or mi_user_assigned:
         parameters["identity"] = _construct_identity_info(mi_system_assigned, mi_user_assigned)
