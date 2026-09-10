@@ -431,6 +431,7 @@ class TestEnrollmentGroupUpdate():
         assert "{}/enrollmentGroups/{}?".format(mock_dps_target['entity'], enrollment_id) in url
         assert request.method == 'GET'
 
+        initial_enrollment = json.loads(serviceclient.calls[0].response.content)
         request = serviceclient.calls[1].request
         url = request.url
 
@@ -446,7 +447,9 @@ class TestEnrollmentGroupUpdate():
         assert body['certificatePolicyName'] == 'device-policy'
         if not req['certificate_path']:
             if not req['root_ca_name'] and not req['secondary_root_ca_name']:
-                assert "info" not in body['attestation']['x509']['signingCertificates']['primary']
+                assert body['attestation']['x509']['signingCertificates']['primary'] == (
+                    initial_enrollment['attestation']['x509']['signingCertificates']['primary']
+                )
 
         if req['certificate_path']:
             assert body['attestation']['x509']['signingCertificates']['primary']['certificate'] is not None

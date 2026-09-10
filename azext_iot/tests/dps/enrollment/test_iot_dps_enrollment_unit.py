@@ -463,7 +463,9 @@ class TestEnrollmentUpdate():
             if req['remove_certificate_path']:
                 assert body['attestation']['x509']['clientCertificates'].get('primary') is None
             else:
-                assert "info" not in body['attestation']['x509']['clientCertificates']['primary']
+                assert body['attestation']['x509']['clientCertificates']['primary'] == (
+                    initial_enrollment['attestation']['x509']['clientCertificates']['primary']
+                )
         if req['certificate_path']:
             assert body['attestation']['x509']['clientCertificates']['primary']['certificate'] is not None
         if req['secondary_certificate_path']:
