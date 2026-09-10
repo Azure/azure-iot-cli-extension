@@ -617,15 +617,17 @@ def test_tokens_use_host_cloud_and_target_subscription(token_profile, cloud):
     graph_get.assert_called_once()
 
 
-def test_access_token_profile_failure_is_actionable(token_profile):
-    error = RuntimeError("profile unavailable")
+@pytest.mark.parametrize("error", [
+    AzureResponseError("login required"), RuntimeError("profile unavailable"),
+])
+def test_access_token_profile_failure_propagates(token_profile, error):
     token_profile.return_value.get_raw_token.side_effect = error
     manager = LinkRbacManager(MagicMock(), cli=MagicMock())
 
-    with pytest.raises(AzureResponseError, match="acquire an access token") as raised:
+    with pytest.raises(type(error)) as raised:
         manager._access_token("sub")
 
-    assert raised.value.__cause__ is error
+    assert raised.value is error
     manager.cli.invoke.assert_not_called()
 
 

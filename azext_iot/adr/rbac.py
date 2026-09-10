@@ -244,15 +244,9 @@ class LinkRbacManager:
         # Use the same profile API as `account get-access-token`, without
         # passing its secret output through EmbeddedCLI's debug logging.
         # The subscription selects the tenant; None retains the ARM audience.
-        try:
-            credentials, _, _ = Profile(cli_ctx=self._cli_ctx).get_raw_token(
-                subscription=subscription_id, resource=resource
-            )
-        except Exception as error:
-            raise AzureResponseError(
-                f"Could not acquire an access token for subscription "
-                f"'{subscription_id}'."
-            ) from error
+        credentials, _, _ = Profile(cli_ctx=self._cli_ctx).get_raw_token(
+            subscription=subscription_id, resource=resource
+        )
         access_token = credentials[1]
         if not isinstance(access_token, str) or not access_token:
             raise AzureResponseError(
