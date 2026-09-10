@@ -96,7 +96,7 @@ def test_create_serializes_stable_resource(
     body = json.loads(mocked_response.calls[1].request.body)
     assert body["location"] == "westus2"
     assert body["sku"] == {"name": "S1", "capacity": 1}
-    assert body["properties"] == {"enableDataResidency": None}
+    assert body["properties"] == {}
     assert body.get("identity") == expected_identity
     if not identity_args:
         assert "identity" not in body

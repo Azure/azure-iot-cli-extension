@@ -89,7 +89,7 @@ def test_dps_create_defaults_do_not_construct_namespace(mocker, system_assigned)
     assert kwargs["resource_group_name"] == "test-rg"
     assert kwargs["provisioning_service_name"] == "test-dps"
     description = kwargs["iot_dps_description"]
-    assert description["properties"] == {"enableDataResidency": None}
+    assert description["properties"] == {}
     assert description["location"] == "westus2"
     assert description["sku"] == {"name": "S1", "capacity": 1}
     if system_assigned is None:

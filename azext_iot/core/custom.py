@@ -199,7 +199,9 @@ def iot_dps_create(
     cli_ctx = cmd.cli_ctx
     _check_dps_name_availability(client.iot_dps_resource, dps_name)
     location = _ensure_location(cli_ctx, resource_group_name, location)
-    dps_property = {"enableDataResidency": enable_data_residency}
+    dps_property = {}
+    if enable_data_residency is not None:
+        dps_property["enableDataResidency"] = enable_data_residency
 
     if disable_local_auth is not None:
         dps_property["disableLocalAuth"] = disable_local_auth
@@ -208,8 +210,10 @@ def iot_dps_create(
         "location": location,
         "properties": dps_property,
         "sku": {"name": sku, "capacity": unit},
-        "tags": tags,
     }
+
+    if tags is not None:
+        dps_description["tags"] = tags
 
     if mi_system_assigned is not None or mi_user_assigned:
         dps_description["identity"] = _construct_identity_info(mi_system_assigned, mi_user_assigned)

@@ -63,8 +63,8 @@ class TestDPSCreate(object):
         iot_dps_create(Mock(), mock_client, dps_name, resource_group)
 
         description = _get_sent_description(mock_client)
-        assert description["properties"] == {"enableDataResidency": None}
-        assert description["tags"] is None
+        assert description["properties"] == {}
+        assert "tags" not in description
 
     @patch("azext_iot.core.custom._ensure_location")
     def test_dps_create_sends_supplied_optionals(self, mock_ensure_location):

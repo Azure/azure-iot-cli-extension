@@ -12,25 +12,39 @@ Release History
 * Preserved the ``preview`` branch's IoT Hub management ``2026-05-01-preview``, IoT Hub service data ``2024-03-31``, and DPS service data ``2025-07-01-preview`` SDKs.
 * Restricted ``az iot adr ns`` to April-compatible namespace operations, migration, simple messaging configuration, and system-assigned identity management. Unsupported certificate, policy, device, registry-device, group, job, report, linking, and new ADR Software Updates command groups are not exposed.
 * Removed DPS namespace-association options because ``deviceRegistryNamespace`` is not part of the stable DPS contract. DPS linked-hub managed-identity authentication remains supported.
+* Removed the preview Certificate Management Service (CMS) command groups.
+* Raised the minimum supported Azure CLI core version from ``2.70.0`` to ``2.73.0``.
 * Updated minimum ``azure-core`` to ``>=1.31.0`` and minimum ``azure-mgmt-core`` to ``>=1.5.0``.
 
 **IoT Hub Device Provisioning Service (DPS) updates**
 
 * Added ``--disable-local-auth`` (``--dla``) parameter to ``az iot dps create`` and ``az iot dps update`` to control whether SAS key (shared access policy) authentication is accepted by the provisioning service. When disabled, only Azure RBAC is used to authorize data plane requests.
 
-**Authentication and diagnostics**
-
-* Reused the hosting Azure CLI's login for Hub, DPS, ADR, and update-staging storage clients instead of spawning nested ``az account get-access-token`` processes.
-* Added consistent ADR integration command logging before execution, with sensitive arguments redacted, colored step/result markers, and delta-symbol elapsed durations.
-
-0.32.0b2 (Preview)
-++++++++++++++++++
-
 **DPS bug fixes**
 
 * ``az iot dps linked-hub update`` no longer fails with ``(400309) hostName is required when connectionString is not provided`` when switching a pre-existing linked hub to ``SystemAssigned`` or ``UserAssigned`` authentication.
 
 * ``az iot dps linked-hub update --authentication-type KeyBased`` no longer raises ``KeyError: 'hostName'`` when refreshing the key of, or switching back to, one of those same links.
+
+**Authentication and diagnostics**
+
+* Reused the hosting Azure CLI's login for Hub, DPS, ADR, and update-staging storage clients instead of spawning nested ``az account get-access-token`` processes.
+* Added consistent ADR integration command logging before execution, with sensitive arguments redacted, colored step/result markers, and delta-symbol elapsed durations.
+
+0.31.0
++++++++++++++++
+
+**General updates**
+
+* **[Breaking Change]** Minimum supported Azure CLI core version bumped from 2.67.0 to 2.73.0.
+
+* Updated minimum ``azure-core`` to ``>=1.31.0`` and minimum ``azure-mgmt-core`` to ``>=1.5.0``.
+
+**IoT Hub Device Provisioning Service (DPS) updates**
+
+* Added ``--disable-local-auth`` (``--dla``) parameter to ``az iot dps create`` and ``az iot dps update`` to control whether SAS key (shared access policy) authentication is accepted by the provisioning service. When disabled, only Azure RBAC is used to authorize data plane requests.
+
+* Updated the DPS control plane SDK to API version ``2026-08-31``.
 
 0.32.0b1 (Preview)
 ++++++++++++++++++
