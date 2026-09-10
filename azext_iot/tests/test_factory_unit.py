@@ -77,9 +77,7 @@ class TestFactoryCredentialScopes:
         assert call_kwargs["credential"] is mocker.sentinel.credential
         assert call_kwargs["subscription_id"] == "test-sub"
         assert call_kwargs["credential_scopes"] == cloud_config["expected_scopes"]
-        assert call_kwargs[endpoint_key] == (
-            CANARY_ARM if factory_name.startswith("adr_") else cloud_config["resource_manager"]
-        )
+        assert call_kwargs[endpoint_key] == CANARY_ARM
         assert "user_agent_policy" in call_kwargs
         assert "http_logging_policy" in call_kwargs
 
@@ -107,9 +105,7 @@ class TestFactoryCredentialScopes:
         assert kwargs["subscription_id"] == "linked-sub"
         assert kwargs["credential"] is mocker.sentinel.credential
         assert kwargs["credential_scopes"] == cloud_config["expected_scopes"]
-        assert kwargs[endpoint_key] == (
-            CANARY_ARM if factory_name.startswith("adr_") else cloud_config["resource_manager"]
-        )
+        assert kwargs[endpoint_key] == CANARY_ARM
 
 
 def test_credential_is_selected_per_context_without_global_cache(mocker, cli_profile):
@@ -226,7 +222,7 @@ def test_adr_requests_use_in_process_auth_without_spawning_cli(
 
 
 @pytest.mark.parametrize("cloud_config", CLOUD_CONFIGS, ids=[c["id"] for c in CLOUD_CONFIGS])
-def test_dps_request_uses_cloud_endpoint_and_stable_api(mocker, cli_profile, mocked_response, cloud_config):
+def test_dps_request_uses_canary_endpoint_and_preserves_api_version(mocker, cli_profile, mocked_response, cloud_config):
     from urllib.parse import parse_qs, urlsplit
     from azure.core.credentials import AccessToken
     from azext_iot._factory import iot_service_provisioning_factory
@@ -237,7 +233,7 @@ def test_dps_request_uses_cloud_endpoint_and_stable_api(mocker, cli_profile, moc
     mocked_response.add(
         method="GET",
         url=(
-            f"{cloud_config['resource_manager']}/subscriptions/test-sub-id/resourceGroups/rg"
+            f"{CANARY_ARM}/subscriptions/test-sub-id/resourceGroups/rg"
             "/providers/Microsoft.Devices/provisioningServices/test-dps"
         ),
         json={"name": "test-dps"},

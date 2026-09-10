@@ -68,10 +68,6 @@ def _get_credential_scopes(cli_ctx):
     return resource_to_scopes(cli_ctx.cloud.endpoints.active_directory_resource_id)
 
 
-def _get_arm_endpoint(cli_ctx):
-    return cli_ctx.cloud.endpoints.resource_manager
-
-
 def _iot_hub_management_client(
     cli_ctx, subscription_id, base_url, **kwargs
 ):
@@ -109,7 +105,7 @@ def iot_hub_service_factory(cli_ctx, *_, subscription_id=None):
     return _iot_hub_management_client(
         cli_ctx,
         subscription_id,
-        _get_arm_endpoint(cli_ctx),
+        _ADR_CANARY_ARM_ENDPOINT,
         api_version=_ADR_IOT_HUB_API_VERSION,
     )
 
@@ -159,7 +155,7 @@ def iot_service_provisioning_factory(cli_ctx, *_, subscription_id=None):
     return _iot_dps_management_client(
         cli_ctx,
         subscription_id,
-        _get_arm_endpoint(cli_ctx),
+        _ADR_CANARY_ARM_ENDPOINT,
         api_version=_ADR_DPS_API_VERSION,
     )
 

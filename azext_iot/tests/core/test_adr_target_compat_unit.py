@@ -45,7 +45,7 @@ def test_native_preview_management_wire_contract(
     credential.get_token.return_value = AccessToken("test-token", 4102444800)
     get_credential = mocker.patch.object(_factory, "get_cli_credential", return_value=credential)
     selected_sub = subscription or "test-sub-id"
-    endpoint = CANARY if adr else cloud["resource_manager"]
+    endpoint = CANARY
     resource_id = (
         f"/subscriptions/{selected_sub}/resourceGroups/rg/providers/"
         f"Microsoft.Devices/{resource_type}/{kind}"
