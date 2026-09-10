@@ -24,6 +24,8 @@ ROLE_PROPAGATION_DELAY = 30
 RESOURCE_POLL_INTERVAL = 10
 RESOURCE_MAX_POLLS = 30
 RESOURCE_POLL_TIMEOUT = RESOURCE_POLL_INTERVAL * RESOURCE_MAX_POLLS
+SU_PROVISIONING_MAX_POLLS = 360
+SU_PROVISIONING_POLL_INTERVAL = 10
 MATERIALIZATION_POLL_INTERVAL = 10
 MATERIALIZATION_POLL_TIMEOUT = 120
 RESOURCE_RETRYABLE_STATUS_CODES = {
@@ -441,6 +443,12 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
             if command:
                 try:
                     self.cmd(show_command)
+                except SystemExit as error:
+                    # CLI core's ARM show handler exits with 3 for a missing resource.
+                    if error.code != 3:
+                        raise
+                    _log(LogKind.RESULT, "%s show reported resource not found", label)
+                    continue
                 except Exception as error:  # noqa: BLE001 - inspect all cleanup paths
                     if is_resource_not_found_error(error):
                         _log(LogKind.RESULT, "%s already absent", label)

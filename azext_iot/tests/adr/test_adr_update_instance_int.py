@@ -9,13 +9,12 @@ import pytest
 from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import (
     CleanupLedger,
+    SU_PROVISIONING_MAX_POLLS,
+    SU_PROVISIONING_POLL_INTERVAL,
     wait_for_resource_succeeded,
 )
 from azext_iot.tests.adr.conftest import TEST_LOCATION, TEST_RG
 from azext_iot.tests.generators import generate_generic_id
-
-SU_PROVISIONING_MAX_POLLS = 360
-SU_PROVISIONING_POLL_INTERVAL = 10
 
 
 def _update_instance_name() -> str:

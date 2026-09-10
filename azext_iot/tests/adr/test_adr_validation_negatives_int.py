@@ -20,6 +20,7 @@ under integration.
 """
 
 import pytest
+from azure.cli.core.azclierror import InvalidArgumentValueError
 
 from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._log import LogKind, _log, timed_step
@@ -57,10 +58,9 @@ class TestADRValidationNegatives(ADRLiveScenarioTest):
                 expect_failure=True,
             )
         with timed_step("ns device ❯ removed alias is not registered"):
-            self.cmd(
-                f"iot adr ns device show -n mydev --ns {ns} -g {rg}",
-                expect_failure=True,
-            )
+            with pytest.raises(SystemExit) as parser_error:
+                self.cmd(f"iot adr ns device show -n mydev --ns {ns} -g {rg}")
+            assert parser_error.value.code == 2
 
         # --- Certificate authority: update requires --tags ---
         with timed_step("ca update ❯ nothing-to-update rejected"):
@@ -115,10 +115,11 @@ class TestADRValidationNegatives(ADRLiveScenarioTest):
                 expect_failure=True,
             )
         with timed_step("job run create ❯ not a command; use job schedule"):
-            self.cmd(
-                f"iot adr ns job run create --job-name myjob --ns {ns} -g {rg}",
-                expect_failure=True,
-            )
+            with pytest.raises(SystemExit) as parser_error:
+                self.cmd(
+                    f"iot adr ns job run create --job-name myjob --ns {ns} -g {rg}"
+                )
+            assert parser_error.value.code == 2
         with timed_step("job schedule ❯ invalid ISO 8601 --scheduled-time rejected"):
             self.cmd(
                 f"iot adr ns job schedule -n myjob --ns {ns} -g {rg} "
@@ -131,18 +132,17 @@ class TestADRValidationNegatives(ADRLiveScenarioTest):
                 f"--scheduled-time 2026-11-02T12:00:00",
                 expect_failure=True,
             )
-        with timed_step("job run results ❯ unsupported --order-by option rejected"):
-            self.cmd(
-                f"iot adr ns job run results --job-name myjob --run-name myrun "
-                f"--ns {ns} -g {rg} --order-by \"name asc\"",
-                expect_failure=True,
-            )
+        with timed_step("job run results ❯ unsupported --order-by field rejected"):
+            with pytest.raises(InvalidArgumentValueError, match="Supported fields: status"):
+                self.cmd(
+                    "iot adr ns job run results --job-name myjob --run-name myrun "
+                    f"--ns {ns} -g {rg} --order-by \"name asc\""
+                )
 
         # --- Group: query filter is required at create time ---
         with timed_step("group create ❯ missing --query-string rejected"):
-            self.cmd(
-                f"iot adr ns group create -n mygroup --ns {ns} -g {rg}",
-                expect_failure=True,
-            )
+            with pytest.raises(SystemExit) as parser_error:
+                self.cmd(f"iot adr ns group create -n mygroup --ns {ns} -g {rg}")
+            assert parser_error.value.code == 2
 
         _log(LogKind.OK, "All cross-surface validation negatives rejected client-side as designed")

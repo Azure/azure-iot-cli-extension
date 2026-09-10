@@ -2,7 +2,7 @@
 
 Release History
 ===============
-0.33.0b10 (Preview)
+0.33.0b11 (Preview)
 ++++++++++++++++++++
 
 **Hub/DPS child SDK and command consolidation**

@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
+from azure.core.exceptions import HttpResponseError
 
 from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import ADRFullInfraHelper
@@ -29,18 +30,11 @@ class TestADRReportServiceNegatives(
                 f"--location {TEST_LOCATION}"
             )
 
-            report_failure = self.cmd(
-                f"iot adr ns report latest --ns {namespace_name} -g {rg} "
-                "--report-type NamespaceUpdateComplianceReport",
-                expect_failure=True,
-            )
-            assert report_failure.exit_code == 3, (
-                "Report latest must reach ARM and return a service error, not fail "
-                "during client-side command processing."
-            )
-            process_error = getattr(report_failure, "process_error", None)
-            status_code = getattr(process_error, "status_code", None)
-            if status_code is not None:
-                assert status_code == 404
+            with pytest.raises(HttpResponseError) as report_failure:
+                self.cmd(
+                    f"iot adr ns report latest --ns {namespace_name} -g {rg} "
+                    "--report-type NamespaceUpdateComplianceReport"
+                )
+            assert report_failure.value.status_code == 404
         finally:
             self.cleanup_namespace(namespace_name, rg)

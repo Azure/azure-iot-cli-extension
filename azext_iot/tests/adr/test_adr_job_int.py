@@ -26,7 +26,7 @@ import datetime
 import pytest
 
 from azext_iot.tests.adr import ADRLiveScenarioTest
-from azext_iot.tests.adr._helpers import ADRFullInfraHelper
+from azext_iot.tests.adr._helpers import ADRFullInfraHelper, CleanupLedger
 from azext_iot.tests.adr._log import LogKind, _log, timed_step
 from azext_iot.tests.adr.conftest import (
     TEST_LOCATION,
@@ -254,16 +254,26 @@ class TestADRJobLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
         namespace_name = generate_adr_namespace_name()
         job_name = _generate_job_name()
 
-        try:
+        with CleanupLedger() as cleanup:
             self.cmd(
                 f"iot adr ns create -n {namespace_name} -g {rg} "
                 f"--location {TEST_LOCATION}"
+            )
+            cleanup.register(
+                "namespace",
+                lambda: self.cmd(f"iot adr ns delete -n {namespace_name} -g {rg} -y"),
             )
             self.cmd(
                 f"iot adr ns job create -n {job_name} --ns {namespace_name} -g {rg} "
                 "--type OnboardingUpdate --description 'Onboarding integration rollout' "
                 "--update-id-provider Contoso --update-id-name onboarding-fw "
                 "--update-id-version 1.0.0 --no-wait"
+            )
+            cleanup.register(
+                "job",
+                lambda: self.cmd(
+                    f"iot adr ns job delete -n {job_name} --ns {namespace_name} -g {rg} -y"
+                ),
             )
             self.cmd(
                 f"iot adr ns job wait -n {job_name} --ns {namespace_name} -g {rg} "
@@ -278,15 +288,28 @@ class TestADRJobLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
             assert "target" not in properties
             assert properties["definition"]["schedulingType"] == "Continuous"
 
-            self.cmd(
+            run = self.cmd(
                 f"iot adr ns job schedule -n {job_name} "
                 f"--ns {namespace_name} -g {rg}"
+            ).get_output_in_json()
+            delete_run = (
+                f"iot adr ns job run delete -n {run['name']} --job-name {job_name} "
+                f"--ns {namespace_name} -g {rg} -y"
             )
+            cancel_run = (
+                f"iot adr ns job run cancel -n {run['name']} --job-name {job_name} "
+                f"--ns {namespace_name} -g {rg} -y"
+            )
+            cleanup.register("run", lambda: self.cmd(delete_run))
+            cleanup.register("run cancellation", lambda: self.cmd(cancel_run))
+            self.cmd(cancel_run)
+            cleanup.dismiss("run cancellation")
+            self.cmd(delete_run)
+            cleanup.dismiss("run")
             self.cmd(
                 f"iot adr ns job delete -n {job_name} --ns {namespace_name} -g {rg} -y"
             )
-        finally:
-            self.cleanup_namespace(namespace_name, rg)
+            cleanup.dismiss("job")
 
 
 @pytest.mark.usefixtures("set_cwd")
@@ -305,14 +328,24 @@ class TestADRJobValidation(ADRFullInfraHelper, ADRLiveScenarioTest):
         group_name = _generate_group_name()
         job_name = _generate_job_name()
 
-        try:
+        with CleanupLedger() as cleanup:
             with timed_step("Setup ❯ Namespace + Group"):
                 self.cmd(
                     f"iot adr ns create -n {namespace_name} -g {rg} --location {TEST_LOCATION}"
                 )
+                cleanup.register(
+                    "namespace",
+                    lambda: self.cmd(f"iot adr ns delete -n {namespace_name} -g {rg} -y"),
+                )
                 self.cmd(
                     f"iot adr ns group create -n {group_name} --ns {namespace_name} -g {rg} "
                     f'--query-string "*"'
+                )
+                cleanup.register(
+                    "group",
+                    lambda: self.cmd(
+                        f"iot adr ns group delete -n {group_name} --ns {namespace_name} -g {rg} -y"
+                    ),
                 )
 
             with timed_step("Neg 1 ❯ job create missing --target-group-name"):
@@ -349,22 +382,30 @@ class TestADRJobValidation(ADRFullInfraHelper, ADRLiveScenarioTest):
                     f"--target-group-name {group_name} "
                     f"--update-id-provider Contoso --update-id-name fw --update-id-version 1.0.0"
                 )
+                cleanup.register(
+                    "job",
+                    lambda: self.cmd(
+                        f"iot adr ns job delete -n {job_name} --ns {namespace_name} -g {rg} -y"
+                    ),
+                )
                 # `--target-group-name` is not a valid `job update` param at the
                 # arg-parser layer; CLI core surfaces an unknown-argument error.
-                self.cmd(
-                    f"iot adr ns job update -n {job_name} --ns {namespace_name} -g {rg} "
-                    f"--target-group-name some-other-group",
-                    expect_failure=True,
-                )
+                with pytest.raises(SystemExit) as parser_error:
+                    self.cmd(
+                        f"iot adr ns job update -n {job_name} --ns {namespace_name} -g {rg} "
+                        "--target-group-name some-other-group"
+                    )
+                assert parser_error.value.code == 2
                 _log(LogKind.OK, "non-tag update field rejected")
 
             with timed_step("Neg 5 ❯ job run create is not a command"):
                 # Scheduling is exposed as `job schedule`, not `job run create`.
-                self.cmd(
-                    f"iot adr ns job run create --job-name {job_name} "
-                    f"--ns {namespace_name} -g {rg}",
-                    expect_failure=True,
-                )
+                with pytest.raises(SystemExit) as parser_error:
+                    self.cmd(
+                        f"iot adr ns job run create --job-name {job_name} "
+                        f"--ns {namespace_name} -g {rg}"
+                    )
+                assert parser_error.value.code == 2
                 _log(LogKind.OK, "job run create rejected as unknown command")
 
             with timed_step("Neg 6 ❯ job schedule with invalid ISO 8601 scheduled-time"):
@@ -383,6 +424,3 @@ class TestADRJobValidation(ADRFullInfraHelper, ADRLiveScenarioTest):
                     f"--scheduled-time 2026-11-02T12:00:00",
                     expect_failure=True,
                 )
-
-        finally:
-            self.cleanup_namespace(namespace_name, rg)

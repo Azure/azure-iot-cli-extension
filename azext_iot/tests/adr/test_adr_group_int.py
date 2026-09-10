@@ -9,7 +9,7 @@
 import pytest
 
 from azext_iot.tests.adr import ADRLiveScenarioTest
-from azext_iot.tests.adr._helpers import ADRFullInfraHelper
+from azext_iot.tests.adr._helpers import ADRFullInfraHelper, CleanupLedger
 from azext_iot.tests.adr._log import LogKind, _log, timed_step
 from azext_iot.tests.adr.conftest import (
     TEST_LOCATION,
@@ -25,6 +25,48 @@ def _generate_group_name() -> str:
 
 @pytest.mark.usefixtures("set_cwd")
 class TestADRGroupLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
+    def test_adr_group_delete_allows_immediate_name_reuse(self):
+        namespace_name = generate_adr_namespace_name()
+        group_name = _generate_group_name()
+        namespace_args = f"--ns {namespace_name} -g {TEST_RG}"
+        group_args = f"-n {group_name} {namespace_args}"
+        with CleanupLedger() as cleanup:
+            self.cmd(
+                f"iot adr ns create -n {namespace_name} -g {TEST_RG} "
+                f"--location {TEST_LOCATION}"
+            )
+            cleanup.register(
+                "namespace",
+                lambda: self.cmd(
+                    f"iot adr ns delete -n {namespace_name} -g {TEST_RG} --yes"
+                ),
+            )
+            for suffix in ("--no-wait", ""):
+                created = self.cmd(
+                    f"iot adr ns group create {group_args} "
+                    '--query-string "*" --tags lifecycle=original'
+                ).get_output_in_json()
+                cleanup.register(
+                    "group",
+                    lambda: self.cmd(f"iot adr ns group delete {group_args} --yes"),
+                )
+                self.cmd(f"iot adr ns group delete {group_args} --yes {suffix}")
+                cleanup.dismiss("group")
+                self.cmd(f"iot adr ns group wait {group_args} --deleted")
+                recreated = self.cmd(
+                    f"iot adr ns group create {group_args} "
+                    '--query-string "*" --tags lifecycle=recreated'
+                ).get_output_in_json()
+                cleanup.register(
+                    "group",
+                    lambda: self.cmd(f"iot adr ns group delete {group_args} --yes"),
+                )
+                assert recreated["id"] == created["id"]
+                assert recreated["tags"] == {"lifecycle": "recreated"}
+                self.cmd(f"iot adr ns group delete {group_args} --yes")
+                cleanup.dismiss("group")
+                self.cmd(f"iot adr ns group wait {group_args} --deleted")
+
     def test_adr_group_lifecycle(self):
         rg = TEST_RG
         namespace_name = generate_adr_namespace_name()
