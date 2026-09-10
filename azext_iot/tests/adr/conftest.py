@@ -479,9 +479,9 @@ class RoleAssignmentHelper:
     cmd: callable  # provided by CaptureOutputLiveScenarioTest via MRO
 
     def assign_role(
-        self, assignee_id: str, role: str, scope: str, assignee_type: str = "auto",
+        self, assignee_id: str, role: str, scope: str, assignee_type: Optional[str] = "auto",
     ) -> Optional[str]:
-        """Assign an Azure RBAC role, skipping if already assigned."""
+        """Assign a role; None identifies an object ID whose type ARM should resolve."""
         from azext_iot.tests.adr._log import LogKind, _log
 
         try:
@@ -507,8 +507,10 @@ class RoleAssignmentHelper:
             else:
                 create_cmd = (
                     f"role assignment create --assignee-object-id '{assignee_id}' --role '{role}' "
-                    f"--scope '{scope}' --assignee-principal-type {assignee_type}"
+                    f"--scope '{scope}'"
                 )
+                if assignee_type:
+                    create_cmd += f" --assignee-principal-type {assignee_type}"
             _log(LogKind.CMD, "az %s", create_cmd)
             result = self.cmd(create_cmd).get_output_in_json()
             _log(LogKind.RESULT, "Role '%s' assigned", role)

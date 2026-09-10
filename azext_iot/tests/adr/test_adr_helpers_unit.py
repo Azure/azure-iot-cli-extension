@@ -372,6 +372,23 @@ def test_known_object_role_assignment_bypasses_graph_resolution():
     assert "--assignee " not in create_command
 
 
+def test_existing_caller_object_role_assignment_lets_arm_resolve_principal_type():
+    helper = RoleAssignmentHelper()
+    absent = Mock()
+    absent.get_output_in_json.return_value = []
+    created = Mock()
+    created.get_output_in_json.return_value = {"id": "assignment"}
+    helper.cmd = Mock(side_effect=[absent, created])
+
+    assert helper.assign_role(
+        "caller", "Device Update Reader", "scope", assignee_type=None
+    ) == "assignment"
+    commands = [item.args[0] for item in helper.cmd.call_args_list]
+    assert all("--assignee-object-id 'caller'" in command for command in commands)
+    assert all("--assignee-principal-type" not in command for command in commands)
+    assert all("--assignee " not in command for command in commands)
+
+
 def test_auto_role_assignment_preserves_name_based_lookup():
     helper = RoleAssignmentHelper()
     existing = Mock()

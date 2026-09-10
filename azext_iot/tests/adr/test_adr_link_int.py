@@ -65,7 +65,7 @@ from azext_iot.adr.topology import (
     DPS_REQUIRED_MSG,
     SU_CAP_EXCEEDED_MSG,
 )
-from azext_iot.adr.rbac import LINK_ROLE_MATRIX
+from azext_iot.adr.rbac import LINK_ROLE_MATRIX, LinkRbacManager
 
 
 _SU_UPDATE_INSTANCE_ENV = "azext_iot_adr_update_instance_id"
@@ -857,6 +857,12 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
             parsed_su_id = parse_resource_id(su_id)
             su_name = parsed_su_id["name"]
             su_rg = parsed_su_id["resource_group"]
+            caller_id = LinkRbacManager(self.cli_ctx)._current_assignee_object_id(  # pylint: disable=protected-access
+                parsed_su_id["subscription"]
+            )
+            assert self.assign_role(
+                caller_id, "Device Update Reader", su_id, assignee_type=None
+            ) is not None, "The SU data-plane fixture requires a reader role for its caller."
             with timed_step("Setup 1/3 ❯ Resolve Update Instance SAMI and UAMI"):
                 update_instance = self.cmd(
                     f"resource show --ids {su_id}"
