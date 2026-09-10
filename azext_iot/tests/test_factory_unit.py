@@ -248,7 +248,7 @@ def test_dps_request_uses_cloud_endpoint_and_stable_api(mocker, cli_profile, moc
         result = client.iot_dps_resource.get(provisioning_service_name="test-dps", resource_group_name="rg")
 
     assert result == {"name": "test-dps"}
-    assert parse_qs(urlsplit(mocked_response.calls[0].request.url).query)["api-version"] == ["2026-08-31"]
+    assert parse_qs(urlsplit(mocked_response.calls[0].request.url).query)["api-version"] == ["2026-06-01-preview"]
     assert credential.get_token.call_args.args == tuple(cloud_config["expected_scopes"])
 
 

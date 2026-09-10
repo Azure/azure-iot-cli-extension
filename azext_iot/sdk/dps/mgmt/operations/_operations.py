@@ -8,8 +8,7 @@
 # --------------------------------------------------------------------------
 from collections.abc import MutableMapping
 import datetime
-from io import IOBase
-from typing import Any, Callable, IO, Iterator, Optional, TypeVar, Union, cast, overload
+from typing import Any, Callable, Iterator, Optional, TypeVar, Union, cast
 import urllib.parse
 
 from azure.core import MatchConditions, PipelineClient
@@ -33,11 +32,11 @@ from azure.core.utils import case_insensitive_dict
 from azure.mgmt.core.exceptions import ARMErrorFormat
 from azure.mgmt.core.polling.arm_polling import ARMPolling
 
+from .. import types, types as _types
 from .._configuration import IotDpsClientConfiguration
 from .._utils.serialization import Deserializer, Serializer
 from .._utils.utils import prep_if_match, prep_if_none_match
 
-JSON = MutableMapping[str, Any]
 T = TypeVar("T")
 ClsType = Optional[Callable[[PipelineResponse[HttpRequest, HttpResponse], T, dict[str, Any]], Any]]
 List = list
@@ -50,7 +49,7 @@ def build_operations_list_request(**kwargs: Any) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-08-31"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -78,7 +77,7 @@ def build_dps_certificate_get_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-08-31"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -113,6 +112,7 @@ def build_dps_certificate_create_or_update_request(  # pylint: disable=name-too-
     certificate_name: str,
     subscription_id: str,
     *,
+    json: _types.CertificateResponse,
     etag: Optional[str] = None,
     match_condition: Optional[MatchConditions] = None,
     **kwargs: Any
@@ -120,8 +120,8 @@ def build_dps_certificate_create_or_update_request(  # pylint: disable=name-too-
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-08-31"))
+    content_type: str = kwargs.pop("content_type")
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -139,8 +139,7 @@ def build_dps_certificate_create_or_update_request(  # pylint: disable=name-too-
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    if content_type is not None:
-        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
     if_match = prep_if_match(etag, match_condition)
     if if_match is not None:
@@ -149,7 +148,7 @@ def build_dps_certificate_create_or_update_request(  # pylint: disable=name-too-
     if if_none_match is not None:
         _headers["if-none-match"] = _SERIALIZER.header("if_none_match", if_none_match, "str")
 
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, json=json, **kwargs)
 
 
 def build_dps_certificate_delete_request(
@@ -163,7 +162,7 @@ def build_dps_certificate_delete_request(
     certificate_name1: Optional[str] = None,
     certificate_raw_bytes: Optional[bytes] = None,
     certificate_is_verified: Optional[bool] = None,
-    certificate_purpose: Optional[str] = None,
+    certificate_purpose: Optional[types.CertificatePurpose] = None,
     certificate_created: Optional[datetime.datetime] = None,
     certificate_last_updated: Optional[datetime.datetime] = None,
     certificate_has_private_key: Optional[bool] = None,
@@ -173,7 +172,7 @@ def build_dps_certificate_delete_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-08-31"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
     # Construct URL
     _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Devices/provisioningServices/{provisioningServiceName}/certificates/{certificateName}"
     path_format_arguments = {
@@ -227,7 +226,7 @@ def build_dps_certificate_list_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-08-31"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -260,7 +259,7 @@ def build_dps_certificate_generate_verification_code_request(  # pylint: disable
     certificate_name1: Optional[str] = None,
     certificate_raw_bytes: Optional[bytes] = None,
     certificate_is_verified: Optional[bool] = None,
-    certificate_purpose: Optional[str] = None,
+    certificate_purpose: Optional[types.CertificatePurpose] = None,
     certificate_created: Optional[datetime.datetime] = None,
     certificate_last_updated: Optional[datetime.datetime] = None,
     certificate_has_private_key: Optional[bool] = None,
@@ -270,7 +269,7 @@ def build_dps_certificate_generate_verification_code_request(  # pylint: disable
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-08-31"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -329,10 +328,11 @@ def build_dps_certificate_verify_certificate_request(  # pylint: disable=name-to
     *,
     etag: str,
     match_condition: MatchConditions,
+    json: _types.VerificationCodeRequest,
     certificate_name1: Optional[str] = None,
     certificate_raw_bytes: Optional[bytes] = None,
     certificate_is_verified: Optional[bool] = None,
-    certificate_purpose: Optional[str] = None,
+    certificate_purpose: Optional[types.CertificatePurpose] = None,
     certificate_created: Optional[datetime.datetime] = None,
     certificate_last_updated: Optional[datetime.datetime] = None,
     certificate_has_private_key: Optional[bool] = None,
@@ -342,8 +342,8 @@ def build_dps_certificate_verify_certificate_request(  # pylint: disable=name-to
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-08-31"))
+    content_type: str = kwargs.pop("content_type")
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -383,8 +383,7 @@ def build_dps_certificate_verify_certificate_request(  # pylint: disable=name-to
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    if content_type is not None:
-        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
     if_match = prep_if_match(etag, match_condition)
     if if_match is not None:
@@ -393,7 +392,7 @@ def build_dps_certificate_verify_certificate_request(  # pylint: disable=name-to
     if if_none_match is not None:
         _headers["if-none-match"] = _SERIALIZER.header("if_none_match", if_none_match, "str")
 
-    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, **kwargs)
+    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, json=json, **kwargs)
 
 
 def build_iot_dps_resource_get_operation_result_request(  # pylint: disable=name-too-long
@@ -408,7 +407,7 @@ def build_iot_dps_resource_get_operation_result_request(  # pylint: disable=name
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-08-31"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -438,7 +437,7 @@ def build_iot_dps_resource_get_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-08-31"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -461,13 +460,18 @@ def build_iot_dps_resource_get_request(
 
 
 def build_iot_dps_resource_create_or_update_request(  # pylint: disable=name-too-long
-    resource_group_name: str, provisioning_service_name: str, subscription_id: str, **kwargs: Any
+    resource_group_name: str,
+    provisioning_service_name: str,
+    subscription_id: str,
+    *,
+    json: _types.ProvisioningServiceDescription,
+    **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-08-31"))
+    content_type: str = kwargs.pop("content_type")
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -484,21 +488,25 @@ def build_iot_dps_resource_create_or_update_request(  # pylint: disable=name-too
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    if content_type is not None:
-        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, json=json, **kwargs)
 
 
 def build_iot_dps_resource_update_request(
-    resource_group_name: str, provisioning_service_name: str, subscription_id: str, **kwargs: Any
+    resource_group_name: str,
+    provisioning_service_name: str,
+    subscription_id: str,
+    *,
+    json: _types.TagsResource,
+    **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-08-31"))
+    content_type: str = kwargs.pop("content_type")
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -515,11 +523,10 @@ def build_iot_dps_resource_update_request(
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    if content_type is not None:
-        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, **kwargs)
+    return HttpRequest(method="PATCH", url=_url, params=_params, headers=_headers, json=json, **kwargs)
 
 
 def build_iot_dps_resource_delete_request(
@@ -527,7 +534,7 @@ def build_iot_dps_resource_delete_request(
 ) -> HttpRequest:
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-08-31"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
     # Construct URL
     _url = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Devices/provisioningServices/{provisioningServiceName}"
     path_format_arguments = {
@@ -550,7 +557,7 @@ def build_iot_dps_resource_list_by_resource_group_request(  # pylint: disable=na
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-08-31"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -577,7 +584,7 @@ def build_iot_dps_resource_list_by_subscription_request(  # pylint: disable=name
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-08-31"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -603,7 +610,7 @@ def build_iot_dps_resource_list_valid_skus_request(  # pylint: disable=name-too-
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-08-31"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -631,7 +638,7 @@ def build_iot_dps_resource_list_keys_request(
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-08-31"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -659,7 +666,7 @@ def build_iot_dps_resource_list_keys_for_key_name_request(  # pylint: disable=na
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-08-31"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -688,7 +695,7 @@ def build_iot_dps_resource_get_private_link_resources_request(  # pylint: disabl
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-08-31"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -717,7 +724,7 @@ def build_iot_dps_resource_list_private_link_resources_request(  # pylint: disab
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-08-31"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -749,7 +756,7 @@ def build_iot_dps_resource_get_private_endpoint_connection_request(  # pylint: d
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-08-31"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -779,13 +786,15 @@ def build_iot_dps_resource_create_or_update_private_endpoint_connection_request(
     resource_name: str,
     private_endpoint_connection_name: str,
     subscription_id: str,
+    *,
+    json: _types.PrivateEndpointConnection,
     **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-08-31"))
+    content_type: str = kwargs.pop("content_type")
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -805,11 +814,10 @@ def build_iot_dps_resource_create_or_update_private_endpoint_connection_request(
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    if content_type is not None:
-        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, **kwargs)
+    return HttpRequest(method="PUT", url=_url, params=_params, headers=_headers, json=json, **kwargs)
 
 
 def build_iot_dps_resource_delete_private_endpoint_connection_request(  # pylint: disable=name-too-long
@@ -822,7 +830,7 @@ def build_iot_dps_resource_delete_private_endpoint_connection_request(  # pylint
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-08-31"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -853,7 +861,7 @@ def build_iot_dps_resource_list_private_endpoint_connections_request(  # pylint:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-08-31"))
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -876,13 +884,13 @@ def build_iot_dps_resource_list_private_endpoint_connections_request(  # pylint:
 
 
 def build_iot_dps_resource_check_provisioning_service_name_availability_request(  # pylint: disable=name-too-long
-    subscription_id: str, **kwargs: Any
+    subscription_id: str, *, json: _types.OperationInputs, **kwargs: Any
 ) -> HttpRequest:
     _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
     _params = case_insensitive_dict(kwargs.pop("params", {}) or {})
 
-    content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-08-31"))
+    content_type: str = kwargs.pop("content_type")
+    api_version: str = kwargs.pop("api_version", _params.pop("api-version", "2026-06-01-preview"))
     accept = _headers.pop("Accept", "application/json")
 
     # Construct URL
@@ -897,11 +905,10 @@ def build_iot_dps_resource_check_provisioning_service_name_availability_request(
     _params["api-version"] = _SERIALIZER.query("api_version", api_version, "str")
 
     # Construct headers
-    if content_type is not None:
-        _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
+    _headers["Content-Type"] = _SERIALIZER.header("content_type", content_type, "str")
     _headers["Accept"] = _SERIALIZER.header("accept", accept, "str")
 
-    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, **kwargs)
+    return HttpRequest(method="POST", url=_url, params=_params, headers=_headers, json=json, **kwargs)
 
 
 class Operations:  # pylint: disable=docstring-missing-param
@@ -922,11 +929,11 @@ class Operations:  # pylint: disable=docstring-missing-param
         self._deserialize: Deserializer = input_args.pop(0) if input_args else kwargs.pop("deserializer")
 
     @distributed_trace
-    def list(self, **kwargs: Any) -> ItemPaged[JSON]:
+    def list(self, **kwargs: Any) -> ItemPaged["_types.Operation"]:
         """List the operations for the provider.
 
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.paging.ItemPaged[JSON]
+        :return: An iterator like instance of Operation
+        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.dps.mgmt.types.Operation]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -945,7 +952,7 @@ class Operations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
+        cls: ClsType[List[_types.Operation]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -1013,7 +1020,11 @@ class Operations:  # pylint: disable=docstring-missing-param
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+                error = self._deserialize.failsafe_deserialize(
+                    _types.ErrorDetails,
+                    pipeline_response,
+                )
+                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -1047,7 +1058,7 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
         etag: Optional[str] = None,
         match_condition: Optional[MatchConditions] = None,
         **kwargs: Any
-    ) -> JSON:
+    ) -> _types.CertificateResponse:
         """Get the certificate from the provisioning service.
 
         :param certificate_name: Name of the certificate to retrieve. Required.
@@ -1062,8 +1073,8 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
         :paramtype etag: str
         :keyword match_condition: The match condition to use upon the etag. Default value is None.
         :paramtype match_condition: ~azure.core.MatchConditions
-        :return: JSON object
-        :rtype: JSON
+        :return: CertificateResponse
+        :rtype: ~azext_iot.sdk.dps.mgmt.types.CertificateResponse
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -1111,7 +1122,7 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_types.CertificateResponse] = kwargs.pop("cls", None)
 
         _request = build_dps_certificate_get_request(
             certificate_name=certificate_name,
@@ -1144,7 +1155,11 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(
+                _types.ErrorDetails,
+                pipeline_response,
+            )
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -1155,164 +1170,9 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
-
-    @overload
-    def create_or_update(
-        self,
-        resource_group_name: str,
-        provisioning_service_name: str,
-        certificate_name: str,
-        certificate_description: JSON,
-        *,
-        content_type: str = "application/json",
-        etag: Optional[str] = None,
-        match_condition: Optional[MatchConditions] = None,
-        **kwargs: Any
-    ) -> JSON:
-        """Add new certificate or update an existing certificate.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param provisioning_service_name: Name of the provisioning service to retrieve. Required.
-        :type provisioning_service_name: str
-        :param certificate_name: Name of the certificate to retrieve. Required.
-        :type certificate_name: str
-        :param certificate_description: The certificate body. Required.
-        :type certificate_description: JSON
-        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :keyword etag: check if resource is changed. Set None to skip checking etag. Default value is
-         None.
-        :paramtype etag: str
-        :keyword match_condition: The match condition to use upon the etag. Default value is None.
-        :paramtype match_condition: ~azure.core.MatchConditions
-        :return: JSON object
-        :rtype: JSON
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                certificate_description = {
-                    "etag": "str",
-                    "id": "str",
-                    "name": "str",
-                    "properties": {
-                        "certificate": bytes("bytes", encoding="utf-8"),
-                        "created": "2020-02-20 00:00:00",
-                        "expiry": "2020-02-20 00:00:00",
-                        "isVerified": bool,
-                        "subject": "str",
-                        "thumbprint": "str",
-                        "updated": "2020-02-20 00:00:00"
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",
-                        "createdBy": "str",
-                        "createdByType": "str",
-                        "lastModifiedAt": "2020-02-20 00:00:00",
-                        "lastModifiedBy": "str",
-                        "lastModifiedByType": "str"
-                    },
-                    "type": "str"
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "etag": "str",
-                    "id": "str",
-                    "name": "str",
-                    "properties": {
-                        "certificate": bytes("bytes", encoding="utf-8"),
-                        "created": "2020-02-20 00:00:00",
-                        "expiry": "2020-02-20 00:00:00",
-                        "isVerified": bool,
-                        "subject": "str",
-                        "thumbprint": "str",
-                        "updated": "2020-02-20 00:00:00"
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",
-                        "createdBy": "str",
-                        "createdByType": "str",
-                        "lastModifiedAt": "2020-02-20 00:00:00",
-                        "lastModifiedBy": "str",
-                        "lastModifiedByType": "str"
-                    },
-                    "type": "str"
-                }
-        """
-
-    @overload
-    def create_or_update(
-        self,
-        resource_group_name: str,
-        provisioning_service_name: str,
-        certificate_name: str,
-        certificate_description: IO[bytes],
-        *,
-        content_type: str = "application/json",
-        etag: Optional[str] = None,
-        match_condition: Optional[MatchConditions] = None,
-        **kwargs: Any
-    ) -> JSON:
-        """Add new certificate or update an existing certificate.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param provisioning_service_name: Name of the provisioning service to retrieve. Required.
-        :type provisioning_service_name: str
-        :param certificate_name: Name of the certificate to retrieve. Required.
-        :type certificate_name: str
-        :param certificate_description: The certificate body. Required.
-        :type certificate_description: IO[bytes]
-        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :keyword etag: check if resource is changed. Set None to skip checking etag. Default value is
-         None.
-        :paramtype etag: str
-        :keyword match_condition: The match condition to use upon the etag. Default value is None.
-        :paramtype match_condition: ~azure.core.MatchConditions
-        :return: JSON object
-        :rtype: JSON
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "etag": "str",
-                    "id": "str",
-                    "name": "str",
-                    "properties": {
-                        "certificate": bytes("bytes", encoding="utf-8"),
-                        "created": "2020-02-20 00:00:00",
-                        "expiry": "2020-02-20 00:00:00",
-                        "isVerified": bool,
-                        "subject": "str",
-                        "thumbprint": "str",
-                        "updated": "2020-02-20 00:00:00"
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",
-                        "createdBy": "str",
-                        "createdByType": "str",
-                        "lastModifiedAt": "2020-02-20 00:00:00",
-                        "lastModifiedBy": "str",
-                        "lastModifiedByType": "str"
-                    },
-                    "type": "str"
-                }
-        """
+        return deserialized  # type: ignore
 
     @distributed_trace
     def create_or_update(
@@ -1320,12 +1180,12 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
         resource_group_name: str,
         provisioning_service_name: str,
         certificate_name: str,
-        certificate_description: Union[JSON, IO[bytes]],
+        certificate_description: _types.CertificateResponse,
         *,
         etag: Optional[str] = None,
         match_condition: Optional[MatchConditions] = None,
         **kwargs: Any
-    ) -> JSON:
+    ) -> _types.CertificateResponse:
         """Add new certificate or update an existing certificate.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -1335,16 +1195,15 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
         :type provisioning_service_name: str
         :param certificate_name: Name of the certificate to retrieve. Required.
         :type certificate_name: str
-        :param certificate_description: The certificate body. Is either a JSON type or a IO[bytes]
-         type. Required.
-        :type certificate_description: JSON or IO[bytes]
+        :param certificate_description: The certificate body. Required.
+        :type certificate_description: ~azext_iot.sdk.dps.mgmt.types.CertificateResponse
         :keyword etag: check if resource is changed. Set None to skip checking etag. Default value is
          None.
         :paramtype etag: str
         :keyword match_condition: The match condition to use upon the etag. Default value is None.
         :paramtype match_condition: ~azure.core.MatchConditions
-        :return: JSON object
-        :rtype: JSON
+        :return: CertificateResponse
+        :rtype: ~azext_iot.sdk.dps.mgmt.types.CertificateResponse
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -1417,16 +1276,10 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        cls: ClsType[_types.CertificateResponse] = kwargs.pop("cls", None)
 
-        content_type = content_type or "application/json"
-        _json = None
-        _content = None
-        if isinstance(certificate_description, (IOBase, bytes)):
-            _content = certificate_description
-        else:
-            _json = certificate_description
+        _json = certificate_description
 
         _request = build_dps_certificate_create_or_update_request(
             resource_group_name=resource_group_name,
@@ -1438,7 +1291,6 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
-            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -1462,7 +1314,11 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(
+                _types.ErrorDetails,
+                pipeline_response,
+            )
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -1473,9 +1329,9 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @distributed_trace
     def delete(  # pylint: disable=inconsistent-return-statements,too-many-locals
@@ -1489,7 +1345,7 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
         certificate_name1: Optional[str] = None,
         certificate_raw_bytes: Optional[bytes] = None,
         certificate_is_verified: Optional[bool] = None,
-        certificate_purpose: Optional[str] = None,
+        certificate_purpose: Optional[types.CertificatePurpose] = None,
         certificate_created: Optional[datetime.datetime] = None,
         certificate_last_updated: Optional[datetime.datetime] = None,
         certificate_has_private_key: Optional[bool] = None,
@@ -1519,7 +1375,7 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
         :paramtype certificate_is_verified: bool
         :keyword certificate_purpose: A description that mentions the purpose of the certificate. Known
          values are: "clientAuthentication" and "serverAuthentication". Default value is None.
-        :paramtype certificate_purpose: str
+        :paramtype certificate_purpose: str or ~azext_iot.sdk.dps.mgmt.models.CertificatePurpose
         :keyword certificate_created: Time the certificate is created. Default value is None.
         :paramtype certificate_created: ~datetime.datetime
         :keyword certificate_last_updated: Certificate last updated time. Default value is None.
@@ -1586,13 +1442,19 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
 
         if response.status_code not in [200, 204]:
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(
+                _types.ErrorDetails,
+                pipeline_response,
+            )
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
         if cls:
             return cls(pipeline_response, None, {})  # type: ignore
 
     @distributed_trace
-    def list(self, resource_group_name: str, provisioning_service_name: str, **kwargs: Any) -> JSON:
+    def list(
+        self, resource_group_name: str, provisioning_service_name: str, **kwargs: Any
+    ) -> _types.CertificateListDescription:
         """Get all the certificates tied to the provisioning service.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -1600,8 +1462,8 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
         :type resource_group_name: str
         :param provisioning_service_name: Name of the provisioning service to retrieve. Required.
         :type provisioning_service_name: str
-        :return: JSON object
-        :rtype: JSON
+        :return: CertificateListDescription
+        :rtype: ~azext_iot.sdk.dps.mgmt.types.CertificateListDescription
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -1647,7 +1509,7 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_types.CertificateListDescription] = kwargs.pop("cls", None)
 
         _request = build_dps_certificate_list_request(
             resource_group_name=resource_group_name,
@@ -1677,7 +1539,11 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(
+                _types.ErrorDetails,
+                pipeline_response,
+            )
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -1688,9 +1554,9 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @distributed_trace
     def generate_verification_code(  # pylint: disable=too-many-locals
@@ -1704,13 +1570,13 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
         certificate_name1: Optional[str] = None,
         certificate_raw_bytes: Optional[bytes] = None,
         certificate_is_verified: Optional[bool] = None,
-        certificate_purpose: Optional[str] = None,
+        certificate_purpose: Optional[types.CertificatePurpose] = None,
         certificate_created: Optional[datetime.datetime] = None,
         certificate_last_updated: Optional[datetime.datetime] = None,
         certificate_has_private_key: Optional[bool] = None,
         certificate_nonce: Optional[str] = None,
         **kwargs: Any
-    ) -> JSON:
+    ) -> _types.VerificationCodeResponse:
         """Generate verification code for Proof of Possession.
 
         :param certificate_name: Name of the certificate to retrieve. Required.
@@ -1733,7 +1599,7 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
         :paramtype certificate_is_verified: bool
         :keyword certificate_purpose: Description mentioning the purpose of the certificate. Known
          values are: "clientAuthentication" and "serverAuthentication". Default value is None.
-        :paramtype certificate_purpose: str
+        :paramtype certificate_purpose: str or ~azext_iot.sdk.dps.mgmt.models.CertificatePurpose
         :keyword certificate_created: Time the certificate is created. Default value is None.
         :paramtype certificate_created: ~datetime.datetime
         :keyword certificate_last_updated: Certificate last updated time. Default value is None.
@@ -1744,8 +1610,8 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
         :keyword certificate_nonce: Random number generated to indicate Proof of Possession. Default
          value is None.
         :paramtype certificate_nonce: str
-        :return: JSON object
-        :rtype: JSON
+        :return: VerificationCodeResponse
+        :rtype: ~azext_iot.sdk.dps.mgmt.types.VerificationCodeResponse
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -1786,7 +1652,7 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_types.VerificationCodeResponse] = kwargs.pop("cls", None)
 
         _request = build_dps_certificate_generate_verification_code_request(
             certificate_name=certificate_name,
@@ -1827,7 +1693,11 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(
+                _types.ErrorDetails,
+                pipeline_response,
+            )
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -1838,200 +1708,9 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
-
-    @overload
-    def verify_certificate(
-        self,
-        certificate_name: str,
-        resource_group_name: str,
-        provisioning_service_name: str,
-        request: JSON,
-        *,
-        etag: str,
-        match_condition: MatchConditions,
-        certificate_name1: Optional[str] = None,
-        certificate_raw_bytes: Optional[bytes] = None,
-        certificate_is_verified: Optional[bool] = None,
-        certificate_purpose: Optional[str] = None,
-        certificate_created: Optional[datetime.datetime] = None,
-        certificate_last_updated: Optional[datetime.datetime] = None,
-        certificate_has_private_key: Optional[bool] = None,
-        certificate_nonce: Optional[str] = None,
-        content_type: str = "application/json",
-        **kwargs: Any
-    ) -> JSON:
-        """Verifies the certificate's private key possession by providing the leaf cert issued by the
-        verifying pre uploaded certificate.
-
-        :param certificate_name: Name of the certificate to retrieve. Required.
-        :type certificate_name: str
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param provisioning_service_name: Name of the provisioning service to retrieve. Required.
-        :type provisioning_service_name: str
-        :param request: The name of the certificate. Required.
-        :type request: JSON
-        :keyword etag: check if resource is changed. Set None to skip checking etag. Required.
-        :paramtype etag: str
-        :keyword match_condition: The match condition to use upon the etag. Required.
-        :paramtype match_condition: ~azure.core.MatchConditions
-        :keyword certificate_name1: Common Name for the certificate. Default value is None.
-        :paramtype certificate_name1: str
-        :keyword certificate_raw_bytes: Raw data of certificate. Default value is None.
-        :paramtype certificate_raw_bytes: bytes
-        :keyword certificate_is_verified: Indicates if the certificate has been verified by owner of
-         the private key. Default value is None.
-        :paramtype certificate_is_verified: bool
-        :keyword certificate_purpose: Describe the purpose of the certificate. Known values are:
-         "clientAuthentication" and "serverAuthentication". Default value is None.
-        :paramtype certificate_purpose: str
-        :keyword certificate_created: Time the certificate is created. Default value is None.
-        :paramtype certificate_created: ~datetime.datetime
-        :keyword certificate_last_updated: Certificate last updated time. Default value is None.
-        :paramtype certificate_last_updated: ~datetime.datetime
-        :keyword certificate_has_private_key: Indicates if the certificate contains private key.
-         Default value is None.
-        :paramtype certificate_has_private_key: bool
-        :keyword certificate_nonce: Random number generated to indicate Proof of Possession. Default
-         value is None.
-        :paramtype certificate_nonce: str
-        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                request = {
-                    "certificate": "str"
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "etag": "str",
-                    "id": "str",
-                    "name": "str",
-                    "properties": {
-                        "certificate": bytes("bytes", encoding="utf-8"),
-                        "created": "2020-02-20 00:00:00",
-                        "expiry": "2020-02-20 00:00:00",
-                        "isVerified": bool,
-                        "subject": "str",
-                        "thumbprint": "str",
-                        "updated": "2020-02-20 00:00:00"
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",
-                        "createdBy": "str",
-                        "createdByType": "str",
-                        "lastModifiedAt": "2020-02-20 00:00:00",
-                        "lastModifiedBy": "str",
-                        "lastModifiedByType": "str"
-                    },
-                    "type": "str"
-                }
-        """
-
-    @overload
-    def verify_certificate(
-        self,
-        certificate_name: str,
-        resource_group_name: str,
-        provisioning_service_name: str,
-        request: IO[bytes],
-        *,
-        etag: str,
-        match_condition: MatchConditions,
-        certificate_name1: Optional[str] = None,
-        certificate_raw_bytes: Optional[bytes] = None,
-        certificate_is_verified: Optional[bool] = None,
-        certificate_purpose: Optional[str] = None,
-        certificate_created: Optional[datetime.datetime] = None,
-        certificate_last_updated: Optional[datetime.datetime] = None,
-        certificate_has_private_key: Optional[bool] = None,
-        certificate_nonce: Optional[str] = None,
-        content_type: str = "application/json",
-        **kwargs: Any
-    ) -> JSON:
-        """Verifies the certificate's private key possession by providing the leaf cert issued by the
-        verifying pre uploaded certificate.
-
-        :param certificate_name: Name of the certificate to retrieve. Required.
-        :type certificate_name: str
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param provisioning_service_name: Name of the provisioning service to retrieve. Required.
-        :type provisioning_service_name: str
-        :param request: The name of the certificate. Required.
-        :type request: IO[bytes]
-        :keyword etag: check if resource is changed. Set None to skip checking etag. Required.
-        :paramtype etag: str
-        :keyword match_condition: The match condition to use upon the etag. Required.
-        :paramtype match_condition: ~azure.core.MatchConditions
-        :keyword certificate_name1: Common Name for the certificate. Default value is None.
-        :paramtype certificate_name1: str
-        :keyword certificate_raw_bytes: Raw data of certificate. Default value is None.
-        :paramtype certificate_raw_bytes: bytes
-        :keyword certificate_is_verified: Indicates if the certificate has been verified by owner of
-         the private key. Default value is None.
-        :paramtype certificate_is_verified: bool
-        :keyword certificate_purpose: Describe the purpose of the certificate. Known values are:
-         "clientAuthentication" and "serverAuthentication". Default value is None.
-        :paramtype certificate_purpose: str
-        :keyword certificate_created: Time the certificate is created. Default value is None.
-        :paramtype certificate_created: ~datetime.datetime
-        :keyword certificate_last_updated: Certificate last updated time. Default value is None.
-        :paramtype certificate_last_updated: ~datetime.datetime
-        :keyword certificate_has_private_key: Indicates if the certificate contains private key.
-         Default value is None.
-        :paramtype certificate_has_private_key: bool
-        :keyword certificate_nonce: Random number generated to indicate Proof of Possession. Default
-         value is None.
-        :paramtype certificate_nonce: str
-        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "etag": "str",
-                    "id": "str",
-                    "name": "str",
-                    "properties": {
-                        "certificate": bytes("bytes", encoding="utf-8"),
-                        "created": "2020-02-20 00:00:00",
-                        "expiry": "2020-02-20 00:00:00",
-                        "isVerified": bool,
-                        "subject": "str",
-                        "thumbprint": "str",
-                        "updated": "2020-02-20 00:00:00"
-                    },
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",
-                        "createdBy": "str",
-                        "createdByType": "str",
-                        "lastModifiedAt": "2020-02-20 00:00:00",
-                        "lastModifiedBy": "str",
-                        "lastModifiedByType": "str"
-                    },
-                    "type": "str"
-                }
-        """
+        return deserialized  # type: ignore
 
     @distributed_trace
     def verify_certificate(  # pylint: disable=too-many-locals
@@ -2039,20 +1718,20 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
         certificate_name: str,
         resource_group_name: str,
         provisioning_service_name: str,
-        request: Union[JSON, IO[bytes]],
+        request: _types.VerificationCodeRequest,
         *,
         etag: str,
         match_condition: MatchConditions,
         certificate_name1: Optional[str] = None,
         certificate_raw_bytes: Optional[bytes] = None,
         certificate_is_verified: Optional[bool] = None,
-        certificate_purpose: Optional[str] = None,
+        certificate_purpose: Optional[types.CertificatePurpose] = None,
         certificate_created: Optional[datetime.datetime] = None,
         certificate_last_updated: Optional[datetime.datetime] = None,
         certificate_has_private_key: Optional[bool] = None,
         certificate_nonce: Optional[str] = None,
         **kwargs: Any
-    ) -> JSON:
+    ) -> _types.CertificateResponse:
         """Verifies the certificate's private key possession by providing the leaf cert issued by the
         verifying pre uploaded certificate.
 
@@ -2063,9 +1742,8 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
         :type resource_group_name: str
         :param provisioning_service_name: Name of the provisioning service to retrieve. Required.
         :type provisioning_service_name: str
-        :param request: The name of the certificate. Is either a JSON type or a IO[bytes] type.
-         Required.
-        :type request: JSON or IO[bytes]
+        :param request: The name of the certificate. Required.
+        :type request: ~azext_iot.sdk.dps.mgmt.types.VerificationCodeRequest
         :keyword etag: check if resource is changed. Set None to skip checking etag. Required.
         :paramtype etag: str
         :keyword match_condition: The match condition to use upon the etag. Required.
@@ -2079,7 +1757,7 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
         :paramtype certificate_is_verified: bool
         :keyword certificate_purpose: Describe the purpose of the certificate. Known values are:
          "clientAuthentication" and "serverAuthentication". Default value is None.
-        :paramtype certificate_purpose: str
+        :paramtype certificate_purpose: str or ~azext_iot.sdk.dps.mgmt.models.CertificatePurpose
         :keyword certificate_created: Time the certificate is created. Default value is None.
         :paramtype certificate_created: ~datetime.datetime
         :keyword certificate_last_updated: Certificate last updated time. Default value is None.
@@ -2090,8 +1768,8 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
         :keyword certificate_nonce: Random number generated to indicate Proof of Possession. Default
          value is None.
         :paramtype certificate_nonce: str
-        :return: JSON object
-        :rtype: JSON
+        :return: CertificateResponse
+        :rtype: ~azext_iot.sdk.dps.mgmt.types.CertificateResponse
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -2144,16 +1822,10 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        cls: ClsType[_types.CertificateResponse] = kwargs.pop("cls", None)
 
-        content_type = content_type or "application/json"
-        _json = None
-        _content = None
-        if isinstance(request, (IOBase, bytes)):
-            _content = request
-        else:
-            _json = request
+        _json = request
 
         _request = build_dps_certificate_verify_certificate_request(
             certificate_name=certificate_name,
@@ -2173,7 +1845,6 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
-            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -2197,7 +1868,11 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(
+                _types.ErrorDetails,
+                pipeline_response,
+            )
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -2208,9 +1883,9 @@ class DpsCertificateOperations:  # pylint: disable=docstring-missing-param
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
 
 class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-many-public-methods
@@ -2239,7 +1914,7 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         *,
         asyncinfo: str,
         **kwargs: Any
-    ) -> JSON:
+    ) -> _types.AsyncOperationResult:
         """Gets the status of a long running operation, such as create, update or delete a provisioning
         service.
 
@@ -2254,8 +1929,8 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :keyword asyncinfo: Async header used to poll on the status of the operation, obtained while
          creating the long running operation. Required.
         :paramtype asyncinfo: str
-        :return: JSON object
-        :rtype: JSON
+        :return: AsyncOperationResult
+        :rtype: ~azext_iot.sdk.dps.mgmt.types.AsyncOperationResult
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -2282,7 +1957,7 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_types.AsyncOperationResult] = kwargs.pop("cls", None)
 
         _request = build_iot_dps_resource_get_operation_result_request(
             operation_id=operation_id,
@@ -2314,7 +1989,11 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(
+                _types.ErrorDetails,
+                pipeline_response,
+            )
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -2325,12 +2004,14 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @distributed_trace
-    def get(self, provisioning_service_name: str, resource_group_name: str, **kwargs: Any) -> JSON:
+    def get(
+        self, provisioning_service_name: str, resource_group_name: str, **kwargs: Any
+    ) -> _types.ProvisioningServiceDescription:
         """Get the metadata of the provisioning service without SAS keys.
 
         :param provisioning_service_name: Name of the provisioning service to retrieve. Required.
@@ -2338,8 +2019,8 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :return: JSON object
-        :rtype: JSON
+        :return: ProvisioningServiceDescription
+        :rtype: ~azext_iot.sdk.dps.mgmt.types.ProvisioningServiceDescription
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -2359,6 +2040,17 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             }
                         ],
                         "deviceProvisioningHostName": "str",
+                        "deviceRegistryNamespaces": [
+                            {
+                                "authenticationType": "str",
+                                "resourceId": "str",
+                                "dataAddress": "str",
+                                "linkingState": "str",
+                                "location": "str",
+                                "namespaceUuid": "str",
+                                "selectedUserAssignedIdentityResourceId": "str"
+                            }
+                        ],
                         "disableLocalAuth": bool,
                         "enableDataResidency": bool,
                         "idScope": "str",
@@ -2459,7 +2151,7 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_types.ProvisioningServiceDescription] = kwargs.pop("cls", None)
 
         _request = build_iot_dps_resource_get_request(
             provisioning_service_name=provisioning_service_name,
@@ -2489,7 +2181,11 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(
+                _types.ErrorDetails,
+                pipeline_response,
+            )
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -2500,15 +2196,15 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     def _create_or_update_initial(
         self,
         resource_group_name: str,
         provisioning_service_name: str,
-        iot_dps_description: Union[JSON, IO[bytes]],
+        iot_dps_description: _types.ProvisioningServiceDescription,
         **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
@@ -2522,16 +2218,10 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        content_type = content_type or "application/json"
-        _json = None
-        _content = None
-        if isinstance(iot_dps_description, (IOBase, bytes)):
-            _content = iot_dps_description
-        else:
-            _json = iot_dps_description
+        _json = iot_dps_description
 
         _request = build_iot_dps_resource_create_or_update_request(
             resource_group_name=resource_group_name,
@@ -2540,7 +2230,6 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
-            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -2563,7 +2252,11 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(
+                _types.ErrorDetails,
+                pipeline_response,
+            )
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 201:
@@ -2573,393 +2266,18 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
+            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
 
-        return cast(Iterator[bytes], deserialized)  # type: ignore
-
-    @overload
-    def begin_create_or_update(
-        self,
-        resource_group_name: str,
-        provisioning_service_name: str,
-        iot_dps_description: JSON,
-        *,
-        content_type: str = "application/json",
-        **kwargs: Any
-    ) -> LROPoller[JSON]:
-        """Create or update the metadata of the provisioning service. The usual pattern to modify a
-        property is to retrieve the provisioning service metadata and security metadata, and then
-        combine them with the modified values in a new body to update the provisioning service.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param provisioning_service_name: Name of the provisioning service to retrieve. Required.
-        :type provisioning_service_name: str
-        :param iot_dps_description: Description of the provisioning service to create or update.
-         Required.
-        :type iot_dps_description: JSON
-        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                iot_dps_description = {
-                    "location": "str",
-                    "properties": {
-                        "allocationPolicy": "str",
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",
-                                "rights": "str",
-                                "primaryKey": "str",
-                                "secondaryKey": "str"
-                            }
-                        ],
-                        "deviceProvisioningHostName": "str",
-                        "disableLocalAuth": bool,
-                        "enableDataResidency": bool,
-                        "idScope": "str",
-                        "iotHubs": [
-                            {
-                                "location": "str",
-                                "allocationWeight": 0,
-                                "applyAllocationPolicy": bool,
-                                "authenticationType": "str",
-                                "connectionString": "str",
-                                "hostName": "str",
-                                "name": "str",
-                                "selectedUserAssignedIdentityResourceId": "str"
-                            }
-                        ],
-                        "ipFilterRules": [
-                            {
-                                "action": "str",
-                                "filterName": "str",
-                                "ipMask": "str",
-                                "target": "str"
-                            }
-                        ],
-                        "portalOperationsHostName": "str",
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",
-                                        "status": "str",
-                                        "actionsRequired": "str"
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"
-                                    }
-                                },
-                                "id": "str",
-                                "name": "str",
-                                "systemData": {
-                                    "createdAt": "2020-02-20 00:00:00",
-                                    "createdBy": "str",
-                                    "createdByType": "str",
-                                    "lastModifiedAt": "2020-02-20 00:00:00",
-                                    "lastModifiedBy": "str",
-                                    "lastModifiedByType": "str"
-                                },
-                                "type": "str"
-                            }
-                        ],
-                        "provisioningState": "str",
-                        "publicNetworkAccess": "str",
-                        "serviceOperationsHostName": "str",
-                        "state": "str"
-                    },
-                    "sku": {
-                        "capacity": 0,
-                        "name": "str",
-                        "tier": "str"
-                    },
-                    "etag": "str",
-                    "id": "str",
-                    "identity": {
-                        "type": "str",
-                        "principalId": "str",
-                        "tenantId": "str",
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",
-                                "principalId": "str"
-                            }
-                        }
-                    },
-                    "name": "str",
-                    "resourcegroup": "str",
-                    "subscriptionid": "str",
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",
-                        "createdBy": "str",
-                        "createdByType": "str",
-                        "lastModifiedAt": "2020-02-20 00:00:00",
-                        "lastModifiedBy": "str",
-                        "lastModifiedByType": "str"
-                    },
-                    "tags": {
-                        "str": "str"
-                    },
-                    "type": "str"
-                }
-
-                # response body for status code(s): 200, 201
-                response == {
-                    "location": "str",
-                    "properties": {
-                        "allocationPolicy": "str",
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",
-                                "rights": "str",
-                                "primaryKey": "str",
-                                "secondaryKey": "str"
-                            }
-                        ],
-                        "deviceProvisioningHostName": "str",
-                        "disableLocalAuth": bool,
-                        "enableDataResidency": bool,
-                        "idScope": "str",
-                        "iotHubs": [
-                            {
-                                "location": "str",
-                                "allocationWeight": 0,
-                                "applyAllocationPolicy": bool,
-                                "authenticationType": "str",
-                                "connectionString": "str",
-                                "hostName": "str",
-                                "name": "str",
-                                "selectedUserAssignedIdentityResourceId": "str"
-                            }
-                        ],
-                        "ipFilterRules": [
-                            {
-                                "action": "str",
-                                "filterName": "str",
-                                "ipMask": "str",
-                                "target": "str"
-                            }
-                        ],
-                        "portalOperationsHostName": "str",
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",
-                                        "status": "str",
-                                        "actionsRequired": "str"
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"
-                                    }
-                                },
-                                "id": "str",
-                                "name": "str",
-                                "systemData": {
-                                    "createdAt": "2020-02-20 00:00:00",
-                                    "createdBy": "str",
-                                    "createdByType": "str",
-                                    "lastModifiedAt": "2020-02-20 00:00:00",
-                                    "lastModifiedBy": "str",
-                                    "lastModifiedByType": "str"
-                                },
-                                "type": "str"
-                            }
-                        ],
-                        "provisioningState": "str",
-                        "publicNetworkAccess": "str",
-                        "serviceOperationsHostName": "str",
-                        "state": "str"
-                    },
-                    "sku": {
-                        "capacity": 0,
-                        "name": "str",
-                        "tier": "str"
-                    },
-                    "etag": "str",
-                    "id": "str",
-                    "identity": {
-                        "type": "str",
-                        "principalId": "str",
-                        "tenantId": "str",
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",
-                                "principalId": "str"
-                            }
-                        }
-                    },
-                    "name": "str",
-                    "resourcegroup": "str",
-                    "subscriptionid": "str",
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",
-                        "createdBy": "str",
-                        "createdByType": "str",
-                        "lastModifiedAt": "2020-02-20 00:00:00",
-                        "lastModifiedBy": "str",
-                        "lastModifiedByType": "str"
-                    },
-                    "tags": {
-                        "str": "str"
-                    },
-                    "type": "str"
-                }
-        """
-
-    @overload
-    def begin_create_or_update(
-        self,
-        resource_group_name: str,
-        provisioning_service_name: str,
-        iot_dps_description: IO[bytes],
-        *,
-        content_type: str = "application/json",
-        **kwargs: Any
-    ) -> LROPoller[JSON]:
-        """Create or update the metadata of the provisioning service. The usual pattern to modify a
-        property is to retrieve the provisioning service metadata and security metadata, and then
-        combine them with the modified values in a new body to update the provisioning service.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param provisioning_service_name: Name of the provisioning service to retrieve. Required.
-        :type provisioning_service_name: str
-        :param iot_dps_description: Description of the provisioning service to create or update.
-         Required.
-        :type iot_dps_description: IO[bytes]
-        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200, 201
-                response == {
-                    "location": "str",
-                    "properties": {
-                        "allocationPolicy": "str",
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",
-                                "rights": "str",
-                                "primaryKey": "str",
-                                "secondaryKey": "str"
-                            }
-                        ],
-                        "deviceProvisioningHostName": "str",
-                        "disableLocalAuth": bool,
-                        "enableDataResidency": bool,
-                        "idScope": "str",
-                        "iotHubs": [
-                            {
-                                "location": "str",
-                                "allocationWeight": 0,
-                                "applyAllocationPolicy": bool,
-                                "authenticationType": "str",
-                                "connectionString": "str",
-                                "hostName": "str",
-                                "name": "str",
-                                "selectedUserAssignedIdentityResourceId": "str"
-                            }
-                        ],
-                        "ipFilterRules": [
-                            {
-                                "action": "str",
-                                "filterName": "str",
-                                "ipMask": "str",
-                                "target": "str"
-                            }
-                        ],
-                        "portalOperationsHostName": "str",
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",
-                                        "status": "str",
-                                        "actionsRequired": "str"
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"
-                                    }
-                                },
-                                "id": "str",
-                                "name": "str",
-                                "systemData": {
-                                    "createdAt": "2020-02-20 00:00:00",
-                                    "createdBy": "str",
-                                    "createdByType": "str",
-                                    "lastModifiedAt": "2020-02-20 00:00:00",
-                                    "lastModifiedBy": "str",
-                                    "lastModifiedByType": "str"
-                                },
-                                "type": "str"
-                            }
-                        ],
-                        "provisioningState": "str",
-                        "publicNetworkAccess": "str",
-                        "serviceOperationsHostName": "str",
-                        "state": "str"
-                    },
-                    "sku": {
-                        "capacity": 0,
-                        "name": "str",
-                        "tier": "str"
-                    },
-                    "etag": "str",
-                    "id": "str",
-                    "identity": {
-                        "type": "str",
-                        "principalId": "str",
-                        "tenantId": "str",
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",
-                                "principalId": "str"
-                            }
-                        }
-                    },
-                    "name": "str",
-                    "resourcegroup": "str",
-                    "subscriptionid": "str",
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",
-                        "createdBy": "str",
-                        "createdByType": "str",
-                        "lastModifiedAt": "2020-02-20 00:00:00",
-                        "lastModifiedBy": "str",
-                        "lastModifiedByType": "str"
-                    },
-                    "tags": {
-                        "str": "str"
-                    },
-                    "type": "str"
-                }
-        """
+        return deserialized  # type: ignore
 
     @distributed_trace
     def begin_create_or_update(
         self,
         resource_group_name: str,
         provisioning_service_name: str,
-        iot_dps_description: Union[JSON, IO[bytes]],
+        iot_dps_description: _types.ProvisioningServiceDescription,
         **kwargs: Any
-    ) -> LROPoller[JSON]:
+    ) -> LROPoller[_types.ProvisioningServiceDescription]:
         """Create or update the metadata of the provisioning service. The usual pattern to modify a
         property is to retrieve the provisioning service metadata and security metadata, and then
         combine them with the modified values in a new body to update the provisioning service.
@@ -2969,11 +2287,12 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :type resource_group_name: str
         :param provisioning_service_name: Name of the provisioning service to retrieve. Required.
         :type provisioning_service_name: str
-        :param iot_dps_description: Description of the provisioning service to create or update. Is
-         either a JSON type or a IO[bytes] type. Required.
-        :type iot_dps_description: JSON or IO[bytes]
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :param iot_dps_description: Description of the provisioning service to create or update.
+         Required.
+        :type iot_dps_description: ~azext_iot.sdk.dps.mgmt.types.ProvisioningServiceDescription
+        :return: An instance of LROPoller that returns ProvisioningServiceDescription
+        :rtype:
+         ~azure.core.polling.LROPoller[~azext_iot.sdk.dps.mgmt.types.ProvisioningServiceDescription]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -2993,6 +2312,17 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             }
                         ],
                         "deviceProvisioningHostName": "str",
+                        "deviceRegistryNamespaces": [
+                            {
+                                "authenticationType": "str",
+                                "resourceId": "str",
+                                "dataAddress": "str",
+                                "linkingState": "str",
+                                "location": "str",
+                                "namespaceUuid": "str",
+                                "selectedUserAssignedIdentityResourceId": "str"
+                            }
+                        ],
                         "disableLocalAuth": bool,
                         "enableDataResidency": bool,
                         "idScope": "str",
@@ -3096,6 +2426,17 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             }
                         ],
                         "deviceProvisioningHostName": "str",
+                        "deviceRegistryNamespaces": [
+                            {
+                                "authenticationType": "str",
+                                "resourceId": "str",
+                                "dataAddress": "str",
+                                "linkingState": "str",
+                                "location": "str",
+                                "namespaceUuid": "str",
+                                "selectedUserAssignedIdentityResourceId": "str"
+                            }
+                        ],
                         "disableLocalAuth": bool,
                         "enableDataResidency": bool,
                         "idScope": "str",
@@ -3188,8 +2529,8 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        cls: ClsType[_types.ProvisioningServiceDescription] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -3208,7 +2549,6 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
-            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -3230,19 +2570,21 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[JSON].from_continuation_token(
+            return LROPoller[_types.ProvisioningServiceDescription].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
+        return LROPoller[_types.ProvisioningServiceDescription](
+            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
+        )
 
     def _update_initial(
         self,
         resource_group_name: str,
         provisioning_service_name: str,
-        provisioning_service_tags: Union[JSON, IO[bytes]],
+        provisioning_service_tags: _types.TagsResource,
         **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
@@ -3256,16 +2598,10 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        content_type = content_type or "application/json"
-        _json = None
-        _content = None
-        if isinstance(provisioning_service_tags, (IOBase, bytes)):
-            _content = provisioning_service_tags
-        else:
-            _json = provisioning_service_tags
+        _json = provisioning_service_tags
 
         _request = build_iot_dps_resource_update_request(
             resource_group_name=resource_group_name,
@@ -3274,7 +2610,6 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
-            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -3297,7 +2632,11 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(
+                _types.ErrorResponse,
+                pipeline_response,
+            )
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
         response_headers = {}
         response_headers["Location"] = self._deserialize("str", response.headers.get("Location"))
@@ -3305,295 +2644,18 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
+            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
 
-        return cast(Iterator[bytes], deserialized)  # type: ignore
-
-    @overload
-    def begin_update(
-        self,
-        resource_group_name: str,
-        provisioning_service_name: str,
-        provisioning_service_tags: JSON,
-        *,
-        content_type: str = "application/json",
-        **kwargs: Any
-    ) -> LROPoller[JSON]:
-        """Update an existing provisioning service's tags. to update other fields use the CreateOrUpdate
-        method.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param provisioning_service_name: Name of the provisioning service to retrieve. Required.
-        :type provisioning_service_name: str
-        :param provisioning_service_tags: Updated tag information to set into the provisioning service
-         instance. Required.
-        :type provisioning_service_tags: JSON
-        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                provisioning_service_tags = {
-                    "tags": {
-                        "str": "str"
-                    }
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",
-                    "properties": {
-                        "allocationPolicy": "str",
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",
-                                "rights": "str",
-                                "primaryKey": "str",
-                                "secondaryKey": "str"
-                            }
-                        ],
-                        "deviceProvisioningHostName": "str",
-                        "disableLocalAuth": bool,
-                        "enableDataResidency": bool,
-                        "idScope": "str",
-                        "iotHubs": [
-                            {
-                                "location": "str",
-                                "allocationWeight": 0,
-                                "applyAllocationPolicy": bool,
-                                "authenticationType": "str",
-                                "connectionString": "str",
-                                "hostName": "str",
-                                "name": "str",
-                                "selectedUserAssignedIdentityResourceId": "str"
-                            }
-                        ],
-                        "ipFilterRules": [
-                            {
-                                "action": "str",
-                                "filterName": "str",
-                                "ipMask": "str",
-                                "target": "str"
-                            }
-                        ],
-                        "portalOperationsHostName": "str",
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",
-                                        "status": "str",
-                                        "actionsRequired": "str"
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"
-                                    }
-                                },
-                                "id": "str",
-                                "name": "str",
-                                "systemData": {
-                                    "createdAt": "2020-02-20 00:00:00",
-                                    "createdBy": "str",
-                                    "createdByType": "str",
-                                    "lastModifiedAt": "2020-02-20 00:00:00",
-                                    "lastModifiedBy": "str",
-                                    "lastModifiedByType": "str"
-                                },
-                                "type": "str"
-                            }
-                        ],
-                        "provisioningState": "str",
-                        "publicNetworkAccess": "str",
-                        "serviceOperationsHostName": "str",
-                        "state": "str"
-                    },
-                    "sku": {
-                        "capacity": 0,
-                        "name": "str",
-                        "tier": "str"
-                    },
-                    "etag": "str",
-                    "id": "str",
-                    "identity": {
-                        "type": "str",
-                        "principalId": "str",
-                        "tenantId": "str",
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",
-                                "principalId": "str"
-                            }
-                        }
-                    },
-                    "name": "str",
-                    "resourcegroup": "str",
-                    "subscriptionid": "str",
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",
-                        "createdBy": "str",
-                        "createdByType": "str",
-                        "lastModifiedAt": "2020-02-20 00:00:00",
-                        "lastModifiedBy": "str",
-                        "lastModifiedByType": "str"
-                    },
-                    "tags": {
-                        "str": "str"
-                    },
-                    "type": "str"
-                }
-        """
-
-    @overload
-    def begin_update(
-        self,
-        resource_group_name: str,
-        provisioning_service_name: str,
-        provisioning_service_tags: IO[bytes],
-        *,
-        content_type: str = "application/json",
-        **kwargs: Any
-    ) -> LROPoller[JSON]:
-        """Update an existing provisioning service's tags. to update other fields use the CreateOrUpdate
-        method.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param provisioning_service_name: Name of the provisioning service to retrieve. Required.
-        :type provisioning_service_name: str
-        :param provisioning_service_tags: Updated tag information to set into the provisioning service
-         instance. Required.
-        :type provisioning_service_tags: IO[bytes]
-        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "location": "str",
-                    "properties": {
-                        "allocationPolicy": "str",
-                        "authorizationPolicies": [
-                            {
-                                "keyName": "str",
-                                "rights": "str",
-                                "primaryKey": "str",
-                                "secondaryKey": "str"
-                            }
-                        ],
-                        "deviceProvisioningHostName": "str",
-                        "disableLocalAuth": bool,
-                        "enableDataResidency": bool,
-                        "idScope": "str",
-                        "iotHubs": [
-                            {
-                                "location": "str",
-                                "allocationWeight": 0,
-                                "applyAllocationPolicy": bool,
-                                "authenticationType": "str",
-                                "connectionString": "str",
-                                "hostName": "str",
-                                "name": "str",
-                                "selectedUserAssignedIdentityResourceId": "str"
-                            }
-                        ],
-                        "ipFilterRules": [
-                            {
-                                "action": "str",
-                                "filterName": "str",
-                                "ipMask": "str",
-                                "target": "str"
-                            }
-                        ],
-                        "portalOperationsHostName": "str",
-                        "privateEndpointConnections": [
-                            {
-                                "properties": {
-                                    "privateLinkServiceConnectionState": {
-                                        "description": "str",
-                                        "status": "str",
-                                        "actionsRequired": "str"
-                                    },
-                                    "privateEndpoint": {
-                                        "id": "str"
-                                    }
-                                },
-                                "id": "str",
-                                "name": "str",
-                                "systemData": {
-                                    "createdAt": "2020-02-20 00:00:00",
-                                    "createdBy": "str",
-                                    "createdByType": "str",
-                                    "lastModifiedAt": "2020-02-20 00:00:00",
-                                    "lastModifiedBy": "str",
-                                    "lastModifiedByType": "str"
-                                },
-                                "type": "str"
-                            }
-                        ],
-                        "provisioningState": "str",
-                        "publicNetworkAccess": "str",
-                        "serviceOperationsHostName": "str",
-                        "state": "str"
-                    },
-                    "sku": {
-                        "capacity": 0,
-                        "name": "str",
-                        "tier": "str"
-                    },
-                    "etag": "str",
-                    "id": "str",
-                    "identity": {
-                        "type": "str",
-                        "principalId": "str",
-                        "tenantId": "str",
-                        "userAssignedIdentities": {
-                            "str": {
-                                "clientId": "str",
-                                "principalId": "str"
-                            }
-                        }
-                    },
-                    "name": "str",
-                    "resourcegroup": "str",
-                    "subscriptionid": "str",
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",
-                        "createdBy": "str",
-                        "createdByType": "str",
-                        "lastModifiedAt": "2020-02-20 00:00:00",
-                        "lastModifiedBy": "str",
-                        "lastModifiedByType": "str"
-                    },
-                    "tags": {
-                        "str": "str"
-                    },
-                    "type": "str"
-                }
-        """
+        return deserialized  # type: ignore
 
     @distributed_trace
     def begin_update(
         self,
         resource_group_name: str,
         provisioning_service_name: str,
-        provisioning_service_tags: Union[JSON, IO[bytes]],
+        provisioning_service_tags: _types.TagsResource,
         **kwargs: Any
-    ) -> LROPoller[JSON]:
+    ) -> LROPoller[_types.ProvisioningServiceDescription]:
         """Update an existing provisioning service's tags. to update other fields use the CreateOrUpdate
         method.
 
@@ -3603,10 +2665,11 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :param provisioning_service_name: Name of the provisioning service to retrieve. Required.
         :type provisioning_service_name: str
         :param provisioning_service_tags: Updated tag information to set into the provisioning service
-         instance. Is either a JSON type or a IO[bytes] type. Required.
-        :type provisioning_service_tags: JSON or IO[bytes]
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
+         instance. Required.
+        :type provisioning_service_tags: ~azext_iot.sdk.dps.mgmt.types.TagsResource
+        :return: An instance of LROPoller that returns ProvisioningServiceDescription
+        :rtype:
+         ~azure.core.polling.LROPoller[~azext_iot.sdk.dps.mgmt.types.ProvisioningServiceDescription]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -3633,6 +2696,17 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             }
                         ],
                         "deviceProvisioningHostName": "str",
+                        "deviceRegistryNamespaces": [
+                            {
+                                "authenticationType": "str",
+                                "resourceId": "str",
+                                "dataAddress": "str",
+                                "linkingState": "str",
+                                "location": "str",
+                                "namespaceUuid": "str",
+                                "selectedUserAssignedIdentityResourceId": "str"
+                            }
+                        ],
                         "disableLocalAuth": bool,
                         "enableDataResidency": bool,
                         "idScope": "str",
@@ -3725,8 +2799,8 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        cls: ClsType[_types.ProvisioningServiceDescription] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -3770,13 +2844,15 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[JSON].from_continuation_token(
+            return LROPoller[_types.ProvisioningServiceDescription].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
+        return LROPoller[_types.ProvisioningServiceDescription](
+            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
+        )
 
     def _delete_initial(
         self, provisioning_service_name: str, resource_group_name: str, **kwargs: Any
@@ -3821,7 +2897,11 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(
+                _types.ErrorDetails,
+                pipeline_response,
+            )
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -3831,9 +2911,9 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
+            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
 
-        return cast(Iterator[bytes], deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @distributed_trace
     def begin_delete(self, provisioning_service_name: str, resource_group_name: str, **kwargs: Any) -> LROPoller[None]:
@@ -3893,14 +2973,17 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         return LROPoller[None](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
 
     @distributed_trace
-    def list_by_resource_group(self, resource_group_name: str, **kwargs: Any) -> ItemPaged[JSON]:
+    def list_by_resource_group(
+        self, resource_group_name: str, **kwargs: Any
+    ) -> ItemPaged["_types.ProvisioningServiceDescription"]:
         """Get a list of all provisioning services in the given resource group.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.paging.ItemPaged[JSON]
+        :return: An iterator like instance of ProvisioningServiceDescription
+        :rtype:
+         ~azure.core.paging.ItemPaged[~azext_iot.sdk.dps.mgmt.types.ProvisioningServiceDescription]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -3920,6 +3003,17 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             }
                         ],
                         "deviceProvisioningHostName": "str",
+                        "deviceRegistryNamespaces": [
+                            {
+                                "authenticationType": "str",
+                                "resourceId": "str",
+                                "dataAddress": "str",
+                                "linkingState": "str",
+                                "location": "str",
+                                "namespaceUuid": "str",
+                                "selectedUserAssignedIdentityResourceId": "str"
+                            }
+                        ],
                         "disableLocalAuth": bool,
                         "enableDataResidency": bool,
                         "idScope": "str",
@@ -4012,7 +3106,7 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
+        cls: ClsType[List[_types.ProvisioningServiceDescription]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -4082,18 +3176,23 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+                error = self._deserialize.failsafe_deserialize(
+                    _types.ErrorDetails,
+                    pipeline_response,
+                )
+                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
             return pipeline_response
 
         return ItemPaged(get_next, extract_data)
 
     @distributed_trace
-    def list_by_subscription(self, **kwargs: Any) -> ItemPaged[JSON]:
+    def list_by_subscription(self, **kwargs: Any) -> ItemPaged["_types.ProvisioningServiceDescription"]:
         """List all the provisioning services for a given subscription id.
 
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.paging.ItemPaged[JSON]
+        :return: An iterator like instance of ProvisioningServiceDescription
+        :rtype:
+         ~azure.core.paging.ItemPaged[~azext_iot.sdk.dps.mgmt.types.ProvisioningServiceDescription]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -4113,6 +3212,17 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                             }
                         ],
                         "deviceProvisioningHostName": "str",
+                        "deviceRegistryNamespaces": [
+                            {
+                                "authenticationType": "str",
+                                "resourceId": "str",
+                                "dataAddress": "str",
+                                "linkingState": "str",
+                                "location": "str",
+                                "namespaceUuid": "str",
+                                "selectedUserAssignedIdentityResourceId": "str"
+                            }
+                        ],
                         "disableLocalAuth": bool,
                         "enableDataResidency": bool,
                         "idScope": "str",
@@ -4205,7 +3315,7 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
+        cls: ClsType[List[_types.ProvisioningServiceDescription]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -4274,7 +3384,11 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+                error = self._deserialize.failsafe_deserialize(
+                    _types.ErrorDetails,
+                    pipeline_response,
+                )
+                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -4283,7 +3397,7 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
     @distributed_trace
     def list_valid_skus(
         self, provisioning_service_name: str, resource_group_name: str, **kwargs: Any
-    ) -> ItemPaged[JSON]:
+    ) -> ItemPaged["_types.IotDpsSkuDefinition"]:
         """Gets the list of valid SKUs and tiers for a provisioning service.
 
         :param provisioning_service_name: Name of the provisioning service to retrieve. Required.
@@ -4291,8 +3405,8 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.paging.ItemPaged[JSON]
+        :return: An iterator like instance of IotDpsSkuDefinition
+        :rtype: ~azure.core.paging.ItemPaged[~azext_iot.sdk.dps.mgmt.types.IotDpsSkuDefinition]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -4306,7 +3420,7 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
+        cls: ClsType[List[_types.IotDpsSkuDefinition]] = kwargs.pop("cls", None)
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -4377,14 +3491,20 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+                error = self._deserialize.failsafe_deserialize(
+                    _types.ErrorDetails,
+                    pipeline_response,
+                )
+                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
             return pipeline_response
 
         return ItemPaged(get_next, extract_data)
 
     @distributed_trace
-    def list_keys(self, provisioning_service_name: str, resource_group_name: str, **kwargs: Any) -> ItemPaged[JSON]:
+    def list_keys(
+        self, provisioning_service_name: str, resource_group_name: str, **kwargs: Any
+    ) -> ItemPaged["_types.SharedAccessSignatureAuthorizationRuleAccessRightsDescription"]:
         """List the primary and secondary keys for a provisioning service.
 
         :param provisioning_service_name: Name of the provisioning service to retrieve. Required.
@@ -4392,8 +3512,10 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :return: An iterator like instance of JSON object
-        :rtype: ~azure.core.paging.ItemPaged[JSON]
+        :return: An iterator like instance of
+         SharedAccessSignatureAuthorizationRuleAccessRightsDescription
+        :rtype:
+         ~azure.core.paging.ItemPaged[~azext_iot.sdk.dps.mgmt.types.SharedAccessSignatureAuthorizationRuleAccessRightsDescription]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -4410,7 +3532,9 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
+        cls: ClsType[List[_types.SharedAccessSignatureAuthorizationRuleAccessRightsDescription]] = kwargs.pop(
+            "cls", None
+        )
 
         error_map: MutableMapping = {
             401: ClientAuthenticationError,
@@ -4481,7 +3605,11 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
 
             if response.status_code not in [200]:
                 map_error(status_code=response.status_code, response=response, error_map=error_map)
-                raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+                error = self._deserialize.failsafe_deserialize(
+                    _types.ErrorDetails,
+                    pipeline_response,
+                )
+                raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
             return pipeline_response
 
@@ -4490,7 +3618,7 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
     @distributed_trace
     def list_keys_for_key_name(
         self, provisioning_service_name: str, key_name: str, resource_group_name: str, **kwargs: Any
-    ) -> JSON:
+    ) -> _types.SharedAccessSignatureAuthorizationRuleAccessRightsDescription:
         """List primary and secondary keys for a specific key name.
 
         :param provisioning_service_name: Name of the provisioning service to retrieve. Required.
@@ -4500,8 +3628,9 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :param resource_group_name: The name of the resource group. The name is case insensitive.
          Required.
         :type resource_group_name: str
-        :return: JSON object
-        :rtype: JSON
+        :return: SharedAccessSignatureAuthorizationRuleAccessRightsDescription
+        :rtype:
+         ~azext_iot.sdk.dps.mgmt.types.SharedAccessSignatureAuthorizationRuleAccessRightsDescription
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -4526,7 +3655,7 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_types.SharedAccessSignatureAuthorizationRuleAccessRightsDescription] = kwargs.pop("cls", None)
 
         _request = build_iot_dps_resource_list_keys_for_key_name_request(
             provisioning_service_name=provisioning_service_name,
@@ -4557,7 +3686,11 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(
+                _types.ErrorDetails,
+                pipeline_response,
+            )
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -4568,14 +3701,14 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @distributed_trace
     def get_private_link_resources(
         self, resource_group_name: str, resource_name: str, group_id: str, **kwargs: Any
-    ) -> JSON:
+    ) -> _types.GroupIdInformation:
         """Get the specified private link resource for the given provisioning service.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -4585,8 +3718,8 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :type resource_name: str
         :param group_id: The name of the private link resource. Required.
         :type group_id: str
-        :return: JSON object
-        :rtype: JSON
+        :return: GroupIdInformation
+        :rtype: ~azext_iot.sdk.dps.mgmt.types.GroupIdInformation
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -4627,7 +3760,7 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_types.GroupIdInformation] = kwargs.pop("cls", None)
 
         _request = build_iot_dps_resource_get_private_link_resources_request(
             resource_group_name=resource_group_name,
@@ -4658,7 +3791,11 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(
+                _types.ErrorDetails,
+                pipeline_response,
+            )
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -4669,12 +3806,14 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @distributed_trace
-    def list_private_link_resources(self, resource_group_name: str, resource_name: str, **kwargs: Any) -> JSON:
+    def list_private_link_resources(
+        self, resource_group_name: str, resource_name: str, **kwargs: Any
+    ) -> _types.PrivateLinkResources:
         """List private link resources for the given provisioning service.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -4682,8 +3821,8 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :type resource_group_name: str
         :param resource_name: Name of the provisioning service to retrieve. Required.
         :type resource_name: str
-        :return: JSON object
-        :rtype: JSON
+        :return: PrivateLinkResources
+        :rtype: ~azext_iot.sdk.dps.mgmt.types.PrivateLinkResources
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -4728,7 +3867,7 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_types.PrivateLinkResources] = kwargs.pop("cls", None)
 
         _request = build_iot_dps_resource_list_private_link_resources_request(
             resource_group_name=resource_group_name,
@@ -4758,7 +3897,11 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(
+                _types.ErrorDetails,
+                pipeline_response,
+            )
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -4769,14 +3912,14 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @distributed_trace
     def get_private_endpoint_connection(
         self, resource_group_name: str, resource_name: str, private_endpoint_connection_name: str, **kwargs: Any
-    ) -> JSON:
+    ) -> _types.PrivateEndpointConnection:
         """Get private endpoint connection properties.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -4786,8 +3929,8 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :type resource_name: str
         :param private_endpoint_connection_name: The name of the private endpoint connection. Required.
         :type private_endpoint_connection_name: str
-        :return: JSON object
-        :rtype: JSON
+        :return: PrivateEndpointConnection
+        :rtype: ~azext_iot.sdk.dps.mgmt.types.PrivateEndpointConnection
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -4829,7 +3972,7 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_types.PrivateEndpointConnection] = kwargs.pop("cls", None)
 
         _request = build_iot_dps_resource_get_private_endpoint_connection_request(
             resource_group_name=resource_group_name,
@@ -4860,7 +4003,11 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(
+                _types.ErrorDetails,
+                pipeline_response,
+            )
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -4871,16 +4018,16 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     def _create_or_update_private_endpoint_connection_initial(  # pylint: disable=name-too-long
         self,
         resource_group_name: str,
         resource_name: str,
         private_endpoint_connection_name: str,
-        private_endpoint_connection: Union[JSON, IO[bytes]],
+        private_endpoint_connection: _types.PrivateEndpointConnection,
         **kwargs: Any
     ) -> Iterator[bytes]:
         error_map: MutableMapping = {
@@ -4894,16 +4041,10 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
+        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
         cls: ClsType[Iterator[bytes]] = kwargs.pop("cls", None)
 
-        content_type = content_type or "application/json"
-        _json = None
-        _content = None
-        if isinstance(private_endpoint_connection, (IOBase, bytes)):
-            _content = private_endpoint_connection
-        else:
-            _json = private_endpoint_connection
+        _json = private_endpoint_connection
 
         _request = build_iot_dps_resource_create_or_update_private_endpoint_connection_request(
             resource_group_name=resource_group_name,
@@ -4913,7 +4054,6 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
-            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -4936,7 +4076,11 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(
+                _types.ErrorDetails,
+                pipeline_response,
+            )
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 201:
@@ -4946,152 +4090,9 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
+            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
 
-        return cast(Iterator[bytes], deserialized)  # type: ignore
-
-    @overload
-    def begin_create_or_update_private_endpoint_connection(  # pylint: disable=name-too-long
-        self,
-        resource_group_name: str,
-        resource_name: str,
-        private_endpoint_connection_name: str,
-        private_endpoint_connection: JSON,
-        *,
-        content_type: str = "application/json",
-        **kwargs: Any
-    ) -> LROPoller[JSON]:
-        """Create or update the status of a private endpoint connection with the specified name.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param resource_name: Name of the provisioning service to retrieve. Required.
-        :type resource_name: str
-        :param private_endpoint_connection_name: The name of the private endpoint connection. Required.
-        :type private_endpoint_connection_name: str
-        :param private_endpoint_connection: The private endpoint connection with updated properties.
-         Required.
-        :type private_endpoint_connection: JSON
-        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                private_endpoint_connection = {
-                    "properties": {
-                        "privateLinkServiceConnectionState": {
-                            "description": "str",
-                            "status": "str",
-                            "actionsRequired": "str"
-                        },
-                        "privateEndpoint": {
-                            "id": "str"
-                        }
-                    },
-                    "id": "str",
-                    "name": "str",
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",
-                        "createdBy": "str",
-                        "createdByType": "str",
-                        "lastModifiedAt": "2020-02-20 00:00:00",
-                        "lastModifiedBy": "str",
-                        "lastModifiedByType": "str"
-                    },
-                    "type": "str"
-                }
-
-                # response body for status code(s): 200, 201
-                response == {
-                    "properties": {
-                        "privateLinkServiceConnectionState": {
-                            "description": "str",
-                            "status": "str",
-                            "actionsRequired": "str"
-                        },
-                        "privateEndpoint": {
-                            "id": "str"
-                        }
-                    },
-                    "id": "str",
-                    "name": "str",
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",
-                        "createdBy": "str",
-                        "createdByType": "str",
-                        "lastModifiedAt": "2020-02-20 00:00:00",
-                        "lastModifiedBy": "str",
-                        "lastModifiedByType": "str"
-                    },
-                    "type": "str"
-                }
-        """
-
-    @overload
-    def begin_create_or_update_private_endpoint_connection(  # pylint: disable=name-too-long
-        self,
-        resource_group_name: str,
-        resource_name: str,
-        private_endpoint_connection_name: str,
-        private_endpoint_connection: IO[bytes],
-        *,
-        content_type: str = "application/json",
-        **kwargs: Any
-    ) -> LROPoller[JSON]:
-        """Create or update the status of a private endpoint connection with the specified name.
-
-        :param resource_group_name: The name of the resource group. The name is case insensitive.
-         Required.
-        :type resource_group_name: str
-        :param resource_name: Name of the provisioning service to retrieve. Required.
-        :type resource_name: str
-        :param private_endpoint_connection_name: The name of the private endpoint connection. Required.
-        :type private_endpoint_connection_name: str
-        :param private_endpoint_connection: The private endpoint connection with updated properties.
-         Required.
-        :type private_endpoint_connection: IO[bytes]
-        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200, 201
-                response == {
-                    "properties": {
-                        "privateLinkServiceConnectionState": {
-                            "description": "str",
-                            "status": "str",
-                            "actionsRequired": "str"
-                        },
-                        "privateEndpoint": {
-                            "id": "str"
-                        }
-                    },
-                    "id": "str",
-                    "name": "str",
-                    "systemData": {
-                        "createdAt": "2020-02-20 00:00:00",
-                        "createdBy": "str",
-                        "createdByType": "str",
-                        "lastModifiedAt": "2020-02-20 00:00:00",
-                        "lastModifiedBy": "str",
-                        "lastModifiedByType": "str"
-                    },
-                    "type": "str"
-                }
-        """
+        return deserialized  # type: ignore
 
     @distributed_trace
     def begin_create_or_update_private_endpoint_connection(  # pylint: disable=name-too-long
@@ -5099,9 +4100,9 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         resource_group_name: str,
         resource_name: str,
         private_endpoint_connection_name: str,
-        private_endpoint_connection: Union[JSON, IO[bytes]],
+        private_endpoint_connection: _types.PrivateEndpointConnection,
         **kwargs: Any
-    ) -> LROPoller[JSON]:
+    ) -> LROPoller[_types.PrivateEndpointConnection]:
         """Create or update the status of a private endpoint connection with the specified name.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -5111,11 +4112,11 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :type resource_name: str
         :param private_endpoint_connection_name: The name of the private endpoint connection. Required.
         :type private_endpoint_connection_name: str
-        :param private_endpoint_connection: The private endpoint connection with updated properties. Is
-         either a JSON type or a IO[bytes] type. Required.
-        :type private_endpoint_connection: JSON or IO[bytes]
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :param private_endpoint_connection: The private endpoint connection with updated properties.
+         Required.
+        :type private_endpoint_connection: ~azext_iot.sdk.dps.mgmt.types.PrivateEndpointConnection
+        :return: An instance of LROPoller that returns PrivateEndpointConnection
+        :rtype: ~azure.core.polling.LROPoller[~azext_iot.sdk.dps.mgmt.types.PrivateEndpointConnection]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -5174,8 +4175,8 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        cls: ClsType[_types.PrivateEndpointConnection] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -5195,7 +4196,6 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
-            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -5217,13 +4217,15 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[JSON].from_continuation_token(
+            return LROPoller[_types.PrivateEndpointConnection].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
+        return LROPoller[_types.PrivateEndpointConnection](
+            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
+        )
 
     def _delete_private_endpoint_connection_initial(  # pylint: disable=name-too-long
         self, resource_group_name: str, resource_name: str, private_endpoint_connection_name: str, **kwargs: Any
@@ -5269,7 +4271,11 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
             except (StreamConsumedError, StreamClosedError):
                 pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(
+                _types.ErrorDetails,
+                pipeline_response,
+            )
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
         response_headers = {}
         if response.status_code == 202:
@@ -5279,14 +4285,14 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         deserialized = response.iter_bytes() if _decompress else response.iter_raw()
 
         if cls:
-            return cls(pipeline_response, cast(Iterator[bytes], deserialized), response_headers)  # type: ignore
+            return cls(pipeline_response, deserialized, response_headers)  # type: ignore
 
-        return cast(Iterator[bytes], deserialized)  # type: ignore
+        return deserialized  # type: ignore
 
     @distributed_trace
     def begin_delete_private_endpoint_connection(
         self, resource_group_name: str, resource_name: str, private_endpoint_connection_name: str, **kwargs: Any
-    ) -> LROPoller[JSON]:
+    ) -> LROPoller[_types.PrivateEndpointConnection]:
         """Delete private endpoint connection with the specified name.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -5296,8 +4302,8 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :type resource_name: str
         :param private_endpoint_connection_name: The name of the private endpoint connection. Required.
         :type private_endpoint_connection_name: str
-        :return: An instance of LROPoller that returns JSON object
-        :rtype: ~azure.core.polling.LROPoller[JSON]
+        :return: An instance of LROPoller that returns PrivateEndpointConnection
+        :rtype: ~azure.core.polling.LROPoller[~azext_iot.sdk.dps.mgmt.types.PrivateEndpointConnection]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -5331,7 +4337,7 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        cls: ClsType[_types.PrivateEndpointConnection] = kwargs.pop("cls", None)
         polling: Union[bool, PollingMethod] = kwargs.pop("polling", True)
         lro_delay = kwargs.pop("polling_interval", self._config.polling_interval)
         cont_token: Optional[str] = kwargs.pop("continuation_token", None)
@@ -5349,7 +4355,6 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         kwargs.pop("error_map", None)
 
         def get_long_running_output(pipeline_response):
-            response = pipeline_response.http_response
             if response.content:
                 deserialized = response.json()
             else:
@@ -5371,18 +4376,20 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         else:
             polling_method = polling
         if cont_token:
-            return LROPoller[JSON].from_continuation_token(
+            return LROPoller[_types.PrivateEndpointConnection].from_continuation_token(
                 polling_method=polling_method,
                 continuation_token=cont_token,
                 client=self._client,
                 deserialization_callback=get_long_running_output,
             )
-        return LROPoller[JSON](self._client, raw_result, get_long_running_output, polling_method)  # type: ignore
+        return LROPoller[_types.PrivateEndpointConnection](
+            self._client, raw_result, get_long_running_output, polling_method  # type: ignore
+        )
 
     @distributed_trace
     def list_private_endpoint_connections(
         self, resource_group_name: str, resource_name: str, **kwargs: Any
-    ) -> List[JSON]:
+    ) -> List[_types.PrivateEndpointConnection]:
         """List private endpoint connection properties.
 
         :param resource_group_name: The name of the resource group. The name is case insensitive.
@@ -5390,8 +4397,8 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         :type resource_group_name: str
         :param resource_name: Name of the provisioning service to retrieve. Required.
         :type resource_name: str
-        :return: list of JSON object
-        :rtype: list[JSON]
+        :return: list of PrivateEndpointConnection
+        :rtype: list[~azext_iot.sdk.dps.mgmt.types.PrivateEndpointConnection]
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -5435,7 +4442,7 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = kwargs.pop("headers", {}) or {}
         _params = kwargs.pop("params", {}) or {}
 
-        cls: ClsType[List[JSON]] = kwargs.pop("cls", None)
+        cls: ClsType[List[_types.PrivateEndpointConnection]] = kwargs.pop("cls", None)
 
         _request = build_iot_dps_resource_list_private_endpoint_connections_request(
             resource_group_name=resource_group_name,
@@ -5465,7 +4472,11 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(
+                _types.ErrorDetails,
+                pipeline_response,
+            )
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -5476,86 +4487,23 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, cast(List[JSON], deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(List[JSON], deserialized)  # type: ignore
-
-    @overload
-    def check_provisioning_service_name_availability(  # pylint: disable=name-too-long
-        self, arguments: JSON, *, content_type: str = "application/json", **kwargs: Any
-    ) -> JSON:
-        """Check if a provisioning service name is available.
-
-        Check if a provisioning service name is available. This will validate if the name is
-        syntactically valid and if the name is usable.
-
-        :param arguments: The request body. Required.
-        :type arguments: JSON
-        :keyword content_type: Body Parameter content-type. Content type parameter for JSON body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # JSON input template you can fill out and use as your body input.
-                arguments = {
-                    "name": "str"
-                }
-
-                # response body for status code(s): 200
-                response == {
-                    "message": "str",
-                    "nameAvailable": bool,
-                    "reason": "str"
-                }
-        """
-
-    @overload
-    def check_provisioning_service_name_availability(  # pylint: disable=name-too-long
-        self, arguments: IO[bytes], *, content_type: str = "application/json", **kwargs: Any
-    ) -> JSON:
-        """Check if a provisioning service name is available.
-
-        Check if a provisioning service name is available. This will validate if the name is
-        syntactically valid and if the name is usable.
-
-        :param arguments: The request body. Required.
-        :type arguments: IO[bytes]
-        :keyword content_type: Body Parameter content-type. Content type parameter for binary body.
-         Default value is "application/json".
-        :paramtype content_type: str
-        :return: JSON object
-        :rtype: JSON
-        :raises ~azure.core.exceptions.HttpResponseError:
-
-        Example:
-            .. code-block:: python
-
-                # response body for status code(s): 200
-                response == {
-                    "message": "str",
-                    "nameAvailable": bool,
-                    "reason": "str"
-                }
-        """
+        return deserialized  # type: ignore
 
     @distributed_trace
     def check_provisioning_service_name_availability(  # pylint: disable=name-too-long
-        self, arguments: Union[JSON, IO[bytes]], **kwargs: Any
-    ) -> JSON:
+        self, arguments: _types.OperationInputs, **kwargs: Any
+    ) -> _types.NameAvailabilityInfo:
         """Check if a provisioning service name is available.
 
         Check if a provisioning service name is available. This will validate if the name is
         syntactically valid and if the name is usable.
 
-        :param arguments: The request body. Is either a JSON type or a IO[bytes] type. Required.
-        :type arguments: JSON or IO[bytes]
-        :return: JSON object
-        :rtype: JSON
+        :param arguments: The request body. Required.
+        :type arguments: ~azext_iot.sdk.dps.mgmt.types.OperationInputs
+        :return: NameAvailabilityInfo
+        :rtype: ~azext_iot.sdk.dps.mgmt.types.NameAvailabilityInfo
         :raises ~azure.core.exceptions.HttpResponseError:
 
         Example:
@@ -5584,23 +4532,16 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
         _headers = case_insensitive_dict(kwargs.pop("headers", {}) or {})
         _params = kwargs.pop("params", {}) or {}
 
-        content_type: Optional[str] = kwargs.pop("content_type", _headers.pop("Content-Type", None))
-        cls: ClsType[JSON] = kwargs.pop("cls", None)
+        content_type: str = kwargs.pop("content_type", _headers.pop("Content-Type", "application/json"))
+        cls: ClsType[_types.NameAvailabilityInfo] = kwargs.pop("cls", None)
 
-        content_type = content_type or "application/json"
-        _json = None
-        _content = None
-        if isinstance(arguments, (IOBase, bytes)):
-            _content = arguments
-        else:
-            _json = arguments
+        _json = arguments
 
         _request = build_iot_dps_resource_check_provisioning_service_name_availability_request(
             subscription_id=self._config.subscription_id,
             content_type=content_type,
             api_version=self._config.api_version,
             json=_json,
-            content=_content,
             headers=_headers,
             params=_params,
         )
@@ -5624,7 +4565,11 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 except (StreamConsumedError, StreamClosedError):
                     pass
             map_error(status_code=response.status_code, response=response, error_map=error_map)
-            raise HttpResponseError(response=response, error_format=ARMErrorFormat)
+            error = self._deserialize.failsafe_deserialize(
+                _types.ErrorDetails,
+                pipeline_response,
+            )
+            raise HttpResponseError(response=response, model=error, error_format=ARMErrorFormat)
 
         if _stream:
             deserialized = response.iter_bytes() if _decompress else response.iter_raw()
@@ -5635,6 +4580,6 @@ class IotDpsResourceOperations:  # pylint: disable=docstring-missing-param,too-m
                 deserialized = None
 
         if cls:
-            return cls(pipeline_response, cast(JSON, deserialized), {})  # type: ignore
+            return cls(pipeline_response, deserialized, {})  # type: ignore
 
-        return cast(JSON, deserialized)  # type: ignore
+        return deserialized  # type: ignore

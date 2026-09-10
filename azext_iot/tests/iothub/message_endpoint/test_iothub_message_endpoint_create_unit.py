@@ -8,6 +8,7 @@ import logging
 from collections import defaultdict
 
 import pytest
+from azure.core import MatchConditions
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
     RequiredArgumentMissingError,
@@ -42,10 +43,12 @@ def _build_hub(cosmos_version=IoTHubSDKVersion.CosmosContainers.value):
     elif cosmos_version == IoTHubSDKVersion.CosmosCollections.value:
         endpoints["cosmosDBSqlCollections"] = []
     return {
+        "id": (
+            "/subscriptions/test-sub/resourceGroups/test-rg/providers/"
+            "Microsoft.Devices/IotHubs/test-hub"
+        ),
         "name": hub_name,
         "etag": "test-etag",
-        "resourcegroup": hub_rg,
-        "subscriptionid": "test-sub",
         "properties": {"routing": {"endpoints": endpoints, "routes": [], "enrichments": []}},
     }
 
@@ -86,6 +89,58 @@ def provider(mocker):
 
 
 class TestCreate:
+    def test_put_is_conditional_and_omits_server_projections(self, provider):
+        hub = _build_hub()
+        hub["sku"] = {"name": "S1", "tier": "Standard", "capacity": 1}
+        hub["identity"] = {
+            "type": "SystemAssigned",
+            "principalId": "principal",
+            "tenantId": "tenant",
+        }
+        hub["properties"].update(
+            {
+                "deviceRegistry": {"namespaceResourceId": "/namespaces/ns"},
+                "provisioningState": "Succeeded",
+                "hostName": "test-hub.azure-devices.net",
+                "eventHubEndpoints": {
+                    "events": {
+                        "retentionTimeInDays": 1,
+                        "partitionCount": 4,
+                        "partitionIds": ["0", "1", "2", "3"],
+                        "path": "test-hub",
+                        "endpoint": "sb://service-owned/",
+                    }
+                },
+            }
+        )
+        p, original = provider(hub=hub)
+
+        p.create(
+            endpoint_name="ep1",
+            endpoint_type=EndpointType.EventHub.value,
+            connection_string="connection-string",
+        )
+
+        kwargs = p.discovery.client.begin_create_or_update.call_args.kwargs
+        assert kwargs["resource_group_name"] == hub_rg
+        assert kwargs["etag"] == "test-etag"
+        assert kwargs["match_condition"] == MatchConditions.IfNotModified
+        body = kwargs["iot_hub_description"]
+        assert body["identity"] == {"type": "SystemAssigned"}
+        assert body["sku"] == {"name": "S1", "capacity": 1}
+        assert {
+            "deviceRegistry",
+            "provisioningState",
+            "hostName",
+        }.isdisjoint(body["properties"])
+        assert body["properties"]["eventHubEndpoints"]["events"] == {
+            "retentionTimeInDays": 1,
+            "partitionCount": 4,
+        }
+        assert original["properties"]["deviceRegistry"] == {
+            "namespaceResourceId": "/namespaces/ns"
+        }
+
     def test_create_event_hub_fetch_cstring(self, provider):
         p, hub = provider()
         result = p.create(
@@ -98,6 +153,10 @@ class TestCreate:
         assert result == generic_response
         eh = hub["properties"]["routing"]["endpoints"]["eventHubs"]
         assert eh[0]["connectionString"] == "eh-cstring"
+        assert eh[0]["resourceGroup"] == "test-rg"
+        assert eh[0]["subscriptionId"] == "test-sub"
+        assert "resourcegroup" not in hub
+        assert "subscriptionid" not in hub
 
     def test_create_event_hub_with_entity_path(self, provider):
         p, hub = provider()
@@ -418,6 +477,25 @@ class TestShowListDelete:
         p, _ = provider(cosmos_version=IoTHubSDKVersion.NoCosmos.value)
         with pytest.raises(InvalidArgumentValueError):
             p.delete(endpoint_type=EndpointType.CosmosDBContainer.value)
+
+    def test_list_cosmos_no_support(self, provider):
+        p, _ = provider(cosmos_version=IoTHubSDKVersion.NoCosmos.value)
+        with pytest.raises(InvalidArgumentValueError):
+            p.list(endpoint_type=EndpointType.CosmosDBContainer.value)
+
+    def test_delete_all_legacy_cosmos_collections(self, provider):
+        p, hub = provider(
+            cosmos_version=IoTHubSDKVersion.CosmosCollections.value
+        )
+        hub["properties"]["routing"]["endpoints"][
+            "cosmosDBSqlCollections"
+        ] = [{"name": "legacy"}]
+
+        p.delete(endpoint_type=EndpointType.CosmosDBContainer.value)
+
+        assert hub["properties"]["routing"]["endpoints"][
+            "cosmosDBSqlCollections"
+        ] == []
 
     def test_delete_with_routes_warning(self, provider):
         p, hub = provider()

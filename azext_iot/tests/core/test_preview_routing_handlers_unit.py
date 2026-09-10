@@ -22,7 +22,8 @@ ENDPOINTS = [
 def assert_hub_write(client, hub, result):
     assert result is client.iot_hub_resource.begin_create_or_update.return_value
     client.iot_hub_resource.begin_create_or_update.assert_called_once_with(
-        resource_group_name="rg", resource_name="hub", iot_hub_description=hub, etag="hub-etag"
+        resource_group_name="rg", resource_name="hub", iot_hub_description=custom._hub_description_for_write(hub),
+        **custom.hub_etag_arguments(hub),
     )
 
 

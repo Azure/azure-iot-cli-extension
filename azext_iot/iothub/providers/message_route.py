@@ -44,12 +44,7 @@ class MessageRoute(IoTHubProvider):
         )
 
         try:
-            return self.discovery.client.begin_create_or_update(
-                resource_group_name=self.hub_resource["resourcegroup"],
-                resource_name=self.hub_resource["name"],
-                iot_hub_description=self.hub_resource,
-                etag=self.hub_resource["etag"]
-            )
+            return self._begin_hub_update()
         except HttpResponseError as e:
             handle_service_exception(e)
 
@@ -68,12 +63,7 @@ class MessageRoute(IoTHubProvider):
         route["isEnabled"] = route["isEnabled"] if enabled is None else enabled
 
         try:
-            return self.discovery.client.begin_create_or_update(
-                resource_group_name=self.hub_resource["resourcegroup"],
-                resource_name=self.hub_resource["name"],
-                iot_hub_description=self.hub_resource,
-                etag=self.hub_resource["etag"]
-            )
+            return self._begin_hub_update()
         except HttpResponseError as e:
             handle_service_exception(e)
 
@@ -100,12 +90,7 @@ class MessageRoute(IoTHubProvider):
             routing["routes"] = [route for route in routing["routes"] if route["source"].lower() != source_type.lower()]
 
         try:
-            return self.discovery.client.begin_create_or_update(
-                resource_group_name=self.hub_resource["resourcegroup"],
-                resource_name=self.hub_resource["name"],
-                iot_hub_description=self.hub_resource,
-                etag=self.hub_resource["etag"]
-            )
+            return self._begin_hub_update()
         except HttpResponseError as e:
             handle_service_exception(e)
 
@@ -137,7 +122,7 @@ class MessageRoute(IoTHubProvider):
             }
             return self.discovery.client.test_route(
                 iot_hub_name=self.hub_resource["name"],
-                resource_group_name=self.hub_resource["resourcegroup"],
+                resource_group_name=self.rg,
                 input=test_route_input
             )
 
@@ -149,7 +134,7 @@ class MessageRoute(IoTHubProvider):
             }
             return self.discovery.client.test_all_routes(
                 iot_hub_name=self.hub_resource["name"],
-                resource_group_name=self.hub_resource["resourcegroup"],
+                resource_group_name=self.rg,
                 input=test_all_routes_input
             )
 
@@ -164,7 +149,7 @@ class MessageRoute(IoTHubProvider):
             }
             result = self.discovery.client.test_all_routes(
                 iot_hub_name=self.hub_resource["name"],
-                resource_group_name=self.hub_resource["resourcegroup"],
+                resource_group_name=self.rg,
                 input=test_all_routes_input
             )["routes"]
 
@@ -185,10 +170,5 @@ class MessageRoute(IoTHubProvider):
         fallback_route = self.hub_resource["properties"]["routing"]["fallbackRoute"]
         fallback_route["isEnabled"] = enabled
 
-        self.discovery.client.begin_create_or_update(
-            resource_group_name=self.hub_resource["resourcegroup"],
-            resource_name=self.hub_resource["name"],
-            iot_hub_description=self.hub_resource,
-            etag=self.hub_resource["etag"]
-        )
+        self._begin_hub_update()
         return self.show_fallback()

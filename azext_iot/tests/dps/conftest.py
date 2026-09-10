@@ -40,7 +40,11 @@ settings = DynamoSettings(
     ))
 )
 ENTITY_RG = settings.env.azext_iot_testrg
-ENTITY_LOCATION = settings.env.azext_iot_dps_test_location or "westus"
+ENTITY_LOCATION = (
+    "centraluseuap"
+    if settings.env.azext_iot_dps_test_location == "centraluseuap"
+    else "westus"
+)
 MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries if settings.env.azext_iot_rbac_max_tries else 10
 
 # DPS instance strategy (timestamp + run-tag + age-based GC)

@@ -2,14 +2,25 @@
 
 Release History
 ===============
-0.33.0b10 (Preview)
+0.33.0b11 (Preview)
 ++++++++++++++++++++
 
-**ADR SDK and target endpoint alignment**
+**Hub/DPS child SDK and command consolidation**
+
+* General Hub management now uses ``2026-10-01-preview`` and DPS management uses ``2026-06-01-preview`` on the selected cloud's ARM endpoint. ADR target and identity-safety reads retain the canary endpoint, native API overrides, target-subscription credentials, and fail-closed resource-ID validation.
+* DPS service and device REST clients use ``2026-11-02-preview``. Hub service REST ``2024-03-31`` and device REST ``2019-10-01`` are unchanged; no unsupported data-plane version bump is made.
+* Recovered modeless management CRUD/upsert, conditional Hub writes, read-only projection removal, partial identity merging, Fabric endpoint/routes/state behavior, and service/device hostname discovery. Hub upserts preserve unspecified settings and active ADR-link identities.
+* DPS enrollment retains unknown JSON fields and supports canonical ``--adr-namespace``, ``--adr-ca-name``, and ``--adr-cert-policy-name`` plus ``--namespace-name``, ``--certificate-authority-name``, and ``--certificate-policy-name`` aliases. Legacy credential-policy aliases remain deprecated. Set all three reference options to empty strings to clear an existing reference. Names and incomplete references are validated explicitly.
+* Modeless DPS queries follow continuation headers, reject repeated tokens and malformed pages, honor zero-item limits, and preserve service error codes and conditional ETags. CLI ``--top -1`` remains the unlimited compatibility spelling.
+* DPS service authentication renews per request using in-process CLI credentials or SAS; exact discovered sovereign/custom hostnames are retained and authentication redirects are blocked.
+* Both CSR and non-CSR device registration use REST. ``--csr`` / ``--csr-file-path`` accept a PEM/base64 DER PKCS #10 request or file; signature and Common Name are validated and the wire value is base64 DER without PEM headers. Payload, TPM schema fields/authentication guards, operation-status, issued certificate-chain JSON, connection profiles, and Registry Device external-ID correlation remain available.
+* Explicit ``--timeout`` isolates the same REST implementation in a reaped worker process, bounding startup, HTTP, and polling after preliminary discovery/bootstrap authentication. Encrypted X.509 keys and requests 2.32 connection-pool SSL contexts are supported. No TLS-ready certificate output is invented: the issued chain's encoding/order is not specified by the generated contract. DPS device-update actions remain SDK methods rather than operator CLI commands.
+
+**Inherited ADR SDK and target endpoint alignment**
 
 * Replaced the ADR/CMS and Software Updates control/data clients with three pinned TypeSpec-generated ``1.0.0b1`` clients. These ADR-owned clients are modeless and synchronous-only; their generated ``models`` and ``aio`` packages are intentionally absent.
 * ADR and Update Instance management use ``2026-11-02-preview`` through the Central US EUAP ARM endpoint. ADR target lookup/deletion and identity-safety reads reuse preview's native modeless Hub/DPS management clients with explicit ``2026-10-01-preview`` (Hub) and ``2026-06-01-preview`` (DPS) contracts. Software Updates data uses its service-derived endpoint and ``2026-11-02-preview``.
-* General Hub/DPS management retain preview SDK defaults (``2026-05-01-preview`` / ``2026-08-31``), selected-cloud ARM endpoints, and preview general commands. DPS enrollment and registration retain preview behavior. General Hub/DPS SDK upgrades, certificate-reference enrollment, CSR/REST registration, and registration operation-status are separate follow-up work, not part of this ADR-only base.
+* The inherited ADR-only base separated general Hub/DPS upgrades; the child consolidation above restores them without changing the ADR command implementations or refreshed SDK.
 * Resource mutations poll ``provisioningState`` and POST actions follow authenticated ``Location`` URLs. This supersedes the b9 ``Azure-AsyncOperation`` polling change because that service host is not usable.
 
 **Canonical namespace links and resource management**

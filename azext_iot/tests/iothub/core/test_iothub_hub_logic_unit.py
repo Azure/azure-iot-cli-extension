@@ -90,8 +90,11 @@ class TestGetHubConnectionString:
     @staticmethod
     def _hub():
         return {
+            "id": (
+                "/subscriptions/sub/resourceGroups/rg/providers/"
+                "Microsoft.Devices/IotHubs/myhub"
+            ),
             "name": "myhub",
-            "resourcegroup": "rg",
             "properties": {
                 "hostName": "myhub.azure-devices.net",
                 "deviceHostName": "myhub.device.azure-devices.net",
@@ -210,8 +213,16 @@ class TestIotHubConnectionStringShow:
 
     def test_list_all_active_only(self, mocker, fixture_cmd):
         self.disc.get_resources.return_value = [
-            {"name": "active", "resourcegroup": "rg", "properties": {"state": "Active"}},
-            {"name": "inactive", "resourcegroup": "rg", "properties": {"state": "Suspended"}},
+            {
+                "id": "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Devices/IotHubs/active",
+                "name": "active",
+                "properties": {"state": "Active"},
+            },
+            {
+                "id": "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Devices/IotHubs/inactive",
+                "name": "inactive",
+                "properties": {"state": "Suspended"},
+            },
         ]
         mocker.patch.object(subject, "_get_hub_connection_string", return_value=["cs"])
         result = subject.iot_hub_connection_string_show(fixture_cmd)
@@ -219,7 +230,11 @@ class TestIotHubConnectionStringShow:
 
     def test_list_all_missing_policy_warning(self, mocker, fixture_cmd):
         self.disc.get_resources.return_value = [
-            {"name": "active", "resourcegroup": "rg", "properties": {"state": "Active"}},
+            {
+                "id": "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Devices/IotHubs/active",
+                "name": "active",
+                "properties": {"state": "Active"},
+            },
         ]
         mocker.patch.object(
             subject, "_get_hub_connection_string", side_effect=Exception("no policy")

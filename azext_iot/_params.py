@@ -35,7 +35,7 @@ from azext_iot.common.shared import (
     AuthenticationTypeDataplane,
     RenewKeyType,
 )
-from azext_iot._validators import mode2_iot_login_handler, process_top
+from azext_iot._validators import mode2_iot_login_handler, process_top, process_dps_top
 from azext_iot.assets.user_messages import info_param_properties_device
 from azext_iot.monitor.models.enum import Transport
 
@@ -1132,6 +1132,9 @@ def load_arguments(self, _):
             arg_type=dps_auth_type_dataplane_param_type,
         )
 
+    with self.argument_context("iot dps") as context:
+        context.argument("top", validator=process_dps_top)
+
     # Apply arg_group only to dataplane commands
     for dps_dataplane_command in ["compute-device-key", "connection-string", "enrollment", "enrollment-group"]:
         with self.argument_context(f"iot dps {dps_dataplane_command}") as context:
@@ -1186,10 +1189,40 @@ def load_arguments(self, _):
             help="Optional device information.",
         )
         context.argument(
+            "adr_namespace",
+            options_list=["--adr-namespace", "--namespace-name"],
+            help="Device Registry namespace containing the certificate policy.",
+            arg_group="ADR Certificate Policy",
+        )
+        context.argument(
+            "adr_ca_name",
+            options_list=["--adr-ca-name", "--certificate-authority-name"],
+            help="Certificate Authority name in the Device Registry namespace.",
+            arg_group="ADR Certificate Policy",
+        )
+        context.argument(
+            "adr_certificate_policy_name",
+            options_list=[
+                "--adr-cert-policy-name",
+                "--certificate-policy-name",
+                context.deprecate(
+                    target="--adr-certificate-policy-name",
+                    redirect="--adr-cert-policy-name",
+                    hide=True,
+                ),
+            ],
+            help="Certificate Policy name under the Device Registry Certificate Authority.",
+            arg_group="ADR Certificate Policy",
+        )
+        context.argument(
             "credential_policy_name",
             options_list=["--credential-policy-name", "--cpn"],
-            help="ADR Namespace Credential Policy Name.",
-            arg_group="ADR Credential Policy"
+            deprecate_info=context.deprecate(
+                redirect="--adr-cert-policy-name", hide=True
+            ),
+            help="Deprecated alias for --adr-cert-policy-name. "
+            "--adr-namespace and --adr-ca-name are also required.",
+            arg_group="ADR Certificate Policy",
         )
 
     with self.argument_context("iot dps enrollment create") as context:
@@ -1298,10 +1331,40 @@ def load_arguments(self, _):
             help="ID of device registration."
         )
         context.argument(
+            "adr_namespace",
+            options_list=["--adr-namespace", "--namespace-name"],
+            help="Device Registry namespace containing the certificate policy.",
+            arg_group="ADR Certificate Policy",
+        )
+        context.argument(
+            "adr_ca_name",
+            options_list=["--adr-ca-name", "--certificate-authority-name"],
+            help="Certificate Authority name in the Device Registry namespace.",
+            arg_group="ADR Certificate Policy",
+        )
+        context.argument(
+            "adr_certificate_policy_name",
+            options_list=[
+                "--adr-cert-policy-name",
+                "--certificate-policy-name",
+                context.deprecate(
+                    target="--adr-certificate-policy-name",
+                    redirect="--adr-cert-policy-name",
+                    hide=True,
+                ),
+            ],
+            help="Certificate Policy name under the Device Registry Certificate Authority.",
+            arg_group="ADR Certificate Policy",
+        )
+        context.argument(
             "credential_policy_name",
             options_list=["--credential-policy-name", "--cpn"],
-            help="ADR Namespace Credential Policy Name.",
-            arg_group="ADR Credential Policy"
+            deprecate_info=context.deprecate(
+                redirect="--adr-cert-policy-name", hide=True
+            ),
+            help="Deprecated alias for --adr-cert-policy-name. "
+            "--adr-namespace and --adr-ca-name are also required.",
+            arg_group="ADR Certificate Policy",
         )
 
     with self.argument_context("iot dps enrollment-group show") as context:
