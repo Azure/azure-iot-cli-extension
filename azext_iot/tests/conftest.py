@@ -463,6 +463,18 @@ def pytest_addoption(parser):
 
 # DPS Fixtures
 @pytest.fixture()
+def dps_service_client_generic_errors(
+    service_client_generic_errors, fixture_gdcs, fixture_dps_sas, patch_certificate_open
+):
+    yield service_client_generic_errors
+    assert service_client_generic_errors.calls
+    assert all(
+        call.request.url.startswith("https://{}/".format(mock_dps_target["entity"]))
+        for call in service_client_generic_errors.calls
+    )
+
+
+@pytest.fixture()
 def fixture_gdcs(mocker):
     gdcs = mocker.patch(path_gdcs)
     gdcs.return_value = mock_dps_target
