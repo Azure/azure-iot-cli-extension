@@ -13,6 +13,9 @@ import pytest
 
 from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import (
+    CleanupLedger,
+    is_resource_not_found_error,
+    wait_for_condition,
     wait_for_materialized_resources,
     wait_for_resource_succeeded,
 )
@@ -69,13 +72,20 @@ def _create_registry_device(
     return test.cmd(create_command).get_output_in_json()
 
 
-def _cleanup_namespace(test, namespace_name: str) -> None:
-    try:
-        test.cmd(
-            f"iot adr ns delete -n {namespace_name} -g {TEST_RG} --yes"
-        )
-    except Exception as error:  # noqa: BLE001 - cleanup is best-effort
-        _log(LogKind.WARN, "Cleanup failed: %s", error)
+def _cleanup_namespace(test, namespace_name: str, device_name: str) -> None:
+    commands = [
+        f"iot adr ns registry-device delete -n {device_name} "
+        f"--ns {namespace_name} -g {TEST_RG} --yes",
+        f"iot adr ns delete -n {namespace_name} -g {TEST_RG} --yes",
+    ]
+    for command in commands:
+        try:
+            test.cmd(command)
+        except Exception as error:  # noqa: BLE001 - attempt all owned cleanup
+            if is_resource_not_found_error(error):
+                _log(LogKind.RESULT, "Cleanup resource already absent: %s", command)
+            else:
+                _log(LogKind.WARN, "Cleanup failed for %s: %s", command, error)
 
 
 @pytest.mark.usefixtures("set_cwd")
@@ -160,7 +170,7 @@ class TestADRRegistryDeviceLifecycle(ADRLiveScenarioTest):
             )
             self.cmd(show_command, expect_failure=True)
         finally:
-            _cleanup_namespace(self, namespace_name)
+            _cleanup_namespace(self, namespace_name, device_name)
 
     def test_registry_device_authentication_profiles(self):
         namespace_name = generate_adr_namespace_name()
@@ -233,8 +243,8 @@ class TestADRRegistryDeviceLifecycle(ADRLiveScenarioTest):
                     f"-n {symmetric_profile} "
                     f"--registry-device-name {device_name} "
                     f"--ns {namespace_name} -g {TEST_RG} "
-                    '--query "{primary:length(symmetricKey.primaryKey),'
-                    'secondary:length(symmetricKey.secondaryKey)}"'
+                    '--query "{{primary:length(symmetricKey.primaryKey),'
+                    'secondary:length(symmetricKey.secondaryKey)}}"'
                 ).get_output_in_json()
                 assert key_lengths["primary"] > 0
                 assert key_lengths["secondary"] > 0
@@ -265,7 +275,7 @@ class TestADRRegistryDeviceLifecycle(ADRLiveScenarioTest):
                 )
 
         finally:
-            _cleanup_namespace(self, namespace_name)
+            _cleanup_namespace(self, namespace_name, device_name)
 
     @pytest.mark.skipif(
         not RUN_CERTIFICATE_REVOCATION or not CA_AUTH_PROFILE_NAME,
@@ -299,7 +309,7 @@ class TestADRRegistryDeviceLifecycle(ADRLiveScenarioTest):
                 f"--ns {namespace_name} -g {TEST_RG} --yes"
             )
         finally:
-            _cleanup_namespace(self, namespace_name)
+            _cleanup_namespace(self, namespace_name, device_name)
 
     def _assert_read_only_child(
         self,
@@ -339,7 +349,7 @@ class TestADRRegistryDeviceLifecycle(ADRLiveScenarioTest):
             ).get_output_in_json()
             assert resource["name"] == resource_name
         finally:
-            _cleanup_namespace(self, namespace_name)
+            _cleanup_namespace(self, namespace_name, device_name)
 
     def test_registry_device_attributes(self):
         self._assert_read_only_child(
@@ -354,7 +364,11 @@ class TestADRRegistryDeviceLifecycle(ADRLiveScenarioTest):
         device_name = _registry_device_name()
         attribute_name = f"site{generate_generic_id()[:8]}"
 
-        try:
+        with CleanupLedger() as cleanup:
+            cleanup.register(
+                "registry device and namespace",
+                lambda: _cleanup_namespace(self, namespace_name, device_name),
+            )
             _create_registry_device(self, namespace_name, device_name, no_wait=False)
 
             scope = (
@@ -364,8 +378,14 @@ class TestADRRegistryDeviceLifecycle(ADRLiveScenarioTest):
             created = self.cmd(
                 f"iot adr ns registry-device attribute create -n {attribute_name} {scope} "
                 f"--schema https://contoso.com/schemas/site.json "
-                f'--properties \'{{"site": "plant-3", "rack": 12}}\''
+                '--properties \'{{"site": "plant-3", "rack": 12}}\''
             ).get_output_in_json()
+            cleanup.register(
+                "user attribute",
+                lambda: self.cmd(
+                    f"iot adr ns registry-device attribute delete -n {attribute_name} {scope} -y"
+                ),
+            )
             assert created["name"] == attribute_name
             properties = created["properties"]
             assert properties["reportedBy"] == "User"
@@ -377,15 +397,22 @@ class TestADRRegistryDeviceLifecycle(ADRLiveScenarioTest):
             ).get_output_in_json()
             assert shown["name"] == attribute_name
 
-            listed = self.cmd(
-                f"iot adr ns registry-device attribute list {scope}"
-            ).get_output_in_json()
+            listed = wait_for_condition(
+                lambda: self.cmd(
+                    f"iot adr ns registry-device attribute list {scope}"
+                ).get_output_in_json(),
+                lambda attributes: attribute_name in [item["name"] for item in attributes],
+                description=f"user attribute '{attribute_name}' to appear in its collection",
+                timeout=120,
+                interval=10,
+                describe=lambda attributes: f"listed count={len(attributes)}",
+            )
             assert attribute_name in [item["name"] for item in listed]
 
             # create is a full replace: omitted properties are dropped.
             replaced = self.cmd(
                 f"iot adr ns registry-device attribute create -n {attribute_name} {scope} "
-                f'--properties \'{{"site": "plant-4"}}\''
+                '--properties \'{{"site": "plant-4"}}\''
             ).get_output_in_json()
             assert replaced["properties"]["site"] == "plant-4"
             assert "rack" not in replaced["properties"]
@@ -393,12 +420,11 @@ class TestADRRegistryDeviceLifecycle(ADRLiveScenarioTest):
             self.cmd(
                 f"iot adr ns registry-device attribute delete -n {attribute_name} {scope} -y"
             )
+            cleanup.dismiss("user attribute")
             self.cmd(
                 f"iot adr ns registry-device attribute show -n {attribute_name} {scope}",
                 expect_failure=True,
             )
-        finally:
-            _cleanup_namespace(self, namespace_name)
 
     def test_registry_device_software_update_alias(self):
         """`show -n software-update` resolves to the ADU-materialized 'update'."""
@@ -449,22 +475,23 @@ class TestADRRegistryDeviceLifecycle(ADRLiveScenarioTest):
                 expect_failure=True,
             )
         finally:
-            _cleanup_namespace(self, namespace_name)
+            _cleanup_namespace(self, namespace_name, device_name)
 
     def test_registry_device_attribute_negatives(self):
         namespace_name = generate_adr_namespace_name()
 
         # Client-side guard: fires before any service call.
+        with pytest.raises(SystemExit) as parser_error:
+            self.cmd(
+                f"iot adr ns registry-device attribute create -n bad "
+                f"--registry-device-name nonexistent --ns {namespace_name} -g {TEST_RG} "
+                "--reported-by Microsoft.DeviceUpdate"
+            )
+        assert parser_error.value.code == 2
         self.cmd(
             f"iot adr ns registry-device attribute create -n bad "
             f"--registry-device-name nonexistent --ns {namespace_name} -g {TEST_RG} "
-            f"--reported-by Microsoft.DeviceUpdate",
-            expect_failure=True,
-        )
-        self.cmd(
-            f"iot adr ns registry-device attribute create -n bad "
-            f"--registry-device-name nonexistent --ns {namespace_name} -g {TEST_RG} "
-            f"--properties '{{\"reportedBy\":\"Microsoft.DeviceUpdate\"}}'",
+            "--properties '{{\"reportedBy\":\"Microsoft.DeviceUpdate\"}}'",
             expect_failure=True,
         )
         self.cmd(

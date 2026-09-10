@@ -88,13 +88,6 @@ class TestADRNamespaceCrud(ADRLiveScenarioTest):
                 ).get_output_in_json()
                 assert shown["name"] == namespace_name
 
-                listed = self.cmd(
-                    f"iot adr ns list {group_args}"
-                ).get_output_in_json()
-                assert namespace_name in [
-                    namespace["name"] for namespace in listed
-                ]
-
             with timed_step("Step 3 > Update namespace tags"):
                 updated = self.cmd(
                     f"iot adr ns update {resource_args} "
@@ -127,3 +120,34 @@ class TestADRNamespaceCrud(ADRLiveScenarioTest):
                     expect_failure=True,
                 )
                 _log(L.OK, "Namespace deleted")
+
+    def test_namespace_list_by_resource_group(self):
+        self._assert_namespace_list(by_resource_group=True)
+
+    def test_namespace_list_by_subscription(self):
+        self._assert_namespace_list(by_resource_group=False)
+
+    def _assert_namespace_list(self, *, by_resource_group: bool):
+        namespace_name = generate_adr_namespace_name()
+        subscription_arg = (
+            f" --subscription {shlex.quote(TEST_SUBSCRIPTION)}"
+            if TEST_SUBSCRIPTION
+            else ""
+        )
+        group_args = f"-g {shlex.quote(TEST_RG)}{subscription_arg}"
+        resource_args = f"-n {shlex.quote(namespace_name)} {group_args}"
+
+        with CleanupLedger() as cleanup:
+            self.cmd(
+                f"iot adr ns create {resource_args} "
+                f"--location {shlex.quote(TEST_LOCATION)}"
+            )
+            cleanup.register(
+                "namespace",
+                lambda: self.cmd(f"iot adr ns delete {resource_args} --yes"),
+            )
+            list_args = group_args if by_resource_group else subscription_arg
+            listed = self.cmd(
+                f"iot adr ns list {list_args}"
+            ).get_output_in_json()
+            assert namespace_name in [namespace["name"] for namespace in listed]

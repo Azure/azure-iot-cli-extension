@@ -15,9 +15,9 @@ Validates the namespace-linking surface exposed as ``iot adr ns link ...``:
   identities, multi-hub list, identity rotation via ``hub update``
 * ``link add`` bundled Hub+DPS PATCH in a single round trip
 * ``link su add / update / show / list`` — Software Updates updating
-  endpoints with UAMI/SAMI identity rotation. Set
+  endpoints with UAMI/SAMI identity rotation. Optionally set
   ``azext_iot_adr_update_instance_id`` to a pre-provisioned Update Instance
-  resource ID to enable this test.
+  resource ID explicitly marked disposable; otherwise the test creates one.
 
 These tests require real Hub and DPS resources to be linked to a real ADR
 namespace, so they re-use :class:`ADRFullInfraHelper` to provision the full
@@ -45,7 +45,10 @@ from msrestazure.tools import parse_resource_id
 from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import (
     ADRFullInfraHelper,
+    SU_PROVISIONING_MAX_POLLS,
+    SU_PROVISIONING_POLL_INTERVAL,
     wait_for_condition,
+    wait_for_resource_succeeded,
 )
 from azext_iot.tests.adr._log import LogKind, _log, timed_step
 from azext_iot.tests.adr.conftest import (
@@ -62,7 +65,7 @@ from azext_iot.adr.topology import (
     DPS_REQUIRED_MSG,
     SU_CAP_EXCEEDED_MSG,
 )
-from azext_iot.adr.rbac import LINK_ROLE_MATRIX
+from azext_iot.adr.rbac import LINK_ROLE_MATRIX, LinkRbacManager
 
 
 _SU_UPDATE_INSTANCE_ENV = "azext_iot_adr_update_instance_id"
@@ -838,16 +841,28 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
                     f"--location {TEST_LOCATION}"
                 ).get_output_in_json()
                 su_name = f"testsu{generate_generic_id()[:8]}"
-                created = self.cmd(
+                self.cmd(
                     f"iot adr ns su instance create -n {su_name} -g {rg} "
                     f"--location {TEST_LOCATION} --system-assigned-mi "
-                    f"--user-assigned-mi {identity['id']}"
-                ).get_output_in_json()
+                    f"--user-assigned-mi {identity['id']} --no-wait"
+                )
+                created = wait_for_resource_succeeded(
+                    self,
+                    f"iot adr ns su instance show -n {su_name} -g {rg}",
+                    max_polls=SU_PROVISIONING_MAX_POLLS,
+                    poll_interval=SU_PROVISIONING_POLL_INTERVAL,
+                )
                 su_id = created["id"]
 
             parsed_su_id = parse_resource_id(su_id)
             su_name = parsed_su_id["name"]
             su_rg = parsed_su_id["resource_group"]
+            caller_id = LinkRbacManager(self.cli_ctx)._current_assignee_object_id(  # pylint: disable=protected-access
+                parsed_su_id["subscription"]
+            )
+            assert self.assign_role(
+                caller_id, "Device Update Reader", su_id, assignee_type=None
+            ) is not None, "The SU data-plane fixture requires a reader role for its caller."
             with timed_step("Setup 1/3 ❯ Resolve Update Instance SAMI and UAMI"):
                 update_instance = self.cmd(
                     f"resource show --ids {su_id}"

@@ -25,6 +25,7 @@ from azext_iot.common.embedded_cli import EmbeddedCLI
 
 CONTRIBUTOR_ROLE = "Contributor"
 HUB_DATA_ROLE = "IoT Hub Data Contributor"
+SU_DATA_ROLE = "Device Update Administrator"
 OWNER_ROLE = "Owner"
 USER_ACCESS_ADMINISTRATOR_ROLE = "User Access Administrator"
 ADU_FIRST_PARTY_APP_ID = "6ee392c4-d339-4083-b04d-6b7947c6cf78"
@@ -43,8 +44,8 @@ class RoleRule:
 
 
 # This is the only service-to-service role matrix. Link runtime, help, and
-# tests consume it directly. User content-management roles intentionally do
-# not appear here and are never granted by link commands.
+# tests consume it directly. Only service identities appear here; link commands
+# never grant roles to the signed-in user.
 LINK_ROLE_MATRIX: Dict[str, Tuple[RoleRule, ...]] = {
     "hub": (
         RoleRule("namespace", CONTRIBUTOR_ROLE, "target"),
@@ -57,6 +58,7 @@ LINK_ROLE_MATRIX: Dict[str, Tuple[RoleRule, ...]] = {
     ),
     "su": (
         RoleRule("namespace", CONTRIBUTOR_ROLE, "target"),
+        RoleRule("namespace", SU_DATA_ROLE, "target"),
         RoleRule("linked", CONTRIBUTOR_ROLE, "namespace"),
         RoleRule("adu_first_party", CONTRIBUTOR_ROLE, "target"),
     ),

@@ -283,6 +283,69 @@ def test_full_infra_cleanup_reports_probe_failures():
         )
 
 
+def test_full_infra_cleanup_continues_after_show_not_found_exit():
+    helper = ADRFullInfraHelper()
+
+    def invoke(command):
+        if command.startswith("iot hub show"):
+            raise SystemExit(3)
+        return Mock()
+
+    helper.cmd = Mock(side_effect=invoke)
+    helper.cleanup_full_infra(
+        resource_group="rg",
+        hub_name="hub",
+        namespace_name="ns",
+        identity_name="identity",
+    )
+
+    assert helper.cmd.call_args_list == [
+        call("iot hub show -n hub -g rg"),
+        call("iot adr ns show -n ns -g rg"),
+        call("iot adr ns delete -n ns -g rg -y"),
+        call("identity show -n identity -g rg"),
+        call("identity delete -n identity -g rg"),
+    ]
+
+
+@pytest.mark.parametrize("exit_code", [1, 2, 130])
+def test_full_infra_cleanup_does_not_ignore_other_cli_exits(exit_code):
+    helper = ADRFullInfraHelper()
+    helper.cmd = Mock(side_effect=SystemExit(exit_code))
+
+    with pytest.raises(SystemExit) as error:
+        helper.cleanup_full_infra(resource_group="rg", hub_name="hub")
+
+    assert error.value.code == exit_code
+    helper.cmd.assert_called_once_with("iot hub show -n hub -g rg")
+
+
+@pytest.mark.parametrize(
+    "device_delete_error",
+    [None, RuntimeError("ResourceNotFound (404)"), RuntimeError("403 Forbidden")],
+)
+def test_registry_cleanup_attempts_device_before_namespace(device_delete_error, caplog):
+    from azext_iot.tests.adr.test_adr_registry_device_int import (
+        TEST_RG,
+        _cleanup_namespace,
+    )
+
+    test = Mock()
+    test.cmd.side_effect = [device_delete_error, None]
+    _cleanup_namespace(test, "ns", "device")
+
+    assert test.cmd.call_args_list == [
+        call(
+            "iot adr ns registry-device delete -n device "
+            f"--ns ns -g {TEST_RG} --yes"
+        ),
+        call(f"iot adr ns delete -n ns -g {TEST_RG} --yes"),
+    ]
+    if device_delete_error is not None:
+        expected = "already absent" if "404" in str(device_delete_error) else "Cleanup failed"
+        assert expected in caplog.text
+
+
 def test_known_object_role_assignment_bypasses_graph_resolution():
     helper = RoleAssignmentHelper()
     absent = Mock()
@@ -307,6 +370,23 @@ def test_known_object_role_assignment_bypasses_graph_resolution():
     assert "--assignee-principal-type ServicePrincipal" in create_command
     assert "--assignee " not in list_command
     assert "--assignee " not in create_command
+
+
+def test_existing_caller_object_role_assignment_lets_arm_resolve_principal_type():
+    helper = RoleAssignmentHelper()
+    absent = Mock()
+    absent.get_output_in_json.return_value = []
+    created = Mock()
+    created.get_output_in_json.return_value = {"id": "assignment"}
+    helper.cmd = Mock(side_effect=[absent, created])
+
+    assert helper.assign_role(
+        "caller", "Device Update Reader", "scope", assignee_type=None
+    ) == "assignment"
+    commands = [item.args[0] for item in helper.cmd.call_args_list]
+    assert all("--assignee-object-id 'caller'" in command for command in commands)
+    assert all("--assignee-principal-type" not in command for command in commands)
+    assert all("--assignee " not in command for command in commands)
 
 
 def test_auto_role_assignment_preserves_name_based_lookup():

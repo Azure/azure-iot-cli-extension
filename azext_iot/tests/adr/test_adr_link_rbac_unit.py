@@ -27,6 +27,7 @@ from azext_iot.adr.rbac import (
     LINK_ROLE_MATRIX,
     LinkRbacManager,
     OWNER_ROLE,
+    SU_DATA_ROLE,
     _scope_subscription,
     format_role_requirements,
     resolve_linked_resource_principal,
@@ -109,6 +110,14 @@ def _resource():
 
 def test_role_matrix_is_authoritative_and_never_grants_user_content_roles():
     assert LINK_ROLE_MATRIX["hub"][1].role == HUB_DATA_ROLE
+    assert (
+        LINK_ROLE_MATRIX["su"][1].principal,
+        LINK_ROLE_MATRIX["su"][1].role,
+        LINK_ROLE_MATRIX["su"][1].scope,
+    ) == ("namespace", SU_DATA_ROLE, "target")
+    assert "namespace outbound MI -> Device Update Administrator on SU" in (
+        format_role_requirements("su")
+    )
     assert {rule.principal for rule in LINK_ROLE_MATRIX["su"]} == {
         "namespace",
         "linked",
@@ -473,14 +482,17 @@ def test_su_resolves_first_party_principal_and_includes_its_assignment(token_pro
         _result([]),
         _result([]),
         _result([]),
+        _result([]),
         _result([{"id": "owner"}]),
         _result([{"id": "owner"}]),
         _result({"id": "created-1"}),
         _result({"id": "created-2"}),
         _result({"id": "created-3"}),
+        _result({"id": "created-4"}),
         _result([{"id": "visible-1"}]),
         _result([{"id": "visible-2"}]),
         _result([{"id": "visible-3"}]),
+        _result([{"id": "visible-4"}]),
     ]
     graph_get = MagicMock(
         return_value=_graph_response([{"id": "adu-object-id"}])
@@ -520,11 +532,50 @@ def test_su_resolves_first_party_principal_and_includes_its_assignment(token_pro
         and "--assignee-object-id 'adu-object-id'" in command
         for command in commands
     )
+    assert any(
+        "role assignment create" in command
+        and "--assignee-object-id 'ns-principal'" in command
+        and f"--role '{SU_DATA_ROLE}'" in command
+        and f"--scope '{TARGET_SCOPE}'" in command
+        for command in commands
+    )
+
+
+@pytest.mark.parametrize("authorized", [True, False])
+def test_su_missing_data_role_is_scoped_and_privilege_gated(mocker, authorized):
+    scope = TARGET_SCOPE.replace("Microsoft.Devices/IotHubs/hub", "Microsoft.DeviceUpdate/updateInstances/su")
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock())
+    mocker.patch.object(manager, "_resolve_adu_principal", return_value="adu-principal")
+    mocker.patch.object(manager, "_current_assignee_object_id", return_value="caller")
+    mocker.patch.object(
+        manager, "_assignment_exists",
+        side_effect=lambda _principal, role, _scope: role != SU_DATA_ROLE,
+    )
+    privilege = mocker.patch.object(manager, "_caller_can_assign", return_value=authorized)
+    invoke = mocker.patch.object(manager, "_invoke_json")
+    wait = mocker.patch.object(manager, "_wait_for_assignments")
+
+    if authorized:
+        manager.ensure("su", NS_SCOPE, scope, "ns-principal", "su-principal")
+        invoke.assert_called_once_with(
+            "role assignment create --assignee-object-id 'ns-principal' "
+            f"--assignee-principal-type ServicePrincipal --role '{SU_DATA_ROLE}' "
+            f"--scope '{scope}'",
+            subscription="sub",
+        )
+        wait.assert_called_once_with([("ns-principal", SU_DATA_ROLE, scope)])
+    else:
+        with pytest.raises(AzureResponseError, match=SU_DATA_ROLE):
+            manager.ensure("su", NS_SCOPE, scope, "ns-principal", "su-principal")
+        invoke.assert_not_called()
+        wait.assert_not_called()
+    privilege.assert_called_once_with("caller", scope)
 
 
 def test_su_reports_unresolvable_first_party_principal():
     cli = MagicMock()
     cli.invoke.side_effect = [
+        _result([{"id": "existing"}]),
         _result([{"id": "existing"}]),
         _result([{"id": "existing"}]),
     ]
@@ -634,6 +685,7 @@ def test_access_token_profile_failure_propagates(token_profile, error):
 def test_su_reports_graph_query_failure():
     cli = MagicMock()
     cli.invoke.side_effect = [
+        _result([{"id": "existing"}]),
         _result([{"id": "existing"}]),
         _result([{"id": "existing"}]),
     ]

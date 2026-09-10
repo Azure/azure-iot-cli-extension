@@ -174,7 +174,6 @@ def test_namespace_lifecycle_logging_preserves_ignite_commands(
         created,
         created,
         created,
-        [created],
         {"tags": {"env": "test", "purpose": "ci"}},
         {"tags": {"owner": "adr-tests"}},
     ]
@@ -205,7 +204,7 @@ def test_namespace_lifecycle_logging_preserves_ignite_commands(
         for message in caplog.messages
         if message.startswith("  \u0394 (")
     ]
-    assert len(commands) == 13
+    assert len(commands) == 12
     assert commands[-2] == (
         f"iot adr ns wait -n {namespace_name} -g {scenario.TEST_RG} "
         "--deleted"
@@ -214,7 +213,7 @@ def test_namespace_lifecycle_logging_preserves_ignite_commands(
         index
         for index, call in enumerate(test.cmd.call_args_list)
         if call.kwargs
-    ] == [4, 9, 12]
+    ] == [4, 8, 11]
     assert all(
         call.kwargs == {"expect_failure": True}
         for call in test.cmd.call_args_list
@@ -222,6 +221,37 @@ def test_namespace_lifecycle_logging_preserves_ignite_commands(
     )
     assert len(durations) == 4
     assert "  \u2713 Namespace deleted" in caplog.messages
+
+
+@pytest.mark.parametrize(
+    "method_name,list_command",
+    [
+        ("test_namespace_list_by_resource_group", "iot adr ns list -g test-rg"),
+        ("test_namespace_list_by_subscription", "iot adr ns list"),
+    ],
+)
+def test_namespace_list_scenarios_preserve_both_scopes(method_name, list_command, mocker):
+    from azext_iot.tests.adr import test_adr_namespace_crud_int as scenario
+
+    test = object.__new__(scenario.TestADRNamespaceCrud)
+    test._testMethodName = method_name
+    test.kwargs = {}
+    test.cli_ctx = Mock()
+    test.cmd = Mock(wraps=test.cmd)
+    mocker.patch.object(scenario, "TEST_RG", "test-rg")
+    mocker.patch.object(scenario, "TEST_SUBSCRIPTION", None)
+    mocker.patch.object(scenario, "generate_adr_namespace_name", return_value="test-namespace")
+    execution = mocker.patch("azure.cli.testsdk.base.execute", autospec=True)
+    execution.return_value.assert_with_checks.return_value.get_output_in_json.return_value = [
+        {"name": "test-namespace"}
+    ]
+
+    getattr(test, method_name)()
+
+    commands = [call.args[0].strip() for call in test.cmd.call_args_list]
+    assert len(commands) == 3
+    assert commands[1] == list_command
+    assert commands[2] == "iot adr ns delete -n test-namespace -g test-rg --yes"
 
 
 def test_timestamp_is_utc():

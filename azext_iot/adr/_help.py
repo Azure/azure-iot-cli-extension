@@ -586,6 +586,7 @@ def load_adr_help():
     Exactly one of --system-assigned-mi or --user-assigned-mi must be provided to set the
     inbound caller identity that the update instance will use to call back into the namespace.
     Required service-to-service roles: {format_role_requirements("su")}.
+    The namespace identity's Device Update data role enables service-to-service updates and reports.
     Missing assignments are created only for an inherited Owner or User Access Administrator.
     A newly created assignment must become visible within the 180-second preflight deadline
     before PATCH. This link workflow never grants the signed-in user Software Updates content roles.

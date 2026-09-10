@@ -14,13 +14,12 @@ Covers the ``iot adr ns job run`` surface:
 * ``run results`` — per-device target results, paginated manually via nextLink
 * ``run cancel``  — cancellation LRO when an active run is available
 
-Job runs are produced by the backend after a job is *scheduled* and the
-scheduling window opens. Without a real software-update target deployed to a
-real device population, the backend will typically not spawn any runs for a
-test job. So the integration coverage here is intentionally minimal:
+Scheduling creates a run resource independently of successful execution.
+This fixture deliberately has no linked Software Update endpoint, so the
+immediate run must fail with ``AduEndpointNotLinked``. The smoke test covers:
 
-* Verify ``run list`` returns an **empty list** (not an error) for a
-  freshly-scheduled job with no matching devices.
+* Run resource creation, explicit/custom waits, and failed-execution reporting.
+* Run show, list, summary, results, and deletion without a deployment fixture.
 * Verify ``run show`` on a non-existent run returns a clean error.
 * Verify ``run results`` on a non-existent run returns a clean error.
 * Verify ``run cancel`` on a non-existent run returns a clean error.
@@ -38,9 +37,10 @@ The supplied run must be active and safe for the test to cancel.
 import os
 
 import pytest
+from azure.cli.core.azclierror import AzureResponseError
 
 from azext_iot.tests.adr import ADRLiveScenarioTest
-from azext_iot.tests.adr._helpers import ADRFullInfraHelper
+from azext_iot.tests.adr._helpers import ADRFullInfraHelper, CleanupLedger
 from azext_iot.tests.adr._log import LogKind, _log, timed_step
 from azext_iot.tests.adr.conftest import (
     TEST_LOCATION,
@@ -80,14 +80,24 @@ class TestADRJobRunSurface(ADRFullInfraHelper, ADRLiveScenarioTest):
         group_name = _generate_group_name()
         job_name = _generate_job_name()
 
-        try:
+        with CleanupLedger() as cleanup:
             with timed_step("Setup ❯ Namespace + Group + Job"):
                 self.cmd(
                     f"iot adr ns create -n {namespace_name} -g {rg} --location {TEST_LOCATION}"
                 )
+                cleanup.register(
+                    "namespace",
+                    lambda: self.cmd(f"iot adr ns delete -n {namespace_name} -g {rg} -y"),
+                )
                 self.cmd(
                     f"iot adr ns group create -n {group_name} --ns {namespace_name} -g {rg} "
                     f'--query-string "*"'
+                )
+                cleanup.register(
+                    "group",
+                    lambda: self.cmd(
+                        f"iot adr ns group delete -n {group_name} --ns {namespace_name} -g {rg} -y"
+                    ),
                 )
                 self.cmd(
                     f"iot adr ns job create -n {job_name} --ns {namespace_name} -g {rg} "
@@ -95,24 +105,50 @@ class TestADRJobRunSurface(ADRFullInfraHelper, ADRLiveScenarioTest):
                     f"--target-group-name {group_name} "
                     f"--update-id-provider Contoso --update-id-name fw --update-id-version 1.0.0"
                 )
+                cleanup.register(
+                    "job",
+                    lambda: self.cmd(
+                        f"iot adr ns job delete -n {job_name} --ns {namespace_name} -g {rg} -y"
+                    ),
+                )
 
             with timed_step("Step 1 ❯ Schedule the job (immediate)"):
-                # Immediate schedule (no --scheduled-time) opens the window
-                # right away. With zero devices in the group, backend will
-                # typically produce zero runs.
                 generated = self.cmd(
                     f"iot adr ns job schedule -n {job_name} "
                     f"--ns {namespace_name} -g {rg}"
                 ).get_output_in_json()
+                cleanup.register(
+                    "generated run",
+                    lambda: self.cmd(
+                        f"iot adr ns job run delete -n {generated['name']} --job-name {job_name} "
+                        f"--ns {namespace_name} -g {rg} -y"
+                    ),
+                )
                 # --run-name is optional; a UTC-timestamped name is generated.
                 assert generated["name"].startswith("run-")
                 self.cmd(
                     "iot adr ns job run wait "
                     f"-n {generated['name']} --job-name {job_name} "
                     f"--ns {namespace_name} -g {rg} "
-                    "--timeout 300 --interval 10"
+                    "--created --timeout 300 --interval 10"
                 )
                 _log(LogKind.OK, "generated run name=%s", generated["name"])
+
+            with timed_step("Neg ❯ Missing Software Update link fails execution, not creation"):
+                wait_command = (
+                    f"iot adr ns job run wait -n {generated['name']} --job-name {job_name} "
+                    f"--ns {namespace_name} -g {rg} --timeout 300 --interval 10"
+                )
+                self.cmd(wait_command + " --custom \"properties.status == 'Failed'\"")
+                failed_run = self.cmd(
+                    f"iot adr ns job run show -n {generated['name']} --job-name {job_name} "
+                    f"--ns {namespace_name} -g {rg}"
+                ).get_output_in_json()
+                assert failed_run["properties"]["provisioningState"] == "Succeeded"
+                assert failed_run["properties"]["status"] == "Failed"
+                assert failed_run["properties"]["error"]["code"] == "AduEndpointNotLinked"
+                with pytest.raises(AzureResponseError, match="terminal status 'Failed'"):
+                    self.cmd(wait_command)
 
             with timed_step("Step 1b ❯ Explicit run name, summary, results, delete"):
                 explicit_run = f"run-explicit-{generate_generic_id()[:8]}"
@@ -120,6 +156,13 @@ class TestADRJobRunSurface(ADRFullInfraHelper, ADRLiveScenarioTest):
                     f"iot adr ns job schedule -n {job_name} "
                     f"--ns {namespace_name} -g {rg} --run-name {explicit_run}"
                 ).get_output_in_json()
+                cleanup.register(
+                    "explicit run",
+                    lambda: self.cmd(
+                        f"iot adr ns job run delete -n {explicit_run} --job-name {job_name} "
+                        f"--ns {namespace_name} -g {rg} -y"
+                    ),
+                )
                 assert created_run["name"] == explicit_run
 
                 summary = self.cmd(
@@ -138,6 +181,7 @@ class TestADRJobRunSurface(ADRFullInfraHelper, ADRLiveScenarioTest):
                     f"iot adr ns job run delete -n {explicit_run} --job-name {job_name} "
                     f"--ns {namespace_name} -g {rg} -y"
                 )
+                cleanup.dismiss("explicit run")
                 self.cmd(
                     f"iot adr ns job run show -n {explicit_run} --job-name {job_name} "
                     f"--ns {namespace_name} -g {rg}",
@@ -145,7 +189,7 @@ class TestADRJobRunSurface(ADRFullInfraHelper, ADRLiveScenarioTest):
                 )
                 _log(LogKind.OK, "explicit run lifecycle complete")
 
-            with timed_step("Step 2 ❯ job run list returns a list (likely empty)"):
+            with timed_step("Step 2 ❯ job run list includes the generated run"):
                 runs = self.cmd(
                     f"iot adr ns job run list --ns {namespace_name} -g {rg} "
                     f"--jn {job_name} --order-by \"status asc\""
@@ -153,6 +197,7 @@ class TestADRJobRunSurface(ADRFullInfraHelper, ADRLiveScenarioTest):
                 assert isinstance(runs, list), (
                     f"job run list should return list, got {type(runs)}"
                 )
+                assert generated["name"] in [run["name"] for run in runs]
                 _log(LogKind.RESULT, "runs returned=%d", len(runs))
 
                 namespace_runs = self.cmd(
@@ -192,9 +237,6 @@ class TestADRJobRunSurface(ADRFullInfraHelper, ADRLiveScenarioTest):
                     expect_failure=True,
                 )
                 _log(LogKind.OK, "cancel for non-existent run rejected")
-
-        finally:
-            self.cleanup_namespace(namespace_name, rg)
 
     @pytest.mark.skipif(
         not all(_PREPROVISIONED_RUN.values()),
