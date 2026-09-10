@@ -1149,6 +1149,9 @@ def load_adr_help():
     ] = """
   type: command
   short-summary: Delete a group from a Device Registry namespace.
+  long-summary: |
+    Deletion completes synchronously and does not delete jobs or job runs.
+    --no-wait is accepted for compatibility, but still waits for the delete response.
   examples:
     - name: Delete a group
       text: az iot adr ns group delete -n myGroup --ns myNamespace -g myResourceGroup
@@ -1457,6 +1460,9 @@ def load_adr_help():
     ] = """
   type: command
   short-summary: Generate an update-compliance report.
+  long-summary: |
+    Wait for generation to complete, then retrieve the latest report for the same type and group.
+    With --no-wait, return the operation immediately without retrieving a report.
   examples:
     - name: Generate a namespace update-compliance report
       text: az iot adr ns report generate --ns myNamespace -g myResourceGroup --report-type NamespaceUpdateComplianceReport

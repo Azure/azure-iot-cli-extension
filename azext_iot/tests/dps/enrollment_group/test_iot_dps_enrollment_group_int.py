@@ -4,8 +4,6 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import os
-
 import pytest
 from azure.cli.core.azclierror import BadRequestError
 from azext_iot.common.embedded_cli import EmbeddedCLI
@@ -20,52 +18,6 @@ from azext_iot.tests.helpers import CERT_ENDING, create_test_cert, set_cmd_auth_
 from azext_iot.tests.generators import generate_generic_id, generate_names
 
 cli = EmbeddedCLI()
-
-
-def test_dps_enrollment_group_adr_certificate_reference_round_trip(
-    provisioned_iot_dps_module,
-):
-    namespace_name = os.getenv("azext_iot_adr_namespace_name", "").strip()
-    ca_name = os.getenv("azext_iot_adr_ca_name", "").strip()
-    policy_name = os.getenv(
-        "azext_iot_adr_certificate_policy_name", ""
-    ).strip()
-    if not all((namespace_name, ca_name, policy_name)):
-        pytest.skip(
-            "Set ADR namespace, CA, and certificate-policy integration variables."
-        )
-
-    dps_rg = provisioned_iot_dps_module["resourceGroup"]
-    dps_host = provisioned_iot_dps_module["dps"]["properties"][
-        "serviceOperationsHostName"
-    ]
-    enrollment_id = generate_names()
-    try:
-        created = cli.invoke(
-            "iot dps enrollment-group create "
-            f"--dps-name {dps_host} -g {dps_rg} "
-            f"--enrollment-id {enrollment_id} "
-            f"--adr-namespace {namespace_name} --adr-ca-name {ca_name} "
-            f"--adr-cert-policy-name {policy_name}"
-        ).as_json()
-        assert created["namespaceName"] == namespace_name
-        assert created["certificateAuthorityName"] == ca_name
-        assert created["certificatePolicyName"] == policy_name
-
-        updated = cli.invoke(
-            "iot dps enrollment-group update "
-            f"--dps-name {dps_host} -g {dps_rg} "
-            f"--enrollment-id {enrollment_id} --provisioning-status disabled"
-        ).as_json()
-        assert updated["namespaceName"] == namespace_name
-        assert updated["certificateAuthorityName"] == ca_name
-        assert updated["certificatePolicyName"] == policy_name
-    finally:
-        cli.invoke(
-            "iot dps enrollment-group delete "
-            f"--dps-name {dps_host} -g {dps_rg} "
-            f"--enrollment-id {enrollment_id}"
-        )
 
 
 def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):

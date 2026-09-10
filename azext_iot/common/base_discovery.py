@@ -9,7 +9,6 @@ from azure.cli.core.azclierror import ResourceNotFoundError
 from azure.core.exceptions import HttpResponseError
 from knack.log import get_logger
 from azext_iot.common.shared import AuthenticationTypeDataplane
-from azext_iot.common.arm import get_resource_group, get_subscription_id
 from typing import Any, Dict, List
 
 from azext_iot.common.utility import valid_hostname
@@ -61,8 +60,6 @@ class BaseDiscovery(ABC):
         self.cmd = cmd
         self.client = None
         self.sub_id = "unknown"
-        self.last_resource_group = None
-        self.last_subscription_id = None
         self.resource_type = resource_type
         self.necessary_rights_set = necessary_rights_set
 
@@ -127,32 +124,6 @@ class BaseDiscovery(ABC):
             policy_list.extend(policies)
 
         return policy_list
-
-    def resolve_resource_group(
-        self, resource: dict, fallback: str = None
-    ) -> str:
-        """Resolve ARM metadata without relying on legacy SDK-added fields."""
-        resource_group = get_resource_group(
-            resource,
-            fallback=fallback,
-            resource_label=getattr(self, "resource_type", None) or "resource",
-        )
-        self.last_resource_group = resource_group
-        return resource_group
-
-    def resolve_subscription_id(
-        self, resource: dict, fallback: str = None
-    ) -> str:
-        """Resolve a resource subscription from its ARM ID or caller context."""
-        subscription_id = get_subscription_id(
-            resource,
-            fallback=fallback or (
-                self.sub_id if self.sub_id != "unknown" else None
-            ),
-            resource_label=getattr(self, "resource_type", None) or "resource",
-        )
-        self.last_subscription_id = subscription_id
-        return subscription_id
 
     def find_resource(self, resource_name: str, rg: str = None):
         """
@@ -319,9 +290,6 @@ class BaseDiscovery(ABC):
                 )
 
             resource = self.find_resource(resource_name=resource_name, rg=resource_group_name)
-            resource_group_name = self.resolve_resource_group(
-                resource, fallback=resource_group_name
-            )
 
             policy = {
                 "keyName": AuthenticationTypeDataplane.login.value,
@@ -333,7 +301,6 @@ class BaseDiscovery(ABC):
                 resource=resource,
                 policy=policy,
                 key_type="primary",
-                resource_group_name=resource_group_name,
                 **kwargs
             )
 
@@ -342,21 +309,16 @@ class BaseDiscovery(ABC):
         resource = self.find_resource(resource_name=resource_name, rg=resource_group_name)
         key_type = kwargs.get("key_type", "primary")
         policy_name = kwargs.get("policy_name", "auto")
-        resource_group_name = self.resolve_resource_group(
-            resource, fallback=resource_group_name
-        )
+        rg = resource.get("resourcegroup")
 
         resource_policy = self.find_policy(
-            resource_name=resource["name"],
-            rg=resource_group_name,
-            policy_name=policy_name,
+            resource_name=resource["name"], rg=rg, policy_name=policy_name,
         )
 
         return self._build_target(
             resource=resource,
             policy=resource_policy,
             key_type=key_type,
-            resource_group_name=resource_group_name,
             **kwargs
         )
 
@@ -377,15 +339,9 @@ class BaseDiscovery(ABC):
         if resources:
             for resource in resources:
                 try:
-                    resolved_resource_group = self.resolve_resource_group(
-                        resource, fallback=resource_group_name
-                    )
+                    resource_group_name = resource.get("resourcegroup")
                     targets.append(
-                        self.get_target(
-                            resource_name=resource["name"],
-                            resource_group_name=resolved_resource_group,
-                            **kwargs
-                        )
+                        self.get_target(resource_name=resource["name"], resource_group_name=resource_group_name, **kwargs)
                     )
                 except (HttpResponseError, ResourceNotFoundError) as e:
                     logger.warning("Could not access %s. %s", resource["name"], e)

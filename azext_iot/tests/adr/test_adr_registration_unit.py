@@ -213,6 +213,11 @@ def test_2026_command_surface_is_registered():
     # Groups_CreateOrReplace / Groups_Update are synchronous in 2026-11-02-preview.
     assert commands["iot adr ns group create"] == ("command", "adr_group_create", {})
     assert commands["iot adr ns group update"] == ("command", "adr_group_update", {})
+    assert commands["iot adr ns group delete"] == (
+        "command",
+        "adr_group_delete",
+        {"confirmation": True, "supports_no_wait": True},
+    )
     assert commands["iot adr ns job schedule"] == (
         "command",
         "adr_job_schedule",

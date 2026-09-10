@@ -109,17 +109,13 @@ class GroupProvider(ADRProvider):
         group_name: str,
         namespace_name: str,
         resource_group_name: str,
-        **kwargs,
+        **kwargs,  # pylint: disable=unused-argument
     ):
-        poller = self.client.groups.begin_delete(
+        # --no-wait remains accepted, but this API completes synchronously.
+        return self.client.groups.delete(
             resource_group_name=resource_group_name,
             namespace_name=namespace_name,
             group_name=group_name,
-        )
-        return self._wait(
-            poller,
-            f"Deleting group '{group_name}' from namespace {namespace_name}...",
-            **kwargs,
         )
 
     def refresh(

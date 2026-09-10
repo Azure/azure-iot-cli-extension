@@ -7,7 +7,6 @@
 from typing import Optional
 from uuid import uuid4
 import pytest
-from msrestazure.tools import parse_resource_id
 from azure.cli.core.azclierror import BadRequestError
 from azext_iot.common.utility import ensure_iothub_sdk_min_version
 from azext_iot.iothub.common import AuthenticationType, RouteSourceType
@@ -33,12 +32,11 @@ def generate_ep_names(count=1):
 
 def test_iot_eventhub_endpoint_lifecycle(provisioned_event_hub_with_identity_module):
     iot_hub_objs, event_hub_obj = provisioned_event_hub_with_identity_module
-    iot_hub_entry = iot_hub_objs[0]
-    iot_hub_obj = iot_hub_entry["hub"]
+    iot_hub_obj = iot_hub_objs[0]["hub"]
 
     iot_hub = iot_hub_obj["name"]
-    iot_rg = iot_hub_entry["rg"]
-    iot_sub = parse_resource_id(iot_hub_obj["id"])["subscription"]
+    iot_rg = iot_hub_obj["resourcegroup"]
+    iot_sub = iot_hub_obj["subscriptionid"]
     user_id = list(iot_hub_obj["identity"]["userAssignedIdentities"].keys())[0]
     eventhub_instance = event_hub_obj["eventhub"]["name"]
     endpoint_uri = "sb:" + event_hub_obj["namespace"]["serviceBusEndpoint"].split(":")[1]
@@ -257,12 +255,11 @@ def test_iot_eventhub_endpoint_lifecycle(provisioned_event_hub_with_identity_mod
 def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity_module):
     # this test covers two endpoint types
     iot_hub_objs, servicebus_obj = provisioned_service_bus_with_identity_module
-    iot_hub_entry = iot_hub_objs[0]
-    iot_hub_obj = iot_hub_entry["hub"]
+    iot_hub_obj = iot_hub_objs[0]["hub"]
 
     iot_hub = iot_hub_obj["name"]
-    iot_rg = iot_hub_entry["rg"]
-    iot_sub = parse_resource_id(iot_hub_obj["id"])["subscription"]
+    iot_rg = iot_hub_obj["resourcegroup"]
+    iot_sub = iot_hub_obj["subscriptionid"]
     user_id = list(iot_hub_obj["identity"]["userAssignedIdentities"].keys())[0]
     # Ensure there are no endpoints
     cli.invoke(
@@ -620,12 +617,11 @@ def test_iot_servicebus_endpoint_lifecycle(provisioned_service_bus_with_identity
 
 def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module):
     iot_hub_objs, storage_obj = provisioned_storage_with_identity_module
-    iot_hub_entry = iot_hub_objs[0]
-    iot_hub_obj = iot_hub_entry["hub"]
+    iot_hub_obj = iot_hub_objs[0]["hub"]
 
     iot_hub = iot_hub_obj["name"]
-    iot_rg = iot_hub_entry["rg"]
-    iot_sub = parse_resource_id(iot_hub_obj["id"])["subscription"]
+    iot_rg = iot_hub_obj["resourcegroup"]
+    iot_sub = iot_hub_obj["subscriptionid"]
     user_id = list(iot_hub_obj["identity"]["userAssignedIdentities"].keys())[0]
     # Ensure there are no endpoints
     cli.invoke(
@@ -904,12 +900,11 @@ def test_iot_storage_endpoint_lifecycle(provisioned_storage_with_identity_module
 @pytest.mark.skipif(not ensure_iothub_sdk_min_version("2.3.0"), reason="Cosmos Db Endpoints requires azure-mgmt-iothub>=2.3.0.")
 def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module):
     iot_hub_objs, cosmosdb_obj = provisioned_cosmosdb_with_identity_module
-    iot_hub_entry = iot_hub_objs[0]
-    iot_hub_obj = iot_hub_entry["hub"]
+    iot_hub_obj = iot_hub_objs[0]["hub"]
 
     iot_hub = iot_hub_obj["name"]
-    iot_rg = iot_hub_entry["rg"]
-    iot_sub = parse_resource_id(iot_hub_obj["id"])["subscription"]
+    iot_rg = iot_hub_obj["resourcegroup"]
+    iot_sub = iot_hub_obj["subscriptionid"]
     user_id = list(iot_hub_obj["identity"]["userAssignedIdentities"].keys())[0]
     # Ensure there are no endpoints
     cli.invoke(
@@ -1189,11 +1184,10 @@ def test_iot_cosmos_endpoint_lifecycle(provisioned_cosmosdb_with_identity_module
 
 def test_iot_fabric_eventstream_endpoint_lifecycle(provisioned_event_hub_with_identity_module):
     iot_hub_objs, event_hub_obj = provisioned_event_hub_with_identity_module
-    iot_hub_entry = iot_hub_objs[0]
-    iot_hub_obj = iot_hub_entry["hub"]
+    iot_hub_obj = iot_hub_objs[0]["hub"]
 
     iot_hub = iot_hub_obj["name"]
-    iot_rg = iot_hub_entry["rg"]
+    iot_rg = iot_hub_obj["resourcegroup"]
     user_id = list(iot_hub_obj["identity"]["userAssignedIdentities"].keys())[0]
     eventhub_instance = event_hub_obj["eventhub"]["name"]
     endpoint_uri = "sb:" + event_hub_obj["namespace"]["serviceBusEndpoint"].split(":")[1]
@@ -1413,11 +1407,10 @@ def test_iot_fabric_eventstream_endpoint_lifecycle(provisioned_event_hub_with_id
 def test_iot_endpoint_force_delete(provisioned_service_bus_with_identity_module):
     # this test covers two endpoint types
     iot_hub_objs, servicebus_obj = provisioned_service_bus_with_identity_module
-    iot_hub_entry = iot_hub_objs[0]
-    iot_hub_obj = iot_hub_entry["hub"]
+    iot_hub_obj = iot_hub_objs[0]["hub"]
 
     iot_hub = iot_hub_obj["name"]
-    iot_rg = iot_hub_entry["rg"]
+    iot_rg = iot_hub_obj["resourcegroup"]
     queue_cs = servicebus_obj["queueConnectionString"]
     topic_cs = servicebus_obj["topicConnectionString"]
     built_in_endpoint = "events"

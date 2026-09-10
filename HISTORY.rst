@@ -5,10 +5,11 @@ Release History
 0.33.0b10 (Preview)
 ++++++++++++++++++++
 
-**Cross-service SDK and endpoint alignment**
+**ADR SDK and target endpoint alignment**
 
-* Replaced the ADR/CMS, IoT Hub, DPS management, DPS service/device, and Software Updates control/data clients with seven pinned TypeSpec-generated ``1.0.0b1`` clients. They are modeless and synchronous-only; generated ``models`` and ``aio`` packages are intentionally absent.
-* Pinned preview management to ``Microsoft.DeviceRegistry/2026-11-02-preview``, ``Microsoft.Devices/IotHubs/2026-10-01-preview``, ``Microsoft.Devices/provisioningServices/2026-06-01-preview``, and ``Microsoft.DeviceUpdate/2026-11-02-preview`` through the Central US EUAP ARM endpoint. DPS and Software Updates data-plane calls use service-derived endpoints and ``2026-11-02-preview``.
+* Replaced the ADR/CMS and Software Updates control/data clients with three pinned TypeSpec-generated ``1.0.0b1`` clients. These ADR-owned clients are modeless and synchronous-only; their generated ``models`` and ``aio`` packages are intentionally absent.
+* ADR and Update Instance management use ``2026-11-02-preview`` through the Central US EUAP ARM endpoint. ADR target lookup/deletion and identity-safety reads reuse preview's native modeless Hub/DPS management clients with explicit ``2026-10-01-preview`` (Hub) and ``2026-06-01-preview`` (DPS) contracts. Software Updates data uses its service-derived endpoint and ``2026-11-02-preview``.
+* General Hub/DPS management retain preview SDK defaults (``2026-05-01-preview`` / ``2026-08-31``), selected-cloud ARM endpoints, and preview general commands. DPS enrollment and registration retain preview behavior. General Hub/DPS SDK upgrades, certificate-reference enrollment, CSR/REST registration, and registration operation-status are separate follow-up work, not part of this ADR-only base.
 * Resource mutations poll ``provisioningState`` and POST actions follow authenticated ``Location`` URLs. This supersedes the b9 ``Azure-AsyncOperation`` polling change because that service host is not usable.
 
 **Canonical namespace links and resource management**
@@ -18,18 +19,11 @@ Release History
 * Link add now reuses inherited role assignments and, only for an inherited Owner or User Access Administrator, creates missing assignments from one shared role matrix. Unauthorized callers receive exact remediation commands before any namespace mutation. SU link setup includes the ADU first-party application assignment and never grants caller content roles.
 * Link update now runs the same target, selected-identity, namespace-principal, and automatic-RBAC preflight as add. Newly created assignments are polled for visibility for up to 180 seconds before namespace mutation; a timeout fails safely and can be retried.
 * Added destructive ``link hub|dps|su delete`` commands. Each permanently deletes the linked Azure resource and then removes its namespace endpoint while preserving unrelated endpoint state; there is no non-destructive unlink. Namespace cleanup re-reads and validates the endpoint immediately before replacement, but the generated API has no ETag/If-Match and cannot eliminate a narrower post-read race.
-* IoT Hub uses ``2026-10-01-preview`` Standard SKUs with no GEN2 path. Ordinary Hub/DPS updates omit read-only ADR projections, partial identity updates preserve unmentioned identities, and identities selected by active links cannot be removed until the link identity is rotated.
+* ADR links require Standard Hub SKUs with no GEN2 path. Identity-sensitive Hub/DPS updates omit read-only ADR projections, partial identity updates preserve unmentioned identities, and identities selected by active links cannot be removed until the link identity is rotated. Legacy identity removal reads the authoritative ADR target contract before mutation and fails closed when that read cannot be validated.
 * DPS generic update identity removals, including ``--system-assigned-mi false`` and ``--remove identity...``, now use the same active ADR-link identity guard as ``az iot dps identity remove``.
 * Standardized managed-identity options on all participating IoT commands: ``--system-assigned-mi`` / ``--user-assigned-mi`` are canonical for Hub, DPS, individual links, and Update Instances; namespace outbound and bundled-link options use the corresponding qualified forms. Existing ``--mi-*`` spellings remain hidden compatibility aliases. Dedicated identity assign/remove commands are unchanged.
 * ADR wait commands now retain the Azure CLI standard predicates but default to command-specific success. Endpoint waits require the endpoint name and evaluate its ``linkingState``; general link wait supports qualified Hub/DPS/SU names or all links and surfaces Failed links; group and job-run waits use their actual terminal models.
 * Incrementally decomposed ``LinkProvider`` into pure endpoint serialization/topology helpers, configured target lookup/RBAC preflight, namespace persistence, and destructive-delete coordination while retaining the command-facing facade and existing semantics.
-
-**DPS enrollment and registration**
-
-* Replaced ``credentialPolicyName`` enrollment data with ``namespaceName``, ``certificateAuthorityName``, and ``certificatePolicyName``. Individual and group create/update accept ``--adr-namespace``, ``--adr-ca-name``, and canonical ``--adr-cert-policy-name`` and preserve the reference on unrelated updates; ``--adr-certificate-policy-name`` remains a compatibility alias and the older credential-policy option remains hidden/deprecated.
-* Updated ``az iot device registration create`` to ``RegisterDeviceAndIssueCertificate`` and added operation-status lookup, issued certificate-chain and ``connectionProfile`` JSON output, and ``registryDeviceExternalId`` correlation to ``az iot adr ns registry-device show``. No certificate-file option was added: the generated TypeSpec contract describes ``issuedCertificateChain`` only as an array of bytes and defines neither wire encoding nor certificate order, so a TLS-ready PEM bundle cannot be constructed safely.
-* Kept generated DPS ``device_update`` methods for agent/SDK consumers, but removed the three operator CLI commands and their handwritten wrappers: ``request-software-updates``, ``request-onboarding-updates``, and ``report-update-status``.
-* Device registration now resolves a supplied DPS name/login even with an explicit ID scope, validates mixed or incomplete authentication inputs before discovery, safely distinguishes inline PEM CSRs from file paths, and polls HTTP 202 responses with Retry-After and a bounded deadline. TPM request fields remain visible, but TPM-only client authentication is explicitly unsupported.
 
 **Software Updates, quality, and delivery**
 
@@ -39,7 +33,7 @@ Release History
 * Consolidated the temporary ADR resource/Location workaround on one deadline-based waiter with a ten-minute default, case-insensitive Retry-After handling, transient-read retries, and distinct timeout versus terminal-failure diagnostics.
 * Registry Device ``show`` accepts exactly one resource name or external device ID. External-ID lookup follows every SDK page, fails on zero or multiple matches, and can be paired with the bounded ``registry-device wait`` materialization flow.
 * Registry Device attribute JSON accepts inline objects, plain file paths, and one-leading-``@`` file paths. Customer writes always serialize ``reportedBy=User``; attempts to author service-owned ``Microsoft.DeviceUpdate`` provenance through either the hidden compatibility option or ``--properties`` are rejected locally before mutation, while backend-generated attributes remain readable.
-* Expanded focused tests for Standard Hub management, link validation/RBAC/topology, DPS ``2026-11-02-preview`` enrollments and device operations, Software Updates discovery, destructive deletion, and generated-client compatibility.
+* Expanded focused tests for link validation/RBAC/topology, target API and credential isolation, Software Updates discovery, destructive deletion, identity-safety reads, and generated-client compatibility.
 * Updated public help, release documentation, design status, and local manual E2E runners. Dedicated Hub/DPS, CA/onboarding, and SU runners delegate to one full runner; live integration/E2E remains an explicit release-operator step.
 
 0.33.0b9 (Preview)

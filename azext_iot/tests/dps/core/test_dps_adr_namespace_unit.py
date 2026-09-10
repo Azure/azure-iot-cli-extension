@@ -39,6 +39,16 @@ NS_ID = (
 )
 
 
+@pytest.fixture(autouse=True)
+def authoritative_target(mocker):
+    # Existing identity tests supply authoritative projections directly.
+    # Separate target-adapter tests exercise the real read and fail-closed path.
+    mocker.patch(
+        "azext_iot.core.custom._adr_identity_target",
+        side_effect=lambda cmd, resource, kind: resource,
+    )
+
+
 def _dps():
     return {
         "id": DPS_ID,

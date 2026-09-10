@@ -436,7 +436,7 @@ def test_auth_list_and_show_select_expected_operations(
     )
 
 
-def test_get_keys_validates_type_and_warns_without_logging_secrets(
+def test_show_keys_validates_type_and_warns_without_logging_secrets(
     registry_device_provider,
 ):
     operations = registry_device_provider.client.registry_device_authentication_profiles
@@ -449,7 +449,7 @@ def test_get_keys_validates_type_and_warns_without_logging_secrets(
             "secondaryKey": "secondary-key-value",
         }
     }
-    operations.get_keys.return_value = keys
+    operations.list_keys.return_value = keys
 
     with patch(
         "azext_iot.adr.providers.registry_device.logger.warning"
@@ -468,7 +468,7 @@ def test_get_keys_validates_type_and_warns_without_logging_secrets(
         registry_device_name=DEVICE,
         authentication_profile_name=PROFILE,
     )
-    operations.get_keys.assert_called_once_with(
+    operations.list_keys.assert_called_once_with(
         resource_group_name=RG,
         namespace_name=NS,
         registry_device_name=DEVICE,
@@ -491,7 +491,7 @@ def test_get_keys_validates_type_and_warns_without_logging_secrets(
         None,
     ],
 )
-def test_get_keys_rejects_non_symmetric_profiles(
+def test_show_keys_rejects_non_symmetric_profiles(
     registry_device_provider, profile
 ):
     operations = registry_device_provider.client.registry_device_authentication_profiles
@@ -506,7 +506,7 @@ def test_get_keys_rejects_non_symmetric_profiles(
         )
 
     operations.get.assert_called_once()
-    operations.get_keys.assert_not_called()
+    operations.list_keys.assert_not_called()
 
 
 def test_revoke_certificates_requires_managed_x509_and_waits(

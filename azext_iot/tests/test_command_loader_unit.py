@@ -129,7 +129,6 @@ def test_command_table_loads(command_table):
         "iot dps enrollment create",
         "iot hub device-identity create",
         "iot device registration create",
-        "iot device registration operation-status",
         "iot adr ns su software-update operation-status list",
         "iot adr ns su software-update catalog provider list",
         "iot adr ns su software-update catalog name list",
@@ -186,74 +185,6 @@ def test_load_arguments_for_all_commands(loader, command_table):
             assert "--observability-enabled" not in options
         else:
             assert "--observability-enabled" in options
-
-    for command_name in (
-        "iot dps enrollment create",
-        "iot dps enrollment update",
-        "iot dps enrollment-group create",
-        "iot dps enrollment-group update",
-    ):
-        arguments = scoped_arguments(command_name)
-        assert {
-            "adr_namespace",
-            "adr_ca_name",
-            "adr_certificate_policy_name",
-        } <= set(arguments)
-
-        policy_options = arguments[
-            "adr_certificate_policy_name"
-        ].settings["options_list"]
-        assert policy_options[0] == "--adr-cert-policy-name"
-        assert any(
-            getattr(option, "target", None)
-            == "--adr-certificate-policy-name"
-            and option.hide
-            for option in policy_options
-        )
-        credential_alias = arguments["credential_policy_name"].settings
-        assert credential_alias["options_list"] == [
-            "--credential-policy-name",
-            "--cpn",
-        ]
-        assert credential_alias["deprecate_info"].hide is True
-        assert (
-            credential_alias["deprecate_info"].redirect
-            == "--adr-cert-policy-name"
-        )
-
-    device_auth_arguments = {
-        "enrollment_group_id",
-        "device_symmetric_key",
-        "compute_key",
-        "certificate_file",
-        "key_file",
-        "passphrase",
-    }
-    for command_name in (
-        "iot device registration create",
-        "iot device registration operation-status",
-    ):
-        arguments = scoped_arguments(command_name)
-        assert device_auth_arguments <= set(arguments)
-
-    create_arguments = scoped_arguments("iot device registration create")
-    assert {
-        "csr",
-        "endorsement_key",
-        "storage_root_key",
-    } <= set(create_arguments)
-    assert {"cert_output", "certificate_output_file"}.isdisjoint(
-        create_arguments
-    )
-    create_options = {
-        option
-        for argument in create_arguments.values()
-        for option in argument.settings.get("options_list", [])
-        if isinstance(option, str)
-    }
-    assert {"--cert-output", "--certificate-output-file"}.isdisjoint(
-        create_options
-    )
 
     for command_name in ("iot hub create", "iot dps create", "iot dps update"):
         arguments = scoped_arguments(command_name)

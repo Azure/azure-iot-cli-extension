@@ -23,8 +23,7 @@ def generate_enrollment_create_req(attestation_type=None, endorsement_key=None,
                                    initial_twin_tags=None, initial_twin_properties=None,
                                    provisioning_status=None, reprovision_policy=None,
                                    primary_key=None, secondary_key=None, allocation_policy=None,
-                                   iot_hubs=None, edge_enabled=False, webhook_url=None, api_version=None,
-                                   adr_namespace=None, adr_ca_name=None, adr_certificate_policy_name=None):
+                                   iot_hubs=None, edge_enabled=False, webhook_url=None, api_version=None):
     return {'client': None,
             'enrollment_id': enrollment_id,
             'rg': resource_group,
@@ -45,10 +44,7 @@ def generate_enrollment_create_req(attestation_type=None, endorsement_key=None,
             'iot_hubs': iot_hubs,
             'edge_enabled': edge_enabled,
             'webhook_url': webhook_url,
-            'api_version': api_version,
-            'adr_namespace': adr_namespace,
-            'adr_ca_name': adr_ca_name,
-            'adr_certificate_policy_name': adr_certificate_policy_name}
+            'api_version': api_version}
 
 
 class TestEnrollmentCreate():
@@ -157,12 +153,7 @@ class TestEnrollmentCreate():
         (generate_enrollment_create_req(attestation_type='tpm',
                                         endorsement_key='mykey',
                                         provisioning_status='enabled',
-                                        initial_twin_properties={'key': ['value1', 'value2']})),
-        (generate_enrollment_create_req(
-            attestation_type='symmetricKey',
-            adr_namespace='adr-ns',
-            adr_ca_name='factory-ca',
-            adr_certificate_policy_name='device-policy'))
+                                        initial_twin_properties={'key': ['value1', 'value2']}))
     ])
     def test_enrollment_create(self, serviceclient, fixture_cmd, req):
         subject.iot_dps_device_enrollment_create(
@@ -186,10 +177,7 @@ class TestEnrollmentCreate():
             iot_hubs=req['iot_hubs'],
             edge_enabled=req['edge_enabled'],
             webhook_url=req['webhook_url'],
-            api_version=req['api_version'],
-            adr_namespace=req['adr_namespace'],
-            adr_ca_name=req['adr_ca_name'],
-            adr_certificate_policy_name=req['adr_certificate_policy_name']
+            api_version=req['api_version']
         )
         request = serviceclient.calls[0].request
         url = request.url
@@ -250,10 +238,6 @@ class TestEnrollmentCreate():
             )
         if req['edge_enabled']:
             assert body['capabilities']['iotEdge']
-        if req['adr_namespace']:
-            assert body['namespaceName'] == req['adr_namespace']
-            assert body['certificateAuthorityName'] == req['adr_ca_name']
-            assert body['certificatePolicyName'] == req['adr_certificate_policy_name']
 
     @pytest.mark.parametrize("req", [
         (generate_enrollment_create_req(attestation_type='x509')),
@@ -324,10 +308,7 @@ def generate_enrollment_show(**kvp):
                'initialTwin': {'tags': {}, 'properties': {'desired': {}}},
                'registrationId': enrollment_id, 'etag': etag,
                'provisioningStatus': 'disabled', 'iotHubHostName': 'myHub',
-               'deviceId': 'myDevice',
-               'namespaceName': 'adr-ns',
-               'certificateAuthorityName': 'factory-ca',
-               'certificatePolicyName': 'device-policy'}
+               'deviceId': 'myDevice'}
     for k in kvp:
         if payload.get(k):
             payload[k] = kvp[k]
@@ -451,19 +432,14 @@ class TestEnrollmentUpdate():
         assert "{}/enrollments/{}?".format(mock_dps_target['entity'], enrollment_id) in url
         assert update_request.method == 'PUT'
 
-        assert update_request.headers["If-Match"] == (
-            f'"{req["etag"]}"' if req["etag"] else "*"
-        )
+        assert update_request.headers["If-Match"] == req['etag'] if req['etag'] else "*"
 
         body = json.loads(update_request.body)
-        assert body['namespaceName'] == initial_enrollment['namespaceName']
-        assert body['certificateAuthorityName'] == initial_enrollment['certificateAuthorityName']
-        assert body['certificatePolicyName'] == initial_enrollment['certificatePolicyName']
         if not req['certificate_path']:
             if req['remove_certificate_path']:
                 assert body['attestation']['x509']['clientCertificates'].get('primary') is None
             else:
-                assert "info" not in body['attestation']['x509']['clientCertificates']['primary']
+                assert body['attestation']['x509']['clientCertificates']['primary']['info'] is not None
         if req['certificate_path']:
             assert body['attestation']['x509']['clientCertificates']['primary']['certificate'] is not None
         if req['secondary_certificate_path']:
@@ -663,7 +639,7 @@ class TestEnrollmentDelete():
         method = request.method
         assert "{}/enrollments/{}?".format(mock_dps_target['entity'], enrollment_id) in url
         assert method == 'DELETE'
-        assert request.headers["If-Match"] == (f'"{etag}"' if etag else "*")
+        assert request.headers["If-Match"] == etag if etag else "*"
 
     def test_enrollment_delete_error(self, serviceclient_generic_error, fixture_cmd):
         with pytest.raises(CLIError):
@@ -748,7 +724,7 @@ class TestRegistrationDelete():
         method = request.method
         assert "{}/registrations/{}?".format(mock_dps_target['entity'], enrollment_id) in url
         assert method == 'DELETE'
-        assert request.headers["If-Match"] == (f'"{etag}"' if etag else "*")
+        assert request.headers["If-Match"] == etag if etag else "*"
 
     def test_registration_delete_error(self, fixture_cmd):
         with pytest.raises(CLIError):

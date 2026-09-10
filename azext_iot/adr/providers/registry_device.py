@@ -283,7 +283,7 @@ class RegistryDeviceProvider(ADRProvider):
                 "authentication type 'SymmetricKey'."
             )
 
-        keys = self.client.registry_device_authentication_profiles.get_keys(
+        keys = self.client.registry_device_authentication_profiles.list_keys(
             resource_group_name=resource_group_name,
             namespace_name=namespace_name,
             registry_device_name=registry_device_name,

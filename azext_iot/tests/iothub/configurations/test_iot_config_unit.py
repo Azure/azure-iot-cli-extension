@@ -893,19 +893,16 @@ class TestConfigList:
         list_request = service_client.calls[0].request
         assert "top=" not in list_request.url
 
-    @pytest.mark.parametrize(
-        "list_method",
-        [
-            subject.iot_hub_configuration_list,
-            subject.iot_edge_deployment_list,
-        ],
-    )
-    @pytest.mark.parametrize("top", [0])
-    def test_list_invalid_top_before_discovery(
-        self, fixture_cmd, list_method, top
-    ):
+    @pytest.mark.parametrize("top", [-2, 0])
+    def test_config_list_invalid_args(self, fixture_cmd, top):
+        from argparse import Namespace
+        from azext_iot._validators import process_top
+
         with pytest.raises(CLIError):
-            list_method(
+            # Preview's CLI argument validator permits unlimited (-1) and
+            # larger result counts; direct Python dispatch bypasses validation.
+            process_top(Namespace(top=top))
+            subject.iot_hub_configuration_list(
                 cmd=fixture_cmd, hub_name_or_hostname=mock_target["entity"], top=top
             )
 

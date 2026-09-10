@@ -81,9 +81,9 @@ class MessageEndpoint(IoTHubProvider):
         source_id: Optional[str] = None,
     ):
         if not endpoint_resource_group:
-            endpoint_resource_group = self.rg
+            endpoint_resource_group = self.hub_resource["resourcegroup"]
         if not endpoint_subscription_id:
-            endpoint_subscription_id = self.subscription_id
+            endpoint_subscription_id = self.hub_resource['subscriptionid']
 
         if connection_string and identity:
             raise MutuallyExclusiveArgumentError("Please use either --connection-string or --identity, both were provided.")
@@ -259,7 +259,12 @@ class MessageEndpoint(IoTHubProvider):
             endpoints["eventStreams"].append(es_endpoint)
 
         try:
-            return self._begin_hub_update()
+            return self.discovery.client.begin_create_or_update(
+                self.hub_resource["resourcegroup"],
+                self.hub_resource["name"],
+                self.hub_resource,
+                etag=self.hub_resource["etag"]
+            )
         except HttpResponseError as e:
             handle_service_exception(e)
 
@@ -383,7 +388,12 @@ class MessageEndpoint(IoTHubProvider):
             if source_id:
                 original_endpoint["sourceId"] = source_id
 
-        return self._begin_hub_update()
+        return self.discovery.client.begin_create_or_update(
+            self.hub_resource["resourcegroup"],
+            self.hub_resource["name"],
+            self.hub_resource,
+            etag=self.hub_resource["etag"]
+        )
 
     def _connection_string_retrieval_args_check(
         self,
@@ -458,6 +468,7 @@ class MessageEndpoint(IoTHubProvider):
                 return endpoints["cosmosDBSqlContainers"]
             elif self.support_cosmos == IoTHubSDKVersion.CosmosCollections.value:
                 return endpoints["cosmosDBSqlCollections"]
+        elif EndpointType.CosmosDBContainer.value == endpoint_type:
             raise InvalidArgumentValueError(INVALID_CLI_CORE_FOR_COSMOS)
         elif EndpointType.AzureStorageContainer.value == endpoint_type:
             return endpoints["storageContainers"]
@@ -593,7 +604,12 @@ class MessageEndpoint(IoTHubProvider):
             endpoints["eventStreams"] = []
 
         try:
-            return self._begin_hub_update()
+            return self.discovery.client.begin_create_or_update(
+                self.hub_resource["resourcegroup"],
+                self.hub_resource["name"],
+                self.hub_resource,
+                etag=self.hub_resource["etag"]
+            )
         except HttpResponseError as e:
             handle_service_exception(e)
 

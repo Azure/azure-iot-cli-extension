@@ -28,7 +28,6 @@ from azext_iot.constants import (
     TRACING_ALLOWED_FOR_SKU,
 )
 from azext_iot.common.sas_token_auth import SasTokenAuthentication
-from azext_iot.common.arm import get_resource_group
 from azext_iot.common.shared import (
     DeviceAuthType,
     SdkType,
@@ -53,7 +52,7 @@ from azext_iot.common.utility import (
     generate_storage_account_sas_token,
 )
 from azext_iot._factory import SdkResolver, CloudError
-from azext_iot.operations.generic import _execute_query, _process_top
+from azext_iot.operations.generic import _execute_query
 from typing import Optional
 import pprint
 
@@ -1780,7 +1779,6 @@ def iot_hub_configuration_list(
     login=None,
     auth_type_dataplane=None,
 ):
-    top = _process_top(top=top)
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         resource_name=hub_name_or_hostname,
@@ -1809,7 +1807,6 @@ def iot_edge_deployment_list(
     login=None,
     auth_type_dataplane=None,
 ):
-    top = _process_top(top=top)
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
         resource_name=hub_name_or_hostname,
@@ -2675,14 +2672,14 @@ def iot_device_export(  # pragma: no cover
             "The parameter --auth-type is now used to specify IoT Hub data access auth type instead of storage access auth type. "
         )
 
+    service_sdk = _get_service_sdk(
+        cmd, hub_name_or_hostname, resource_group_name, login, auth_type_dataplane
+    )
     export_job_properties = _create_export_import_job_properties(
         job_type=JobType.exportDevices.value,
         output_blob_container_uri=blob_container_uri,
         include_keys=include_keys,
         identity=identity
-    )
-    service_sdk = _get_service_sdk(
-        cmd, hub_name_or_hostname, resource_group_name, login, auth_type_dataplane
     )
 
     try:
@@ -2722,14 +2719,14 @@ def iot_device_import(  # pragma: no cover
             "The parameter --auth-type is now used to specify IoT Hub data access auth type instead of storage access auth type. "
         )
 
+    service_sdk = _get_service_sdk(
+        cmd, hub_name_or_hostname, resource_group_name, login, auth_type_dataplane
+    )
     import_job_properties = _create_export_import_job_properties(
         job_type=JobType.importDevices.value,
         input_blob_container_uri=input_blob_container_uri,
         output_blob_container_uri=output_blob_container_uri,
         identity=identity
-    )
-    service_sdk = _get_service_sdk(
-        cmd, hub_name_or_hostname, resource_group_name, login, auth_type_dataplane
     )
 
     try:
@@ -2963,15 +2960,7 @@ def iot_hub_connection_string_show(
 
         def conn_str_getter(hub):
             return _get_hub_connection_string(
-                cmd,
-                discovery,
-                hub,
-                policy_name,
-                key_type,
-                show_all,
-                default_eventhub,
-                hostname_type,
-                resource_group_name,
+                cmd, discovery, hub, policy_name, key_type, show_all, default_eventhub, hostname_type
             )
 
         connection_strings = []
@@ -2987,25 +2976,15 @@ def iot_hub_connection_string_show(
                         }
                     )
                 except Exception:
-                    hub_resource_group = get_resource_group(
-                        hub,
-                        fallback=resource_group_name,
-                        resource_label="IoT Hub",
-                    )
                     logger.warning(
                         f"Warning: The IoT Hub {hub['name']} in resource group "
-                        + f"{hub_resource_group} does "
+                        + f"{hub['resourcegroup']} does "
                         + f"not have the target policy {policy_name}."
                     )
             else:
-                hub_resource_group = get_resource_group(
-                    hub,
-                    fallback=resource_group_name,
-                    resource_label="IoT Hub",
-                )
                 logger.warning(
                     f"Warning: The IoT Hub {hub['name']} in resource group "
-                    + f"{hub_resource_group} is skipped "
+                    + f"{hub['resourcegroup']} is skipped "
                     + "because the hub is not active."
                 )
         return connection_strings
@@ -3013,38 +2992,25 @@ def iot_hub_connection_string_show(
     hub = discovery.find_resource(hub_name_or_hostname, resource_group_name)
     if hub:
         conn_str = _get_hub_connection_string(
-            cmd,
-            discovery,
-            hub,
-            policy_name,
-            key_type,
-            show_all,
-            default_eventhub,
-            hostname_type,
-            resource_group_name,
+            cmd, discovery, hub, policy_name, key_type, show_all, default_eventhub, hostname_type
         )
         return {"connectionString": conn_str if show_all else conn_str[0]}
 
 
 def _get_hub_connection_string(
     cmd, discovery, hub, policy_name, key_type, show_all, default_eventhub,
-    hostname_type=HostnameType.AUTO.value, resource_group_name=None,
+    hostname_type=HostnameType.AUTO.value,
 ):
 
-    resource_group_name = get_resource_group(
-        hub,
-        fallback=resource_group_name,
-        resource_label="IoT Hub",
-    )
     policies = []
     if show_all:
         policies.extend(
-            discovery.get_policies(hub["name"], resource_group_name)
+            discovery.get_policies(hub["name"], hub["resourcegroup"])
         )
     else:
         policies.append(
             discovery.find_policy(
-                hub["name"], resource_group_name, policy_name
+                hub["name"], hub["resourcegroup"], policy_name
             )
         )
     if default_eventhub:

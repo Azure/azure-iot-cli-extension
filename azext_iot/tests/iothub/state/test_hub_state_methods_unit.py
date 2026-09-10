@@ -297,13 +297,7 @@ class TestMigrateState:
     def test_migrate_rg_from_orig_target(self, mocker):
         p = _provider(mocker, target=None)
         p.rg = None
-        p.discovery.get_target.return_value = {"name": "orig"}
-        p.discovery.find_resource.return_value = {
-            "id": (
-                "/subscriptions/sub/resourceGroups/rg2/providers/"
-                "Microsoft.Devices/IotHubs/orig"
-            )
-        }
+        p.discovery.get_target.return_value = {"resourcegroup": "rg2"}
         mocker.patch.object(p, "process_hub_to_dict", return_value={})
         mocker.patch.object(p, "delete_aspects")
         mocker.patch.object(p, "upload_hub_from_dict")
@@ -343,10 +337,8 @@ class TestProcessHubToDict:
     def test_arm_aspect(self, mocker):
         p = _provider(mocker)
         p.discovery.find_resource.return_value = {
-            "id": (
-                "/subscriptions/x/resourceGroups/rg/providers/"
-                "Microsoft.Devices/IotHubs/hub"
-            ),
+            "resourcegroup": "rg",
+            "id": "/subscriptions/x/hub",
         }
         arm_json = {"resources": [{"name": "hub", "type": "Microsoft.Devices/IotHubs"}]}
         invoke_result = mocker.MagicMock()
@@ -358,13 +350,10 @@ class TestProcessHubToDict:
 
     def test_arm_aspect_target_no_rg(self, mocker):
         p = _provider(mocker)
-        p.rg = None
         p.target = {"entity": "hub.azure-devices.net"}
         p.discovery.find_resource.return_value = {
-            "id": (
-                "/subscriptions/x/resourceGroups/rg-from-resource/providers/"
-                "Microsoft.Devices/IotHubs/hub"
-            ),
+            "resourcegroup": "rg-from-resource",
+            "id": "/subscriptions/x/hub",
         }
         arm_json = {"resources": [{"name": "hub", "type": "Microsoft.Devices/IotHubs"}]}
         invoke_result = mocker.MagicMock()
@@ -377,12 +366,7 @@ class TestProcessHubToDict:
 
     def test_arm_aspect_empty(self, mocker):
         p = _provider(mocker)
-        p.discovery.find_resource.return_value = {
-            "id": (
-                "/subscriptions/x/resourceGroups/rg/providers/"
-                "Microsoft.Devices/IotHubs/hub"
-            )
-        }
+        p.discovery.find_resource.return_value = {"resourcegroup": "rg", "id": "id"}
         invoke_result = mocker.MagicMock()
         invoke_result.as_json.return_value = {"resources": []}
         mocker.patch.object(state_module.cli, "invoke", return_value=invoke_result)
@@ -735,6 +719,7 @@ class TestUploadHubFromDict:
     def test_upload_arm_existing_target(self, mocker):
         p = _provider(mocker)
         p.discovery.find_resource.return_value = {
+            "resourcegroup": "rg",
             "location": "eastus",
             "sku": {"name": "S1"},
             "properties": {
@@ -752,10 +737,7 @@ class TestUploadHubFromDict:
         p = _provider(mocker)
         p.rg = None
         p.discovery.find_resource.return_value = {
-            "id": (
-                "/subscriptions/sub/resourceGroups/rg-resolved/providers/"
-                "Microsoft.Devices/IotHubs/hub"
-            ),
+            "resourcegroup": "rg-resolved",
             "location": "eastus",
             "sku": {"name": "S1"},
             "properties": {
@@ -793,6 +775,7 @@ class TestUploadHubFromDict:
     def test_upload_arm_deployment_fails(self, mocker):
         p = _provider(mocker)
         p.discovery.find_resource.return_value = {
+            "resourcegroup": "rg",
             "location": "eastus",
             "sku": {"name": "S1"},
             "properties": {
@@ -833,8 +816,8 @@ class TestUploadHubFromDict:
 class TestStateProviderInit:
     def test_init_success(self, mocker):
         def fake_init(self, **kwargs):
-            self.target = {"name": "hub"}
-            self.rg = "rg"
+            self.target = {"name": "hub", "resourcegroup": "rg"}
+            self.rg = None
 
         mocker.patch.object(state_module.IoTHubProvider, "__init__", fake_init)
         p = StateProvider(cmd=mocker.MagicMock())
