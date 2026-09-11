@@ -4,6 +4,8 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
+
 from azure.cli.core.azclierror import (
     AzureResponseError,
     RequiredArgumentMissingError,
@@ -108,7 +110,7 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
         assert registration["registrationState"]["assignedHub"] == hub_hostname
         assert registration["registrationState"]["deviceId"] == enrollment_id
         assert registration["registrationState"]["registrationId"] == enrollment_id
-        assert registration["registrationState"]["substatus"] == "initialAssignment"
+        assert registration["registrationState"]["substatus"] == "reprovisionedToInitialAssignment"
         assert registration["status"] == "assigned"
 
         # Try different provisioning host
@@ -125,7 +127,7 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
         assert registration["registrationState"]["assignedHub"] == hub_hostname
         assert registration["registrationState"]["deviceId"] == enrollment_id
         assert registration["registrationState"]["registrationId"] == enrollment_id
-        assert registration["registrationState"]["substatus"] == "initialAssignment"
+        assert registration["registrationState"]["substatus"] == "reprovisionedToInitialAssignment"
         assert registration["status"] == "assigned"
 
         # Unauthorized
@@ -155,7 +157,7 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
         assert registration["registrationState"]["assignedHub"] == hub_hostname
         assert registration["registrationState"]["deviceId"] == enrollment_id
         assert registration["registrationState"]["registrationId"] == enrollment_id
-        assert registration["registrationState"]["substatus"] == "initialAssignment"
+        assert registration["registrationState"]["substatus"] == "reprovisionedToInitialAssignment"
         assert registration["status"] == "assigned"
 
         # Check registration from service side
@@ -205,7 +207,7 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
         check_hub_device(cli, enrollment_id, "sas", hub)
 
         # Try with payload
-        payload = {"Thermostat": {"$metadata": {}}}
+        payload = json.dumps({"Thermostat": {"$metadata": {}}})
 
         registration = cli.invoke(
             set_cmd_auth_type(
@@ -214,12 +216,13 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
+            capture_stderr=True,
         ).as_json()
         assert registration["operationId"]
         assert registration["registrationState"]["assignedHub"] == hub_hostname
         assert registration["registrationState"]["deviceId"] == device_id
         assert registration["registrationState"]["registrationId"] == enrollment_id
-        assert registration["registrationState"]["substatus"] == "initialAssignment"
+        assert registration["registrationState"]["substatus"] == "reprovisionedToInitialAssignment"
         assert registration["status"] == "assigned"
 
 
@@ -315,7 +318,7 @@ def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module, auth
         assert registration["registrationState"]["assignedHub"] == hub_hostname
         assert registration["registrationState"]["deviceId"] == cert_name
         assert registration["registrationState"]["registrationId"] == cert_name
-        assert registration["registrationState"]["substatus"] == "initialAssignment"
+        assert registration["registrationState"]["substatus"] == "reprovisionedToInitialAssignment"
         assert registration["status"] == "assigned"
 
         # Check registration from service side
@@ -367,7 +370,7 @@ def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module, auth
         check_hub_device(cli, cert_name, "selfSigned", hub, thumbprint=first_thumbprint)
 
         # Try with payload
-        payload = {"Thermostat": {"$metadata": {}}}
+        payload = json.dumps({"Thermostat": {"$metadata": {}}})
 
         registration = cli.invoke(
             set_cmd_auth_type(
@@ -376,12 +379,13 @@ def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module, auth
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
+            capture_stderr=True,
         ).as_json()
         assert registration["operationId"]
         assert registration["registrationState"]["assignedHub"] == hub_hostname
         assert registration["registrationState"]["deviceId"] == device_id
         assert registration["registrationState"]["registrationId"] == cert_name
-        assert registration["registrationState"]["substatus"] == "initialAssignment"
+        assert registration["registrationState"]["substatus"] == "reprovisionedToInitialAssignment"
         assert registration["status"] == "assigned"
 
         # Try secondary cert
@@ -397,7 +401,7 @@ def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module, auth
         assert registration["registrationState"]["assignedHub"] == hub_hostname
         assert registration["registrationState"]["deviceId"] == device_id
         assert registration["registrationState"]["registrationId"] == cert_name
-        assert registration["registrationState"]["substatus"] == "initialAssignment"
+        assert registration["registrationState"]["substatus"] == "reprovisionedToInitialAssignment"
         assert registration["status"] == "assigned"
         check_hub_device(cli, device_id, "selfSigned", hub, thumbprint=secondary_thumprint)
 

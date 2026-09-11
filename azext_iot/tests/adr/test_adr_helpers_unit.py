@@ -15,6 +15,7 @@ from azext_iot.tests.adr._helpers import (
     is_retryable_resource_error,
     is_resource_not_found_error,
     wait_for_condition,
+    wait_for_listed_resource,
     wait_for_materialized_resources,
     wait_for_resource_succeeded,
 )
@@ -112,6 +113,18 @@ def test_resource_not_found_error_is_specific():
     assert not is_resource_not_found_error(forbidden)
 
 
+@pytest.mark.parametrize(
+    "message,expected",
+    [
+        ("An IotHub 'hub' under resource group 'rg' was not found.", True),
+        ("AuthorizationFailed: an assignment was not found.", False),
+        ("Required configuration was not found.", False),
+    ],
+)
+def test_resource_not_found_error_recognizes_only_hub_show_absence(message, expected):
+    assert is_resource_not_found_error(RuntimeError(message)) is expected
+
+
 def test_wait_for_condition_uses_bounded_clock_and_sanitized_observation():
     observations = iter([{"state": "Creating"}, {"state": "Succeeded"}])
     sleeps = []
@@ -195,6 +208,40 @@ def test_wait_for_materialized_resources_retries_empty_collection():
 
     assert resources == [{"name": "child"}]
     assert test.cmd.call_count == 2
+
+
+def test_wait_for_listed_resource_retries_missing_name_and_transient_read():
+    test = Mock()
+    stale = Mock()
+    stale.get_output_in_json.return_value = [{"name": "older-resource"}]
+    ready = Mock()
+    ready.get_output_in_json.return_value = [{"name": "new-resource"}]
+    error = RuntimeError("ProviderError: failed to return collection response")
+    error.status_code = 502
+    test.cmd.side_effect = [stale, error, ready]
+
+    assert wait_for_listed_resource(
+        test, "list resources", "new-resource", timeout=10, interval=0
+    ) == [{"name": "new-resource"}]
+    assert test.cmd.call_count == 3
+
+
+def test_wait_for_listed_resource_times_out_without_skipping():
+    test = Mock()
+    test.cmd.return_value.get_output_in_json.return_value = [{"name": "old"}]
+
+    with pytest.raises(AssertionError, match="expected resource absent"):
+        wait_for_listed_resource(test, "list resources", "new", timeout=0)
+    test.cmd.assert_called_once_with("list resources")
+
+
+def test_wait_for_listed_resource_does_not_retry_authorization_failure():
+    test = Mock()
+    test.cmd.side_effect = RuntimeError("403 AuthorizationFailed")
+
+    with pytest.raises(RuntimeError, match="AuthorizationFailed"):
+        wait_for_listed_resource(test, "list resources", "new")
+    test.cmd.assert_called_once_with("list resources")
 
 
 def test_cleanup_ledger_runs_callbacks_in_reverse_and_supports_dismiss():
@@ -305,6 +352,26 @@ def test_full_infra_cleanup_continues_after_show_not_found_exit():
         call("iot adr ns delete -n ns -g rg -y"),
         call("identity show -n identity -g rg"),
         call("identity delete -n identity -g rg"),
+    ]
+
+
+def test_full_infra_cleanup_accepts_deleted_hub_show_error():
+    helper = ADRFullInfraHelper()
+
+    def invoke(command):
+        if command.startswith("iot hub show"):
+            raise RuntimeError("An IotHub 'hub' under resource group 'rg' was not found.")
+        return Mock()
+
+    helper.cmd = Mock(side_effect=invoke)
+    helper.cleanup_full_infra(
+        resource_group="rg", hub_name="hub", namespace_name="ns",
+    )
+
+    assert helper.cmd.call_args_list == [
+        call("iot hub show -n hub -g rg"),
+        call("iot adr ns show -n ns -g rg"),
+        call("iot adr ns delete -n ns -g rg -y"),
     ]
 
 

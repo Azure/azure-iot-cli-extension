@@ -6,6 +6,7 @@
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
+from azext_iot.tests.iothub._integration_helpers import wait_for_query_ids
 from time import sleep
 
 # TODO: assert device scope format in device twin.
@@ -167,8 +168,16 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
                 checks=self.is_empty(),
             )
 
-            # Wait for API to catch up
-            sleep(10)
+            wait_for_query_ids(
+                lambda: self.cmd(
+                    self.set_cmd_auth_type(
+                        f"iot hub device-identity children list -d {edge_device_ids[0]} "
+                        f"-n {self.host_name} -g {self.entity_rg}",
+                        auth_type=auth_phase,
+                    )
+                ).get_output_in_json(),
+                [device_ids[1]],
+            )
 
             # List child devices of edge device
             output = self.cmd(

@@ -30,3 +30,22 @@ def test_load_dps_commands():
 
 def test_load_dps_arguments():
     load_dps_arguments(MagicMock(), None)
+
+
+def test_registration_timeout_argument_is_integer_and_scoped_to_create():
+    loader = MagicMock()
+    contexts = {}
+
+    def argument_context(name):
+        contexts.setdefault(name, MagicMock())
+        return contexts[name]
+
+    loader.argument_context.side_effect = argument_context
+    load_dps_arguments(loader, None)
+    create = contexts["iot device registration create"].__enter__.return_value
+    timeout = next(call for call in create.argument.call_args_list if call.args == ("timeout",))
+    assert timeout.kwargs["type"] is int
+    assert "Positive integer" in timeout.kwargs["help"]
+    for name, context in contexts.items():
+        if name != "iot device registration create":
+            assert all(call.args != ("timeout",) for call in context.__enter__.return_value.argument.call_args_list)

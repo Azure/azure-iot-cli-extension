@@ -2320,20 +2320,20 @@ def _iot_build_sas_token_from_cs(connection_string, duration=3600):
 
     for parser in all_parsers:
         try:
-            parsed_cs = parser(connection_string)
+            parsed_cs = {name.lower(): value for name, value in parser(connection_string).items()}
 
-            if "SharedAccessKeyName" in parsed_cs:
-                policy = parsed_cs["SharedAccessKeyName"]
-            key = parsed_cs["SharedAccessKey"]
+            if "sharedaccesskeyname" in parsed_cs:
+                policy = parsed_cs["sharedaccesskeyname"]
+            key = parsed_cs["sharedaccesskey"]
 
             if parser == ConnectionStringParser.IotHub:
-                uri = parsed_cs["HostName"]
+                uri = parsed_cs["hostname"]
             elif parser == ConnectionStringParser.Module:
                 uri = "{}/devices/{}/modules/{}".format(
-                    parsed_cs["HostName"], parsed_cs["DeviceId"], parsed_cs["ModuleId"]
+                    parsed_cs["hostname"], parsed_cs["deviceid"], parsed_cs["moduleid"]
                 )
             elif parser == ConnectionStringParser.Device:
-                uri = "{}/devices/{}".format(parsed_cs["HostName"], parsed_cs["DeviceId"])
+                uri = "{}/devices/{}".format(parsed_cs["hostname"], parsed_cs["deviceid"])
             else:
                 raise InvalidArgumentValueError("Given Connection String was not in a supported format.")
 

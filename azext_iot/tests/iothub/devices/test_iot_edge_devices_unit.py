@@ -63,15 +63,6 @@ test_certs_folder = "./test_certs"
 test_root_cert = "root-cert.pem"
 test_root_key = "root-key.pem"
 
-test_device_scopes = [
-    {"deviceId": "device_1", "deviceScope": "dev1-scope-value"},
-    {"deviceId": "device_2", "deviceScope": "dev2-scope-value"},
-    {"deviceId": "device_3", "deviceScope": "dev3-scope-value"},
-    {"deviceId": "device_4", "deviceScope": "dev4-scope-value"},
-    {"deviceId": "device_5", "deviceScope": "dev5-scope-value"},
-    {"deviceId": "device_6", "deviceScope": "dev6-scope-value"},
-    {"deviceId": "device_7", "deviceScope": "dev7-scope-value"},
-]
 test_path = getcwd()
 
 
@@ -119,7 +110,7 @@ class TestEdgeHierarchyCreateArgs:
         mocked_response.add(
             method=responses.GET,
             url=re.compile(r"{}/dev\d+".format(devices_url)),
-            body="{}",
+            body=json.dumps({"deviceScope": "registry-scope"}),
             status=200,
             content_type="application/json",
             match_querystring=False,
@@ -213,6 +204,13 @@ class TestEdgeHierarchyCreateArgs:
             bundle_output_path=output,
         )
 
+        query_calls = [call for call in service_client.calls if "/devices/query?" in call.request.url]
+        assert len(query_calls) == 1
+        for request in (call.request for call in service_client.calls if call.request.method == "PUT"):
+            parent_scopes = json.loads(request.body).get("parentScopes")
+            if parent_scopes:
+                assert parent_scopes == ["registry-scope"]
+
         if output:
             assert exists(output)
             for device in devices:
@@ -220,6 +218,40 @@ class TestEdgeHierarchyCreateArgs:
                 assert exists(join(output, f"{device_id}.tgz"))
 
             rmtree(output)
+
+    @pytest.mark.parametrize("status", [404, 403, 409, 500])
+    def test_clean_handles_only_missing_stale_query_rows(self, fixture_cmd, set_cwd, service_client, status):
+        service_client.replace(
+            responses.DELETE,
+            url=re.compile(r"https://{}/devices/dev\d+".format(hub_entity)),
+            json={"Message": "Registry delete error"},
+            status=status,
+        )
+        if status == 404:
+            subject.iot_edge_devices_create(
+                cmd=fixture_cmd, devices=[["id=dev1", "parent=dev2"], ["id=dev2"]],
+                clean=True, yes=True, visualize=False,
+            )
+        else:
+            with pytest.raises(AzureResponseError):
+                subject.iot_edge_devices_create(
+                    cmd=fixture_cmd, devices=[["id=dev1", "parent=dev2"], ["id=dev2"]],
+                    clean=True, yes=True, visualize=False,
+                )
+            assert not any(call.request.method == "PUT" for call in service_client.calls)
+
+    def test_explicit_device_delete_keeps_not_found_strict(self, fixture_cmd, service_client):
+        from azext_iot.iothub.providers.device_identity import DeviceIdentityProvider
+
+        service_client.replace(
+            responses.DELETE,
+            url=re.compile(r"https://{}/devices/dev\d+".format(hub_entity)),
+            json={"Message": "Device not found"},
+            status=404,
+        )
+        provider = DeviceIdentityProvider(cmd=fixture_cmd)
+        with pytest.raises(AzureResponseError):
+            provider.delete_device_identities(["dev1"])
 
 
 class TestHierarchyCreateFailures:
@@ -426,20 +458,15 @@ class TestHierarchyCreateConfig:
     def service_client(self, mocked_response, fixture_ghcs, fixture_sas):
         mocked_response.assert_all_requests_are_fired = False
         devices_url = f"https://{hub_entity}/devices"
-        # get scopes (force retry)
-        for scope_response in [
-            [],  # Query existing devices
-            test_device_scopes[:-2],  # Get Scopes [missing last 2]
-            test_device_scopes  # On retry, return full list
-        ]:
-            mocked_response.add(
-                method=responses.POST,
-                url=f"{devices_url}/query",
-                body=json.dumps(scope_response),
-                status=200,
-                content_type="application/json",
-                match_querystring=False,
-            )
+        # Keep the query index empty; known parent scopes come from registry GETs.
+        mocked_response.add(
+            method=responses.POST,
+            url=f"{devices_url}/query",
+            body="[]",
+            status=200,
+            content_type="application/json",
+            match_querystring=False,
+        )
 
         # delete any existing devices
         mocked_response.add(
@@ -477,7 +504,7 @@ class TestHierarchyCreateConfig:
         mocked_response.add(
             method=responses.GET,
             url=re.compile(r"{}/device_\d+".format(devices_url)),
-            body="{}",
+            body=json.dumps({"deviceScope": "registry-scope"}),
             status=200,
             content_type="application/json",
             match_querystring=False,
@@ -498,7 +525,7 @@ class TestHierarchyCreateConfig:
         yield mocked_response
 
     @pytest.fixture()
-    def scope_retry_failed_client(self, mocked_response, fixture_ghcs, fixture_sas):
+    def scope_missing_client(self, mocked_response, fixture_ghcs, fixture_sas):
         devices_url = f"https://{hub_entity}/devices"
         # always return empty query
         mocked_response.add(
@@ -517,6 +544,14 @@ class TestHierarchyCreateConfig:
             body=json.dumps(
                 {"authentication": {"symmetricKey": {"primaryKey": "devicePrimaryKey"}}}
             ),
+            status=200,
+            content_type="application/json",
+            match_querystring=False,
+        )
+        mocked_response.add(
+            method=responses.GET,
+            url=re.compile(r"{}/device_\d+".format(devices_url)),
+            body="{}",
             status=200,
             content_type="application/json",
             match_querystring=False,
@@ -702,8 +737,8 @@ class TestHierarchyCreateConfig:
 
             rmtree(out)
 
-    def test_edge_devices_scope_retry_failure(self, fixture_cmd, scope_retry_failed_client, set_cwd):
-        with pytest.raises(AzureResponseError):
+    def test_edge_devices_missing_parent_scope_fails(self, fixture_cmd, scope_missing_client, set_cwd):
+        with pytest.raises(AzureResponseError, match="Parent device.*did not return a device scope"):
             subject.iot_edge_devices_create(
                 cmd=fixture_cmd,
                 devices=None,

@@ -159,7 +159,13 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module, auth_ph
         etag = enrollment["etag"]
         assert enrollment_update["allocationPolicy"] == AllocationType.hashed.value
         assert enrollment_update["attestation"]["type"] == AttestationType.x509.value
-        assert enrollment_update["attestation"]["x509"]["clientCertificates"] is None
+        assert enrollment_update["attestation"]["x509"].get("clientCertificates") is None
+        assert enrollment_update["attestation"]["x509"]["signingCertificates"]["primary"] == (
+            enrollment["attestation"]["x509"]["signingCertificates"]["primary"]
+        )
+        assert enrollment_update["attestation"]["x509"]["signingCertificates"]["secondary"] == (
+            enrollment["attestation"]["x509"]["signingCertificates"]["secondary"]
+        )
         assert enrollment_update["capabilities"]["iotEdge"] is False
         assert enrollment_update["enrollmentGroupId"] == enrollment_id
         assert enrollment_update["provisioningStatus"] == EntityStatusType.disabled.value
@@ -198,7 +204,7 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module, auth_ph
         assert enrollment_update["allocationPolicy"] == AllocationType.custom.value
         assert enrollment_update["attestation"]["type"] == AttestationType.x509.value
         assert enrollment_update["attestation"]["x509"]["caReferences"]["primary"] == cert_name
-        assert enrollment_update["attestation"]["x509"]["caReferences"]["secondary"] is None
+        assert enrollment_update["attestation"]["x509"]["caReferences"].get("secondary") is None
         assert enrollment_update["customAllocationDefinition"]["webhookUrl"] == WEBHOOK_URL
         assert enrollment_update["customAllocationDefinition"]["apiVersion"] == API_VERSION
         assert enrollment_update["enrollmentGroupId"] == enrollment_id
@@ -225,9 +231,6 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module,
     generic_dict = {
         generate_generic_id(): generate_generic_id(),
         "key": "value",
-        "count": None,
-        "metadata": None,
-        "version": None,
     }
 
     attestation_type = AttestationType.symmetricKey.value
@@ -409,18 +412,11 @@ def test_dps_enrollment_twin_array(provisioned_iot_dps_module, auth_phases):
     dps_host_name = provisioned_iot_dps_module['dps']['properties']['serviceOperationsHostName']
     hub_hostname = provisioned_iot_dps_module['hubHostName']
     dps_cstring = provisioned_iot_dps_module["connectionString"]
-    base_enrollment_props = {
-        "count": None,
-        "metadata": None,
-        "version": None,
-    }
     generic_dict = {
-        **base_enrollment_props,
         generate_generic_id(): generate_generic_id(),
         "key": "value",
     }
     twin_array_dict = {
-        **base_enrollment_props,
         "values": [{"key1": "value1"}, {"key2": "value2"}],
     }
 

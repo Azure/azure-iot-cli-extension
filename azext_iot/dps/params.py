@@ -109,7 +109,7 @@ def load_dps_arguments(self, _):
         )
         context.argument(
             "timeout", type=int,
-            help="Hard REST registration timeout in seconds, including worker startup, HTTP and polling. "
+            help="Positive integer hard REST registration timeout in seconds, including worker startup, HTTP and polling. "
             "Excludes preliminary ID scope and bootstrap credential discovery.",
         )
         context.argument(

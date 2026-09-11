@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from contextlib import ExitStack
 from datetime import datetime, timezone
 from time import sleep, time
 from typing import Dict, Iterator, Optional
@@ -176,7 +177,13 @@ def _shared_acquire(run_uid: str, kind: str, create_fn, find_fn) -> dict:
                 _write_state(state_path, state)
                 return resource
         name, resource = create_fn(run_uid, kind)
-        _write_state(state_path, {"name": name, "refcount": 1})
+        with ExitStack() as cleanup:
+            cleanup.callback(
+                _cleanup_created_resource, name, run_uid, kind, find_fn,
+                _delete_hub if kind == "hub" else _delete_dps,
+            )
+            _write_state(state_path, {"name": name, "refcount": 1})
+            cleanup.pop_all()
         return resource
 
 
@@ -265,7 +272,22 @@ def _find_dps_by_name(dps_name: str) -> Optional[dict]:
 
 
 def _delete_dps(dps_name: str) -> None:
-    cli.invoke(f"iot dps delete --name {dps_name} --resource-group {ENTITY_RG}")
+    result = cli.invoke(f"iot dps delete --name {dps_name} --resource-group {ENTITY_RG}", capture_stderr=True)
+    if not result.success():
+        raise CLIInternalError(f"Failed to delete DPS '{dps_name}' in resource group '{ENTITY_RG}'.")
+
+
+def _cleanup_created_resource(name, run_uid, kind, find_fn, delete_fn):
+    resource = find_fn(name)
+    if resource is None:
+        return
+    tags = resource.get("tags") or {}
+    if resource.get("name") != name or any(
+        tags.get(key) != value for key, value in {"intTest": "true", "runUid": run_uid, "kind": kind}.items()
+    ):
+        logger.error("Not deleting '%s': resource ownership does not match this test run.", name)
+        return
+    delete_fn(name)
 
 
 def _hub_link_host_name(iot_hub: Dict) -> str:
@@ -330,16 +352,20 @@ def _create_managed_dps(run_uid: str, kind: str, iot_hub: Optional[Dict]) -> tup
     tags = f"intTest=true runUid={run_uid} kind={kind} createdEpoch={int(time())}"
     if iot_hub:
         tags += f" hubname={iot_hub['name']}"
-    target_dps = cli.invoke(
-        f"iot dps create --name {name} --resource-group {ENTITY_RG} "
-        f"--location {ENTITY_LOCATION} --disable-local-auth true --tags {tags}"
-    ).as_json()
-    assign_iot_dps_dataplane_rbac_role(target_dps)
-    if iot_hub:
-        _link_hub(name, iot_hub)
-    else:
-        _unlink_all_hubs(name)
-    return name, target_dps
+    with ExitStack() as cleanup:
+        cleanup.callback(_cleanup_created_resource, name, run_uid, kind, _find_dps_by_name, _delete_dps)
+        target_dps = cli.invoke(
+            f"iot dps create --name {name} --resource-group {ENTITY_RG} "
+            f"--location {ENTITY_LOCATION} --disable-local-auth true --tags {tags}",
+            capture_stderr=True,
+        ).as_json()
+        assign_iot_dps_dataplane_rbac_role(target_dps)
+        if iot_hub:
+            _link_hub(name, iot_hub)
+        else:
+            _unlink_all_hubs(name)
+        cleanup.pop_all()
+        return name, target_dps
 
 
 def _create_unmanaged_dps(dps_name: str, iot_hub: Optional[Dict]) -> dict:
@@ -358,42 +384,48 @@ def _iot_dps_provisioner(request, iot_hub: Optional[Dict] = None) -> dict:
     kind = "h" if iot_hub else "nh"
     run_uid = _get_run_uid(request)
 
-    if use_managed:
-        _gc_stale_resources_once(run_uid)
-        target_dps = _shared_acquire(
-            run_uid,
-            kind,
-            create_fn=lambda ru, k: _create_managed_dps(ru, k, iot_hub),
-            find_fn=_find_dps_by_name,
-        )
-        dps_name = target_dps["name"]
-        hub_host_name = _hub_link_host_name(iot_hub) if iot_hub else None
-    else:
-        dps_name = settings.env.azext_iot_testdps
-        target_dps = _find_dps_by_name(dps_name)
-        if not target_dps:
-            logger.error(f"DPS {dps_name} specified in pytest settings not found. DPS will be created")
-            target_dps = _create_unmanaged_dps(dps_name, iot_hub)
-        _assert_local_auth_disabled(target_dps)
-        assign_iot_dps_dataplane_rbac_role(target_dps)
-        hub_host_name = _link_hub(dps_name, iot_hub) if iot_hub else None
-        if not iot_hub:
-            _unlink_all_hubs(dps_name)
+    with ExitStack() as cleanup:
+        if use_managed:
+            _gc_stale_resources_once(run_uid)
+            target_dps = _shared_acquire(
+                run_uid,
+                kind,
+                create_fn=lambda ru, k: _create_managed_dps(ru, k, iot_hub),
+                find_fn=_find_dps_by_name,
+            )
+            cleanup.callback(
+                _shared_release, run_uid, kind,
+                lambda name: _cleanup_created_resource(name, run_uid, kind, _find_dps_by_name, _delete_dps),
+            )
+            dps_name = target_dps["name"]
+            hub_host_name = _hub_link_host_name(iot_hub) if iot_hub else None
+        else:
+            dps_name = settings.env.azext_iot_testdps
+            target_dps = _find_dps_by_name(dps_name)
+            if not target_dps:
+                logger.error(f"DPS {dps_name} specified in pytest settings not found. DPS will be created")
+                target_dps = _create_unmanaged_dps(dps_name, iot_hub)
+            _assert_local_auth_disabled(target_dps)
+            assign_iot_dps_dataplane_rbac_role(target_dps)
+            hub_host_name = _link_hub(dps_name, iot_hub) if iot_hub else None
+            if not iot_hub:
+                _unlink_all_hubs(dps_name)
 
-    _assert_local_auth_disabled(target_dps)
-    return {
-        "name": dps_name,
-        "resourceGroup": ENTITY_RG,
-        "dps": target_dps,
-        # Kept for the parametrized legacy auth cases, which are explicitly skipped.
-        # Login scenarios must not retrieve or use a DPS service SAS credential.
-        "connectionString": None,
-        "hubHostName": hub_host_name,
-        "iotHub": iot_hub,
-        "certificates": [],
-        "_runUid": run_uid if use_managed else None,
-        "_kind": kind if use_managed else None,
-    }
+        _assert_local_auth_disabled(target_dps)
+        result = {
+            "name": dps_name,
+            "resourceGroup": ENTITY_RG,
+            "dps": target_dps,
+            # Kept for skipped legacy service-auth cases, without retrieving SAS credentials.
+            "connectionString": None,
+            "hubHostName": hub_host_name,
+            "iotHub": iot_hub,
+            "certificates": [],
+            "_runUid": run_uid if use_managed else None,
+            "_kind": kind if use_managed else None,
+        }
+        cleanup.pop_all()
+        return result
 
 
 def _iot_dps_removal(dps):
@@ -447,17 +479,21 @@ def _find_hub_by_name(name: str) -> Optional[dict]:
 
 def _create_managed_hub(run_uid: str, kind: str) -> tuple:
     name = f"{INT_TEST_HUB_PREFIX}-{_timestamp()}-{run_uid[:8]}"
-    target_hub = cli.invoke(
-        f"iot hub create -n {name} -g {ENTITY_RG} --sku S1 "
-        f"--location {HUB_TEST_LOCATION} --disable-local-auth true "
-        f"--tags intTest=true runUid={run_uid} kind=hub createdEpoch={int(time())}"
-    ).as_json()
-    return name, target_hub
+    with ExitStack() as cleanup:
+        cleanup.callback(_cleanup_created_resource, name, run_uid, kind, _find_hub_by_name, _delete_hub)
+        target_hub = cli.invoke(
+            f"iot hub create -n {name} -g {ENTITY_RG} --sku S1 "
+            f"--location {HUB_TEST_LOCATION} --disable-local-auth true "
+            f"--tags intTest=true runUid={run_uid} kind=hub createdEpoch={int(time())}",
+            capture_stderr=True,
+        ).as_json()
+        cleanup.pop_all()
+        return name, target_hub
 
 
 def _delete_hub(name: str) -> None:
-    if not cli.invoke(f"iot hub delete -n {name} -g {ENTITY_RG}").success():
-        logger.error(f"Failed to delete iot hub resource {name}.")
+    if not cli.invoke(f"iot hub delete -n {name} -g {ENTITY_RG}", capture_stderr=True).success():
+        raise CLIInternalError(f"Failed to delete iot hub resource '{name}' in resource group '{ENTITY_RG}'.")
 
 
 def _iot_hubs_provisioner(request):
@@ -479,17 +515,25 @@ def _iot_hubs_provisioner(request):
         )
         name = target_hub["name"]
 
-    _assert_local_auth_disabled(target_hub)
-    assert target_hub["location"].replace(" ", "").casefold() == HUB_TEST_LOCATION.replace(" ", "").casefold(), (
-        f"DPS integration Hubs must be in {HUB_TEST_LOCATION}; use a compliant azext_iot_testdps_hub."
-    )
-    _assign_current_user_role(HUB_USER_ROLE, target_hub["id"])
-    return {
-        "hub": target_hub,
-        "name": name,
-        "rg": ENTITY_RG,
-        "_runUid": run_uid,
-    }
+    with ExitStack() as cleanup:
+        if run_uid:
+            cleanup.callback(
+                _shared_release, run_uid, "hub",
+                lambda target: _cleanup_created_resource(target, run_uid, "hub", _find_hub_by_name, _delete_hub),
+            )
+        _assert_local_auth_disabled(target_hub)
+        assert target_hub["location"].replace(" ", "").casefold() == HUB_TEST_LOCATION.replace(" ", "").casefold(), (
+            f"DPS integration Hubs must be in {HUB_TEST_LOCATION}; use a compliant azext_iot_testdps_hub."
+        )
+        _assign_current_user_role(HUB_USER_ROLE, target_hub["id"])
+        result = {
+            "hub": target_hub,
+            "name": name,
+            "rg": ENTITY_RG,
+            "_runUid": run_uid,
+        }
+        cleanup.pop_all()
+        return result
 
 
 def _iot_hubs_removal(hub_result):

@@ -480,7 +480,6 @@ class DeviceRegistrationProvider:
             "connection_timeout": remaining / 2,
             "read_timeout": remaining / 2,
             "retry_total": 0,
-            "logging_enable": False,
         }
 
     def _perform_registration(self, body, deadline=None):

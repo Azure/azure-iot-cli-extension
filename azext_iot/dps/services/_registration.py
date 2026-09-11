@@ -76,9 +76,11 @@ def call_with_deadline(operation, deadline, **kwargs):
                         response.http_response.headers.pop(key)
 
         try:
+            # The factory disables body logging with a no-op policy, so no
+            # NetworkTraceLoggingPolicy remains to consume logging_enable.
             result = operation(
                 connection_timeout=remaining / 2, read_timeout=remaining / 2,
-                retry_total=0, logging_enable=False, raw_response_hook=capture_headers,
+                retry_total=0, raw_response_hook=capture_headers,
                 cls=lambda response, body, _: callback(response, body, headers),
                 **kwargs,
             )

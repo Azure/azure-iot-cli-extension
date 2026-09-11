@@ -47,7 +47,8 @@ RESOURCE_RETRYABLE_ERROR = re.compile(
     re.IGNORECASE,
 )
 RESOURCE_NOT_FOUND_ERROR = re.compile(
-    r"ResourceNotFound|ParentResourceNotFound|could not be found|\b404\b",
+    r"ResourceNotFound|ParentResourceNotFound|could not be found|\b404\b|"
+    r"An IotHub '[^']+' under resource group '[^']+' was not found\.",
     re.IGNORECASE,
 )
 T = TypeVar("T")
@@ -229,6 +230,25 @@ def wait_for_materialized_resources(
         timeout=timeout,
         interval=interval,
         describe=lambda resources: f"materialized count={len(resources or [])}",
+    )
+
+
+def wait_for_listed_resource(
+    test,
+    list_command: str,
+    resource_name: str,
+    *,
+    timeout: float = MATERIALIZATION_POLL_TIMEOUT,
+    interval: float = MATERIALIZATION_POLL_INTERVAL,
+) -> list:
+    """Wait for a newly-created resource to become visible in collection reads."""
+    return wait_for_condition(
+        lambda: test.cmd(list_command).get_output_in_json(),
+        lambda resources: any(resource.get("name") == resource_name for resource in resources),
+        description=f"resource '{resource_name}' in '{list_command}'",
+        timeout=timeout,
+        interval=interval,
+        describe=lambda resources: f"listed count={len(resources)}; expected resource absent",
     )
 
 

@@ -47,6 +47,34 @@ def test_hub_cleanup_uses_login(mocker):
         assert call.args[0].endswith("--auth-type login")
 
 
+@pytest.mark.parametrize("status", [404, 403, 409, 500])
+@pytest.mark.parametrize("error_type", ["legacy", "modern"])
+def test_hub_cleanup_does_not_retry_missing_targets_or_hide_other_errors(mocker, status, error_type):
+    from azure.core.exceptions import HttpResponseError
+    from msrestazure.azure_exceptions import CloudError
+
+    response = mocker.Mock(status_code=status, reason="cleanup failure")
+    response.text.return_value = '{"Message": "cleanup failure"}'
+    response.json.return_value = {"Message": "cleanup failure"}
+    error = CloudError(response, error="cleanup failure") if error_type == "legacy" else HttpResponseError(response=response)
+    listed = mocker.Mock()
+    listed.success.return_value = True
+    listed.as_json.side_effect = [[{"deviceId": "stale-device"}], [], []]
+    invoke = mocker.patch.object(helpers.cli, "invoke", side_effect=[listed, listed, listed, error, error, error])
+    sleep = mocker.patch("time.sleep")
+    if status == 404:
+        helpers.clean_up_iothub_device_config("hub", "rg")
+        assert invoke.call_count == 4
+        sleep.assert_not_called()
+    else:
+        with pytest.raises(type(error)) as caught:
+            helpers.clean_up_iothub_device_config("hub", "rg")
+        assert caught.value is error
+        assert invoke.call_count == 6
+        assert sleep.call_count == 2
+    assert all(call.kwargs["capture_stderr"] for call in invoke.call_args_list[3:])
+
+
 @pytest.mark.parametrize("location", [None, "centraluseuap"])
 def test_storage_creation_preserves_optional_location(mocker, location):
     cmd = mocker.Mock()

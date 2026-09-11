@@ -34,13 +34,14 @@ What is intentionally NOT covered here (covered by unit tests):
 
 import os
 import re
+import shlex
 import sys
 import time
 from typing import Optional
 
 import pytest
 from azure.cli.core.azclierror import ArgumentUsageError
-from msrestazure.tools import parse_resource_id
+from msrestazure.tools import is_valid_resource_id, parse_resource_id
 
 from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import (
@@ -54,6 +55,7 @@ from azext_iot.tests.adr._log import LogKind, _log, timed_step
 from azext_iot.tests.adr.conftest import (
     TEST_LOCATION,
     TEST_RG,
+    TEST_SUBSCRIPTION,
     generate_adr_namespace_name,
     generate_dps_name,
     generate_hub_name,
@@ -61,6 +63,7 @@ from azext_iot.tests.adr.conftest import (
 )
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests.settings import HUB_TEST_LOCATION
+from azext_iot.adr.providers.link_helpers import failed_link_recovery_commands
 from azext_iot.adr.topology import (
     DPS_CAP_EXCEEDED_MSG,
     DPS_REQUIRED_MSG,
@@ -78,7 +81,6 @@ _LINKING_POLL_ATTEMPTS = int(
     os.getenv("azext_iot_adr_su_link_poll_attempts", "240")
 )
 _LINKING_POLL_INTERVAL_SECONDS = 10
-_ADU_FPA_APP_ID = "6ee392c4-d339-4083-b04d-6b7947c6cf78"
 
 
 def _assert_cli_failure(test_case, command: str, expected_message: str):
@@ -146,11 +148,11 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
     both inbound caller identity variants (UAMI and SAMI):
 
     1. Setup: provision ADR + UAMI + an independent Standard primary Hub
-    2. Step 1: create a standalone DPS, pre-register the primary Hub on it via
-       ``iot dps linked-hub create`` (seeds the brownfield list), then
-       ``link dps add`` to attach the DPS to the namespace
-    3. Step 2: ``link dps show`` asserts ``brownfieldHubs`` enumerates the Hub
-    4. Step 3-4: secondary Hub linked with **UAMI** + show/list (single entry)
+    2. Step 1: create a standalone DPS without classic Hub registrations,
+       then ``link dps add`` to attach the DPS to the namespace
+    3. Step 2: ``link dps show`` / ``list`` projects the DPS endpoint
+    4. Step 3-4: secondary Hub linked with **UAMI**, then registered on DPS;
+       ``brownfieldHubs`` must enumerate this already namespace-linked Hub
     5. Step 5-6: tertiary Hub linked with **SAMI** + multi-hub list assertion
     6. Step 7-8: ``link hub update`` rotates inbound identities
     7. Step 9: ``link dps update`` rotates DPS identity
@@ -193,11 +195,9 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
             # properties.messaging.endpoints collection is the only ownership
             # model, and link tests add endpoint entries explicitly.
 
-            # Step 1: link DPS — DPS-first ordering means this must succeed
-            # before any `link hub add`. We also pre-register the primary Hub on
-            # the DPS via `iot dps linked-hub create` so the `dps show` brownfield
-            # enumeration in Step 2 has a real entry to surface.
-            with timed_step("Step 1 ❯ link dps add (+ seed DPS-side Hub registration)"):
+            # A classic DPS registration must not reference a Hub absent from
+            # the namespace. Seed it only after the namespace Hub link succeeds.
+            with timed_step("Step 1 ❯ link dps add"):
                 cmd = (
                     f"iot dps create --name {dps_name} -g {rg} "
                     f"--location {TEST_LOCATION} --disable-local-auth true "
@@ -210,19 +210,6 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                 dps_show = self.cmd(f"iot dps show --name {dps_name} -g {rg}").get_output_in_json()
                 dps_id = dps_show["id"]
                 _log(LogKind.RESULT, "dps_id=%s", dps_id)
-
-                # Register the primary Hub on the DPS so `iot adr ns link dps show`
-                # has a non-empty `brownfieldHubs` list to surface.
-                linked_hub_cmd = (
-                    f"iot dps linked-hub create --dps-name {dps_name} -g {rg} "
-                    f"--hub-name {primary_hub}"
-                )
-                _log(LogKind.CMD, "az %s", linked_hub_cmd)
-                try:
-                    self.cmd(linked_hub_cmd)
-                    _log(LogKind.RESULT, "Primary Hub registered on DPS (seeds brownfield list)")
-                except Exception as e:  # noqa: BLE001 — best-effort seed
-                    _log(LogKind.WARN, "DPS linked-hub create failed (brownfield assertion may skip): %s", e)
 
                 add_cmd = (
                     f"iot adr ns link dps add --ns {namespace_name} -g {rg} "
@@ -245,7 +232,7 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                 )
                 _log(LogKind.OK, "DPS link '%s' created", dps_endpoint)
 
-            with timed_step("Step 2 ❯ link dps show (+ brownfield Hubs) / list"):
+            with timed_step("Step 2 ❯ link dps show / list"):
                 shown = self.cmd(
                     f"iot adr ns link dps show --ns {namespace_name} -g {rg} -n {dps_endpoint}"
                 ).get_output_in_json()
@@ -253,32 +240,7 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                     f"link dps show did not surface name field: {shown}"
                 )
 
-                # Strengthened: assert brownfieldHubs is enumerated. The Hub was
-                # registered via `iot dps linked-hub create` in Step 1, so the
-                # side-GET against the DPS RP must surface it.
-                brownfield = shown.get("brownfieldHubs")
-                assert brownfield is not None, (
-                    f"link dps show must always set 'brownfieldHubs' key (may be empty list); got: {shown}"
-                )
-                brownfield_names = {
-                    ((h.get("name") if isinstance(h, dict) else h) or "").lower()
-                    for h in (brownfield or [])
-                }
-                # Each entry is the iotHubs[] record from the DPS — its `name` field
-                # is typically the hub hostname (e.g. `myhub.azure-devices.net`) or
-                # the bare hub name depending on backend serialization. Accept either.
-                primary_lower = primary_hub.lower()
-                assert any(primary_lower in n for n in brownfield_names) or any(
-                    primary_lower == n.split(".")[0] for n in brownfield_names
-                ), (
-                    f"Expected primary Hub '{primary_hub}' in brownfieldHubs, "
-                    f"got: {brownfield_names}"
-                )
-                _log(
-                    LogKind.OK,
-                    "DPS link visible; brownfieldHubs contains primary Hub (%d entry/entries)",
-                    len(brownfield_names),
-                )
+                assert isinstance(shown.get("brownfieldHubs"), list), shown
 
                 listed = self.cmd(
                     f"iot adr ns link dps list --ns {namespace_name} -g {rg}"
@@ -424,6 +386,34 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                     "projection."
                 )
                 _log(LogKind.OK, "Hub list returned %d entry/entries", len(names))
+
+            with timed_step("Verify classic DPS projection after namespace Hub linking"):
+                self.cmd(
+                    f"iot dps linked-hub create --dps-name {dps_name} -g {rg} "
+                    f"--hub-name {secondary_hub} --hub-resource-group {rg} "
+                    f"--authentication-type UserAssigned --user-assigned-identity {identity_resource_id}"
+                )
+                shown = self.cmd(
+                    f"iot adr ns link dps show --ns {namespace_name} -g {rg} -n {dps_endpoint}"
+                ).get_output_in_json()
+                brownfield_names = {
+                    str(hub.get("hostName") or hub.get("name") or "").casefold().split(".")[0]
+                    for hub in shown["brownfieldHubs"]
+                }
+                assert secondary_hub.casefold() in brownfield_names, shown
+                self.cmd(
+                    f"iot adr ns link dps update --ns {namespace_name} -g {rg} "
+                    f"-n {dps_endpoint} --user-assigned-mi {identity_resource_id}"
+                )
+                recovered = _wait_for_linking_succeeded(
+                    self, "dps", namespace_name, rg, dps_endpoint,
+                    expected_identity_type="UserAssigned",
+                )
+                assert recovered["resourceId"].casefold() == dps_id.casefold()
+                assert (
+                    recovered["inboundCallerIdentity"]["userAssignedIdentity"].casefold()
+                    == identity_resource_id.casefold()
+                )
 
             # Step 5: link hub (SAMI). Provision both identities so subsequent
             # SAMI/UAMI rotations always reference identities on the Hub.
@@ -679,6 +669,52 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
 
 
 @pytest.mark.usefixtures("set_cwd")
+class TestADRLinkRecovery(ADRLiveScenarioTest):
+    """Opt-in repair of a pre-provisioned failed DPS endpoint, without deletion.
+
+    Setting azext_iot_adr_failed_dps_namespace_id and
+    azext_iot_adr_failed_dps_endpoint authorizes an update with its existing
+    inbound identity. The namespace and linked DPS remain in place.
+    """
+
+    def test_preprovisioned_failed_dps_link_recovery(self):
+        namespace_id = os.getenv("azext_iot_adr_failed_dps_namespace_id")
+        endpoint_name = os.getenv("azext_iot_adr_failed_dps_endpoint")
+        if not namespace_id or not endpoint_name:
+            pytest.skip(
+                "Set azext_iot_adr_failed_dps_namespace_id and "
+                "azext_iot_adr_failed_dps_endpoint to repair a persisted failed DPS link."
+            )
+        assert is_valid_resource_id(namespace_id), "A namespace ARM resource ID is required."
+        parsed = parse_resource_id(namespace_id)
+        assert parsed.get("namespace", "").casefold() == "microsoft.deviceregistry"
+        assert parsed.get("type", "").casefold() == "namespaces"
+        assert "child_name_1" not in parsed
+        namespace_args = shlex.join([
+            "-n", parsed["name"], "-g", parsed["resource_group"],
+            "--subscription", parsed["subscription"],
+        ])
+        namespace = self.cmd(f"iot adr ns show {namespace_args}").get_output_in_json()
+        endpoint = namespace["properties"]["provisioning"]["endpoints"][endpoint_name]
+        assert endpoint["linkingState"] == "Failed", endpoint
+        recovery = failed_link_recovery_commands({
+            "id": namespace["id"],
+            "properties": {"provisioning": {"endpoints": {endpoint_name: endpoint}}},
+        })
+        assert len(recovery) == 1, "The failed endpoint must have a known inbound identity."
+        self.cmd(recovery[0])
+        endpoint_args = shlex.join([
+            "-n", endpoint_name, "--ns", parsed["name"], "-g", parsed["resource_group"],
+            "--subscription", parsed["subscription"],
+        ])
+        self.cmd(f"iot adr ns link dps wait {endpoint_args} --timeout 120 --interval 5")
+        shown = self.cmd(f"iot adr ns link dps show {endpoint_args}").get_output_in_json()
+        assert shown["linkingState"] == "Succeeded"
+        assert shown["resourceId"] == endpoint["resourceId"]
+        assert shown["inboundCallerIdentity"] == endpoint["inboundCallerIdentity"]
+
+
+@pytest.mark.usefixtures("set_cwd")
 class TestADRLinkBundledAdd(ADRFullInfraHelper, ADRLiveScenarioTest):
     """``iot adr ns link add`` bundled Hub+DPS in one PATCH (P4).
 
@@ -794,6 +830,7 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
 
     Mirrors the Hub/DPS link lifecycle for the ``iot adr ns link su`` surface:
 
+    Resolve the ADU first-party principal before provisioning any test resources.
     1. Create a disposable Update Instance with SAMI and UAMI identities, or use
        the explicitly disposable ``azext_iot_adr_update_instance_id`` fixture.
     2. Create an ADR namespace and authorize the update instance identities.
@@ -834,6 +871,14 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
                 "azext_iot_adr_update_instance_id must be explicitly marked "
                 "disposable because link su delete removes the resource."
             )
+        with timed_step("Preflight > Resolve ADU first-party service principal"):
+            subscription_id = (
+                parse_resource_id(su_id)["subscription"] if su_id else TEST_SUBSCRIPTION
+            )
+            rbac_manager = LinkRbacManager(self.cli_ctx)
+            adu_principal_id = rbac_manager._resolve_adu_principal(  # pylint: disable=protected-access
+                subscription_id
+            )
         try:
             if not su_id:
                 owned_identity_name = generate_identity_name()
@@ -858,7 +903,7 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
             parsed_su_id = parse_resource_id(su_id)
             su_name = parsed_su_id["name"]
             su_rg = parsed_su_id["resource_group"]
-            caller_id = LinkRbacManager(self.cli_ctx)._current_assignee_object_id(  # pylint: disable=protected-access
+            caller_id = rbac_manager._current_assignee_object_id(  # pylint: disable=protected-access
                 parsed_su_id["subscription"]
             )
             assert self.assign_role(
@@ -919,9 +964,6 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
                 )
                 _log(LogKind.CMD, "az %s", add_cmd)
                 self.cmd(add_cmd)
-                adu_principal_id = self.cmd(
-                    f"ad sp show --id {_ADU_FPA_APP_ID} --query id"
-                ).get_output_in_json()
                 principals = {
                     "namespace": namespace_principal_id,
                     "linked": identity_principal_id,

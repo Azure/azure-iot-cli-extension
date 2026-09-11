@@ -10,6 +10,8 @@ import base64
 from copy import deepcopy
 import io
 import json
+import logging
+import socket
 import ssl
 import subprocess
 import runpy
@@ -19,6 +21,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
+import requests
 from azure.cli.core.azclierror import (
     AzureConnectionError, AzureResponseError, CLIInternalError, InvalidArgumentValueError,
     MutuallyExclusiveArgumentError, RequiredArgumentMissingError,
@@ -41,6 +44,7 @@ from azext_iot.dps.services._authentication import DpsAuthenticationPolicy
 from azext_iot.dps.services._csr import normalize_csr
 from azext_iot.dps.services._enrollment import handle_service_error
 from azext_iot.operations import dps
+from azext_iot.tests.dps.device_registration import compare_registrations
 
 
 @pytest.fixture
@@ -238,6 +242,31 @@ def test_enrollment_unknown_nested_fields_and_input_are_preserved():
     assert original == snapshot
 
 
+def test_modeless_twin_omits_null_members_but_preserves_payload_and_arrays():
+    value = {
+        "count": None, "metadata": None, "version": None,
+        "key": "value", "enabled": False, "number": 0,
+        "values": [{"key1": "value1"}, {"key2": "value2"}],
+    }
+    expected = {key: item for key, item in value.items() if item is not None}
+    twin = dps._get_initial_twin(json.dumps(value), json.dumps(value))
+    assert twin == {"tags": expected, "properties": {"desired": expected}}
+    assert dps._drop_none({"optionalDeviceInformation": value}) == {"optionalDeviceInformation": expected}
+    assert "count" in value
+
+
+@pytest.mark.parametrize("substatus", ["initialAssignment", "reprovisionedToInitialAssignment"])
+def test_registration_comparison_preserves_service_substatus(substatus):
+    state = {
+        "assignedHub": "hub", "createdDateTimeUtc": "2026-09-10T01:00:00Z",
+        "lastUpdatedDateTimeUtc": "2026-09-10T02:00:00Z", "deviceId": "device",
+        "registrationId": "registration", "etag": "etag", "substatus": substatus,
+    }
+    compare_registrations(state, dict(state))
+    with pytest.raises(AssertionError):
+        compare_registrations(state, {**state, "substatus": "differentAssignment"})
+
+
 @pytest.mark.parametrize("values", [
     ("UPPER", "authority", "policy"), ("ab", "authority", "policy"),
     ("namespace", "a", "policy"), ("namespace", "authority", "invalid_policy"),
@@ -309,6 +338,33 @@ def test_worker_error_roundtrip_redacts_secrets_and_retains_cause():
     assert isinstance(raised.value.__cause__, ValueError)
     assert worker._error_to_json(RuntimeError("private text"), []) == {
         "type": "CLIInternalError", "message": "Unexpected DPS registration worker error (RuntimeError).",
+    }
+
+
+@pytest.mark.parametrize("option", [
+    "logging_enable", "connection_timeout", "read_timeout", "retry_total", "raw_response_hook",
+])
+def test_worker_transport_diagnostic_is_vetted_and_redacted(option):
+    error = TypeError(f"Session.request() got an unexpected keyword argument '{option}'")
+    encoded = worker._error_to_json(error, [])
+    assert encoded == {
+        "type": "CLIInternalError",
+        "message": f"DPS registration transport rejected request option '{option}'. "
+        "This is a client pipeline configuration error.",
+    }
+    with pytest.raises(CLIInternalError, match=f"request option '{option}'"):
+        worker.decode_response(json.dumps({"version": 1, "ok": False, "error": encoded}))
+    assert option not in worker._error_to_json(error, [option])["message"]
+
+
+@pytest.mark.parametrize("message", [
+    "private key or CSR text",
+    "Session.request() got an unexpected keyword argument 'private_secret'",
+    "Session.request() got an unexpected keyword argument 'logging_enable'\nprivate text",
+])
+def test_worker_unrecognized_type_errors_do_not_disclose_messages(message):
+    assert worker._error_to_json(TypeError(message), []) == {
+        "type": "CLIInternalError", "message": "Unexpected DPS registration worker error (TypeError).",
     }
 
 
@@ -429,7 +485,7 @@ def test_deadline_options_and_registration_dispatch(mocker):
     with pytest.raises(AzureConnectionError):
         registration._remaining(10)
     assert device.DeviceRegistrationProvider._request_options(20) == {
-        "connection_timeout": 5, "read_timeout": 5, "retry_total": 0, "logging_enable": False,
+        "connection_timeout": 5, "read_timeout": 5, "retry_total": 0,
     }
     provider = device.DeviceRegistrationProvider(
         SimpleNamespace(cli_ctx=None), "reg", id_scope="scope", device_symmetric_key="key"
@@ -567,6 +623,80 @@ def test_real_provider_deadline_flow_uses_register_and_operation_status(mocker):
     assert operations.register_device_and_issue_certificate.call_args.kwargs["device_registration"]["payload"] == {"x": 1}
     assert operations.operation_status_lookup_preview.call_args.kwargs["operation_id"] == "op"
     assert operations.operation_status_lookup_preview.call_args.kwargs["read_timeout"] < 5
+
+
+@pytest.mark.parametrize("path", ["default", "deadline", "worker"])
+@pytest.mark.parametrize("with_csr", [False, True])
+@pytest.mark.parametrize("polled", [False, True])
+def test_registration_requests_transport_options_and_confidentiality(
+    mocker, caplog, csr_material, path, with_csr, polled,
+):
+    caplog.set_level(logging.DEBUG)
+    blocked = mocker.Mock(side_effect=AssertionError("Network access is forbidden"))
+    mocker.patch.object(socket.socket, "connect", blocked)
+    mocker.patch.object(socket.socket, "connect_ex", blocked)
+    mocker.patch.object(socket, "getaddrinfo", blocked)
+    mocker.patch.object(socket, "create_connection", blocked)
+    mocker.patch.object(requests.adapters.HTTPAdapter, "send", blocked)
+    original_request = requests.Session.request
+    request_options = []
+    sent = []
+
+    def request(session, *args, **kwargs):
+        request_options.append(kwargs)
+        return original_request(session, *args, **kwargs)
+
+    def send(_session, prepared, **_kwargs):
+        sent.append(prepared)
+        pending = polled and len(sent) == 1
+        body = {"operationId": "op", "status": "assigning" if pending else "assigned"}
+        if not pending:
+            body["registrationState"] = {"registrationId": "reg", "deviceId": "reg"}
+        response = requests.Response()
+        response.status_code = 202 if pending else 200
+        response.headers = {"Content-Type": "application/json", "Retry-After": "0"}
+        response._content = json.dumps(body).encode()
+        response.raw = io.BytesIO(response.content)
+        response.request, response.url = prepared, prepared.url
+        return response
+
+    mocker.patch.object(requests.Session, "request", request)
+    mocker.patch.object(requests.Session, "send", send)
+    pem, der = csr_material()
+    encoded_csr = base64.b64encode(der).decode()
+    key = base64.b64encode(b"offline-device-secret").decode()
+    values = {
+        "registration_id": "reg", "id_scope": "scope",
+        "provisioning_host": "https://dps.invalid", "device_symmetric_key": key,
+    }
+    payload = {"private": "opaque-payload-secret"}
+    body = {"registrationId": "reg", "payload": payload}
+    if with_csr:
+        body["csr"] = encoded_csr
+    provider = device.DeviceRegistrationProvider(SimpleNamespace(cli_ctx=None), **values)
+    try:
+        if path == "worker":
+            result = registration.register_in_worker(values, body, registration.registration_deadline(10))
+        elif path == "deadline":
+            result = provider._perform_registration(body, deadline=registration.registration_deadline(10))
+        else:
+            result = provider.create(payload=payload, csr=pem if with_csr else None)
+    finally:
+        if provider.client is not None:
+            provider.client.close()
+
+    assert result["status"] == "assigned"
+    assert result["registrationState"]["registryDeviceExternalId"] == "reg"
+    assert [item.method for item in sent] == (["PUT", "GET"] if polled else ["PUT"])
+    assert json.loads(sent[0].body) == body
+    for options in request_options:
+        assert not {"logging_enable", "connection_timeout", "read_timeout", "retry_total", "raw_response_hook"} & options.keys()
+        if path != "default":
+            assert all(0 < value <= 5 for value in options["timeout"])
+        assert options["allow_redirects"] is False
+    for secret in (key, pem, encoded_csr, payload["private"], sent[0].headers["Authorization"]):
+        assert secret not in caplog.text
+    blocked.assert_not_called()
 
 
 @pytest.mark.parametrize("mode", ["success", "blocked-request", "blocked-stdin"])

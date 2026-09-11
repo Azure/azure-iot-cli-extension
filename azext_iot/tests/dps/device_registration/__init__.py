@@ -17,9 +17,7 @@ def compare_registrations(device_side: Dict[str, str], service_side: Dict[str, s
     assert device_side["etag"] == service_side["etag"]
     assert device_side["lastUpdatedDateTimeUtc"].rstrip("+00:00") in service_side["lastUpdatedDateTimeUtc"]
     assert device_side["registrationId"] == service_side["registrationId"]
-    # The device sdk always returns a substatus of initialAssignment, when that should not be the case if a
-    # device is reregistered. The service side has the correct substatus.
-    # assert device_side["substatus"] == service_side["substatus"]
+    assert device_side["substatus"] == service_side["substatus"]
 
 
 def check_hub_device(

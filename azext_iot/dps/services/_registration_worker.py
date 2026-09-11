@@ -36,11 +36,19 @@ _ERROR_TYPES = {kind.__name__: kind for kind in (
 )}
 _ERROR_TYPES["HttpResourceNotFoundError"] = HttpResourceNotFoundError
 _ERROR_NAMES = {kind: name for name, kind in _ERROR_TYPES.items()}
+_TRANSPORT_OPTION_ERRORS = {
+    f"Session.request() got an unexpected keyword argument '{option}'":
+        f"DPS registration transport rejected request option '{option}'. "
+        "This is a client pipeline configuration error."
+    for option in ("logging_enable", "connection_timeout", "read_timeout", "retry_total", "raw_response_hook")
+}
 
 
 def _error_to_json(error, secrets, depth=0):
     kind = _ERROR_NAMES.get(type(error))
     message = str(error) if kind else "Unexpected DPS registration worker error ({}).".format(type(error).__name__)
+    if type(error) is TypeError:
+        message = _TRANSPORT_OPTION_ERRORS.get(str(error), message)
     result = {"type": kind or "CLIInternalError", "message": _redact(message, secrets)}
     if isinstance(error, HttpResponseError):
         result["status_code"] = error.status_code
