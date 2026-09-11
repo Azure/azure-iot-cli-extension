@@ -16,7 +16,7 @@ from knack.log import get_logger
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests.helpers import get_role_assignments, tags_to_dict
-from azext_iot.tests.settings import DynamoSettings
+from azext_iot.tests.settings import DynamoSettings, HUB_TEST_LOCATION
 
 logger = get_logger(__name__)
 
@@ -302,7 +302,10 @@ def _iothub_provisioner(request) -> Optional[dict]:
             hub_names = []
             for _ in range(desired_instance_count):
                 target_name = generate_linked_hub_id()
-                create_result = cli.invoke(f"iot hub create -g {ACCOUNT_RG} -n {target_name}")
+                create_result = cli.invoke(
+                    f"iot hub create -g {ACCOUNT_RG} -n {target_name} "
+                    f"--location {HUB_TEST_LOCATION} --disable-local-auth true"
+                )
                 if not create_result.success():
                     raise RuntimeError(f"Failed to provision iot hub resource {target_name}.")
                 create_result = create_result.as_json()

@@ -432,11 +432,14 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                 expect_failure=True,
             )
 
-        # Mixed case connection string
-        cstring = self.connection_string
+        # Obtain module credentials using Entra; offline SAS does not authenticate as a Hub policy.
+        cstring = self.cmd(
+            f"iot hub module-identity connection-string show -m {module_ids[0]} -d {device_ids[0]} "
+            f"-n {self.entity_name} -g {self.entity_rg} --auth-type login"
+        ).get_output_in_json()["connectionString"]
         mixed_case_cstring = cstring.replace("HostName", "hostname", 1)
         self.cmd(
-            f"iot hub generate-sas-token -m {module_ids[0]} -d {device_ids[0]} --login {mixed_case_cstring}",
+            f"iot hub generate-sas-token --connection-string {mixed_case_cstring}",
             checks=[self.exists("sas")],
         )
 

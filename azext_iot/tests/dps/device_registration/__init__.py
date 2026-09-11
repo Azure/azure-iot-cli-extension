@@ -26,20 +26,18 @@ def check_hub_device(
     cli,
     device: str,
     auth_type: str,
-    hub_cstring: str,
+    hub: Dict,
     key: str = None,
     thumbprint: str = None
 ):
-    """Helper method to check whether a device exists in a hub."""
+    """Read the Hub registry with Entra; auth_type describes the DEVICE, not the service caller."""
 
     last_error = None
     for attempt in range(3):
         try:
             result = cli.invoke(
-                "iot hub device-identity show -l {} -d {}".format(
-                    hub_cstring,
-                    device,
-                )
+                f"iot hub device-identity show -n {hub['name']} -g {hub['rg']} "
+                f"-d {device} --auth-type login"
             )
             if not result.success():
                 raise RuntimeError(f"Command failed with exit code {result.error_code}: {result.output}")

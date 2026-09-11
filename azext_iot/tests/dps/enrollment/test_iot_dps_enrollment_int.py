@@ -13,7 +13,7 @@ from azext_iot.common.shared import EntityStatusType, AttestationType, Allocatio
 from azext_iot.common.utility import generate_key
 from azext_iot.tests.dps import (
     API_VERSION,
-    DATAPLANE_AUTH_TYPES,
+    DPS_SERVICE_AUTH_PARAMS,
     WEBHOOK_URL,
     TEST_ENDORSEMENT_KEY,
 )
@@ -48,7 +48,7 @@ def test_dps_enrollment_adr_certificate_reference_round_trip(
         f"--dps-name {dps_host} -g {dps_rg} "
         f"--enrollment-id {enrollment_id} --attestation-type symmetricKey "
         f"--adr-namespace {namespace_name} --adr-ca-name {ca_name} "
-        f"--adr-cert-policy-name {policy_name}"
+        f"--adr-cert-policy-name {policy_name} --auth-type login"
     )
     try:
         created = cli.invoke(command).as_json()
@@ -59,7 +59,7 @@ def test_dps_enrollment_adr_certificate_reference_round_trip(
         updated = cli.invoke(
             "iot dps enrollment update "
             f"--dps-name {dps_host} -g {dps_rg} "
-            f"--enrollment-id {enrollment_id} --device-id {enrollment_id}"
+            f"--enrollment-id {enrollment_id} --device-id {enrollment_id} --auth-type login"
         ).as_json()
         assert updated["namespaceName"] == namespace_name
         assert updated["certificateAuthorityName"] == ca_name
@@ -68,11 +68,12 @@ def test_dps_enrollment_adr_certificate_reference_round_trip(
         cli.invoke(
             "iot dps enrollment delete "
             f"--dps-name {dps_host} -g {dps_rg} "
-            f"--enrollment-id {enrollment_id}"
+            f"--enrollment-id {enrollment_id} --auth-type login"
         )
 
 
-def test_dps_enrollment_tpm_lifecycle(provisioned_iot_dps_module):
+@pytest.mark.parametrize("auth_phases", DPS_SERVICE_AUTH_PARAMS)
+def test_dps_enrollment_tpm_lifecycle(provisioned_iot_dps_module, auth_phases):
     dps_rg = provisioned_iot_dps_module['resourceGroup']
     dps_host_name = provisioned_iot_dps_module['dps']['properties']['serviceOperationsHostName']
     hub_hostname = provisioned_iot_dps_module['hubHostName']
@@ -87,7 +88,7 @@ def test_dps_enrollment_tpm_lifecycle(provisioned_iot_dps_module):
     }
 
     attestation_type = AttestationType.tpm.value
-    for auth_phase in DATAPLANE_AUTH_TYPES:
+    for auth_phase in auth_phases:
         enrollment_id = generate_names()
         device_id = generate_names()
 
@@ -167,7 +168,8 @@ def test_dps_enrollment_tpm_lifecycle(provisioned_iot_dps_module):
         )
 
 
-def test_dps_enrollment_x509_lifecycle(provisioned_iot_dps_module):
+@pytest.mark.parametrize("auth_phases", DPS_SERVICE_AUTH_PARAMS)
+def test_dps_enrollment_x509_lifecycle(provisioned_iot_dps_module, auth_phases):
     dps_rg = provisioned_iot_dps_module['resourceGroup']
     dps_host_name = provisioned_iot_dps_module['dps']['properties']['serviceOperationsHostName']
     hub_hostname = provisioned_iot_dps_module['hubHostName']
@@ -185,7 +187,7 @@ def test_dps_enrollment_x509_lifecycle(provisioned_iot_dps_module):
     cert_path = cert_name + CERT_ENDING
     create_test_cert(tracked_certs=provisioned_iot_dps_module["certificates"], subject=cert_name)
     attestation_type = AttestationType.x509.value
-    for auth_phase in DATAPLANE_AUTH_TYPES:
+    for auth_phase in auth_phases:
         enrollment_id = generate_names()
         device_id = generate_names()
 
@@ -262,7 +264,8 @@ def test_dps_enrollment_x509_lifecycle(provisioned_iot_dps_module):
         )
 
 
-def test_dps_enrollment_symmetrickey_lifecycle(provisioned_iot_dps_module):
+@pytest.mark.parametrize("auth_phases", DPS_SERVICE_AUTH_PARAMS)
+def test_dps_enrollment_symmetrickey_lifecycle(provisioned_iot_dps_module, auth_phases):
     dps_rg = provisioned_iot_dps_module['resourceGroup']
     dps_host_name = provisioned_iot_dps_module['dps']['properties']['serviceOperationsHostName']
     hub_hostname = provisioned_iot_dps_module['hubHostName']
@@ -277,7 +280,7 @@ def test_dps_enrollment_symmetrickey_lifecycle(provisioned_iot_dps_module):
     }
 
     attestation_type = AttestationType.symmetricKey.value
-    for auth_phase in DATAPLANE_AUTH_TYPES:
+    for auth_phase in auth_phases:
         enrollment_id, enrollment_id2 = generate_names(count=2)
         primary_key = generate_key()
         secondary_key = generate_key()

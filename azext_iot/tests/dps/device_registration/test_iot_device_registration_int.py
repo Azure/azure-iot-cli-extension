@@ -41,7 +41,7 @@ def test_register_and_issue_certificate_contract():
         f"--resource-group '{values['azext_iot_dps_device_resource_group']}' "
         f"--id-scope '{values['azext_iot_dps_device_id_scope']}' "
         f"--registration-id '{values['azext_iot_dps_device_registration_id']}' "
-        f"--csr '{values['azext_iot_dps_device_csr_path']}'"
+        f"--csr '{values['azext_iot_dps_device_csr_path']}' --auth-type login"
     ).as_json()
 
     assert result["operationId"]
@@ -56,7 +56,7 @@ def test_register_and_issue_certificate_contract():
         f"--resource-group '{values['azext_iot_dps_device_resource_group']}' "
         f"--id-scope '{values['azext_iot_dps_device_id_scope']}' "
         f"--registration-id '{values['azext_iot_dps_device_registration_id']}' "
-        f"--operation-id '{result['operationId']}'"
+        f"--operation-id '{result['operationId']}' --auth-type login"
     ).as_json()
     assert followed["operationId"] == result["operationId"]
     assert followed["status"] in {"assigned", "failed"}

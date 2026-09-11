@@ -107,6 +107,14 @@ def generate_cs(
 
 
 @pytest.fixture(autouse=True)
+def integration_auth_defaults(request, monkeypatch):
+    if request.node.path.name.endswith("_int.py"):
+        # Knack preserves configured-default option hyphens in environment names.
+        monkeypatch.setenv("AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE", "login")
+        monkeypatch.setenv("AZURE_DEFAULTS_IOTDPS-DATA-AUTH-TYPE", "login")
+
+
+@pytest.fixture(autouse=True)
 def disable_cli_version_check(mocker):
     """Prevent the Azure CLI version-update check from issuing real HTTP calls.
 

@@ -90,16 +90,17 @@ def command_table(loader):
 
 
 @pytest.fixture(scope="module")
-def link_command_parser():
+def management_command_parser():
     from azext_iot import IoTExtCommandsLoader
 
     cli_ctx = DummyCli(commands_loader_cls=IoTExtCommandsLoader)
     loader = cli_ctx.commands_loader
     loader.skip_applicability = True
     loader.load_command_table(None)
+    names = [*_LINK_PARSER_CASES, "iot hub create", "iot dps create"]
     loader.command_table = {
         name: loader.command_table[name]
-        for name in _LINK_PARSER_CASES
+        for name in names
     }
 
     # Azure CLI contributes --subscription as a private global argument before
@@ -108,7 +109,7 @@ def link_command_parser():
         EVENT_INVOKER_PRE_LOAD_ARGUMENTS,
         commands_loader=loader,
     )
-    for command_name in _LINK_PARSER_CASES:
+    for command_name in names:
         loader.load_arguments(command_name)
         AzCommandsLoader.load_arguments(loader, command_name)
 
@@ -264,7 +265,7 @@ def test_load_arguments_for_all_commands(loader, command_table):
 @pytest.mark.parametrize("command_name", sorted(_LINK_PARSER_CASES))
 def test_all_link_commands_parse_one_global_subscription_without_collision(
     mocker,
-    link_command_parser,
+    management_command_parser,
     command_name,
 ):
     subscription = "namespace-sub"
@@ -272,7 +273,7 @@ def test_all_link_commands_parse_one_global_subscription_without_collision(
         "azure.cli.core._profile.Profile.load_cached_subscriptions",
         return_value=[{"id": subscription, "name": "namespace-subscription"}],
     )
-    parsed = link_command_parser.parse_args(
+    parsed = management_command_parser.parse_args(
         [
             *command_name.split(),
             *_LINK_PARSER_CASES[command_name],
@@ -284,7 +285,7 @@ def test_all_link_commands_parse_one_global_subscription_without_collision(
     assert parsed._subscription == subscription  # pylint: disable=protected-access
     subscription_actions = [
         action
-        for action in link_command_parser.subparser_map[
+        for action in management_command_parser.subparser_map[
             command_name
         ]._actions  # pylint: disable=protected-access
         if "--subscription" in action.option_strings
@@ -294,10 +295,10 @@ def test_all_link_commands_parse_one_global_subscription_without_collision(
 
 
 def test_link_command_parser_leaves_subscription_for_current_account_default(
-    link_command_parser,
+    management_command_parser,
 ):
     command_name = "iot adr ns link su add"
-    parsed = link_command_parser.parse_args(
+    parsed = management_command_parser.parse_args(
         [
             *command_name.split(),
             *_LINK_PARSER_CASES[command_name],
@@ -305,6 +306,16 @@ def test_link_command_parser_leaves_subscription_for_current_account_default(
     )
 
     assert parsed._subscription is None  # pylint: disable=protected-access
+
+
+@pytest.mark.parametrize("kind", ["hub", "dps"])
+@pytest.mark.parametrize("value,expected", [(None, None), ("true", True), ("false", False)])
+def test_resource_create_local_auth_option(management_command_parser, kind, value, expected):
+    arguments = ["iot", kind, "create", "--name", "resource", "--resource-group", "rg"]
+    if value is not None:
+        arguments += ["--disable-local-auth", value]
+    parsed = management_command_parser.parse_args(arguments)
+    assert parsed.disable_local_auth is expected
 
 
 @pytest.fixture(scope="module")

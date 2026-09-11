@@ -96,12 +96,12 @@ def test_create_serializes_stable_resource(
     body = json.loads(mocked_response.calls[1].request.body)
     assert body["location"] == "westus2"
     assert body["sku"] == {"name": "S1", "capacity": 1}
-    assert body["properties"] == {}
+    assert body["properties"] == {"disableLocalAuth": True}
     assert body.get("identity") == expected_identity
     if not identity_args:
         assert "identity" not in body
     assert "deviceRegistryNamespace" not in body["properties"]
-    assert "disableLocalAuth" not in body["properties"]
+    assert body["properties"]["disableLocalAuth"] is True
     assert_stable_requests(mocked_response)
 
 

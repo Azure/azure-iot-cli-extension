@@ -4,15 +4,27 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import pytest
+
 from azext_iot.common.shared import AuthenticationTypeDataplane
 from knack.log import get_logger
 
 
 logger = get_logger(__name__)
-DATAPLANE_AUTH_TYPES = [
-    AuthenticationTypeDataplane.key.value,
-    AuthenticationTypeDataplane.login.value,
-    "cstring",
+# Each lifecycle keeps its sequence of auth phases, but policy-incompatible
+# service credentials are now separate, visibly skipped pytest cases. This
+# does NOT disable symmetric-key/X.509 device enrollment or registration.
+_SERVICE_SAS_DISABLED = pytest.mark.skip(
+    reason=(
+        "DPS disableLocalAuth=true rejects service shared-access-policy SAS authentication "
+        "(--auth-type key / --login connection string). The same lifecycle runs with "
+        "Entra login; device symmetric-key and X.509 attestation remain supported."
+    )
+)
+DPS_SERVICE_AUTH_PARAMS = [
+    pytest.param((AuthenticationTypeDataplane.key.value,), id="key", marks=_SERVICE_SAS_DISABLED),
+    pytest.param((AuthenticationTypeDataplane.login.value,), id="login"),
+    pytest.param(("cstring",), id="cstring", marks=_SERVICE_SAS_DISABLED),
 ]
 
 CERT_NAME = "aziotcli"

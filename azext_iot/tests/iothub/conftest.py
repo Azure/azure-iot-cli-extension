@@ -16,8 +16,11 @@ from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.tests.helpers import assign_role_assignment, clean_up_iothub_device_config, get_closest_marker
-from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
-from azext_iot.tests.iothub import ENTITY_NAME, ENTITY_RG, settings as iothub_settings
+from azext_iot.tests.settings import (
+    DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL, HUB_TEST_LOCATION
+)
+from azext_iot.tests.iothub import ENTITY_NAME, ENTITY_RG, ROLE_ASSIGNMENT_REFRESH_TIME, settings as iothub_settings
+from azext_iot.tests.iothub._integration_helpers import assert_hub_policy, assign_role_with_propagation
 
 logger = get_logger(__name__)
 MAX_RBAC_ASSIGNMENT_TRIES = 10
@@ -44,17 +47,18 @@ def assign_iot_hub_dataplane_rbac_role(hub_results):
         # Only add dataplane roles to the hubs that were not created mid test
         if hub.get("hub"):
             target_hub_id = hub["hub"]["id"]
-            account = cli.invoke("account show").as_json()
+            account = cli.invoke("account show", capture_stderr=True).as_json()
             user = account["user"]
 
             if user["name"] is None:
                 raise CLIInternalError("User not found")  # pylint: disable=broad-except
 
-            assign_role_assignment(
+            assign_role_with_propagation(
                 assignee=user["name"],
                 scope=target_hub_id,
                 role=USER_ROLE,
-                max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+                max_tries=MAX_RBAC_ASSIGNMENT_TRIES,
+                wait=ROLE_ASSIGNMENT_REFRESH_TIME,
             )
 
 
@@ -90,7 +94,7 @@ def _cleanup_dynamic_hub(request):
 
 
 @pytest.fixture()
-def fixture_provision_existing_hub_device_config(request):
+def fixture_provision_existing_hub_device_config(request, fixture_provision_existing_hub_role):
     # Clean up existing devices and configurations
     if settings.env.azext_iot_testhub:
         clean_up_iothub_device_config(
@@ -104,18 +108,19 @@ def fixture_provision_existing_hub_device_config(request):
 def fixture_provision_existing_hub_role(request):
     if settings.env.azext_iot_testhub:
         # Assign Data Contributor role
-        account = cli.invoke("account show").as_json()
+        account = cli.invoke("account show", capture_stderr=True).as_json()
         user = account["user"]
 
         target_hub = cli.invoke(
-            "iot hub show -n {} -g {}".format(HUB_NAME, RG)
+            "iot hub show -n {} -g {}".format(HUB_NAME, RG), capture_stderr=True
         ).as_json()
 
-        assign_role_assignment(
+        assign_role_with_propagation(
             assignee=user["name"],
             scope=target_hub["id"],
             role=USER_ROLE,
-            max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+            max_tries=MAX_RBAC_ASSIGNMENT_TRIES,
+            wait=ROLE_ASSIGNMENT_REFRESH_TIME,
         )
     yield
 
@@ -291,7 +296,7 @@ def provisioned_only_iot_hubs_module(request) -> dict:
 
 def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_storage=None):
     hub_marker = get_closest_marker(request)
-    desired_location = None
+    desired_location = HUB_TEST_LOCATION
     desired_tags = None
     desired_sys_identity = False
     desired_user_identity = False
@@ -299,7 +304,9 @@ def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_s
     desired_count = 1
 
     if hub_marker:
-        desired_location = hub_marker.kwargs.get("location")
+        desired_location = hub_marker.kwargs.get("location", HUB_TEST_LOCATION)
+        if desired_location != HUB_TEST_LOCATION:
+            raise ValueError(f"Hub integration resources must use {HUB_TEST_LOCATION}.")
         desired_tags = hub_marker.kwargs.get("desired_tags")
         desired_sys_identity = hub_marker.kwargs.get("sys_identity", False)
         desired_user_identity = hub_marker.kwargs.get("user_identity", False)
@@ -309,7 +316,10 @@ def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_s
     hub_results = []
     for _ in range(desired_count):
         name = generate_hub_id()
-        base_create_command = f"iot hub create -n {name} -g {RG} --sku S1"
+        base_create_command = (
+            f"iot hub create -n {name} -g {RG} --sku S1 "
+            f"--location {desired_location} --disable-local-auth true"
+        )
         if desired_sys_identity:
             base_create_command += " --system-assigned-mi"
         if desired_user_identity and provisioned_user_identity:
@@ -317,18 +327,16 @@ def _iot_hubs_provisioner(request, provisioned_user_identity=None, provisioned_s
             base_create_command += f" --user-assigned-mi {user_identity_id}"
         if desired_tags:
             base_create_command += f" --tags {desired_tags}"
-        if desired_location:
-            base_create_command += f" -l {desired_location}"
         if desired_storage and provisioned_storage:
             storage_cstring = provisioned_storage["connectionString"]
             base_create_command += f" --fcs {storage_cstring} --fc fileupload"
 
-        hub_obj = cli.invoke(base_create_command).as_json()
+        hub_obj = cli.invoke(base_create_command, capture_stderr=True).as_json()
+        assert_hub_policy(hub_obj)
         hub_results.append({
             "hub": hub_obj,
             "name": name,
             "rg": RG,
-            "connectionString": _get_hub_connection_string(name, RG),
             "storage": provisioned_storage
         })
     return hub_results
@@ -362,7 +370,7 @@ def provisioned_user_identity_module() -> dict:
 def _user_identity_provisioner():
     name = generate_hub_depenency_id()
     return cli.invoke(
-        f"identity create -n {name} -g {RG}"
+        f"identity create -n {name} -g {RG} --location {HUB_TEST_LOCATION}"
     ).as_json()
 
 
@@ -423,22 +431,11 @@ def _storage_provisioner():
     account_name = generate_hub_depenency_id()
     container_name = generate_hub_depenency_id()
 
-    storage_list = cli.invoke(
-        'storage account list -g "{}"'.format(RG)
+    # The generated name is new; no subscription/RG enumeration is necessary.
+    target_storage = cli.invoke(
+        f"storage account create -n {account_name} -g {RG} --location {HUB_TEST_LOCATION}",
+        capture_stderr=True,
     ).as_json()
-
-    target_storage = None
-    for storage in storage_list:
-        if storage["name"] == account_name:
-            target_storage = storage
-            break
-
-    if not target_storage:
-        target_storage = cli.invoke(
-            "storage account create -n {} -g {}".format(
-                account_name, RG
-            )
-        ).as_json()
 
     storage_cstring = _storage_get_cstring(account_name)
 
@@ -517,8 +514,8 @@ def _event_hub_provisioner():
     eventhub_name = generate_hub_depenency_id()
     policy_name = generate_hub_depenency_id()
     namespace_obj = cli.invoke(
-        "eventhubs namespace create --name {} --resource-group {}".format(
-            namespace_name, RG
+        "eventhubs namespace create --name {} --resource-group {} --location {}".format(
+            namespace_name, RG, HUB_TEST_LOCATION
         )
     ).as_json()
 
@@ -621,8 +618,8 @@ def _service_bus_provisioner():
     topic_name = generate_hub_depenency_id()
     policy_name = generate_hub_depenency_id()
     namespace_obj = cli.invoke(
-        "servicebus namespace create --name {} --resource-group {}".format(
-            namespace_name, RG
+        "servicebus namespace create --name {} --resource-group {} --location {}".format(
+            namespace_name, RG, HUB_TEST_LOCATION
         )
     ).as_json()
 
@@ -719,7 +716,7 @@ def _cosmos_db_provisioner():
     database_name = generate_hub_depenency_id()
     collection_name = generate_hub_depenency_id()
     partition_key_path = "/test"
-    location = "westus"
+    location = HUB_TEST_LOCATION
     cosmos_obj = cli.invoke(
         "cosmosdb create --name {} --resource-group {} --locations regionName={} failoverPriority=0".format(
             account_name, RG, location
@@ -753,37 +750,13 @@ def _cosmos_db_removal(account_name: str):
 
 
 def _clean_up(device_ids: List[str] = None, config_ids: List[str] = None):
-    connection_string = cli.invoke(
-        "iot hub connection-string show -n {} -g {} --policy-name {}".format(
-            HUB_NAME, RG, "iothubowner"
-        )
-    ).as_json()["connectionString"]
-    if device_ids:
-        device = device_ids.pop()
+    for device in device_ids or []:
         cli.invoke(
-            "iot hub device-identity delete -d {} --login {}".format(
-                device, connection_string
-            )
+            f"iot hub device-identity delete -d {device} -n {HUB_NAME} -g {RG} --auth-type login",
+            capture_stderr=True,
         )
-
-        for device in device_ids:
-            cli.invoke(
-                "iot hub device-identity delete -d {} -n {} -g {}".format(
-                    device, HUB_NAME, RG
-                )
-            )
-
-    if config_ids:
-        config = config_ids.pop()
+    for config in config_ids or []:
         cli.invoke(
-            "iot hub configuration delete -c {} --login {}".format(
-                config, connection_string
-            )
+            f"iot hub configuration delete -c {config} -n {HUB_NAME} -g {RG} --auth-type login",
+            capture_stderr=True,
         )
-
-        for config in config_ids:
-            cli.invoke(
-                "iot hub configuration delete -c {} -n {} -g {}".format(
-                    config, HUB_NAME, RG
-                )
-            )

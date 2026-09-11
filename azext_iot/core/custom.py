@@ -207,12 +207,16 @@ def iot_dps_create(
     enable_data_residency=None,
     mi_system_assigned=None,
     mi_user_assigned=None,
+    disable_local_auth=None,
 ):
     """Create a DPS instance with optional managed identities."""
     cli_ctx = cmd.cli_ctx
     _check_dps_name_availability(client.iot_dps_resource, dps_name)
     location = _ensure_location(cli_ctx, resource_group_name, location)
-    dps_property = {"enableDataResidency": enable_data_residency}
+    dps_property = {
+        "enableDataResidency": enable_data_residency,
+        "disableLocalAuth": True if disable_local_auth is None else disable_local_auth,
+    }
 
     dps_description = {
         "location": location,
@@ -1156,7 +1160,7 @@ def iot_hub_create(
                 },
                 "minTlsVersion": min_tls_version,
                 "enableDataResidency": enable_data_residency,
-                "disableLocalAuth": disable_local_auth,
+                "disableLocalAuth": True if disable_local_auth is None else disable_local_auth,
                 "disableDeviceSAS": disable_device_sas,
                 "disableModuleSAS": disable_module_sas,
                 "enableFileUploadNotifications": False if enable_fileupload_notifications is None else enable_fileupload_notifications,

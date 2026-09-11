@@ -5,12 +5,16 @@
 # --------------------------------------------------------------------------------------------
 
 import json
+import pytest
+import re
+import yaml
 
 from time import sleep
 from uuid import uuid4
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.common.shared import AuthenticationTypeDataplane
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
+from azext_iot.tests.iothub._integration_helpers import device_receiver, LOCAL_AUTH_DEVICE_HTTP_REASON
 from azext_iot.common.utility import (
     calculate_millisec_since_unix_epoch_utc,
     validate_key_value_pairs
@@ -24,6 +28,68 @@ class TestIoTHubC2DMessages(IoTLiveScenarioTest):
         )
 
     def test_iothub_c2d_messages(self):
+        """Entra service send, with a real device-key MQTT receiver."""
+        device_id = self.generate_device_names()[0]
+        self.cmd(
+            f"iot hub device-identity create -d {device_id} -n {self.entity_name} "
+            f"-g {self.entity_rg} --auth-type login"
+        )
+        with device_receiver(self.get_device_cstring(device_id)) as messages:
+            for encoding in ("utf-8", "utf-16"):
+                body = f"{uuid4()} шеллы 😁"
+                message_id, correlation_id = str(uuid4()), str(uuid4())
+                properties = {"key0": str(uuid4()), "key1": str(uuid4())}
+                self.cmd(
+                    f"iot device c2d-message send -d {device_id} -n {self.entity_name} -g {self.entity_rg} "
+                    f"--auth-type login --data '{body}' --mid {message_id} --cid {correlation_id} "
+                    f"--ct text/plain --ce {encoding} "
+                    f"--props 'key0={properties['key0']};key1={properties['key1']}' -y"
+                )
+                received = messages.get(timeout=60)
+                payload = received.data
+                if isinstance(payload, bytes):
+                    payload = payload.decode(encoding)
+                assert payload == body
+                assert received.message_id == message_id
+                assert received.correlation_id == correlation_id
+                assert received.content_type == "text/plain"
+                assert received.content_encoding == encoding
+                assert received.custom_properties == properties
+
+    def test_iothub_c2d_feedback(self):
+        """The AMQP feedback path supports Entra; device receipt/ack uses a device key."""
+        device_id = self.generate_device_names()[0]
+        self.cmd(
+            f"iot hub device-identity create -d {device_id} -n {self.entity_name} "
+            f"-g {self.entity_rg} --auth-type login"
+        )
+        body, message_id = str(uuid4()), str(uuid4())
+        with device_receiver(self.get_device_cstring(device_id)) as messages:
+            output = self.command_execute_assert(
+                f"iot device c2d-message send -d {device_id} -n {self.entity_name} -g {self.entity_rg} "
+                f"--auth-type login --data '{body}' --mid {message_id} --ack full --wait -y"
+            )
+            received = messages.get(timeout=60)
+            payload = received.data.decode("utf-8") if isinstance(received.data, bytes) else received.data
+            assert payload == body
+            assert received.message_id == message_id
+
+        # The monitor prints a banner followed by one or more YAML feedback
+        # mappings, without YAML document separators. Match all three fields in
+        # the same record, not unrelated fragments elsewhere in captured stdout.
+        feedback = [
+            yaml.safe_load(record)["feedback"]
+            for record in re.findall(r"(?m)^feedback:\n(?:[ \t]+.*\n)*", output)
+        ]
+        assert any(
+            record.get("deviceId") == device_id
+            and record.get("statusCode") == "Success"
+            and record.get("originalMessageId") == message_id
+            for record in feedback
+        ), f"No successful feedback for device {device_id}, message {message_id}: {feedback}"
+
+    @pytest.mark.skip(reason=LOCAL_AUTH_DEVICE_HTTP_REASON)
+    def test_iothub_c2d_messages_http(self):
         device_count = 1
         device_ids = self.generate_device_names(device_count)
 

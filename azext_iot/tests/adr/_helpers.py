@@ -18,6 +18,7 @@ from azext_iot.tests.adr._log import (  # noqa: F401 - re-exported for back-comp
     timed_step,
 )
 from azext_iot.tests.adr.conftest import RoleAssignmentHelper, TEST_LOCATION
+from azext_iot.tests.settings import HUB_TEST_LOCATION
 
 
 ROLE_PROPAGATION_DELAY = 30
@@ -292,7 +293,7 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
         ):
             hub_cmd = (
                 f"iot hub create -n {hub_name} -g {resource_group} "
-                f"--sku S1 --location {TEST_LOCATION} "
+                f"--sku S1 --location {HUB_TEST_LOCATION} "
                 f"--user-assigned-mi {identity_resource_id} "
                 "--disable-local-auth true"
             )
