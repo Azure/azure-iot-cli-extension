@@ -44,5 +44,7 @@ def test_preview_integration_environments_bound_each_test_and_select_only_integr
         line.strip() for line in section["commands"].splitlines()
         if line.strip().startswith(f"{service}:")
     ]
-    assert "--reruns 0" in " ".join(service_lines)
+    # Even --reruns 0 buffers phase reports until teardown finishes.
+    assert "-p no:rerunfailures" in " ".join(service_lines)
+    assert "--reruns" not in " ".join(service_lines)
     assert "pytest-timeout" in (root / "dev_requirements").read_text(encoding="utf-8")
