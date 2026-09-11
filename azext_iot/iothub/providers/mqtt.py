@@ -6,11 +6,14 @@
 
 import os
 import pprint
+import sys
 from time import sleep
 from typing import Any, Dict, Optional
 
 from azext_iot.common.utility import ensure_azure_namespace_path
-from azure.cli.core.azclierror import RequiredArgumentMissingError
+from azure.cli.core.azclierror import (
+    AuthenticationError, AzureConnectionError, AzureResponseError, RequiredArgumentMissingError
+)
 from knack.log import get_logger
 
 printer = pprint.PrettyPrinter(indent=2)
@@ -34,6 +37,7 @@ class MQTTProvider(object):
         from azure.iot.device import X509
 
         self.device_id = device_id
+        self.hub_hostname = hub_hostname
         # The client automatically connects when we send/receive a message or method invocation
         if x509_files:
             self.device_client = mqtt_device_client.create_from_x509_certificate(
@@ -62,6 +66,42 @@ class MQTTProvider(object):
         self.device_client.on_twin_desired_properties_patch_received = self.twin_patch_handler
         self.default_data_encoding = 'utf-8'
         self.init_reported_properties = init_reported_properties
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, _error_type, error, _traceback):
+        from azure.iot.device import exceptions
+
+        try:
+            self.shutdown()
+        except (exceptions.ClientError, exceptions.OperationTimeout) as cleanup_error:
+            raise AzureResponseError(
+                f"MQTT client cleanup failed for device '{self.device_id}' "
+                f"({type(cleanup_error).__name__})."
+            ) from cleanup_error
+
+        context = f"device '{self.device_id}' at '{self.hub_hostname}'"
+        if isinstance(error, exceptions.CredentialError):
+            raise AuthenticationError(
+                f"MQTT authentication failed for {context}. Check the device key or "
+                "certificate/private-key pair and the hub's device authentication "
+                "configuration. Caller Entra roles do not authenticate this MQTT connection."
+            ) from error
+        if isinstance(error, (
+            exceptions.ConnectionFailedError, exceptions.ConnectionDroppedError,
+            exceptions.NoConnectionError, exceptions.OperationTimeout,
+        )):
+            raise AzureConnectionError(
+                f"MQTT connection failed for {context} ({type(error).__name__}). "
+                "Check the device endpoint, DNS/network access and TLS configuration; "
+                "this error alone does not establish that device credentials were rejected."
+            ) from error
+        if isinstance(error, exceptions.ClientError):
+            raise AzureResponseError(
+                f"MQTT device client failed for {context} ({type(error).__name__})."
+            ) from error
+        return False
 
     def send_d2c_message(
         self,
@@ -190,7 +230,14 @@ class MQTTProvider(object):
             raise x
 
     def shutdown(self):
+        operation_failed = sys.exc_info()[0] is not None
         try:
             self.device_client.shutdown()
         except Exception as e:
-            logger.debug("Failed to shutdown MQTT device client: %s", e)
+            if not operation_failed:
+                raise
+            logger.warning(
+                "MQTT client cleanup also failed for device '%s' (%s); "
+                "preserving the original operation error.",
+                self.device_id, type(e).__name__,
+            )

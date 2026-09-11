@@ -6,6 +6,7 @@
 
 from typing import Dict, Optional
 
+from azure.cli.core.azclierror import FileOperationError
 from knack.log import get_logger
 
 from azext_iot.adr.providers.certificate_authority import CertificateAuthorityProvider
@@ -93,7 +94,13 @@ def adr_ca_activate(
 ):
     from azext_iot.common.utility import read_file_content
 
-    certificate_chain = read_file_content(certificate_chain_file)
+    try:
+        certificate_chain = read_file_content(certificate_chain_file)
+    except OSError as error:
+        raise FileOperationError(
+            f"Unable to read certificate chain file '{certificate_chain_file}': "
+            f"{error.strerror or str(error)}"
+        ) from error
     provider = CertificateAuthorityProvider(cmd)
     return provider.activate(
         certificate_authority_name=certificate_authority_name,
