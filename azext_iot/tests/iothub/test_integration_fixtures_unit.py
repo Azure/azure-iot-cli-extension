@@ -58,6 +58,9 @@ def test_new_data_role_waits_after_the_assignment_is_observed(mocker):
     assignments = iter([[], [{"principalId": "principal"}]])
 
     def get_assignments(**kwargs):
+        assert kwargs == {
+            "scope": ROLE_ARGS["scope"], "role": ROLE_ARGS["role"], "fill_role_definition_name": False,
+        }
         calls.append("list")
         return next(assignments)
 
@@ -76,10 +79,15 @@ def test_new_data_role_waits_after_the_assignment_is_observed(mocker):
 
 @pytest.mark.parametrize("principal_key", ["name", "principalId", "principalName"])
 def test_existing_data_role_does_not_repeat_assignment_or_propagation_wait(mocker, principal_key):
-    mocker.patch.object(integration_helpers, "get_role_assignments", return_value=[{principal_key: "principal"}])
+    get_assignments = mocker.patch.object(
+        integration_helpers, "get_role_assignments", return_value=[{principal_key: "principal"}]
+    )
     assign = mocker.patch.object(integration_helpers, "assign_role_assignment")
     wait = mocker.patch.object(integration_helpers, "sleep")
     integration_helpers.assign_role_with_propagation(**ROLE_ARGS)
+    get_assignments.assert_called_once_with(
+        scope=ROLE_ARGS["scope"], role=ROLE_ARGS["role"], fill_role_definition_name=False,
+    )
     assign.assert_not_called()
     wait.assert_not_called()
 
@@ -151,6 +159,110 @@ def test_state_hub_role_setup_waits_before_returning_to_dataplane_setup(mocker):
         max_tries=fixtures.MAX_RBAC_ASSIGNMENT_TRIES,
         wait=fixtures.ROLE_ASSIGNMENT_REFRESH_TIME,
     )
+
+
+@pytest.mark.parametrize("marker_kwargs,system_endpoints", [
+    ({"system_endpoints": True}, True),
+    ({"system_endpoints": False}, False),
+    pytest.param({}, True, id="marked-default-system"),
+    pytest.param(None, True, id="unmarked-default-system"),
+])
+@pytest.mark.parametrize("failed_command", [None, *range(9)])
+@pytest.mark.parametrize("failure_kind", ["cli_error", "nonzero", "system_exit"])
+def test_state_endpoint_roles_match_the_configured_identities(
+    mocker, marker_kwargs, system_endpoints, failed_command, failure_kind
+):
+    user_id = "/user-identities/shared"
+    storage = {
+        "storage": {"id": "storage-scope", "primaryEndpoints": {"blob": "https://storage.blob.core.windows.net/"}},
+        "container": {"name": "container"},
+        "connectionString": "unused",
+    }
+    hubs = [
+        {
+            "name": name, "rg": "rg", "storage": storage,
+            "hub": {"identity": {"principalId": f"{name}-system", "userAssignedIdentities": {user_id: {}}}},
+        }
+        for name in ("origin", "destination")
+    ]
+    eventhub = {
+        "namespace": {"serviceBusEndpoint": "https://events.servicebus.windows.net/"},
+        "eventhub": {"name": "events", "id": "eventhub-scope"},
+    }
+    servicebus = {
+        "namespace": {"serviceBusEndpoint": "https://bus.servicebus.windows.net/"},
+        "queue": {"name": "queue", "id": "queue-scope"},
+        "topic": {"name": "topic", "id": "topic-scope"},
+    }
+    cosmos = {"container": {"name": "container"}, "database": {"name": "database"}, "connectionString": "unused"}
+    marker = SimpleNamespace(kwargs=marker_kwargs) if marker_kwargs is not None else None
+    mocker.patch.object(fixtures, "get_closest_marker", return_value=marker)
+    assign = mocker.patch.object(fixtures, "assign_role_assignment")
+    client = SimpleNamespace(
+        exception_handler=mocker.Mock(return_value=1),
+        result=SimpleNamespace(error=None),
+    )
+    mocker.patch.object(fixtures.cli, "az_cli", client)
+    error = HttpResponseError("Original fixture command failure")
+    exit_code = 2 if failure_kind == "system_exit" else 7
+
+    def invoke(args, out_file):
+        failed = client.invoke.call_count - 1 == failed_command
+        client.result.error = error if failed and failure_kind == "cli_error" else None
+        if failed:
+            if failure_kind == "system_exit":
+                raise SystemExit(exit_code)
+            return exit_code
+        out_file.write("{}")
+        return 0
+
+    client.invoke = mocker.Mock(side_effect=invoke)
+    mocker.patch.object(fixtures, "sleep")
+    mocker.patch.object(fixtures, "create_self_signed_certificate", return_value={"certificate": "unused"})
+    mocker.patch("builtins.open", mocker.mock_open())
+    mocker.patch.object(fixtures.os.path, "isfile", return_value=True)
+    remove = mocker.patch.object(fixtures.os, "remove")
+
+    setup = fixtures.setup_hub_controlplane_states.__wrapped__(
+        Mock(), {"principalId": "user-principal"}, hubs, eventhub, servicebus, cosmos
+    )
+    if failed_command is None:
+        assert next(setup) is hubs
+        setup.close()
+        assert client.invoke.call_count == 9
+    else:
+        expected_error = HttpResponseError if failure_kind == "cli_error" else CLIInternalError
+        with pytest.raises(expected_error) as raised:
+            next(setup)
+        if failure_kind == "cli_error":
+            assert raised.value is error
+        else:
+            assert str(raised.value) == f"IoT Hub fixture command failed with exit code {exit_code}."
+        assert client.invoke.call_count == failed_command + 1
+    assert remove.call_count == (1 if failed_command in (None, 8) else 0)
+
+    expected = []
+    for scope, role in (
+        ("storage-scope", "Storage Blob Data Contributor"),
+        ("eventhub-scope", "Azure Event Hubs Data Sender"),
+        ("queue-scope", "Azure Service Bus Data Sender"),
+        ("topic-scope", "Azure Service Bus Data Sender"),
+    ):
+        principals = (
+            ["origin-system", "destination-system"]
+            if system_endpoints and scope != "topic-scope" else ["user-principal"]
+        )
+        expected.extend(
+            mocker.call(assignee=principal, scope=scope, role=role, max_tries=fixtures.MAX_RBAC_ASSIGNMENT_TRIES)
+            for principal in principals
+        )
+    assert assign.call_args_list == expected
+    identity_commands = [call.args[0] for call in client.invoke.call_args_list if "--identity" in call.args[0]]
+    if failed_command is None:
+        assert len(identity_commands) == 4
+    for command in identity_commands:
+        identity = user_id if "servicebus-topic" in command or not system_endpoints else "[system]"
+        assert command[command.index("--identity") + 1] == identity
 
 
 def test_existing_hub_role_fixture_uses_propagation_wait(mocker):

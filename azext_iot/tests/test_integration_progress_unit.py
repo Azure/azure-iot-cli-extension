@@ -39,7 +39,7 @@ def test_progress_reports_phases_and_durations_without_parameter_values(progress
     assert "END teardown passed" in lines[3]
     assert all("credential-value" not in line for line in lines)
     assert reporter.flush.call_count == 4
-    assert plugin._active == {}
+    assert not plugin._active
 
 
 def test_heartbeat_identifies_unfinished_phase_without_claiming_progress(progress, mocker):
@@ -102,7 +102,7 @@ def test_progress_does_not_start_a_thread_when_disabled_or_on_workers(mocker, ca
     plugin.pytest_sessionstart()
     plugin.pytest_runtest_logstart("test_example_int.py::test_example")
     thread.assert_not_called()
-    assert plugin._active == {}
+    assert not plugin._active
 
 
 def test_progress_ignores_unit_cases_and_untracked_reports(progress):
@@ -112,7 +112,7 @@ def test_progress_ignores_unit_cases_and_untracked_reports(progress):
         SimpleNamespace(nodeid="test_example_int.py::test_unknown", when="call")
     )
     reporter.write_line.assert_not_called()
-    assert plugin._active == {}
+    assert not plugin._active
 
 
 def test_finish_and_crashed_worker_report_clear_active_test(progress):
@@ -122,10 +122,10 @@ def test_finish_and_crashed_worker_report_clear_active_test(progress):
     plugin.pytest_runtest_logreport(
         SimpleNamespace(nodeid=nodeid, when="???", outcome="failed", duration=0)
     )
-    assert plugin._active == {}
+    assert not plugin._active
     plugin.pytest_runtest_logstart(nodeid)
     plugin.pytest_runtest_logfinish(nodeid)
-    assert plugin._active == {}
+    assert not plugin._active
 
 
 def test_progress_thread_stops_once_on_session_finish_and_unconfigure(progress):
