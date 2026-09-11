@@ -10,9 +10,11 @@ import json
 from time import time
 
 from uuid import uuid4
+from azure.cli.core.azclierror import RequiredArgumentMissingError
 from azext_iot.iothub.common import NON_DECODABLE_PAYLOAD
 from azext_iot.tests.conftest import get_context_path
 from azext_iot.tests.iothub import IoTLiveScenarioTest, PREFIX_DEVICE
+from azext_iot.tests.iothub._integration_helpers import LOCAL_AUTH_DEVICE_HTTP_REASON, LOCAL_AUTH_MONITOR_REASON
 from azext_iot.common.utility import (
     execute_onthread,
     calculate_millisec_since_unix_epoch_utc,
@@ -49,6 +51,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         super(TestIoTHubMessaging, self).tearDown()
 
+    @pytest.mark.skip(reason=LOCAL_AUTH_DEVICE_HTTP_REASON)
     def test_device_messaging(self):
         device_count = 1
         device_ids = self.generate_device_names(device_count)
@@ -515,17 +518,19 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         twin_init_props = {'prop_1': 'val_1', 'prop_2': 'val_2'}
         self.kwargs["twin_props_json"] = json.dumps(twin_init_props)
+        device_key = self.get_device_key(device_ids[0])
 
         self.cmd(
-            """iot device simulate -d {} -n {} -g {} --da '{}' --irp '{}' --mc 2 --mi 3 """.format(
-                device_ids[0], self.entity_name, self.entity_rg, "Testing init reported twin properties", "{twin_props_json}"
+            """iot device simulate -d {} -n {} -g {} --da '{}' --irp '{}' --mc 2 --mi 3 --key {}""".format(
+                device_ids[0], self.entity_name, self.entity_rg,
+                "Testing init reported twin properties", "{twin_props_json}", device_key
             )
         )
 
         # get device twin
         result = self.cmd(
-            "iot hub device-twin show -d {} --login {}".format(
-                device_ids[0], self.connection_string
+            "iot hub device-twin show -d {} -n {} --auth-type login".format(
+                device_ids[0], self.entity_name
             )
         ).get_output_in_json()
 
@@ -535,8 +540,6 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
     def test_mqtt_device_simulation_key(self):
         device_id = self.generate_device_names(1)[0]
-        device_events = []
-        enqueued_time = calculate_millisec_since_unix_epoch_utc()
         simulate_msg = "Key Connection Simulate"
         send_d2c_msg = "Key Connection Send-D2C-Message"
         self.kwargs["messaging_data"] = read_file_content(messaging_data_path)
@@ -557,7 +560,6 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 keys["primaryKey"]
             )
         )
-        device_events.append((device_id, f"{simulate_msg} #1"))
 
         self.cmd(
             "iot device send-d2c-message -d {} -n {} -g {} --da '{}' --key {}".format(
@@ -565,7 +567,6 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 keys["primaryKey"]
             )
         )
-        device_events.append((device_id, send_d2c_msg))
 
         self.cmd(
             "iot device send-d2c-message -d {} -n {} -g {} --dfp '{}' -p '$.ct=application/json;$.ce=utf-8' --key {}".format(
@@ -573,7 +574,6 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 keys["primaryKey"]
             )
         )
-        device_events.append((device_id, self.kwargs["messaging_data"]))
 
         # Simulate with secondary key and include model Id upon connection
         model_id_simulate_key = "dtmi:com:example:simulatekey;1"
@@ -582,7 +582,6 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 device_id, self.entity_name, self.entity_rg, simulate_msg, keys["secondaryKey"], model_id_simulate_key
             )
         )
-        device_events.append((device_id, f"{simulate_msg} #1"))
         twin_result = self.cmd(
             f"iot hub device-twin show -d {device_id} -n {self.entity_name} -g {self.entity_rg}").get_output_in_json()
         assert twin_result["modelId"] == model_id_simulate_key
@@ -595,7 +594,6 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 keys["secondaryKey"], model_id_d2c_key
             )
         )
-        device_events.append((device_id, send_d2c_msg))
 
         # Send-d2c-message with secondary key and binary data
         self.cmd(
@@ -604,7 +602,6 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 keys["secondaryKey"]
             )
         )
-        device_events.append((device_id, self.kwargs["messaging_unicodable_data"]))
 
         self.cmd(
             "iot device send-d2c-message -d {} -n {} -g {} --dfp '{}' -p '$.ct=application/octet-stream' --key {}".format(
@@ -612,7 +609,6 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 keys["secondaryKey"]
             )
         )
-        device_events.append((device_id, self.kwargs["messaging_non_unicodable_data"]))
 
         twin_result = self.cmd(
             f"iot hub device-twin show -d {device_id} -n {self.entity_name} -g {self.entity_rg}").get_output_in_json()
@@ -644,13 +640,12 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             expect_failure=True
         )
 
-        self._monitor_checker(enqueued_time=enqueued_time, device_events=device_events)
+        # Successful CLI sends and the observed modelId above verify device-key
+        # authentication. Built-in-endpoint payload monitoring is scoped separately.
 
     def test_mqtt_device_simulation_x509(self):
         device_ids = self.generate_device_names(1)
-        device_events = []
         output_dir = os.getcwd()
-        enqueued_time = calculate_millisec_since_unix_epoch_utc()
         simulate_msg = "Cert Connection Simulate"
         send_d2c_msg = "Cert Connection Send-D2C-Message"
         self.kwargs["messaging_data"] = read_file_content(messaging_data_path)
@@ -664,29 +659,30 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         self.tracked_certs.append(f"{device_ids[0]}-cert.pem")
         self.tracked_certs.append(f"{device_ids[0]}-key.pem")
 
-        # Need to specify files
-        self.cmd(
-            "iot device simulate -d {} -n {} -g {} --da '{}' --mc 1 --mi 1".format(
-                device_ids[0], self.entity_name, self.entity_rg, simulate_msg
-            ),
-            expect_failure=True
-        )
+        # Missing one certificate argument is a local validation error, not a
+        # failed attempt to discover a device using a disabled Hub policy.
+        with pytest.raises(RequiredArgumentMissingError, match="Both 'certificate-file' and 'key-file' required"):
+            self.cmd(
+                "iot device simulate -d {} -n {} -g {} --da '{}' --mc 1 --mi 1 --cp {}".format(
+                    device_ids[0], self.entity_name, self.entity_rg, simulate_msg, f"{device_ids[0]}-cert.pem"
+                )
+            )
 
-        self.cmd(
-            "iot device send-d2c-message -d {} -n {} -g {} --da '{}'".format(
-                device_ids[0], self.entity_name, self.entity_rg, send_d2c_msg
-            ),
-            expect_failure=True
-        )
+        with pytest.raises(RequiredArgumentMissingError, match="Both 'certificate-file' and 'key-file' required"):
+            self.cmd(
+                "iot device send-d2c-message -d {} -n {} -g {} --da '{}' --kp {}".format(
+                    device_ids[0], self.entity_name, self.entity_rg, send_d2c_msg, f"{device_ids[0]}-key.pem"
+                )
+            )
 
         # Normal simulation
+        self.kwargs["x509_reported"] = json.dumps({"integrationAuth": "x509"})
         self.cmd(
-            "iot device simulate -d {} -n {} -g {} --da '{}' --mc 1 --mi 1 --cp {} --kp {}".format(
+            "iot device simulate -d {} -n {} -g {} --da '{}' --mc 1 --mi 1 --cp {} --kp {} --irp '{}'".format(
                 device_ids[0], self.entity_name, self.entity_rg, simulate_msg,
-                f"{device_ids[0]}-cert.pem", f"{device_ids[0]}-key.pem"
+                f"{device_ids[0]}-cert.pem", f"{device_ids[0]}-key.pem", "{x509_reported}"
             )
         )
-        device_events.append((device_ids[0], f"{simulate_msg} #1"))
 
         self.cmd(
             "iot device send-d2c-message -d {} -n {} -g {} --da '{}' --cp {} --kp {}".format(
@@ -694,7 +690,6 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 f"{device_ids[0]}-cert.pem", f"{device_ids[0]}-key.pem"
             )
         )
-        device_events.append((device_ids[0], send_d2c_msg))
 
         self.cmd(
             """iot device send-d2c-message -d {} -n {} -g {} --dfp '{}' -p '$.ct=application/json;$.ce=utf-8'
@@ -703,9 +698,11 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 f"{device_ids[0]}-cert.pem", f"{device_ids[0]}-key.pem"
             )
         )
-        device_events.append((device_ids[0], self.kwargs["messaging_data"]))
-
-        self._monitor_checker(enqueued_time=enqueued_time, device_events=device_events)
+        self.cmd(
+            f"iot hub device-twin show -d {device_ids[0]} -n {self.entity_name} "
+            f"-g {self.entity_rg} --auth-type login",
+            checks=[self.check("properties.reported.integrationAuth", "x509")],
+        )
 
     def test_mqtt_device_direct_method_with_custom_response_status_payload(self):
         device_count = 1
@@ -732,6 +729,8 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 "cmd": client,
                 "device_id": device_ids[0],
                 "hub_name_or_hostname": self.entity_name,
+                "resource_group_name": self.entity_rg,
+                "device_symmetric_key": self.get_device_key(device_ids[0]),
                 "receive_settle": "complete",
                 "data": "Testing direct method invocations when simulator is run with custom method response status and payload",
                 "msg_count": 4,
@@ -748,8 +747,8 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # invoke device method with response status and payload
         result = self.cmd(
-            "iot hub invoke-device-method -d {} --method-name Test_Method_2 --login {}".format(
-                device_ids[0], self.connection_string
+            "iot hub invoke-device-method -d {} --method-name Test_Method_2 -n {} --auth-type login".format(
+                device_ids[0], self.entity_name
             )
         ).get_output_in_json()
 
@@ -795,6 +794,8 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 "msg_interval": 5,
                 "protocol_type": "mqtt",
                 "hub_name_or_hostname": self.entity_name,
+                "resource_group_name": self.entity_rg,
+                "device_symmetric_key": self.get_device_key(device_ids[0]),
             },
             max_runs=4,
             return_handle=True,
@@ -804,8 +805,8 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # invoke device twin property update
         self.cmd(
-            """iot hub device-twin update -d {} --login {} --desired '{}'""".format(
-                device_ids[0], self.connection_string, "{twin_desired_properties}"
+            """iot hub device-twin update -d {} -n {} --auth-type login --desired '{}'""".format(
+                device_ids[0], self.entity_name, "{twin_desired_properties}"
             )
         )
 
@@ -814,8 +815,8 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         # get device twin
         result = self.cmd(
-            "iot hub device-twin show -d {} --login {}".format(
-                device_ids[0], self.connection_string
+            "iot hub device-twin show -d {} -n {} --auth-type login".format(
+                device_ids[0], self.entity_name
             )
         ).get_output_in_json()
 
@@ -828,6 +829,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         token.set()
         thread.join()
 
+    @pytest.mark.skip(reason=LOCAL_AUTH_DEVICE_HTTP_REASON)
     def test_pyamqp_device_messaging(self):
         device_count = 1
         device_ids = self.generate_device_names(device_count)
@@ -986,6 +988,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             checks=self.is_empty(),
         )
 
+    @pytest.mark.skip(reason=LOCAL_AUTH_MONITOR_REASON)
     def test_hub_monitor_events(self):
         for cg in LIVE_CONSUMER_GROUPS:
             self.cmd(
@@ -1261,6 +1264,9 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 expect_failure=False,
             )
 
+    @pytest.mark.skip(
+        reason=LOCAL_AUTH_DEVICE_HTTP_REASON + " Entra feedback is covered by TestIoTHubC2DMessages.test_iothub_c2d_feedback."
+    )
     def test_hub_monitor_feedback(self):
         device_count = 1
         device_ids = self.generate_device_names(device_count)

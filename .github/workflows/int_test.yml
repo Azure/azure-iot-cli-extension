@@ -318,6 +318,9 @@ jobs:
         env:
           AZURE_TEST_RUN_LIVE: "True"
           azext_iot_testrg: ${{ env.RESOURCE_GROUP }}
+          azext_iot_testhub_location: centraluseuap
+          AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE: login
+          AZURE_DEFAULTS_IOTDPS-DATA-AUTH-TYPE: login
           azext_iot_adr_subscription: ${{ env.TEST_SUBSCRIPTION_ID }}
           azext_iot_adr_resource_group: ${{ env.RESOURCE_GROUP }}
           azext_iot_adr_location: ${{ matrix.config.region }}

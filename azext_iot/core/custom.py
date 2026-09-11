@@ -197,12 +197,16 @@ def iot_dps_create(
     enable_data_residency=None,
     mi_system_assigned=None,
     mi_user_assigned=None,
+    disable_local_auth=None,
 ):
     """Create a DPS instance with optional managed identities."""
     cli_ctx = cmd.cli_ctx
     _check_dps_name_availability(client.iot_dps_resource, dps_name)
     location = _ensure_location(cli_ctx, resource_group_name, location)
-    dps_property = {"enableDataResidency": enable_data_residency}
+    dps_property = {
+        "enableDataResidency": enable_data_residency,
+        "disableLocalAuth": True if disable_local_auth is None else disable_local_auth,
+    }
 
     dps_description = {
         "location": location,
@@ -1056,6 +1060,11 @@ def iot_hub_create(
         raise InvalidArgumentValueError(
             "Data Residency enforcement must be enabled for IoT Hubs created in this region. Please use the '--enforce-data-residency' (--edr) argument "
             "to enable it. Check command help (-h) for more information on this property's usage and implications."
+        )
+
+    if disable_local_auth is None:
+        disable_local_auth = (
+            True if existing_hub is None else (existing_hub.get("properties") or {}).get("disableLocalAuth")
         )
 
     sku = {"name": sku, "capacity": unit}

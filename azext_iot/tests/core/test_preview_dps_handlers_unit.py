@@ -149,6 +149,14 @@ def test_dps_create_unavailable_name_does_not_write(preview_mgmt):
     client.iot_dps_resource.begin_create_or_update.assert_not_called()
 
 
+@pytest.mark.parametrize("disable_local_auth,expected", [(None, True), (True, True), (False, False)])
+def test_dps_create_local_auth_default(preview_mgmt, disable_local_auth, expected):
+    cmd, client, _, _, _ = preview_mgmt
+    custom.iot_dps_create(cmd, client, "dps", "rg", disable_local_auth=disable_local_auth)
+    body = client.iot_dps_resource.begin_create_or_update.call_args.kwargs["iot_dps_description"]
+    assert body["properties"]["disableLocalAuth"] is expected
+
+
 @pytest.mark.parametrize("no_wait", [False, True])
 @pytest.mark.parametrize("use_connection_string", [False, True])
 def test_dps_classic_link_creation_and_namespace_warning(mocker, preview_mgmt, no_wait, use_connection_string):

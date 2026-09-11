@@ -451,11 +451,15 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
                 expect_failure=True,
             )
 
-        # Mixed case connection string
-        cstring = self.connection_string
+        # Device SAS remains valid when Hub service local auth is disabled.
+        # Read the device key with Entra, then exercise the offline mixed-case parser.
+        cstring = self.cmd(
+            f"iot hub device-identity connection-string show -d {device_ids[0]} "
+            f"-n {self.entity_name} -g {self.entity_rg} --auth-type login"
+        ).get_output_in_json()["connectionString"]
         mixed_case_cstring = cstring.replace("HostName", "hostname", 1)
         self.cmd(
-            f"iot hub generate-sas-token -d {device_ids[0]} --login {mixed_case_cstring}",
+            f"iot hub generate-sas-token --connection-string {mixed_case_cstring}",
             checks=[self.exists("sas")],
         )
 

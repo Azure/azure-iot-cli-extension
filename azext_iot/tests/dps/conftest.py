@@ -13,10 +13,12 @@ import tempfile
 import uuid
 
 import pytest
-from azure.cli.core.azclierror import CLIInternalError
+from azure.cli.core.azclierror import CLIInternalError, ResourceNotFoundError
+from azure.core.exceptions import HttpResponseError, ResourceNotFoundError as AzureResourceNotFoundError
 from filelock import FileLock
 from knack.log import get_logger
 
+from azext_iot._factory import iot_hub_service_factory
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests.helpers import assign_role_assignment
@@ -25,6 +27,7 @@ from azext_iot.tests.settings import (
     ENV_SET_TEST_IOTHUB_REQUIRED,
     ENV_SET_TEST_IOTHUB_OPTIONAL,
     ENV_SET_TEST_IOTDPS_OPTIONAL,
+    HUB_TEST_LOCATION,
 )
 
 logger = get_logger(__name__)
@@ -74,16 +77,24 @@ def generate_dps_id() -> str:
 
 
 def assign_iot_dps_dataplane_rbac_role(target_dps):
+    _assign_current_user_role(DPS_USER_ROLE, target_dps["id"])
+
+
+def _assign_current_user_role(role: str, scope: str):
     account = cli.invoke("account show").as_json()
     user = account["user"]
     if user["name"] is None:
         raise CLIInternalError("User not found")
     assign_role_assignment(
-        role=DPS_USER_ROLE,
-        scope=target_dps["id"],
+        role=role,
+        scope=scope,
         assignee=user["name"],
         max_tries=MAX_RBAC_ASSIGNMENT_TRIES
     )
+    # ARM role-assignment visibility is not data-plane readiness. Login is the
+    # first service-auth phase, including for env-pinned resources, so retain
+    # the bounded propagation wait AFTER ensuring the caller's data role.
+    sleep(60)
 
 
 # IoT DPS fixtures
@@ -188,12 +199,23 @@ def _gc_stale_resources_once(run_uid: str) -> None:
     with FileLock(gc_lock):
         if os.path.exists(gc_marker):
             return
+        _gc_stale(run_uid, INT_TEST_DPS_PREFIX, _list_dps, _delete_dps)
+        # Only orphan discovery needs a Hub list. A known canary pagination failure
+        # must not block creation of this run's uniquely named, directly addressed Hub.
         try:
-            _gc_stale(run_uid, INT_TEST_DPS_PREFIX, _list_dps, _delete_dps)
-            _gc_stale(run_uid, INT_TEST_HUB_PREFIX, _list_hubs, _delete_hub)
-        finally:
-            with open(gc_marker, "w", encoding="utf-8"):
-                pass
+            hubs = _list_hubs()
+        except HttpResponseError as error:
+            if error.status_code != 502 or getattr(error.error, "code", None) != "ProviderError":
+                raise
+            logger.warning(
+                "Deferring stale DPS-test Hub cleanup: Hub list returned the backend-confirmed "
+                "HTTP 502 ProviderError. No partial list is used; retry cleanup on the next run."
+            )
+        else:
+            _gc_stale(run_uid, INT_TEST_HUB_PREFIX, lambda: hubs, _delete_hub)
+        # Unexpected failures must not mark GC complete for the other workers.
+        with open(gc_marker, "w", encoding="utf-8"):
+            pass
 
 
 def _gc_stale(current_run_uid: str, prefix: str, list_fn, delete_fn) -> None:
@@ -219,14 +241,23 @@ def _gc_stale(current_run_uid: str, prefix: str, list_fn, delete_fn) -> None:
 
 # --- DPS helpers -------------------------------------------------------------------------------
 def _list_dps() -> list:
-    return cli.invoke('iot dps list -g "{}"'.format(ENTITY_RG)).as_json() or []
+    return cli.invoke('iot dps list -g "{}"'.format(ENTITY_RG), capture_stderr=True).as_json() or []
+
+
+def _assert_local_auth_disabled(resource: Dict) -> None:
+    assert resource["properties"].get("disableLocalAuth") is True, (
+        f"Integration resource {resource['name']} must have disableLocalAuth=true. "
+        "Use a policy-compliant resource; fixtures will not change a supplied resource's auth policy."
+    )
 
 
 def _find_dps_by_name(dps_name: str) -> Optional[dict]:
-    for dps in _list_dps():
-        if dps["name"] == dps_name:
-            return dps
-    return None
+    try:
+        return cli.invoke(
+            f"iot dps show -n {dps_name} -g {ENTITY_RG}", capture_stderr=True
+        ).as_json()
+    except (ResourceNotFoundError, AzureResourceNotFoundError):
+        return None
 
 
 def _delete_dps(dps_name: str) -> None:
@@ -234,29 +265,47 @@ def _delete_dps(dps_name: str) -> None:
 
 
 def _hub_link_host_name(iot_hub: Dict) -> str:
-    """Return the hub hostname the way DPS actually links it.
+    """Match linked-hub's auto hostname selection without retrieving Hub SAS keys."""
+    properties = iot_hub["hub"]["properties"]
+    return properties.get("deviceHostName") or properties["hostName"]
 
-    DPS links the hub from its connection string and records the linked hub by the
-    connection string's ``HostName``. On GWv2/TLS 1.3 hubs that is the device-facing
-    hostname (``<name>.device.azure-devices.net``) rather than the classic
-    ``<name>.azure-devices.net``. Enrollment ``--iot-hubs`` and the registration
-    ``assignedHub`` must use this same value, so derive it from the connection string.
-    """
-    for segment in iot_hub["connectionString"].split(";"):
-        if segment.lower().startswith("hostname="):
-            return segment.split("=", 1)[1]
-    return "{}.azure-devices.net".format(iot_hub["name"])
+
+def _enable_dps_hub_identity(dps_name: str, iot_hub: Dict) -> None:
+    dps = cli.invoke(
+        f"iot dps identity assign --name {dps_name} -g {ENTITY_RG} --system-assigned",
+        capture_stderr=True,
+    ).as_json()
+    assign_role_assignment(
+        role=HUB_USER_ROLE,
+        scope=iot_hub["hub"]["id"],
+        assignee=dps["identity"]["principalId"],
+        max_tries=MAX_RBAC_ASSIGNMENT_TRIES,
+    )
+    # The DPS managed identity has a separate Hub data-role grant and must
+    # settle before device provisioning. Caller-role propagation is handled
+    # by _assign_current_user_role; device attestation is still key/X.509.
+    sleep(60)
 
 
 def _link_hub(dps_name: str, iot_hub: Dict) -> str:
+    _enable_dps_hub_identity(dps_name, iot_hub)
     linked_hubs = cli.invoke(
         "iot dps linked-hub list --dps-name {} -g {}".format(dps_name, ENTITY_RG)
     ).as_json()
     hub_host_name = _hub_link_host_name(iot_hub)
-    if hub_host_name not in [hub["name"] for hub in linked_hubs]:
+    linked_hub = next((hub for hub in linked_hubs if hub["name"] == hub_host_name), None)
+    if not linked_hub:
         cli.invoke(
             f"iot dps linked-hub create --dps-name {dps_name} -g {ENTITY_RG} "
-            f"--connection-string {iot_hub['connectionString']}"
+            f"--hub-name {iot_hub['name']} --hub-resource-group {iot_hub['rg']} "
+            "--authentication-type SystemAssigned",
+            capture_stderr=True,
+        )
+    elif linked_hub.get("authenticationType") != "SystemAssigned":
+        cli.invoke(
+            f"iot dps linked-hub update --dps-name {dps_name} -g {ENTITY_RG} "
+            f"--linked-hub {hub_host_name} --authentication-type SystemAssigned",
+            capture_stderr=True,
         )
     return hub_host_name
 
@@ -279,20 +328,21 @@ def _create_managed_dps(run_uid: str, kind: str, iot_hub: Optional[Dict]) -> tup
         tags += f" hubname={iot_hub['name']}"
     target_dps = cli.invoke(
         f"iot dps create --name {name} --resource-group {ENTITY_RG} "
-        f"--location {ENTITY_LOCATION} --tags {tags}"
+        f"--location {ENTITY_LOCATION} --disable-local-auth true --tags {tags}"
     ).as_json()
     assign_iot_dps_dataplane_rbac_role(target_dps)
     if iot_hub:
         _link_hub(name, iot_hub)
     else:
         _unlink_all_hubs(name)
-        # Allow data-plane RBAC propagation to settle on the fresh instance.
-        sleep(60)
     return name, target_dps
 
 
 def _create_unmanaged_dps(dps_name: str, iot_hub: Optional[Dict]) -> dict:
-    base_command = f"iot dps create --name {dps_name} --resource-group {ENTITY_RG} --location {ENTITY_LOCATION}"
+    base_command = (
+        f"iot dps create --name {dps_name} --resource-group {ENTITY_RG} "
+        f"--location {ENTITY_LOCATION} --disable-local-auth true"
+    )
     if iot_hub:
         base_command += f" --tags hubname={iot_hub['name']}"
     return cli.invoke(base_command).as_json()
@@ -320,30 +370,26 @@ def _iot_dps_provisioner(request, iot_hub: Optional[Dict] = None) -> dict:
         if not target_dps:
             logger.error(f"DPS {dps_name} specified in pytest settings not found. DPS will be created")
             target_dps = _create_unmanaged_dps(dps_name, iot_hub)
+        _assert_local_auth_disabled(target_dps)
         assign_iot_dps_dataplane_rbac_role(target_dps)
         hub_host_name = _link_hub(dps_name, iot_hub) if iot_hub else None
         if not iot_hub:
             _unlink_all_hubs(dps_name)
 
+    _assert_local_auth_disabled(target_dps)
     return {
         "name": dps_name,
         "resourceGroup": ENTITY_RG,
         "dps": target_dps,
-        "connectionString": get_dps_cstring(dps_name, ENTITY_RG),
+        # Kept for the parametrized legacy auth cases, which are explicitly skipped.
+        # Login scenarios must not retrieve or use a DPS service SAS credential.
+        "connectionString": None,
         "hubHostName": hub_host_name,
-        "hubConnectionString": iot_hub["connectionString"] if iot_hub else None,
+        "iotHub": iot_hub,
         "certificates": [],
         "_runUid": run_uid if use_managed else None,
         "_kind": kind if use_managed else None,
     }
-
-
-def get_dps_cstring(dps_name: str, dps_rg: str, policy: str = "provisioningserviceowner") -> str:
-    return cli.invoke(
-        "iot dps connection-string show -n {} -g {} --policy-name {}".format(
-            dps_name, dps_rg, policy
-        )
-    ).as_json()["connectionString"]
 
 
 def _iot_dps_removal(dps):
@@ -371,21 +417,35 @@ def provisioned_only_iot_hubs_session(request) -> Iterator[dict]:
         _iot_hubs_removal(result)
 
 
+@pytest.fixture(scope="session")
+def dps_linked_hub_identity(provisioned_iot_dps_no_hub_module, provisioned_only_iot_hubs_session):
+    """Enable MI without linking, so linked-hub lifecycle tests own their entries."""
+    _enable_dps_hub_identity(
+        provisioned_iot_dps_no_hub_module["name"], provisioned_only_iot_hubs_session
+    )
+
+
 def _list_hubs() -> list:
-    return cli.invoke('iot hub list -g "{}"'.format(ENTITY_RG)).as_json() or []
+    return cli.invoke('iot hub list -g "{}"'.format(ENTITY_RG), capture_stderr=True).as_json() or []
 
 
 def _find_hub_by_name(name: str) -> Optional[dict]:
-    for hub in _list_hubs():
-        if hub["name"] == name:
-            return hub
-    return None
+    # `iot hub show` can translate name availability into an untyped CLIError.
+    # A scoped ARM GET preserves the distinction between absence and failures.
+    client = iot_hub_service_factory(cli.az_cli)
+    try:
+        return client.iot_hub_resource.get(resource_group_name=ENTITY_RG, resource_name=name)
+    except HttpResponseError as error:
+        if error.status_code == 404:
+            return None
+        raise
 
 
 def _create_managed_hub(run_uid: str, kind: str) -> tuple:
     name = f"{INT_TEST_HUB_PREFIX}-{_timestamp()}-{run_uid[:8]}"
     target_hub = cli.invoke(
         f"iot hub create -n {name} -g {ENTITY_RG} --sku S1 "
+        f"--location {HUB_TEST_LOCATION} --disable-local-auth true "
         f"--tags intTest=true runUid={run_uid} kind=hub createdEpoch={int(time())}"
     ).as_json()
     return name, target_hub
@@ -403,7 +463,10 @@ def _iot_hubs_provisioner(request):
         target_hub = _find_hub_by_name(name)
         if not target_hub:
             logger.error(f"Hub {name} specified in pytest settings not found. Hub will be created")
-            target_hub = cli.invoke(f"iot hub create -n {name} -g {ENTITY_RG} --sku S1").as_json()
+            target_hub = cli.invoke(
+                f"iot hub create -n {name} -g {ENTITY_RG} --sku S1 "
+                f"--location {HUB_TEST_LOCATION} --disable-local-auth true"
+            ).as_json()
         run_uid = None
     else:
         run_uid = _get_run_uid(request)
@@ -412,21 +475,17 @@ def _iot_hubs_provisioner(request):
         )
         name = target_hub["name"]
 
+    _assert_local_auth_disabled(target_hub)
+    assert target_hub["location"].replace(" ", "").casefold() == HUB_TEST_LOCATION.replace(" ", "").casefold(), (
+        f"DPS integration Hubs must be in {HUB_TEST_LOCATION}; use a compliant azext_iot_testdps_hub."
+    )
+    _assign_current_user_role(HUB_USER_ROLE, target_hub["id"])
     return {
         "hub": target_hub,
         "name": name,
         "rg": ENTITY_RG,
-        "connectionString": _get_hub_connection_string(name, ENTITY_RG),
         "_runUid": run_uid,
     }
-
-
-def _get_hub_connection_string(name, rg, policy="iothubowner"):
-    return cli.invoke(
-        "iot hub connection-string show -n {} -g {} --policy-name {}".format(
-            name, rg, policy
-        )
-    ).as_json()["connectionString"]
 
 
 def _iot_hubs_removal(hub_result):

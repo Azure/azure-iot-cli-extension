@@ -14,7 +14,9 @@ from azext_iot.common.shared import DeviceAuthApiType
 
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.iothub.conftest import assign_iot_hub_dataplane_rbac_role, generate_hub_id
-from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
+from azext_iot.tests.settings import (
+    DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL, HUB_TEST_LOCATION
+)
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.utility import generate_key, read_file_content
 from azext_iot.common.certops import create_self_signed_certificate
@@ -46,7 +48,11 @@ def generate_device_names(count, edge=False):
     return names
 
 
-def _setup_hub_dataplane_state(cstring):
+def _hub_auth(hub):
+    return f"--hub-name {hub['name']} --resource-group {hub['rg']} --auth-type login"
+
+
+def _setup_hub_dataplane_state(hub_auth):
     # make a configuration for the hub (applies to 0 devices, this is just to test the configuration settings)
     labels = {generate_generic_id() : generate_generic_id(), generate_generic_id() : generate_generic_id()}
     labels = json.dumps(labels)
@@ -59,9 +65,9 @@ def _setup_hub_dataplane_state(cstring):
     target_condition = "tags.bar=12"
 
     cli.invoke(
-        "iot hub configuration create --config-id {} -l {} --content '{}' --labels '{}' --priority {} --metrics '{}' "
+        "iot hub configuration create --config-id {} {} --content '{}' --labels '{}' --priority {} --metrics '{}' "
         "--target-condition {}".format(
-            generate_generic_id()[:10], cstring, config_content, labels, random.randint(1, 10), metrics, target_condition
+            generate_generic_id()[:10], hub_auth, config_content, labels, random.randint(1, 10), metrics, target_condition
         )
     )
 
@@ -69,9 +75,9 @@ def _setup_hub_dataplane_state(cstring):
     deployment1_path = os.path.join(Path(CWD), "..", "configurations", "test_edge_deployment.json")
     edge_content1 = read_file_content(deployment1_path)
     cli.invoke(
-        "iot edge deployment create -d deployment1 -l {} --content '{}' --labels '{}' --priority {} --metrics '{}' "
+        "iot edge deployment create -d deployment1 {} --content '{}' --labels '{}' --priority {} --metrics '{}' "
         "--target-condition {}".format(
-            cstring, edge_content1, labels, random.randint(1, 10), metrics, target_condition
+            hub_auth, edge_content1, labels, random.randint(1, 10), metrics, target_condition
         )
     )
 
@@ -79,9 +85,9 @@ def _setup_hub_dataplane_state(cstring):
     deployment2_path = os.path.join(Path(CWD), "..", "configurations", "test_edge_deployment_layered.json")
     edge_content2 = read_file_content(deployment2_path)
     cli.invoke(
-        "iot edge deployment create -d deployment2 -l {} --content '{}' --labels '{}' --priority {} --metrics '{}' "
+        "iot edge deployment create -d deployment2 {} --content '{}' --labels '{}' --priority {} --metrics '{}' "
         "--target-condition {} --layered".format(
-            cstring, edge_content2, labels, random.randint(1, 10), metrics, target_condition
+            hub_auth, edge_content2, labels, random.randint(1, 10), metrics, target_condition
         )
     )
     edge_content_v1_path = os.path.join(Path(CWD), "..", "configurations", "test_edge_deployment_v1.json")
@@ -97,46 +103,46 @@ def _setup_hub_dataplane_state(cstring):
         custom_primary_key = generate_key()
         custom_secondary_key = generate_key()
         cli.invoke(
-            f"iot hub device-identity create -d {device_ids[0]} -l {cstring} --pk {custom_primary_key} "
+            f"iot hub device-identity create -d {device_ids[0]} {hub_auth} --pk {custom_primary_key} "
             f"--sk {custom_secondary_key} {edge_enabled}"
         )
         cli.invoke(
-            f"iot hub module-identity create -m {module_id} -d {device_ids[0]} -l {cstring}"
+            f"iot hub module-identity create -m {module_id} -d {device_ids[0]} {hub_auth}"
         )
 
         # create x509_ca device and module
         cli.invoke(
-            f"iot hub device-identity create -d {device_ids[1]} -l {cstring} --am x509_ca {edge_enabled}"
+            f"iot hub device-identity create -d {device_ids[1]} {hub_auth} --am x509_ca {edge_enabled}"
         )
         cli.invoke(
-            f"iot hub module-identity create -m {module_id} -d {device_ids[1]} -l {cstring} --am x509_ca"
+            f"iot hub module-identity create -m {module_id} -d {device_ids[1]} {hub_auth} --am x509_ca"
         )
 
         # create x509_thumbprint device and module
         cli.invoke(
-            f"iot hub device-identity create -d {device_ids[2]} -l {cstring} --am x509_thumbprint "
+            f"iot hub device-identity create -d {device_ids[2]} {hub_auth} --am x509_thumbprint "
             f"--ptp {PRIMARY_THUMBPRINT} --stp {SECONDARY_THUMBPRINT} {edge_enabled}"
         )
         ptp = create_self_signed_certificate(subject="aziotcli", valid_days=1, cert_output_dir=None)["thumbprint"]
         stp = create_self_signed_certificate(subject="aziotcli", valid_days=1, cert_output_dir=None)["thumbprint"]
         cli.invoke(
-            f"iot hub module-identity create -m {module_id} -d {device_ids[2]} -l {cstring} "
+            f"iot hub module-identity create -m {module_id} -d {device_ids[2]} {hub_auth} "
             f"--am x509_thumbprint --ptp {ptp} --stp {stp}"
         )
 
         if device_type == "edge":
             # add edge modules to edge devices
             cli.invoke(
-                f"iot edge set-modules -d {device_ids[0]} -l {cstring} --content '{edge_content_v1_path}'"
+                f"iot edge set-modules -d {device_ids[0]} {hub_auth} --content '{edge_content_v1_path}'"
             )
 
         # add some children
         if edge_enabled:
             cli.invoke(
-                f"iot hub device-identity children add -l {cstring} -d {device_ids[0]} --cl {device_ids[1]}"
+                f"iot hub device-identity children add {hub_auth} -d {device_ids[0]} --cl {device_ids[1]}"
             )
             cli.invoke(
-                f"iot hub device-identity children add -l {cstring} -d {device_ids[1]} --cl {device_ids[2]}"
+                f"iot hub device-identity children add {hub_auth} -d {device_ids[1]} --cl {device_ids[2]}"
             )
 
         # add a property and a tag to each device's twin
@@ -145,7 +151,7 @@ def _setup_hub_dataplane_state(cstring):
 
             val = generate_generic_id()
             cli.invoke(
-                f"iot hub device-twin update -d {device} -l {cstring} --set properties.desired.testProp={val}"
+                f"iot hub device-twin update -d {device} {hub_auth} --set properties.desired.testProp={val}"
             )
 
             patch_tags = json.dumps({
@@ -154,13 +160,13 @@ def _setup_hub_dataplane_state(cstring):
             })
 
             cli.invoke(
-                f"iot hub device-twin update -d {device} -l {cstring}"
+                f"iot hub device-twin update -d {device} {hub_auth}"
                 f" --tags '{patch_tags}'"
             )
 
             val = generate_generic_id()
             cli.invoke(
-                f"iot hub module-twin update -d {device} -m {module_id} -l {cstring} --set "
+                f"iot hub module-twin update -d {device} -m {module_id} {hub_auth} --set "
                 f"properties.desired.testProp={val}"
             )
 
@@ -170,7 +176,7 @@ def _setup_hub_dataplane_state(cstring):
             })
 
             cli.invoke(
-                f"iot hub module-twin update -d {device} -m {module_id} -l {cstring}"
+                f"iot hub module-twin update -d {device} -m {module_id} {hub_auth}"
                 f" --tags '{patch_tags}'"
             )
 
@@ -181,7 +187,7 @@ def setup_hub_states_dataplane(provisioned_iot_hubs_with_storage_user_module):
     filename = generate_generic_id() + ".json"
     provisioned_iot_hubs_with_storage_user_module[0]["filename"] = filename
     assign_iot_hub_dataplane_rbac_role(provisioned_iot_hubs_with_storage_user_module)
-    _setup_hub_dataplane_state(provisioned_iot_hubs_with_storage_user_module[0]["connectionString"])
+    _setup_hub_dataplane_state(_hub_auth(provisioned_iot_hubs_with_storage_user_module[0]))
     # let dataplane state in hub catch up
     time.sleep(5)
     yield provisioned_iot_hubs_with_storage_user_module
@@ -216,6 +222,7 @@ def clean_up_hub_controlplane(hub_name, hub_rg, hub_location):
         contents = json.load(f)
         contents["resources"][0]["name"] = hub_name
         contents["resources"][0]["location"] = hub_location
+        contents["resources"][0]["properties"]["disableLocalAuth"] = True
         json.dump(contents, g, indent=4, sort_keys=True)
     cli.invoke(
         f"deployment group create --template-file {arm_file} -g {hub_rg}"
@@ -224,27 +231,27 @@ def clean_up_hub_controlplane(hub_name, hub_rg, hub_location):
     os.remove(arm_file)
 
 
-def clean_up_hub_dataplane(cstring):
+def clean_up_hub_dataplane(hub_auth):
     dest_hub_configs = cli.invoke(
-        f"iot hub configuration list -l {cstring}"
+        f"iot hub configuration list {hub_auth}"
     ).as_json()
 
     dest_hub_deploys = cli.invoke(
-        f"iot edge deployment list -l {cstring}"
+        f"iot edge deployment list {hub_auth}"
     ).as_json()
 
     for config in dest_hub_configs + dest_hub_deploys:
         cli.invoke(
-            "iot hub configuration delete -c {} -l {}".format(config["id"], cstring)
+            "iot hub configuration delete -c {} {}".format(config["id"], hub_auth)
         )
 
     dest_hub_identities = cli.invoke(
-        f"iot hub device-identity list -l {cstring}"
+        f"iot hub device-identity list {hub_auth}"
     ).as_json()
 
     for device in dest_hub_identities:
         cli.invoke(
-            "iot hub device-identity delete -d {} -l {}".format(device["deviceId"], cstring)
+            "iot hub device-identity delete -d {} {}".format(device["deviceId"], hub_auth)
         )
 
     # gives the api enough time to update
@@ -283,28 +290,22 @@ def test_migrate_controlplane(setup_hub_states_controlplane):
 def test_migrate_dataplane(setup_hub_states_dataplane):
     origin_name = setup_hub_states_dataplane[0]["name"]
     origin_rg = setup_hub_states_dataplane[0]["rg"]
-    origin_cstring = setup_hub_states_dataplane[0]["connectionString"]
+    origin_auth = _hub_auth(setup_hub_states_dataplane[0])
     dest_name = setup_hub_states_dataplane[1]["name"]
-    dest_cstring = setup_hub_states_dataplane[1]["connectionString"]
+    dest_auth = _hub_auth(setup_hub_states_dataplane[1])
     for auth_phase in DATAPLANE_AUTH_TYPES:
-        if auth_phase == "cstring":
-            cli.invoke(
-                f"iot hub state migrate --origin-hub-login {origin_cstring} --destination-hub-login "
-                f"{dest_cstring} -r --aspects {DATAPLANE}"
+        cli.invoke(
+            set_cmd_auth_type(
+                f"iot hub state migrate --origin-hub {origin_name} --origin-resource-group {origin_rg} "
+                f"--destination-hub {dest_name} --destination-resource-group {origin_rg} -r --aspects {DATAPLANE}",
+                auth_type=auth_phase,
+                cstring=None
             )
-        else:
-            cli.invoke(
-                set_cmd_auth_type(
-                    f"iot hub state migrate --origin-hub {origin_name} --origin-resource-group {origin_rg} "
-                    f"--destination-hub {dest_name} -r --aspects {DATAPLANE}",
-                    auth_type=auth_phase,
-                    cstring=None
-                )
-            )
+        )
 
         time.sleep(1)  # gives the hub time to update before the checks
-        compare_hubs_dataplane(origin_cstring, dest_cstring)
-        clean_up_hub_dataplane(dest_cstring)
+        compare_hubs_dataplane(origin_auth, dest_auth)
+        clean_up_hub_dataplane(dest_auth)
 
 
 @pytest.mark.hub_infrastructure(
@@ -440,29 +441,29 @@ def test_export_import_dataplane(setup_hub_states_dataplane):
     filename = setup_hub_states_dataplane[0]["filename"]
     hub_name = setup_hub_states_dataplane[0]["name"]
     hub_rg = setup_hub_states_dataplane[0]["rg"]
-    hub_cstring = setup_hub_states_dataplane[0]["connectionString"]
+    hub_auth = _hub_auth(setup_hub_states_dataplane[0])
     for auth_phase in DATAPLANE_AUTH_TYPES:
         cli.invoke(
             set_cmd_auth_type(
                 f"iot hub state export -n {hub_name} -f {filename} -g {hub_rg} -r --aspects {DATAPLANE}",
                 auth_type=auth_phase,
-                cstring=hub_cstring
+                cstring=None
             )
         )
-        compare_hub_dataplane_to_file(filename, hub_cstring)
+        compare_hub_dataplane_to_file(filename, hub_auth)
 
     for auth_phase in DATAPLANE_AUTH_TYPES:
-        clean_up_hub_dataplane(hub_cstring)
+        clean_up_hub_dataplane(hub_auth)
         time.sleep(5)
         cli.invoke(
             set_cmd_auth_type(
                 f"iot hub state import -n {hub_name} -f {filename} -g {hub_rg} -r --aspects {DATAPLANE}",
                 auth_type=auth_phase,
-                cstring=hub_cstring
+                cstring=None
             )
         )
         time.sleep(10)  # gives the hub time to update before the checks
-        compare_hub_dataplane_to_file(filename, hub_cstring)
+        compare_hub_dataplane_to_file(filename, hub_auth)
 
 
 @pytest.mark.hub_infrastructure(count=0)
@@ -504,16 +505,16 @@ def test_export_import_migrate_missing_hubs_error():
 
 
 # Dataplane main compare commands
-def compare_hubs_dataplane(origin_cstring: str, dest_cstring: str):
+def compare_hubs_dataplane(origin_auth: str, dest_auth: str):
     # compare configurations (there's only one)
     tries = 0
     while tries < MAX_RETRIES:
         try:
             orig_hub_configs = cli.invoke(
-                f"iot hub configuration list -l {origin_cstring}"
+                f"iot hub configuration list {origin_auth}"
             ).as_json()
             dest_hub_configs = cli.invoke(
-                f"iot hub configuration list -l {dest_cstring}"
+                f"iot hub configuration list {dest_auth}"
             ).as_json()
             compare_configs(orig_hub_configs, dest_hub_configs)
             break
@@ -526,10 +527,10 @@ def compare_hubs_dataplane(origin_cstring: str, dest_cstring: str):
     while tries < MAX_RETRIES:
         try:
             orig_hub_deploys = cli.invoke(
-                f"iot edge deployment list -l {origin_cstring}"
+                f"iot edge deployment list {origin_auth}"
             ).as_json()
             dest_hub_deploys = cli.invoke(
-                f"iot edge deployment list -l {dest_cstring}"
+                f"iot edge deployment list {dest_auth}"
             ).as_json()
             compare_configs(orig_hub_deploys, dest_hub_deploys)
             break
@@ -541,10 +542,10 @@ def compare_hubs_dataplane(origin_cstring: str, dest_cstring: str):
     tries = 0
     while tries < MAX_RETRIES:
         orig_hub_identities = cli.invoke(
-            f"iot hub device-identity list -l {origin_cstring}"
+            f"iot hub device-identity list {origin_auth}"
         ).as_json()
         dest_hub_identities = cli.invoke(
-            f"iot hub device-identity list -l {dest_cstring}"
+            f"iot hub device-identity list {dest_auth}"
         ).as_json()
         if len(orig_hub_identities) == len(dest_hub_identities):
             break
@@ -561,10 +562,10 @@ def compare_hubs_dataplane(origin_cstring: str, dest_cstring: str):
 
         if device["authenticationType"] == DeviceAuthApiType.sas.value:
             id1 = cli.invoke(
-                "iot hub device-identity show -l {} -d {}".format(origin_cstring, device['deviceId'])
+                "iot hub device-identity show {} -d {}".format(origin_auth, device['deviceId'])
             ).as_json()
             id2 = cli.invoke(
-                "iot hub device-identity show -l {} -d {}".format(dest_cstring, device['deviceId'])
+                "iot hub device-identity show {} -d {}".format(dest_auth, device['deviceId'])
             ).as_json()
 
             device["symmetricKey"] = id1["authentication"]["symmetricKey"]
@@ -575,10 +576,10 @@ def compare_hubs_dataplane(origin_cstring: str, dest_cstring: str):
         # compare modules
 
         orig_modules = cli.invoke(
-            "iot hub module-identity list -d {} -l {}".format(device['deviceId'], origin_cstring)
+            "iot hub module-identity list -d {} {}".format(device['deviceId'], origin_auth)
         ).as_json()
         dest_modules = cli.invoke(
-            "iot hub module-identity list -d {} -l {}".format(device['deviceId'], dest_cstring)
+            "iot hub module-identity list -d {} {}".format(device['deviceId'], dest_auth)
         ).as_json()
 
         if device["capabilities"]["iotEdge"]:
@@ -598,10 +599,10 @@ def compare_hubs_dataplane(origin_cstring: str, dest_cstring: str):
             assert module["authentication"] == target_module["authentication"]
 
             module_twin = cli.invoke(
-                f"iot hub module-twin show -m {module['moduleId']} -d {device['deviceId']} -l {origin_cstring}"
+                f"iot hub module-twin show -m {module['moduleId']} -d {device['deviceId']} {origin_auth}"
             ).as_json()
             target_module_twin = cli.invoke(
-                f"iot hub module-twin show -m {module['moduleId']} -d {device['deviceId']} -l {dest_cstring}"
+                f"iot hub module-twin show -m {module['moduleId']} -d {device['deviceId']} {dest_auth}"
             ).as_json()
 
             compare_module_twins(module_twin, target_module_twin)
@@ -609,16 +610,16 @@ def compare_hubs_dataplane(origin_cstring: str, dest_cstring: str):
         # compare children
         if device["capabilities"]["iotEdge"]:
             orig_children = cli.invoke(
-                f"iot hub device-identity children list -d {device['deviceId']} -l {origin_cstring}"
+                f"iot hub device-identity children list -d {device['deviceId']} {origin_auth}"
             ).as_json()
             dest_children = cli.invoke(
-                f"iot hub device-identity children list -d {device['deviceId']} -l {dest_cstring}"
+                f"iot hub device-identity children list -d {device['deviceId']} {dest_auth}"
             ).as_json()
 
             assert orig_children == dest_children
 
 
-def compare_hub_dataplane_to_file(filename: str, cstring: str):
+def compare_hub_dataplane_to_file(filename: str, hub_auth: str):
     with open(filename, 'r', encoding='utf-8') as f:
         hub_info = json.load(f)
 
@@ -628,7 +629,7 @@ def compare_hub_dataplane_to_file(filename: str, cstring: str):
     while tries < MAX_RETRIES:
         try:
             hub_configs = cli.invoke(
-                f"iot hub configuration list -l {cstring}"
+                f"iot hub configuration list {hub_auth}"
             ).as_json()
             compare_configs(file_configs, hub_configs)
             break
@@ -642,7 +643,7 @@ def compare_hub_dataplane_to_file(filename: str, cstring: str):
     while tries < MAX_RETRIES:
         try:
             hub_deploys = cli.invoke(
-                f"iot edge deployment list -l {cstring}"
+                f"iot edge deployment list {hub_auth}"
             ).as_json()
             compare_configs(file_deploys, hub_deploys)
             break
@@ -653,13 +654,13 @@ def compare_hub_dataplane_to_file(filename: str, cstring: str):
     # compare devices
     file_devices = hub_info["devices"]
     hub_devices = cli.invoke(
-        f"iot hub device-identity list -l {cstring}"
+        f"iot hub device-identity list {hub_auth}"
     ).as_json()
 
     tries = 0
     while tries < MAX_RETRIES:
         hub_devices = cli.invoke(
-            f"iot hub device-identity list -l {cstring}"
+            f"iot hub device-identity list {hub_auth}"
         ).as_json()
         if len(file_devices) == len(hub_devices):
             break
@@ -670,7 +671,7 @@ def compare_hub_dataplane_to_file(filename: str, cstring: str):
 
     for device in hub_devices:
         id = cli.invoke(
-            f"iot hub device-identity show -l {cstring} -d {device['deviceId']}"
+            f"iot hub device-identity show {hub_auth} -d {device['deviceId']}"
         ).as_json()
         device["symmetricKey"] = id["authentication"]["symmetricKey"]
 
@@ -692,7 +693,7 @@ def compare_hub_dataplane_to_file(filename: str, cstring: str):
 
         file_modules = file_device.get("modules", {})
         hub_modules = cli.invoke(
-            "iot hub module-identity list -d {} -l {}".format(device["deviceId"], cstring)
+            "iot hub module-identity list -d {} {}".format(device["deviceId"], hub_auth)
         ).as_json()
 
         assert len(file_modules) == len(hub_modules)
@@ -700,7 +701,7 @@ def compare_hub_dataplane_to_file(filename: str, cstring: str):
         for module in hub_modules:
 
             module_twin = cli.invoke(
-                f"iot hub module-twin show -m {module['moduleId']} -d {device['deviceId']} -l {cstring}"
+                f"iot hub module-twin show -m {module['moduleId']} -d {device['deviceId']} {hub_auth}"
             ).as_json()
 
             target_module = file_modules[module["moduleId"]]["identity"]
@@ -1072,7 +1073,7 @@ def test_export_endpoint_resource_name_starting_with_scheme_char(
     endpoint_name = generate_generic_id()
     try:
         cli.invoke(
-            f"servicebus namespace create --name {sb_namespace} -g {hub_rg} --sku Standard"
+            f"servicebus namespace create --name {sb_namespace} -g {hub_rg} --sku Standard --location {HUB_TEST_LOCATION}"
         )
         cli.invoke(
             f"servicebus topic create --namespace-name {sb_namespace} -g {hub_rg} --name {topic_name}"
@@ -1124,7 +1125,8 @@ def test_export_cosmosdb_endpoint_resource_name_starting_with_scheme_char(
     endpoint_name = generate_generic_id()
     try:
         cli.invoke(
-            f"cosmosdb create --name {cosmos_account} -g {hub_rg}"
+            f"cosmosdb create --name {cosmos_account} -g {hub_rg} "
+            f"--locations regionName={HUB_TEST_LOCATION} failoverPriority=0"
         )
         cli.invoke(
             f"cosmosdb sql database create --account-name {cosmos_account} -g {hub_rg} --name {database_name}"

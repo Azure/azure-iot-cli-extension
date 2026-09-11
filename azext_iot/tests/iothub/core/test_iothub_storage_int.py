@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import os
+import pytest
 from azure.cli.core.azclierror import CLIInternalError
 from time import sleep
 from knack.util import CLIError
@@ -13,7 +14,8 @@ from knack.log import get_logger
 from azext_iot.tests.helpers import delete_role_assignment, get_role_assignments
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
-from azext_iot.tests.settings import UserTypes
+from azext_iot.tests.iothub._integration_helpers import LOCAL_AUTH_DEVICE_HTTP_REASON
+from azext_iot.tests.settings import UserTypes, HUB_TEST_LOCATION
 from azext_iot.common.utility import generate_storage_account_sas_token
 
 from azext_iot.tests.generators import generate_generic_id
@@ -67,8 +69,8 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
         # Create managed identity
         result = self.cmd(
-            "identity create -n {} -g {}".format(
-                user_managed_identity_name, self.entity_rg
+            "identity create -n {} -g {} --location {}".format(
+                user_managed_identity_name, self.entity_rg, HUB_TEST_LOCATION
             )).get_output_in_json()
 
         # ensure resource is created before hub immediately tries to assign it
@@ -118,7 +120,8 @@ class TestIoTStorage(IoTLiveScenarioTest):
             ))
         return super().tearDown()
 
-    def test_storage(self):
+    @pytest.mark.skip(reason=LOCAL_AUTH_DEVICE_HTTP_REASON)
+    def test_device_upload_file(self):
         device_count = 1
 
         content_path = os.path.join(Path(CWD).parent, "test_generic_replace.json")
@@ -146,6 +149,9 @@ class TestIoTStorage(IoTLiveScenarioTest):
             checks=self.is_empty(),
         )
 
+    def test_storage(self):
+        # Import/export authenticate as the service with Entra; storage SAS is
+        # a separate storage credential and does not enable Hub local auth.
         attempts = 0
         setup_completed = False
         while not setup_completed:

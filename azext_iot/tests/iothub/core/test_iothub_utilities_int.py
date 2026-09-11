@@ -6,6 +6,8 @@
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
+from azext_iot.common.embedded_cli import EmbeddedCLI
+from azext_iot.tests.iothub._integration_helpers import skip_hub_list_provider_error
 
 
 class TestIoTHubUtilities(IoTLiveScenarioTest):
@@ -13,6 +15,7 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
         super(TestIoTHubUtilities, self).__init__(test_case)
 
     def test_iothub_generate_sas_token(self):
+        """Inspect ARM policy metadata and offline token formatting, never authenticate with Hub SAS."""
         for auth_phase in DATAPLANE_AUTH_TYPES:
             self.cmd(
                 self.set_cmd_auth_type(
@@ -71,6 +74,7 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
         """--hostname-type permutations for hub-level SAS.
 
         Verifies the `sr=` audience in the generated SAS token matches the requested hostname type.
+        Tokens are inspected locally, not used to authenticate against the local-auth-disabled Hub.
         """
         from urllib.parse import unquote
 
@@ -143,11 +147,6 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
         default_policy = "iothubowner"
         nonexistent_policy = "badpolicy"
 
-        hubs_in_sub = self.cmd("iot hub connection-string show").get_output_in_json()
-
-        hubs_in_rg = self.cmd(f"iot hub connection-string show -g {self.entity_rg}").get_output_in_json()
-        assert len(hubs_in_sub) >= len(hubs_in_rg)
-
         self.cmd(
             f"iot hub connection-string show -n {self.entity_name}",
             checks=[self.check_pattern("connectionString", conn_str_pattern)],
@@ -161,11 +160,6 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
         self.cmd(
             f"iot hub connection-string show -n {self.entity_name} -g {self.entity_rg} --pn {nonexistent_policy}",
             expect_failure=True,
-        )
-
-        self.cmd(
-            f"iot hub connection-string show --pn {nonexistent_policy}",
-            checks=[self.check("length(@)", 0)],
         )
 
         self.cmd(
@@ -198,6 +192,16 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
                 ),
             ],
         )
+
+    def test_iothub_connection_string_lists(self):
+        # ARM policy metadata inspection does not authenticate with the returned keys.
+        cli = EmbeddedCLI(cli_ctx=self.cli_ctx, capture_stderr=True)
+        with skip_hub_list_provider_error():
+            hubs_in_sub = cli.invoke("iot hub connection-string show").as_json()
+            hubs_in_rg = cli.invoke(f"iot hub connection-string show -g {self.entity_rg}").as_json()
+            missing_policy = cli.invoke("iot hub connection-string show --pn badpolicy").as_json()
+        assert len(hubs_in_sub) >= len(hubs_in_rg)
+        assert missing_policy == []
 
     def test_iothub_init(self):
         for auth_phase in DATAPLANE_AUTH_TYPES:

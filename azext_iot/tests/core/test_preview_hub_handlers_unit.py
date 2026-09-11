@@ -362,6 +362,26 @@ def test_hub_create_default_put_contract(preview_mgmt):
         "authenticationType": None, "identity": None,
     }
     assert body["properties"]["enableFileUploadNotifications"] is False
+    assert body["properties"]["disableLocalAuth"] is True
+
+
+@pytest.mark.parametrize("disable_local_auth", [True, False])
+def test_hub_create_honors_explicit_local_auth(preview_mgmt, disable_local_auth):
+    cmd, client, _, _, _ = preview_mgmt
+    client.iot_hub_resource.check_name_availability.return_value = {"nameAvailable": True}
+    custom.iot_hub_create(cmd, client, "hub", "rg", disable_local_auth=disable_local_auth)
+    body = client.iot_hub_resource.begin_create_or_update.call_args.kwargs["iot_hub_description"]
+    assert body["properties"]["disableLocalAuth"] is disable_local_auth
+
+
+@pytest.mark.parametrize("disable_local_auth", [True, False, None])
+def test_hub_create_preserves_existing_local_auth(preview_mgmt, disable_local_auth):
+    cmd, client, hub, _, _ = preview_mgmt
+    if disable_local_auth is not None:
+        hub["properties"]["disableLocalAuth"] = disable_local_auth
+    custom.iot_hub_create(cmd, client, "hub", "rg")
+    body = client.iot_hub_resource.begin_create_or_update.call_args.kwargs["iot_hub_description"]
+    assert body["properties"].get("disableLocalAuth") is disable_local_auth
 
 
 @pytest.mark.parametrize("status", [404, 403])

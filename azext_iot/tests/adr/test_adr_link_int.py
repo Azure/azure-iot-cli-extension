@@ -60,6 +60,7 @@ from azext_iot.tests.adr.conftest import (
     generate_identity_name,
 )
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests.settings import HUB_TEST_LOCATION
 from azext_iot.adr.topology import (
     DPS_CAP_EXCEEDED_MSG,
     DPS_REQUIRED_MSG,
@@ -199,7 +200,7 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
             with timed_step("Step 1 ❯ link dps add (+ seed DPS-side Hub registration)"):
                 cmd = (
                     f"iot dps create --name {dps_name} -g {rg} "
-                    f"--location {TEST_LOCATION} "
+                    f"--location {TEST_LOCATION} --disable-local-auth true "
                     f"--user-assigned-mi {identity_resource_id}"
                 )
                 _log(LogKind.CMD, "az %s", cmd)
@@ -301,7 +302,7 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
             # Step 3: link hub (UAMI) — should now succeed since a DPS is linked.
             with timed_step("Step 3 ❯ link hub add - secondary, UAMI (DPS-first satisfied)"):
                 hub_cmd = (
-                    f"iot hub create -n {secondary_hub} -g {rg} --sku S1 "
+                    f"iot hub create -n {secondary_hub} -g {rg} --sku S1 --location {HUB_TEST_LOCATION} "
                     f"--system-assigned-mi --user-assigned-mi {identity_resource_id} "
                     "--disable-local-auth true"
                 )
@@ -428,7 +429,7 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
             # SAMI/UAMI rotations always reference identities on the Hub.
             with timed_step("Step 5 ❯ link hub add - tertiary, SAMI"):
                 hub_cmd = (
-                    f"iot hub create -n {tertiary_hub} -g {rg} --sku S1 "
+                    f"iot hub create -n {tertiary_hub} -g {rg} --sku S1 --location {HUB_TEST_LOCATION} "
                     f"--system-assigned-mi --user-assigned-mi {identity_resource_id} "
                     "--disable-local-auth true"
                 )
@@ -712,7 +713,7 @@ class TestADRLinkBundledAdd(ADRFullInfraHelper, ADRLiveScenarioTest):
 
             with timed_step("Setup 3/4 ❯ Create standalone Standard Hub"):
                 hub = self.cmd(
-                    f"iot hub create -n {hub_name} -g {rg} --sku S1 --location {TEST_LOCATION} "
+                    f"iot hub create -n {hub_name} -g {rg} --sku S1 --location {HUB_TEST_LOCATION} "
                     f"--user-assigned-mi {identity_resource_id} "
                     "--disable-local-auth true"
                 ).get_output_in_json()
@@ -720,7 +721,7 @@ class TestADRLinkBundledAdd(ADRFullInfraHelper, ADRLiveScenarioTest):
 
             with timed_step("Setup 4/4 ❯ Create standalone DPS"):
                 dps = self.cmd(
-                    f"iot dps create --name {dps_name} -g {rg} --location {TEST_LOCATION} "
+                    f"iot dps create --name {dps_name} -g {rg} --location {TEST_LOCATION} --disable-local-auth true "
                     f"--user-assigned-mi {identity_resource_id}"
                 ).get_output_in_json()
                 dps_id = dps["id"]

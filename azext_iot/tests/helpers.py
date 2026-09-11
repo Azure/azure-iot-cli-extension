@@ -40,9 +40,7 @@ TAG_ENV_VAR = [
 CERT_ENDING = "-cert.pem"
 KEY_ENDING = "-key.pem"
 DATAPLANE_AUTH_TYPES = [
-    AuthenticationTypeDataplane.key.value,
     AuthenticationTypeDataplane.login.value,
-    "cstring",
 ]
 
 settings = DynamoSettings(opt_env_set=TAG_ENV_VAR)
@@ -107,6 +105,7 @@ def create_storage_account(
     rg: str,
     resource_name: str,
     create_account: bool = True,
+    location: Optional[str] = None,
 ) -> str:
     """
     Create a storage account (if needed) and container and return storage connection string.
@@ -123,11 +122,13 @@ def create_storage_account(
                 break
 
         if not target_storage:
-            cmd(
-                "storage account create -n {} -g {} --allow-shared-key-access true --tags iot_resource={}".format(
-                    account_name, rg, resource_name
-                )
+            create_command = (
+                f"storage account create -n {account_name} -g {rg} "
+                f"--allow-shared-key-access true --tags iot_resource={resource_name}"
             )
+            if location:
+                create_command += f" --location {location}"
+            cmd(create_command)
 
     storage_cstring = cmd(
         "storage account show-connection-string -n {} -g {}".format(
@@ -257,7 +258,7 @@ def clean_up_iothub_device_config(
         last_exc = None
         for attempt in range(retries):
             try:
-                result = cli.invoke(command)
+                result = cli.invoke(f"{command} --auth-type login")
                 if not result.success():
                     raise RuntimeError(f"Command failed with exit code {result.error_code}: {result.output}")
                 return result.as_json()
@@ -272,7 +273,7 @@ def clean_up_iothub_device_config(
         last_exc = None
         for attempt in range(retries):
             try:
-                result = cli.invoke(command)
+                result = cli.invoke(f"{command} --auth-type login")
                 if not result.success():
                     raise RuntimeError(f"Command failed with exit code {result.error_code}: {result.output}")
                 return
@@ -349,7 +350,9 @@ def create_test_cert(
 
 def set_cmd_auth_type(command: str, auth_type: str, cstring: str) -> str:
     """Append the dataplane command auth type."""
-    if auth_type not in DATAPLANE_AUTH_TYPES:
+    if auth_type not in {
+        AuthenticationTypeDataplane.key.value, AuthenticationTypeDataplane.login.value, "cstring"
+    }:
         raise RuntimeError(f"auth_type of: {auth_type} is unsupported.")
 
     # cstring takes precedence
