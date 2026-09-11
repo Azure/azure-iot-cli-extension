@@ -203,10 +203,11 @@ def assign_role_assignment(
     """
     Assign rbac permissions to resource.
     """
-    output = None
-    tries = 0
+    from azure.cli.core.azclierror import CLIInternalError
+
     principal_kpis = ["name", "principalId", "principalName"]
-    while tries < max_tries:
+    expected_principals = {assignee}
+    for attempt in range(max_tries + 1):
         flat_assignment_kpis = []
         role_assignments = get_role_assignments(scope=scope, role=role)
         logger.info(f"Role assignments for the role of '{role}' against scope '{scope}': {role_assignments}")
@@ -214,18 +215,31 @@ def assign_role_assignment(
             for principal_kpi in principal_kpis:
                 if principal_kpi in role_assignment and role_assignment[principal_kpi]:
                     flat_assignment_kpis.append(role_assignment[principal_kpi])
-        if assignee in flat_assignment_kpis:
+        if expected_principals.intersection(flat_assignment_kpis):
+            return
+        if attempt == max_tries:
             break
         # else assign role to scope and check again
         output = cli.invoke(
-            f'role assignment create --assignee "{assignee}" --role "{role}" --scope "{scope}"'
+            f'role assignment create --assignee "{assignee}" --role "{role}" --scope "{scope}"',
+            capture_stderr=True,
         )
         if not output.success():
-            logger.warning(f"Failed to assign '{assignee}' the role of '{role}' against scope '{scope}'.")
-            break
+            error = output.get_error()
+            if error:
+                raise error
+            raise CLIInternalError(
+                f"Role assignment create failed for '{assignee}', role '{role}', scope '{scope}' "
+                f"(exit code {output.error_code})."
+            )
 
+        principal_id = output.as_json().get("principalId")
+        if principal_id:
+            expected_principals.add(principal_id)
         sleep(wait)
-        tries += 1
+    raise CLIInternalError(
+        f"Role '{role}' for '{assignee}' at scope '{scope}' was not visible after {max_tries} assignment attempts."
+    )
 
 
 def delete_role_assignment(
@@ -250,6 +264,8 @@ def clean_up_iothub_device_config(
     hub_name: str,
     rg: str
 ):
+    from azure.core.exceptions import HttpResponseError
+    from msrestazure.azure_exceptions import CloudError
     from time import sleep
     import logging
     logger = logging.getLogger(__name__)
@@ -273,15 +289,23 @@ def clean_up_iothub_device_config(
         last_exc = None
         for attempt in range(retries):
             try:
-                result = cli.invoke(f"{command} --auth-type login")
+                result = cli.invoke(f"{command} --auth-type login", capture_stderr=True)
                 if not result.success():
+                    error = result.get_error()
+                    if error:
+                        raise error
                     raise RuntimeError(f"Command failed with exit code {result.error_code}: {result.output}")
                 return
             except Exception as e:
+                response = getattr(e, "response", None)
+                if isinstance(e, (CloudError, HttpResponseError)) and getattr(response, "status_code", None) == 404:
+                    logger.info("Cleanup target is already absent: %s", command)
+                    return
                 last_exc = e
                 if attempt < retries - 1:
                     sleep(delay)
         logger.warning("Delete command failed after %d retries: %s — %s", retries, command, last_exc)
+        raise last_exc
 
     device_list = [
         d["deviceId"] for d in _list_with_retry(

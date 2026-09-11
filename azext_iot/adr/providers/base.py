@@ -20,6 +20,7 @@ from knack.log import get_logger
 from rich.console import Console
 
 from azext_iot._factory import adr_service_factory
+from azext_iot.adr.providers.link_helpers import failed_link_recovery_commands
 from azext_iot.constants import LRO_POLL_WAIT_SEC
 from azext_iot.common.utility import process_json_arg, wait_for_terminal_state
 
@@ -305,13 +306,21 @@ class ADRProvider(object):
         if detail:
             message += f" {detail}" if detail.endswith((".", "!", "?")) else f" {detail}."
         if detail and "not authorized" in detail.lower():
-            # Role names and directions are defined only in adr.rbac. Keep this
-            # fallback generic so it cannot drift from automatic add preflight.
             message += (
-                " The service-to-service link roles are incomplete. Rerun the "
-                "corresponding link add command to perform automatic RBAC "
-                "preflight, or use the exact remediation commands it prints."
+                " Verify access for the identity and resource named in the service error. "
+                "Role assignments visible in ARM may not yet be effective at the linked service. "
+                "If the failed endpoint is still present, use link update, not link add, "
+                "preserving its existing identity and endpoint settings. "
+                "Update reruns RBAC preflight; it does not require deleting the linked resource."
             )
+            commands = failed_link_recovery_commands(body)
+            if commands:
+                message += (
+                    "\nAfter verifying access and allowing any recent assignments to propagate, "
+                    "retry the persisted failed link(s):\n"
+                    + "\n".join(commands)
+                    + "\n"
+                )
         headers = getattr(response, "headers", None)
         corr = headers.get("x-ms-correlation-request-id") if headers is not None else None
         if corr:

@@ -396,6 +396,10 @@ def load_adr_help():
     provisioning-state, Standard SKU, selected identity attachment, namespace outbound
     principal, and automatic RBAC preflight. Newly created assignments must become visible
     before namespace mutation.
+    ARM assignment visibility does not guarantee that the linked service already honors access.
+    After verifying access and allowing recent assignments to propagate, retry a persisted
+    failed endpoint with update, not add, preserving its existing identity and endpoint
+    settings. There is no need to delete the linked Hub to retry the link.
   examples:
     - name: Switch a Hub link to a system-assigned identity
       text: az iot adr ns link hub update -n primary --ns myNamespace -g myResourceGroup --system-assigned-mi
@@ -499,6 +503,10 @@ def load_adr_help():
     in place. Before PATCH, update repeats add's target existence, region,
     provisioning-state, selected identity attachment, namespace outbound principal,
     automatic RBAC, and assignment-visibility preflight.
+    ARM assignment visibility does not guarantee that the linked service already honors access.
+    After verifying access and allowing recent assignments to propagate, retry a persisted
+    failed endpoint with update, not add, passing its existing inbound identity. There is no
+    need to delete the linked DPS to retry the link.
   examples:
     - name: Rotate to a system-assigned identity on an existing DPS link
       text: az iot adr ns link dps update -n primary --ns myNamespace -g myResourceGroup --system-assigned-mi
@@ -613,6 +621,10 @@ def load_adr_help():
     in place. Before PATCH, update repeats add's target existence, region,
     provisioning-state, selected identity attachment, namespace outbound principal,
     automatic RBAC, and assignment-visibility preflight.
+    ARM assignment visibility does not guarantee that the linked service already honors access.
+    After verifying access and allowing recent assignments to propagate, retry a persisted
+    failed endpoint with update, not add, passing its existing inbound identity. There is no
+    need to delete the linked Update Instance to retry the link.
   examples:
     - name: Rotate to a system-assigned identity on an existing Software Updates link
       text: az iot adr ns link su update -n my-su --ns myNamespace -g myResourceGroup --system-assigned-mi

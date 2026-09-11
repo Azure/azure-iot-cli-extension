@@ -10,6 +10,7 @@ from contextlib import nullcontext
 from functools import partial
 from types import SimpleNamespace
 from unittest.mock import Mock
+from requests import Response
 
 import pytest
 import yaml
@@ -386,6 +387,93 @@ def test_device_receiver_uses_device_credentials_and_always_shuts_down(mocker):
     factory.assert_called_once_with("device-connection-string")
     client.connect.assert_called_once_with()
     client.shutdown.assert_called_once_with()
+
+
+@pytest.mark.parametrize("id_key", [None, "deviceId", "moduleId"])
+def test_query_wait_retries_only_until_exact_ids_are_visible(mocker, id_key):
+    expected = ["device1", "device2"]
+    rows = [{id_key: name} for name in expected] if id_key else expected
+    read = Mock(side_effect=[[], rows[:1], rows])
+    sleep = mocker.patch.object(integration_helpers, "sleep")
+    assert integration_helpers.wait_for_query_ids(read, expected, id_key=id_key) == rows
+    assert read.call_count == 3
+    assert sleep.call_count == 2
+
+
+def test_query_wait_exhaustion_preserves_observed_ids_and_fails(mocker):
+    sleep = mocker.patch.object(integration_helpers, "sleep")
+    read = Mock(return_value=["unexpected-device"])
+    with pytest.raises(AssertionError, match="expected IDs.*new-device.*observed IDs.*unexpected-device"):
+        integration_helpers.wait_for_query_ids(read, ["new-device"])
+    assert read.call_count == 7
+    assert sleep.call_count == 6
+
+
+@pytest.mark.parametrize("status", [400, 403, 502])
+def test_query_wait_never_retries_service_errors(mocker, status):
+    sleep = mocker.patch.object(integration_helpers, "sleep")
+    error = service_error(status, "ProviderError")
+    read = Mock(side_effect=error)
+    with pytest.raises(HttpResponseError) as raised:
+        integration_helpers.wait_for_query_ids(read, ["device"])
+    assert raised.value is error
+    read.assert_called_once_with()
+    sleep.assert_not_called()
+
+
+@pytest.mark.parametrize("attempts,wait", [(0, 10), (1, -1)])
+def test_query_wait_invalid_bounds_fail_before_reading(attempts, wait):
+    read = Mock()
+    with pytest.raises(ValueError, match="at least one attempt"):
+        integration_helpers.wait_for_query_ids(read, [], attempts=attempts, wait=wait)
+    read.assert_not_called()
+
+
+@pytest.mark.parametrize("error_type", [HttpResponseError, integration_helpers.CloudError])
+@pytest.mark.parametrize("status", [404, 400, 403, 409, 502])
+def test_known_device_cleanup_ignores_only_actual_not_found(error_type, status):
+    response = Response()
+    response.status_code = status
+    response._content = b"{}"
+    error = error_type(response=response)
+    devices = Mock()
+    devices.delete_identity.side_effect = [error, None]
+    if status == 404:
+        integration_helpers.delete_known_devices(devices, ["owned-child", "owned-parent", "owned-child"])
+        assert devices.delete_identity.call_count == 2
+    else:
+        with pytest.raises(error_type) as raised:
+            integration_helpers.delete_known_devices(devices, ["owned-child", "owned-parent"])
+        assert raised.value is error
+        assert devices.delete_identity.call_count == 1
+    devices.delete_identity.assert_any_call(id="owned-child", if_match="*")
+    devices.get_devices.assert_not_called()
+
+
+def test_edge_cleanup_uses_only_known_ids_with_entra(mocker):
+    from azext_iot.tests.iothub.devices import test_iot_edge_devices_create_int as edge
+
+    provider = mocker.patch.object(edge, "DeviceIdentityProvider")
+    cleanup = mocker.patch.object(edge, "delete_known_devices")
+    scenario = SimpleNamespace(entity_name="hub", entity_rg="rg", owned_device_ids=("child", "parent"))
+    edge.TestNestedEdgeHierarchy._delete_owned_devices(scenario)
+    provider.assert_called_once_with(cmd=scenario, hub_name="hub", rg="rg", auth_type_dataplane="login")
+    cleanup.assert_called_once_with(provider.return_value.service_sdk.devices, ("child", "parent"))
+
+
+def test_query_adapter_follows_continuation_after_an_empty_first_page():
+    from azext_iot.operations.generic import _execute_query
+
+    first = SimpleNamespace(response=SimpleNamespace(
+        headers={"x-ms-continuation": "next"}, json=lambda: []
+    ))
+    last = SimpleNamespace(response=SimpleNamespace(
+        headers={}, json=lambda: [{"deviceId": "owned-device"}]
+    ))
+    query = Mock(side_effect=[first, last])
+    assert _execute_query(["SELECT deviceId FROM devices"], query) == [{"deviceId": "owned-device"}]
+    assert query.call_count == 2
+    assert query.call_args.kwargs["custom_headers"]["x-ms-continuation"] == "next"
 
 
 @pytest.mark.parametrize("feedback_case", [

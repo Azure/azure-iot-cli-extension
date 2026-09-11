@@ -13,6 +13,8 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 from azure.cli.core.azclierror import CLIInternalError
 from azure.core.exceptions import HttpResponseError
+from knack.log import get_logger
+from msrestazure.azure_exceptions import CloudError
 
 from azext_iot.tests.helpers import assign_role_assignment, get_role_assignments
 from azext_iot.tests.settings import HUB_TEST_LOCATION
@@ -27,6 +29,39 @@ LOCAL_AUTH_DEVICE_HTTP_REASON = (
     "operation uses a Hub shared-access policy, not a device key, and has no Entra/device-key option."
 )
 _CANARY_HUB_LIST_API_VERSIONS = frozenset({"2026-05-01-preview", "2026-10-01-preview"})
+logger = get_logger(__name__)
+
+
+def wait_for_query_ids(read, expected_ids, id_key=None, attempts=7, wait=10):
+    """Wait only for post-write query visibility; command/service errors propagate."""
+    if attempts < 1 or wait < 0:
+        raise ValueError("Query wait requires at least one attempt and a nonnegative interval.")
+    expected = set(expected_ids)
+    for attempt in range(attempts):
+        rows = read()
+        observed = {row[id_key] for row in rows} if id_key else set(rows)
+        if observed == expected:
+            return rows
+        logger.warning(
+            "Query visibility %s/%s: expected IDs %s, observed IDs %s",
+            attempt + 1, attempts, sorted(expected), sorted(observed),
+        )
+        if attempt + 1 < attempts:
+            sleep(wait)
+    raise AssertionError(
+        f"Query did not converge after {attempts} reads: expected IDs {sorted(expected)}, "
+        f"observed IDs {sorted(observed)}"
+    )
+
+
+def delete_known_devices(devices, device_ids):
+    """Delete only test-owned IDs, without relying on the query index to enumerate them."""
+    for device_id in dict.fromkeys(device_ids):
+        try:
+            devices.delete_identity(id=device_id, if_match="*")
+        except (CloudError, HttpResponseError) as error:
+            if getattr(error.response, "status_code", None) != 404:
+                raise
 
 
 def assign_role_with_propagation(*, role, scope, assignee, max_tries, wait):

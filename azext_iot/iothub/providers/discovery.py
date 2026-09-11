@@ -9,7 +9,7 @@ from azure.cli.core.commands.client_factory import get_subscription_id
 from azext_iot.common._azure import IOT_SERVICE_CS_TEMPLATE
 from azext_iot.common.base_discovery import BaseDiscovery
 from azext_iot.common.shared import DiscoveryResourceType, AuthenticationTypeDataplane, GatewayVersion
-from azext_iot.common.utility import trim_from_start, is_eventhub_connection_string
+from azext_iot.common.utility import trim_from_start, is_eventhub_connection_string, valid_hostname
 from azext_iot.iothub.models.iothub_target import IotHubTarget, derive_iot_hub_hostnames
 from azext_iot._factory import iot_hub_service_factory
 from typing import Any, Dict
@@ -39,6 +39,27 @@ class IotHubDiscovery(BaseDiscovery):
 
     def _make_kwargs(self, **kwargs) -> Dict[str, Any]:
         return kwargs
+
+    def get_target(self, resource_name: str, resource_group_name: str = None, **kwargs) -> Dict[str, str]:
+        if (
+            resource_name
+            and not kwargs.get("login")
+            and kwargs.get("auth_type") == AuthenticationTypeDataplane.login.value
+            and (resource_group_name or kwargs.get("rg") or kwargs.get("force_find_resource"))
+        ):
+            hostname = resource_name
+            for prefix in ("https://", "http://"):
+                if hostname.lower().startswith(prefix):
+                    hostname = hostname[len(prefix):]
+                    break
+            if valid_hostname(hostname) and "." in hostname:
+                service_hostname, _ = derive_iot_hub_hostnames(hostname)
+                # A classic FQDN cannot tell us whether ARM exposes GWv2 split
+                # hostnames. An explicit RG permits a targeted metadata lookup.
+                # Split FQDNs and unscoped hostname-only calls remain ARM-free.
+                if not service_hostname or kwargs.get("force_find_resource"):
+                    resource_name = hostname.split(".")[0]
+        return super().get_target(resource_name, resource_group_name, **kwargs)
 
     @classmethod
     def get_target_by_cstring(cls, connection_string: str) -> Dict[str, str]:

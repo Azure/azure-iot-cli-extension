@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
+from azext_iot.tests.iothub._integration_helpers import wait_for_query_ids
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.common.utility import generate_key
 from azext_iot.tests.iothub import (
@@ -242,6 +243,16 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
                     query_checks.append(self.exists(f"[?deviceId=='{d}']"))
 
                 # By default query has no return cap
+                wait_for_query_ids(
+                    lambda: self.cmd(
+                        self.set_cmd_auth_type(
+                            f'iot hub query --hub-name {self.host_name} -g {self.entity_rg} -q "select * from devices"',
+                            auth_type=auth_phase,
+                        )
+                    ).get_output_in_json(),
+                    to_remove_device_ids,
+                    id_key="deviceId",
+                )
                 self.cmd(
                     self.set_cmd_auth_type(
                         f'iot hub query --hub-name {self.host_name} -g {self.entity_rg} -q "select * from devices"',

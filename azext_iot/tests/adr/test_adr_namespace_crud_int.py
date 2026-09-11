@@ -11,7 +11,7 @@ import shlex
 import pytest
 
 from azext_iot.tests.adr import ADRLiveScenarioTest
-from azext_iot.tests.adr._helpers import CleanupLedger
+from azext_iot.tests.adr._helpers import CleanupLedger, wait_for_listed_resource
 from azext_iot.tests.adr._log import LogKind as L, _log, timed_step
 from azext_iot.tests.adr.conftest import (
     TEST_LOCATION,
@@ -147,7 +147,7 @@ class TestADRNamespaceCrud(ADRLiveScenarioTest):
                 lambda: self.cmd(f"iot adr ns delete {resource_args} --yes"),
             )
             list_args = group_args if by_resource_group else subscription_arg
-            listed = self.cmd(
-                f"iot adr ns list {list_args}"
-            ).get_output_in_json()
+            listed = wait_for_listed_resource(
+                self, f"iot adr ns list {list_args}", namespace_name,
+            )
             assert namespace_name in [namespace["name"] for namespace in listed]

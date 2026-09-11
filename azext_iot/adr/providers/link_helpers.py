@@ -7,6 +7,7 @@
 """Pure parsing and serialization helpers for namespace links."""
 
 from copy import deepcopy
+from shlex import join
 from typing import Optional
 
 from azure.cli.core.azclierror import (
@@ -26,6 +27,7 @@ from azext_iot.adr.common import (
     validate_uami_resource_id,
 )
 from azext_iot.adr.topology import (
+    endpoint_is_type,
     get_endpoints,
     writable_namespace_properties,
 )
@@ -157,6 +159,64 @@ def get_provisioning_endpoints(namespace: dict) -> dict:
 
 def get_updating_endpoints(namespace: dict) -> dict:
     return get_endpoints(namespace, "updating")
+
+
+def failed_link_recovery_commands(namespace: dict) -> list:
+    """Render scoped updates only when the persisted link identity is known."""
+    resource_id = namespace.get("id")
+    if not isinstance(resource_id, str) or not is_valid_resource_id(resource_id):
+        return []
+    parsed = parse_resource_id(resource_id)
+    if (
+        parsed.get("namespace", "").casefold() != "microsoft.deviceregistry"
+        or parsed.get("type", "").casefold() != "namespaces"
+        or "child_name_1" in parsed
+        or not all(parsed.get(field) for field in ("subscription", "resource_group", "name"))
+    ):
+        return []
+
+    commands = []
+    for kind, section, endpoint_type in (
+        ("dps", "provisioning", DPS_ENDPOINT_TYPE),
+        ("hub", "messaging", IOT_HUB_ENDPOINT_TYPE),
+        ("su", "updating", SU_ENDPOINT_TYPE),
+    ):
+        endpoints = get_endpoints(namespace, section)
+        if not isinstance(endpoints, dict):
+            continue
+        for name, endpoint in endpoints.items():
+            if not endpoint_is_type(endpoint, endpoint_type):
+                continue
+            status = endpoint.get("provisioningStatus") or endpoint.get("status") or {}
+            state = endpoint.get("linkingState") or (
+                status.get("status") if isinstance(status, dict) else None
+            )
+            if str(state).casefold() != "failed":
+                continue
+            identity = endpoint.get("inboundCallerIdentity") or {}
+            if not isinstance(identity, dict):
+                continue
+            if identity.get("type") == IdentityType.system_assigned.value:
+                identity_args = ["--system-assigned-mi"]
+            elif identity.get("type") == IdentityType.user_assigned.value:
+                uami = identity.get("userAssignedIdentity")
+                if not isinstance(uami, str):
+                    continue
+                try:
+                    validate_uami_resource_id(uami)
+                except InvalidArgumentValueError:
+                    continue
+                identity_args = ["--user-assigned-mi", uami]
+            else:
+                continue
+            commands.append(join([
+                "az", "iot", "adr", "ns", "link", kind, "update",
+                "-n", name, "--ns", parsed["name"],
+                "-g", parsed["resource_group"],
+                "--subscription", parsed["subscription"],
+                *identity_args,
+            ]))
+    return commands
 
 
 def build_hub_endpoint_body(

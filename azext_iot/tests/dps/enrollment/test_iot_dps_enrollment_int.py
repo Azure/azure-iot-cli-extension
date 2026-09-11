@@ -104,7 +104,7 @@ def test_dps_enrollment_tpm_lifecycle(provisioned_iot_dps_module, auth_phases):
         assert update_enrollment["iotHubs"] == [hub_hostname]
         assert update_enrollment["initialTwin"]["tags"] == generic_dict
         assert update_enrollment["initialTwin"]["properties"]["desired"] == generic_dict
-        assert update_enrollment["optionalDeviceInformation"]
+        assert update_enrollment["optionalDeviceInformation"] == generic_dict
         assert update_enrollment["provisioningStatus"] == EntityStatusType.disabled.value
         assert update_enrollment["registrationId"] == enrollment_id
 
@@ -195,7 +195,9 @@ def test_dps_enrollment_x509_lifecycle(provisioned_iot_dps_module, auth_phases):
 
         assert update_enrollment["allocationPolicy"] == AllocationType.hashed.value
         assert update_enrollment["attestation"]["type"] == attestation_type
-        assert update_enrollment["attestation"]["x509"]["clientCertificates"]["primary"] is None
+        certificates = update_enrollment["attestation"]["x509"]["clientCertificates"]
+        assert certificates.get("primary") is None
+        assert certificates["secondary"] == enrollment["attestation"]["x509"]["clientCertificates"]["secondary"]
         assert update_enrollment["deviceId"] == device_id
         assert update_enrollment["iotHubs"] == [hub_hostname]
         assert update_enrollment["initialTwin"]["tags"] == generic_dict

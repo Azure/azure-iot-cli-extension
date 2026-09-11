@@ -1,6 +1,6 @@
 name: Integration Tests
 run-name: >-
-  Integration Tests (${{ inputs['test-services'] || 'auto' }} | ${{ inputs.regions || 'westus' }})
+  Integration Tests (${{ inputs['test-services'] || 'auto' }} | ${{ inputs.regions || 'centraluseuap' }})
 
 on:
   # Reusable workflow trigger — called programmatically by other workflows (e.g. release_workflow.yml)
@@ -20,7 +20,7 @@ on:
         description: "Azure regions (comma-separated)"
         type: string
         required: false
-        default: "westus"
+        default: "centraluseuap"
       resource-group:
         description: "Resource group for test resources"
         type: string
@@ -70,7 +70,7 @@ on:
         description: "Azure regions (comma-separated)"
         type: string
         required: false
-        default: "westus"
+        default: "centraluseuap"
       resource-group:
         description: "Resource group for test resources"
         type: string
@@ -94,6 +94,7 @@ jobs:
   setup:
     name: "Detect test matrix"
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
@@ -108,7 +109,7 @@ jobs:
         env:
           INPUT_SERVICES: ${{ inputs['test-services'] }}
           INPUT_PYTHON_VERSIONS: ${{ inputs['python-versions'] || '3.13' }}
-          INPUT_REGIONS: ${{ inputs.regions || 'westus' }}
+          INPUT_REGIONS: ${{ inputs.regions || 'centraluseuap' }}
           INPUT_TEST_DPS: ${{ inputs.testDPS }}
           INPUT_TEST_HUB_MGMT: ${{ inputs.testHubMgmt }}
           INPUT_TEST_HUB_DATA: ${{ inputs.testHubData }}
@@ -118,11 +119,11 @@ jobs:
           set -euo pipefail
           # --- Service registry: service|test_dir|tox_env|timeout ---
           all_services=(
-            "DPS|azext_iot/tests/dps|DPS-int|90"
-            "HubMgmt|azext_iot/tests/iothub|HubMgmt-int|120"
-            "HubData|azext_iot/tests/iothub|HubData-int|120"
+            "DPS|azext_iot/tests/dps|DPS-int|45"
+            "HubMgmt|azext_iot/tests/iothub|HubMgmt-int|60"
+            "HubData|azext_iot/tests/iothub|HubData-int|60"
             "ADU|azext_iot/tests/deviceupdate|ADU-int|200"
-            "ADR|azext_iot/tests/adr|ADR-int|200"
+            "ADR|azext_iot/tests/adr|ADR-int|60"
           )
 
           # --- Determine which services to include ---
@@ -182,8 +183,8 @@ jobs:
               [ "$s" = "$svc" ] && tox_env="$t" && timeout="$tm" && break
             done
             if [ -z "$tox_env" ]; then
-              echo "::warning::Unknown service: $svc"
-              continue
+              echo "::error::Unknown service: $svc"
+              exit 1
             fi
 
             for py in "${PY_ARRAY[@]}"; do
@@ -206,7 +207,7 @@ jobs:
           echo "├───────────┬─────────┬──────────────┬─────────────────────┤"
           echo "│  Service  │ Python  │    Region    │  Timeout            │"
           echo "├───────────┼─────────┼──────────────┼─────────────────────┤"
-          echo "$matrix" | jq -r '.[] | "│  \(.service)\(" " * (9 - (.service | length)))│ \(.python)\(" " * (8 - (.python | length)))│  \(.region)\(" " * (12 - (.region | length)))│  \(.timeout) min\(" " * (19 - ((.timeout | tostring) + " min" | length)))│"'
+          echo "$matrix" | jq -r '.[] | "│  \(.service)\(" " * (9 - (.service | length)))│ \(.python)\(" " * (8 - (.python | length)))│  \(.region)\(" " * ([1, 12 - (.region | length)] | max))│  \(.timeout) min\(" " * (19 - ((.timeout | tostring) + " min" | length)))│"'
           echo "└───────────┴─────────┴──────────────┴─────────────────────┘"
           echo ""
           echo "matrix=$matrix" >> $GITHUB_OUTPUT
@@ -220,6 +221,7 @@ jobs:
   unit-test:
     name: "Linter and unit tests"
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: "Checkout source"
         uses: actions/checkout@v5
@@ -243,6 +245,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: coverage-unit
+          overwrite: true
           path: ./.coverage
           include-hidden-files: true
           retention-days: 30
@@ -250,9 +253,8 @@ jobs:
   int-test:
     name: "${{ matrix.config.service }} py${{ matrix.config.python }} (${{ matrix.config.region }})"
     needs: [setup, unit-test]
-    if: ${{ needs.setup.result == 'success' && (needs.setup.outputs.matrix || '[]') != '[]' }}
+    if: ${{ needs.setup.result == 'success' && needs.unit-test.result == 'success' && (needs.setup.outputs.matrix || '[]') != '[]' }}
     runs-on: ubuntu-latest
-    continue-on-error: true
     timeout-minutes: ${{ matrix.config.timeout }}
     strategy:
       fail-fast: false
@@ -317,6 +319,7 @@ jobs:
         id: run_tests
         env:
           AZURE_TEST_RUN_LIVE: "True"
+          PYTHONUNBUFFERED: "1"
           azext_iot_testrg: ${{ env.RESOURCE_GROUP }}
           azext_iot_testhub_location: centraluseuap
           AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE: login
@@ -327,23 +330,24 @@ jobs:
         run: |
           set -o pipefail
           tox r -e ${{ matrix.config.tox_env }} --skip-pkg-install 2>&1 | \
-            sed 's/SharedAccessKey=[^;& "'"'"']*//g; s/AccountKey=[^;& "'"'"']*//g; s/sig=[^&"]*//g' | \
-            sed 's/\("primaryKey"\s*:\s*\)"[^"]*"/\1"***"/g; s/\("secondaryKey"\s*:\s*\)"[^"]*"/\1"***"/g' | \
-            sed 's/--pk [^ ]*/--pk ***/g; s/--sk [^ ]*/--sk ***/g; s/--key [^ ]*/--key ***/g' | \
-            sed 's/--login [^ ]*/--login ***/g; s/-l [^ ]*/--login ***/g; s/--connection-string [^ ]*/--connection-string ***/g' | \
+            sed -u 's/SharedAccessKey=[^;& "'"'"']*//g; s/AccountKey=[^;& "'"'"']*//g; s/sig=[^&"]*//g' | \
+            sed -u 's/\("primaryKey"\s*:\s*\)"[^"]*"/\1"***"/g; s/\("secondaryKey"\s*:\s*\)"[^"]*"/\1"***"/g' | \
+            sed -u 's/--pk [^ ]*/--pk ***/g; s/--sk [^ ]*/--sk ***/g; s/--key [^ ]*/--key ***/g' | \
+            sed -u 's/--login [^ ]*/--login ***/g; s/-l [^ ]*/--login ***/g; s/--connection-string [^ ]*/--connection-string ***/g' | \
             tee test-output.log
 
       - name: "Record test result"
         if: ${{ always() }}
         run: |
           mkdir -p test-result
-          echo '${{ steps.run_tests.outcome }}' > test-result/status.txt
+          echo '${{ job.status }}' > test-result/status.txt
           echo '${{ matrix.config.service }}' > test-result/service.txt
           echo '${{ matrix.config.python }}' > test-result/python.txt
           echo '${{ matrix.config.region }}' > test-result/region.txt
           # Extract failed/errored test names from pytest output
           if [ -f test-output.log ]; then
-            grep -E '^FAILED |^ERROR ' test-output.log | sed 's/^FAILED //;s/^ERROR //;s/ - .*$//' > test-result/failures.txt || true
+            grep -E '^(FAILED|ERROR) azext_iot/tests/[^ ]+::' test-output.log | \
+              sed 's/^FAILED //;s/^ERROR //;s/ - .*$//' > test-result/failures.txt || true
           fi
           touch test-result/failures.txt
 
@@ -352,6 +356,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: test-result-${{ matrix.config.service }}-py${{ matrix.config.python }}-${{ matrix.config.region }}
+          overwrite: true
           path: test-result/
           retention-days: 1
 
@@ -360,108 +365,43 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: coverage-${{ matrix.config.service }}-py${{ matrix.config.python }}-${{ matrix.config.region }}
+          overwrite: true
           path: ./.coverage
           include-hidden-files: true
           retention-days: 30
 
   int-test-gate:
     name: "Integration test gate"
-    needs: [int-test]
+    needs: [setup, unit-test, int-test]
     if: always() && !cancelled()
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
+      - name: "Checkout source"
+        uses: actions/checkout@v5
+
       - name: "Download all test results"
         uses: actions/download-artifact@v7
-        continue-on-error: true
         with:
           pattern: test-result-*
           path: ./test-results
 
       - name: "Evaluate per-service results"
-        run: |
-          echo "## Integration Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "| Service | Python | Region | Result |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|--------|--------|--------|" >> $GITHUB_STEP_SUMMARY
-
-          gate_pass=true
-          result_count=0
-          declare -A service_pass
-          declare -A service_fail
-
-          for result_dir in ./test-results/test-result-*; do
-            [ -d "$result_dir" ] || continue
-            service=$(cat "$result_dir/service.txt")
-            status=$(cat "$result_dir/status.txt")
-            python=$(cat "$result_dir/python.txt")
-            region=$(cat "$result_dir/region.txt")
-            icon=$( [ "$status" = "success" ] && echo "✅" || echo "❌" )
-            echo "| $service | $python | $region | $icon $status |" >> $GITHUB_STEP_SUMMARY
-
-            result_count=$((result_count + 1))
-            if [ "$status" = "success" ]; then
-              service_pass[$service]=1
-            else
-              service_fail[$service]=$(( ${service_fail[$service]:-0} + 1 ))
-            fi
-          done
-
-          if [ "$result_count" -eq 0 ]; then
-            echo "::notice::No integration test results found — all jobs were skipped or cancelled"
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### ⏭️ Integration tests were skipped" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "No test results were produced. This is expected when a prerequisite job (e.g. linter or unit tests) failed." >> $GITHUB_STEP_SUMMARY
-            exit 0
-          fi
-
-          # Show failed test details
-          has_failures=false
-          for result_dir in ./test-results/test-result-*; do
-            [ -d "$result_dir" ] || continue
-            if [ -s "$result_dir/failures.txt" ]; then
-              if [ "$has_failures" = false ]; then
-                echo "" >> $GITHUB_STEP_SUMMARY
-                echo "## Failed Tests" >> $GITHUB_STEP_SUMMARY
-                has_failures=true
-              fi
-              service=$(cat "$result_dir/service.txt")
-              python=$(cat "$result_dir/python.txt")
-              region=$(cat "$result_dir/region.txt")
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "<details><summary><b>$service</b> py$python ($region) — $(wc -l < "$result_dir/failures.txt") failed</summary>" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo '```' >> $GITHUB_STEP_SUMMARY
-              cat "$result_dir/failures.txt" >> $GITHUB_STEP_SUMMARY
-              echo '```' >> $GITHUB_STEP_SUMMARY
-              echo "</details>" >> $GITHUB_STEP_SUMMARY
-            fi
-          done
-
-          echo "" >> $GITHUB_STEP_SUMMARY
-          for svc in $(echo "${!service_pass[@]} ${!service_fail[@]}" | tr ' ' '\n' | sort -u); do
-            pass_count=${service_pass[$svc]:-0}
-            fail_count=${service_fail[$svc]:-0}
-            if [ "$pass_count" -gt 0 ] && [ "$fail_count" -gt 0 ]; then
-              echo "::warning::$svc: $fail_count combination(s) failed but at least one passed — not blocking release"
-            elif [ "$pass_count" -eq 0 ]; then
-              echo "::error::$svc: ALL combinations failed"
-              gate_pass=false
-            fi
-          done
-
-          if [ "$gate_pass" = false ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### ❌ Gate FAILED — one or more services had zero successful runs" >> $GITHUB_STEP_SUMMARY
-            exit 1
-          fi
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### ✅ Gate passed — every service has at least one successful run" >> $GITHUB_STEP_SUMMARY
+        if: ${{ always() }}
+        env:
+          INTEGRATION_MATRIX: ${{ needs.setup.outputs.matrix || '[]' }}
+          SETUP_RESULT: ${{ needs.setup.result }}
+          UNIT_TEST_RESULT: ${{ needs.unit-test.result }}
+          INTEGRATION_RESULT: ${{ needs.int-test.result }}
+          GATE_JOB_RESULT: ${{ job.status }}
+        run: python3 scripts/evaluate_test_results.py --results-dir ./test-results
 
   combine-coverage:
     name: "Combine coverage reports"
     if: always()
-    needs: [unit-test, int-test, int-test-gate]
+    needs: [setup, unit-test, int-test, int-test-gate]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: "Checkout source"
         uses: actions/checkout@v5
@@ -475,8 +415,9 @@ jobs:
       - name: "Combine coverage and generate report"
         run: |
           pip install coverage
-          if compgen -G "./coverage_parts/*/.coverage" > /dev/null; then
-            coverage combine ./coverage_parts/*/.coverage
+          mapfile -t coverage_files < <(find ./coverage_parts -type f -name .coverage)
+          if [ "${#coverage_files[@]}" -gt 0 ]; then
+            coverage combine "${coverage_files[@]}"
             coverage report
             coverage html --directory ./htmlcov
           else
@@ -484,20 +425,30 @@ jobs:
             echo "### ⚠️ No coverage data collected" >> $GITHUB_STEP_SUMMARY
           fi
 
-      - name: "Write job summary"
-        if: ${{ always() }}
-        run: |
-          if [ "${{ needs.unit-test.result }}" = "success" ] && [ "${{ needs.int-test-gate.result }}" = "success" ]; then
-            echo "### All tests passed" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "### Test failures detected" >> $GITHUB_STEP_SUMMARY
-            [ "${{ needs.unit-test.result }}" != "success" ] && echo "- Unit tests: ${{ needs.unit-test.result }}" >> $GITHUB_STEP_SUMMARY
-            [ "${{ needs.int-test-gate.result }}" != "success" ] && echo "- Integration tests: ${{ needs.int-test-gate.result }}" >> $GITHUB_STEP_SUMMARY
-          fi
-
       - name: "Upload combined coverage artifact"
         uses: actions/upload-artifact@v6
         with:
           name: combined-coverage
+          overwrite: true
           path: ./htmlcov
           retention-days: 30
+
+      - name: "Write job summary"
+        if: ${{ always() }}
+        env:
+          SETUP_RESULT: ${{ needs.setup.result }}
+          UNIT_TEST_RESULT: ${{ needs.unit-test.result }}
+          INTEGRATION_RESULT: ${{ needs.int-test.result }}
+          GATE_RESULT: ${{ needs.int-test-gate.result }}
+          COVERAGE_RESULT: ${{ job.status }}
+        run: |
+          if [ "$SETUP_RESULT" = "success" ] && [ "$UNIT_TEST_RESULT" = "success" ] && \
+             [ "$INTEGRATION_RESULT" = "success" ] && [ "$GATE_RESULT" = "success" ] && \
+             [ "$COVERAGE_RESULT" = "success" ]; then
+            echo "### All workflow checks passed" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Workflow did not succeed" >> "$GITHUB_STEP_SUMMARY"
+            printf -- '- Matrix setup: %s\n- Unit tests: %s\n- Integration jobs: %s\n- Integration gate: %s\n- Coverage: %s\n' \
+              "$SETUP_RESULT" "$UNIT_TEST_RESULT" "$INTEGRATION_RESULT" "$GATE_RESULT" "$COVERAGE_RESULT" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi

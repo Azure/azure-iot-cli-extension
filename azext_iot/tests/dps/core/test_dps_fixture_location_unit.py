@@ -15,11 +15,239 @@ from azure.core.credentials import AccessToken
 from azure.core.exceptions import HttpResponseError, ResourceNotFoundError as AzureResourceNotFoundError
 from knack.util import CLIError
 
+from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.core import custom
 from azext_iot.sdk.iothub.mgmt import IotHubClient
 from azext_iot.tests.dps import DPS_SERVICE_AUTH_PARAMS
 from azext_iot.tests.dps import conftest as dps_fixtures
 from azext_iot.tests.dps.device_registration import check_hub_device
+from azext_iot.tests import helpers
+
+
+@pytest.mark.parametrize("managed_identity", [False, True])
+def test_required_grant_surfaces_original_cli_error_without_waiting(mocker, managed_identity):
+    error = HttpResponseError(
+        message="AuthorizationFailed: Microsoft.Authorization/roleAssignments/write at scope /resource-id"
+    )
+    embedded = EmbeddedCLI()
+    embedded.az_cli = mocker.Mock()
+    embedded.az_cli.invoke.return_value = 1
+    embedded.az_cli.result.error = error
+    mocker.patch.object(helpers, "cli", embedded)
+    mocker.patch.object(helpers, "get_role_assignments", return_value=[])
+    helper_sleep = mocker.patch.object(helpers, "sleep")
+    fixture_sleep = mocker.patch.object(dps_fixtures, "sleep")
+    cli = mocker.patch.object(dps_fixtures, "cli")
+    cli.invoke.return_value.as_json.return_value = {
+        "user": {"name": "principal"}, "identity": {"principalId": "principal"},
+    }
+
+    with pytest.raises(HttpResponseError) as raised:
+        if managed_identity:
+            dps_fixtures._enable_dps_hub_identity("dps", {"hub": {"id": "/resource-id"}})
+        else:
+            dps_fixtures._assign_current_user_role(dps_fixtures.DPS_USER_ROLE, "/resource-id")
+
+    assert raised.value is error
+    helper_sleep.assert_not_called()
+    fixture_sleep.assert_not_called()
+    embedded.az_cli.invoke.assert_called_once()
+
+
+@pytest.mark.parametrize("principal_field", ["name", "principalId", "principalName"])
+def test_required_grant_reuses_visible_assignment(mocker, principal_field):
+    mocker.patch.object(helpers, "get_role_assignments", return_value=[{principal_field: "principal"}])
+    cli = mocker.patch.object(helpers, "cli")
+    sleep = mocker.patch.object(helpers, "sleep")
+    helpers.assign_role_assignment("role", "/scope", "principal")
+    cli.invoke.assert_not_called()
+    sleep.assert_not_called()
+
+
+def test_required_grant_preserves_cli_role_assignment_exists_race(mocker):
+    from azure.cli.command_modules.role import custom as role_commands
+
+    existing = {"principalId": "principal"}
+    error = HttpResponseError(message="(RoleAssignmentExists) The role assignment already exists.")
+    error.status_code = 409
+    error.error = SimpleNamespace(code="RoleAssignmentExists")
+    mocker.patch.object(role_commands, "_resolve_object_id_and_type", return_value=("principal", "ServicePrincipal"))
+    create = mocker.patch.object(role_commands, "_create_role_assignment", side_effect=error)
+    lookup = mocker.patch.object(role_commands, "list_role_assignments", return_value=[existing])
+    visible = mocker.patch.object(helpers, "get_role_assignments", side_effect=[[], [existing]])
+    cli = mocker.patch.object(helpers, "cli")
+
+    def invoke(_command, capture_stderr):
+        assert capture_stderr is True
+        assert role_commands.create_role_assignment(
+            SimpleNamespace(cli_ctx=None), "role", "/scope", assignee="principal"
+        ) == existing
+        return SimpleNamespace(success=lambda: True, as_json=lambda: existing)
+
+    cli.invoke.side_effect = invoke
+    sleep = mocker.patch.object(helpers, "sleep")
+    helpers.assign_role_assignment("role", "/scope", "principal", max_tries=1, wait=2)
+    assert visible.call_count == 2
+    create.assert_called_once()
+    lookup.assert_called_once()
+    sleep.assert_called_once_with(2)
+
+
+def test_required_grant_visibility_accepts_resolved_object_id(mocker):
+    mocker.patch.object(helpers, "get_role_assignments", side_effect=[[], [{"principalId": "object-id"}]])
+    cli = mocker.patch.object(helpers, "cli")
+    cli.invoke.return_value.success.return_value = True
+    cli.invoke.return_value.as_json.return_value = {"principalId": "object-id"}
+    sleep = mocker.patch.object(helpers, "sleep")
+    helpers.assign_role_assignment("role", "/scope", "principal-alias", max_tries=1, wait=1)
+    cli.invoke.assert_called_once()
+    sleep.assert_called_once_with(1)
+
+
+def test_required_grant_visibility_exhaustion_is_not_success(mocker):
+    visible = mocker.patch.object(helpers, "get_role_assignments", return_value=[])
+    cli = mocker.patch.object(helpers, "cli")
+    cli.invoke.return_value.success.return_value = True
+    cli.invoke.return_value.as_json.return_value = {"principalId": "principal"}
+    sleep = mocker.patch.object(helpers, "sleep")
+    with pytest.raises(CLIInternalError, match="scope.*not visible"):
+        helpers.assign_role_assignment("role", "/scope", "principal", max_tries=2, wait=1)
+    assert visible.call_count == 3
+    assert cli.invoke.call_count == sleep.call_count == 2
+    assert all(call.kwargs["capture_stderr"] is True for call in cli.invoke.call_args_list)
+
+
+def test_required_grant_nonzero_exit_without_exception_fails(mocker):
+    mocker.patch.object(helpers, "get_role_assignments", return_value=[])
+    cli = mocker.patch.object(helpers, "cli")
+    cli.invoke.return_value.success.return_value = False
+    cli.invoke.return_value.get_error.return_value = None
+    cli.invoke.return_value.error_code = 2
+    sleep = mocker.patch.object(helpers, "sleep")
+    with pytest.raises(CLIInternalError, match="scope.*exit code 2"):
+        helpers.assign_role_assignment("role", "/scope", "principal")
+    sleep.assert_not_called()
+
+
+def _owned_test_resource(name, kind, run_uid="test-run"):
+    return {
+        "id": "/resource-id", "name": name, "location": "centraluseuap",
+        "properties": {"disableLocalAuth": True},
+        "tags": {"intTest": "true", "runUid": run_uid, "kind": kind},
+    }
+
+
+@pytest.mark.parametrize("stage", ["create", "role", "link", "unlink"])
+@pytest.mark.parametrize("error_type", [CLIError, pytest.fail.Exception, KeyboardInterrupt])
+def test_new_dps_setup_failure_cleans_only_owned_resource(mocker, stage, error_type):
+    error = error_type("setup failure")
+    kind = "nh" if stage == "unlink" else "h"
+    name = f"{dps_fixtures.INT_TEST_DPS_PREFIX}-timestamp-test-run-{kind}"
+    mocker.patch.object(dps_fixtures, "_timestamp", return_value="timestamp")
+    cli = mocker.patch.object(dps_fixtures, "cli")
+    cli.invoke.return_value.as_json.return_value = _owned_test_resource(name, kind)
+    find = mocker.patch.object(dps_fixtures, "_find_dps_by_name", return_value=_owned_test_resource(name, kind))
+    delete = mocker.patch.object(dps_fixtures, "_delete_dps")
+    role = mocker.patch.object(dps_fixtures, "assign_iot_dps_dataplane_rbac_role")
+    link = mocker.patch.object(dps_fixtures, "_link_hub")
+    unlink = mocker.patch.object(dps_fixtures, "_unlink_all_hubs")
+    {"create": cli.invoke, "role": role, "link": link, "unlink": unlink}[stage].side_effect = error
+
+    with pytest.raises(error_type) as raised:
+        dps_fixtures._create_managed_dps("test-run", kind, None if kind == "nh" else {"name": "hub"})
+
+    assert raised.value is error
+    find.assert_called_once_with(name)
+    delete.assert_called_once_with(name)
+
+
+@pytest.mark.parametrize("tags", [
+    {}, {"intTest": "true", "runUid": "other-run", "kind": "h"},
+    {"intTest": "true", "runUid": "test-run", "kind": "nh"},
+])
+def test_failed_setup_cleanup_does_not_delete_unowned_resources(mocker, caplog, tags):
+    resource = {**_owned_test_resource("resource", "h"), "tags": tags}
+    find, delete = mocker.Mock(return_value=resource), mocker.Mock()
+    dps_fixtures._cleanup_created_resource("resource", "test-run", "h", find, delete)
+    delete.assert_not_called()
+    assert "ownership does not match" in caplog.text
+
+
+def test_failed_setup_cleanup_handles_absent_resource(mocker):
+    find, delete = mocker.Mock(return_value=None), mocker.Mock()
+    dps_fixtures._cleanup_created_resource("resource", "test-run", "h", find, delete)
+    delete.assert_not_called()
+
+
+def test_cleanup_failure_retains_original_setup_error(mocker):
+    original, cleanup_error = CLIError("grant denied"), CLIError("delete denied")
+    name = f"{dps_fixtures.INT_TEST_DPS_PREFIX}-timestamp-test-run-nh"
+    mocker.patch.object(dps_fixtures, "_timestamp", return_value="timestamp")
+    mocker.patch.object(dps_fixtures, "cli").invoke.side_effect = original
+    mocker.patch.object(dps_fixtures, "_find_dps_by_name", return_value=_owned_test_resource(name, "nh"))
+    mocker.patch.object(dps_fixtures, "_delete_dps", side_effect=cleanup_error)
+    with pytest.raises(CLIError) as raised:
+        dps_fixtures._create_managed_dps("test-run", "nh", None)
+    assert raised.value is cleanup_error
+    assert raised.value.__context__ is original
+
+
+@pytest.mark.parametrize("kind", ["h", "hub"])
+def test_new_resource_state_write_failure_is_cleaned(mocker, monkeypatch, tmp_path, kind):
+    monkeypatch.setattr(dps_fixtures.tempfile, "gettempdir", lambda: str(tmp_path))
+    resource = _owned_test_resource("resource", kind)
+    create, find = mocker.Mock(return_value=("resource", resource)), mocker.Mock(return_value=resource)
+    mocker.patch.object(dps_fixtures, "_write_state", side_effect=OSError("state write failed"))
+    delete = mocker.patch.object(dps_fixtures, "_delete_hub" if kind == "hub" else "_delete_dps")
+    with pytest.raises(OSError, match="state write failed"):
+        dps_fixtures._shared_acquire("test-run", kind, create, find)
+    delete.assert_called_once_with("resource")
+
+
+@pytest.mark.parametrize("kind", ["nh", "hub"])
+@pytest.mark.parametrize("refcount", [1, 2])
+def test_post_acquire_failure_releases_only_its_reference(mocker, monkeypatch, tmp_path, kind, refcount):
+    monkeypatch.setattr(dps_fixtures.tempfile, "gettempdir", lambda: str(tmp_path))
+    monkeypatch.setattr(dps_fixtures.settings.env, "azext_iot_testdps", None)
+    monkeypatch.setattr(dps_fixtures.settings.env, "azext_iot_testdps_hub", None)
+    mocker.patch.object(dps_fixtures, "_get_run_uid", return_value="test-run")
+    mocker.patch.object(dps_fixtures, "_gc_stale_resources_once")
+    resource = _owned_test_resource("resource", kind)
+    mocker.patch.object(dps_fixtures, "_shared_acquire", return_value=resource)
+    mocker.patch.object(dps_fixtures, "_find_hub_by_name" if kind == "hub" else "_find_dps_by_name", return_value=resource)
+    error = pytest.fail.Exception("setup timed out before yield")
+    mocker.patch.object(dps_fixtures, "_assert_local_auth_disabled", side_effect=error)
+    delete = mocker.patch.object(dps_fixtures, "_delete_hub" if kind == "hub" else "_delete_dps")
+    _, path = dps_fixtures._state_paths("test-run", kind)
+    dps_fixtures._write_state(path, {"name": "resource", "refcount": refcount})
+    provision = dps_fixtures._iot_hubs_provisioner if kind == "hub" else dps_fixtures._iot_dps_provisioner
+    with pytest.raises(pytest.fail.Exception) as raised:
+        provision(mocker.Mock())
+    assert raised.value is error
+    if refcount == 1:
+        delete.assert_called_once_with("resource")
+        assert not Path(path).exists()
+    else:
+        delete.assert_not_called()
+        assert dps_fixtures._read_state(path)["refcount"] == 1
+
+
+@pytest.mark.parametrize("kind", ["nh", "hub"])
+def test_pinned_setup_failure_never_deletes_resource(mocker, monkeypatch, kind):
+    monkeypatch.setattr(dps_fixtures.settings.env, "azext_iot_testdps", "external")
+    monkeypatch.setattr(dps_fixtures.settings.env, "azext_iot_testdps_hub", "external")
+    mocker.patch.object(
+        dps_fixtures, "_find_hub_by_name" if kind == "hub" else "_find_dps_by_name",
+        return_value=_owned_test_resource("external", kind, "other-run"),
+    )
+    mocker.patch.object(dps_fixtures, "_assert_local_auth_disabled", side_effect=CLIError("setup denied"))
+    release = mocker.patch.object(dps_fixtures, "_shared_release")
+    delete = mocker.patch.object(dps_fixtures, "_delete_hub" if kind == "hub" else "_delete_dps")
+    provision = dps_fixtures._iot_hubs_provisioner if kind == "hub" else dps_fixtures._iot_dps_provisioner
+    with pytest.raises(CLIError, match="setup denied"):
+        provision(SimpleNamespace(config=SimpleNamespace()))
+    release.assert_not_called()
+    delete.assert_not_called()
 
 
 @pytest.mark.parametrize("location", [None, "", "sentinel", "centraluseuap", "eastus"])

@@ -111,7 +111,13 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module, auth_ph
         etag = enrollment["etag"]
         assert enrollment_update["allocationPolicy"] == AllocationType.hashed.value
         assert enrollment_update["attestation"]["type"] == AttestationType.x509.value
-        assert enrollment_update["attestation"]["x509"]["clientCertificates"] is None
+        assert enrollment_update["attestation"]["x509"].get("clientCertificates") is None
+        assert enrollment_update["attestation"]["x509"]["signingCertificates"]["primary"] == (
+            enrollment["attestation"]["x509"]["signingCertificates"]["primary"]
+        )
+        assert enrollment_update["attestation"]["x509"]["signingCertificates"]["secondary"] == (
+            enrollment["attestation"]["x509"]["signingCertificates"]["secondary"]
+        )
         assert enrollment_update["capabilities"]["iotEdge"] is False
         assert enrollment_update["enrollmentGroupId"] == enrollment_id
         assert enrollment_update["provisioningStatus"] == EntityStatusType.disabled.value
@@ -150,7 +156,7 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module, auth_ph
         assert enrollment_update["allocationPolicy"] == AllocationType.custom.value
         assert enrollment_update["attestation"]["type"] == AttestationType.x509.value
         assert enrollment_update["attestation"]["x509"]["caReferences"]["primary"] == cert_name
-        assert enrollment_update["attestation"]["x509"]["caReferences"]["secondary"] is None
+        assert enrollment_update["attestation"]["x509"]["caReferences"].get("secondary") is None
         assert enrollment_update["customAllocationDefinition"]["webhookUrl"] == WEBHOOK_URL
         assert enrollment_update["customAllocationDefinition"]["apiVersion"] == API_VERSION
         assert enrollment_update["enrollmentGroupId"] == enrollment_id

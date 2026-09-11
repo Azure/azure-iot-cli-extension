@@ -371,8 +371,12 @@ def test_format_failure_includes_authorization_guidance_and_correlation_id(
     )
 
     assert "Managed identity is not authorized." in message
-    assert "automatic RBAC preflight" in message
-    assert "exact remediation commands" in message
+    assert "Role assignments visible in ARM may not yet be effective" in message
+    assert "use link update, not link add" in message
+    assert "Update reruns RBAC preflight" in message
+    assert "roles are incomplete" not in message
+    assert "exact remediation commands" not in message
+    assert "\naz iot" not in message
     assert "Correlation id: correlation-id." in message
 
 

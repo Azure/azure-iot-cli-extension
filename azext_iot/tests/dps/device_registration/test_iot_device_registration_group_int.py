@@ -4,6 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
 import os
 from azure.cli.core.azclierror import (
     AzureResponseError,
@@ -244,7 +245,7 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
             )
 
         # Try with payload
-        payload = {"Thermostat": {"$metadata": {}}}
+        payload = json.dumps({"Thermostat": {"$metadata": {}}})
 
         registration = cli.invoke(
             set_cmd_auth_type(
@@ -254,6 +255,7 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
+            capture_stderr=True,
         ).as_json()
         device1_registration = registration["registrationState"]
         assert registration["operationId"]
@@ -369,7 +371,7 @@ def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module, auth
             compare_registrations(registration_states[i], service_side)
 
         # Try with payload
-        payload = {"Thermostat": {"$metadata": {}}}
+        payload = json.dumps({"Thermostat": {"$metadata": {}}})
 
         registration = cli.invoke(
             set_cmd_auth_type(
@@ -378,6 +380,7 @@ def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module, auth
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
+            capture_stderr=True,
         ).as_json()
         assert registration["operationId"]
         assert registration["registrationState"]["assignedHub"] == hub_hostname
