@@ -10,15 +10,17 @@ ADR job integration tests (P6).
 Covers the ``iot adr ns job`` surface end-to-end:
 
 * CRUD: create / show / list / update / delete
-* ``schedule`` with optional ``--scheduled-time`` and ``--timeout``
+* ``schedule`` with ``--scheduled-time`` (no execution prerequisites)
 * Update guards (``Nothing to update``; non-tag fields rejected)
 * ``wait`` (LRO polling)
 * Same-namespace lock on ``--target-group-name`` (no cross-namespace targets)
 
-Jobs require a target Group in the same namespace; they do **not** require
+SoftwareUpdate jobs require a target Group in the same namespace; CRUD does **not** require
 any Hub/DPS infrastructure. We keep the namespace lightweight (no certificate
 infrastructure or linked Hub) since job CRUD does not exercise
-linking surfaces.
+linking surfaces. Immediate/custom-name execution and the missing-SU-link failure
+belong to test_adr_job_run_int.py, as does opt-in healthy cancellation. Neither
+SoftwareUpdate CRUD nor OnboardingUpdate scheduling proves rollout health.
 """
 
 import datetime
@@ -34,6 +36,9 @@ from azext_iot.tests.adr.conftest import (
     generate_adr_namespace_name,
 )
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests.adr.test_adr_job_run_int import (
+    _delete_test_namespace, _delete_test_run, _wait_for_run_statuses,
+)
 
 
 def _generate_group_name() -> str:
@@ -42,6 +47,12 @@ def _generate_group_name() -> str:
 
 def _generate_job_name() -> str:
     return f"testjob{generate_generic_id()[:8]}"
+
+
+def _future_scheduled_time():
+    return (
+        datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=1)
+    ).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 @pytest.mark.usefixtures("set_cwd")
@@ -54,20 +65,26 @@ class TestADRJobLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
         namespace_name = generate_adr_namespace_name()
         group_name = _generate_group_name()
         job_name = _generate_job_name()
-        run_names = []
-        group_created = False
-        job_created = False
 
-        try:
+        with CleanupLedger() as cleanup:
             with timed_step("Setup ❯ Namespace + Group"):
                 self.cmd(
                     f"iot adr ns create -n {namespace_name} -g {rg} --location {TEST_LOCATION}"
+                )
+                cleanup.register(
+                    "namespace",
+                    lambda: _delete_test_namespace(self, namespace_name, rg),
                 )
                 self.cmd(
                     f"iot adr ns group create -n {group_name} --ns {namespace_name} -g {rg} "
                     f'--query-string "*"'
                 )
-                group_created = True
+                cleanup.register(
+                    "group",
+                    lambda: self.cmd(
+                        f"iot adr ns group delete -n {group_name} --ns {namespace_name} -g {rg} -y"
+                    ),
+                )
                 _log(LogKind.OK, "Group '%s' created", group_name)
 
             with timed_step("Step 1 ❯ job create (SoftwareUpdate)"):
@@ -79,7 +96,12 @@ class TestADRJobLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                     f"--update-id-name gateway-firmware "
                     f"--update-id-version 1.2.3"
                 ).get_output_in_json()
-                job_created = True
+                cleanup.register(
+                    "job",
+                    lambda: self.cmd(
+                        f"iot adr ns job delete -n {job_name} --ns {namespace_name} -g {rg} -y"
+                    ),
+                )
                 assert created["name"] == job_name
                 assert created["properties"]["provisioningState"] == "Succeeded"
                 # Surface-level: target & update identity should be present in
@@ -152,38 +174,27 @@ class TestADRJobLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                 )
                 _log(LogKind.OK, "tags cleared with --tags ''")
 
-            with timed_step("Step 6 ❯ job schedule (no args = immediate)"):
-                run = self.cmd(
-                    f"iot adr ns job schedule -n {job_name} "
-                    f"--ns {namespace_name} -g {rg}"
-                ).get_output_in_json()
-                # --run-name is optional; the CLI generates a UTC-timestamped name.
-                assert run["name"].startswith("run-")
-                run_names.append(run["name"])
-                _log(LogKind.OK, "job schedule (immediate) returned %s", run["name"])
-
-            with timed_step("Step 7 ❯ job schedule with --scheduled-time"):
-                self.cmd(
-                    f"iot adr ns job run cancel -n {run['name']} "
-                    f"--job-name {job_name} --ns {namespace_name} -g {rg} -y"
-                )
-                self.cmd(
-                    f"iot adr ns job run delete -n {run['name']} "
-                    f"--job-name {job_name} --ns {namespace_name} -g {rg} -y"
-                )
-                run_names.remove(run["name"])
-                # Schedule for ~1 hour from now to keep it well-formed
-                future = (
-                    datetime.datetime.now(datetime.timezone.utc)
-                    + datetime.timedelta(hours=1)
-                ).strftime("%Y-%m-%dT%H:%M:%SZ")
+            with timed_step("Step 6 ❯ job schedule with --scheduled-time"):
+                # Exercise scheduling without executing this deliberately
+                # lightweight, unlinked SoftwareUpdate job.
+                future = _future_scheduled_time()
                 scheduled_run = f"{job_name}-scheduled"
-                self.cmd(
+                run = self.cmd(
                     f"iot adr ns job schedule -n {job_name} "
                     f"--ns {namespace_name} -g {rg} "
                     f"--run-name {scheduled_run} --scheduled-time {future}"
+                ).get_output_in_json()
+                run_scope = (
+                    f"-n {scheduled_run} --job-name {job_name} --ns {namespace_name} -g {rg}"
                 )
-                run_names.append(scheduled_run)
+                cleanup.register("scheduled run", lambda: _delete_test_run(self, run_scope))
+                assert run["name"] == scheduled_run
+                run = _wait_for_run_statuses(self, run_scope, ("Scheduled",))
+                assert run["properties"]["provisioningState"] == "Succeeded"
+                assert run["properties"]["status"] == "Scheduled", run["properties"]
+                assert datetime.datetime.fromisoformat(
+                    run["properties"]["scheduledTime"].replace("Z", "+00:00")
+                ) == datetime.datetime.fromisoformat(future.replace("Z", "+00:00"))
                 _log(LogKind.OK, "job schedule (--scheduled-time=%s) returned", future)
 
                 summary = self.cmd(
@@ -192,62 +203,25 @@ class TestADRJobLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                 ).get_output_in_json()
                 assert "total" in summary
 
-                self.cmd(
-                    f"iot adr ns job run delete -n {scheduled_run} --job-name {job_name} "
-                    f"--ns {namespace_name} -g {rg} -y"
-                )
-                run_names.remove(scheduled_run)
+                _delete_test_run(self, run_scope)
+                cleanup.dismiss("scheduled run")
 
-            with timed_step("Step 8 ❯ job wait"):
+            with timed_step("Step 7 ❯ job wait"):
                 self.cmd(
                     f"iot adr ns job wait -n {job_name} --ns {namespace_name} -g {rg}"
                 )
                 _log(LogKind.OK, "default success wait returned")
 
-            with timed_step("Step 9 ❯ job delete"):
+            with timed_step("Step 8 ❯ job delete"):
                 self.cmd(
                     f"iot adr ns job delete -n {job_name} --ns {namespace_name} -g {rg} -y"
                 )
-                job_created = False
+                cleanup.dismiss("job")
                 self.cmd(
                     f"iot adr ns job show -n {job_name} --ns {namespace_name} -g {rg}",
                     expect_failure=True,
                 )
                 _log(LogKind.OK, "job deleted")
-
-        finally:
-            for run_name in list(run_names):
-                try:
-                    self.cmd(
-                        f"iot adr ns job run cancel -n {run_name} "
-                        f"--job-name {job_name} --ns {namespace_name} -g {rg} -y"
-                    )
-                except Exception:
-                    pass
-                try:
-                    self.cmd(
-                        f"iot adr ns job run delete -n {run_name} "
-                        f"--job-name {job_name} --ns {namespace_name} -g {rg} -y"
-                    )
-                except Exception:
-                    pass
-            if job_created:
-                try:
-                    self.cmd(
-                        f"iot adr ns job delete -n {job_name} "
-                        f"--ns {namespace_name} -g {rg} -y"
-                    )
-                except Exception:
-                    pass
-            if group_created:
-                try:
-                    self.cmd(
-                        f"iot adr ns group delete -n {group_name} "
-                        f"--ns {namespace_name} -g {rg} -y"
-                    )
-                except Exception:
-                    pass
-            self.cleanup_namespace(namespace_name, rg)
 
     def test_adr_onboarding_update_job_lifecycle(self):
         rg = TEST_RG
@@ -261,7 +235,7 @@ class TestADRJobLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
             )
             cleanup.register(
                 "namespace",
-                lambda: self.cmd(f"iot adr ns delete -n {namespace_name} -g {rg} -y"),
+                lambda: _delete_test_namespace(self, namespace_name, rg),
             )
             self.cmd(
                 f"iot adr ns job create -n {job_name} --ns {namespace_name} -g {rg} "
@@ -288,23 +262,22 @@ class TestADRJobLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
             assert "target" not in properties
             assert properties["definition"]["schedulingType"] == "Continuous"
 
+            # OnboardingUpdate has different execution prerequisites. Test its
+            # scheduling contract, not ADU failure semantics or cancellation.
+            future = _future_scheduled_time()
             run = self.cmd(
                 f"iot adr ns job schedule -n {job_name} "
-                f"--ns {namespace_name} -g {rg}"
+                f"--ns {namespace_name} -g {rg} --scheduled-time {future}"
             ).get_output_in_json()
-            delete_run = (
-                f"iot adr ns job run delete -n {run['name']} --job-name {job_name} "
-                f"--ns {namespace_name} -g {rg} -y"
+            run_scope = (
+                f"-n {run['name']} --job-name {job_name} --ns {namespace_name} -g {rg}"
             )
-            cancel_run = (
-                f"iot adr ns job run cancel -n {run['name']} --job-name {job_name} "
-                f"--ns {namespace_name} -g {rg} -y"
-            )
-            cleanup.register("run", lambda: self.cmd(delete_run))
-            cleanup.register("run cancellation", lambda: self.cmd(cancel_run))
-            self.cmd(cancel_run)
-            cleanup.dismiss("run cancellation")
-            self.cmd(delete_run)
+            cleanup.register("run", lambda: _delete_test_run(self, run_scope))
+            assert run["name"].startswith("run-")
+            run = _wait_for_run_statuses(self, run_scope, ("Scheduled",))
+            assert run["properties"]["provisioningState"] == "Succeeded"
+            assert run["properties"]["status"] == "Scheduled", run["properties"]
+            _delete_test_run(self, run_scope)
             cleanup.dismiss("run")
             self.cmd(
                 f"iot adr ns job delete -n {job_name} --ns {namespace_name} -g {rg} -y"
@@ -335,7 +308,7 @@ class TestADRJobValidation(ADRFullInfraHelper, ADRLiveScenarioTest):
                 )
                 cleanup.register(
                     "namespace",
-                    lambda: self.cmd(f"iot adr ns delete -n {namespace_name} -g {rg} -y"),
+                    lambda: _delete_test_namespace(self, namespace_name, rg),
                 )
                 self.cmd(
                     f"iot adr ns group create -n {group_name} --ns {namespace_name} -g {rg} "

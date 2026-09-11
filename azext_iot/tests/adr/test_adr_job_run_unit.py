@@ -397,15 +397,16 @@ def test_job_run_results_rejects_repeated_skip_token(fixture_job_run_provider):
 
 
 def test_job_run_cancel_waits_for_lro(fixture_job_run_provider, mock_poller):
-    fixture_job_run_provider.client.job_runs.begin_cancel.return_value = mock_poller(
-        {"status": "Canceled"}
-    )
+    # The generated SDK returns LROPoller[None], not an execution status.
+    poller = mock_poller(None)
+    poller.result.return_value = None
+    fixture_job_run_provider.client.job_runs.begin_cancel.return_value = poller
 
     result = fixture_job_run_provider.cancel(
         "job", "run", "namespace", "rg"
     )
 
-    assert result == {"status": "Canceled"}
+    assert result is None
     fixture_job_run_provider.client.job_runs.begin_cancel.assert_called_once_with(
         resource_group_name="rg",
         namespace_name="namespace",
