@@ -51,3 +51,16 @@ def test_dps_fixture_creates_in_configured_region(monkeypatch, mocker, managed, 
     assert "--resource-group unit-test-rg" in command
     if iot_hub:
         assert "hubname=existing-hub" in command
+
+
+def test_managed_dps_fixture_sets_disable_local_auth(monkeypatch, mocker):
+    cli = mocker.patch.object(dps_fixtures, "cli")
+    mocker.patch.object(dps_fixtures, "assign_iot_dps_dataplane_rbac_role")
+    mocker.patch.object(dps_fixtures, "_unlink_all_hubs")
+    mocker.patch.object(dps_fixtures, "sleep")
+    monkeypatch.setattr(dps_fixtures, "ENTITY_LOCATION", "westus")
+    monkeypatch.setattr(dps_fixtures, "ENTITY_RG", "unit-test-rg")
+
+    dps_fixtures._create_managed_dps("test-run", "dla", None, disable_local_auth=True)
+
+    assert "--disable-local-auth true" in cli.invoke.call_args.args[0]

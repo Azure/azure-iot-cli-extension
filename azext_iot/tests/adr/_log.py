@@ -8,8 +8,8 @@
 Dual-path logging for ADR integration tests.
 
 Emits colored output via ``print()`` when ``PRETTY_LOG=1`` is set in the
-environment; otherwise falls back to plain ``logger.warning()`` for standard
-pytest log capture.
+environment, escaping characters unsupported by the output stream; otherwise
+falls back to plain ``logger.warning()`` for standard pytest log capture.
 
 Usage::
 
@@ -23,6 +23,7 @@ the ``_STYLES`` dict below.  Call sites never reference prefixes or colors.
 import os
 import re
 import shlex
+import sys
 import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -139,6 +140,13 @@ def _pretty_log_enabled() -> bool:
     return os.environ.get("PRETTY_LOG") == "1"
 
 
+def _print_pretty(text: str) -> None:
+    encoding = getattr(sys.stdout, "encoding", None)
+    if encoding:
+        text = text.encode(encoding, errors="backslashreplace").decode(encoding)
+    print(text, flush=True)
+
+
 def _ts() -> str:
     """Return current UTC timestamp as a short string for log lines."""
     return datetime.now(timezone.utc).strftime("%H:%M:%S")
@@ -179,7 +187,7 @@ def _log(kind: str, msg: str = "", *args):
     if _pretty_log_enabled():
         text = full % args if args else full
         ansi = _ANSI.get(color, "")
-        print(f"{ansi}{text}{_ANSI_RESET}" if ansi else text, flush=True)
+        _print_pretty(f"{ansi}{text}{_ANSI_RESET}" if ansi else text)
     else:
         logger.warning(full, *args)
 
@@ -188,7 +196,7 @@ def _raw_log(msg: str = "", *args):
     """Emit a plain log line with no prefix or color."""
     if _pretty_log_enabled():
         text = msg % args if args else msg
-        print(text, flush=True)
+        _print_pretty(text)
     else:
         if msg:
             logger.warning(msg, *args)

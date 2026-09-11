@@ -52,8 +52,9 @@ MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries if settings.en
 #     never collide (DPS names also map to globally-unique DNS).
 #   * Tag each instance (intTest/runUid/kind/createdEpoch) so it can be discovered and garbage
 #     collected reliably without fragile name parsing.
-#   * Share a single instance per kind across all xdist workers of the same run (ref-counted), so a
-#     run only ever holds 2 instances (hub + no-hub) regardless of "-n".
+#   * Share a single instance per kind across all xdist workers of the same run (ref-counted).
+#     The parallel suite holds 2 instances (hub + no-hub); the RBAC suite runs separately and
+#     serially with 1 local-auth instance.
 #   * Delete our own instances at teardown once the last worker is done, and additionally GC any
 #     stale int-test instance older than ``DPS_GC_THRESHOLD_SECONDS`` (left behind by crashed runs).
 INT_TEST_DPS_PREFIX = "aziotcli-int-dps"
@@ -103,6 +104,14 @@ def provisioned_iot_dps_no_hub_module(request) -> Iterator[dict]:
         _iot_dps_removal(result)
 
 
+@pytest.fixture(scope="module")
+def provisioned_iot_dps_local_auth_module(request) -> Iterator[dict]:
+    result = _iot_dps_provisioner(request, managed_kind="dla", disable_local_auth=True)
+    yield result
+    if result:
+        _iot_dps_removal(result)
+
+
 def _get_run_uid(request) -> str:
     """Return an id that is identical for every worker of the same test run.
 
@@ -123,7 +132,7 @@ def _timestamp() -> str:
 # A single instance per kind is shared by every xdist worker of the same run. State is a small JSON
 # file (``{"name", "refcount"}``) guarded by a file lock so only the first worker creates the
 # resource and the last worker out deletes it. ``kind`` is one of "h" (hub-linked DPS), "nh"
-# (no-hub DPS) or "hub" (the shared IoT Hub).
+# (no-hub DPS), "dla" (local-auth DPS) or "hub" (the shared IoT Hub).
 def _state_paths(run_uid: str, kind: str):
     base = os.path.join(tempfile.gettempdir(), f"{INT_TEST_DPS_PREFIX}-{run_uid}-{kind}")
     return base + ".lock", base + ".json"
@@ -271,16 +280,24 @@ def _unlink_all_hubs(dps_name: str) -> None:
         )
 
 
-def _create_managed_dps(run_uid: str, kind: str, iot_hub: Optional[Dict]) -> tuple:
+def _create_managed_dps(
+    run_uid: str,
+    kind: str,
+    iot_hub: Optional[Dict],
+    disable_local_auth: Optional[bool] = None,
+) -> tuple:
     """Create a tagged, run-scoped DPS and perform one-time RBAC + hub linking (creator only)."""
     name = f"{INT_TEST_DPS_PREFIX}-{_timestamp()}-{run_uid[:8]}-{kind}"
     tags = f"intTest=true runUid={run_uid} kind={kind} createdEpoch={int(time())}"
     if iot_hub:
         tags += f" hubname={iot_hub['name']}"
-    target_dps = cli.invoke(
+    create_command = (
         f"iot dps create --name {name} --resource-group {ENTITY_RG} "
         f"--location {ENTITY_LOCATION} --tags {tags}"
-    ).as_json()
+    )
+    if disable_local_auth is not None:
+        create_command += f" --disable-local-auth {str(disable_local_auth).lower()}"
+    target_dps = cli.invoke(create_command).as_json()
     assign_iot_dps_dataplane_rbac_role(target_dps)
     if iot_hub:
         _link_hub(name, iot_hub)
@@ -298,10 +315,15 @@ def _create_unmanaged_dps(dps_name: str, iot_hub: Optional[Dict]) -> dict:
     return cli.invoke(base_command).as_json()
 
 
-def _iot_dps_provisioner(request, iot_hub: Optional[Dict] = None) -> dict:
+def _iot_dps_provisioner(
+    request,
+    iot_hub: Optional[Dict] = None,
+    managed_kind: Optional[str] = None,
+    disable_local_auth: Optional[bool] = None,
+) -> dict:
     """Create or reuse a device provisioning service for testing purposes."""
-    use_managed = not settings.env.azext_iot_testdps
-    kind = "h" if iot_hub else "nh"
+    use_managed = managed_kind is not None or not settings.env.azext_iot_testdps
+    kind = managed_kind or ("h" if iot_hub else "nh")
     run_uid = _get_run_uid(request)
 
     if use_managed:
@@ -309,7 +331,9 @@ def _iot_dps_provisioner(request, iot_hub: Optional[Dict] = None) -> dict:
         target_dps = _shared_acquire(
             run_uid,
             kind,
-            create_fn=lambda ru, k: _create_managed_dps(ru, k, iot_hub),
+            create_fn=lambda ru, k: _create_managed_dps(
+                ru, k, iot_hub, disable_local_auth=disable_local_auth
+            ),
             find_fn=_find_dps_by_name,
         )
         dps_name = target_dps["name"]

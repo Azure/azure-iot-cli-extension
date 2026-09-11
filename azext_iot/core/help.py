@@ -43,6 +43,19 @@ def patch_core_help():
   - name: Create an Azure IoT Hub Device Provisioning Service with a user-assigned identity
     text: >
         az iot dps create --name MyDps --resource-group MyResourceGroup --mi-user-assigned IdentityResourceId
+  - name: Create an Azure IoT Hub Device Provisioning Service with SAS key (local) authentication disabled, requiring Azure RBAC
+    text: >
+        az iot dps create --name MyDps --resource-group MyResourceGroup --disable-local-auth
+"""
+
+    # add DPS update example for local authentication
+    if "iot dps update" in helps:
+        helps[
+            "iot dps update"
+        ] += """
+  - name: Disable SAS key (local) authentication on an existing Device Provisioning Service, requiring Azure RBAC
+    text: >
+        az iot dps update --name MyDps --resource-group MyResourceGroup --disable-local-auth
 """
 
     # add DPS identity help
