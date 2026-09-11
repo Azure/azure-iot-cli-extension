@@ -120,8 +120,9 @@ jobs:
           # --- Service registry: service|test_dir|tox_env|timeout ---
           all_services=(
             "DPS|azext_iot/tests/dps|DPS-int|45"
-            "HubMgmt|azext_iot/tests/iothub|HubMgmt-int|60"
-            "HubData|azext_iot/tests/iothub|HubData-int|60"
+            # Successful Hub suites include more than 90 minutes of shared resource lifecycles.
+            "HubMgmt|azext_iot/tests/iothub|HubMgmt-int|120"
+            "HubData|azext_iot/tests/iothub|HubData-int|120"
             "ADU|azext_iot/tests/deviceupdate|ADU-int|200"
             "ADR|azext_iot/tests/adr|ADR-int|75"
           )

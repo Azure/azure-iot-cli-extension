@@ -38,6 +38,8 @@ cli = EmbeddedCLI()
 DATAPLANE = "configurations devices"
 CONTROLPLANE = "arm"
 MAX_RETRIES = 5
+# An isolated consumer owns both cold setup and shared cleanup, not just the command under test.
+CONTROLPLANE_LIFECYCLE_TIMEOUT = 45 * 60
 
 
 def _invoke_state(command: str) -> EmbeddedCLI:
@@ -277,6 +279,7 @@ def delete_system_endpoints(hub_name, rg):
 
 
 @pytest.mark.hub_infrastructure(count=2, sys_identity=True, user_identity=True, storage=True, desired_tags="abc=def")
+@pytest.mark.timeout(CONTROLPLANE_LIFECYCLE_TIMEOUT, func_only=False)
 def test_migrate_controlplane(setup_hub_states_controlplane):
     origin_name = setup_hub_states_controlplane[0]["name"]
     origin_rg = setup_hub_states_controlplane[0]["rg"]
@@ -316,6 +319,7 @@ def test_migrate_dataplane(setup_hub_states_dataplane):
 @pytest.mark.hub_infrastructure(
     count=1, sys_identity=True, user_identity=True, storage=True, desired_tags="abc=def", system_endpoints=False
 )
+@pytest.mark.timeout(CONTROLPLANE_LIFECYCLE_TIMEOUT, func_only=False)
 def test_migrate_controlplane_with_create(setup_hub_states_controlplane):
     """
     Try using migrate to create new hubs. One hub is needed, two new hubs will be created.
@@ -362,6 +366,7 @@ def test_mirgate_hub_dataplane_error(provisioned_only_iot_hubs_module):
 
 
 @pytest.mark.hub_infrastructure(count=1, sys_identity=True, user_identity=True, storage=True, desired_tags="abc=def")
+@pytest.mark.timeout(CONTROLPLANE_LIFECYCLE_TIMEOUT, func_only=False)
 def test_export_import_controlplane(setup_hub_states_controlplane):
     filename = setup_hub_states_controlplane[0]["filename"]
     hub_name = setup_hub_states_controlplane[0]["name"]
@@ -384,6 +389,7 @@ def test_export_import_controlplane(setup_hub_states_controlplane):
 @pytest.mark.hub_infrastructure(
     count=1, sys_identity=True, user_identity=True, storage=True, desired_tags="abc=def", system_endpoints=False
 )
+@pytest.mark.timeout(CONTROLPLANE_LIFECYCLE_TIMEOUT, func_only=False)
 def test_export_import_controlplane_with_create(setup_hub_states_controlplane):
     """
     Try using export/import to create new hubs. One hub is needed, one new hub will be created.
@@ -1116,6 +1122,8 @@ def test_export_endpoint_resource_name_starting_with_scheme_char(
 
 
 @pytest.mark.hub_infrastructure(count=1)
+# This last item includes shared module teardown; a passing lifecycle exceeded 35 minutes.
+@pytest.mark.timeout(45 * 60, func_only=False)
 def test_export_cosmosdb_endpoint_resource_name_starting_with_scheme_char(
     provisioned_only_iot_hubs_module, setup_file
 ):

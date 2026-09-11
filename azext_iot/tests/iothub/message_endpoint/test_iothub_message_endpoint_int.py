@@ -1404,6 +1404,8 @@ def test_iot_fabric_eventstream_endpoint_lifecycle(provisioned_event_hub_with_id
     assert fabric_list == []
 
 
+# The successful baseline needed over 27 minutes for this body and shared module teardown.
+@pytest.mark.timeout(35 * 60, func_only=False)
 def test_iot_endpoint_force_delete(provisioned_service_bus_with_identity_module):
     # this test covers two endpoint types
     iot_hub_objs, servicebus_obj = provisioned_service_bus_with_identity_module
