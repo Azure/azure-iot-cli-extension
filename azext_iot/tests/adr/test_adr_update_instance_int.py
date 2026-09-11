@@ -4,7 +4,10 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import re
+
 import pytest
+from azure.cli.core.azclierror import InvalidArgumentValueError, RequiredArgumentMissingError
 
 from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import (
@@ -177,12 +180,21 @@ class TestADRUpdateInstanceLifecycle(ADRLiveScenarioTest):
 @pytest.mark.usefixtures("set_cwd")
 class TestADRUpdateInstanceValidation(ADRLiveScenarioTest):
     def test_update_instance_validation_negatives(self):
-        self.cmd(
-            "iot adr ns su instance update -n missing-instance " f"-g {TEST_RG}",
-            expect_failure=True,
-        )
-        self.cmd(
-            "iot adr ns su instance update -n missing-instance "
-            f"-g {TEST_RG} --user-assigned-mi not-an-arm-id",
-            expect_failure=True,
-        )
+        with pytest.raises(
+            RequiredArgumentMissingError,
+            match="^" + re.escape(
+                "Nothing to update. Provide --tags, --system-assigned-mi, "
+                "or --user-assigned-mi."
+            ) + "$",
+        ):
+            self.cmd(f"iot adr ns su instance update -n missing-instance -g {TEST_RG}")
+        with pytest.raises(
+            InvalidArgumentValueError,
+            match="^" + re.escape(
+                "'not-an-arm-id' is not a valid user-assigned managed identity resource ID."
+            ) + "$",
+        ):
+            self.cmd(
+                "iot adr ns su instance update -n missing-instance "
+                f"-g {TEST_RG} --user-assigned-mi not-an-arm-id"
+            )
