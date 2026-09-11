@@ -38,4 +38,5 @@ def test_preview_integration_environments_bound_each_test_and_select_only_integr
     assert "--timeout=900" in command
     assert "-o faulthandler_timeout=300" in command
     assert "-k _int.py " in command
+    assert "PYTHONUNBUFFERED=1" in {line.strip() for line in section["setenv"].splitlines()}
     assert "pytest-timeout" in (root / "dev_requirements").read_text(encoding="utf-8")
