@@ -39,6 +39,13 @@ CONTROLPLANE = "arm"
 MAX_RETRIES = 5
 
 
+def _invoke_state(command: str) -> EmbeddedCLI:
+    result = cli.invoke(command, capture_stderr=True)
+    if not result.success():
+        raise CLIInternalError(f"IoT Hub state command failed with exit code {result.error_code}.")
+    return result
+
+
 def generate_device_names(count, edge=False):
     prefix = "d" if not edge else "e"
     names = [
@@ -277,9 +284,9 @@ def test_migrate_controlplane(setup_hub_states_controlplane):
     origin_rg = setup_hub_states_controlplane[0]["rg"]
     dest_name = setup_hub_states_controlplane[1]["name"]
 
-    cli.invoke(
+    _invoke_state(
         f"iot hub state migrate --origin-hub {origin_name} --origin-resource-group {origin_rg} "
-        f"--destination-hub {dest_name} --destination-resource-group {origin_rg} -r --aspects {CONTROLPLANE}"
+        f"--destination-hub {dest_name} --destination-resource-group {origin_rg} -r --aspects {CONTROLPLANE}",
     )
 
     time.sleep(1)  # gives the hub time to update before the checks
@@ -294,13 +301,13 @@ def test_migrate_dataplane(setup_hub_states_dataplane):
     dest_name = setup_hub_states_dataplane[1]["name"]
     dest_auth = _hub_auth(setup_hub_states_dataplane[1])
     for auth_phase in DATAPLANE_AUTH_TYPES:
-        cli.invoke(
+        _invoke_state(
             set_cmd_auth_type(
                 f"iot hub state migrate --origin-hub {origin_name} --origin-resource-group {origin_rg} "
                 f"--destination-hub {dest_name} --destination-resource-group {origin_rg} -r --aspects {DATAPLANE}",
                 auth_type=auth_phase,
                 cstring=None
-            )
+            ),
         )
 
         time.sleep(1)  # gives the hub time to update before the checks
@@ -322,18 +329,18 @@ def test_migrate_controlplane_with_create(setup_hub_states_controlplane):
     # ensure that there are no system endpoints
     delete_system_endpoints(origin_name, origin_rg)
 
-    cli.invoke(
+    _invoke_state(
         f"iot hub state migrate --origin-hub {origin_name} --origin-resource-group {origin_rg} "
-        f"--destination-hub {dest_name} --destination-resource-group {origin_rg} -r --aspects {CONTROLPLANE}"
+        f"--destination-hub {dest_name} --destination-resource-group {origin_rg} -r --aspects {CONTROLPLANE}",
     )
 
     # default the destination rg
     dest_name2 = generate_hub_id()
     setup_hub_states_controlplane.append({"name": dest_name2})
 
-    cli.invoke(
+    _invoke_state(
         f"iot hub state migrate --origin-hub {origin_name} --origin-resource-group {origin_rg} "
-        f"--destination-hub {dest_name} -r --aspects {CONTROLPLANE}"
+        f"--destination-hub {dest_name} -r --aspects {CONTROLPLANE}",
     )
 
     time.sleep(1)  # gives the hub time to update before the checks
@@ -363,14 +370,14 @@ def test_export_import_controlplane(setup_hub_states_controlplane):
     hub_rg = setup_hub_states_controlplane[0]["rg"]
     hub_location = setup_hub_states_controlplane[0]["hub"]["location"]
 
-    cli.invoke(
-        f"iot hub state export -n {hub_name} -f {filename} -g {hub_rg} -r --aspects {CONTROLPLANE}"
+    _invoke_state(
+        f"iot hub state export -n {hub_name} -f {filename} -g {hub_rg} -r --aspects {CONTROLPLANE}",
     )
     compare_hub_controlplane_to_file(filename, hub_name, hub_rg)
     clean_up_hub_controlplane(hub_name, hub_rg, hub_location)
     time.sleep(5)
-    cli.invoke(
-        f"iot hub state import -n {hub_name} -f {filename} -g {hub_rg} -r --aspects {CONTROLPLANE}"
+    _invoke_state(
+        f"iot hub state import -n {hub_name} -f {filename} -g {hub_rg} -r --aspects {CONTROLPLANE}",
     )
     time.sleep(10)  # gives the hub time to update before the checks
     compare_hub_controlplane_to_file(filename, hub_name, hub_rg)
@@ -391,13 +398,13 @@ def test_export_import_controlplane_with_create(setup_hub_states_controlplane):
     # ensure that there are no system endpoints
     delete_system_endpoints(hub_name, hub_rg)
 
-    cli.invoke(
-        f"iot hub state export -n {hub_name} -f {filename} -g {hub_rg} -r --aspects {CONTROLPLANE}"
+    _invoke_state(
+        f"iot hub state export -n {hub_name} -f {filename} -g {hub_rg} -r --aspects {CONTROLPLANE}",
     )
     compare_hub_controlplane_to_file(filename, hub_name, hub_rg)
     time.sleep(5)
-    cli.invoke(
-        f"iot hub state import -n {dest_name} -f {filename} -g {hub_rg} -r --aspects {CONTROLPLANE}"
+    _invoke_state(
+        f"iot hub state import -n {dest_name} -f {filename} -g {hub_rg} -r --aspects {CONTROLPLANE}",
     )
     time.sleep(10)  # gives the hub time to update before the checks
     compare_hub_controlplane_to_file(filename, dest_name, hub_rg)
@@ -424,8 +431,8 @@ def test_custom_scenarios_controlplane(provisioned_only_iot_hubs_module, provisi
     )
     time.sleep(60)
 
-    cli.invoke(
-        f"iot hub state export -n {hub_name} -f {setup_file} -g {hub_rg} -r --aspects {CONTROLPLANE}"
+    _invoke_state(
+        f"iot hub state export -n {hub_name} -f {setup_file} -g {hub_rg} -r --aspects {CONTROLPLANE}",
     )
 
     # check that the file does not have said props
@@ -443,24 +450,24 @@ def test_export_import_dataplane(setup_hub_states_dataplane):
     hub_rg = setup_hub_states_dataplane[0]["rg"]
     hub_auth = _hub_auth(setup_hub_states_dataplane[0])
     for auth_phase in DATAPLANE_AUTH_TYPES:
-        cli.invoke(
+        _invoke_state(
             set_cmd_auth_type(
                 f"iot hub state export -n {hub_name} -f {filename} -g {hub_rg} -r --aspects {DATAPLANE}",
                 auth_type=auth_phase,
                 cstring=None
-            )
+            ),
         )
         compare_hub_dataplane_to_file(filename, hub_auth)
 
     for auth_phase in DATAPLANE_AUTH_TYPES:
         clean_up_hub_dataplane(hub_auth)
         time.sleep(5)
-        cli.invoke(
+        _invoke_state(
             set_cmd_auth_type(
                 f"iot hub state import -n {hub_name} -f {filename} -g {hub_rg} -r --aspects {DATAPLANE}",
                 auth_type=auth_phase,
                 cstring=None
-            )
+            ),
         )
         time.sleep(10)  # gives the hub time to update before the checks
         compare_hub_dataplane_to_file(filename, hub_auth)
@@ -1094,8 +1101,8 @@ def test_export_endpoint_resource_name_starting_with_scheme_char(
         )
         time.sleep(10)  # gives the hub time to update before the export
 
-        cli.invoke(
-            f"iot hub state export -n {hub_name} -f {setup_file} -g {hub_rg} -r --aspects {CONTROLPLANE}"
+        _invoke_state(
+            f"iot hub state export -n {hub_name} -f {setup_file} -g {hub_rg} -r --aspects {CONTROLPLANE}",
         )
 
         with open(setup_file, "r", encoding="utf-8") as f:
@@ -1147,8 +1154,8 @@ def test_export_cosmosdb_endpoint_resource_name_starting_with_scheme_char(
         )
         time.sleep(10)  # gives the hub time to update before the export
 
-        cli.invoke(
-            f"iot hub state export -n {hub_name} -f {setup_file} -g {hub_rg} -r --aspects {CONTROLPLANE}"
+        _invoke_state(
+            f"iot hub state export -n {hub_name} -f {setup_file} -g {hub_rg} -r --aspects {CONTROLPLANE}",
         )
 
         with open(setup_file, "r", encoding="utf-8") as f:
