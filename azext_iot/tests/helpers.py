@@ -175,6 +175,8 @@ def get_role_assignments(
     scope: str,
     assignee: str = None,
     role: str = None,
+    *,
+    fill_role_definition_name: bool = True,
 ) -> List[dict]:
     """
     Get rbac permissions of resource.
@@ -188,9 +190,10 @@ def get_role_assignments(
     if assignee:
         assignee_flag = '--assignee "{}"'.format(assignee)
 
-    return cli.invoke(
-        f'role assignment list --scope "{scope}" {role_flag} {assignee_flag}'
-    ).as_json()
+    command = f'role assignment list --scope "{scope}" {role_flag} {assignee_flag}'
+    if not fill_role_definition_name:
+        command += " --fill-role-definition-name false"
+    return cli.invoke(command).as_json()
 
 
 def assign_role_assignment(
@@ -209,7 +212,8 @@ def assign_role_assignment(
     expected_principals = {assignee}
     for attempt in range(max_tries + 1):
         flat_assignment_kpis = []
-        role_assignments = get_role_assignments(scope=scope, role=role)
+        # Visibility checks do not need the CLI's additional role-definition name enumeration.
+        role_assignments = get_role_assignments(scope=scope, role=role, fill_role_definition_name=False)
         logger.info(f"Role assignments for the role of '{role}' against scope '{scope}': {role_assignments}")
         for role_assignment in role_assignments:
             for principal_kpi in principal_kpis:

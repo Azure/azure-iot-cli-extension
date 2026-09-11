@@ -330,6 +330,26 @@ class TestHandleC2DMsg:
 
 
 class TestSimulateDevice:
+    @pytest.mark.parametrize("operation", ["simulate_device", "device_send_message"])
+    @pytest.mark.parametrize("auth_args", [
+        {"certificate_file": "certificate.pem"},
+        {"key_file": "key.pem"},
+        {"passphrase": "passphrase"},
+    ])
+    def test_incomplete_x509_auth_preserves_validation_error(self, mocker, operation, auth_args):
+        p = _provider(mocker)
+        mqtt = mocker.patch("azext_iot.iothub.providers.mqtt.MQTTProvider")
+        lookup = mocker.patch(f"{dm_path}._iot_device_show")
+
+        with pytest.raises(
+            RequiredArgumentMissingError,
+            match="Both 'certificate-file' and 'key-file' required",
+        ):
+            getattr(p, operation)(**auth_args)
+
+        mqtt.assert_not_called()
+        lookup.assert_not_called()
+
     def test_simulate_mqtt_invalid_settle(self, mocker):
         p = _provider(mocker)
         with pytest.raises(InvalidArgumentValueError):
