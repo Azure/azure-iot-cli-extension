@@ -5,8 +5,8 @@
 # --------------------------------------------------------------------------------------------
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
-from time import sleep
 from azext_iot.common.utility import generate_key
+from azext_iot.tests.helpers import wait_for_assertion
 from azext_iot.tests.iothub import (
     DATAPLANE_AUTH_TYPES,
     PRIMARY_THUMBPRINT,
@@ -190,17 +190,15 @@ class TestIoTHubModules(IoTLiveScenarioTest):
                     query_checks.append(self.exists("[?moduleId=='$edgeAgent']"))
                     query_checks.append(self.exists("[?moduleId=='$edgeHub']"))
 
-                # wait for API to catch up before query
-                sleep(10)
-
-                # Query device modules. Edge devices include the $edgeAgent and $edgeHub system modules.
-                module_query_result = self.cmd(
-                    self.set_cmd_auth_type(
-                        f"iot hub query -n {self.host_name} -g {self.entity_rg} "
-                        f"-q \"select * from devices.modules where devices.deviceId='{device_ids[0]}'\"",
-                        auth_type=auth_phase,
-                    ),
-                    checks=query_checks,
+                module_query_result = wait_for_assertion(
+                    lambda: self.cmd(
+                        self.set_cmd_auth_type(
+                            f"iot hub query -n {self.host_name} -g {self.entity_rg} "
+                            f"-q \"select * from devices.modules where devices.deviceId='{device_ids[0]}'\"",
+                            auth_type=auth_phase,
+                        ),
+                        checks=query_checks,
+                    )
                 ).get_output_in_json()
 
                 target_module_count = (

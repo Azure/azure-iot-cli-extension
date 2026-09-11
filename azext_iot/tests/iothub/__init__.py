@@ -13,7 +13,8 @@ from azext_iot.tests.helpers import (
     assign_role_assignment,
     clean_up_iothub_device_config,
     create_storage_account,
-    set_cmd_auth_type
+    set_cmd_auth_type,
+    wait_for_assertion,
 )
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 from azext_iot.tests.generators import generate_generic_id
@@ -93,8 +94,11 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                     )
                 sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
 
-        target_hub = self.cmd(
-            "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg)
+        target_hub = wait_for_assertion(
+            lambda: self.cmd(
+                "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg),
+                checks=[self.exists("id"), self.exists("properties.hostName")],
+            )
         ).get_output_in_json()
 
         if add_data_contributor:

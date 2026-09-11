@@ -10,6 +10,7 @@ import tarfile
 from shutil import rmtree
 from os.path import exists
 from azext_iot.tests.iothub import IoTLiveScenarioTest
+from azext_iot.tests.helpers import wait_for_assertion
 
 
 class EdgeDevicesTestConfig(NamedTuple):
@@ -275,12 +276,15 @@ class TestNestedEdgeHierarchy(IoTLiveScenarioTest):
         cert_auth: bool = False,
         custom_device_template: bool = False,
     ):
-        # get all devices in hub
-        device_list = self.cmd(
-            f"iot hub device-identity list -n {self.entity_name} -g {self.entity_rg}"
-        ).get_output_in_json()
-        # make sure all devices were created
-        assert len(device_list) == len(devices)
+        expected_device_ids = {device.id for device in devices}
+
+        def get_device_list():
+            device_list = self.cmd(
+                f"iot hub device-identity list -n {self.entity_name} -g {self.entity_rg}"
+            ).get_output_in_json()
+            assert {device["deviceId"] for device in device_list} == expected_device_ids
+
+        wait_for_assertion(get_device_list)
         # validate each device
         for device_tuple in devices:
             device_id = device_tuple.id

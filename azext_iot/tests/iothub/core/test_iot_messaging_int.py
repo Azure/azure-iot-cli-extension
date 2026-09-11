@@ -13,6 +13,7 @@ from uuid import uuid4
 from azext_iot.iothub.common import NON_DECODABLE_PAYLOAD
 from azext_iot.tests.conftest import get_context_path
 from azext_iot.tests.iothub import IoTLiveScenarioTest, PREFIX_DEVICE
+from azext_iot.tests.helpers import wait_for_assertion
 from azext_iot.common.utility import (
     execute_onthread,
     calculate_millisec_since_unix_epoch_utc,
@@ -1097,6 +1098,18 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         query_string = "select * from devices where deviceId in [{}]".format(
             device_include_string
         )
+
+        expected_device_ids = set(device_subset_include)
+
+        def assert_query_ready():
+            devices = self.cmd(
+                'iot hub query -n {} -g {} -q "{}"'.format(
+                    self.entity_name, self.entity_rg, query_string
+                )
+            ).get_output_in_json()
+            assert {device["deviceId"] for device in devices} == expected_device_ids
+
+        wait_for_assertion(assert_query_ready)
 
         self.command_execute_assert(
             'iot hub monitor-events -n {} -g {} --device-query "{}" --et {} -t 8 -y -p sys anno app'.format(

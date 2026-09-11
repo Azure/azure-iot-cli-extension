@@ -6,6 +6,7 @@
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests.helpers import wait_for_assertion
 from azext_iot.common.utility import generate_key
 from azext_iot.tests.iothub import (
     DATAPLANE_AUTH_TYPES,
@@ -242,12 +243,14 @@ class TestIoTHubDevices(IoTLiveScenarioTest):
                     query_checks.append(self.exists(f"[?deviceId=='{d}']"))
 
                 # By default query has no return cap
-                self.cmd(
-                    self.set_cmd_auth_type(
-                        f'iot hub query --hub-name {self.host_name} -g {self.entity_rg} -q "select * from devices"',
-                        auth_type=auth_phase,
-                    ),
-                    checks=query_checks,
+                wait_for_assertion(
+                    lambda: self.cmd(
+                        self.set_cmd_auth_type(
+                            f'iot hub query --hub-name {self.host_name} -g {self.entity_rg} -q "select * from devices"',
+                            auth_type=auth_phase,
+                        ),
+                        checks=query_checks,
+                    )
                 )
 
                 # -1 Top is equivalent to unlimited

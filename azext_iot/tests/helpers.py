@@ -8,7 +8,7 @@ import json
 import os
 
 from inspect import getsourcefile
-from time import sleep
+from time import monotonic, sleep
 from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.common.shared import AuthenticationTypeDataplane
@@ -245,12 +245,26 @@ def delete_role_assignment(
     )
 
 
+def wait_for_assertion(check, timeout=300, poll_interval=5):
+    deadline = monotonic() + timeout
+    while True:
+        try:
+            return check()
+        except AssertionError:
+            if monotonic() >= deadline:
+                raise
+            sleep(poll_interval)
+
+
 def clean_up_iothub_device_config(
     hub_name: str,
     rg: str
 ):
     from time import sleep
     import logging
+    from azext_iot._factory import SdkResolver
+    from azext_iot.common.shared import SdkType
+    from azext_iot.iothub.providers.discovery import IotHubDiscovery
     logger = logging.getLogger(__name__)
 
     def _list_with_retry(command, retries=3, delay=30):
@@ -266,7 +280,7 @@ def clean_up_iothub_device_config(
                 if attempt < retries - 1:
                     sleep(delay)
         logger.warning("List command failed after %d retries: %s — %s", retries, command, last_exc)
-        return []
+        raise last_exc
 
     def _delete_with_retry(command, retries=3, delay=30):
         last_exc = None
@@ -281,12 +295,15 @@ def clean_up_iothub_device_config(
                 if attempt < retries - 1:
                     sleep(delay)
         logger.warning("Delete command failed after %d retries: %s — %s", retries, command, last_exc)
+        raise last_exc
 
-    device_list = [
-        d["deviceId"] for d in _list_with_retry(
-            f"iot hub device-twin list -n {hub_name} -g {rg}"
-        )
-    ]
+    cstring = cli.invoke(
+        f"iot hub connection-string show -n {hub_name} -g {rg} --policy-name iothubowner"
+    ).as_json()["connectionString"]
+    devices = SdkResolver(
+        IotHubDiscovery.get_target_by_cstring(cstring)
+    ).get_sdk(SdkType.service_sdk).devices
+    device_list = devices.get_devices(top=1000)
 
     deployment_list = [
         c["id"] for c in _list_with_retry(
@@ -301,11 +318,13 @@ def clean_up_iothub_device_config(
     ]
 
     for device in device_list:
-        _delete_with_retry(
-            "iot hub device-identity delete -d {} -n {} -g {}".format(
-                device, hub_name, rg
-            )
-        )
+        devices.delete_identity(id=device.device_id, if_match="*")
+
+    def assert_devices_deleted():
+        remaining = [device.device_id for device in devices.get_devices(top=1000)]
+        assert not remaining, f"Devices were not deleted: {remaining}"
+
+    wait_for_assertion(assert_devices_deleted, timeout=60, poll_interval=2)
 
     for deployment in deployment_list:
         _delete_with_retry(
@@ -320,6 +339,12 @@ def clean_up_iothub_device_config(
                 config, hub_name, rg
             )
         )
+
+    def assert_configurations_deleted():
+        assert not _list_with_retry(f"iot edge deployment list -n {hub_name} -g {rg}")
+        assert not _list_with_retry(f"iot hub configuration list -n {hub_name} -g {rg}")
+
+    wait_for_assertion(assert_configurations_deleted, timeout=60, poll_interval=2)
 
 
 def create_test_cert(

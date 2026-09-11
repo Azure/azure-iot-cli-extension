@@ -7,6 +7,7 @@
 import json
 from datetime import datetime, timedelta, timezone
 
+from azext_iot.tests.helpers import wait_for_assertion
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES, IoTLiveScenarioTest
 
 
@@ -30,6 +31,8 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
                         auth_type=auth_phase,
                     )
                 )
+
+            self._wait_for_query_devices(device_ids_twin_tags + device_ids_twin_props, auth_phase)
 
             # Focus is on scheduleUpdateTwin jobs until we improve JIT device simulation
 
@@ -59,12 +62,14 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             )
 
             for device_id in device_ids_twin_tags:
-                self.cmd(
-                    self.set_cmd_auth_type(
-                        f"iot hub device-twin show -d {device_id} -n {self.host_name} -g {self.entity_rg}",
-                        auth_type=auth_phase,
-                    ),
-                    checks=[self.check("tags", json.loads(self.kwargs["twin_patch_tags"])["tags"])],
+                wait_for_assertion(
+                    lambda device_id=device_id: self.cmd(
+                        self.set_cmd_auth_type(
+                            f"iot hub device-twin show -d {device_id} -n {self.host_name} -g {self.entity_rg}",
+                            auth_type=auth_phase,
+                        ),
+                        checks=[self.check("tags", json.loads(self.kwargs["twin_patch_tags"])["tags"])],
+                    )
                 )
 
             # Update twin desired properties
@@ -238,6 +243,22 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             ).get_output_in_json()
 
             self.validate_job_list(jobs_set=job_result_set)
+
+    def _wait_for_query_devices(self, device_ids, auth_phase):
+        expected_ids = set(device_ids)
+        query_condition = "deviceId in ['{}']".format("','".join(device_ids))
+
+        def check():
+            devices = self.cmd(
+                self.set_cmd_auth_type(
+                    f'iot hub query -q "select deviceId from devices where {query_condition}" '
+                    f"-n {self.host_name} -g {self.entity_rg}",
+                    auth_type=auth_phase,
+                )
+            ).get_output_in_json()
+            assert {device["deviceId"] for device in devices} == expected_ids
+
+        wait_for_assertion(check)
 
     def validate_job_list(self, jobs_set):
         filtered_job_ids_result = {}

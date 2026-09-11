@@ -10,6 +10,7 @@ from knack.cli import CLIError
 from azure.cli.core.azclierror import ArgumentUsageError, CLIInternalError
 from azext_iot.operations import hub as subject
 from azext_iot.tests.generators import generate_generic_id
+from azext_iot.tests import helpers
 
 
 def generate_valid_cs(validate_pairs=[]):
@@ -37,6 +38,17 @@ def generate_valid_cs(validate_pairs=[]):
         "policy": policy,
         "key": shared_access_key
     }
+
+
+def test_wait_for_assertion(mocker):
+    check = mocker.Mock(side_effect=[AssertionError(), "ready"])
+    mocker.patch("azext_iot.tests.helpers.sleep")
+    assert helpers.wait_for_assertion(check, timeout=1, poll_interval=0.1) == "ready"
+
+    check = mocker.Mock(side_effect=AssertionError("not ready"))
+    mocker.patch("azext_iot.tests.helpers.monotonic", side_effect=[0, 1])
+    with pytest.raises(AssertionError, match="not ready"):
+        helpers.wait_for_assertion(check, timeout=1, poll_interval=0)
 
 
 class TestGenerateSasToken:
