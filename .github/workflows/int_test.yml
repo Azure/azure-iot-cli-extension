@@ -123,7 +123,7 @@ jobs:
             "HubMgmt|azext_iot/tests/iothub|HubMgmt-int|60"
             "HubData|azext_iot/tests/iothub|HubData-int|60"
             "ADU|azext_iot/tests/deviceupdate|ADU-int|200"
-            "ADR|azext_iot/tests/adr|ADR-int|60"
+            "ADR|azext_iot/tests/adr|ADR-int|75"
           )
 
           # --- Determine which services to include ---
