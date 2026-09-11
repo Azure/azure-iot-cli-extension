@@ -7,6 +7,7 @@
 from pathlib import Path
 import json
 import runpy
+import re
 
 import pytest
 import yaml
@@ -134,3 +135,12 @@ def test_workflow_failure_propagation_is_wired():
     summaries = [step for step in jobs["combine-coverage"]["steps"] if step["name"] == "Write job summary"]
     assert summaries[0] is jobs["combine-coverage"]["steps"][-1]
     assert "job.status" in summaries[0]["env"]["COVERAGE_RESULT"]
+
+
+def test_hub_job_budgets_accommodate_the_successful_full_suite_baseline():
+    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
+    jobs = workflow["jobs"]
+    matrix = next(step for step in jobs["setup"]["steps"] if step.get("id") == "matrix")
+    budgets = dict(re.findall(r'"(HubMgmt|HubData)\|[^"]+\|(\d+)"', matrix["run"]))
+    assert budgets == {"HubMgmt": "120", "HubData": "120"}
+    assert jobs["int-test"]["timeout-minutes"] == "${{ matrix.config.timeout }}"
