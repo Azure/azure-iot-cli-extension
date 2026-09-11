@@ -24,6 +24,25 @@ from azext_iot.tests.dps.device_registration import check_hub_device
 from azext_iot.tests import helpers
 
 
+@pytest.mark.parametrize("fill_role_definition_name", [None, True, False])
+def test_role_assignment_listing_can_skip_unused_role_names(mocker, fill_role_definition_name):
+    cli = mocker.patch.object(helpers, "cli")
+    assignments = [{"principalId": "principal", "roleDefinitionId": "/roles/role"}]
+    cli.invoke.return_value.as_json.return_value = assignments
+    options = {} if fill_role_definition_name is None else {
+        "fill_role_definition_name": fill_role_definition_name,
+    }
+
+    assert helpers.get_role_assignments("/scope", assignee="principal", role="role", **options) is assignments
+
+    command = cli.invoke.call_args.args[0]
+    assert '--scope "/scope"' in command
+    assert '--assignee "principal"' in command
+    assert '--role "role"' in command
+    assert ("--fill-role-definition-name false" in command) is (fill_role_definition_name is False)
+    assert "--fill-principal-name" not in command
+
+
 @pytest.mark.parametrize("managed_identity", [False, True])
 def test_required_grant_surfaces_original_cli_error_without_waiting(mocker, managed_identity):
     error = HttpResponseError(
@@ -56,10 +75,11 @@ def test_required_grant_surfaces_original_cli_error_without_waiting(mocker, mana
 
 @pytest.mark.parametrize("principal_field", ["name", "principalId", "principalName"])
 def test_required_grant_reuses_visible_assignment(mocker, principal_field):
-    mocker.patch.object(helpers, "get_role_assignments", return_value=[{principal_field: "principal"}])
+    lookup = mocker.patch.object(helpers, "get_role_assignments", return_value=[{principal_field: "principal"}])
     cli = mocker.patch.object(helpers, "cli")
     sleep = mocker.patch.object(helpers, "sleep")
     helpers.assign_role_assignment("role", "/scope", "principal")
+    lookup.assert_called_once_with(scope="/scope", role="role", fill_role_definition_name=False)
     cli.invoke.assert_not_called()
     sleep.assert_not_called()
 

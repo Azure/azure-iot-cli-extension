@@ -15,6 +15,7 @@ from azext_iot.common.utility import (
 )
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
+    AzCLIError,
     CLIInternalError,
     FileOperationError,
     InvalidArgumentValueError,
@@ -442,6 +443,8 @@ class DeviceMessagingProvider(IoTHubProvider):
 
         except KeyboardInterrupt:
             sys.exit()
+        except AzCLIError:
+            raise
         except Exception as x:
             raise CLIInternalError(x)
         finally:
