@@ -268,3 +268,16 @@ def test_context_success_shuts_down_once(mock_device_client):
         client.send_d2c_message("message")
     provider.device_client.send_message.assert_called_once()
     provider.device_client.shutdown.assert_called_once()
+
+
+def test_cleanup_failure_is_not_suppressed_by_an_unrelated_outer_exception(mock_device_client):
+    from azure.iot.device.exceptions import ClientError
+
+    provider = _make_provider(mock_device_client)
+    provider.device_client.shutdown.side_effect = ClientError("cleanup")
+    try:
+        raise ValueError("previous unrelated operation")
+    except ValueError:
+        with pytest.raises(AzureResponseError, match="MQTT client cleanup failed"):
+            with provider:
+                pass
