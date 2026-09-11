@@ -13,6 +13,7 @@ from pathlib import Path
 from azext_iot.common.shared import DeviceAuthApiType
 
 from azext_iot.common.embedded_cli import EmbeddedCLI
+from azext_iot.tests.iothub._integration_helpers import invoke_checked
 from azext_iot.tests.iothub.conftest import assign_iot_hub_dataplane_rbac_role, generate_hub_id
 from azext_iot.tests.settings import (
     DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL, HUB_TEST_LOCATION
@@ -40,10 +41,7 @@ MAX_RETRIES = 5
 
 
 def _invoke_state(command: str) -> EmbeddedCLI:
-    result = cli.invoke(command, capture_stderr=True)
-    if not result.success():
-        raise CLIInternalError(f"IoT Hub state command failed with exit code {result.error_code}.")
-    return result
+    return invoke_checked(cli, command, description="IoT Hub state command")
 
 
 def generate_device_names(count, edge=False):

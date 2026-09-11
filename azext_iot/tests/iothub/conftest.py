@@ -20,7 +20,7 @@ from azext_iot.tests.settings import (
     DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL, HUB_TEST_LOCATION
 )
 from azext_iot.tests.iothub import ENTITY_NAME, ENTITY_RG, ROLE_ASSIGNMENT_REFRESH_TIME, settings as iothub_settings
-from azext_iot.tests.iothub._integration_helpers import assert_hub_policy, assign_role_with_propagation
+from azext_iot.tests.iothub._integration_helpers import assert_hub_policy, assign_role_with_propagation, invoke_checked
 
 logger = get_logger(__name__)
 MAX_RBAC_ASSIGNMENT_TRIES = 10
@@ -31,6 +31,10 @@ RG = settings.env.azext_iot_testrg
 HUB_NAME = settings.env.azext_iot_testhub
 STORAGE_ACCOUNT = settings.env.azext_iot_teststorageaccount
 STORAGE_CONTAINER = settings.env.azext_iot_teststoragecontainer
+
+
+def _invoke_fixture(command: str) -> EmbeddedCLI:
+    return invoke_checked(cli, command, description="IoT Hub fixture command")
 
 
 def generate_hub_id() -> str:
@@ -159,7 +163,8 @@ def setup_hub_controlplane_states(
     cosmosdb_database_name = provisioned_cosmos_db_module["database"]["name"]
     cosmosdb_cstring = provisioned_cosmos_db_module["connectionString"]
 
-    use_system_endpoints = get_closest_marker(request).kwargs.get("system_endpoints", True)
+    hub_marker = get_closest_marker(request)
+    use_system_endpoints = hub_marker.kwargs.get("system_endpoints", True) if hub_marker else True
 
     # add endpoints
     hub_principal_ids = [
@@ -179,61 +184,60 @@ def setup_hub_controlplane_states(
         provisioned_service_bus_module["topic"]["id"]: "Azure Service Bus Data Sender"
     }
     for scope, role in scope_dict.items():
-        assign_role_assignment(
-            assignee=user_principal_id,
-            scope=scope,
-            role=role,
-            max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+        # The topic endpoint always uses the shared user-assigned identity.
+        principals = (
+            hub_principal_ids
+            if use_system_endpoints and scope != provisioned_service_bus_module["topic"]["id"]
+            else [user_principal_id]
         )
-        if use_system_endpoints:
-            for hub_principal_id in hub_principal_ids:
-                assign_role_assignment(
-                    assignee=hub_principal_id,
-                    scope=scope,
-                    role=role,
-                    max_tries=MAX_RBAC_ASSIGNMENT_TRIES
-                )
+        for principal in principals:
+            assign_role_assignment(
+                assignee=principal,
+                scope=scope,
+                role=role,
+                max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+            )
     sleep(30)
 
     suffix = "systemid" if use_system_endpoints else "userid"
     user_identity_parameter = "[system]" if use_system_endpoints else user_id
-    cli.invoke(
+    _invoke_fixture(
         f"iot hub message-endpoint create eventhub --en eventhub-{suffix} -g {hub_rg} -n {hub_name} --endpoint-uri "
         f"{eventhub_endpoint_uri} --entity-path {eventhub_name} --identity {user_identity_parameter}"
     )
 
-    cli.invoke(
+    _invoke_fixture(
         f"iot hub message-endpoint create servicebus-queue --en queue-{suffix} -g {hub_rg} -n {hub_name} "
         f"--endpoint-uri {servicebus_endpoint_uri} --entity-path {servicebus_queue} --identity {user_identity_parameter}"
     )
 
-    cli.invoke(
+    _invoke_fixture(
         f"iot hub message-endpoint create servicebus-topic --en topic-userid -g {hub_rg} -n {hub_name} --endpoint-uri "
         f"{servicebus_endpoint_uri} --entity-path {servicebus_topic} --identity {user_id}"
     )
 
-    cli.invoke(
+    _invoke_fixture(
         f"iot hub message-endpoint create storage-container --en storagecontainer-key -g {hub_rg} -n {hub_name} -c "
         f"{storage_cstring} --container {storage_container}  -b 350 -w 250 --encoding json"
     )
 
-    cli.invoke(
+    _invoke_fixture(
         f"iot hub message-endpoint create storage-container --en storagecontainer-{suffix} -g {hub_rg} -n {hub_name} "
         f"--identity {user_identity_parameter} --endpoint-uri {storage_endpoint_uri} --container {storage_container} "
         "-b 350 -w 250 --encoding json"
     )
 
-    cli.invoke(
+    _invoke_fixture(
         f"iot hub message-endpoint create cosmosdb-container --en cosmosdb-key -g {hub_rg} -n {hub_name} --container "
         f"{cosmosdb_container_name} --db {cosmosdb_database_name} -c {cosmosdb_cstring}"
     )
 
     # add routes - prob change one to be custom endpoint
-    cli.invoke(
+    _invoke_fixture(
         f"iot hub message-route create --endpoint events -n {hub_name} -g {hub_rg}"
         f" --rn {generate_generic_id()} --source devicelifecycleevents --condition false --enabled true"
     )
-    cli.invoke(
+    _invoke_fixture(
         f"iot hub message-route create --endpoint events -n {hub_name} -g {hub_rg}"
         f" --rn {generate_generic_id()} --source twinchangeevents --condition true --enabled false"
     )
@@ -244,12 +248,13 @@ def setup_hub_controlplane_states(
     with open(cert_file, 'w', encoding='utf-8') as f:
         f.write(cert)
 
-    cli.invoke(
-        f"iot hub certificate create --hub-name {hub_name} --name cert1 --path {cert_file} -g {hub_rg} -v True"
-    )
-
-    if os.path.isfile(cert_file):
-        os.remove(cert_file)
+    try:
+        _invoke_fixture(
+            f"iot hub certificate create --hub-name {hub_name} --name cert1 --path {cert_file} -g {hub_rg} -v True"
+        )
+    finally:
+        if os.path.isfile(cert_file):
+            os.remove(cert_file)
 
     # # add ip filter rule - make sure to add public ip address so dataplane isn't screwed up
     # public_ip = get_agent_public_ip()
