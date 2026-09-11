@@ -740,7 +740,8 @@ def test_rbac_creation_failure_lists_remaining_commands():
     assert "--assignee-object-id 'ns-principal'" in str(raised.value)
 
 
-def test_rbac_creation_race_reuses_assignment_created_by_another_actor():
+def test_rbac_creation_race_reuses_assignment_created_by_another_actor(caplog):
+    caplog.set_level(logging.WARNING, logger="azext_iot.adr.rbac")
     cli = MagicMock()
     cli.invoke.side_effect = [
         _result([]),
@@ -764,6 +765,9 @@ def test_rbac_creation_race_reuses_assignment_created_by_another_actor():
         if "role assignment create" in call.args[0]
     ]
     assert len(creates) == 2
+    completed = caplog.text.split("Completed these role-assignment creation requests")[1]
+    assert "principalId=dps-principal" in completed
+    assert "principalId=ns-principal" not in completed
 
 
 def test_created_assignments_wait_for_visibility_with_capped_backoff():
@@ -860,6 +864,82 @@ def test_assignment_visibility_empty_set_returns_immediately():
     manager._wait_for_assignments([])  # pylint: disable=protected-access
 
     manager.cli.invoke.assert_not_called()
+
+
+@pytest.mark.parametrize("link_type", ["hub", "dps", "su"])
+def test_assignment_plan_is_visible_before_every_write(mocker, caplog, capsys, link_type):
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock())
+    mocker.patch.object(manager, "_assignment_exists", return_value=False)
+    mocker.patch.object(manager, "_caller_can_assign", return_value=True)
+    mocker.patch.object(manager, "_resolve_adu_principal", return_value="adu-principal")
+    mocker.patch.object(manager, "_wait_for_assignments")
+    caplog.set_level(logging.WARNING, logger="azext_iot.adr.rbac")
+    target = TARGET_SCOPE.replace("/sub/", "/target-sub/")
+    namespace = NS_SCOPE.replace("/sub/", "/namespace-sub/")
+
+    def create(command, subscription):
+        assert command.startswith("role assignment create ")
+        assert "before updating the namespace" in caplog.text
+        assert f"scope={target}; subscription=target-sub" in caplog.text
+        assert f"scope={namespace}; subscription=namespace-sub" in caplog.text
+        assert subscription in ("target-sub", "namespace-sub")
+        return {"id": "created"}
+
+    invoke = mocker.patch.object(manager, "_invoke_json", side_effect=create)
+    manager.ensure(link_type, namespace, target, "ns-principal", "linked-principal")
+
+    assert invoke.call_count == len(LINK_ROLE_MATRIX[link_type])
+    assert caplog.text.count("before updating the namespace") == 1
+    assert "Completed these role-assignment creation requests" in caplog.text
+    assert "service authorization may still need time to propagate" in caplog.text
+    assert f"namespace outbound MI -> Contributor on {link_type.upper()}" in caplog.text
+    assert f"{link_type.upper()} selected inbound MI -> Contributor on namespace" in caplog.text
+    assert "principalId=ns-principal" in caplog.text
+    assert "principalId=linked-principal" in caplog.text
+    if link_type == "su":
+        assert "ADU first-party app -> Contributor on SU; principalId=adu-principal" in caplog.text
+    assert "caller-object-id" not in caplog.text
+    assert _access_token() not in caplog.text
+    assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize("already_assigned", [False, True])
+def test_no_automatic_grant_notice_when_no_creation_can_occur(mocker, caplog, already_assigned):
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock())
+    mocker.patch.object(manager, "_assignment_exists", return_value=already_assigned)
+    mocker.patch.object(manager, "_caller_can_assign", return_value=False)
+    invoke = mocker.patch.object(manager, "_invoke_json")
+    caplog.set_level(logging.WARNING, logger="azext_iot.adr.rbac")
+
+    if already_assigned:
+        manager.ensure("dps", NS_SCOPE, TARGET_SCOPE, "ns-principal", "dps-principal")
+    else:
+        with pytest.raises(AzureResponseError, match="No link mutation was submitted"):
+            manager.ensure("dps", NS_SCOPE, TARGET_SCOPE, "ns-principal", "dps-principal")
+
+    invoke.assert_not_called()
+    assert "before updating the namespace" not in caplog.text
+
+
+def test_partial_assignment_failure_reports_completed_and_remaining_requests(mocker):
+    manager = LinkRbacManager(MagicMock(), cli=MagicMock())
+    mocker.patch.object(manager, "_assignment_exists", return_value=False)
+    mocker.patch.object(manager, "_caller_can_assign", return_value=True)
+    error = AzureResponseError("Original assignment rejection")
+    mocker.patch.object(manager, "_invoke_json", side_effect=[{"id": "created"}, error])
+    wait = mocker.patch.object(manager, "_wait_for_assignments")
+
+    with pytest.raises(AzureResponseError) as raised:
+        manager.ensure("dps", NS_SCOPE, TARGET_SCOPE, "ns-principal", "dps-principal")
+
+    completed, remaining = str(raised.value).split("Complete these exact remediation commands")
+    assert "Assignment requests completed before the failure" in completed
+    assert "principalId=ns-principal" in completed
+    assert "principalId=dps-principal" not in completed
+    assert "--assignee-object-id 'dps-principal'" in remaining
+    assert "--assignee-object-id 'ns-principal'" not in remaining
+    assert raised.value.__cause__ is error
+    wait.assert_not_called()
 
 
 def test_rbac_rejects_unknown_link_type_and_failed_cli_command():
