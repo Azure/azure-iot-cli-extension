@@ -14,6 +14,7 @@ from time import monotonic, sleep
 from typing import Dict, Iterable, Optional, Tuple
 
 import requests
+from knack.log import get_logger
 from azure.cli.core._profile import Profile
 from azure.cli.core.azclierror import (
     AzureResponseError,
@@ -23,6 +24,7 @@ from azure.cli.core.azclierror import (
 from azext_iot.common.embedded_cli import EmbeddedCLI
 
 
+logger = get_logger(__name__)
 CONTRIBUTOR_ROLE = "Contributor"
 HUB_DATA_ROLE = "IoT Hub Data Contributor"
 SU_DATA_ROLE = "Device Update Administrator"
@@ -177,19 +179,20 @@ def resolve_linked_resource_principal(
     )
 
 
-def format_role_requirements(link_type: str) -> str:
+def _format_role_requirement(link_type: str, rule: RoleRule) -> str:
     labels = {
         "namespace": "namespace outbound MI",
         "linked": f"{link_type.upper()} selected inbound MI",
         "adu_first_party": "ADU first-party app",
     }
     scopes = {"namespace": "namespace", "target": link_type.upper()}
+    return f"{labels[rule.principal]} -> {rule.role} on {scopes[rule.scope]}"
+
+
+def format_role_requirements(link_type: str) -> str:
     requirements = []
     for rule in LINK_ROLE_MATRIX[link_type]:
-        requirement = (
-            f"{labels[rule.principal]} -> {rule.role} on "
-            f"{scopes[rule.scope]}"
-        )
+        requirement = _format_role_requirement(link_type, rule)
         if link_type == "hub" and rule.principal == "linked":
             requirement = (
                 "when an inbound identity is selected, " + requirement
@@ -406,6 +409,24 @@ class LinkRbacManager:
             )
         return "\n".join(commands)
 
+    @staticmethod
+    def _assignment_summary(
+        assignments: Iterable[Tuple[str, str, str]],
+        descriptions: Dict[Tuple[str, str, str], str],
+    ) -> str:
+        lines = []
+        for assignment in assignments:
+            principal_id, _, scope = assignment
+            detail = (
+                f"- {descriptions[assignment]}; principalId={principal_id}; "
+                f"scope={scope}"
+            )
+            subscription = _scope_subscription(scope)
+            if subscription:
+                detail += f"; subscription={subscription}"
+            lines.append(detail)
+        return "\n".join(lines)
+
     def ensure(
         self,
         link_type: str,
@@ -429,6 +450,7 @@ class LinkRbacManager:
     def ensure_many(self, requests: Iterable[dict]) -> None:
         """Authorize a complete atomic link plan before creating any assignment."""
         missing = []
+        descriptions = {}
         for request in requests:
             link_type = request["link_type"]
             if link_type not in LINK_ROLE_MATRIX:
@@ -464,6 +486,7 @@ class LinkRbacManager:
                     )
                 ):
                     missing.append(assignment)
+                    descriptions[assignment] = _format_role_requirement(link_type, rule)
 
         if not missing:
             return
@@ -487,6 +510,11 @@ class LinkRbacManager:
                 f"{commands}"
             )
 
+        logger.warning(
+            "Automatic link RBAC setup will request these missing service-role "
+            "assignments before updating the namespace:\n%s",
+            self._assignment_summary(missing, descriptions),
+        )
         created = []
         for index, (principal_id, role, scope) in enumerate(missing):
             try:
@@ -511,9 +539,22 @@ class LinkRbacManager:
                 if assignment_now_exists:
                     continue
                 remaining = self._manual_commands(missing[index:])
+                completed = (
+                    "Assignment requests completed before the failure:\n"
+                    + self._assignment_summary(created, descriptions)
+                    if created
+                    else "No assignment creation request completed successfully."
+                )
                 raise AzureResponseError(
                     "Automatic link RBAC setup failed before namespace mutation. "
+                    f"{completed}\n"
                     "Complete these exact remediation commands, allow RBAC to "
                     f"propagate, and retry:\n{remaining}\nDetail: {error}"
                 ) from error
+        if created:
+            logger.warning(
+                "Completed these role-assignment creation requests "
+                "(service authorization may still need time to propagate):\n%s",
+                self._assignment_summary(created, descriptions),
+            )
         self._wait_for_assignments(created)
