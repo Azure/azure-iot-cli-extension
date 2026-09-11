@@ -6,7 +6,6 @@
 
 import os
 import pprint
-import sys
 from time import sleep
 from typing import Any, Dict, Optional
 
@@ -74,7 +73,7 @@ class MQTTProvider(object):
         from azure.iot.device import exceptions
 
         try:
-            self.shutdown()
+            self.shutdown(preserve_error=error is not None)
         except (exceptions.ClientError, exceptions.OperationTimeout) as cleanup_error:
             raise AzureResponseError(
                 f"MQTT client cleanup failed for device '{self.device_id}' "
@@ -229,12 +228,11 @@ class MQTTProvider(object):
         except Exception as x:
             raise x
 
-    def shutdown(self):
-        operation_failed = sys.exc_info()[0] is not None
+    def shutdown(self, *, preserve_error: bool = False):
         try:
             self.device_client.shutdown()
         except Exception as e:
-            if not operation_failed:
+            if not preserve_error:
                 raise
             logger.warning(
                 "MQTT client cleanup also failed for device '%s' (%s); "
