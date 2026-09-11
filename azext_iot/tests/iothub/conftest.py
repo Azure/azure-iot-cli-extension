@@ -9,8 +9,10 @@ from typing import Optional, List
 import os
 
 import pytest
-from azure.cli.core.azclierror import CLIInternalError
+from azure.cli.core.azclierror import AzCLIError, CLIInternalError, ResourceNotFoundError
+from azure.core.exceptions import HttpResponseError, ResourceNotFoundError as CoreResourceNotFoundError
 from knack.log import get_logger
+from msrestazure.azure_exceptions import CloudError
 
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
@@ -35,6 +37,20 @@ STORAGE_CONTAINER = settings.env.azext_iot_teststoragecontainer
 
 def _invoke_fixture(command: str) -> EmbeddedCLI:
     return invoke_checked(cli, command, description="IoT Hub fixture command")
+
+
+def _delete_fixture_resource(command: str, name: str):
+    try:
+        invoke_checked(cli, command, description=f"Deleting test resource '{name}'")
+    except (AzCLIError, CloudError, HttpResponseError) as error:
+        if (
+            isinstance(error, (ResourceNotFoundError, CoreResourceNotFoundError))
+            or getattr(error, "status_code", None) == 404
+            or getattr(getattr(error, "response", None), "status_code", None) == 404
+        ):
+            logger.info("Cleanup target is already absent: %s", name)
+            return
+        raise
 
 
 def generate_hub_id() -> str:
@@ -85,16 +101,17 @@ def _cleanup_dynamic_hub(request):
         and not iothub_settings.env.azext_iot_testhub
     ):
         logger.info("Deleting dynamically created hub: %s", ENTITY_NAME)
-        from time import sleep
         for attempt in range(3):
-            delete_result = cli.invoke(f"iot hub delete --name {ENTITY_NAME} --resource-group {ENTITY_RG}")
-            if delete_result.success():
+            try:
+                _delete_fixture_resource(
+                    f"iot hub delete --name {ENTITY_NAME} --resource-group {ENTITY_RG}", ENTITY_NAME
+                )
                 break
-            if attempt < 2:
+            except (AzCLIError, CloudError, HttpResponseError):
+                if attempt == 2:
+                    raise
                 logger.warning("Hub deletion attempt %s failed, retrying...", attempt + 1)
                 sleep(30)
-        else:
-            logger.error("Failed to delete hub %s after 3 attempts.", ENTITY_NAME)
 
 
 @pytest.fixture()
@@ -356,11 +373,17 @@ def _get_hub_connection_string(name, rg, policy="iothubowner"):
 
 
 def _iot_hubs_removal(hub_result):
+    failures = []
     for hub in hub_result:
         name = hub["name"]
-        delete_result = cli.invoke(f"iot hub delete -n {name} -g {RG}")
-        if not delete_result.success():
-            logger.error(f"Failed to delete iot hub resource {name}.")
+        try:
+            _delete_fixture_resource(f"iot hub delete -n {name} -g {RG}", name)
+        except (AzCLIError, CloudError, HttpResponseError) as error:
+            logger.error("Failed to delete IoT Hub resource '%s': %s", name, error)
+            failures.append((name, error))
+    if failures:
+        names = ", ".join(name for name, _ in failures)
+        raise CLIInternalError(f"Failed to delete test IoT Hub resources: {names}.") from failures[0][1]
 
 
 # User Assigned Identity fixtures (UAI)
@@ -380,9 +403,7 @@ def _user_identity_provisioner():
 
 
 def _user_identity_removal(name):
-    delete_result = cli.invoke(f"identity delete -n {name} -g {RG}")
-    if not delete_result.success():
-        logger.error(f"Failed to delete user identity resource {name}.")
+    _delete_fixture_resource(f"identity delete -n {name} -g {RG}", name)
 
 
 # Storage Account fixtures
@@ -445,7 +466,7 @@ def _storage_provisioner():
     storage_cstring = _storage_get_cstring(account_name)
 
     # Will not do anything if container exists.
-    cli.invoke(
+    _invoke_fixture(
         "storage container create -n {} --connection-string '{}'".format(
             container_name, storage_cstring
         ),
@@ -464,9 +485,7 @@ def _storage_provisioner():
 
 
 def _storage_removal(account_name: str):
-    delete_result = cli.invoke(f"storage account delete -g {RG} -n {account_name} -y")
-    if not delete_result.success():
-        logger.error(f"Failed to delete storage account resource {account_name}.")
+    _delete_fixture_resource(f"storage account delete -g {RG} -n {account_name} -y", account_name)
 
 
 # Event Hub fixtures
@@ -545,9 +564,7 @@ def _event_hub_provisioner():
 
 
 def _event_hub_removal(account_name: str):
-    delete_result = cli.invoke(f"eventhubs namespace delete -g {RG} -n {account_name}")
-    if not delete_result.success():
-        logger.error(f"Failed to delete eventhubs namespace resource {account_name}.")
+    _delete_fixture_resource(f"eventhubs namespace delete -g {RG} -n {account_name}", account_name)
 
 
 # Service Bus fixtures
@@ -666,9 +683,7 @@ def _service_bus_provisioner():
 
 
 def _service_bus_removal(account_name: str):
-    delete_result = cli.invoke(f"servicebus namespace delete -g {RG} -n {account_name}")
-    if not delete_result.success():
-        logger.error(f"Failed to delete servicebus namespace resource {account_name}.")
+    _delete_fixture_resource(f"servicebus namespace delete -g {RG} -n {account_name}", account_name)
 
 
 # Cosmos Db fixtures
@@ -688,7 +703,7 @@ def provisioned_cosmosdb_with_identity_module(
 
 
 def assign_cosmos_db_role(principal_id: str, role: str, cosmos_db_account: str, rg: str):
-    cli.invoke(
+    _invoke_fixture(
         "cosmosdb sql role assignment create -a {} -g {} --scope '/' -n '{}' -p {}".format(
             cosmos_db_account, rg, role, principal_id
         )
@@ -749,19 +764,17 @@ def _cosmos_db_provisioner():
 
 
 def _cosmos_db_removal(account_name: str):
-    delete_result = cli.invoke(f"cosmosdb delete -g {RG} -n {account_name} -y")
-    if not delete_result.success():
-        logger.error(f"Failed to delete Cosmos DB resource {account_name}.")
+    _delete_fixture_resource(f"cosmosdb delete -g {RG} -n {account_name} -y", account_name)
 
 
 def _clean_up(device_ids: List[str] = None, config_ids: List[str] = None):
     for device in device_ids or []:
-        cli.invoke(
+        _delete_fixture_resource(
             f"iot hub device-identity delete -d {device} -n {HUB_NAME} -g {RG} --auth-type login",
-            capture_stderr=True,
+            device,
         )
     for config in config_ids or []:
-        cli.invoke(
+        _delete_fixture_resource(
             f"iot hub configuration delete -c {config} -n {HUB_NAME} -g {RG} --auth-type login",
-            capture_stderr=True,
+            config,
         )
