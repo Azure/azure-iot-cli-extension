@@ -420,6 +420,7 @@ class DeviceIdentityProvider(IoTHubProvider):
             try:
                 self.service_sdk.devices.delete_identity(id=id, if_match="*")
             except Exception as err:
-                if ignore_missing and isinstance(err, CloudError) and err.response.status_code == 404:
+                response = getattr(err, "response", None)
+                if ignore_missing and isinstance(err, CloudError) and getattr(response, "status_code", None) == 404:
                     continue
                 raise AzureResponseError(err)
