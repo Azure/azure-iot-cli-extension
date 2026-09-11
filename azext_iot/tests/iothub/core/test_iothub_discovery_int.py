@@ -60,8 +60,6 @@ class TestIoTHubDiscovery(IoTLiveScenarioTest):
         filtered_rg_hubs = [hub for hub in rg_hubs if hub["name"] == self.entity_name]
         assert filtered_rg_hubs
 
-        assert len(rg_hubs) <= len(sub_hubs)
-
     def test_iothub_targets(self):
         discovery = IotHubDiscovery(self.cmd_shell)
 
@@ -95,7 +93,8 @@ class TestIoTHubDiscovery(IoTLiveScenarioTest):
 
         [assert_target(tar, rg=self.entity_rg, include_events=True) for tar in rg_targets]
 
-        assert len(rg_targets) <= len(sub_targets)
+        assert any(target["name"] == self.entity_name for target in sub_targets)
+        assert any(target["name"] == self.entity_name for target in rg_targets)
 
 
 def assert_target(target: dict, by_cstring=False, include_events=False, **kwargs):

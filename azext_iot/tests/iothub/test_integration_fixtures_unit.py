@@ -527,6 +527,45 @@ def test_c2d_feedback_scenario_checks_the_matching_stdout_record(mocker, feedbac
     receiver.assert_called_once_with("device-connection-string")
 
 
+@pytest.mark.parametrize("collection", ["resources", "targets", "connection_strings"])
+@pytest.mark.parametrize("missing_scope", [None, "subscription", "resource_group"])
+def test_hub_collection_scenarios_require_owned_hub_not_cross_request_counts(mocker, collection, missing_scope):
+    from azext_iot.tests.iothub.core import test_iothub_discovery_int as discovery_tests
+    from azext_iot.tests.iothub.core import test_iothub_utilities_int as utility_tests
+
+    metadata = {
+        "cs": "metadata-only", "policy": "owner", "primarykey": "unused", "secondarykey": "unused",
+        "entity": "hub.azure-devices.net", "subscription": "sub", "resourcegroup": "rg",
+        "location": HUB_TEST_LOCATION, "sku_tier": "Standard",
+        "events": {"endpoint": "endpoint", "partition_count": 2, "path": "path", "partition_ids": ["0", "1"]},
+    }
+    sub_hubs = [dict(metadata, name="other" if missing_scope == "subscription" else "hub")]
+    rg_hubs = [dict(metadata, name="other" if missing_scope == "resource_group" else "hub")]
+    if missing_scope is None:
+        # Another worker can create a Hub between the two enumeration requests.
+        rg_hubs.append(dict(metadata, name="new-hub"))
+    scenario = SimpleNamespace(cmd_shell=Mock(), cli_ctx=Mock(), entity_name="hub", entity_rg="rg")
+
+    if collection == "connection_strings":
+        cli = mocker.patch.object(utility_tests, "EmbeddedCLI").return_value
+        cli.invoke.return_value.as_json.side_effect = [sub_hubs, rg_hubs, []]
+        run = utility_tests.TestIoTHubUtilities.test_iothub_connection_string_lists
+    else:
+        discovery = mocker.patch.object(discovery_tests, "IotHubDiscovery").return_value
+        if collection == "resources":
+            discovery.get_resources.side_effect = [sub_hubs, rg_hubs]
+            run = discovery_tests.TestIoTHubDiscovery.test_iothub_discovery_lists
+        else:
+            discovery.get_targets.side_effect = [sub_hubs, rg_hubs]
+            run = discovery_tests.TestIoTHubDiscovery.test_iothub_target_lists
+
+    if missing_scope:
+        with pytest.raises(AssertionError):
+            run(scenario)
+    else:
+        run(scenario)
+
+
 @pytest.mark.parametrize("unexpected_command,error_kind", [
     (None, None),
     ("simulate", "type"),
@@ -545,16 +584,19 @@ def test_x509_scenario_asserts_validation_exceptions_without_suppressing_them(mo
     )
 
     def command_result(command, **kwargs):
+        from azure.cli.testsdk.base import ExecutionResult
+        from azure.cli.testsdk.exceptions import CliExecutionError
+
         args = shlex.split(command)
         if args[:2] == ["iot", "device"] and (("--cp" in args) != ("--kp" in args)):
-            # LiveScenarioTest's patched exception handler must be allowed to raise.
             assert "expect_failure" not in kwargs
             validation_calls.append(args[2])
-            if args[2] == unexpected_command:
-                raise unexpected_error
-            raise RequiredArgumentMissingError(
+            error = unexpected_error if args[2] == unexpected_command else RequiredArgumentMissingError(
                 "Both 'certificate-file' and 'key-file' required for x509 certificate authentication."
             )
+            # Exercise the real SDK path that unwraps its patched CLI exception.
+            cli_ctx = SimpleNamespace(data={}, invoke=Mock(side_effect=CliExecutionError(error)))
+            return ExecutionResult(cli_ctx, command)
         # Successful commands need no captured log; inspecting applog would fail.
         return None
 

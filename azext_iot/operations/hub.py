@@ -1397,7 +1397,7 @@ def iot_edge_export_modules(
 
     try:
         # Get all modules in the device
-        module_list = iot_device_module_list(cmd, device_id, hub_name_or_hostname=hub_name_or_hostname, login=login)
+        module_list = _iot_device_module_list(target=target, device_id=device_id)
         for module in module_list:
             # Get module twins using module ids
             module_twin = _iot_device_module_twin_show(

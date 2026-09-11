@@ -200,7 +200,8 @@ class TestIoTHubUtilities(IoTLiveScenarioTest):
             hubs_in_sub = cli.invoke("iot hub connection-string show").as_json()
             hubs_in_rg = cli.invoke(f"iot hub connection-string show -g {self.entity_rg}").as_json()
             missing_policy = cli.invoke("iot hub connection-string show --pn badpolicy").as_json()
-        assert len(hubs_in_sub) >= len(hubs_in_rg)
+        assert any(hub["name"] == self.entity_name for hub in hubs_in_sub)
+        assert any(hub["name"] == self.entity_name for hub in hubs_in_rg)
         assert missing_policy == []
 
     def test_iothub_init(self):
