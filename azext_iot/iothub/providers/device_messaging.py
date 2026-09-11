@@ -87,20 +87,19 @@ class DeviceMessagingProvider(IoTHubProvider):
         device_connection_string = _build_device_or_module_connection_string(
             device, KeyType.primary.value, hostname_override=self._device_hostname
         )
-        client_mqtt = MQTTProvider(
+        with MQTTProvider(
             hub_hostname=self._device_hostname,
             device_conn_string=device_connection_string,
             x509_files=device["authentication"].get("x509_files"),
             device_id=self.device_id,
             model_id=model_id
-        )
-        for _ in range(msg_count):
-            client_mqtt.send_d2c_message(
-                message_content=data,
-                message_file_path=data_file_path,
-                properties=properties
-            )
-        client_mqtt.shutdown()
+        ) as client_mqtt:
+            for _ in range(msg_count):
+                client_mqtt.send_d2c_message(
+                    message_content=data,
+                    message_file_path=data_file_path,
+                    properties=properties
+                )
 
     def device_send_message_http(self, data: str, headers: dict = None):
         try:
@@ -413,7 +412,7 @@ class DeviceMessagingProvider(IoTHubProvider):
                     device, KeyType.primary.value, hostname_override=self._device_hostname
                 )
 
-                client_mqtt = MQTTProvider(
+                with MQTTProvider(
                     hub_hostname=self._device_hostname,
                     device_conn_string=device_connection_string,
                     x509_files=device["authentication"].get("x509_files"),
@@ -422,14 +421,13 @@ class DeviceMessagingProvider(IoTHubProvider):
                     method_response_payload=method_response_payload,
                     init_reported_properties=init_reported_properties,
                     model_id=model_id
-                )
-                client_mqtt.execute(
-                    data=generator(),
-                    properties=properties_to_send,
-                    publish_delay=msg_interval,
-                    msg_count=msg_count
-                )
-                client_mqtt.shutdown()
+                ) as client_mqtt:
+                    client_mqtt.execute(
+                        data=generator(),
+                        properties=properties_to_send,
+                        publish_delay=msg_interval,
+                        msg_count=msg_count
+                    )
             else:
                 op = Thread(
                     target=http_wrap,

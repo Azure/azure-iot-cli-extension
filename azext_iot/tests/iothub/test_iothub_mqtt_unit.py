@@ -8,7 +8,9 @@ import logging
 from types import SimpleNamespace
 
 import pytest
-from azure.cli.core.azclierror import RequiredArgumentMissingError
+from azure.cli.core.azclierror import (
+    AuthenticationError, AzureConnectionError, AzureResponseError, RequiredArgumentMissingError
+)
 
 from azext_iot.iothub.providers.mqtt import MQTTProvider
 
@@ -189,8 +191,80 @@ class TestExecuteShutdown:
         provider.shutdown()
         provider.device_client.shutdown.assert_called_once()
 
-    def test_shutdown_handles_error(self, mock_device_client):
+    def test_shutdown_alone_propagates_error(self, mock_device_client):
         provider = _make_provider(mock_device_client)
-        provider.device_client.shutdown.side_effect = Exception("boom")
-        # Should not raise.
-        provider.shutdown()
+        provider.device_client.shutdown.side_effect = RuntimeError("boom")
+        with pytest.raises(RuntimeError, match="boom"):
+            provider.shutdown()
+
+
+@pytest.mark.parametrize("error_name,cli_error", [
+    ("CredentialError", AuthenticationError),
+    ("ConnectionFailedError", AzureConnectionError),
+    ("ConnectionDroppedError", AzureConnectionError),
+    ("NoConnectionError", AzureConnectionError),
+    ("OperationTimeout", AzureConnectionError),
+    ("ClientError", AzureResponseError),
+])
+@pytest.mark.parametrize("cleanup_fails", [False, True])
+def test_context_translates_sdk_errors_and_preserves_original(
+    mock_device_client, caplog, error_name, cli_error, cleanup_fails,
+):
+    from azure.iot.device import exceptions
+
+    provider = _make_provider(mock_device_client)
+    error = getattr(exceptions, error_name)("private SDK details")
+    provider.device_client.send_message.side_effect = error
+    if cleanup_fails:
+        provider.device_client.shutdown.side_effect = RuntimeError("private cleanup details")
+    caplog.set_level(logging.WARNING, logger=mqtt_path)
+
+    with pytest.raises(cli_error) as raised:
+        with provider as client:
+            client.send_d2c_message("message")
+
+    assert raised.value.__cause__ is error
+    assert "dev1" in str(raised.value)
+    assert "myhub.azure-devices.net" in str(raised.value)
+    assert "private SDK details" not in str(raised.value)
+    assert "private cleanup details" not in caplog.text
+    assert ("preserving the original" in caplog.text) is cleanup_fails
+    if error_name == "CredentialError":
+        assert "Caller Entra roles do not authenticate" in str(raised.value)
+    else:
+        assert "MQTT authentication failed" not in str(raised.value)
+    provider.device_client.shutdown.assert_called_once()
+
+
+@pytest.mark.parametrize("error_type", [RuntimeError, ValueError, FileNotFoundError, KeyboardInterrupt])
+def test_context_preserves_unknown_errors_even_when_cleanup_fails(mock_device_client, error_type):
+    provider = _make_provider(mock_device_client)
+    error = error_type("original")
+    provider.device_client.shutdown.side_effect = RuntimeError("cleanup")
+    with pytest.raises(error_type) as raised:
+        with provider:
+            raise error
+    assert raised.value is error
+    provider.device_client.shutdown.assert_called_once()
+
+
+def test_context_reports_cleanup_only_failure(mock_device_client):
+    from azure.iot.device.exceptions import ClientError
+
+    provider = _make_provider(mock_device_client)
+    error = ClientError("private cleanup details")
+    provider.device_client.shutdown.side_effect = error
+    with pytest.raises(AzureResponseError, match="MQTT client cleanup failed") as raised:
+        with provider:
+            pass
+    assert raised.value.__cause__ is error
+    assert "private cleanup details" not in str(raised.value)
+
+
+def test_context_success_shuts_down_once(mock_device_client):
+    provider = _make_provider(mock_device_client)
+    with provider as client:
+        assert client is provider
+        client.send_d2c_message("message")
+    provider.device_client.send_message.assert_called_once()
+    provider.device_client.shutdown.assert_called_once()
