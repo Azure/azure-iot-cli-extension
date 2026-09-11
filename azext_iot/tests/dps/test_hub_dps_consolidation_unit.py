@@ -8,9 +8,12 @@
 
 import base64
 from copy import deepcopy
+import hmac
 import io
 import json
 import logging
+from pathlib import Path
+import shutil
 import socket
 import ssl
 import subprocess
@@ -19,6 +22,7 @@ import sys
 import time
 from types import SimpleNamespace
 from unittest.mock import Mock
+from urllib.parse import parse_qs
 
 import pytest
 import requests
@@ -524,6 +528,106 @@ def test_worker_entrypoint_and_import_provenance(mocker, stale):
         assert result["result"] == {"status": "assigned"}
 
 
+@pytest.mark.parametrize("with_csr", [False, True])
+def test_isolated_worker_loads_extension_dependencies_without_shadowing_source(
+    monkeypatch, tmp_path, csr_material, with_csr,
+):
+    import azure.cli.core
+    import msrestazure
+
+    extension = tmp_path / "extensions" / "azure-iot"
+    extension.mkdir(parents=True)
+    shutil.copytree(Path(msrestazure.__file__).parent, extension / "msrestazure")
+    stale = extension / "azext_iot"
+    stale.mkdir()
+    (stale / "__init__.py").write_text("raise AssertionError('Stale installed extension was imported')\n")
+    untrusted = tmp_path / "untrusted"
+    untrusted.mkdir()
+    (untrusted / "msrestazure.py").write_text("raise AssertionError('PYTHONPATH was imported')\n")
+    monkeypatch.setenv("AZURE_EXTENSION_DIR", str(extension.parent))
+    monkeypatch.setenv("PYTHONPATH", str(untrusted))
+
+    # Supply this interpreter's CLI runtime, but make msrestazure extension-only as in tox.
+    runtime = str(Path(azure.cli.core.__file__).parents[3])
+    driver = f"""
+import importlib.machinery
+import io
+import json
+import runpy
+import socket
+import sys
+
+sys.path.insert(0, {runtime!r})
+extension = {str(extension)!r}
+
+class ExtensionDependency:
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname == "msrestazure":
+            if extension not in sys.path:
+                raise ModuleNotFoundError("No module named 'msrestazure'", name=fullname)
+            return importlib.machinery.PathFinder.find_spec(fullname, [extension])
+        return None
+
+sys.meta_path.insert(0, ExtensionDependency())
+
+def blocked(*args, **kwargs):
+    raise AssertionError("Network access is forbidden")
+
+socket.socket.connect = socket.socket.connect_ex = blocked
+socket.getaddrinfo = socket.create_connection = blocked
+import requests
+requests.adapters.HTTPAdapter.send = blocked
+
+def send(session, prepared, **kwargs):
+    assert prepared.url.startswith("https://dps.invalid/")
+    assert ("csr" in json.loads(prepared.body)) is {with_csr!r}
+    response = requests.Response()
+    response.status_code = 200
+    response.headers = {{"Content-Type": "application/json"}}
+    response._content = b'{{"status":"assigned","registrationState":{{"deviceId":"reg"}}}}'
+    response.raw = io.BytesIO(response.content)
+    response.request, response.url = prepared, prepared.url
+    return response
+
+requests.Session.send = send
+runpy.run_path({worker.__file__!r}, run_name="__main__")
+"""
+    body = {"registrationId": "reg"}
+    if with_csr:
+        body["csr"] = base64.b64encode(csr_material()[1]).decode()
+    request = {
+        "provider": {
+            "registration_id": "reg", "id_scope": "scope", "provisioning_host": "https://dps.invalid",
+            "device_symmetric_key": base64.b64encode(b"offline-device-secret").decode(), "passphrase": None,
+        },
+        "body": body,
+        "deadline": time.monotonic() + 30,
+    }
+    completed = subprocess.run(
+        [sys.executable, "-I", "-c", driver], cwd=untrusted, input=json.dumps(request),
+        capture_output=True, text=True, timeout=30, check=False,
+    )
+    assert completed.returncode == 0
+    result = worker.decode_response(completed.stdout)
+    assert result["status"] == "assigned"
+    assert result["registrationState"]["registryDeviceExternalId"] == "reg"
+    assert request["provider"]["device_symmetric_key"] not in completed.stdout + completed.stderr
+    if with_csr:
+        assert body["csr"] not in completed.stdout + completed.stderr
+
+
+@pytest.mark.parametrize("name", ["msrestazure", "private-module-detail"])
+def test_worker_missing_dependency_diagnostic_is_allowlisted(name):
+    error = ModuleNotFoundError("private-exception-detail", name=name)
+    response = worker._error_to_json(error, [])
+    assert response["type"] == "CLIInternalError"
+    if name == "msrestazure":
+        assert "required dependency 'msrestazure'" in response["message"]
+    else:
+        assert response["message"] == "Unexpected DPS registration worker error (ModuleNotFoundError)."
+    assert "private" not in json.dumps(response)
+
+
 def test_factory_x509_branch_and_non_json_error(mocker):
     transport = mocker.patch.object(_factory, "_dps_x509_transport").return_value
     client = mocker.patch("azext_iot.sdk.dps.device.ProvisioningDeviceClient")
@@ -628,8 +732,9 @@ def test_real_provider_deadline_flow_uses_register_and_operation_status(mocker):
 @pytest.mark.parametrize("path", ["default", "deadline", "worker"])
 @pytest.mark.parametrize("with_csr", [False, True])
 @pytest.mark.parametrize("polled", [False, True])
+@pytest.mark.parametrize("credential", ["primary", "secondary", "derived-secondary"])
 def test_registration_requests_transport_options_and_confidentiality(
-    mocker, caplog, csr_material, path, with_csr, polled,
+    mocker, caplog, csr_material, path, with_csr, polled, credential,
 ):
     caplog.set_level(logging.DEBUG)
     blocked = mocker.Mock(side_effect=AssertionError("Network access is forbidden"))
@@ -664,10 +769,12 @@ def test_registration_requests_transport_options_and_confidentiality(
     mocker.patch.object(requests.Session, "send", send)
     pem, der = csr_material()
     encoded_csr = base64.b64encode(der).decode()
-    key = base64.b64encode(b"offline-device-secret").decode()
+    key_bytes = b"offline-primary-secret" if credential == "primary" else b"offline-secondary-secret"
+    key = base64.b64encode(key_bytes).decode()
     values = {
         "registration_id": "reg", "id_scope": "scope",
         "provisioning_host": "https://dps.invalid", "device_symmetric_key": key,
+        "compute_key": credential == "derived-secondary",
     }
     payload = {"private": "opaque-payload-secret"}
     body = {"registrationId": "reg", "payload": payload}
@@ -689,12 +796,22 @@ def test_registration_requests_transport_options_and_confidentiality(
     assert result["registrationState"]["registryDeviceExternalId"] == "reg"
     assert [item.method for item in sent] == (["PUT", "GET"] if polled else ["PUT"])
     assert json.loads(sent[0].body) == body
+    signing_key = hmac.digest(key_bytes, b"reg", "sha256") if values["compute_key"] else key_bytes
+    for item in sent:
+        token = parse_qs(item.headers["Authorization"].removeprefix("SharedAccessSignature "))
+        assert token["sr"] == ["scope/registrations/reg"]
+        assert token["skn"] == ["registration"]
+        signed = f"scope%2Fregistrations%2Freg\n{token['se'][0]}".encode()
+        assert token["sig"] == [base64.b64encode(hmac.digest(signing_key, signed, "sha256")).decode()]
     for options in request_options:
         assert not {"logging_enable", "connection_timeout", "read_timeout", "retry_total", "raw_response_hook"} & options.keys()
         if path != "default":
             assert all(0 < value <= 5 for value in options["timeout"])
         assert options["allow_redirects"] is False
-    for secret in (key, pem, encoded_csr, payload["private"], sent[0].headers["Authorization"]):
+    for secret in (
+        key, base64.b64encode(signing_key).decode(), pem, encoded_csr,
+        payload["private"], sent[0].headers["Authorization"],
+    ):
         assert secret not in caplog.text
     blocked.assert_not_called()
 

@@ -151,6 +151,7 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
+            capture_stderr=True,
         ).as_json()
         registration_state = registration["registrationState"]
         assert registration["operationId"]

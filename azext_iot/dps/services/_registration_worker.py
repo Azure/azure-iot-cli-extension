@@ -17,6 +17,13 @@ from types import SimpleNamespace
 # -I excludes the current directory/PYTHONPATH; anchor imports to the caller's extension.
 if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+    from azure.cli.core.extension import get_extension_path
+    from azext_iot.constants import EXTENSION_NAME
+
+    # Checkout-backed commands still need dependencies from the CLI's extension installation.
+    extension_path = get_extension_path(EXTENSION_NAME)
+    if extension_path and Path(extension_path).is_dir() and extension_path not in sys.path:
+        sys.path.insert(1, extension_path)
 
 from azure.cli.core.azclierror import (
     AzureConnectionError, AzureInternalError, AzureResponseError, BadRequestError, CLIInternalError, ForbiddenError,
@@ -49,6 +56,9 @@ def _error_to_json(error, secrets, depth=0):
     message = str(error) if kind else "Unexpected DPS registration worker error ({}).".format(type(error).__name__)
     if type(error) is TypeError:
         message = _TRANSPORT_OPTION_ERRORS.get(str(error), message)
+    if type(error) is ModuleNotFoundError and error.name == "msrestazure":
+        message = ("DPS registration worker could not load required dependency 'msrestazure'. "
+                   "Reinstall the azure-iot extension in the active Azure CLI environment.")
     result = {"type": kind or "CLIInternalError", "message": _redact(message, secrets)}
     if isinstance(error, HttpResponseError):
         result["status_code"] = error.status_code
