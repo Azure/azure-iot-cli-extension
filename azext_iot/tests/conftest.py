@@ -467,10 +467,20 @@ def fixture_dt_client(mocker, fixture_cmd):
 
 def pytest_addoption(parser):
     parser.addoption("--api-version", action="store", default=None)
+    parser.addoption(
+        "--integration-progress-interval", type=int, default=0,
+        help="Emit credential-free integration phase progress every N seconds (0 disables).",
+    )
 
 
 def pytest_configure(config):
+    from azext_iot.tests._integration_progress import IntegrationProgress
+
+    interval = config.getoption("integration_progress_interval")
+    if interval < 0:
+        raise pytest.UsageError("--integration-progress-interval must be nonnegative.")
     config.pluginmanager.register(ImmediateIntegrationReports(config), "iot-immediate-reports")
+    config.pluginmanager.register(IntegrationProgress(config, interval), "iot-integration-progress")
 
 
 class ImmediateIntegrationReports:
