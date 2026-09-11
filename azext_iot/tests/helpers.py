@@ -155,11 +155,10 @@ def tags_to_dict(tags: str) -> dict:
     return result
 
 
-def get_closest_marker(request: SubRequest) -> Mark:
-    for item in request.session.items:
-        if item.get_closest_marker("hub_infrastructure"):
-            return item.get_closest_marker("hub_infrastructure")
-    return request.node.get_closest_marker("hub_infrastructure")
+def get_closest_marker(request: SubRequest) -> Optional[Mark]:
+    # For cached fixtures request.node is the scope node, not the test which
+    # initializes the fixture. Pytest retains that consumer in _pyfuncitem.
+    return request._pyfuncitem.get_closest_marker("hub_infrastructure")  # pylint: disable=protected-access
 
 
 def get_agent_public_ip():
