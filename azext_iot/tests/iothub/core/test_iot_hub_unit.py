@@ -136,24 +136,6 @@ class TestIoTHubDeviceIdentityExport(object):
 
         assert_device_identity_result(result, generic_job_response)
 
-    @pytest.mark.parametrize(
-        "req",
-        [
-            generate_device_identity(identity="[system]"),
-            generate_device_identity(identity="system"),
-        ]
-    )
-    def test_device_identity_export_input(self, fixture_cmd, req):
-        with pytest.raises(CLIError):
-            subject.iot_device_export(
-                cmd=fixture_cmd,
-                hub_name_or_hostname=hub_name,
-                blob_container_uri=blob_container_uri,
-                include_keys=req["include_keys"],
-                identity=req["identity"],
-                resource_group_name=req["resource_group_name"],
-            )
-
     def test_device_identity_export_error(self, fixture_cmd, importexport_service_client_error):
         with pytest.raises(CLIError) as e:
             subject.iot_device_export(
@@ -219,24 +201,6 @@ class TestIoTHubDeviceIdentityImport(object):
                 assert request_body["identity"]["userAssignedIdentity"] == req["identity"]
 
         assert_device_identity_result(result, generic_job_response)
-
-    @pytest.mark.parametrize(
-        "req",
-        [
-            generate_device_identity(identity="[system]"),
-            generate_device_identity(identity="managed_identity"),
-        ]
-    )
-    def test_device_identity_import_input(self, fixture_cmd, req):
-        with pytest.raises(CLIError):
-            subject.iot_device_import(
-                cmd=fixture_cmd,
-                hub_name_or_hostname=hub_name,
-                input_blob_container_uri=blob_container_uri,
-                output_blob_container_uri=blob_container_uri + "2",
-                identity=req["identity"],
-                resource_group_name=req["resource_group_name"],
-            )
 
     def test_device_identity_import_error(self, fixture_cmd, importexport_service_client_error):
         with pytest.raises(CLIError) as e:

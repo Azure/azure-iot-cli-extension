@@ -16,57 +16,40 @@ from azext_iot.core._params import load_arguments
 
 def load_core_arguments(self, _):
 
-    # TODO - CMS Preview - load default CLI Core args
+    # Load default CLI core args
     load_arguments(self, _)
 
-    # IoT Hub ADR params
-    with self.argument_context("iot hub") as c:
-        c.argument(
-            "adr_ns_id",
-            options_list=["--ns-resource-id"],
-            help="Device Registry namespace resource ID to link to this IoT hub.",
-        )
-        c.argument(
-            "adr_ns_identity_id",
-            options_list=["--ns-identity-id"],
-            help="User-managed identity resource ID to access Device Registry namespace.",
-        )
-
-    # IoT Hub create - namespace role assignment customization
-    with self.argument_context("iot hub create") as context:
-        context.argument(
-            "skip_ns_role_assignments",
-            options_list=["--skip-ns-ra"],
-            arg_group="ADR Namespace Role Assignment",
-            arg_type=get_three_state_flag(),
-            help="Used to skip ADR Namespace role assignment after IoT hub creation. "
-            "Only applicable to Gen2 IoT Hubs."
-        )
-
-        context.argument(
-            "custom_ns_role_id",
-            options_list=["--custom-ns-role-id"],
-            arg_group="ADR Namespace Role Assignment",
-            help="Fully qualified role definition Id to apply to ADR Namespace, in the following format: "
-            "/subscriptions/{subscriptionId}/providers/Microsoft.Authorization/roleDefinitions/{roleId}. "
-            "Only applicable to Gen2 IoT Hubs.",
-        )
-
-    # DPS create / update identity params
-    with self.argument_context("iot dps") as c:
-        c.argument(
-            "mi_system_assigned",
-            arg_type=get_three_state_flag(),
-            options_list=["--mi-system-assigned"],
-            help="Enable system-assigned managed identity for this provisioning service.",
-        )
-        c.argument(
-            "mi_user_assigned",
-            nargs="*",
-            options_list=["--mi-user-assigned"],
-            help="Enable user-assigned managed identities for this provisioning service. "
-            "Accepts space-separated list of identity resource IDs.",
-        )
+    # DPS create / update identity params. Namespace links are managed only by
+    # ``iot adr ns link`` and are intentionally absent here.
+    for command in ("iot dps create", "iot dps update"):
+        with self.argument_context(command) as c:
+            c.argument(
+                "mi_system_assigned",
+                arg_type=get_three_state_flag(),
+                options_list=[
+                    "--system-assigned-mi",
+                    c.deprecate(
+                        target="--mi-system-assigned",
+                        redirect="--system-assigned-mi",
+                        hide=True,
+                    ),
+                ],
+                help="Enable system-assigned managed identity for this provisioning service.",
+            )
+            c.argument(
+                "mi_user_assigned",
+                nargs="*",
+                options_list=[
+                    "--user-assigned-mi",
+                    c.deprecate(
+                        target="--mi-user-assigned",
+                        redirect="--user-assigned-mi",
+                        hide=True,
+                    ),
+                ],
+                help="Enable user-assigned managed identities for this provisioning service. "
+                "Accepts space-separated list of identity resource IDs.",
+            )
 
     # DPS identity assignment params
     with self.argument_context("iot dps identity assign") as c:

@@ -138,4 +138,7 @@ class EmbeddedCLI(object):
 
     def _ensure_subscription(self, command: str, subscription: str) -> str:
         """Add subscription to invoked cli command."""
+        command_group = command.lstrip().split(maxsplit=1)[0]
+        if command_group in {"account", "ad", "extension"}:
+            return command
         return "{} --subscription '{}'".format(command, subscription)

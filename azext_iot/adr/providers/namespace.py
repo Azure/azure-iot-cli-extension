@@ -4,89 +4,408 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import Any, Dict, List, Optional
+from copy import deepcopy
+from typing import Dict, List, Optional
 
 from azure.cli.core.azclierror import (
     AzureResponseError,
     InvalidArgumentValueError,
+    MutuallyExclusiveArgumentError,
     RequiredArgumentMissingError,
 )
 from azure.core.exceptions import HttpResponseError
+from knack.log import get_logger
 from msrestazure.tools import is_valid_resource_id, parse_resource_id
 
-from azext_iot.adr.common import IdentityType
-from azext_iot.adr.providers.base import ADRProvider, parse_json_object
+from azext_iot.adr.common import (
+    IdentityType,
+    ManagedServiceIdentityType,
+    build_mi_body,
+    validate_uami_resource_id,
+)
+from azext_iot.adr.providers.base import ADRProvider, console
+from azext_iot.adr.topology import writable_namespace_properties
+
+logger = get_logger(__name__)
 
 
-def _messaging_properties(value: Any) -> dict:
-    if value is None:
-        return {}
-    endpoints = parse_json_object(value, "--messaging-endpoints")
-    for name, endpoint in endpoints.items():
-        if not isinstance(name, str) or not name.strip() or not isinstance(endpoint, dict):
-            raise InvalidArgumentValueError(
-                "--messaging-endpoints must map nonempty endpoint names to JSON objects."
-            )
-        unsupported = set(endpoint) - {"address", "endpointType", "resourceId"}
-        if unsupported:
-            raise InvalidArgumentValueError(
-                f"Messaging endpoint '{name}' contains unsupported properties: "
-                f"{', '.join(sorted(unsupported))}."
-            )
-        if not isinstance(endpoint.get("address"), str) or not endpoint["address"].strip():
-            raise InvalidArgumentValueError(f"Messaging endpoint '{name}' requires a nonempty address.")
-        for key in ("endpointType", "resourceId"):
-            if key in endpoint and not isinstance(endpoint[key], str):
-                raise InvalidArgumentValueError(f"Messaging endpoint '{name}' property '{key}' must be a string.")
-    return {"messaging": {"endpoints": endpoints}}
+_OUTBOUND_MI_MUTEX_MSG = (
+    "Specify only one outbound identity: --outbound-system-assigned-mi uses the "
+    "namespace's system-assigned identity, while --outbound-user-assigned-mi "
+    "<uami-resource-id> uses a user-assigned managed identity (the two options "
+    "are mutually exclusive)."
+)
+
+_OBSERVABILITY_ENDPOINT_FIELDS = (
+    "endpointType",
+    "address",
+    "scopeId",
+    "resourceId",
+)
+_OBSERVABILITY_ENDPOINT_REQUIRED_MSG = (
+    "Namespace observability can only be enabled or disabled when the namespace "
+    "already has a complete service-configured observability endpoint. The CLI "
+    "does not accept raw observability endpoint values."
+)
+
+
+def _normalize_resource_id(resource_id: str) -> str:
+    return resource_id.rstrip("/").casefold()
+
+
+def _resolve_outbound_identity(
+    outbound_mi_system_assigned: Optional[bool],
+    outbound_mi_user_assigned: Optional[str],
+) -> Optional[dict]:
+    """Return the OutboundIdentity body (or None when no flag provided)."""
+    # An empty/whitespace UAMI (e.g. `--outbound-user-assigned-mi ""`) means the caller
+    # did not actually supply one. Clear it first so it neither trips the SAMI/UAMI
+    # mutually-exclusive check below nor reaches build_mi_body as a malformed value.
+    if outbound_mi_user_assigned is not None and not outbound_mi_user_assigned.strip():
+        outbound_mi_user_assigned = None
+    if outbound_mi_system_assigned and outbound_mi_user_assigned:
+        raise MutuallyExclusiveArgumentError(_OUTBOUND_MI_MUTEX_MSG)
+    if outbound_mi_user_assigned:
+        validate_uami_resource_id(outbound_mi_user_assigned)
+    return build_mi_body(
+        outbound_mi_system_assigned,
+        outbound_mi_user_assigned,
+        sami_type=IdentityType.system_assigned.value,
+        uami_type=IdentityType.user_assigned.value,
+    )
+
+
+def _build_namespace_identity(
+    existing_identity: Optional[dict] = None,
+    user_assigned_identity: Optional[str] = None,
+    ensure_system_assigned: bool = False,
+) -> dict:
+    """Build a namespace ARM identity while preserving existing UAMI assignments."""
+    existing_identity = existing_identity or {}
+    identity_type = existing_identity.get("type") or ""
+    has_system_assigned = ensure_system_assigned or "SystemAssigned" in identity_type
+    user_assigned_identities = {
+        _normalize_resource_id(resource_id): resource_id
+        for resource_id in (existing_identity.get("userAssignedIdentities") or {})
+    }
+    if user_assigned_identity:
+        user_assigned_identities.setdefault(
+            _normalize_resource_id(user_assigned_identity),
+            user_assigned_identity,
+        )
+
+    if has_system_assigned and user_assigned_identities:
+        resolved_type = ManagedServiceIdentityType.system_assigned_user_assigned.value
+    elif has_system_assigned:
+        resolved_type = ManagedServiceIdentityType.system_assigned.value
+    elif user_assigned_identities:
+        resolved_type = ManagedServiceIdentityType.user_assigned.value
+    else:
+        resolved_type = "None"
+
+    identity = {"type": resolved_type}
+    if user_assigned_identities:
+        identity["userAssignedIdentities"] = {
+            resource_id: {} for resource_id in user_assigned_identities.values()
+        }
+    return identity
+
+
+def _build_observability(
+    existing_observability: Optional[dict], enabled: bool
+) -> dict:
+    observability = dict(existing_observability or {})
+    endpoints = observability.get("endpoints")
+    if (
+        not isinstance(endpoints, dict)
+        or not endpoints
+        or any(
+            not isinstance(endpoint, dict)
+            or any(not endpoint.get(field) for field in _OBSERVABILITY_ENDPOINT_FIELDS)
+            for endpoint in endpoints.values()
+        )
+    ):
+        raise InvalidArgumentValueError(_OBSERVABILITY_ENDPOINT_REQUIRED_MSG)
+    observability["enabled"] = enabled
+    return observability
+
+
+def _managed_identity_type(has_system_assigned: bool, user_identity_ids) -> str:
+    if has_system_assigned and user_identity_ids:
+        return ManagedServiceIdentityType.system_assigned_user_assigned.value
+    if has_system_assigned:
+        return ManagedServiceIdentityType.system_assigned.value
+    if user_identity_ids:
+        return ManagedServiceIdentityType.user_assigned.value
+    return "None"
+
+
+def _clean_identity_ids(identity_ids: Optional[List[str]]) -> Optional[List[str]]:
+    if identity_ids is None:
+        return None
+    cleaned = [
+        identity_id.strip()
+        for identity_id in identity_ids
+        if isinstance(identity_id, str) and identity_id.strip()
+    ]
+    if len(cleaned) != len(identity_ids):
+        raise InvalidArgumentValueError(
+            "User-assigned identity resource IDs must not be empty."
+        )
+    unique_ids = {}
+    for identity_id in cleaned:
+        validate_uami_resource_id(identity_id)
+        unique_ids.setdefault(_normalize_resource_id(identity_id), identity_id)
+    return list(unique_ids.values())
 
 
 def _clean_migrate_resource_ids(resource_ids: Optional[List[str]]) -> List[str]:
     if not resource_ids:
-        raise RequiredArgumentMissingError("Specify at least one legacy asset resource ID with --resource-ids.")
+        raise RequiredArgumentMissingError(
+            "Specify at least one legacy asset resource ID with --resource-ids."
+        )
+
     unique_ids = {}
     for resource_id in resource_ids:
-        cleaned = resource_id.strip().rstrip("/") if isinstance(resource_id, str) else ""
-        if not cleaned or not is_valid_resource_id(cleaned):
-            raise InvalidArgumentValueError(f"'{resource_id}' is not a valid Azure resource ID.")
-        parsed = parse_resource_id(cleaned)
+        cleaned_id = resource_id.strip() if isinstance(resource_id, str) else ""
+        if not cleaned_id or not is_valid_resource_id(cleaned_id):
+            raise InvalidArgumentValueError(
+                f"'{resource_id}' is not a valid Azure resource ID."
+            )
+        parsed = parse_resource_id(cleaned_id)
         if (
-            (parsed.get("namespace") or "").casefold() != "microsoft.deviceregistry"
+            (parsed.get("namespace") or "").casefold()
+            != "microsoft.deviceregistry"
             or (parsed.get("type") or "").casefold() != "assets"
             or "child_name_1" in parsed
         ):
-            raise InvalidArgumentValueError(f"'{resource_id}' is not a Microsoft.DeviceRegistry/assets resource ID.")
-        unique_ids.setdefault(cleaned.casefold(), cleaned)
+            raise InvalidArgumentValueError(
+                f"'{resource_id}' is not a Microsoft.DeviceRegistry/assets "
+                "resource ID."
+            )
+        unique_ids.setdefault(_normalize_resource_id(cleaned_id), cleaned_id)
     return list(unique_ids.values())
 
 
 class NamespaceProvider(ADRProvider):
+    def __init__(self, cmd):
+        super(NamespaceProvider, self).__init__(cmd)
+
+    def _preflight_outbound_identity_change(
+        self, namespace: dict, outbound_identity: Optional[dict]
+    ) -> None:
+        properties = (namespace or {}).get("properties") or {}
+        sections = {
+            "provisioning": "dps",
+            "messaging": "hub",
+            "updating": "su",
+        }
+        links = [
+            (kind, endpoint)
+            for section, kind in sections.items()
+            for endpoint in (
+                (properties.get(section) or {}).get("endpoints") or {}
+            ).values()
+            if endpoint
+        ]
+        if not links:
+            return
+
+        from azext_iot.adr.providers import link as link_provider
+
+        candidate = deepcopy(namespace)
+        candidate_properties = candidate.setdefault("properties", {})
+        candidate_properties["outboundIdentity"] = outbound_identity
+        candidate_identity = candidate.get("identity") or {}
+        outbound_type = (outbound_identity or {}).get("type")
+        if outbound_type == "UserAssigned":
+            resource_id = outbound_identity.get("userAssignedIdentity")
+            normalized_id = _normalize_resource_id(resource_id)
+            identities = candidate_identity.setdefault(
+                "userAssignedIdentities", {}
+            )
+            matching_id = next(
+                (
+                    identity_id
+                    for identity_id in identities
+                    if _normalize_resource_id(identity_id) == normalized_id
+                ),
+                None,
+            )
+            details = identities.get(matching_id) or {}
+            if not details.get("principalId"):
+                from azext_iot.common.embedded_cli import EmbeddedCLI
+
+                parsed = parse_resource_id(resource_id)
+                details = EmbeddedCLI(
+                    cli_ctx=self.cmd.cli_ctx,
+                    capture_stderr=True,
+                ).invoke(
+                    f"identity show --ids '{resource_id}'",
+                    subscription=parsed.get("subscription"),
+                ).as_json()
+            identities[matching_id or resource_id] = {
+                "principalId": details.get("principalId")
+            }
+            candidate_identity["type"] = _managed_identity_type(
+                "SystemAssigned" in str(candidate_identity.get("type") or ""),
+                identities,
+            )
+        candidate["identity"] = candidate_identity
+
+        provider = link_provider.LinkProvider(
+            self.cmd, client=self.client
+        )
+        requests = []
+        strategies = {
+            "hub": (
+                link_provider._parse_hub_resource_id,
+                link_provider._HUB_TARGET,
+            ),
+            "dps": (
+                link_provider._parse_dps_resource_id,
+                link_provider._DPS_TARGET,
+            ),
+            "su": (
+                link_provider._parse_su_resource_id,
+                link_provider._SU_TARGET,
+            ),
+        }
+        endpoint_types = {
+            "hub": "Microsoft.Devices/IotHubs",
+            "dps": "Microsoft.Devices/provisioningServices",
+            "su": "Microsoft.DeviceUpdate/updateInstances",
+        }
+        for kind, endpoint in links:
+            if (
+                str(endpoint.get("endpointType") or "").casefold()
+                != endpoint_types[kind].casefold()
+            ):
+                continue
+            resource_id = endpoint.get("resourceId")
+            parser, strategy = strategies[kind]
+            provider._preflight_link(  # pylint: disable=protected-access
+                link_type=kind,
+                namespace=candidate,
+                target_resource_id=resource_id,
+                inbound_identity=endpoint.get("inboundCallerIdentity"),
+                parsed=parser(resource_id),
+                strategy=strategy,
+                rbac_requests=requests,
+            )
+        provider._rbac_manager().ensure_many(  # pylint: disable=protected-access
+            requests
+        )
+
     def create(
         self,
         namespace_name: str,
         resource_group_name: str,
         location: Optional[str] = None,
         tags: Optional[Dict[str, str]] = None,
-        system_assigned: bool = True,
-        messaging_endpoints: Any = None,
+        outbound_mi_system_assigned: Optional[bool] = None,
+        outbound_mi_user_assigned: Optional[str] = None,
+        observability_enabled: Optional[bool] = None,
         **kwargs,
     ):
-        properties = _messaging_properties(messaging_endpoints)
-        resource = {
-            "location": self._ensure_location(self.cmd.cli_ctx, resource_group_name, location),
-            "identity": {"type": IdentityType.system_assigned.value if system_assigned else IdentityType.none.value},
-        }
+        try:
+            existing_namespace = self.client.namespaces.get(
+                resource_group_name=resource_group_name,
+                namespace_name=namespace_name,
+            )
+        except HttpResponseError as error:
+            if error.status_code != 404:
+                raise
+            existing_namespace = None
+
+        if not location:
+            location = (existing_namespace or {}).get("location")
+        if not location:
+            location = self._ensure_location(
+                self.cmd.cli_ctx, resource_group_name, location
+            )
+
+        namespace_resource = {"location": location}
         if tags is not None:
-            resource["tags"] = tags
-        if properties:
-            resource["properties"] = properties
-        poller = self.client.namespaces.begin_create_or_replace(
-            resource_group_name=resource_group_name, namespace_name=namespace_name, resource=resource
+            namespace_resource["tags"] = tags
+        elif existing_namespace is not None and "tags" in existing_namespace:
+            namespace_resource["tags"] = deepcopy(existing_namespace["tags"])
+
+        outbound_identity = _resolve_outbound_identity(
+            outbound_mi_system_assigned, outbound_mi_user_assigned
         )
-        result = self._wait(poller, f"Creating namespace {namespace_name}...", **kwargs)
-        if not kwargs.get("no_wait") and result and not result.get("resourceGroup"):
-            result["resourceGroup"] = resource_group_name
-        return result
+
+        existing_properties = (existing_namespace or {}).get("properties") or {}
+        properties = writable_namespace_properties(existing_properties)
+        if outbound_identity is not None:
+            properties["outboundIdentity"] = outbound_identity
+        elif outbound_mi_system_assigned is False:
+            properties["outboundIdentity"] = None
+
+        if existing_namespace is None:
+            # Keep the established new-resource default while avoiding an
+            # implicit SAMI change on CreateOrReplace of an existing resource.
+            namespace_resource["identity"] = _build_namespace_identity(
+                user_assigned_identity=(
+                    outbound_identity.get("userAssignedIdentity")
+                    if outbound_identity
+                    else None
+                ),
+                ensure_system_assigned=True,
+            )
+        elif outbound_identity is not None:
+            namespace_resource["identity"] = _build_namespace_identity(
+                existing_identity=existing_namespace.get("identity"),
+                user_assigned_identity=outbound_identity.get(
+                    "userAssignedIdentity"
+                ),
+                ensure_system_assigned=bool(
+                    outbound_mi_system_assigned
+                ),
+            )
+        elif "identity" in existing_namespace:
+            existing_identity = existing_namespace.get("identity")
+            namespace_resource["identity"] = (
+                _build_namespace_identity(existing_identity)
+                if existing_identity
+                else existing_identity
+            )
+
+        existing_observability = existing_properties.get("observability")
+        if observability_enabled is not None:
+            properties["observability"] = _build_observability(
+                existing_observability, observability_enabled
+            )
+
+        if properties:
+            namespace_resource["properties"] = properties
+
+        if existing_namespace is not None and (
+            outbound_identity is not None
+            or outbound_mi_system_assigned is False
+        ):
+            self._preflight_outbound_identity_change(
+                existing_namespace,
+                outbound_identity,
+            )
+
+        poller = self.client.namespaces.begin_create_or_replace(
+            resource_group_name=resource_group_name,
+            namespace_name=namespace_name,
+            resource=namespace_resource,
+        )
+        no_wait = kwargs.pop("no_wait", False)
+        if no_wait:
+            return poller
+        with console.status(f"Creating namespace {namespace_name}..."):
+            namespace_result = self._await_terminal(poller, **kwargs)
+
+        # The create response may omit resourceGroup; backfill it from the request input.
+        # (namespace_result can be None if the provisioningState poll times out.)
+        if namespace_result and not namespace_result.get("resourceGroup"):
+            namespace_result["resourceGroup"] = resource_group_name
+
+        return namespace_result
 
     def show(self, namespace_name: str, resource_group_name: str):
         return self.client.namespaces.get(resource_group_name=resource_group_name, namespace_name=namespace_name)
@@ -99,57 +418,315 @@ class NamespaceProvider(ADRProvider):
         return list(result)
 
     def delete(self, namespace_name: str, resource_group_name: str, **kwargs):
+        # The service does NOT cascade: it rejects the delete with 'NamespaceNotEmpty'
+        # while any child resource remains, so children must be removed first.
         try:
             poller = self.client.namespaces.begin_delete(
                 resource_group_name=resource_group_name, namespace_name=namespace_name
             )
             return self._wait(poller, f"Deleting namespace {namespace_name}...", **kwargs)
         except HttpResponseError as error:
-            if "NamespaceNotEmpty" in str(error):
-                raise AzureResponseError(
-                    f"Namespace '{namespace_name}' is not empty. Delete its child resources before deleting "
-                    "the namespace; namespace deletion does not cascade."
-                ) from error
+            self._raise_if_namespace_not_empty(error, namespace_name)
             raise
+
+    def migrate(
+        self,
+        namespace_name: str,
+        resource_group_name: str,
+        resource_ids: List[str],
+        **kwargs,
+    ):
+        body = {
+            "scope": "Resources",
+            "resourceIds": _clean_migrate_resource_ids(resource_ids),
+        }
+        poller = self.client.namespaces.begin_migrate(
+            resource_group_name=resource_group_name,
+            namespace_name=namespace_name,
+            body=body,
+        )
+        return self._wait(
+            poller,
+            f"Migrating assets into namespace {namespace_name}...",
+            **kwargs,
+        )
+
+    @staticmethod
+    def _raise_if_namespace_not_empty(error: HttpResponseError, namespace_name: str):
+        """Translate the backend 'NamespaceNotEmpty' rejection into actionable guidance.
+
+        Returns without raising when ``error`` is unrelated, so the caller can re-raise it
+        unchanged.
+        """
+        if "NamespaceNotEmpty" not in str(error):
+            return
+        # error.message carries a multi-line 'Exception Details' block; keep only its first
+        # line so the guidance below stays readable.
+        summary = (error.message or str(error)).strip().splitlines()[0].strip()
+        raise AzureResponseError(
+            f"{summary}\nNamespace deletion does not cascade. Delete the child resources "
+            f"and links in this safe order:\n"
+            f"  az iot adr ns job run delete --ns {namespace_name} -g <rg> "
+            f"--job-name <job> --run-name <run>\n"
+            f"  az iot adr ns job delete --ns {namespace_name} -g <rg> -n <job>\n"
+            f"  az iot adr ns registry-device delete --ns {namespace_name} -g <rg> -n <device>\n"
+            f"  az iot adr ns group delete --ns {namespace_name} -g <rg> -n <group>\n"
+            f"  az iot adr ns ca policy delete --ns {namespace_name} -g <rg> "
+            f"--ca-name <ca> -n <policy>\n"
+            f"  az iot adr ns ca delete --ns {namespace_name} -g <rg> -n <ca>\n"
+            f"  az iot adr ns link hub delete --ns {namespace_name} -g <rg> -n <endpoint>\n"
+            f"  az iot adr ns link dps delete --ns {namespace_name} -g <rg> -n <endpoint>\n"
+            f"  az iot adr ns link su delete --ns {namespace_name} -g <rg> -n <endpoint>\n"
+            "Warning: each link delete command permanently deletes the linked "
+            "Azure Hub, DPS, or Update Instance resource; it is not a non-destructive unlink."
+        )
 
     def update(
         self,
         namespace_name: str,
         resource_group_name: str,
         tags: Optional[Dict[str, str]] = None,
-        system_assigned: Optional[bool] = None,
-        messaging_endpoints: Any = None,
+        outbound_mi_system_assigned: Optional[bool] = None,
+        outbound_mi_user_assigned: Optional[str] = None,
+        observability_enabled: Optional[bool] = None,
         **kwargs,
     ):
-        properties = _messaging_properties(messaging_endpoints)
-        resource = {}
+        # NamespaceUpdate body: tags at top, substantive fields nested under "properties".
+        body: dict = {}
         if tags is not None:
-            resource["tags"] = tags
-        if system_assigned is not None:
-            resource["identity"] = {
-                "type": IdentityType.system_assigned.value if system_assigned else IdentityType.none.value
-            }
+            body["tags"] = tags
+
+        properties = {}
+        namespace = None
+        if observability_enabled is not None:
+            namespace = self.client.namespaces.get(
+                resource_group_name=resource_group_name,
+                namespace_name=namespace_name,
+            )
+            existing_observability = (
+                ((namespace or {}).get("properties") or {}).get("observability") or {}
+            )
+            properties["observability"] = _build_observability(
+                existing_observability, observability_enabled
+            )
+
+        outbound_identity = _resolve_outbound_identity(
+            outbound_mi_system_assigned, outbound_mi_user_assigned
+        )
+        if outbound_identity is not None:
+            properties["outboundIdentity"] = outbound_identity
+            if namespace is None:
+                namespace = self.client.namespaces.get(
+                    resource_group_name=resource_group_name,
+                    namespace_name=namespace_name,
+                )
+            body["identity"] = _build_namespace_identity(
+                existing_identity=(namespace or {}).get("identity"),
+                user_assigned_identity=outbound_identity.get("userAssignedIdentity"),
+                ensure_system_assigned=bool(outbound_mi_system_assigned),
+            )
+        elif outbound_mi_system_assigned is False:
+            properties["outboundIdentity"] = None
+            if namespace is None:
+                namespace = self.client.namespaces.get(
+                    resource_group_name=resource_group_name,
+                    namespace_name=namespace_name,
+                )
         if properties:
-            resource["properties"] = properties
+            body["properties"] = properties
+        if not body:
+            raise RequiredArgumentMissingError(
+                "Nothing to update. Provide --tags, --observability-enabled, or "
+                "an outbound managed identity."
+            )
+
+        if outbound_identity is not None or outbound_mi_system_assigned is False:
+            self._preflight_outbound_identity_change(
+                namespace,
+                outbound_identity,
+            )
+
         poller = self.client.namespaces.begin_update(
-            resource_group_name=resource_group_name, namespace_name=namespace_name, properties=resource
+            resource_group_name=resource_group_name,
+            namespace_name=namespace_name,
+            properties=body,
         )
         return self._wait(poller, f"Updating namespace {namespace_name}...", **kwargs)
 
-    def migrate(self, namespace_name: str, resource_group_name: str, resource_ids: List[str], **kwargs):
-        body = {"scope": "Resources", "resourceIds": _clean_migrate_resource_ids(resource_ids)}
-        poller = self.client.namespaces.begin_migrate(
-            resource_group_name=resource_group_name, namespace_name=namespace_name, body=body
-        )
-        return self._wait(poller, f"Migrating assets into namespace {namespace_name}...", **kwargs)
-
     def identity_show(self, namespace_name: str, resource_group_name: str):
-        return self.show(namespace_name, resource_group_name).get("identity") or {}
+        namespace = self.show(namespace_name, resource_group_name)
+        return (namespace or {}).get("identity")
 
-    def identity_assign(self, namespace_name: str, resource_group_name: str, **kwargs):
-        result = self.update(namespace_name, resource_group_name, system_assigned=True, **kwargs)
-        return result if kwargs.get("no_wait") or result is None else result.get("identity") or {}
+    def identity_assign(
+        self,
+        namespace_name: str,
+        resource_group_name: str,
+        system_assigned: bool = False,
+        user_assigned_identities: Optional[List[str]] = None,
+        **kwargs,
+    ):
+        user_assigned_identities = _clean_identity_ids(user_assigned_identities)
+        if not system_assigned and not user_assigned_identities:
+            raise RequiredArgumentMissingError(
+                "Specify --system-assigned or at least one "
+                "--user-assigned-identity."
+            )
 
-    def identity_remove(self, namespace_name: str, resource_group_name: str, **kwargs):
-        result = self.update(namespace_name, resource_group_name, system_assigned=False, **kwargs)
-        return result if kwargs.get("no_wait") or result is None else result.get("identity") or {}
+        namespace = self.show(namespace_name, resource_group_name)
+        existing_identity = (namespace or {}).get("identity") or {}
+        existing_type = existing_identity.get("type") or ""
+        has_system_assigned = system_assigned or "SystemAssigned" in existing_type
+        existing_ids = {
+            _normalize_resource_id(identity_id): identity_id
+            for identity_id in (
+                existing_identity.get("userAssignedIdentities") or {}
+            )
+        }
+        requested_ids = {
+            _normalize_resource_id(identity_id): identity_id
+            for identity_id in (user_assigned_identities or [])
+        }
+        added_ids = set(requested_ids) - set(existing_ids)
+        adds_system_identity = system_assigned and "SystemAssigned" not in existing_type
+        if not added_ids and not adds_system_identity:
+            raise InvalidArgumentValueError(
+                "All requested managed identities are already assigned."
+            )
+        identity_ids = {
+            **existing_ids,
+            **{
+                normalized_id: requested_ids[normalized_id]
+                for normalized_id in added_ids
+            },
+        }
+        identity = {
+            "type": _managed_identity_type(has_system_assigned, identity_ids)
+        }
+        if identity_ids:
+            identity["userAssignedIdentities"] = {
+                identity_id: {} for identity_id in sorted(identity_ids.values())
+            }
+
+        poller = self.client.namespaces.begin_update(
+            resource_group_name=resource_group_name,
+            namespace_name=namespace_name,
+            properties={"identity": identity},
+        )
+        no_wait = kwargs.get("no_wait", False)
+        result = self._wait(
+            poller,
+            f"Assigning managed identities to namespace {namespace_name}...",
+            **kwargs,
+        )
+        if no_wait:
+            return result
+        return (result or {}).get("identity")
+
+    def identity_remove(
+        self,
+        namespace_name: str,
+        resource_group_name: str,
+        system_assigned: bool = False,
+        user_assigned_identities: Optional[List[str]] = None,
+        **kwargs,
+    ):
+        user_assigned_identities = _clean_identity_ids(user_assigned_identities)
+        if not system_assigned and user_assigned_identities is None:
+            raise RequiredArgumentMissingError(
+                "Specify --system-assigned or --user-assigned-identity."
+            )
+
+        namespace = self.show(namespace_name, resource_group_name)
+        existing_identity = (namespace or {}).get("identity") or {}
+        existing_type = existing_identity.get("type") or ""
+        has_system_assigned = "SystemAssigned" in existing_type
+        existing_ids = {
+            _normalize_resource_id(identity_id): identity_id
+            for identity_id in (
+                existing_identity.get("userAssignedIdentities") or {}
+            )
+        }
+        requested_ids = {
+            _normalize_resource_id(identity_id): identity_id
+            for identity_id in (user_assigned_identities or [])
+        }
+        remove_ids = (
+            set(existing_ids)
+            if user_assigned_identities == []
+            else set(requested_ids)
+        )
+        if not system_assigned and not remove_ids:
+            raise InvalidArgumentValueError(
+                "The namespace has no user-assigned identities to remove."
+            )
+        missing_ids = remove_ids - set(existing_ids)
+        if missing_ids:
+            names = ", ".join(
+                sorted(requested_ids[identity_id] for identity_id in missing_ids)
+            )
+            raise InvalidArgumentValueError(
+                f"These user-assigned identities are not assigned: {names}."
+            )
+        if system_assigned and not has_system_assigned:
+            raise InvalidArgumentValueError(
+                "The namespace does not have a system-assigned identity."
+            )
+
+        outbound_identity = ((namespace or {}).get("properties") or {}).get(
+            "outboundIdentity"
+        ) or {}
+        namespace_properties = (namespace or {}).get("properties") or {}
+        has_links = any(
+            ((namespace_properties.get(section) or {}).get("endpoints") or {})
+            for section in ("provisioning", "messaging", "updating")
+        )
+        outbound_type = outbound_identity.get("type")
+        if system_assigned and (
+            outbound_type == "SystemAssigned"
+            or not outbound_type and has_links
+        ):
+            raise InvalidArgumentValueError(
+                "The system-assigned identity is configured as the outbound "
+                "identity. Change the outbound identity before removing it."
+            )
+        outbound_uami = outbound_identity.get("userAssignedIdentity")
+        if (
+            outbound_uami
+            and _normalize_resource_id(outbound_uami) in remove_ids
+        ):
+            raise InvalidArgumentValueError(
+                "A selected user-assigned identity is configured as the outbound "
+                "identity. Change the outbound identity before removing it."
+            )
+
+        remaining_ids = set(existing_ids) - remove_ids
+        has_system_assigned = has_system_assigned and not system_assigned
+        identity = {
+            "type": _managed_identity_type(has_system_assigned, remaining_ids)
+        }
+        if remaining_ids:
+            identity["userAssignedIdentities"] = {
+                **{
+                    existing_ids[identity_id]: {}
+                    for identity_id in sorted(remaining_ids)
+                },
+                **{
+                    existing_ids[identity_id]: None
+                    for identity_id in sorted(remove_ids)
+                },
+            }
+
+        poller = self.client.namespaces.begin_update(
+            resource_group_name=resource_group_name,
+            namespace_name=namespace_name,
+            properties={"identity": identity},
+        )
+        no_wait = kwargs.get("no_wait", False)
+        result = self._wait(
+            poller,
+            f"Removing managed identities from namespace {namespace_name}...",
+            **kwargs,
+        )
+        if no_wait:
+            return result
+        return (result or {}).get("identity")

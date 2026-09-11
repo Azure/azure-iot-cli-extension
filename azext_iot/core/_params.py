@@ -45,7 +45,7 @@ dps_name_type = CLIArgumentType(
     help='IoT Hub Device Provisioning Service name')
 
 mi_system_assigned_type = CLIArgumentType(
-    options_list=['--mi-system-assigned'],
+    options_list=['--system-assigned-mi'],
     help='Provide this flag to use system assigned identity.')
 
 system_assigned_type = CLIArgumentType(
@@ -64,6 +64,10 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
             c.argument('dps_name', dps_name_type, id_part='name')
 
     with self.argument_context('iot dps create') as c:
+        c.argument('disable_local_auth', options_list=['--disable-local-auth', '--dla'],
+                   arg_type=get_three_state_flag(),
+                   help='Disable DPS service scoped SAS keys for authentication. '
+                   'Defaults to true for new resources. Use --auth-type login for service data-plane commands.')
         c.argument('location', get_location_type(self.cli_ctx),
                    help='Location of your IoT Hub Device Provisioning Service. '
                    'Default is the location of target resource group.')
@@ -239,7 +243,9 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
         c.argument('disable_local_auth', options_list=['--disable-local-auth', '--dla'],
                    arg_type=get_three_state_flag(),
                    help='A boolean indicating whether or not to disable '
-                        'IoT hub scoped SAS keys for authentication.')
+                        'IoT hub scoped SAS keys for authentication. Defaults to true for new Hubs; '
+                        'existing Hub settings are preserved unless specified. '
+                        'Use --auth-type login for service data-plane commands.')
         c.argument('disable_device_sas', options_list=['--disable-device-sas', '--dds'],
                    arg_type=get_three_state_flag(),
                    help='A boolean indicating whether or not to disable all device '
@@ -303,12 +309,29 @@ def load_arguments(self, _):  # pylint: disable=too-many-statements
                    type=str, help='Specify the minimum TLS version to support for this hub. Can be set to '
                                   '"1.0" or "1.2". For example, minimum TLS version set to "1.2" '
                                   'results in clients that use a TLS version below 1.2 to be rejected.')
-        c.argument('system_identity', options_list=['--mi-system-assigned'],
-                   arg_type=get_three_state_flag(),
-                   help="Enable system-assigned managed identity for this hub")
-        c.argument('user_identities', options_list=['--mi-user-assigned'],
-                   nargs='*', help="Enable user-assigned managed identities for this hub. "
-                   "Accept space-separated list of identity resource IDs.")
+        c.argument(
+            'system_identity',
+            options_list=[
+                '--system-assigned-mi',
+                c.deprecate(
+                    target='--mi-system-assigned',
+                    redirect='--system-assigned-mi',
+                    hide=True),
+            ],
+            arg_type=get_three_state_flag(),
+            help="Enable system-assigned managed identity for this hub")
+        c.argument(
+            'user_identities',
+            options_list=[
+                '--user-assigned-mi',
+                c.deprecate(
+                    target='--mi-user-assigned',
+                    redirect='--user-assigned-mi',
+                    hide=True),
+            ],
+            nargs='*',
+            help="Enable user-assigned managed identities for this hub. "
+                 "Accept space-separated list of identity resource IDs.")
         c.argument('identity_role', options_list=['--role'],
                    help="Role to assign to the hub's system-assigned managed identity.")
         c.argument('identity_scopes', options_list=['--scopes'], nargs='*',

@@ -4,10 +4,11 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 # pylint: disable=no-member,line-too-long,too-few-public-methods,too-many-lines,too-many-arguments,too-many-locals
-# TODO - CMS Preview - Remove / fix linting
+# TODO: tighten the broad lint disables above
 # flake8: noqa
 import json
 import re
+from copy import deepcopy
 from datetime import timedelta
 from enum import Enum
 from typing import List, Optional
@@ -30,14 +31,17 @@ from knack.log import get_logger
 from knack.util import CLIError
 
 from azext_iot._factory import iot_hub_service_factory, resource_service_factory
+from azext_iot.common.arm import (
+    adapt_modeless_lro_poller,
+    hub_description_for_write as _hub_description_for_write,
+    hub_etag_arguments,
+    sanitize_arm_identity as _sanitize_arm_identity,
+)
 from azext_iot.common._azure import IOT_SERVICE_CS_TEMPLATE
 from azext_iot.common.utility import validate_key_value_pairs
 from azext_iot.constants import IOT_HUB_DEFAULT_POLICY
 from azext_iot.common.certops import open_certificate
 from azext_iot.core.shared import (
-    ADR_CONFIGURE_ROLES_ERROR_MSG,
-    ADR_NS_IDENTITY_ROLES_FOR_HUB,
-    ADR_ROLE_ASSIGN_ERROR_MSG,
     AccessRights,
     AuthenticationType,
     EncodingFormat,
@@ -193,12 +197,16 @@ def iot_dps_create(
     enable_data_residency=None,
     mi_system_assigned=None,
     mi_user_assigned=None,
+    disable_local_auth=None,
 ):
     """Create a DPS instance with optional managed identities."""
     cli_ctx = cmd.cli_ctx
     _check_dps_name_availability(client.iot_dps_resource, dps_name)
     location = _ensure_location(cli_ctx, resource_group_name, location)
-    dps_property = {"enableDataResidency": enable_data_residency}
+    dps_property = {
+        "enableDataResidency": enable_data_residency,
+        "disableLocalAuth": True if disable_local_auth is None else disable_local_auth,
+    }
 
     dps_description = {
         "location": location,
@@ -223,16 +231,45 @@ def iot_dps_update(
     tags=None,
     mi_system_assigned=None,
     mi_user_assigned=None,
+    cmd=None,
 ):
     resource_group_name = _ensure_dps_resource_group_name(client, resource_group_name, dps_name)
     if tags is not None:
         parameters["tags"] = tags
 
-    if mi_system_assigned is not None or mi_user_assigned:
-        parameters["identity"] = _construct_identity_info(mi_system_assigned, mi_user_assigned)
+    if mi_system_assigned is not None or mi_user_assigned is not None:
+        parameters["identity"] = _merge_dps_identity(
+            parameters.get("identity"),
+            mi_system_assigned,
+            mi_user_assigned,
+        )
 
-    return client.iot_dps_resource.begin_create_or_update(
-        resource_group_name=resource_group_name, provisioning_service_name=dps_name, iot_dps_description=parameters
+    # Generic update mutates the object returned by its getter before invoking
+    # this setter. Re-read the current resource so --remove identity (including
+    # a nested UAMI removal) and --system-assigned-mi false are protected by
+    # the same active-link guard as `iot dps identity remove`.
+    current = client.iot_dps_resource.get(
+        resource_group_name=resource_group_name,
+        provisioning_service_name=dps_name,
+    )
+    remove_system, remove_user_identities = _dps_identity_removals(
+        (current or {}).get("identity"),
+        parameters.get("identity"),
+    )
+    if remove_system or remove_user_identities:
+        _protect_dps_link_identity(
+            cmd,
+            current,
+            remove_system=remove_system,
+            remove_user_identities=remove_user_identities,
+        )
+
+    return adapt_modeless_lro_poller(
+        client.iot_dps_resource.begin_create_or_update(
+            resource_group_name=resource_group_name,
+            provisioning_service_name=dps_name,
+            iot_dps_description=_dps_description_for_write(parameters),
+        )
     )
 
 
@@ -363,8 +400,22 @@ def iot_dps_policy_delete(cmd, client, dps_name, access_policy_name, resource_gr
 
 
 # DPS linked hub methods
+def _warn_namespace_linked_dps(dps):
+    links = ((dps or {}).get("properties") or {}).get(
+        "deviceRegistryNamespaces"
+    ) or []
+    if links:
+        logger.warning(
+            "This DPS is linked to a Device Registry namespace. "
+            "'az iot dps linked-hub' manages the classic DPS properties.iotHubs "
+            "allocation list only; namespace-side 'az iot adr ns link hub' "
+            "relationships are authoritative for ADR."
+        )
+
+
 def iot_dps_linked_hub_list(client, dps_name, resource_group_name=None):
     dps = iot_dps_get(client, dps_name, resource_group_name)
+    _warn_namespace_linked_dps(dps)
     return dps["properties"]["iotHubs"]
 
 
@@ -374,6 +425,7 @@ def iot_dps_linked_hub_get(cmd, client, dps_name, linked_hub, resource_group_nam
         linked_hub = _get_iot_hub_hostname(hub_client, linked_hub)
 
     dps = iot_dps_get(client, dps_name, resource_group_name)
+    _warn_namespace_linked_dps(dps)
     for hub in dps["properties"]["iotHubs"]:
         if hub["name"] == linked_hub:
             return hub
@@ -490,6 +542,7 @@ def iot_dps_linked_hub_create(
             "hostName": host_name,
         }
 
+    _warn_namespace_linked_dps(dps)
     if apply_allocation_policy is not None:
         linked_hub_entry["applyAllocationPolicy"] = apply_allocation_policy
     if allocation_weight is not None:
@@ -577,6 +630,7 @@ def iot_dps_linked_hub_update(
 
     resource_group_name = _ensure_dps_resource_group_name(client, resource_group_name, dps_name)
     dps = iot_dps_get(client, dps_name, resource_group_name)
+    _warn_namespace_linked_dps(dps)
     linked_hubs = dps["properties"]["iotHubs"]
     _ensure_linked_hub_hostnames(linked_hubs)
     target_entry = _find_linked_hub_entry(linked_hubs, hub_name=hub_name, linked_hub=linked_hub)
@@ -948,12 +1002,41 @@ def iot_hub_create(
     user_identities=None,
     identity_role=None,
     identity_scopes=None,
-    adr_ns_id=None,
-    adr_ns_identity_id=None,
-    skip_ns_role_assignments: Optional[bool] = None,
-    custom_ns_role_id: Optional[str] = None,
 ):
     cli_ctx = cmd.cli_ctx
+    # Preview's create is a PUT. Preserve the ADR identity guard when that PUT
+    # targets an existing Hub; general upsert/option merging belongs separately.
+    availability = client.iot_hub_resource.check_name_availability(
+        operation_inputs={"name": hub_name}
+    )
+    existing_hub = None
+    if isinstance(availability, dict) and availability.get("nameAvailable") is False:
+        try:
+            existing_hub = client.iot_hub_resource.get(
+                resource_group_name=resource_group_name, resource_name=hub_name
+            )
+        except HttpResponseError as error:
+            if error.status_code != 404:
+                raise
+    desired_identity = None
+    if existing_hub:
+        existing_identity = existing_hub.get("identity") or {}
+        desired_identity = _build_identity(
+            system=(
+                _identity_has_type(existing_identity, SYSTEM_ASSIGNED)
+                if system_identity is None else bool(system_identity)
+            ),
+            identities=(
+                list(existing_identity.get("userAssignedIdentities") or {})
+                if user_identities is None else user_identities
+            ),
+        )
+        remove_system, remove_users = _identity_removals(existing_identity, desired_identity)
+        if remove_system or remove_users:
+            _protect_hub_link_identity(
+                existing_hub, cmd=cmd, remove_system=remove_system,
+                remove_user_identities=remove_users,
+            )
     if enable_fileupload_notifications:
         if not fileupload_storage_connectionstring or not fileupload_storage_container_name:
             raise RequiredArgumentMissingError('Please specify storage endpoint (storage connection string and storage container name).')
@@ -964,18 +1047,24 @@ def iot_hub_create(
     identity_based_file_upload = fileupload_storage_authentication_type and fileupload_storage_authentication_type == AuthenticationType.IdentityBased
     if not identity_based_file_upload and fileupload_storage_identity:
         raise RequiredArgumentMissingError('In order to set a fileupload storage identity, please set file upload storage authentication (--fsa) to IdentityBased')
+
     if identity_based_file_upload or fileupload_storage_identity:
         # Not explicitly setting fileupload_storage_identity assumes system-assigned managed identity for file upload
         if fileupload_storage_identity in [None, SYSTEM_ASSIGNED_IDENTITY] and not system_identity:
-            raise ArgumentUsageError('System managed identity [--mi-system-assigned] must be enabled in order to use managed identity for file upload')
+            raise ArgumentUsageError('System managed identity [--system-assigned-mi] must be enabled in order to use managed identity for file upload')
         if fileupload_storage_identity and fileupload_storage_identity != SYSTEM_ASSIGNED_IDENTITY and not user_identities:
-            raise ArgumentUsageError('User identity [--mi-user-assigned] must be added in order to use it for file upload')
+            raise ArgumentUsageError('User identity [--user-assigned-mi] must be added in order to use it for file upload')
     location = _ensure_location(cli_ctx, resource_group_name, location)
 
     if location.lower() == 'qatarcentral' and not enable_data_residency:
         raise InvalidArgumentValueError(
             "Data Residency enforcement must be enabled for IoT Hubs created in this region. Please use the '--enforce-data-residency' (--edr) argument "
             "to enable it. Check command help (-h) for more information on this property's usage and implications."
+        )
+
+    if disable_local_auth is None:
+        disable_local_auth = (
+            True if existing_hub is None else (existing_hub.get("properties") or {}).get("disableLocalAuth")
         )
 
     sku = {"name": sku, "capacity": unit}
@@ -1012,20 +1101,14 @@ def iot_hub_create(
                     "disableModuleSAS": disable_module_sas}
     properties["enableFileUploadNotifications"] = enable_fileupload_notifications
 
-    # TODO - CMS Preview - Hub Create ADR property validation
-    _validate_and_set_adr_properties(
-        instance=properties,
-        sku=sku["name"],
-        adr_namespace_resource_id=adr_ns_id,
-        adr_identity_resource_id=adr_ns_identity_id
-    )
-
     hub_description = {"location": location,
                        "sku": sku,
                        "properties": properties,
                        "tags": tags}
     if (system_identity or user_identities):
         hub_description["identity"] = _build_identity(system=bool(system_identity), identities=user_identities)
+    if desired_identity is not None:
+        hub_description["identity"] = desired_identity
     if bool(identity_role) ^ bool(identity_scopes):
         raise RequiredArgumentMissingError('At least one scope (--scopes) and one role (--role) required for system-assigned managed identity role assignment')
 
@@ -1042,26 +1125,12 @@ def iot_hub_create(
         except HttpResponseError as e:
             raise e
 
-    def adr_role_assignment(lro):
-        """Set up role assignments between ADR namespace and IoT Hub after hub creation."""
-        try:
-            instance = lro.resource()
-            hub_resource_id = instance.get("id")
-            if hub_resource_id:
-                _setup_adr_hub_role_assignments(cmd, adr_ns_id, hub_resource_id, custom_ns_role_id)
-            else:
-                # this is bad
-                raise CLIError(f"Could not fetch IoT Hub resource ID after creation. {ADR_ROLE_ASSIGN_ERROR_MSG}")
-        except HttpResponseError as e:
-            logger.warning(f"ADR role assignment failed: {str(e)}. {ADR_ROLE_ASSIGN_ERROR_MSG}")
-
     create = client.iot_hub_resource.begin_create_or_update(
-        resource_group_name=resource_group_name, resource_name=hub_name, iot_hub_description=hub_description
+        resource_group_name=resource_group_name, resource_name=hub_name,
+        iot_hub_description=hub_description, **hub_etag_arguments(existing_hub)
     )
     if identity_role and identity_scopes:
         create.add_done_callback(identity_assignment)
-    if adr_ns_id and not skip_ns_role_assignments:
-        create.add_done_callback(adr_role_assignment)
     return create
 
 
@@ -1108,7 +1177,6 @@ def update_iot_hub_custom(instance,
     fileupload_storage_identity=None,
     min_tls_version=None,
     tags=None,
-    adr_ns_identity_id=None,
 ):
     if tags is not None:
         instance["tags"] = tags
@@ -1174,26 +1242,6 @@ def update_iot_hub_custom(instance,
         disable_module_sas=disable_module_sas
     )
 
-    # TODO - CMS Preview - Prevent Generation2 SKU change
-    existing_sku_name = instance["sku"]["name"]
-    final_sku_name = sku or existing_sku_name
-
-    is_existing_gen2 = existing_sku_name == IotHubSku.GEN2.value
-    is_final_gen2 = final_sku_name == IotHubSku.GEN2.value
-
-    if sku and (is_existing_gen2 ^ is_final_gen2):
-        raise InvalidArgumentValueError(
-            f"Cannot change IoT Hub SKU from {existing_sku_name} to {final_sku_name}."
-        )
-
-    device_registry = instance["properties"].get("deviceRegistry")
-    adr_namespace_resource_id = device_registry["namespaceResourceId"] if device_registry else None
-    _validate_and_set_adr_properties(
-        instance=instance["properties"],
-        sku=final_sku_name,
-        adr_namespace_resource_id=adr_namespace_resource_id,
-        adr_identity_resource_id=adr_ns_identity_id,
-    )
     if sku is not None:
         instance["sku"]["name"] = sku
     return instance
@@ -1209,13 +1257,30 @@ def _update_iot_hub_auth(instance, disable_local_auth=None, disable_device_sas=N
         instance["properties"]["disableModuleSAS"] = disable_module_sas
 
 
-def iot_hub_update(client, hub_name, parameters, resource_group_name=None):
+def iot_hub_update(client, hub_name, parameters, resource_group_name=None, cmd=None):
     resource_group_name = _ensure_hub_resource_group_name(client, resource_group_name, hub_name)
-    return client.iot_hub_resource.begin_create_or_update(
+    current = client.iot_hub_resource.get(
         resource_group_name=resource_group_name,
         resource_name=hub_name,
-        iot_hub_description=parameters,
-        etag=parameters["etag"],
+    )
+    remove_system, remove_user_identities = _identity_removals(
+        (current or {}).get("identity"),
+        (parameters or {}).get("identity"),
+    )
+    if remove_system or remove_user_identities:
+        _protect_hub_link_identity(
+            current,
+            remove_system=remove_system,
+            remove_user_identities=remove_user_identities,
+            cmd=cmd,
+        )
+    return adapt_modeless_lro_poller(
+        client.iot_hub_resource.begin_create_or_update(
+            resource_group_name=resource_group_name,
+            resource_name=hub_name,
+            iot_hub_description=_hub_description_for_write(parameters),
+            **hub_etag_arguments(parameters),
+        )
     )
 
 
@@ -1314,22 +1379,35 @@ def iot_hub_identity_assign(cmd, client, hub_name, system_identity=None, user_id
         return iot_hub_get(cmd, client, hub_name, resource_group_name)
 
     def setter(hub):
-
+        hub["identity"] = hub.get("identity") or {"type": IdentityType.none.value}
         if user_identities and not hub["identity"].get("userAssignedIdentities"):
             hub["identity"]["userAssignedIdentities"] = {}
         if user_identities:
+            existing_user_ids = {
+                resource_id.rstrip("/").casefold(): resource_id
+                for resource_id in hub["identity"]["userAssignedIdentities"]
+            }
             for identity in user_identities:
-                hub["identity"]["userAssignedIdentities"][identity] = hub["identity"]["userAssignedIdentities"].get(identity, {}) if hub["identity"].get("userAssignedIdentities") else {}
+                if identity.rstrip("/").casefold() not in existing_user_ids:
+                    hub["identity"]["userAssignedIdentities"][identity] = {}
+                    existing_user_ids[identity.rstrip("/").casefold()] = identity
 
-        has_system_identity = hub["identity"]["type"] in [IdentityType.system_assigned_user_assigned.value, IdentityType.system_assigned.value]
+        has_system_identity = _identity_has_type(
+            hub["identity"], IdentityType.system_assigned.value
+        )
 
         if system_identity or has_system_identity:
             hub["identity"]["type"] = IdentityType.system_assigned_user_assigned.value if hub["identity"].get("userAssignedIdentities") else IdentityType.system_assigned.value
         else:
             hub["identity"]["type"] = IdentityType.user_assigned.value if hub["identity"].get("userAssignedIdentities") else IdentityType.none.value
 
-        poller = client.iot_hub_resource.begin_create_or_update(
-            resource_group_name=resource_group_name, resource_name=hub_name, iot_hub_description=hub, etag=hub["etag"]
+        poller = adapt_modeless_lro_poller(
+            client.iot_hub_resource.begin_create_or_update(
+                resource_group_name=resource_group_name,
+                resource_name=hub_name,
+                iot_hub_description=_hub_description_for_write(hub),
+                **hub_etag_arguments(hub),
+            )
         )
         return LongRunningOperation(cmd.cli_ctx)(poller)
 
@@ -1358,31 +1436,44 @@ def iot_hub_identity_remove(cmd, client, hub_name, system_identity=None, user_id
 
     if not system_identity and user_identities is None:
         raise RequiredArgumentMissingError('No identities provided to remove. Please provide system (--system) or user-assigned identities (--user).')
+    _protect_hub_link_identity(
+        hub,
+        remove_system=bool(system_identity),
+        remove_user_identities=user_identities,
+        cmd=cmd,
+    )
     # Turn off system managed identity
     if system_identity:
-        if hub_identity["type"] not in [
-                IdentityType.system_assigned.value,
-                IdentityType.system_assigned_user_assigned.value
-        ]:
+        if not _identity_has_type(
+            hub_identity, IdentityType.system_assigned.value
+        ):
             raise ArgumentUsageError('Hub {} is not currently using a system-assigned identity'.format(hub_name))
-        hub_identity["type"] = IdentityType.user_assigned.value if hub["identity"]["type"] in [IdentityType.user_assigned.value, IdentityType.system_assigned_user_assigned.value] else IdentityType.none.value
+        hub_identity["type"] = (
+            IdentityType.user_assigned.value
+            if hub_identity.get("userAssignedIdentities")
+            else IdentityType.none.value
+        )
 
     if user_identities:
         # loop through user_identities to remove
         identities_to_remove = user_identities if isinstance(user_identities, (list, tuple)) else [user_identities]
         for identity in identities_to_remove:
-            if not hub_identity.get("userAssignedIdentities", {}).get(identity):
+            attached = {
+                resource_id.rstrip("/").casefold(): resource_id
+                for resource_id in (
+                    hub_identity.get("userAssignedIdentities") or {}
+                )
+            }
+            normalized = identity.rstrip("/").casefold()
+            if normalized not in attached:
                 raise ArgumentUsageError('Hub {0} is not currently using a user-assigned identity with id: {1}'.format(hub_name, identity))
-            del hub_identity["userAssignedIdentities"][identity]
+            del hub_identity["userAssignedIdentities"][attached[normalized]]
         if not hub_identity.get("userAssignedIdentities"):
             hub_identity.pop("userAssignedIdentities", None)
     elif isinstance(user_identities, list):
         hub_identity.pop("userAssignedIdentities", None)
 
-    if hub_identity["type"] in [
-            IdentityType.system_assigned.value,
-            IdentityType.system_assigned_user_assigned.value
-    ]:
+    if _identity_has_type(hub_identity, IdentityType.system_assigned.value):
         hub_identity["type"] = IdentityType.system_assigned_user_assigned.value if hub_identity.get("userAssignedIdentities") else IdentityType.system_assigned.value
     else:
         hub_identity["type"] = IdentityType.user_assigned.value if hub_identity.get("userAssignedIdentities") else IdentityType.none.value
@@ -1390,11 +1481,109 @@ def iot_hub_identity_remove(cmd, client, hub_name, system_identity=None, user_id
     hub["identity"] = hub_identity
     if not hub["identity"].get("userAssignedIdentities"):
         hub["identity"]["userAssignedIdentities"] = None
-    poller = client.iot_hub_resource.begin_create_or_update(
-        resource_group_name=resource_group_name, resource_name=hub_name, iot_hub_description=hub, etag=hub["etag"]
+    poller = adapt_modeless_lro_poller(
+        client.iot_hub_resource.begin_create_or_update(
+            resource_group_name=resource_group_name,
+            resource_name=hub_name,
+            iot_hub_description=_hub_description_for_write(hub),
+            **hub_etag_arguments(hub),
+        )
     )
     lro = LongRunningOperation(cmd.cli_ctx)(poller)
     return lro["identity"]
+
+
+def _adr_identity_target(cmd, resource, kind):
+    """Read authoritative ADR projections before a legacy identity removal.
+
+    General commands retain preview's management API and endpoint. Only this
+    safety read uses the canary target contract, in the resource's subscription.
+    Preserve direct Python callers that already supply an authoritative object.
+    """
+    if cmd is None:
+        return resource
+
+    from msrestazure.tools import parse_resource_id
+    from azext_iot._factory import (
+        adr_iot_hub_service_factory,
+        adr_iot_service_provisioning_factory,
+    )
+
+    resource_id = (resource or {}).get("id")
+    parsed = parse_resource_id(resource_id) if isinstance(resource_id, str) else {}
+    if not all(parsed.get(key) for key in ("subscription", "resource_group", "name")):
+        raise ArgumentUsageError(
+            "Cannot validate the ADR link identity without a target resource ID."
+        )
+    try:
+        if kind == "hub":
+            client = adr_iot_hub_service_factory(
+                cmd.cli_ctx, subscription_id=parsed["subscription"]
+            )
+            target = client.iot_hub_resource.get(
+                resource_group_name=parsed["resource_group"], resource_name=parsed["name"]
+            )
+        else:
+            client = adr_iot_service_provisioning_factory(
+                cmd.cli_ctx, subscription_id=parsed["subscription"]
+            )
+            target = client.iot_dps_resource.get(
+                resource_group_name=parsed["resource_group"],
+                provisioning_service_name=parsed["name"],
+            )
+        if not isinstance(target, dict) or str(target.get("id", "")).rstrip("/").casefold() != resource_id.rstrip("/").casefold():
+            raise ValueError("The ADR target response did not identify the requested resource.")
+        return target
+    except Exception as error:
+        raise ArgumentUsageError(
+            "The ADR link identity could not be validated. Do not remove identities "
+            "until you can read the target and rotate or delete its namespace link."
+        ) from error
+
+
+def _protect_hub_link_identity(
+    hub: dict,
+    *,
+    remove_system: bool,
+    remove_user_identities,
+    cmd=None,
+) -> None:
+    hub = _adr_identity_target(cmd, hub, "hub")
+    device_registry = ((hub or {}).get("properties") or {}).get(
+        "deviceRegistry"
+    ) or {}
+    linking_state = str(
+        (device_registry.get("linkingProperties") or {}).get("state") or ""
+    ).casefold()
+    if not device_registry.get("namespaceResourceId") or linking_state == "failed":
+        return
+
+    selected = device_registry.get("identity") or {}
+    selected_type = str(selected.get("type") or "").casefold()
+    if remove_system and selected_type == "systemassigned":
+        raise ArgumentUsageError(
+            "The Hub system-assigned identity is used by an active ADR link. "
+            "Rotate it first with 'az iot adr ns link hub update --user-assigned-mi ...' "
+            "or permanently delete the link."
+        )
+    selected_uami = selected.get("userAssignedIdentity")
+    removals = {
+        identity.rstrip("/").casefold()
+        for identity in (remove_user_identities or [])
+    }
+    if (
+        selected_type == "userassigned"
+        and selected_uami
+        and (
+            selected_uami.rstrip("/").casefold() in removals
+            or remove_user_identities == []
+        )
+    ):
+        raise ArgumentUsageError(
+            "The selected Hub user-assigned identity is used by an active ADR "
+            "link. Rotate it first with 'az iot adr ns link hub update' or "
+            "permanently delete the link."
+        )
 
 
 def iot_hub_policy_list(client, hub_name, resource_group_name=None):
@@ -2007,112 +2196,7 @@ def _build_identity(system=False, identities=None):
     return identity
 
 
-# TODO - CMS Preview - Hub ADR property validation logic
-def _validate_and_set_adr_properties(
-    instance: dict,
-    sku: str,
-    adr_namespace_resource_id: Optional[str] = None,
-    adr_identity_resource_id: Optional[str] = None,
-):
-    """Validate and set Azure Device Registry properties for IoT Hub."""
-
-    if sku == IotHubSku.GEN2.value:
-        # Generation2 hubs require both ADR properties
-        if not (adr_namespace_resource_id and adr_identity_resource_id):
-            raise RequiredArgumentMissingError(
-                "Generation2 IoT Hubs require both ADR namespace resource ID (--adr-ns-id) and ADR identity resource ID (--adr-identity-id)."
-            )
-        instance["deviceRegistry"] = {
-            "namespaceResourceId": adr_namespace_resource_id,
-            "identityResourceId": adr_identity_resource_id,
-        }
-    else:
-        # Non-Generation2 hubs cannot have ADR properties
-        if adr_namespace_resource_id or adr_identity_resource_id:
-            raise InvalidArgumentValueError(
-                "ADR properties are only supported for Generation2 IoT Hub SKUs."
-            )
-
-
-def _setup_adr_hub_role_assignments(cmd, namespace_id: str, hub_id: str, custom_role_id: Optional[str] = None) -> None:
-    """
-    Set up role assignments between ADR namespace system-assigned identity and IoT Hub.
-    
-    Args:
-        cmd: Azure CLI command context
-        namespace_id: ADR namespace resource ID
-        hub_id: IoT Hub resource ID
-        custom_role_id: Custom role definition ID to use instead of default roles
-    """
-    try:
-        from msrestazure.tools import parse_resource_id
-
-        from azext_iot.adr.providers.namespace import NamespaceProvider
-
-        # Parse the ADR namespace resource ID
-        parsed_adr_id = parse_resource_id(namespace_id)
-        ns_rg = parsed_adr_id.get('resource_group')
-        ns_name = parsed_adr_id.get('name')
-
-        if not ns_rg or not ns_name:
-            logger.warning(f"Failed to parse ADR namespace resource ID. {ADR_CONFIGURE_ROLES_ERROR_MSG}")
-            return
-
-        # Set up namespace provider
-        namespace_provider = NamespaceProvider(cmd)
-        namespace_details = namespace_provider.show(ns_name, ns_rg)
-
-        identity = namespace_details.get("identity", {})
-        principal_id = identity.get("principalId")
-
-        if not principal_id:
-            logger.warning(f"ADR namespace does not have a system-assigned identity. {ADR_CONFIGURE_ROLES_ERROR_MSG}")
-            return
-
-        # Determine which roles to assign
-        roles_to_assign = []
-        if custom_role_id:
-            logger.info(f"Assigning custom role ID '{custom_role_id}' to ADR namespace.")
-            roles_to_assign = [custom_role_id]
-        if not roles_to_assign:
-            roles_to_assign = ADR_NS_IDENTITY_ROLES_FOR_HUB
-
-        # Assign roles
-        failed_roles = []
-        for role in roles_to_assign:
-            try:
-                # assign_identity needs the resource identity as an object, not a dict
-                from types import SimpleNamespace
-
-                ns_obj = SimpleNamespace(
-                    identity=SimpleNamespace(principal_id=principal_id)
-                )
-                # accepts a role name or role ID
-                assign_identity(
-                    cmd.cli_ctx,
-                    lambda: ns_obj, 
-                    lambda ns: ns_obj,
-                    identity_role=role, 
-                    identity_scope=hub_id
-                )
-                logger.info(f"Successfully assigned '{role}' role to ADR namespace on IoT Hub")
-            except Exception as role_error:
-                failed_roles.append(role)
-                logger.warning(f"Failed to assign '{role}' role: {str(role_error)}")
-
-        if failed_roles:
-            logger.warning("Failed to configure some role assignments. "
-                "Please run the following commands to ensure your ADR namespace has permissions to this IoT Hub:"
-            )
-            for role in failed_roles:
-                logger.warning(f"az role assignment create --assignee '{principal_id}' --role '{role}' --scope '{hub_id}'")
-
-    except Exception as e:
-        logger.warning(f"Failed to set up ADR role assignments: {str(e)}.\n{ADR_ROLE_ASSIGN_ERROR_MSG}")
-
-
 def _construct_identity_info(enable_system_identity, user_identities) -> Optional[dict]:
-    identity = None
     if enable_system_identity and user_identities:
         identity_type = ManagedServiceIdentityType.SYSTEM_ASSIGNED_USER_ASSIGNED
     elif enable_system_identity:
@@ -2120,20 +2204,105 @@ def _construct_identity_info(enable_system_identity, user_identities) -> Optiona
     elif user_identities:
         identity_type = ManagedServiceIdentityType.USER_ASSIGNED
     else:
-        return identity
+        return None
 
     user_identities_dict = {}
     if user_identities:
         for identity_id in user_identities:
             user_identities_dict[identity_id] = {}
 
-    identity = {
+    return {
         "type": identity_type,
-        "userAssignedIdentities": user_identities_dict if user_identities else None
+        "userAssignedIdentities": (
+            user_identities_dict if user_identities else None
+        ),
     }
-    return identity
 
 
+def _identity_has_type(identity: Optional[dict], identity_type: str) -> bool:
+    values = {
+        item.strip().casefold()
+        for item in str((identity or {}).get("type") or "").split(",")
+    }
+    return identity_type.casefold() in values
+
+
+def _merge_dps_identity(
+        existing_identity: Optional[dict],
+        system_assigned: Optional[bool],
+        user_identities: Optional[List[str]],
+) -> dict:
+    """Merge DPS identity additions without dropping unmentioned identities."""
+    existing_identity = existing_identity or {}
+    has_system = _identity_has_type(existing_identity, SYSTEM_ASSIGNED)
+    if system_assigned is not None:
+        has_system = bool(system_assigned)
+
+    identities = {
+        resource_id.rstrip("/").casefold(): resource_id
+        for resource_id in (
+            existing_identity.get("userAssignedIdentities") or {}
+        )
+    }
+    for resource_id in user_identities or []:
+        identities.setdefault(resource_id.rstrip("/").casefold(), resource_id)
+
+    result = _construct_identity_info(
+        has_system, list(identities.values()) or None
+    )
+    return result or {"type": ManagedServiceIdentityType.NONE}
+
+
+def _identity_removals(
+    current_identity: Optional[dict], desired_identity: Optional[dict]
+):
+    """Return the SAMI/UAMI identities removed by a desired ARM identity."""
+    remove_system = _identity_has_type(
+        current_identity, SYSTEM_ASSIGNED
+    ) and not _identity_has_type(desired_identity, SYSTEM_ASSIGNED)
+    desired_uamis = {
+        resource_id.rstrip("/").casefold()
+        for resource_id in (
+            (desired_identity or {}).get("userAssignedIdentities") or {}
+        )
+    }
+    removed_uamis = [
+        resource_id
+        for resource_id in (
+            (current_identity or {}).get("userAssignedIdentities") or {}
+        )
+        if resource_id.rstrip("/").casefold() not in desired_uamis
+    ]
+    return remove_system, removed_uamis or None
+
+
+# Retain the existing private name for callers and tests outside the Hub path.
+_dps_identity_removals = _identity_removals
+
+
+def _dps_description_for_write(dps: dict) -> dict:
+    """Strip server projections before sending a modeless DPS PUT body."""
+    body = {
+        key: deepcopy(dps[key])
+        for key in ("location", "tags", "sku")
+        if key in dps
+    }
+    if "identity" in dps:
+        body["identity"] = _sanitize_arm_identity(dps.get("identity"))
+    properties = deepcopy(dps.get("properties") or {})
+    for key in (
+        "state",
+        "provisioningState",
+        "privateEndpointConnections",
+        "deviceRegistryNamespaces",
+        "serviceOperationsHostName",
+        "deviceProvisioningHostName",
+        "idScope",
+        "portalOperationsHostName",
+    ):
+        properties.pop(key, None)
+    body["properties"] = properties
+    return body
 # DPS Identity management functions
 def dps_identity_assign(client, dps_name: str, resource_group_name:Optional[str]=None,
                         system_assigned:Optional[bool]=None, user_assigned:Optional[List[str]]=None):
@@ -2143,34 +2312,24 @@ def dps_identity_assign(client, dps_name: str, resource_group_name:Optional[str]
     if system_assigned is None and user_assigned is None:
         raise RequiredArgumentMissingError("Specify --system-assigned and/or --user-assigned")
 
-    existing_identity = dps.get("identity")
+    dps["identity"] = _merge_dps_identity(
+        dps.get("identity"),
+        True if system_assigned else None,
+        user_assigned,
+    )
 
-    # Determine if system identity should be enabled
-    if system_assigned is not None:
-        has_system_identity = system_assigned
-    else:
-        has_system_identity = existing_identity and existing_identity["type"] in [
-            ManagedServiceIdentityType.SYSTEM_ASSIGNED,
-            ManagedServiceIdentityType.SYSTEM_ASSIGNED_USER_ASSIGNED,
-        ]
-
-    # Merge existing and new user identities
-    existing_user_identities = []
-    if existing_identity and existing_identity.get("userAssignedIdentities"):
-        existing_user_identities = list(existing_identity["userAssignedIdentities"].keys())
-
-    new_user_identities = user_assigned or []
-    all_user_identities = list(set(existing_user_identities + new_user_identities))
-
-    dps["identity"] = _construct_identity_info(has_system_identity, all_user_identities if all_user_identities else None)
-
-    return client.iot_dps_resource.begin_create_or_update(
-        resource_group_name=resource_group_name, provisioning_service_name=dps_name, iot_dps_description=dps
+    return adapt_modeless_lro_poller(
+        client.iot_dps_resource.begin_create_or_update(
+            resource_group_name=resource_group_name,
+            provisioning_service_name=dps_name,
+            iot_dps_description=_dps_description_for_write(dps),
+        )
     )
 
 
 def dps_identity_remove(client, dps_name: str, resource_group_name:Optional[str]=None,
-                        system_assigned:Optional[bool]=None, user_assigned:Optional[List[str]]=None):
+                        system_assigned:Optional[bool]=None, user_assigned:Optional[List[str]]=None,
+                        cmd=None):
     resource_group_name = _ensure_dps_resource_group_name(client, resource_group_name, dps_name)
     dps = client.iot_dps_resource.get(resource_group_name=resource_group_name, provisioning_service_name=dps_name)
 
@@ -2182,10 +2341,14 @@ def dps_identity_remove(client, dps_name: str, resource_group_name:Optional[str]
         # No identity to remove
         return dps
 
-    has_system_identity = existing_identity["type"] in [
-        ManagedServiceIdentityType.SYSTEM_ASSIGNED,
-        ManagedServiceIdentityType.SYSTEM_ASSIGNED_USER_ASSIGNED,
-    ]
+    _protect_dps_link_identity(
+        cmd,
+        dps,
+        remove_system=bool(system_assigned),
+        remove_user_identities=user_assigned,
+    )
+
+    has_system_identity = _identity_has_type(existing_identity, SYSTEM_ASSIGNED)
 
     if system_assigned is True and has_system_identity:
         enable_system = False
@@ -2197,11 +2360,20 @@ def dps_identity_remove(client, dps_name: str, resource_group_name:Optional[str]
     if existing_identity.get("userAssignedIdentities"):
         existing_user_identities = list(existing_identity["userAssignedIdentities"].keys())
 
-    if user_assigned:
-        # Remove specified user identities
-        for identity_id in user_assigned:
-            if identity_id in existing_user_identities:
-                existing_user_identities.remove(identity_id)
+    if user_assigned is not None:
+        remove_ids = (
+            {identity_id.rstrip("/").casefold() for identity_id in user_assigned}
+            if user_assigned
+            else {
+                identity_id.rstrip("/").casefold()
+                for identity_id in existing_user_identities
+            }
+        )
+        existing_user_identities = [
+            identity_id
+            for identity_id in existing_user_identities
+            if identity_id.rstrip("/").casefold() not in remove_ids
+        ]
 
     # If no identities remain, set to None type
     if not enable_system and not existing_user_identities:
@@ -2211,8 +2383,12 @@ def dps_identity_remove(client, dps_name: str, resource_group_name:Optional[str]
             enable_system, existing_user_identities if existing_user_identities else None
         )
 
-    return client.iot_dps_resource.begin_create_or_update(
-        resource_group_name=resource_group_name, provisioning_service_name=dps_name, iot_dps_description=dps
+    return adapt_modeless_lro_poller(
+        client.iot_dps_resource.begin_create_or_update(
+            resource_group_name=resource_group_name,
+            provisioning_service_name=dps_name,
+            iot_dps_description=_dps_description_for_write(dps),
+        )
     )
 
 
@@ -2220,3 +2396,98 @@ def dps_identity_show(client, dps_name: str, resource_group_name: Optional[str] 
     resource_group_name = _ensure_dps_resource_group_name(client, resource_group_name, dps_name)
     dps = client.iot_dps_resource.get(resource_group_name=resource_group_name, provisioning_service_name=dps_name)
     return dps.get("identity")
+
+
+def _protect_dps_link_identity(
+    cmd,
+    dps: dict,
+    *,
+    remove_system: bool,
+    remove_user_identities,
+) -> None:
+    """Block removal of identities selected by canonical namespace links."""
+    dps = _adr_identity_target(cmd, dps, "dps")
+    namespace_links = ((dps or {}).get("properties") or {}).get(
+        "deviceRegistryNamespaces"
+    ) or []
+    if not namespace_links:
+        return
+
+    from msrestazure.tools import parse_resource_id
+    from azext_iot._factory import adr_service_factory
+
+    dps_id = (dps or {}).get("id")
+    if not dps_id:
+        raise ArgumentUsageError(
+            "DPS has an active ADR namespace projection but its resource ID is "
+            "missing. Rotate or delete the link before removing identities."
+        )
+    requested_uamis = {
+        value.rstrip("/").casefold() for value in (remove_user_identities or [])
+    }
+    remove_all_uamis = remove_user_identities == []
+    for namespace_link in namespace_links:
+        if cmd is None:
+            raise ArgumentUsageError(
+                "DPS is namespace-linked. Run identity removal through Azure CLI "
+                "so the active link identity can be validated."
+            )
+        namespace_id = namespace_link.get("resourceId")
+        parsed = parse_resource_id(namespace_id) if namespace_id else {}
+        if not all(
+            parsed.get(key)
+            for key in ("subscription", "resource_group", "name")
+        ):
+            raise ArgumentUsageError(
+                "DPS has an active ADR namespace projection that could not be "
+                "validated. Rotate or delete the namespace link before removing identities."
+            )
+        try:
+            namespace = adr_service_factory(
+                cmd.cli_ctx, subscription_id=parsed["subscription"]
+            ).namespaces.get(
+                resource_group_name=parsed["resource_group"],
+                namespace_name=parsed["name"],
+            )
+        except Exception as error:
+            raise ArgumentUsageError(
+                "DPS is namespace-linked, but the active link identity could "
+                "not be read. Do not remove identities until you can run "
+                "'az iot adr ns link dps show' and rotate the link."
+            ) from error
+
+        endpoints = (
+            (((namespace or {}).get("properties") or {}).get("provisioning") or {})
+            .get("endpoints")
+            or {}
+        )
+        for endpoint in endpoints.values():
+            if (
+                str((endpoint or {}).get("resourceId") or "")
+                .rstrip("/")
+                .casefold()
+                != str(dps_id or "").rstrip("/").casefold()
+            ):
+                continue
+            inbound = (endpoint or {}).get("inboundCallerIdentity") or {}
+            inbound_type = str(inbound.get("type") or "").casefold()
+            if remove_system and inbound_type == "systemassigned":
+                raise ArgumentUsageError(
+                    "The DPS system-assigned identity is used by an active ADR "
+                    "link. Rotate it first with 'az iot adr ns link dps update' "
+                    "or permanently delete the link."
+                )
+            selected_uami = inbound.get("userAssignedIdentity")
+            if (
+                inbound_type == "userassigned"
+                and selected_uami
+                and (
+                    remove_all_uamis
+                    or selected_uami.rstrip("/").casefold() in requested_uamis
+                )
+            ):
+                raise ArgumentUsageError(
+                    "The selected DPS user-assigned identity is used by an active "
+                    "ADR link. Rotate it first with "
+                    "'az iot adr ns link dps update' or permanently delete the link."
+                )

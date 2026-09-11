@@ -104,6 +104,14 @@ def generate_cs(
 
 
 @pytest.fixture(autouse=True)
+def integration_auth_defaults(request, monkeypatch):
+    if request.node.path.name.endswith("_int.py"):
+        # Knack preserves configured-default option hyphens in environment names.
+        monkeypatch.setenv("AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE", "login")
+        monkeypatch.setenv("AZURE_DEFAULTS_IOTDPS-DATA-AUTH-TYPE", "login")
+
+
+@pytest.fixture(autouse=True)
 def disable_cli_version_check(mocker):
     """Prevent the Azure CLI version-update check from issuing real HTTP calls.
 
@@ -461,7 +469,43 @@ def pytest_addoption(parser):
     parser.addoption("--api-version", action="store", default=None)
 
 
+def pytest_configure(config):
+    config.pluginmanager.register(ImmediateIntegrationReports(config), "iot-immediate-reports")
+
+
+class ImmediateIntegrationReports:
+    """Keep integration failures visible even if cancellation prevents the final summary."""
+
+    def __init__(self, config):
+        self.config = config
+
+    def pytest_runtest_logreport(self, report):
+        if (
+            hasattr(self.config, "workerinput")
+            or not report.nodeid.partition("::")[0].endswith("_int.py")
+            or report.outcome not in ("failed", "rerun")
+        ):
+            return
+        reporter = self.config.pluginmanager.getplugin("terminalreporter")
+        if reporter is not None:
+            reporter.write_sep("=", f"Immediate {report.outcome} ({report.when}): {report.nodeid}")
+            reporter.write_line(report.longreprtext)
+            reporter.flush()
+
+
 # DPS Fixtures
+@pytest.fixture()
+def dps_service_client_generic_errors(
+    service_client_generic_errors, fixture_gdcs, fixture_dps_sas, patch_certificate_open
+):
+    yield service_client_generic_errors
+    assert service_client_generic_errors.calls
+    assert all(
+        call.request.url.startswith("https://{}/".format(mock_dps_target["entity"]))
+        for call in service_client_generic_errors.calls
+    )
+
+
 @pytest.fixture()
 def fixture_gdcs(mocker):
     gdcs = mocker.patch(path_gdcs)

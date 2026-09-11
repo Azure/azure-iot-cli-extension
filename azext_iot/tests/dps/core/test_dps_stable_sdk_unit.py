@@ -96,12 +96,12 @@ def test_create_serializes_stable_resource(
     body = json.loads(mocked_response.calls[1].request.body)
     assert body["location"] == "westus2"
     assert body["sku"] == {"name": "S1", "capacity": 1}
-    assert body["properties"] == {"enableDataResidency": None}
+    assert body["properties"] == {"enableDataResidency": None, "disableLocalAuth": True}
     assert body.get("identity") == expected_identity
     if not identity_args:
         assert "identity" not in body
     assert "deviceRegistryNamespace" not in body["properties"]
-    assert "disableLocalAuth" not in body["properties"]
+    assert body["properties"]["disableLocalAuth"] is True
     assert_stable_requests(mocked_response)
 
 
@@ -118,18 +118,17 @@ def test_get_put_update_preserves_supported_properties(
     ).result()
 
     assert result == dps_resource
-    body = json.loads(mocked_response.calls[1].request.body)
-    assert mocked_response.calls[1].request.method == "PUT"
-    assert body["properties"] == dps_resource["properties"]
+    # The ADR identity guard re-reads the original identity before the PUT.
+    assert [call.request.method for call in mocked_response.calls] == ["GET", "GET", "PUT"]
+    body = json.loads(mocked_response.calls[-1].request.body)
+    assert body["properties"] == custom._dps_description_for_write(dps_resource)["properties"]
     assert body["properties"]["disableLocalAuth"] is True
     assert "deviceRegistryNamespace" not in body["properties"]
     assert body["tags"] == (dps_resource["tags"] if tags is None else tags)
-    assert body["id"] == dps_resource["id"]
-    assert body["etag"] == dps_resource["etag"]
-    if not identity_args:
-        assert body["identity"] == dps_resource["identity"]
-    else:
-        assert body["identity"]["type"] == ("SystemAssigned" if "mi_system_assigned" in identity_args else "UserAssigned")
+    assert "id" not in body
+    assert "etag" not in body
+    # Partial identity options must not remove an unmentioned linked identity.
+    assert body["identity"] == dps_resource["identity"]
     assert_stable_requests(mocked_response)
 
 
@@ -141,7 +140,7 @@ def test_identity_roundtrip_preserves_local_auth(stable_client, mocked_response,
     assert handler(stable_client, "test-dps", "test-rg", system_assigned=True).result() == dps_resource
 
     body = json.loads(mocked_response.calls[1].request.body)
-    assert body["properties"] == dps_resource["properties"]
+    assert body["properties"] == custom._dps_description_for_write(dps_resource)["properties"]
     assert body["identity"]["userAssignedIdentities"] == {USER_ID: {}}
     assert body["identity"]["type"] == (
         "SystemAssigned,UserAssigned" if handler is custom.dps_identity_assign else "UserAssigned"

@@ -893,9 +893,15 @@ class TestConfigList:
         list_request = service_client.calls[0].request
         assert "top=" not in list_request.url
 
-    @pytest.mark.parametrize("top", [-1, 0, 101])
+    @pytest.mark.parametrize("top", [-2, 0])
     def test_config_list_invalid_args(self, fixture_cmd, top):
+        from argparse import Namespace
+        from azext_iot._validators import process_top
+
         with pytest.raises(CLIError):
+            # Preview's CLI argument validator permits unlimited (-1) and
+            # larger result counts; direct Python dispatch bypasses validation.
+            process_top(Namespace(top=top))
             subject.iot_hub_configuration_list(
                 cmd=fixture_cmd, hub_name_or_hostname=mock_target["entity"], top=top
             )
@@ -1033,6 +1039,38 @@ class TestConfigApply:
 
 
 class TestConfigExport:
+    @pytest.mark.parametrize("auth_type,login", [
+        ("login", None),
+        ("key", None),
+        (None, "HostName=hub.azure-devices.net;SharedAccessKeyName=owner;SharedAccessKey=a2V5"),
+    ])
+    def test_export_reuses_resolved_target(self, mocker, fixture_cmd, auth_type, login):
+        discovery = mocker.patch.object(subject, "IotHubDiscovery")
+        target = discovery.return_value.get_target.return_value
+        module = mocker.Mock(module_id="module")
+        list_modules = mocker.patch.object(subject, "_iot_device_module_list", return_value=[module])
+        show_twin = mocker.patch.object(subject, "_iot_device_module_twin_show", return_value={
+            "moduleId": "module",
+            "properties": {"desired": {"$metadata": {}, "$version": 1, "setting": "value"}},
+        })
+
+        result = subject.iot_edge_export_modules(
+            cmd=fixture_cmd,
+            device_id="device",
+            hub_name_or_hostname="hub",
+            resource_group_name="rg",
+            auth_type_dataplane=auth_type,
+            login=login,
+        )
+
+        discovery.assert_called_once_with(fixture_cmd)
+        discovery.return_value.get_target.assert_called_once_with(
+            resource_name="hub", resource_group_name="rg", login=login, auth_type=auth_type,
+        )
+        list_modules.assert_called_once_with(target=target, device_id="device")
+        show_twin.assert_called_once_with(target=target, device_id="device", module_id="module")
+        assert result == {"content": {"modulesContent": {"module": {"properties.desired": {"setting": "value"}}}}}
+
     @pytest.fixture(params=[200])
     def serviceclient(self, mocked_response, fixture_ghcs, fixture_sas, request, sample_config_read, device_id):
         mocked_response.add(

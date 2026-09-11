@@ -9,6 +9,8 @@ The **Azure IoT extension for Azure CLI** aims to accelerate the development, ma
 
 - ❗ When upgrading your Azure CLI core version, for the best experience and to avoid breaking changes, we recommend updating your `azure-iot` extension to the [latest available](https://github.com/Azure/azure-iot-cli-extension/releases).
 
+- 🆕 **`0.33.0b10` ADR-only Preview** provides all 112 `az iot adr` commands: canonical namespace links, command-specific success waits, managed-identity options, Registry Device external-ID lookup/materialization wait, and Software Updates catalog/status discovery. Links validate topology and target readiness, create only missing service-to-service RBAC when authorized, and permanently delete their linked Hub, DPS, or Update Instance on `link ... delete`. Three ADR-owned TypeSpec SDKs are modeless and synchronous-only. ADR control-plane operations use Central US EUAP; Software Updates data uses service-derived endpoints. ADR target lookups and identity-safety reads explicitly use Hub `2026-10-01-preview` and DPS `2026-06-01-preview` through preview's management clients. General Hub/DPS commands and SDKs retain preview behavior; their SDK upgrades and certificate-issuing enrollment/registration are separate follow-up work. This remains a cloud-only surface; AIO custom-location resources stay under `az iot ops ns`. See [HISTORY.rst](HISTORY.rst) for details. Install with `az extension add --name azure-iot --allow-preview`.
+
 - Azure CLI `2.24.0` requires an `azure-iot` extension update to `0.10.11` or later for IoT Hub commands to work properly. However **we recommend** at least `azure-iot` `0.10.14`. Updating the extension can be done with `az extension update --name azure-iot`.
 
 > Note: A common error that arises when using an older `azure-iot` with Azure CLI `2.24.0+` shows as follows: `AttributeError: 'IotHubResourceOperations' object has no attribute 'config'`.
@@ -41,15 +43,21 @@ Please refer to the official `az iot` reference on [Microsoft Docs](https://lear
 1. Install the [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)
     - You must have at least `v2.59.0` for the latest versions of `azure-iot`, which you can verify with `az --version`
 1. Add, Update or Remove the IoT extension with the following commands:
-    - Add: `az extension add --name azure-iot`
-    - Update: `az extension update --name azure-iot`
+    - Add preview: `az extension add --name azure-iot --allow-preview`
+    - Update preview: `az extension update --name azure-iot --allow-preview`
     - Remove: `az extension remove --name azure-iot`
+
+The extension installer resolves native dependencies for the Python runtime used by
+that `az` executable. If multiple Azure CLI installations are present, install and run
+the extension with the same executable, or give each installation a separate
+`AZURE_EXTENSION_DIR`. Do not share one extension directory between Azure CLI
+installations that use different Python versions.
 
 Please refer to the [Installation Troubleshooting Guide](docs/install-help.md) if you run into any issues or the [Alternative Installation Methods](docs/alt-install-methods.md) if you'd like to install from a GitHub release or local source.
 
 ## Usage
 
-After installing the Azure IoT extension your CLI environment is augmented with the addition of `hub`, `central`, `dps`, `dt`, `edge` and `device` commands.
+After installing the Azure IoT extension, your CLI environment includes `adr`, `hub`, `central`, `dps`, `dt`, `edge`, and `device` commands.
 
 For usage and help content of any command or command group, pass in the `-h` parameter. Root command group details are shown for the following IoT services.
 
@@ -85,6 +93,54 @@ Commands:
     show            : Show an existing Digital Twins instance.
     wait            : Wait until an operation on an Digital Twins instance is complete.
 ```
+
+</details>
+
+<details>
+  <summary>Azure Device Registry (Preview)</summary>
+
+```text
+$ az iot adr -h
+
+Group
+    az iot adr : Manage Azure Device Registry (ADR) resources.
+
+Subgroups:
+    ns : Manage Device Registry namespaces.
+
+$ az iot adr ns -h
+
+Group
+    az iot adr ns : Manage Device Registry namespaces.
+
+Subgroups:
+    ca                      : Manage certificate authorities for a Device Registry namespace.
+    group                   : Manage Device Registry namespace groups.
+    identity                : Manage identities assigned to a Device Registry namespace.
+    job                     : Manage Device Registry namespace jobs.
+    link                    : Manage links between a Device Registry namespace and downstream
+                              resources.
+    registry-device         : Manage Registry Devices in a Device Registry namespace.
+    report                  : Manage Device Registry update-compliance reports.
+    su                      : Manage Software Updates for Device Registry namespaces.
+
+Commands:
+    create                  : Create a Device Registry namespace.
+    delete                  : Delete a Device Registry namespace.
+    list                    : List Device Registry namespaces.
+    migrate                 : Migrate legacy assets into a Device Registry namespace.
+    show                    : Show details of a Device Registry namespace.
+    update                  : Update a Device Registry namespace.
+    wait                    : Wait for a Device Registry namespace to reach a desired state.
+```
+
+`az iot adr ns` is a cloud-only surface. Asset, discovered-asset, discovered-device,
+and management-endpoint resources require an Azure IoT Operations custom location
+and live in the `azure-iot-ops` extension under `az iot ops ns`. Namespace Device
+commands are not exposed here; use `az iot adr ns registry-device` for cloud-managed
+devices.
+Use `az iot adr ns migrate --resource-ids ...` only to move existing legacy assets
+into a namespace.
 
 </details>
 

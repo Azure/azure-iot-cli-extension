@@ -491,10 +491,6 @@ def iot_dps_device_enrollment_group_create(
                 certificate_path, secondary_certificate_path
             )
         if root_ca_name or secondary_root_ca_name:
-            if certificate_path or secondary_certificate_path:
-                raise MutuallyExclusiveArgumentError(
-                    "Please provide either certificate path or certficate name"
-                )
             attestation = _get_attestation_with_x509_ca_cert(
                 root_ca_name, secondary_root_ca_name
             )
@@ -618,10 +614,6 @@ def iot_dps_device_enrollment_group_update(
                     remove_secondary_certificate,
                 )
             if root_ca_name or secondary_root_ca_name:
-                if certificate_path or secondary_certificate_path:
-                    raise MutuallyExclusiveArgumentError(
-                        "Please provide either certificate path or certficate name"
-                    )
                 enrollment_record.attestation = _get_updated_attestation_with_x509_ca_cert(
                     enrollment_record.attestation,
                     root_ca_name,

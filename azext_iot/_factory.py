@@ -20,6 +20,9 @@ from azext_iot.constants import IOTDPS_RESOURCE_ID, IOTHUB_RESOURCE_ID, USER_AGE
 ensure_azure_namespace_path()
 
 from azure.core.pipeline.policies import HttpLoggingPolicy, UserAgentPolicy
+_ADR_CANARY_ARM_ENDPOINT = "https://centraluseuap.management.azure.com"
+_ADR_IOT_HUB_API_VERSION = "2026-10-01-preview"
+_ADR_DPS_API_VERSION = "2026-06-01-preview"
 
 logger = get_logger(__name__)
 
@@ -28,7 +31,11 @@ __all__ = [
     "CloudError",
     "iot_hub_service_factory",
     "iot_service_provisioning_factory",
+    "adr_iot_hub_service_factory",
+    "adr_iot_service_provisioning_factory",
     "adr_service_factory",
+    "adr_update_instance_service_factory",
+    "adr_software_update_data_service_factory",
 ]
 
 
@@ -53,8 +60,26 @@ def _get_credential_scopes(cli_ctx):
     return resource_to_scopes(cli_ctx.cloud.endpoints.active_directory_resource_id)
 
 
-def _get_arm_endpoint(cli_ctx):
-    return cli_ctx.cloud.endpoints.resource_manager
+def _iot_hub_management_client(
+    cli_ctx, subscription_id, base_url, **kwargs
+):
+    from azure.cli.core.commands.client_factory import get_subscription_id
+
+    from azext_iot.sdk.iothub.mgmt import IotHubClient
+
+    subscription_id = subscription_id or get_subscription_id(cli_ctx)
+
+    return IotHubClient(
+        credential=get_cli_credential(
+            cli_ctx, subscription_id=subscription_id
+        ),
+        subscription_id=subscription_id,
+        base_url=base_url,
+        **kwargs,
+        credential_scopes=_get_credential_scopes(cli_ctx),
+        user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
+        http_logging_policy=_get_default_logging_policy(),
+    )
 
 
 def iot_hub_service_factory(cli_ctx, *_, subscription_id=None):
@@ -69,16 +94,37 @@ def iot_hub_service_factory(cli_ctx, *_, subscription_id=None):
         service_client (IotHubClient): operational resource for
             working with IoT Hub Service.
     """
+    return _iot_hub_management_client(
+        cli_ctx,
+        subscription_id,
+        _ADR_CANARY_ARM_ENDPOINT,
+    )
+
+
+def adr_iot_hub_service_factory(cli_ctx, *_, subscription_id=None):
+    """Use preview's modeless transport with the ADR target API contract."""
+    return _iot_hub_management_client(
+        cli_ctx,
+        subscription_id,
+        _ADR_CANARY_ARM_ENDPOINT,
+        api_version=_ADR_IOT_HUB_API_VERSION,
+    )
+
+
+def _iot_dps_management_client(cli_ctx, subscription_id, base_url, **kwargs):
     from azure.cli.core.commands.client_factory import get_subscription_id
 
-    from azext_iot.sdk.iothub.mgmt import IotHubClient
+    from azext_iot.sdk.dps.mgmt import IotDpsClient
 
     subscription_id = subscription_id or get_subscription_id(cli_ctx)
 
-    return IotHubClient(
-        credential=get_cli_credential(cli_ctx, subscription_id=subscription_id),
+    return IotDpsClient(
+        credential=get_cli_credential(
+            cli_ctx, subscription_id=subscription_id
+        ),
         subscription_id=subscription_id,
-        base_url=_get_arm_endpoint(cli_ctx),
+        base_url=base_url,
+        **kwargs,
         credential_scopes=_get_credential_scopes(cli_ctx),
         user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
         http_logging_policy=_get_default_logging_policy(),
@@ -97,23 +143,26 @@ def iot_service_provisioning_factory(cli_ctx, *_, subscription_id=None):
         service_client (IotDpsClient): operational resource for
             working with IoT Hub Device Provisioning Service.
     """
-    from azure.cli.core.commands.client_factory import get_subscription_id
-
-    from azext_iot.sdk.dps.mgmt import IotDpsClient
-
-    subscription_id = subscription_id or get_subscription_id(cli_ctx)
-
-    return IotDpsClient(
-        credential=get_cli_credential(cli_ctx, subscription_id=subscription_id),
-        subscription_id=subscription_id,
-        base_url=_get_arm_endpoint(cli_ctx),
-        credential_scopes=_get_credential_scopes(cli_ctx),
-        user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
-        http_logging_policy=_get_default_logging_policy(),
+    return _iot_dps_management_client(
+        cli_ctx,
+        subscription_id,
+        _ADR_CANARY_ARM_ENDPOINT,
     )
 
 
-def adr_service_factory(cli_ctx, *_):
+def adr_iot_service_provisioning_factory(
+    cli_ctx, *_, subscription_id=None
+):
+    """Use preview's modeless transport with the ADR target API contract."""
+    return _iot_dps_management_client(
+        cli_ctx,
+        subscription_id,
+        _ADR_CANARY_ARM_ENDPOINT,
+        api_version=_ADR_DPS_API_VERSION,
+    )
+
+
+def adr_service_factory(cli_ctx, *_, subscription_id=None):
     """
     Factory for importing deps and getting service client resources.
 
@@ -129,13 +178,53 @@ def adr_service_factory(cli_ctx, *_):
 
     from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
 
-    subscription_id = get_subscription_id(cli_ctx)
+    subscription_id = subscription_id or get_subscription_id(cli_ctx)
 
     return DeviceRegistryMgmtClient(
-        credential=get_cli_credential(cli_ctx, subscription_id=subscription_id),
+        credential=get_cli_credential(
+            cli_ctx, subscription_id=subscription_id
+        ),
         subscription_id=subscription_id,
-        base_url=_get_arm_endpoint(cli_ctx),
+        base_url=_ADR_CANARY_ARM_ENDPOINT,
         credential_scopes=_get_credential_scopes(cli_ctx),
+        user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
+        http_logging_policy=_get_default_logging_policy(),
+    )
+
+
+def adr_update_instance_service_factory(cli_ctx, *_, subscription_id=None):
+    """Create the Software Updates Update Instance management client."""
+    from azure.cli.core.commands.client_factory import get_subscription_id
+
+    from azext_iot.sdk.deviceupdate.duregistry import DeviceUpdateClient
+
+    subscription_id = subscription_id or get_subscription_id(cli_ctx)
+
+    return DeviceUpdateClient(
+        credential=get_cli_credential(
+            cli_ctx, subscription_id=subscription_id
+        ),
+        subscription_id=subscription_id,
+        base_url=_ADR_CANARY_ARM_ENDPOINT,
+        credential_scopes=_get_credential_scopes(cli_ctx),
+        user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
+        http_logging_policy=_get_default_logging_policy(),
+    )
+
+
+def adr_software_update_data_service_factory(cli_ctx, *_, endpoint=None):
+    """Create the Software Updates data-plane client."""
+    from azure.cli.core.azclierror import RequiredArgumentMissingError
+    from azext_iot.sdk.deviceupdate.duregistrydata import DeviceRegistrySoftwareUpdateClient
+
+    if not endpoint:
+        raise RequiredArgumentMissingError(
+            "A service-derived Software Updates endpoint is required."
+        )
+
+    return DeviceRegistrySoftwareUpdateClient(
+        endpoint=endpoint,
+        credential=get_cli_credential(cli_ctx),
         user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
         http_logging_policy=_get_default_logging_policy(),
     )

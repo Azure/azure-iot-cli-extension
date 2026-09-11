@@ -800,9 +800,11 @@ class TestUploadHubFromDict:
         with pytest.raises(BadRequestError):
             p.upload_hub_from_dict(state, [HubAspects.Arm.value])
 
-    def test_upload_arm_new_hub_success(self, mocker):
+    @pytest.mark.parametrize("auth_type", ["login", "key", None])
+    def test_upload_arm_new_hub_success(self, mocker, auth_type):
         p = _provider(mocker, target=None)
         p.rg = "rg"
+        p.auth_type = auth_type
         invoke_result = mocker.MagicMock()
         invoke_result.success.return_value = True
         invoke_result.as_json.return_value = {"resourceGroup": "rg"}
@@ -811,6 +813,7 @@ class TestUploadHubFromDict:
         p.discovery.get_target.return_value = {"name": "hub", "entity": "hub.azure-devices.net"}
         p.upload_hub_from_dict(self._arm_state(), [HubAspects.Arm.value])
         assert p.target is not None
+        p.discovery.get_target.assert_called_once_with("hub", resource_group_name="rg", auth_type=auth_type)
 
 
 class TestStateProviderInit:

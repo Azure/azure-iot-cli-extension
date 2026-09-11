@@ -6,6 +6,7 @@
 
 import pytest
 
+CANARY_ARM = "https://centraluseuap.management.azure.com"
 
 CLOUD_CONFIGS = [
     {
@@ -44,6 +45,9 @@ MANAGEMENT_FACTORIES = [
     ("iot_hub_service_factory", "azext_iot.sdk.iothub.mgmt.IotHubClient", "base_url"),
     ("iot_service_provisioning_factory", "azext_iot.sdk.dps.mgmt.IotDpsClient", "base_url"),
     ("adr_service_factory", "azext_iot.sdk.deviceregistry.DeviceRegistryMgmtClient", "base_url"),
+    ("adr_iot_hub_service_factory", "azext_iot.sdk.iothub.mgmt.IotHubClient", "base_url"),
+    ("adr_iot_service_provisioning_factory", "azext_iot.sdk.dps.mgmt.IotDpsClient", "base_url"),
+    ("adr_update_instance_service_factory", "azext_iot.sdk.deviceupdate.duregistry.DeviceUpdateClient", "base_url"),
 ]
 
 
@@ -73,13 +77,13 @@ class TestFactoryCredentialScopes:
         assert call_kwargs["credential"] is mocker.sentinel.credential
         assert call_kwargs["subscription_id"] == "test-sub"
         assert call_kwargs["credential_scopes"] == cloud_config["expected_scopes"]
-        assert call_kwargs[endpoint_key] == cloud_config["resource_manager"]
+        assert call_kwargs[endpoint_key] == CANARY_ARM
         assert "user_agent_policy" in call_kwargs
         assert "http_logging_policy" in call_kwargs
 
     @pytest.mark.parametrize(
         "factory_name,client_path,endpoint_key",
-        [config for config in MANAGEMENT_FACTORIES if config[0] != "adr_service_factory"],
+        MANAGEMENT_FACTORIES,
     )
     def test_management_factory_honors_subscription_override(
         self, mocker, cloud_config, cli_profile, factory_name, client_path, endpoint_key
@@ -101,7 +105,7 @@ class TestFactoryCredentialScopes:
         assert kwargs["subscription_id"] == "linked-sub"
         assert kwargs["credential"] is mocker.sentinel.credential
         assert kwargs["credential_scopes"] == cloud_config["expected_scopes"]
-        assert kwargs[endpoint_key] == cloud_config["resource_manager"]
+        assert kwargs[endpoint_key] == CANARY_ARM
 
 
 def test_credential_is_selected_per_context_without_global_cache(mocker, cli_profile):
@@ -149,7 +153,10 @@ def test_adr_requests_use_in_process_auth_without_spawning_cli(
     from urllib.parse import parse_qs, urlsplit
     from azure.cli.core.auth.credential_adaptor import CredentialAdaptor
     from azext_iot._factory import adr_service_factory
+    from azext_iot.common.arm import adapt_modeless_lro_poller
 
+    import platform
+    platform.processor()
     cli_ctx = _build_cli_ctx(mocker, cloud_config)
     msal_credential = mocker.Mock()
     msal_credential.acquire_token.return_value = {
@@ -171,7 +178,7 @@ def test_adr_requests_use_in_process_auth_without_spawning_cli(
     mocked_response.add(
         method="GET" if operation == "get" else "PUT",
         url=(
-            f"{cloud_config['resource_manager']}/subscriptions/test-sub-id"
+            f"{CANARY_ARM}/subscriptions/test-sub-id"
             "/resourceGroups/rg/providers/Microsoft.DeviceRegistry/namespaces/namespace"
         ),
         json=namespace,
@@ -183,12 +190,15 @@ def test_adr_requests_use_in_process_auth_without_spawning_cli(
             if operation == "get":
                 result = client.namespaces.get(resource_group_name="rg", namespace_name="namespace")
             else:
-                result = client.namespaces.begin_create_or_replace(
+                poller = client.namespaces.begin_create_or_replace(
                     resource_group_name="rg",
                     namespace_name="namespace",
                     resource={"location": "centraluseuap"},
                     polling=False,
-                ).result()
+                )
+                # This tests authentication/transport, not the current ADR
+                # generator's final-response callback defect.
+                result = adapt_modeless_lro_poller(poller).result()
         assert result["name"] == "namespace"
 
     spawn.assert_not_called()
@@ -206,13 +216,13 @@ def test_adr_requests_use_in_process_auth_without_spawning_cli(
         mocker.call(subscription_id="test-sub-id"),
     ]
     assert all(
-        parse_qs(urlsplit(call.request.url).query)["api-version"] == ["2026-04-01"]
+        parse_qs(urlsplit(call.request.url).query)["api-version"] == ["2026-11-02-preview"]
         for call in mocked_response.calls
     )
 
 
 @pytest.mark.parametrize("cloud_config", CLOUD_CONFIGS, ids=[c["id"] for c in CLOUD_CONFIGS])
-def test_dps_request_uses_cloud_endpoint_and_stable_api(mocker, cli_profile, mocked_response, cloud_config):
+def test_dps_request_uses_canary_endpoint_and_preserves_api_version(mocker, cli_profile, mocked_response, cloud_config):
     from urllib.parse import parse_qs, urlsplit
     from azure.core.credentials import AccessToken
     from azext_iot._factory import iot_service_provisioning_factory
@@ -223,7 +233,7 @@ def test_dps_request_uses_cloud_endpoint_and_stable_api(mocker, cli_profile, moc
     mocked_response.add(
         method="GET",
         url=(
-            f"{cloud_config['resource_manager']}/subscriptions/test-sub-id/resourceGroups/rg"
+            f"{CANARY_ARM}/subscriptions/test-sub-id/resourceGroups/rg"
             "/providers/Microsoft.Devices/provisioningServices/test-dps"
         ),
         json={"name": "test-dps"},

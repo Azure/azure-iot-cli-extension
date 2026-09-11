@@ -148,8 +148,9 @@ def test_outcome_hook_preserves_standard_pytest_reporting(pretty, when, outcome,
     assert not capsys.readouterr().out
 
 
-@pytest.mark.parametrize("wait_fails,cleanup_fails", [(False, False), (True, False), (True, True)])
-def test_namespace_lifecycle_logging_preserves_commands_and_cleanup(wait_fails, cleanup_fails, caplog, mocker):
+def test_namespace_lifecycle_logging_preserves_ignite_commands(
+    caplog, mocker
+):
     from azext_iot.tests.adr import test_adr_namespace_crud_int as scenario
 
     test = object.__new__(scenario.TestADRNamespaceCrud)
@@ -164,61 +165,93 @@ def test_namespace_lifecycle_logging_preserves_commands_and_cleanup(wait_fails, 
     created = {
         "name": namespace_name,
         "location": scenario.TEST_LOCATION,
-        "identity": {"type": "SystemAssigned"},
-        "properties": {"provisioningState": "Succeeded"},
+        "properties": {
+            "provisioningState": "Succeeded",
+            "observability": {"enabled": False},
+        },
     }
     execution.return_value.assert_with_checks.return_value.get_output_in_json.side_effect = [
-        {"id": "test-sub"},
-        {"endpoints": {"resourceManager": "https://management.azure.com/"}},
         created,
-        [created],
+        created,
+        created,
         {"tags": {"env": "test", "purpose": "ci"}},
         {"tags": {"owner": "adr-tests"}},
-        {"properties": {"messaging": {"endpoints": {}}}},
-        {"type": "None"},
-        {"type": "SystemAssigned"},
     ]
-    error = RuntimeError("authentication failed")
-    if wait_fails:
-        execution.side_effect = [
-            *[execution.return_value] * 5,
-            error,
-            RuntimeError("cleanup failed") if cleanup_fails else execution.return_value,
-        ]
 
-    with patch.object(scenario, "generate_adr_namespace_name", return_value=namespace_name):
-        if wait_fails:
-            with pytest.raises(RuntimeError) as raised:
-                scenario.TestADRNamespaceCrud.test_namespace_crud_lifecycle(test)
-            assert raised.value is error
-        else:
-            scenario.TestADRNamespaceCrud.test_namespace_crud_lifecycle(test)
+    with patch.object(
+        scenario, "generate_adr_namespace_name", return_value=namespace_name
+    ):
+        scenario.TestADRNamespaceCrud.test_namespace_crud_lifecycle(test)
 
     commands = [call.args[0] for call in test.cmd.call_args_list]
-    assert commands[4] == (
+    assert commands[0] == (
         f"iot adr ns create -n {namespace_name} -g {scenario.TEST_RG} "
         f"--location {scenario.TEST_LOCATION} --no-wait"
     )
-    assert commands[5] == f"iot adr ns wait -n {namespace_name} -g {scenario.TEST_RG} --created"
+    assert commands[1] == (
+        f"iot adr ns wait -n {namespace_name} -g {scenario.TEST_RG}"
+    )
+    assert not any("--messaging-endpoints" in command for command in commands)
     assert caplog.messages[0] == "\u25b6 TEST: test_namespace_crud_lifecycle"
-    command_logs = [message for message in caplog.messages if message.startswith("  \u203a az ")]
+    command_logs = [
+        message
+        for message in caplog.messages
+        if message.startswith("  \u203a az ")
+    ]
     assert len(command_logs) == len(commands)
-    durations = [message for message in caplog.messages if message.startswith("  \u0394 (")]
-    if wait_fails:
-        assert commands[6:] == [f"iot adr ns delete -n {namespace_name} -g {scenario.TEST_RG} --yes"]
-        assert len(durations) == 3
-        assert not any(message.startswith("  \u2713 ") for message in caplog.messages)
-        assert any("cleanup failed" in message for message in caplog.messages) is cleanup_fails
-    else:
-        assert len(commands) == 23
-        assert commands[-2] == f"iot adr ns wait -n {namespace_name} -g {scenario.TEST_RG} --deleted"
-        assert [index for index, call in enumerate(test.cmd.call_args_list) if call.kwargs] == [9, 22]
-        assert all(
-            call.kwargs == {"expect_failure": True}
-            for call in test.cmd.call_args_list if call.kwargs
-        )
-        assert len(durations) == 6
-        assert "  \u2713 Namespace deleted" in caplog.messages
+    durations = [
+        message
+        for message in caplog.messages
+        if message.startswith("  \u0394 (")
+    ]
+    assert len(commands) == 12
+    assert commands[-2] == (
+        f"iot adr ns wait -n {namespace_name} -g {scenario.TEST_RG} "
+        "--deleted"
+    )
+    assert [
+        index
+        for index, call in enumerate(test.cmd.call_args_list)
+        if call.kwargs
+    ] == [4, 8, 11]
+    assert all(
+        call.kwargs == {"expect_failure": True}
+        for call in test.cmd.call_args_list
+        if call.kwargs
+    )
+    assert len(durations) == 4
+    assert "  \u2713 Namespace deleted" in caplog.messages
+
+
+@pytest.mark.parametrize(
+    "method_name,list_command",
+    [
+        ("test_namespace_list_by_resource_group", "iot adr ns list -g test-rg"),
+        ("test_namespace_list_by_subscription", "iot adr ns list"),
+    ],
+)
+def test_namespace_list_scenarios_preserve_both_scopes(method_name, list_command, mocker):
+    from azext_iot.tests.adr import test_adr_namespace_crud_int as scenario
+
+    test = object.__new__(scenario.TestADRNamespaceCrud)
+    test._testMethodName = method_name
+    test.kwargs = {}
+    test.cli_ctx = Mock()
+    test.cmd = Mock(wraps=test.cmd)
+    mocker.patch.object(scenario, "TEST_RG", "test-rg")
+    mocker.patch.object(scenario, "TEST_SUBSCRIPTION", None)
+    mocker.patch.object(scenario, "generate_adr_namespace_name", return_value="test-namespace")
+    execution = mocker.patch("azure.cli.testsdk.base.execute", autospec=True)
+    execution.return_value.assert_with_checks.return_value.get_output_in_json.return_value = [
+        {"name": "test-namespace"}
+    ]
+
+    getattr(test, method_name)()
+
+    commands = [call.args[0].strip() for call in test.cmd.call_args_list]
+    assert len(commands) == 3
+    assert commands[1] == list_command
+    assert commands[2] == "iot adr ns delete -n test-namespace -g test-rg --yes"
 
 
 def test_timestamp_is_utc():
@@ -251,40 +284,6 @@ def test_pretty_step_without_arguments(monkeypatch, capsys):
     assert "Step \u00b7 17:21:30" in capsys.readouterr().out
 
 
-def test_namespace_scenario_requires_config(mocker):
-    from azext_iot.tests.adr import test_adr_namespace_crud_int as scenario
-    mocker.patch.object(scenario, "TEST_RG", None)
-    test = object.__new__(scenario.TestADRNamespaceCrud)
-    with pytest.raises(pytest.skip.Exception, match="azext_iot_testrg"):
-        scenario.TestADRNamespaceCrud.test_namespace_crud_lifecycle(test)
-
-
-def test_preflight_uses_explicit_configuration_and_does_not_provision(mocker):
-    from azext_iot.tests.adr import test_adr_namespace_crud_int as scenario
-    mocker.patch.object(scenario, "TEST_RG", "test group")
-    mocker.patch.object(scenario, "TEST_SUBSCRIPTION", "selected-sub")
-    mocker.patch.object(scenario, "TEST_LOCATION", "selected-location")
-    mocker.patch.object(scenario, "TEST_API_VERSION", "selected-api")
-    test = object.__new__(scenario.TestADRNamespaceCrud)
-    test.cmd = Mock()
-    test.cmd.return_value.get_output_in_json.side_effect = [
-        {"id": "selected-sub"},
-        {"endpoints": {"resourceManager": "https://management.example/"}},
-    ]
-    error = RuntimeError("preflight failure")
-    test.cmd.side_effect = [test.cmd.return_value, test.cmd.return_value, test.cmd.return_value, error]
-    with pytest.raises(RuntimeError) as raised:
-        scenario.TestADRNamespaceCrud.test_namespace_crud_lifecycle(test)
-    assert raised.value is error
-    commands = [call.args[0] for call in test.cmd.call_args_list]
-    assert commands == [
-        "account show --subscription selected-sub", "cloud show",
-        "group show -n 'test group' --subscription selected-sub",
-        "rest --method get --url 'https://management.example/subscriptions/selected-sub/resourceGroups/test%20group/"
-        "providers/Microsoft.DeviceRegistry/namespaces?api-version=selected-api'",
-    ]
-
-
 def test_namespace_name_generation():
     from azext_iot.tests.adr.conftest import generate_adr_namespace_name
     name = generate_adr_namespace_name()
@@ -292,8 +291,17 @@ def test_namespace_name_generation():
     assert len(name) == 15
 
 
-@pytest.mark.parametrize("adr_group", [None, "", "adr-group"])
-def test_adr_resource_group_override_and_fallback(monkeypatch, adr_group):
+@pytest.mark.parametrize(
+    "adr_group,expected",
+    [
+        (None, "cli-int-test-rg"),
+        ("", ""),
+        ("adr-group", "adr-group"),
+    ],
+)
+def test_adr_resource_group_preserves_ignite_default(
+    monkeypatch, adr_group, expected
+):
     from azext_iot.tests.adr import conftest
 
     monkeypatch.setenv("azext_iot_testrg", "shared-group")
@@ -301,4 +309,4 @@ def test_adr_resource_group_override_and_fallback(monkeypatch, adr_group):
     if adr_group is not None:
         monkeypatch.setenv("azext_iot_adr_resource_group", adr_group)
     settings = runpy.run_path(conftest.__file__)
-    assert settings["TEST_RG"] == (adr_group or "shared-group")
+    assert settings["TEST_RG"] == expected

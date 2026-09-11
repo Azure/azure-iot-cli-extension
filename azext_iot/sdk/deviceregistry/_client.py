@@ -23,7 +23,14 @@ from ._utils.serialization import Deserializer, Serializer
 from .operations import (
     AssetEndpointProfilesOperations,
     AssetsOperations,
+    AsyncOperationStatusOperations,
     BillingContainersOperations,
+    CertificateAuthoritiesOperations,
+    CertificatePoliciesOperations,
+    GroupsOperations,
+    JobRunsByNamespaceOperations,
+    JobRunsOperations,
+    JobsOperations,
     NamespaceAssetsOperations,
     NamespaceDevicesOperations,
     NamespaceDiscoveredAssetsOperations,
@@ -31,6 +38,10 @@ from .operations import (
     NamespacesOperations,
     OperationStatusOperations,
     Operations,
+    RegistryDeviceAttributesOperations,
+    RegistryDeviceAuthenticationProfilesOperations,
+    RegistryDeviceCapabilitiesOperations,
+    RegistryDevicesOperations,
     SchemaRegistriesOperations,
     SchemaVersionsOperations,
     SchemasOperations,
@@ -53,6 +64,9 @@ class DeviceRegistryMgmtClient:  # pylint: disable=too-many-instance-attributes,
     :vartype operations: azext_iot.sdk.deviceregistry.operations.Operations
     :ivar operation_status: OperationStatusOperations operations
     :vartype operation_status: azext_iot.sdk.deviceregistry.operations.OperationStatusOperations
+    :ivar async_operation_status: AsyncOperationStatusOperations operations
+    :vartype async_operation_status:
+     azext_iot.sdk.deviceregistry.operations.AsyncOperationStatusOperations
     :ivar assets: AssetsOperations operations
     :vartype assets: azext_iot.sdk.deviceregistry.operations.AssetsOperations
     :ivar asset_endpoint_profiles: AssetEndpointProfilesOperations operations
@@ -79,6 +93,33 @@ class DeviceRegistryMgmtClient:  # pylint: disable=too-many-instance-attributes,
     :vartype schemas: azext_iot.sdk.deviceregistry.operations.SchemasOperations
     :ivar schema_versions: SchemaVersionsOperations operations
     :vartype schema_versions: azext_iot.sdk.deviceregistry.operations.SchemaVersionsOperations
+    :ivar certificate_authorities: CertificateAuthoritiesOperations operations
+    :vartype certificate_authorities:
+     azext_iot.sdk.deviceregistry.operations.CertificateAuthoritiesOperations
+    :ivar certificate_policies: CertificatePoliciesOperations operations
+    :vartype certificate_policies:
+     azext_iot.sdk.deviceregistry.operations.CertificatePoliciesOperations
+    :ivar groups: GroupsOperations operations
+    :vartype groups: azext_iot.sdk.deviceregistry.operations.GroupsOperations
+    :ivar jobs: JobsOperations operations
+    :vartype jobs: azext_iot.sdk.deviceregistry.operations.JobsOperations
+    :ivar job_runs: JobRunsOperations operations
+    :vartype job_runs: azext_iot.sdk.deviceregistry.operations.JobRunsOperations
+    :ivar job_runs_by_namespace: JobRunsByNamespaceOperations operations
+    :vartype job_runs_by_namespace:
+     azext_iot.sdk.deviceregistry.operations.JobRunsByNamespaceOperations
+    :ivar registry_devices: RegistryDevicesOperations operations
+    :vartype registry_devices: azext_iot.sdk.deviceregistry.operations.RegistryDevicesOperations
+    :ivar registry_device_attributes: RegistryDeviceAttributesOperations operations
+    :vartype registry_device_attributes:
+     azext_iot.sdk.deviceregistry.operations.RegistryDeviceAttributesOperations
+    :ivar registry_device_capabilities: RegistryDeviceCapabilitiesOperations operations
+    :vartype registry_device_capabilities:
+     azext_iot.sdk.deviceregistry.operations.RegistryDeviceCapabilitiesOperations
+    :ivar registry_device_authentication_profiles: RegistryDeviceAuthenticationProfilesOperations
+     operations
+    :vartype registry_device_authentication_profiles:
+     azext_iot.sdk.deviceregistry.operations.RegistryDeviceAuthenticationProfilesOperations
     :param credential: Credential used to authenticate requests to the service. Required.
     :type credential: ~azure.core.credentials.TokenCredential
     :param subscription_id: The ID of the target subscription. The value must be an UUID. Required.
@@ -88,9 +129,10 @@ class DeviceRegistryMgmtClient:  # pylint: disable=too-many-instance-attributes,
     :keyword cloud_setting: The cloud setting for which to get the ARM endpoint. Default value is
      None.
     :paramtype cloud_setting: ~azure.core.AzureClouds
-    :keyword api_version: The API version to use for this operation. Known values are "2026-04-01"
-     and None. Default value is None. If not set, the operation's default API version will be used.
-     Note that overriding this default value may result in unsupported behavior.
+    :keyword api_version: The API version to use for this operation. Known values are
+     "2026-11-02-preview" and None. Default value is None. If not set, the operation's default API
+     version will be used. Note that overriding this default value may result in unsupported
+     behavior.
     :paramtype api_version: str
     :keyword int polling_interval: Default waiting time between two polls for LRO operations if no
      Retry-After header is present.
@@ -147,6 +189,9 @@ class DeviceRegistryMgmtClient:  # pylint: disable=too-many-instance-attributes,
         self.operation_status = OperationStatusOperations(
             self._client, self._config, self._serialize, self._deserialize
         )
+        self.async_operation_status = AsyncOperationStatusOperations(
+            self._client, self._config, self._serialize, self._deserialize
+        )
         self.assets = AssetsOperations(self._client, self._config, self._serialize, self._deserialize)
         self.asset_endpoint_profiles = AssetEndpointProfilesOperations(
             self._client, self._config, self._serialize, self._deserialize
@@ -172,6 +217,30 @@ class DeviceRegistryMgmtClient:  # pylint: disable=too-many-instance-attributes,
         )
         self.schemas = SchemasOperations(self._client, self._config, self._serialize, self._deserialize)
         self.schema_versions = SchemaVersionsOperations(self._client, self._config, self._serialize, self._deserialize)
+        self.certificate_authorities = CertificateAuthoritiesOperations(
+            self._client, self._config, self._serialize, self._deserialize
+        )
+        self.certificate_policies = CertificatePoliciesOperations(
+            self._client, self._config, self._serialize, self._deserialize
+        )
+        self.groups = GroupsOperations(self._client, self._config, self._serialize, self._deserialize)
+        self.jobs = JobsOperations(self._client, self._config, self._serialize, self._deserialize)
+        self.job_runs = JobRunsOperations(self._client, self._config, self._serialize, self._deserialize)
+        self.job_runs_by_namespace = JobRunsByNamespaceOperations(
+            self._client, self._config, self._serialize, self._deserialize
+        )
+        self.registry_devices = RegistryDevicesOperations(
+            self._client, self._config, self._serialize, self._deserialize
+        )
+        self.registry_device_attributes = RegistryDeviceAttributesOperations(
+            self._client, self._config, self._serialize, self._deserialize
+        )
+        self.registry_device_capabilities = RegistryDeviceCapabilitiesOperations(
+            self._client, self._config, self._serialize, self._deserialize
+        )
+        self.registry_device_authentication_profiles = RegistryDeviceAuthenticationProfilesOperations(
+            self._client, self._config, self._serialize, self._deserialize
+        )
 
     def send_request(self, request: HttpRequest, *, stream: bool = False, **kwargs: Any) -> HttpResponse:
         """Runs the network request through the client's chained policies.

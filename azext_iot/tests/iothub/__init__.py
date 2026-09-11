@@ -7,27 +7,27 @@
 import pytest
 
 from azure.cli.core.azclierror import CLIInternalError
-from time import sleep
 from azext_iot.tests.helpers import (
     add_test_tag,
-    assign_role_assignment,
     clean_up_iothub_device_config,
     create_storage_account,
+    DATAPLANE_AUTH_TYPES as SERVICE_AUTH_TYPES,
     set_cmd_auth_type
 )
-from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
+from azext_iot.tests.settings import (
+    DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL, HUB_TEST_LOCATION
+)
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests import CaptureOutputLiveScenarioTest
 
 from azext_iot.common.certops import create_self_signed_certificate
-from azext_iot.common.shared import AuthenticationTypeDataplane
 from azext_iot.tests.test_constants import ResourceTypes
+from azext_iot.tests.iothub._integration_helpers import (
+    assert_hub_policy, assign_role_with_propagation, get_or_create_hub, scope_known_hub
+)
+from azext_iot._factory import iot_hub_service_factory
 
-DATAPLANE_AUTH_TYPES = [
-    AuthenticationTypeDataplane.key.value,
-    AuthenticationTypeDataplane.login.value,
-    "cstring",
-]
+DATAPLANE_AUTH_TYPES = SERVICE_AUTH_TYPES
 
 PRIMARY_THUMBPRINT = create_self_signed_certificate(
     subject="aziotcli", valid_days=1, cert_output_dir=None
@@ -66,36 +66,14 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         if hasattr(self, 'storage_cstring'):
             self._create_storage_account()
 
+        client = iot_hub_service_factory(self.cli_ctx).iot_hub_resource
         if not settings.env.azext_iot_testhub:
-            hubs_list = self.cmd(
-                'iot hub list -g "{}"'.format(self.entity_rg)
-            ).get_output_in_json()
-
-            target_hub = None
-            for hub in hubs_list:
-                if hub["name"] == self.entity_name:
-                    target_hub = hub
-                    break
-
-            if not target_hub:
-                if hasattr(self, 'storage_cstring'):
-                    self.cmd(
-                        "iot hub create --name {} --resource-group {} --fc {} --fcs {} --sku S1 ".format(
-                            self.entity_name, self.entity_rg,
-                            self.storage_container, self.storage_cstring
-                        )
-                    )
-                else:
-                    self.cmd(
-                        "iot hub create --name {} --resource-group {} --sku S1 ".format(
-                            self.entity_name, self.entity_rg
-                        )
-                    )
-                sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
-
-        target_hub = self.cmd(
-            "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg)
-        ).get_output_in_json()
+            target_hub, _ = get_or_create_hub(
+                client, self.entity_name, self.entity_rg, self._create_hub
+            )
+        else:
+            target_hub = client.get(resource_group_name=self.entity_rg, resource_name=self.entity_name)
+        assert_hub_policy(target_hub)
 
         if add_data_contributor:
             self._add_data_contributor(target_hub)
@@ -103,8 +81,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         self.host_name = target_hub["properties"]["hostName"]
         # Device-facing hostname (GWv2 hubs expose a distinct deviceHostName; classic hubs reuse hostName)
         self.device_host_name = target_hub["properties"].get("deviceHostName") or self.host_name
-        self.region = self.get_region()
-        self.connection_string = self.get_hub_cstring()
+        self.region = target_hub["location"]
         add_test_tag(
             cmd=self.cmd,
             name=self.entity_name,
@@ -113,6 +90,27 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             test_tag=test_scenario
         )
 
+    def _create_hub(self):
+        command = (
+            f"iot hub create --name {self.entity_name} --resource-group {self.entity_rg} "
+            f"--location {HUB_TEST_LOCATION} --disable-local-auth true --sku S1"
+        )
+        if hasattr(self, "storage_cstring"):
+            command += f" --fc {self.storage_container} --fcs {self.storage_cstring}"
+        self.cmd(command)
+
+    def cmd(self, command, *args, **kwargs):
+        command = scope_known_hub(
+            command, self.entity_rg,
+            (self.entity_name, getattr(self, "host_name", None), getattr(self, "device_host_name", None)),
+        )
+        return super().cmd(command, *args, **kwargs)
+
+    @property
+    def connection_string(self):
+        # Only metadata/offline-token tests need a Hub policy key. Service calls use Entra.
+        return self.get_hub_cstring()
+
     def _add_data_contributor(self, target_hub):
         account = self.cmd("account show").get_output_in_json()
         user = account["user"]
@@ -120,11 +118,12 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         if user["name"] is None:
             raise CLIInternalError("User not found")  # pylint: disable=broad-except
 
-        assign_role_assignment(
+        assign_role_with_propagation(
             role=USER_ROLE,
             scope=target_hub["id"],
             assignee=user["name"],
-            max_tries=MAX_RBAC_ASSIGNMENT_TRIES
+            max_tries=MAX_RBAC_ASSIGNMENT_TRIES,
+            wait=ROLE_ASSIGNMENT_REFRESH_TIME,
         )
 
     def generate_device_names(self, count=1, edge=False):
@@ -173,7 +172,8 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             container_name=self.storage_container,
             rg=self.entity_rg,
             resource_name=self.entity_name,
-            create_account=(not settings.env.azext_iot_teststorageaccount)
+            create_account=(not settings.env.azext_iot_teststorageaccount),
+            location=HUB_TEST_LOCATION,
         )
 
     def _delete_storage_account(self):
@@ -217,9 +217,21 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             )
         ).get_output_in_json()["connectionString"]
 
+    def get_device_cstring(self, device_id):
+        return self.cmd(
+            f"iot hub device-identity connection-string show -d {device_id} "
+            f"-n {self.entity_name} -g {self.entity_rg} --auth-type login"
+        ).get_output_in_json()["connectionString"]
+
+    def get_device_key(self, device_id):
+        return self.cmd(
+            f"iot hub device-identity show -d {device_id} "
+            f"-n {self.entity_name} -g {self.entity_rg} --auth-type login"
+        ).get_output_in_json()["authentication"]["symmetricKey"]["primaryKey"]
+
     def set_cmd_auth_type(self, command: str, auth_type: str) -> str:
         return set_cmd_auth_type(
-            command=command, auth_type=auth_type, cstring=self.connection_string
+            command=command, auth_type=auth_type, cstring=self.connection_string if auth_type == "cstring" else None
         )
 
     @pytest.fixture(scope='class', autouse=True)

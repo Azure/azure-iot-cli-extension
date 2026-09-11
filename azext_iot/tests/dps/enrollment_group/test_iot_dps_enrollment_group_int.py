@@ -11,7 +11,7 @@ from azext_iot.common.shared import EntityStatusType, AttestationType, Allocatio
 from azext_iot.common.utility import generate_key
 from azext_iot.tests.dps import (
     API_VERSION,
-    DATAPLANE_AUTH_TYPES,
+    DPS_SERVICE_AUTH_PARAMS,
     WEBHOOK_URL,
 )
 from azext_iot.tests.helpers import CERT_ENDING, create_test_cert, set_cmd_auth_type
@@ -20,7 +20,8 @@ from azext_iot.tests.generators import generate_generic_id, generate_names
 cli = EmbeddedCLI()
 
 
-def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):
+@pytest.mark.parametrize("auth_phases", DPS_SERVICE_AUTH_PARAMS)
+def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module, auth_phases):
     dps_name = provisioned_iot_dps_module['name']
     dps_rg = provisioned_iot_dps_module['resourceGroup']
     dps_host_name = provisioned_iot_dps_module['dps']['properties']['serviceOperationsHostName']
@@ -30,7 +31,7 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):
     cert_name = generate_names()
     cert_path = cert_name + CERT_ENDING
     create_test_cert(tracked_certs=provisioned_iot_dps_module["certificates"], subject=cert_name)
-    for auth_phase in DATAPLANE_AUTH_TYPES:
+    for auth_phase in auth_phases:
         enrollment_id = generate_names()
 
         enrollment = cli.invoke(
@@ -110,7 +111,13 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):
         etag = enrollment["etag"]
         assert enrollment_update["allocationPolicy"] == AllocationType.hashed.value
         assert enrollment_update["attestation"]["type"] == AttestationType.x509.value
-        assert enrollment_update["attestation"]["x509"]["clientCertificates"] is None
+        assert enrollment_update["attestation"]["x509"].get("clientCertificates") is None
+        assert enrollment_update["attestation"]["x509"]["signingCertificates"]["primary"] == (
+            enrollment["attestation"]["x509"]["signingCertificates"]["primary"]
+        )
+        assert enrollment_update["attestation"]["x509"]["signingCertificates"]["secondary"] == (
+            enrollment["attestation"]["x509"]["signingCertificates"]["secondary"]
+        )
         assert enrollment_update["capabilities"]["iotEdge"] is False
         assert enrollment_update["enrollmentGroupId"] == enrollment_id
         assert enrollment_update["provisioningStatus"] == EntityStatusType.disabled.value
@@ -149,7 +156,7 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):
         assert enrollment_update["allocationPolicy"] == AllocationType.custom.value
         assert enrollment_update["attestation"]["type"] == AttestationType.x509.value
         assert enrollment_update["attestation"]["x509"]["caReferences"]["primary"] == cert_name
-        assert enrollment_update["attestation"]["x509"]["caReferences"]["secondary"] is None
+        assert enrollment_update["attestation"]["x509"]["caReferences"].get("secondary") is None
         assert enrollment_update["customAllocationDefinition"]["webhookUrl"] == WEBHOOK_URL
         assert enrollment_update["customAllocationDefinition"]["apiVersion"] == API_VERSION
         assert enrollment_update["enrollmentGroupId"] == enrollment_id
@@ -167,7 +174,8 @@ def test_dps_enrollment_group_x509_lifecycle(provisioned_iot_dps_module):
         )
 
 
-def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module):
+@pytest.mark.parametrize("auth_phases", DPS_SERVICE_AUTH_PARAMS)
+def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module, auth_phases):
     dps_rg = provisioned_iot_dps_module['resourceGroup']
     dps_host_name = provisioned_iot_dps_module['dps']['properties']['serviceOperationsHostName']
     hub_hostname = provisioned_iot_dps_module['hubHostName']
@@ -181,7 +189,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
     }
 
     attestation_type = AttestationType.symmetricKey.value
-    for auth_phase in DATAPLANE_AUTH_TYPES:
+    for auth_phase in auth_phases:
         enrollment_id, enrollment_id2 = generate_names(count=2)
         primary_key = generate_key()
         secondary_key = generate_key()
@@ -353,7 +361,8 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module)
         )
 
 
-def test_dps_enrollment_twin_array(provisioned_iot_dps_module):
+@pytest.mark.parametrize("auth_phases", DPS_SERVICE_AUTH_PARAMS)
+def test_dps_enrollment_twin_array(provisioned_iot_dps_module, auth_phases):
     dps_rg = provisioned_iot_dps_module['resourceGroup']
     dps_host_name = provisioned_iot_dps_module['dps']['properties']['serviceOperationsHostName']
     hub_hostname = provisioned_iot_dps_module['hubHostName']
@@ -377,7 +386,7 @@ def test_dps_enrollment_twin_array(provisioned_iot_dps_module):
     cert_name = generate_names()
     cert_path = cert_name + CERT_ENDING
     create_test_cert(tracked_certs=provisioned_iot_dps_module["certificates"], subject=cert_name)
-    for auth_phase in DATAPLANE_AUTH_TYPES:
+    for auth_phase in auth_phases:
         # test twin array in enrollment
         device_id = generate_names()
         enrollment_id = generate_names()
