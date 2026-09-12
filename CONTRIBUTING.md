@@ -186,6 +186,41 @@ deadline the runner asks workers to unwind while keeping tox/xdist's controller
 alive for bounded fixture cleanup, then forcibly terminates any remaining owned
 processes. Timeout/cancellation is always unsuccessful, even when cleanup finishes.
 
+#### Opt-in Hub key and connection-string coverage
+
+The normal `HubMgmt-int` and `HubData-int` suites retain `disableLocalAuth=true`
+and Entra service authentication. This is a test policy, not a claim that Azure
+requires local authentication to be disabled.
+
+`HubSAS-int` runs six existing HTTP, messaging, monitoring and file-upload cases
+serially against a separate, generated S1 Hub with `disableLocalAuth=false`.
+The exact node list and upload-first order are checked before unittest
+constructors can provision resources. Resource pins, parallel workers,
+selection filters, scenario reruns and uncaptured output are rejected.
+The HTTP C2D case covers key, login and connection-string service authentication;
+device MQTT keys remain distinct from Hub service policy keys.
+
+The workflow's `testHubSAS` toggle defaults to false. Reusable workflows can
+explicitly select `HubSAS` in `test-services`; `auto` never selects it.
+The phase requires `azext_iot_testrg` and an explicit
+`azext_iot_hubsas_subscription`, and uses `centraluseuap`. It needs only one Hub,
+one Storage account/container, and one Hub-scoped data-role assignment. No DPS,
+UAMI or separate Event Hubs namespace is provisioned.
+
+The phase writes credential-free ownership/results to `test-result/hub-sas.json`
+before mutations. Cleanup operates only on those IDs, checks ownership, observes
+already-Deleting resources without repeating DELETE, and reports incomplete
+cleanup as failure. Constructor failure cannot trigger another creation attempt.
+The six cases retain their 900-second item deadlines and have no scenario reruns.
+Background cleanup is bounded; a worker still running prevents resource deletion.
+Forced process termination can prevent finalizers: consult the ownership receipt
+and obtain explicit authorization for any remaining resource cleanup.
+
+Captured reports and logging are filtered using the existing integration
+redactor before pytest/GitHub reporting. Do not use `--showlocals`, live logging
+or `--capture=no`. A phase is successful only with six actual passes, no skips,
+and complete owned-resource cleanup; DLA-false creation alone is not SAS proof.
+
 #### Azure Resource Setup
 
 The following resources will be needed for the integration tests.

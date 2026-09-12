@@ -13,7 +13,7 @@ from time import sleep
 from uuid import uuid4
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.common.shared import AuthenticationTypeDataplane
-from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
+from azext_iot.tests.iothub._sas_phase import AUTH_TYPES, enabled as sas_phase_enabled
 from azext_iot.tests.iothub._integration_helpers import device_receiver, LOCAL_AUTH_DEVICE_HTTP_REASON
 from azext_iot.common.utility import (
     calculate_millisec_since_unix_epoch_utc,
@@ -88,7 +88,7 @@ class TestIoTHubC2DMessages(IoTLiveScenarioTest):
             for record in feedback
         ), f"No successful feedback for device {device_id}, message {message_id}: {feedback}"
 
-    @pytest.mark.skip(reason=LOCAL_AUTH_DEVICE_HTTP_REASON)
+    @pytest.mark.skipif(not sas_phase_enabled(), reason=LOCAL_AUTH_DEVICE_HTTP_REASON)
     def test_iothub_c2d_messages_http(self):
         device_count = 1
         device_ids = self.generate_device_names(device_count)
@@ -100,7 +100,7 @@ class TestIoTHubC2DMessages(IoTLiveScenarioTest):
             f"iot hub device-identity create -d {device_ids[0]} -n {self.entity_name} -g {self.entity_rg}"
         )
 
-        for auth_phase in DATAPLANE_AUTH_TYPES:
+        for auth_phase in AUTH_TYPES:
             test_ce = "utf-16" if auth_phase == AuthenticationTypeDataplane.login.value else "utf-8"
             test_body = f"{uuid4()} шеллы 😁"  # Mixed unicode blocks
             test_props = f"key0={str(uuid4())};key1={str(uuid4())}"

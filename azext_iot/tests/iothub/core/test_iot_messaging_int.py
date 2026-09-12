@@ -15,6 +15,8 @@ from azext_iot.iothub.common import NON_DECODABLE_PAYLOAD
 from azext_iot.tests.conftest import get_context_path
 from azext_iot.tests.iothub import IoTLiveScenarioTest, PREFIX_DEVICE
 from azext_iot.tests.iothub._integration_helpers import LOCAL_AUTH_DEVICE_HTTP_REASON, LOCAL_AUTH_MONITOR_REASON
+from azext_iot.tests.iothub._sas_phase import enabled as sas_phase_enabled
+from azext_iot.tests.iothub.conftest import _delete_fixture_resource
 from azext_iot.common.utility import (
     execute_onthread,
     calculate_millisec_since_unix_epoch_utc,
@@ -51,7 +53,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         super(TestIoTHubMessaging, self).tearDown()
 
-    @pytest.mark.skip(reason=LOCAL_AUTH_DEVICE_HTTP_REASON)
+    @pytest.mark.skipif(not sas_phase_enabled(), reason=LOCAL_AUTH_DEVICE_HTTP_REASON)
     def test_device_messaging(self):
         device_count = 1
         device_ids = self.generate_device_names(device_count)
@@ -414,17 +416,16 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         # Test waiting for ack from c2d send
         from azext_iot.iothub.commands_device_messaging import iot_simulate_device
         from azext_iot._factory import iot_hub_service_factory
-        from azure.cli.core.mock import DummyCli
 
-        cli_ctx = DummyCli()
-        client = iot_hub_service_factory(cli_ctx).iot_hub_resource
+        client = iot_hub_service_factory(self.cli_ctx).iot_hub_resource
 
-        token, thread = execute_onthread(
+        self.start_background(
             method=iot_simulate_device,
             args={
                 "cmd": client,
                 "device_id": device_ids[0],
                 "hub_name_or_hostname": self.entity_name,
+                "resource_group_name": self.entity_rg,
                 "receive_settle": "complete",
                 "data": "Testing mqtt c2d and direct method invocations",
                 "msg_count": 10,
@@ -454,15 +455,15 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             "methodRequestPayload": test_mp
         }
 
-        token.set()
-        thread.join()
+        self.stop_background()
 
-        token, thread = execute_onthread(
+        self.start_background(
             method=iot_simulate_device,
             args={
                 "cmd": client,
                 "device_id": device_ids[0],
                 "hub_name_or_hostname": self.entity_name,
+                "resource_group_name": self.entity_rg,
                 "receive_settle": "complete",
                 "data": "Ping from c2d ack wait test",
                 "msg_count": 6,
@@ -478,8 +479,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
                 device_ids[0], "full", self.connection_string
             )
         )
-        token.set()
-        thread.join()
+        self.stop_background()
 
         # Error - invalid wait when no ack requested
         self.cmd(
@@ -829,7 +829,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         token.set()
         thread.join()
 
-    @pytest.mark.skip(reason=LOCAL_AUTH_DEVICE_HTTP_REASON)
+    @pytest.mark.skipif(not sas_phase_enabled(), reason=LOCAL_AUTH_DEVICE_HTTP_REASON)
     def test_pyamqp_device_messaging(self):
         device_count = 1
         device_ids = self.generate_device_names(device_count)
@@ -988,9 +988,15 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             checks=self.is_empty(),
         )
 
-    @pytest.mark.skip(reason=LOCAL_AUTH_MONITOR_REASON)
+    @pytest.mark.skipif(not sas_phase_enabled(), reason=LOCAL_AUTH_MONITOR_REASON)
     def test_hub_monitor_events(self):
         for cg in LIVE_CONSUMER_GROUPS:
+            self.addCleanup(
+                _delete_fixture_resource,
+                f"iot hub consumer-group delete --hub-name {self.entity_name} "
+                f"--resource-group {self.entity_rg} --name {cg}",
+                cg,
+            )
             self.cmd(
                 "az iot hub consumer-group create --hub-name {} --resource-group {} --name {}".format(
                     self.entity_name, self.entity_rg, cg
@@ -1000,10 +1006,8 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
 
         from azext_iot.iothub.commands_device_messaging import iot_device_send_message
         from azext_iot._factory import iot_hub_service_factory
-        from azure.cli.core.mock import DummyCli
 
-        cli_ctx = DummyCli()
-        client = iot_hub_service_factory(cli_ctx).iot_hub_resource
+        client = iot_hub_service_factory(self.cli_ctx).iot_hub_resource
 
         device_count = 10
         device_ids = self.generate_device_names(device_count)
@@ -1027,7 +1031,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         enqueued_time = calculate_millisec_since_unix_epoch_utc()
 
         for i in range(device_count):
-            execute_onthread(
+            self.start_background(
                 method=iot_device_send_message,
                 args={
                     "cmd": client,
@@ -1256,15 +1260,8 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
             [NON_DECODABLE_PAYLOAD],
         )
 
-        for cg in LIVE_CONSUMER_GROUPS:
-            self.cmd(
-                "az iot hub consumer-group delete --hub-name {} --resource-group {} --name {}".format(
-                    self.entity_name, self.entity_rg, cg
-                ),
-                expect_failure=False,
-            )
-
-    @pytest.mark.skip(
+    @pytest.mark.skipif(
+        not sas_phase_enabled(),
         reason=LOCAL_AUTH_DEVICE_HTTP_REASON + " Entra feedback is covered by TestIoTHubC2DMessages.test_iothub_c2d_feedback."
     )
     def test_hub_monitor_feedback(self):

@@ -12,8 +12,8 @@ from time import monotonic, sleep
 from urllib.parse import parse_qs, urlparse
 
 import pytest
-from azure.cli.core.azclierror import CLIInternalError
-from azure.core.exceptions import HttpResponseError
+from azure.cli.core.azclierror import CLIInternalError, ResourceNotFoundError
+from azure.core.exceptions import HttpResponseError, ResourceNotFoundError as CoreResourceNotFoundError
 from knack.log import get_logger
 from msrestazure.azure_exceptions import CloudError
 
@@ -35,6 +35,14 @@ _CANARY_HUB_LIST_API_VERSIONS = frozenset({"2026-05-01-preview", "2026-10-01-pre
 # https://learn.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language#twin-query-limitations
 QUERY_VISIBILITY_TIMEOUT = 30 * 60
 logger = get_logger(__name__)
+
+
+def is_not_found(error):
+    return (
+        isinstance(error, (ResourceNotFoundError, CoreResourceNotFoundError))
+        or getattr(error, "status_code", None) == 404
+        or getattr(getattr(error, "response", None), "status_code", None) == 404
+    )
 
 
 def wait_for_query_ids(read, expected_ids, id_key=None, attempts=None, wait=10, timeout=QUERY_VISIBILITY_TIMEOUT):
@@ -126,11 +134,11 @@ def get_or_create_hub(client, name, resource_group, create):
     return client.get(resource_group_name=resource_group, resource_name=name), True
 
 
-def assert_hub_policy(hub):
+def assert_hub_policy(hub, disable_local_auth=True):
     """Fail rather than silently moving or weakening a caller-supplied Hub."""
     assert hub["location"].replace(" ", "").casefold() == HUB_TEST_LOCATION.replace(" ", "").casefold()
-    assert hub["properties"].get("disableLocalAuth") is True, (
-        "Hub integration tests require disableLocalAuth=true; use a policy-compliant test Hub."
+    assert hub["properties"].get("disableLocalAuth") is disable_local_auth, (
+        f"Hub integration tests require disableLocalAuth={str(disable_local_auth).lower()} for this cohort."
     )
 
 
