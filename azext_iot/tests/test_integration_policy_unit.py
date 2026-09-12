@@ -75,6 +75,55 @@ def test_hub_cleanup_does_not_retry_missing_targets_or_hide_other_errors(mocker,
     assert all(call.kwargs["capture_stderr"] for call in invoke.call_args_list[3:])
 
 
+@pytest.mark.parametrize("error_type", ["missing", "cli", "transport"])
+@pytest.mark.parametrize("returned_error", [False, True])
+def test_hub_cleanup_recognizes_translated_absence_and_continues(mocker, error_type, returned_error):
+    from azure.cli.core.azclierror import CLIInternalError, ResourceNotFoundError
+
+    message = '{"Message": "ErrorCode:DeviceNotFound;404"}'
+    errors = {
+        "missing": ResourceNotFoundError(message),
+        "cli": CLIInternalError(message),
+        "transport": ConnectionError("Connection reset by peer"),
+    }
+    error = errors[error_type]
+    listed = mocker.Mock()
+    listed.success.return_value = True
+    listed.as_json.side_effect = [
+        [{"deviceId": "already-deleted"}], [{"id": "deployment"}], [{"id": "configuration"}],
+    ]
+    deleted = mocker.Mock()
+    deleted.success.return_value = True
+    failure = error
+    if returned_error:
+        failure = mocker.Mock(error_code=3)
+        failure.success.return_value = False
+        failure.get_error.return_value = error
+
+    def _invoke(command, **_kwargs):
+        if command.startswith("iot hub device-identity delete"):
+            if returned_error:
+                return failure
+            raise error
+        return deleted if " delete " in command else listed
+
+    invoke = mocker.patch.object(helpers.cli, "invoke", side_effect=_invoke)
+    sleep = mocker.patch("time.sleep")
+
+    if error_type == "missing":
+        helpers.clean_up_iothub_device_config("hub", "rg")
+        sleep.assert_not_called()
+        assert invoke.call_args_list[-2].args[0].startswith("iot edge deployment delete")
+        assert invoke.call_args_list[-1].args[0].startswith("iot hub configuration delete")
+    else:
+        with pytest.raises(type(error)) as caught:
+            helpers.clean_up_iothub_device_config("hub", "rg")
+        assert caught.value is error
+        assert sleep.call_count == 2
+    assert invoke.call_count == 6
+    assert all(call.kwargs["capture_stderr"] for call in invoke.call_args_list[3:])
+
+
 @pytest.mark.parametrize("location", [None, "centraluseuap"])
 def test_storage_creation_preserves_optional_location(mocker, location):
     cmd = mocker.Mock()

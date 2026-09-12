@@ -16,7 +16,7 @@ from azext_iot.common.utility import ensure_azure_namespace_path
 from azext_iot.common.utility import read_file_content
 from azext_iot.tests.settings import DynamoSettings
 from typing import Optional, TypeVar, List
-from azure.cli.core.azclierror import CLIInternalError
+from azure.cli.core.azclierror import CLIInternalError, ResourceNotFoundError
 
 ensure_azure_namespace_path()
 
@@ -309,7 +309,9 @@ def clean_up_iothub_device_config(
                 return
             except Exception as e:
                 response = getattr(e, "response", None)
-                if isinstance(e, (CloudError, HttpResponseError)) and getattr(response, "status_code", None) == 404:
+                if isinstance(e, ResourceNotFoundError) or (
+                    isinstance(e, (CloudError, HttpResponseError)) and getattr(response, "status_code", None) == 404
+                ):
                     logger.info("Cleanup target is already absent: %s", command)
                     return
                 last_exc = e
