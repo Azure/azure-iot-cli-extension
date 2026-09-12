@@ -9,7 +9,6 @@ import pytest
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
 from azext_iot.tests.iothub._integration_helpers import QUERY_VISIBILITY_TIMEOUT, wait_for_query_ids
-from time import sleep
 
 # TODO: assert device scope format in device twin.
 # from azext_iot.constants import DEVICE_DEVICESCOPE_PREFIX
@@ -19,7 +18,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTHubNestedEdge, self).__init__(test_case)
 
-    @pytest.mark.timeout(900 + QUERY_VISIBILITY_TIMEOUT * len(DATAPLANE_AUTH_TYPES), func_only=False)
+    @pytest.mark.timeout(900 + 3 * QUERY_VISIBILITY_TIMEOUT * len(DATAPLANE_AUTH_TYPES), func_only=False)
     def test_iothub_nested_edge(self):
         for auth_phase in DATAPLANE_AUTH_TYPES:
             device_count = 3
@@ -201,6 +200,18 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
                 expect_failure=True,
             )
 
+            # The query-backed remove-all must see every intended target before it runs.
+            wait_for_query_ids(
+                lambda: self.cmd(
+                    self.set_cmd_auth_type(
+                        f"iot hub device-identity children list -d {edge_device_ids[1]} "
+                        f"-n {self.host_name} -g {self.entity_rg}",
+                        auth_type=auth_phase,
+                    )
+                ).get_output_in_json(),
+                [edge_device_ids[0], device_ids[0], device_ids[2]],
+            )
+
             # Remove all child devices from edge device
             self.cmd(
                 self.set_cmd_auth_type(
@@ -211,8 +222,16 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
                 checks=self.is_empty(),
             )
 
-            # Wait for child devices to be removed to prevent failures
-            sleep(40)
+            wait_for_query_ids(
+                lambda: self.cmd(
+                    self.set_cmd_auth_type(
+                        f"iot hub device-identity children list -d {edge_device_ids[1]} "
+                        f"-n {self.host_name} -g {self.entity_rg}",
+                        auth_type=auth_phase,
+                    )
+                ).get_output_in_json(),
+                [],
+            )
 
             # Error - remove all child devices of edge device which does not have any child devices
             self.cmd(

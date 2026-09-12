@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
+from contextlib import ExitStack
 
 from azure.cli.core.azclierror import CLIInternalError
 from azext_iot.tests.helpers import (
@@ -23,8 +24,9 @@ from azext_iot.tests import CaptureOutputLiveScenarioTest
 from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.tests.test_constants import ResourceTypes
 from azext_iot.tests.iothub._integration_helpers import (
-    assert_hub_policy, assign_role_with_propagation, get_or_create_hub, scope_known_hub
+    assert_hub_policy, assign_role_with_propagation, delete_known_devices, get_or_create_hub, scope_known_hub
 )
+from azext_iot.iothub.providers.device_identity import DeviceIdentityProvider
 from azext_iot._factory import iot_hub_service_factory
 
 DATAPLANE_AUTH_TYPES = SERVICE_AUTH_TYPES
@@ -61,6 +63,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         assert test_scenario
         self.entity_rg = ENTITY_RG
         self.entity_name = ENTITY_NAME
+        self._generated_device_ids = []
         super(IoTLiveScenarioTest, self).__init__(test_scenario)
 
         if hasattr(self, 'storage_cstring'):
@@ -133,6 +136,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             )
             for i in range(count)
         ]
+        self._generated_device_ids.extend(names)
         return names
 
     def generate_module_names(self, count=1):
@@ -196,10 +200,15 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
 
     def tearDown(self):
         if not settings.env.azext_iot_testhub:
-            clean_up_iothub_device_config(
-                hub_name=self.entity_name,
-                rg=self.entity_rg
-            )
+            with ExitStack() as cleanup:
+                cleanup.callback(clean_up_iothub_device_config, hub_name=self.entity_name, rg=self.entity_rg)
+                if self._generated_device_ids:
+                    provider = DeviceIdentityProvider(
+                        cmd=self, hub_name=self.entity_name, rg=self.entity_rg, auth_type_dataplane="login"
+                    )
+                    # A fresh identity may not appear in the query used by legacy cleanup.
+                    for device_id in dict.fromkeys(self._generated_device_ids):
+                        cleanup.callback(delete_known_devices, provider.service_sdk.devices, [device_id])
 
     def get_region(self):
         result = self.cmd(
