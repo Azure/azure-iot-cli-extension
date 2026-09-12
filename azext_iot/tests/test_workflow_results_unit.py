@@ -151,8 +151,11 @@ def test_dps_workflow_runs_two_serial_complete_phases_with_existing_redaction_an
     jobs = workflow["jobs"]
     matrix = next(step for step in jobs["setup"]["steps"] if step.get("id") == "matrix")
     assert '"DPS|azext_iot/tests/dps|DPS-int|90"' in matrix["run"]
+    setup = next(step for step in jobs["int-test"]["steps"] if step["name"] == "Setup tox test environment")
+    assert "tox r -vv -e DPS-phases,DPS-int --notest" in setup["run"]
     step = next(step for step in jobs["int-test"]["steps"] if step.get("id") == "run_tests")
-    assert ".tox/DPS-int/bin/python scripts/run_dps_phases.py" in step["run"]
+    assert ".tox/DPS-phases/bin/python scripts/run_dps_phases.py" in step["run"]
+    assert ".tox/DPS-int/bin/python scripts/run_dps_phases.py" not in step["run"]
     assert "certificate coverage is not configured in this workflow" in step["run"]
     assert '--subscription "${{ env.TEST_SUBSCRIPTION_ID }}"' in step["run"]
     assert "set -o pipefail" in step["run"] and "run_service 2>&1 |" in step["run"]

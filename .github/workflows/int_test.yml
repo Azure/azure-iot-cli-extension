@@ -289,7 +289,11 @@ jobs:
       - name: "Setup tox test environment"
         run: |
           pip install tox
-          tox r -vv -e ${{ matrix.config.tox_env }} --notest
+          if [ "${{ matrix.config.service }}" = "DPS" ]; then
+            tox r -vv -e DPS-phases,DPS-int --notest
+          else
+            tox r -vv -e ${{ matrix.config.tox_env }} --notest
+          fi
 
       - name: "Az CLI login"
         uses: azure/login@v3
@@ -335,7 +339,7 @@ jobs:
           run_service() {
             if [ "${{ matrix.config.service }}" = "DPS" ]; then
               echo "DPS coverage: regular and service-SAS; certificate coverage is not configured in this workflow."
-              .tox/DPS-int/bin/python scripts/run_dps_phases.py \
+              .tox/DPS-phases/bin/python scripts/run_dps_phases.py \
                 --subscription "${{ env.TEST_SUBSCRIPTION_ID }}" --resource-group "${{ env.RESOURCE_GROUP }}" \
                 --region "${{ matrix.config.region }}"
             else

@@ -155,6 +155,13 @@ use and phase-unset manual tests are unchanged. Portable selection, receipt,
 SDK/HTTP, and result-gate unit tests still run on every OS; only real Linux
 process/timer proofs are platform-marked.
 
+Prepare the controller and worker environments with
+`tox r -e DPS-phases,DPS-int --notest`, then invoke the runner with
+`.tox/DPS-phases/bin/python scripts/run_dps_phases.py` and the required
+`--subscription` and `--resource-group` arguments. Keep the controller outside
+`DPS-int`: tox can recreate that managed environment when its interpreter,
+dependencies, or virtualenv version changes.
+
 For direct test invocations, `azext_iot_dps_test_phase=service-sas` selects exactly
 the 29 SAS cases; partial selections are errors. The default retains Entra fixture
 behavior without changing command defaults. Explicit `regular` and `service-sas`
