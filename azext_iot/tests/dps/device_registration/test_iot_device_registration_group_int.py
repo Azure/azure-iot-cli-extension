@@ -390,6 +390,7 @@ def test_dps_device_registration_x509_lifecycle(provisioned_iot_dps_module, auth
 
 
 @pytest.mark.parametrize("auth_phases", DPS_SERVICE_AUTH_PARAMS)
+@pytest.mark.usefixtures("exclusive_iot_dps_no_hub")
 def test_dps_device_registration_unlinked_hub(provisioned_iot_dps_no_hub_module, auth_phases):
     dps_name = provisioned_iot_dps_no_hub_module['name']
     dps_rg = provisioned_iot_dps_no_hub_module['resourceGroup']

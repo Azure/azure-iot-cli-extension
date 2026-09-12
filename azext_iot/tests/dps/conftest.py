@@ -22,7 +22,7 @@ from knack.log import get_logger
 from azext_iot._factory import iot_hub_service_factory
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
-from azext_iot.tests.helpers import assign_role_assignment
+from azext_iot.tests.helpers import assign_role_assignment, invoke_checked
 from azext_iot.tests.settings import (
     DynamoSettings,
     ENV_SET_TEST_IOTHUB_REQUIRED,
@@ -63,6 +63,7 @@ MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries if settings.en
 INT_TEST_DPS_PREFIX = "aziotcli-int-dps"
 INT_TEST_HUB_PREFIX = "aziotcli-int-hub"
 DPS_GC_THRESHOLD_SECONDS = 24 * 60 * 60
+DPS_NO_HUB_LOCK_TIMEOUT_SECONDS = 300
 
 # Unique per process; identifies a run when not executing under pytest-xdist. Under xdist all workers
 # of the same run share ``workerinput["testrunuid"]`` instead.
@@ -113,6 +114,34 @@ def provisioned_iot_dps_no_hub_module(request) -> Iterator[dict]:
     yield result
     if result:
         _iot_dps_removal(result)
+
+
+@pytest.fixture
+def exclusive_iot_dps_no_hub(request, provisioned_iot_dps_no_hub_module):
+    """Keep temporary Hub links out of concurrent no-Hub registration tests."""
+    resource = provisioned_iot_dps_no_hub_module
+    with _no_hub_usage_lock(request):
+        _assert_no_linked_hubs(resource, "before")
+        try:
+            yield resource
+        finally:
+            _assert_no_linked_hubs(resource, "after")
+
+
+def _no_hub_usage_lock(request):
+    # Resource reference-count locking protects setup/teardown, not test-body mutations.
+    lock_path, _ = _state_paths(_get_run_uid(request), "nh-usage")
+    return FileLock(lock_path, timeout=DPS_NO_HUB_LOCK_TIMEOUT_SECONDS)
+
+
+def _assert_no_linked_hubs(resource, phase):
+    linked_hubs = invoke_checked(
+        cli,
+        f"iot dps linked-hub list --dps-name {resource['name']} -g {resource['resourceGroup']}",
+        description="Read shared no-Hub DPS links",
+    ).as_json()
+    empty = linked_hubs == []
+    assert empty, f"Shared no-Hub DPS '{resource['name']}' must have no linked hubs {phase} the isolated test."
 
 
 def _get_run_uid(request) -> str:
@@ -450,11 +479,12 @@ def provisioned_only_iot_hubs_session(request) -> Iterator[dict]:
 
 
 @pytest.fixture(scope="session")
-def dps_linked_hub_identity(provisioned_iot_dps_no_hub_module, provisioned_only_iot_hubs_session):
+def dps_linked_hub_identity(request, provisioned_iot_dps_no_hub_module, provisioned_only_iot_hubs_session):
     """Enable MI without linking, so linked-hub lifecycle tests own their entries."""
-    _enable_dps_hub_identity(
-        provisioned_iot_dps_no_hub_module["name"], provisioned_only_iot_hubs_session
-    )
+    with _no_hub_usage_lock(request):
+        _enable_dps_hub_identity(
+            provisioned_iot_dps_no_hub_module["name"], provisioned_only_iot_hubs_session
+        )
 
 
 def _list_hubs() -> list:
