@@ -4,6 +4,9 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
+import logging
+
 import pytest
 
 from azext_iot.tests.iothub.jobs import test_iothub_jobs_int as subject
@@ -14,14 +17,23 @@ from azext_iot.tests.iothub.jobs import test_iothub_jobs_int as subject
     {"deviceCount": 0, "succeededCount": 0, "failedCount": 0},
     {"deviceCount": 2, "succeededCount": 2, "failedCount": 0, "extra": "not logged"},
 ])
-def test_job_statistics_report_missing_or_actual_counters(mocker, statistics):
-    log = mocker.patch.object(subject.logger, "info")
+def test_job_statistics_report_missing_or_actual_counters(capsys, statistics):
     subject._log_job_device_statistics({"jobId": "job", "deviceJobStatistics": statistics}, 2)
-    counters = log.call_args.args[3]
-    assert log.call_args.args[1:3] == ("job", 2)
+    output = capsys.readouterr().out
+    prefix = "Hub job job: expected devices=2; service statistics="
+    assert output.startswith(prefix)
+    counters = json.loads(output[len(prefix):])
     assert set(counters) == {"deviceCount", "succeededCount", "failedCount", "pendingCount", "runningCount"}
     for name, value in counters.items():
         assert value == (statistics or {}).get(name)
+
+
+def test_job_statistics_remain_visible_when_logging_is_disabled(capsys, monkeypatch):
+    monkeypatch.setattr(logging.root.manager, "disable", logging.CRITICAL)
+    subject._log_job_device_statistics(
+        {"jobId": "job", "deviceJobStatistics": {"deviceCount": 0}}, 2,
+    )
+    assert '"deviceCount": 0' in capsys.readouterr().out
 
 
 def test_job_scenario_checks_actual_desired_properties_and_logs_both_jobs(mocker):
