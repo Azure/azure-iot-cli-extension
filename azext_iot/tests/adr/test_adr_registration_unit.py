@@ -14,9 +14,6 @@ from knack.help_files import helps
 
 from azext_iot.adr._help import load_adr_help
 from azext_iot.adr.command_map import (
-    _DPS_DELETE_CONFIRMATION,
-    _HUB_DELETE_CONFIRMATION,
-    _SU_DELETE_CONFIRMATION,
     adr_link_ops,
     adr_link_wait_ops,
     load_adr_commands,
@@ -171,11 +168,8 @@ def test_2026_command_surface_is_registered():
         "iot adr ns job run wait",
         "iot adr ns link wait",
         "iot adr ns link su wait",
-        "iot adr ns link su delete",
         "iot adr ns link dps wait",
-        "iot adr ns link dps delete",
         "iot adr ns link hub wait",
-        "iot adr ns link hub delete",
         "iot adr ns su instance check-name",
         "iot adr ns su instance create",
         "iot adr ns su instance show",
@@ -228,20 +222,10 @@ def test_2026_command_surface_is_registered():
         "adr_job_run_delete",
         {"confirmation": True, "supports_no_wait": True},
     )
-    assert len(commands) == 112
-    confirmations = {
-        "hub": _HUB_DELETE_CONFIRMATION,
-        "dps": _DPS_DELETE_CONFIRMATION,
-        "su": _SU_DELETE_CONFIRMATION,
-    }
+    assert len(commands) == 109
     for endpoint in ("hub", "dps", "su"):
-        assert commands[f"iot adr ns link {endpoint} delete"] == (
-            "command",
-            f"adr_link_{endpoint}_delete",
-            {
-                "confirmation": confirmations[endpoint],
-            },
-        )
+        assert f"iot adr ns link {endpoint} delete" not in commands
+        assert not hasattr(commands_link, f"adr_link_{endpoint}_delete")
     assert commands[
         "iot adr ns registry-device auth revoke-certs"
     ][2] == {"confirmation": True, "supports_no_wait": True}
@@ -283,7 +267,7 @@ def test_all_link_commands_receive_factory_client_without_subscription_arg():
         or name.startswith("iot adr ns link su ")
     }
 
-    assert len(link_commands) == 20
+    assert len(link_commands) == 17
     for _, operation, _ in link_commands.values():
         module = commands_wait if operation.endswith("_wait") else commands_link
         parameters = inspect.signature(getattr(module, operation)).parameters
@@ -772,12 +756,11 @@ def test_help_surface_matches_2026_commands_and_su_type():
         "iot adr ns job run summary",
         "iot adr ns registry-device attribute create",
         "iot adr ns registry-device attribute delete",
-        "iot adr ns link hub delete",
-        "iot adr ns link dps delete",
-        "iot adr ns link su delete",
     ):
         assert command in helps
     assert "iot adr ns job run create" not in helps
+    for kind in ("hub", "dps", "su"):
+        assert f"iot adr ns link {kind} delete" not in helps
 
     assert "Microsoft.DeviceUpdate/updateInstances" in helps["iot adr ns link su"]
     assert "linkedAccounts" not in helps["iot adr ns link su"]
@@ -794,6 +777,8 @@ def test_help_surface_matches_2026_commands_and_su_type():
         helps["iot adr ns ca policy create"].split()
     )
     assert "between 7 and 90 days" in policy_create_help
+    assert "below 30" not in policy_create_help
+    assert "Central US EUAP" not in policy_create_help
     assert "--validity-days 30" in helps["iot adr ns ca policy create"]
     assert "--validity-days 90" in helps["iot adr ns ca policy update"]
     assert "starts its initial membership calculation" in helps[
@@ -816,10 +801,7 @@ def test_help_surface_matches_2026_commands_and_su_type():
     )
     for endpoint in ("hub", "dps", "su"):
         assert f"iot adr ns link {endpoint} remove" not in helps
-        delete_help = helps[f"iot adr ns link {endpoint} delete"]
-        assert "Permanently delete" in delete_help
-        assert "namespace" in delete_help
-        assert "--delete-linked-resource" not in delete_help
+        assert f"iot adr ns link {endpoint} delete" not in helps
     assert not any(command.startswith("iot adr ns su link") for command in helps)
     assert not any(
         command.startswith("iot adr ns su update") for command in helps

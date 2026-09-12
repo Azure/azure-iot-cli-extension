@@ -7,6 +7,7 @@
 from unittest.mock import Mock, call, patch
 
 import pytest
+from knack.util import CLIError
 
 from azext_iot.tests.adr import _helpers as subject
 from azext_iot.tests.adr._helpers import (
@@ -20,6 +21,115 @@ from azext_iot.tests.adr._helpers import (
     wait_for_resource_succeeded,
 )
 from azext_iot.tests.adr.conftest import RoleAssignmentHelper
+
+
+def _owned_helper(*kinds):
+    helper = ADRFullInfraHelper()
+    helper.cmd = Mock()
+    for kind in kinds:
+        helper.cmd.side_effect = [CLIError("ResourceNotFound (404)"), Mock()]
+        helper.create_owned_resource(
+            f"create {kind}", kind=kind, name=f"owned-{kind}", resource_group="rg",
+        )
+    helper.cmd.side_effect = None
+    helper.cmd.reset_mock()
+    return helper
+
+
+def test_full_infra_cleanup_uses_recorded_resources_not_link_targets():
+    helper = _owned_helper("identity", "namespace", "hub", "dps", "su")
+    helper.cleanup_full_infra()
+    assert helper.cmd.call_args_list == [
+        call("iot adr ns show -n owned-namespace -g rg"),
+        call("iot adr ns delete -n owned-namespace -g rg --yes"),
+        call("iot dps show -n owned-dps -g rg"),
+        call("iot dps delete -n owned-dps -g rg"),
+        call("iot hub show -n owned-hub -g rg"),
+        call("iot hub delete -n owned-hub -g rg"),
+        call("iot adr ns su instance show -n owned-su -g rg"),
+        call("iot adr ns su instance delete -n owned-su -g rg --yes"),
+        call("identity show -n owned-identity -g rg"),
+        call("identity delete -n owned-identity -g rg"),
+    ]
+    helper.cmd.reset_mock()
+    helper.cleanup_full_infra()
+    helper.cmd.assert_not_called()
+
+
+def test_full_infra_cleanup_never_discovers_or_deletes_borrowed_resources():
+    helper = _owned_helper()
+    helper.cmd.return_value.get_output_in_json.return_value = [
+        {"name": "borrowed", "resourceId": "/subscriptions/other/resourceGroups/shared"}
+    ]
+    helper.cleanup_full_infra()
+    helper.cmd.assert_not_called()
+
+
+def test_failed_create_retains_cleanup_record_after_confirming_initial_absence():
+    helper = _owned_helper()
+    helper.cmd.side_effect = [CLIError("ResourceNotFound (404)"), RuntimeError("create failed")]
+    with pytest.raises(RuntimeError, match="create failed"):
+        helper.create_owned_resource("create hub", kind="hub", name="hub", resource_group="rg")
+    helper.cmd.reset_mock()
+    helper.cmd.side_effect = None
+    helper.cleanup_full_infra()
+    assert helper.cmd.call_args_list == [
+        call("iot hub show -n hub -g rg"),
+        call("iot hub delete -n hub -g rg"),
+    ]
+
+
+def test_existing_resource_is_never_overwritten_or_recorded_for_cleanup():
+    helper = _owned_helper()
+    with pytest.raises(AssertionError, match="Refusing to overwrite existing hub"):
+        helper.create_owned_resource("create hub", kind="hub", name="borrowed", resource_group="shared")
+    helper.cmd.assert_called_once_with("iot hub show -n borrowed -g shared")
+    helper.cmd.reset_mock()
+    helper.cleanup_full_infra()
+    helper.cmd.assert_not_called()
+
+
+@pytest.mark.parametrize("primary_failure", [False, True])
+def test_full_infra_cleanup_reports_independent_failures_and_preserves_primary(primary_failure, caplog):
+    helper = _owned_helper("identity", "namespace", "hub")
+
+    def invoke(command):
+        if command.startswith("iot adr ns delete"):
+            raise RuntimeError("namespace deletion rejected")
+        if command.startswith("identity delete"):
+            raise RuntimeError("identity deletion rejected")
+        return Mock()
+
+    helper.cmd.side_effect = invoke
+    with pytest.raises(RuntimeError if primary_failure else AssertionError):
+        try:
+            if primary_failure:
+                raise RuntimeError("primary failure")
+        finally:
+            helper.cleanup_full_infra()
+    assert "namespace deletion rejected" in caplog.text
+    assert "identity deletion rejected" in caplog.text
+    assert call("iot hub delete -n owned-hub -g rg") in helper.cmd.call_args_list
+
+
+@pytest.mark.parametrize(
+    "error",
+    [SystemExit(3), CLIError("ResourceNotFound (404)"),
+     CLIError("An IotHub 'owned-hub' under resource group 'rg' was not found.")],
+)
+def test_full_infra_cleanup_accepts_only_known_missing_resources(error):
+    helper = _owned_helper("hub")
+    helper.cmd.side_effect = error
+    helper.cleanup_full_infra()
+    helper.cmd.assert_called_once_with("iot hub show -n owned-hub -g rg")
+
+
+@pytest.mark.parametrize("error", [SystemExit(2), RuntimeError("403 Forbidden")])
+def test_full_infra_cleanup_reports_other_lookup_failures(error):
+    helper = _owned_helper("hub")
+    helper.cmd.side_effect = error
+    with pytest.raises(AssertionError, match="ADR cleanup failed"):
+        helper.cleanup_full_infra()
 
 
 def test_wait_for_resource_succeeded_retries_initial_not_found():
@@ -107,7 +217,7 @@ def test_retryable_resource_error_uses_symbolic_code(message):
 
 
 def test_resource_not_found_error_is_specific():
-    missing = RuntimeError("ResourceNotFound (404)")
+    missing = CLIError("ResourceNotFound (404)")
     forbidden = RuntimeError("403 Forbidden")
     assert is_resource_not_found_error(missing)
     assert not is_resource_not_found_error(forbidden)
@@ -122,7 +232,7 @@ def test_resource_not_found_error_is_specific():
     ],
 )
 def test_resource_not_found_error_recognizes_only_hub_show_absence(message, expected):
-    assert is_resource_not_found_error(RuntimeError(message)) is expected
+    assert is_resource_not_found_error(CLIError(message)) is expected
 
 
 def test_wait_for_condition_uses_bounded_clock_and_sanitized_observation():
@@ -274,122 +384,9 @@ def test_cleanup_ledger_raises_when_only_cleanup_fails():
             cleanup.register("resource", fail_cleanup)
 
 
-def test_full_infra_cleanup_removes_links_before_namespace_and_identity():
-    helper = ADRFullInfraHelper()
-    commands = []
-
-    def invoke(command):
-        commands.append(command)
-        if "link dps list" in command:
-            response = Mock()
-            response.get_output_in_json.return_value = [{"name": "dps-primary"}]
-            return response
-        if command.startswith("iot dps show"):
-            raise RuntimeError("ResourceNotFound (404)")
-        return Mock()
-
-    helper.cmd = Mock(side_effect=invoke)
-    helper.cleanup_full_infra(
-        resource_group="rg",
-        namespace_name="ns",
-        identity_name="identity",
-        dps_name="dps",
-        linked_endpoints=[("dps", "dps-primary")],
-    )
-
-    link_delete = next(
-        index
-        for index, command in enumerate(commands)
-        if "link dps delete" in command
-    )
-    namespace_delete = next(
-        index
-        for index, command in enumerate(commands)
-        if command.startswith("iot adr ns delete")
-    )
-    identity_delete = next(
-        index
-        for index, command in enumerate(commands)
-        if command.startswith("identity delete")
-    )
-    assert link_delete < namespace_delete < identity_delete
-    assert not any(command.startswith("iot dps delete") for command in commands)
-
-
-def test_full_infra_cleanup_reports_probe_failures():
-    helper = ADRFullInfraHelper()
-    helper.cmd = Mock(side_effect=RuntimeError("403 Forbidden"))
-
-    with pytest.raises(AssertionError, match="lookup: 403 Forbidden"):
-        helper.cleanup_full_infra(
-            resource_group="rg",
-            namespace_name="ns",
-            identity_name="identity",
-            dps_name="dps",
-            linked_endpoints=[("dps", "dps-primary")],
-        )
-
-
-def test_full_infra_cleanup_continues_after_show_not_found_exit():
-    helper = ADRFullInfraHelper()
-
-    def invoke(command):
-        if command.startswith("iot hub show"):
-            raise SystemExit(3)
-        return Mock()
-
-    helper.cmd = Mock(side_effect=invoke)
-    helper.cleanup_full_infra(
-        resource_group="rg",
-        hub_name="hub",
-        namespace_name="ns",
-        identity_name="identity",
-    )
-
-    assert helper.cmd.call_args_list == [
-        call("iot hub show -n hub -g rg"),
-        call("iot adr ns show -n ns -g rg"),
-        call("iot adr ns delete -n ns -g rg -y"),
-        call("identity show -n identity -g rg"),
-        call("identity delete -n identity -g rg"),
-    ]
-
-
-def test_full_infra_cleanup_accepts_deleted_hub_show_error():
-    helper = ADRFullInfraHelper()
-
-    def invoke(command):
-        if command.startswith("iot hub show"):
-            raise RuntimeError("An IotHub 'hub' under resource group 'rg' was not found.")
-        return Mock()
-
-    helper.cmd = Mock(side_effect=invoke)
-    helper.cleanup_full_infra(
-        resource_group="rg", hub_name="hub", namespace_name="ns",
-    )
-
-    assert helper.cmd.call_args_list == [
-        call("iot hub show -n hub -g rg"),
-        call("iot adr ns show -n ns -g rg"),
-        call("iot adr ns delete -n ns -g rg -y"),
-    ]
-
-
-@pytest.mark.parametrize("exit_code", [1, 2, 130])
-def test_full_infra_cleanup_does_not_ignore_other_cli_exits(exit_code):
-    helper = ADRFullInfraHelper()
-    helper.cmd = Mock(side_effect=SystemExit(exit_code))
-
-    with pytest.raises(SystemExit) as error:
-        helper.cleanup_full_infra(resource_group="rg", hub_name="hub")
-
-    assert error.value.code == exit_code
-    helper.cmd.assert_called_once_with("iot hub show -n hub -g rg")
-
-
 @pytest.mark.parametrize(
     "device_delete_error",
-    [None, RuntimeError("ResourceNotFound (404)"), RuntimeError("403 Forbidden")],
+    [None, CLIError("ResourceNotFound (404)"), RuntimeError("403 Forbidden")],
 )
 def test_registry_cleanup_attempts_device_before_namespace(device_delete_error, caplog):
     from azext_iot.tests.adr.test_adr_registry_device_int import (

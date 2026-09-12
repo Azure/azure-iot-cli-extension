@@ -383,7 +383,6 @@ def fixture_link_provider(fixture_cmd):
             }
         )
         provider._warn_if_hub_classically_linked = MagicMock()  # pylint: disable=protected-access
-        provider._wait_for_linked_resource_deleted = MagicMock()  # pylint: disable=protected-access
         return provider
 
 

@@ -57,20 +57,6 @@ def adr_link_hub_update(
     )
 
 
-def adr_link_hub_delete(
-    cmd,
-    client,
-    endpoint_name: str,
-    namespace_name: str,
-    resource_group_name: str,
-):
-    return LinkProvider(cmd, client=client).hub_delete(
-        endpoint_name=endpoint_name,
-        namespace_name=namespace_name,
-        resource_group_name=resource_group_name,
-    )
-
-
 def adr_link_hub_show(
     cmd,
     client,
@@ -146,20 +132,6 @@ def adr_link_dps_update(
     )
 
 
-def adr_link_dps_delete(
-    cmd,
-    client,
-    endpoint_name: str,
-    namespace_name: str,
-    resource_group_name: str,
-):
-    return LinkProvider(cmd, client=client).dps_delete(
-        endpoint_name=endpoint_name,
-        namespace_name=namespace_name,
-        resource_group_name=resource_group_name,
-    )
-
-
 def adr_link_dps_show(
     cmd,
     client,
@@ -232,20 +204,6 @@ def adr_link_su_update(
         mi_system_assigned=mi_system_assigned,
         mi_user_assigned=mi_user_assigned,
         no_wait=no_wait,
-    )
-
-
-def adr_link_su_delete(
-    cmd,
-    client,
-    endpoint_name: str,
-    namespace_name: str,
-    resource_group_name: str,
-):
-    return LinkProvider(cmd, client=client).su_delete(
-        endpoint_name=endpoint_name,
-        namespace_name=namespace_name,
-        resource_group_name=resource_group_name,
     )
 
 

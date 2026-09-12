@@ -249,8 +249,8 @@ def load_adr_help():
     Certificate policies can only be created under an issuing certificate
     authority with type ICA. Create the ICA under a Root CA, then pass the ICA
     name to --ca-name. The leaf certificate validity period must be between 7
-    and 90 days, inclusive. During the current preview rollout, Central US EUAP
-    may reject values below 30 days even though the contract allows them.
+    and 90 days, inclusive. Use 'ca policy update --validity-days' to change
+    the validity period of an existing policy.
   examples:
     - name: Create a certificate policy with a 30 day leaf certificate validity period
       text: az iot adr ns ca policy create -n myPolicy --ca-name myICA --ns myNamespace -g myResourceGroup --validity-days 30
@@ -330,9 +330,9 @@ def load_adr_help():
   short-summary: Manage links between a Device Registry namespace and downstream resources.
   long-summary: |
     Links live on the namespace, not on the linked IoT Hub, DPS, or Update Instance.
-    Add and update use namespace PATCH. Destructive delete removes the linked Azure
-    resource first and then uses the generated namespace replacement operation because
-    this API exposes no narrow endpoint remove.
+    Add and update use namespace PATCH. Show and list expose each endpoint's
+    top-level linkingState. This group does not provide unlink or composite
+    resource-delete commands; namespace and target lifecycles are managed separately.
   """
 
     helps[
@@ -342,9 +342,8 @@ def load_adr_help():
   short-summary: Manage IoT Hub links (messaging endpoints) on a Device Registry namespace.
   long-summary: |
     A namespace must have a linked DPS before a new Hub can be linked or a failed
-    Hub link can be retried (DPS-first ordering). A successfully linked Hub remains
-    operational and updateable after DPS deletion. Links live on the namespace,
-    not on the IoT Hub resource.
+    Hub link can be retried (DPS-first ordering). Hub updates preserve existing
+    provisioning settings. Links live on the namespace, not on the IoT Hub resource.
   """
 
     helps[
@@ -413,6 +412,8 @@ def load_adr_help():
   examples:
     - name: Show a Hub link by endpoint name
       text: az iot adr ns link hub show -n primary --ns myNamespace -g myResourceGroup
+    - name: Show the endpoint linking state
+      text: az iot adr ns link hub show -n primary --ns myNamespace -g myResourceGroup --query linkingState -o tsv
   """
 
     helps[
@@ -423,24 +424,10 @@ def load_adr_help():
   examples:
     - name: List all Hub links on a namespace
       text: az iot adr ns link hub list --ns myNamespace -g myResourceGroup
-  """
-
-    helps[
-        "iot adr ns link hub delete"
-    ] = """
-  type: command
-  short-summary: Permanently delete a linked IoT Hub and update the namespace.
-  long-summary: |
-    Permanently deletes the actual IoT Hub resource referenced by the named link,
-    then removes that messaging endpoint from the Device Registry namespace. Role
-    assignments are not deleted. Immediately before namespace replacement, the command
-    re-reads the namespace, preserves its latest unrelated state, and aborts if the named
-    endpoint was repointed. The generated API exposes no ETag/If-Match for this replacement,
-    so a narrower race after that final read cannot be eliminated. This operation cannot
-    be undone.
-  examples:
-    - name: Delete the linked IoT Hub and update the namespace without prompting
-      text: az iot adr ns link hub delete -n primary --ns myNamespace -g myResourceGroup --yes
+    - name: List endpoint names and linking states
+      text: az iot adr ns link hub list --ns myNamespace -g myResourceGroup --query "[].{name:name,linkingState:linkingState}"
+    - name: List failed Hub endpoints
+      text: az iot adr ns link hub list --ns myNamespace -g myResourceGroup --query "[?linkingState=='Failed']"
   """
 
     helps[
@@ -525,6 +512,8 @@ def load_adr_help():
   examples:
     - name: Show a DPS link by endpoint name (with brownfield Hubs when accessible)
       text: az iot adr ns link dps show -n primary --ns myNamespace -g myResourceGroup
+    - name: Show the endpoint linking state
+      text: az iot adr ns link dps show -n primary --ns myNamespace -g myResourceGroup --query linkingState -o tsv
   """
 
     helps[
@@ -535,25 +524,10 @@ def load_adr_help():
   examples:
     - name: List all DPS links on a namespace
       text: az iot adr ns link dps list --ns myNamespace -g myResourceGroup
-  """
-
-    helps[
-        "iot adr ns link dps delete"
-    ] = """
-  type: command
-  short-summary: Permanently delete a linked DPS and update the namespace.
-  long-summary: |
-    Permanently deletes the actual Device Provisioning Service resource referenced
-    by the named link, then removes that provisioning endpoint from the Device
-    Registry namespace. Hub links do not block this command. Role assignments are
-    not deleted. Successfully linked Hubs remain operational and updateable, but
-    adding a new Hub or retrying a failed Hub requires linking another DPS first.
-    The namespace is re-read immediately before replacement; latest unrelated state
-    is preserved and a repointed endpoint causes an abort. The generated API has no
-    ETag/If-Match, so a narrower post-read race remains. This operation cannot be undone.
-  examples:
-    - name: Delete the linked DPS and update the namespace without prompting
-      text: az iot adr ns link dps delete -n primary --ns myNamespace -g myResourceGroup --yes
+    - name: List endpoint names and linking states
+      text: az iot adr ns link dps list --ns myNamespace -g myResourceGroup --query "[].{name:name,linkingState:linkingState}"
+    - name: List failed DPS endpoints
+      text: az iot adr ns link dps list --ns myNamespace -g myResourceGroup --query "[?linkingState=='Failed']"
   """
 
     helps[
@@ -590,7 +564,7 @@ def load_adr_help():
   long-summary: |
     Adds a Software Updates updating endpoint entry under the namespace's properties.updating.endpoints.
     Only one Software Updates instance may be linked per namespace. If one is already
-    linked, use 'link su update' to modify it or destructive 'link su delete' to replace it.
+    linked, use 'link su update' to modify the existing endpoint.
     Exactly one of --system-assigned-mi or --user-assigned-mi must be provided to set the
     inbound caller identity that the update instance will use to call back into the namespace.
     Required service-to-service roles: {format_role_requirements("su")}.
@@ -638,6 +612,8 @@ def load_adr_help():
   examples:
     - name: Show a Software Updates link by endpoint name
       text: az iot adr ns link su show -n my-su --ns myNamespace -g myResourceGroup
+    - name: Show the endpoint linking state
+      text: az iot adr ns link su show -n my-su --ns myNamespace -g myResourceGroup --query linkingState -o tsv
   """
 
     helps[
@@ -648,23 +624,10 @@ def load_adr_help():
   examples:
     - name: List all Software Updates links on a namespace
       text: az iot adr ns link su list --ns myNamespace -g myResourceGroup
-  """
-
-    helps[
-        "iot adr ns link su delete"
-    ] = """
-  type: command
-  short-summary: Permanently delete a linked Update Instance and update the namespace.
-  long-summary: |
-    Permanently deletes the actual Microsoft.DeviceUpdate/updateInstances resource
-    referenced by the named link, then removes that updating endpoint from the
-    Device Registry namespace. Role assignments are not deleted. The namespace is
-    re-read immediately before replacement; latest unrelated state is preserved and
-    a repointed endpoint causes an abort. The generated API has no ETag/If-Match, so
-    a narrower post-read race remains. This operation cannot be undone.
-  examples:
-    - name: Delete the linked Update Instance and update the namespace without prompting
-      text: az iot adr ns link su delete -n my-su --ns myNamespace -g myResourceGroup --yes
+    - name: List endpoint names and linking states
+      text: az iot adr ns link su list --ns myNamespace -g myResourceGroup --query "[].{name:name,linkingState:linkingState}"
+    - name: List failed Software Updates endpoints
+      text: az iot adr ns link su list --ns myNamespace -g myResourceGroup --query "[?linkingState=='Failed']"
   """
 
     helps[

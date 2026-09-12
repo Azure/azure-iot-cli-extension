@@ -465,7 +465,7 @@ class NamespaceProvider(ADRProvider):
         summary = (error.message or str(error)).strip().splitlines()[0].strip()
         raise AzureResponseError(
             f"{summary}\nNamespace deletion does not cascade. Delete the child resources "
-            f"and links in this safe order:\n"
+            f"before retrying namespace deletion:\n"
             f"  az iot adr ns job run delete --ns {namespace_name} -g <rg> "
             f"--job-name <job> --run-name <run>\n"
             f"  az iot adr ns job delete --ns {namespace_name} -g <rg> -n <job>\n"
@@ -474,11 +474,8 @@ class NamespaceProvider(ADRProvider):
             f"  az iot adr ns ca policy delete --ns {namespace_name} -g <rg> "
             f"--ca-name <ca> -n <policy>\n"
             f"  az iot adr ns ca delete --ns {namespace_name} -g <rg> -n <ca>\n"
-            f"  az iot adr ns link hub delete --ns {namespace_name} -g <rg> -n <endpoint>\n"
-            f"  az iot adr ns link dps delete --ns {namespace_name} -g <rg> -n <endpoint>\n"
-            f"  az iot adr ns link su delete --ns {namespace_name} -g <rg> -n <endpoint>\n"
-            "Warning: each link delete command permanently deletes the linked "
-            "Azure Hub, DPS, or Update Instance resource; it is not a non-destructive unlink."
+            "Only remove resources you own. Do not delete linked Hub, DPS, or "
+            "Update Instance targets to resolve a namespace child-resource error."
         )
 
     def update(
