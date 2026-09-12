@@ -56,7 +56,7 @@ def test_ordinary_scenarios_keep_the_default_timeout(scenario):
 @pytest.mark.parametrize("scenario,windows", [
     (devices.TestIoTHubDevices.test_iothub_device_identity, len(DATAPLANE_AUTH_TYPES) * len(DEVICE_TYPES)),
     (modules.TestIoTHubModules.test_iothub_module_identity, len(DATAPLANE_AUTH_TYPES) * len(DEVICE_TYPES)),
-    (nested.TestIoTHubNestedEdge.test_iothub_nested_edge, len(DATAPLANE_AUTH_TYPES)),
+    (nested.TestIoTHubNestedEdge.test_iothub_nested_edge, 3 * len(DATAPLANE_AUTH_TYPES)),
     (jobs.TestIoTHubJobs.test_jobs, 2 * len(DATAPLANE_AUTH_TYPES)),
     (state.test_migrate_dataplane, 1 + len(DATAPLANE_AUTH_TYPES)),
     (state.test_export_import_dataplane, 1 + len(DATAPLANE_AUTH_TYPES)),

@@ -663,6 +663,84 @@ def test_edge_cleanup_uses_only_known_ids_with_entra(mocker):
     cleanup.assert_called_once_with(provider.return_value.service_sdk.devices, ("child", "parent"))
 
 
+@pytest.mark.parametrize("edge", [False, True])
+def test_generated_device_ids_are_tracked_before_visibility(edge):
+    scenario = SimpleNamespace(
+        _generated_device_ids=["earlier"],
+        create_random_name=Mock(side_effect=["first", "second"]),
+    )
+    assert IoTLiveScenarioTest.generate_device_names(scenario, count=2, edge=edge) == ["first", "second"]
+    assert scenario._generated_device_ids == ["earlier", "first", "second"]
+    assert all(
+        call.kwargs == {"prefix": iothub.PREFIX_EDGE_DEVICE if edge else iothub.PREFIX_DEVICE, "length": 32}
+        for call in scenario.create_random_name.call_args_list
+    )
+
+
+@pytest.mark.parametrize("borrowed_hub", [False, True])
+@pytest.mark.parametrize("ids", [[], ["first", "second", "first"]])
+def test_generated_id_cleanup_does_not_depend_on_query_visibility(mocker, borrowed_hub, ids):
+    mocker.patch.object(iothub.settings.env, "azext_iot_testhub", "borrowed" if borrowed_hub else None)
+    provider = mocker.patch.object(iothub, "DeviceIdentityProvider")
+    events = []
+    devices = provider.return_value.service_sdk.devices
+    devices.delete_identity.side_effect = lambda **kwargs: events.append(("delete", kwargs))
+    legacy = mocker.patch.object(iothub, "clean_up_iothub_device_config", side_effect=lambda **kwargs: events.append("legacy"))
+    scenario = SimpleNamespace(entity_name="owned-hub", entity_rg="rg", _generated_device_ids=ids)
+    IoTLiveScenarioTest.tearDown(scenario)
+    if borrowed_hub:
+        assert not events
+        provider.assert_not_called()
+        legacy.assert_not_called()
+    else:
+        if ids:
+            provider.assert_called_once_with(
+                cmd=scenario, hub_name="owned-hub", rg="rg", auth_type_dataplane="login"
+            )
+            assert events[:-1] == [
+                ("delete", {"id": "second", "if_match": "*"}), ("delete", {"id": "first", "if_match": "*"}),
+            ]
+        else:
+            provider.assert_not_called()
+        assert events[-1] == "legacy"
+        legacy.assert_called_once_with(hub_name="owned-hub", rg="rg")
+    devices.get_devices.assert_not_called()
+
+
+@pytest.mark.parametrize("status", [403, 404, 500])
+def test_generated_id_cleanup_attempts_remaining_cleanup_and_propagates_errors(mocker, status):
+    mocker.patch.object(iothub.settings.env, "azext_iot_testhub", None)
+    provider = mocker.patch.object(iothub, "DeviceIdentityProvider")
+    legacy = mocker.patch.object(iothub, "clean_up_iothub_device_config")
+    response = Response()
+    response.status_code = status
+    response._content = b"{}"
+    error = HttpResponseError(response=response)
+    devices = provider.return_value.service_sdk.devices
+    devices.delete_identity.side_effect = [error, None]
+    scenario = SimpleNamespace(entity_name="owned-hub", entity_rg="rg", _generated_device_ids=["first", "second"])
+    if status == 404:
+        IoTLiveScenarioTest.tearDown(scenario)
+    else:
+        with pytest.raises(HttpResponseError) as raised:
+            IoTLiveScenarioTest.tearDown(scenario)
+        assert raised.value is error
+    assert devices.delete_identity.call_count == 2
+    legacy.assert_called_once_with(hub_name="owned-hub", rg="rg")
+
+
+def test_cleanup_client_failure_still_runs_legacy_cleanup_and_fails(mocker):
+    mocker.patch.object(iothub.settings.env, "azext_iot_testhub", None)
+    error = CLIInternalError("Data client initialization failed")
+    mocker.patch.object(iothub, "DeviceIdentityProvider", side_effect=error)
+    legacy = mocker.patch.object(iothub, "clean_up_iothub_device_config")
+    scenario = SimpleNamespace(entity_name="owned-hub", entity_rg="rg", _generated_device_ids=["owned"])
+    with pytest.raises(CLIInternalError) as raised:
+        IoTLiveScenarioTest.tearDown(scenario)
+    assert raised.value is error
+    legacy.assert_called_once_with(hub_name="owned-hub", rg="rg")
+
+
 def test_query_adapter_follows_continuation_after_an_empty_first_page():
     from azext_iot.operations.generic import _execute_query
 
