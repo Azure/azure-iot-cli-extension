@@ -124,7 +124,8 @@ jobs:
             "HubMgmt|azext_iot/tests/iothub|HubMgmt-int|120"
             "HubData|azext_iot/tests/iothub|HubData-int|120"
             "ADU|azext_iot/tests/deviceupdate|ADU-int|200"
-            "ADR|azext_iot/tests/adr|ADR-int|75"
+            # SU readiness already allows an hour; ordinary ADR items retain their 15-minute cap.
+            "ADR|azext_iot/tests/adr|ADR-int|120"
           )
 
           # --- Determine which services to include ---

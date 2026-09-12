@@ -12,6 +12,7 @@ from azure.cli.core.azclierror import InvalidArgumentValueError, RequiredArgumen
 from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import (
     CleanupLedger,
+    SU_LIFECYCLE_TIMEOUT,
     SU_PROVISIONING_MAX_POLLS,
     SU_PROVISIONING_POLL_INTERVAL,
     wait_for_resource_succeeded,
@@ -26,6 +27,7 @@ def _update_instance_name() -> str:
 
 @pytest.mark.usefixtures("set_cwd")
 class TestADRUpdateInstanceLifecycle(ADRLiveScenarioTest):
+    @pytest.mark.timeout(SU_LIFECYCLE_TIMEOUT, func_only=False)
     def test_update_instance_lifecycle(self):
         instance_name = _update_instance_name()
         identity_name = f"testsuid{generate_generic_id()[:8]}"

@@ -45,6 +45,7 @@ from msrestazure.tools import is_valid_resource_id, parse_resource_id
 from azext_iot.tests.adr import ADRLiveScenarioTest
 from azext_iot.tests.adr._helpers import (
     ADRFullInfraHelper,
+    SU_LIFECYCLE_TIMEOUT,
     SU_PROVISIONING_MAX_POLLS,
     SU_PROVISIONING_POLL_INTERVAL,
     wait_for_condition,
@@ -731,6 +732,7 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
     - Invalid / wrong-type Update Instance resource id rejection
     """
 
+    @pytest.mark.timeout(SU_LIFECYCLE_TIMEOUT, func_only=False)
     def test_adr_link_su_lifecycle(self):
         _log(LogKind.TEST, "test_adr_link_su_lifecycle")
         from azext_iot.tests.adr.conftest import TEST_LOCATION
