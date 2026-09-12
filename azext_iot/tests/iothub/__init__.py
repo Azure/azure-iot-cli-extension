@@ -28,6 +28,7 @@ from azext_iot.tests.iothub._integration_helpers import (
 )
 from azext_iot.iothub.providers.device_identity import DeviceIdentityProvider
 from azext_iot._factory import iot_hub_service_factory
+from azext_iot.tests.iothub import _sas_phase
 
 DATAPLANE_AUTH_TYPES = SERVICE_AUTH_TYPES
 
@@ -50,8 +51,12 @@ DEFAULT_CONTAINER = "devices"
 
 settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL)
 ENTITY_RG = settings.env.azext_iot_testrg
-ENTITY_NAME = settings.env.azext_iot_testhub or "test-hub-" + generate_generic_id()
-STORAGE_ACCOUNT = settings.env.azext_iot_teststorageaccount or "hubstore" + generate_generic_id()[:4]
+ENTITY_NAME = settings.env.azext_iot_testhub or (
+    "test-hubsas-" + _sas_phase.UID if _sas_phase.enabled() else "test-hub-" + generate_generic_id()
+)
+STORAGE_ACCOUNT = settings.env.azext_iot_teststorageaccount or (
+    "hubsas" + _sas_phase.UID[:18] if _sas_phase.enabled() else "hubstore" + generate_generic_id()[:4]
+)
 STORAGE_CONTAINER = settings.env.azext_iot_teststoragecontainer or DEFAULT_CONTAINER
 MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries or 10
 ROLE_ASSIGNMENT_REFRESH_TIME = 120
@@ -66,38 +71,45 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         self._generated_device_ids = []
         super(IoTLiveScenarioTest, self).__init__(test_scenario)
 
-        if hasattr(self, 'storage_cstring'):
-            self._create_storage_account()
-
-        client = iot_hub_service_factory(self.cli_ctx).iot_hub_resource
-        if not settings.env.azext_iot_testhub:
-            target_hub, _ = get_or_create_hub(
-                client, self.entity_name, self.entity_rg, self._create_hub
-            )
+        if _sas_phase.enabled():
+            runtime = _sas_phase.require_runtime()
+            runtime.scope_context(self.cli_ctx)
+            target_hub = runtime.provision(self)
         else:
-            target_hub = client.get(resource_group_name=self.entity_rg, resource_name=self.entity_name)
-        assert_hub_policy(target_hub)
+            if hasattr(self, 'storage_cstring'):
+                self._create_storage_account()
+            client = iot_hub_service_factory(self.cli_ctx).iot_hub_resource
+            if not settings.env.azext_iot_testhub:
+                target_hub, _ = get_or_create_hub(
+                    client, self.entity_name, self.entity_rg, self._create_hub
+                )
+            else:
+                target_hub = client.get(resource_group_name=self.entity_rg, resource_name=self.entity_name)
+        assert_hub_policy(target_hub, disable_local_auth=not _sas_phase.enabled())
 
-        if add_data_contributor:
+        if add_data_contributor and not _sas_phase.enabled():
             self._add_data_contributor(target_hub)
 
         self.host_name = target_hub["properties"]["hostName"]
         # Device-facing hostname (GWv2 hubs expose a distinct deviceHostName; classic hubs reuse hostName)
         self.device_host_name = target_hub["properties"].get("deviceHostName") or self.host_name
         self.region = target_hub["location"]
-        add_test_tag(
-            cmd=self.cmd,
-            name=self.entity_name,
-            rg=self.entity_rg,
-            rtype=ResourceTypes.hub.value,
-            test_tag=test_scenario
-        )
+        if not _sas_phase.enabled():
+            add_test_tag(
+                cmd=self.cmd,
+                name=self.entity_name,
+                rg=self.entity_rg,
+                rtype=ResourceTypes.hub.value,
+                test_tag=test_scenario
+            )
 
     def _create_hub(self):
         command = (
             f"iot hub create --name {self.entity_name} --resource-group {self.entity_rg} "
-            f"--location {HUB_TEST_LOCATION} --disable-local-auth true --sku S1"
+            f"--location {HUB_TEST_LOCATION} --disable-local-auth {str(not _sas_phase.enabled()).lower()} --sku S1"
         )
+        if _sas_phase.enabled():
+            command += f" --tags runUid={_sas_phase.UID} authPhase=local-auth"
         if hasattr(self, "storage_cstring"):
             command += f" --fc {self.storage_container} --fcs {self.storage_cstring}"
         self.cmd(command)
@@ -107,7 +119,15 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             command, self.entity_rg,
             (self.entity_name, getattr(self, "host_name", None), getattr(self, "device_host_name", None)),
         )
+        if _sas_phase.enabled():
+            command += f" --subscription {_sas_phase.require_runtime().subscription}"
         return super().cmd(command, *args, **kwargs)
+
+    def start_background(self, **kwargs):
+        return _sas_phase.require_runtime().tasks.start(**kwargs)
+
+    def stop_background(self):
+        _sas_phase.require_runtime().tasks.finish()
 
     @property
     def connection_string(self):
@@ -137,6 +157,10 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             for i in range(count)
         ]
         self._generated_device_ids.extend(names)
+        if _sas_phase.enabled():
+            runtime = _sas_phase.require_runtime()
+            runtime.device_ids.extend(names)
+            runtime.write_receipt()
         return names
 
     def generate_module_names(self, count=1):
@@ -199,9 +223,14 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             )
 
     def tearDown(self):
+        if _sas_phase.enabled():
+            self.stop_background()
         if not settings.env.azext_iot_testhub:
             with ExitStack() as cleanup:
-                cleanup.callback(clean_up_iothub_device_config, hub_name=self.entity_name, rg=self.entity_rg)
+                if _sas_phase.enabled():
+                    cleanup.callback(_sas_phase.require_runtime().cleanup_devices)
+                else:
+                    cleanup.callback(clean_up_iothub_device_config, hub_name=self.entity_name, rg=self.entity_rg)
                 if self._generated_device_ids:
                     provider = DeviceIdentityProvider(
                         cmd=self, hub_name=self.entity_name, rg=self.entity_rg, auth_type_dataplane="login"
@@ -248,5 +277,5 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
         yield None
         # Hub deletion is handled by the session-scoped _cleanup_dynamic_hub
         # fixture in conftest.py to avoid race conditions between classes.
-        if hasattr(self, "storage_cstring"):
+        if hasattr(self, "storage_cstring") and not _sas_phase.enabled():
             self._delete_storage_account()

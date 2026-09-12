@@ -8,6 +8,9 @@ from pathlib import Path
 import json
 import runpy
 import re
+import os
+import subprocess
+import sys
 
 import pytest
 import yaml
@@ -163,3 +166,56 @@ def test_dps_workflow_runs_two_serial_complete_phases_with_existing_redaction_an
     assert "tox r -e ${{ matrix.config.tox_env }} --skip-pkg-install" in step["run"]
     upload = next(step for step in jobs["int-test"]["steps"] if step["name"] == "Upload test result")
     assert upload["with"]["path"] == "test-result/"
+
+
+def test_hub_sas_workflow_defaults_to_opt_in():
+    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
+    triggers = workflow.get("on", workflow.get(True))
+    assert triggers["workflow_dispatch"]["inputs"]["testHubSAS"]["default"] is False
+    step = next(value for value in workflow["jobs"]["setup"]["steps"] if value.get("id") == "matrix")
+    assert step["env"]["INPUT_TEST_HUB_SAS"] == "${{ inputs.testHubSAS }}"
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Executes the Ubuntu workflow's Bash matrix script.")
+@pytest.mark.parametrize("services,toggle,expected", [
+    ("auto", "false", False), ("auto", "true", False),
+    ("HubSAS", "false", True), ("", "true", True),
+])
+def test_hub_sas_is_explicitly_opt_in(services, toggle, expected, tmp_path):
+    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
+    step = next(value for value in workflow["jobs"]["setup"]["steps"] if value.get("id") == "matrix")
+    output = tmp_path / "output"
+    env = dict(os.environ, INPUT_SERVICES=services, INPUT_TEST_HUB_SAS=toggle,
+               INPUT_TEST_DPS="false", INPUT_TEST_HUB_MGMT="false", INPUT_TEST_HUB_DATA="false",
+               INPUT_TEST_ADU="false", INPUT_TEST_ADR="false", INPUT_PYTHON_VERSIONS="3.13",
+               INPUT_REGIONS="centraluseuap", GITHUB_OUTPUT=str(output), GITHUB_STEP_SUMMARY=str(tmp_path / "summary"))
+    result = subprocess.run(
+        ["bash", "-c", step["run"]], cwd=REPOSITORY_ROOT, env=env,
+        capture_output=True, text=True, timeout=15, check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    matrix = json.loads(output.read_text(encoding="utf-8").split("matrix=", 1)[1])
+    assert any(value["service"] == "HubSAS" for value in matrix) is expected
+    if expected:
+        assert matrix == [{"service": "HubSAS", "tox_env": "HubSAS-int",
+                           "timeout": 120, "python": "3.13", "region": "centraluseuap"}]
+
+
+@pytest.mark.parametrize("status", ["success", "failure", "cancelled"])
+def test_hub_sas_uses_existing_service_result_gate(tmp_path, status):
+    combination = dict(MATRIX[0], service="HubSAS")
+    _result(tmp_path, combination, status=status)
+    _, errors = EVALUATE(tmp_path, [combination], SUCCESSFUL_JOBS)
+    assert bool(errors) == (status != "success")
+
+
+def test_hub_sas_tox_uses_exact_six_nodes_without_changing_other_auth_defaults():
+    from azext_iot.tests.iothub._sas_phase import NODES
+    content = (REPOSITORY_ROOT / "tox.ini").read_text(encoding="utf-8")
+    selected = re.findall(r"HubSAS:\s+(azext_iot/tests/iothub/\S+::\S+::\S+)", content)
+    assert tuple(selected) == NODES
+    assert "HubSAS: pytest -c setup.cfg" in content
+    assert "HubSAS: azext_iot_hub_auth_phase=local-auth" in content
+    assert "HubSAS: azext_iot_hubsas_subscription={env:azext_iot_hubsas_subscription}\n" in content
+    assert "HubSAS:    -n 0 -p no:rerunfailures --capture=fd" in content
+    assert "AZURE_DEFAULTS_IOTHUB-DATA-AUTH-TYPE=login" in content

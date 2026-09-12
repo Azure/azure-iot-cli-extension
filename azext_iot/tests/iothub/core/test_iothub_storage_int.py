@@ -17,6 +17,7 @@ from pathlib import Path
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest, MAX_RBAC_ASSIGNMENT_TRIES
 from azext_iot.tests.iothub._integration_helpers import LOCAL_AUTH_DEVICE_HTTP_REASON
+from azext_iot.tests.iothub._sas_phase import enabled as sas_phase_enabled
 from azext_iot.tests.iothub.conftest import _delete_fixture_resource
 from azext_iot.tests.settings import UserTypes, HUB_TEST_LOCATION
 from azext_iot.common.utility import generate_storage_account_sas_token
@@ -157,7 +158,7 @@ class TestIoTStorage(IoTLiveScenarioTest):
                     self.managed_identity["id"],
                 )
 
-    @pytest.mark.skip(reason=LOCAL_AUTH_DEVICE_HTTP_REASON)
+    @pytest.mark.skipif(not sas_phase_enabled(), reason=LOCAL_AUTH_DEVICE_HTTP_REASON)
     def test_device_upload_file(self):
         device_count = 1
 

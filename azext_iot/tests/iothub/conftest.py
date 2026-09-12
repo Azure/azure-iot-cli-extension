@@ -9,8 +9,8 @@ from typing import Optional, List
 import os
 
 import pytest
-from azure.cli.core.azclierror import AzCLIError, CLIInternalError, ResourceNotFoundError
-from azure.core.exceptions import HttpResponseError, ResourceNotFoundError as CoreResourceNotFoundError
+from azure.cli.core.azclierror import AzCLIError, CLIInternalError
+from azure.core.exceptions import HttpResponseError
 from knack.log import get_logger
 from msrestazure.azure_exceptions import CloudError
 
@@ -22,7 +22,10 @@ from azext_iot.tests.settings import (
     DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL, HUB_TEST_LOCATION
 )
 from azext_iot.tests.iothub import ENTITY_NAME, ENTITY_RG, ROLE_ASSIGNMENT_REFRESH_TIME, settings as iothub_settings
-from azext_iot.tests.iothub._integration_helpers import assert_hub_policy, assign_role_with_propagation, invoke_checked
+from azext_iot.tests.iothub._integration_helpers import (
+    assert_hub_policy, assign_role_with_propagation, invoke_checked, is_not_found
+)
+from azext_iot.tests.iothub import _sas_phase, STORAGE_ACCOUNT as DYNAMIC_STORAGE
 
 logger = get_logger(__name__)
 MAX_RBAC_ASSIGNMENT_TRIES = 10
@@ -35,19 +38,30 @@ STORAGE_ACCOUNT = settings.env.azext_iot_teststorageaccount
 STORAGE_CONTAINER = settings.env.azext_iot_teststoragecontainer
 
 
+def pytest_configure(config):
+    if _sas_phase.enabled():
+        _sas_phase.validate_selection(config)
+        runtime = _sas_phase.HubSasPhase(config, ENTITY_NAME, DYNAMIC_STORAGE, ENTITY_RG, HUB_TEST_LOCATION)
+        _sas_phase.ACTIVE = runtime
+        runtime.install()
+        config.pluginmanager.register(runtime, "iot-hub-sas-phase")
+
+
+def pytest_unconfigure():
+    _sas_phase.ACTIVE = None
+
+
 def _invoke_fixture(command: str) -> EmbeddedCLI:
-    return invoke_checked(cli, command, description="IoT Hub fixture command")
+    target_cli = _sas_phase.require_runtime().get_cli() if _sas_phase.enabled() else cli
+    return invoke_checked(target_cli, command, description="IoT Hub fixture command")
 
 
 def _delete_fixture_resource(command: str, name: str):
     try:
-        invoke_checked(cli, command, description=f"Deleting test resource '{name}'")
+        target_cli = _sas_phase.require_runtime().get_cli() if _sas_phase.enabled() else cli
+        invoke_checked(target_cli, command, description=f"Deleting test resource '{name}'")
     except (AzCLIError, CloudError, HttpResponseError) as error:
-        if (
-            isinstance(error, (ResourceNotFoundError, CoreResourceNotFoundError))
-            or getattr(error, "status_code", None) == 404
-            or getattr(getattr(error, "response", None), "status_code", None) == 404
-        ):
+        if is_not_found(error):
             logger.info("Cleanup target is already absent: %s", name)
             return
         raise
@@ -99,6 +113,7 @@ def _cleanup_dynamic_hub(request):
         live
         and integration_selected
         and not iothub_settings.env.azext_iot_testhub
+        and not _sas_phase.enabled()
     ):
         logger.info("Deleting dynamically created hub: %s", ENTITY_NAME)
         for attempt in range(3):

@@ -122,7 +122,7 @@ def test_hubmgmt_collection_keeps_42_nodes_including_two_isolated_state_groups(p
     root = Path(__file__).resolve().parents[4]
     config = ConfigParser(interpolation=None)
     config.read(root / "tox.ini")
-    commands = config.get("testenv:{Central,ADT,DPS,HubMgmt,HubData,ADU,ADR}-int", "commands")
+    commands = config.get("testenv:{Central,ADT,DPS,HubMgmt,HubData,HubSAS,ADU,ADR}-int", "commands")
     command = " ".join(line.split(":", 1)[1].rstrip(" \\") for line in commands.splitlines() if line.startswith("HubMgmt:"))
     args = split(command)
     assert args[0] == "pytest"
