@@ -15,6 +15,7 @@ Tests cover:
 
 import pytest
 from azext_iot.common.embedded_cli import EmbeddedCLI
+from azext_iot.tests.helpers import invoke_checked
 
 cli = EmbeddedCLI()
 
@@ -31,13 +32,15 @@ def _require_gwv2_hub(provisioned_hub):
 
 
 def _cleanup_linked_hub(dps_name, rg, linked_hub_name):
-    cli.invoke(
+    invoke_checked(
+        cli,
         f"iot dps linked-hub delete --dps-name {dps_name} -g {rg} "
-        f"--linked-hub {linked_hub_name}"
+        f"--linked-hub {linked_hub_name}",
+        description="Delete test-owned DPS Hub link",
     )
 
 
-@pytest.mark.usefixtures("dps_linked_hub_identity")
+@pytest.mark.usefixtures("dps_linked_hub_identity", "exclusive_iot_dps_no_hub")
 def test_linked_hub_create_auto_hostname(provisioned_iot_dps_no_hub_module, provisioned_only_iot_hubs_session):
     """On a GWv2 hub, auto (default) should resolve to the device hostname."""
     dps_name = provisioned_iot_dps_no_hub_module["name"]
@@ -67,7 +70,7 @@ def test_linked_hub_create_auto_hostname(provisioned_iot_dps_no_hub_module, prov
         _cleanup_linked_hub(dps_name, dps_rg, device_hostname)
 
 
-@pytest.mark.usefixtures("dps_linked_hub_identity")
+@pytest.mark.usefixtures("dps_linked_hub_identity", "exclusive_iot_dps_no_hub")
 def test_linked_hub_create_classic_hostname(provisioned_iot_dps_no_hub_module, provisioned_only_iot_hubs_session):
     """Create linked hub with explicit classic hostname type."""
     dps_name = provisioned_iot_dps_no_hub_module["name"]
@@ -98,7 +101,7 @@ def test_linked_hub_create_classic_hostname(provisioned_iot_dps_no_hub_module, p
         _cleanup_linked_hub(dps_name, dps_rg, classic_hostname)
 
 
-@pytest.mark.usefixtures("dps_linked_hub_identity")
+@pytest.mark.usefixtures("dps_linked_hub_identity", "exclusive_iot_dps_no_hub")
 def test_linked_hub_create_device_hostname(provisioned_iot_dps_no_hub_module, provisioned_only_iot_hubs_session):
     """Create linked hub with explicit device hostname type on a GWv2 hub."""
     dps_name = provisioned_iot_dps_no_hub_module["name"]
@@ -147,7 +150,7 @@ def test_hub_show_returns_tls13_hostnames(provisioned_only_iot_hubs_session):
     assert hub_name in props["serviceHostName"]
 
 
-@pytest.mark.usefixtures("dps_linked_hub_identity")
+@pytest.mark.usefixtures("dps_linked_hub_identity", "exclusive_iot_dps_no_hub")
 def test_linked_hub_list_shows_hostname(provisioned_iot_dps_no_hub_module, provisioned_only_iot_hubs_session):
     """Verify linked hub list returns the correct hostname after linking."""
     dps_name = provisioned_iot_dps_no_hub_module["name"]
@@ -183,6 +186,7 @@ def test_linked_hub_list_shows_hostname(provisioned_iot_dps_no_hub_module, provi
         "SystemAssigned linking and hostname lifecycles run separately."
     )
 )
+@pytest.mark.usefixtures("exclusive_iot_dps_no_hub")
 def test_linked_hub_create_keybased_then_switch_to_mi(provisioned_iot_dps_no_hub_module, provisioned_only_iot_hubs_session):
     """KeyBased create -> auth-only SystemAssigned swap (no hostname change)."""
     dps_name = provisioned_iot_dps_no_hub_module["name"]

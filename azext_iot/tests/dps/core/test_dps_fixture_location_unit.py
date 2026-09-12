@@ -13,6 +13,7 @@ import pytest
 from azure.cli.core.azclierror import CLIInternalError, ResourceNotFoundError
 from azure.core.credentials import AccessToken
 from azure.core.exceptions import HttpResponseError, ResourceNotFoundError as AzureResourceNotFoundError
+from filelock import FileLock, Timeout
 from knack.util import CLIError
 
 from azext_iot.common.embedded_cli import EmbeddedCLI
@@ -815,10 +816,14 @@ def test_dps_lifecycle_auth_cases_are_collected_independently(mocker, module_nam
     ]
     assert len(cases) == case_count
     for case in cases:
-        assert len(case.pytestmark) == 1
-        mark = case.pytestmark[0]
-        assert mark.name == "parametrize"
+        marks = [mark for mark in case.pytestmark if mark.name == "parametrize"]
+        assert len(marks) == 1
+        mark = marks[0]
         assert mark.args == ("auth_phases", DPS_SERVICE_AUTH_PARAMS)
+        fixture_marks = [mark.args for mark in case.pytestmark if mark.name == "usefixtures"]
+        assert fixture_marks == (
+            [("exclusive_iot_dps_no_hub",)] if case.__name__ == "test_dps_device_registration_unlinked_hub" else []
+        )
     cli.return_value.invoke.assert_not_called()
 
 
@@ -833,6 +838,136 @@ def test_dps_linked_hub_coverage_keeps_managed_identity_cases_active(mocker):
         marks = getattr(module, name).pytestmark
         assert len(marks) == 1
         assert marks[0].name == "usefixtures"
-        assert marks[0].args == ("dps_linked_hub_identity",)
-    assert module.test_linked_hub_create_keybased_then_switch_to_mi.pytestmark[0].name == "skip"
+        assert marks[0].args == ("dps_linked_hub_identity", "exclusive_iot_dps_no_hub")
+    skipped_marks = module.test_linked_hub_create_keybased_then_switch_to_mi.pytestmark
+    assert [mark.name for mark in skipped_marks] == ["usefixtures", "skip"]
+    assert skipped_marks[0].args == ("exclusive_iot_dps_no_hub",)
     cli.return_value.invoke.assert_not_called()
+
+
+@pytest.fixture
+def no_hub_isolation(mocker, monkeypatch, tmp_path):
+    monkeypatch.setattr(dps_fixtures.tempfile, "gettempdir", lambda: str(tmp_path))
+    monkeypatch.setattr(dps_fixtures, "DPS_NO_HUB_LOCK_TIMEOUT_SECONDS", 0)
+    cli = mocker.patch.object(dps_fixtures, "cli")
+    cli.invoke.return_value.success.return_value = True
+    cli.invoke.return_value.as_json.return_value = []
+    requests = [
+        SimpleNamespace(config=SimpleNamespace(workerinput={"testrunuid": "same-run", "workerid": worker}))
+        for worker in ("gw1", "gw6")
+    ]
+    return requests, {"name": "no-hub-dps", "resourceGroup": "rg"}, cli
+
+
+def test_no_hub_usage_excludes_other_workers_and_identity_setup(mocker, no_hub_isolation):
+    requests, resource, cli = no_hub_isolation
+    fixture = dps_fixtures.exclusive_iot_dps_no_hub.__wrapped__
+    identity = mocker.patch.object(dps_fixtures, "_enable_dps_hub_identity")
+    first = fixture(requests[0], resource)
+    assert next(first) is resource
+    try:
+        with pytest.raises(Timeout):
+            next(fixture(requests[1], resource))
+        with pytest.raises(Timeout):
+            dps_fixtures.dps_linked_hub_identity.__wrapped__(requests[1], resource, {})
+        identity.assert_not_called()
+        assert cli.invoke.call_count == 1
+        # The usage lock must not prevent reference-count setup/teardown.
+        state_lock, _ = dps_fixtures._state_paths("same-run", "nh")
+        with FileLock(state_lock, timeout=0):
+            pass
+    finally:
+        first.close()
+
+    def enable(*_):
+        with pytest.raises(Timeout):
+            with dps_fixtures._no_hub_usage_lock(requests[0]):
+                pytest.fail("Identity setup did not hold the shared usage lock.")
+
+    identity.side_effect = enable
+    dps_fixtures.dps_linked_hub_identity.__wrapped__(requests[1], resource, {})
+    identity.assert_called_once_with(resource["name"], {})
+    second = fixture(requests[1], resource)
+    assert next(second) is resource
+    second.close()
+    assert cli.invoke.call_count == 4
+
+
+@pytest.mark.parametrize("error_type", [RuntimeError, pytest.fail.Exception, KeyboardInterrupt])
+def test_no_hub_usage_releases_after_failure_and_timeout(no_hub_isolation, error_type):
+    requests, resource, cli = no_hub_isolation
+    fixture = dps_fixtures.exclusive_iot_dps_no_hub.__wrapped__(requests[0], resource)
+    error = error_type("test interrupted")
+    assert next(fixture) is resource
+
+    def check_while_locked(*_args, **_kwargs):
+        with pytest.raises(Timeout):
+            with dps_fixtures._no_hub_usage_lock(requests[1]):
+                pytest.fail("Postcondition ran after releasing the usage lock.")
+        return cli.invoke.return_value
+
+    cli.invoke.side_effect = check_while_locked
+    with pytest.raises(error_type) as raised:
+        fixture.throw(error)
+    assert raised.value is error
+    assert cli.invoke.call_count == 2
+    with dps_fixtures._no_hub_usage_lock(requests[1]):
+        pass
+
+
+@pytest.mark.parametrize("phase", ["before", "after"])
+@pytest.mark.parametrize("links", [[{"name": "unexpected-hub", "connectionString": "do-not-log"}], None, {}])
+def test_no_hub_usage_rejects_nonempty_or_invalid_link_state(no_hub_isolation, phase, links):
+    requests, resource, cli = no_hub_isolation
+    cli.invoke.return_value.as_json.side_effect = [links] if phase == "before" else [[], links]
+    fixture = dps_fixtures.exclusive_iot_dps_no_hub.__wrapped__(requests[0], resource)
+    if phase == "after":
+        assert next(fixture) is resource
+    with pytest.raises(AssertionError, match=f"no linked hubs {phase}") as raised:
+        if phase == "before":
+            next(fixture)
+        else:
+            fixture.close()
+    assert "do-not-log" not in str(raised.value)
+    assert all("linked-hub list" in call.args[0] and call.kwargs["capture_stderr"]
+               for call in cli.invoke.call_args_list)
+    with dps_fixtures._no_hub_usage_lock(requests[1]):
+        pass
+
+
+@pytest.mark.parametrize("failure", ["exception", "exit"])
+def test_no_hub_usage_does_not_hide_link_read_failures(no_hub_isolation, failure):
+    requests, resource, cli = no_hub_isolation
+    error = HttpResponseError("AuthorizationFailed")
+    if failure == "exception":
+        cli.invoke.side_effect = error
+    else:
+        cli.invoke.return_value.success.return_value = False
+        cli.invoke.return_value.error_code = 2
+    with pytest.raises(HttpResponseError if failure == "exception" else CLIInternalError) as raised:
+        next(dps_fixtures.exclusive_iot_dps_no_hub.__wrapped__(requests[0], resource))
+    if failure == "exception":
+        assert raised.value is error
+    cli.invoke.assert_called_once()
+    with dps_fixtures._no_hub_usage_lock(requests[1]):
+        pass
+
+
+@pytest.mark.parametrize("failure", ["exception", "exit"])
+def test_linked_hub_cleanup_surfaces_failure(mocker, failure):
+    cli = mocker.patch("azext_iot.common.embedded_cli.EmbeddedCLI").return_value
+    module_path = Path(dps_fixtures.__file__).parent / "core/test_dps_linked_hub_int.py"
+    module = SimpleNamespace(**runpy.run_path(str(module_path)))
+    error = HttpResponseError("AuthorizationFailed")
+    if failure == "exception":
+        cli.invoke.side_effect = error
+    else:
+        cli.invoke.return_value.success.return_value = False
+        cli.invoke.return_value.error_code = 2
+    with pytest.raises(HttpResponseError if failure == "exception" else CLIInternalError) as raised:
+        module._cleanup_linked_hub("dps", "rg", "owned-hub")
+    if failure == "exception":
+        assert raised.value is error
+    cli.invoke.assert_called_once_with(
+        "iot dps linked-hub delete --dps-name dps -g rg --linked-hub owned-hub", capture_stderr=True,
+    )
