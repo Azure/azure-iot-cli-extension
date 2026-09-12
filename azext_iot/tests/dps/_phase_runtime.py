@@ -299,8 +299,9 @@ def start_worker(session):
     directory = config[0]
     plugin = WorkerStop(session, directory)
     session.config.pluginmanager.register(plugin, "dps-worker-stop")
-    previous = signal.signal(signal.SIGUSR1, plugin.stop)
-    session.config.add_cleanup(lambda: signal.signal(signal.SIGUSR1, previous))
+    stop_signal = signal.Signals["SIGUSR1"]
+    previous = signal.signal(stop_signal, plugin.stop)
+    session.config.add_cleanup(lambda: signal.signal(stop_signal, previous))
     receipts.write(f"worker-{os.getpid()}.json", {
         "pid": os.getpid(), "parent_pid": os.getppid(), "ready": True,
     }, exclusive=True)
