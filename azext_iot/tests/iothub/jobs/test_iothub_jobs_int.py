@@ -6,12 +6,8 @@
 
 import json
 from datetime import datetime, timedelta, timezone
-from knack.log import get_logger
 
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES, IoTLiveScenarioTest
-
-
-logger = get_logger(__name__)
 
 
 def _log_job_device_statistics(job, expected_count):
@@ -20,7 +16,12 @@ def _log_job_device_statistics(job, expected_count):
         name: statistics.get(name)
         for name in ("deviceCount", "succeededCount", "failedCount", "pendingCount", "runningCount")
     }
-    logger.info("Hub job %s: expected devices=%s; service statistics=%s", job["jobId"], expected_count, counters)
+    # CLI logging configuration can suppress INFO; retain these in pytest's failure output.
+    print(
+        f"Hub job {job['jobId']}: expected devices={expected_count}; "
+        f"service statistics={json.dumps(counters, sort_keys=True)}",
+        flush=True,
+    )
 
 
 class TestIoTHubJobs(IoTLiveScenarioTest):
