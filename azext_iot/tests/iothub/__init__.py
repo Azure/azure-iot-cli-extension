@@ -8,6 +8,7 @@ import pytest
 
 from azure.cli.core.azclierror import CLIInternalError
 from time import sleep
+from types import SimpleNamespace
 from azext_iot.tests.helpers import (
     add_test_tag,
     assign_role_assignment,
@@ -50,7 +51,15 @@ DEFAULT_CONTAINER = "devices"
 
 settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL)
 ENTITY_RG = settings.env.azext_iot_testrg
-ENTITY_NAME = settings.env.azext_iot_testhub or "test-hub-" + generate_generic_id()
+
+
+def generate_dynamic_hub_name():
+    return "test-hub-" + generate_generic_id()
+
+
+DYNAMIC_HUB = SimpleNamespace(
+    name=settings.env.azext_iot_testhub or generate_dynamic_hub_name()
+)
 STORAGE_ACCOUNT = settings.env.azext_iot_teststorageaccount or "hubstore" + generate_generic_id()[:4]
 STORAGE_CONTAINER = settings.env.azext_iot_teststoragecontainer or DEFAULT_CONTAINER
 MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries or 10
@@ -63,7 +72,7 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def __init__(self, test_scenario, add_data_contributor=True):
         assert test_scenario
         self.entity_rg = ENTITY_RG
-        self.entity_name = ENTITY_NAME
+        self.entity_name = DYNAMIC_HUB.name
         super(IoTLiveScenarioTest, self).__init__(test_scenario)
 
         if hasattr(self, 'storage_cstring'):
@@ -142,6 +151,8 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                 )
                 if attempt == HUB_PROVISION_ATTEMPTS - 1:
                     raise
+                self.entity_name = generate_dynamic_hub_name()
+                DYNAMIC_HUB.name = self.entity_name
                 self._create_dynamic_hub()
                 target_hub = self._wait_for_ready_hub()
 

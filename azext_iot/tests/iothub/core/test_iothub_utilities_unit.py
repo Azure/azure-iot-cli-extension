@@ -11,6 +11,7 @@ from azure.cli.core.azclierror import ArgumentUsageError, CLIInternalError
 from azext_iot.operations import hub as subject
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests import helpers
+import azext_iot.tests.iothub as iothub_test
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.iothub import conftest as iothub_conftest
 
@@ -109,20 +110,53 @@ def test_iot_live_scenario_replaces_query_unready_hub(mocker):
     scenario = mocker.Mock()
     scenario.entity_name = "test-hub"
     scenario.entity_rg = "test-rg"
-    replacement_hub = {"id": "replacement-hub"}
-    scenario._wait_for_ready_hub.return_value = replacement_hub
-    mocker.patch(
+    replacement_hubs = [{"id": "replacement-hub-1"}, {"id": "replacement-hub-2"}]
+    scenario._wait_for_ready_hub.side_effect = replacement_hubs
+    created_names = []
+    scenario._create_dynamic_hub.side_effect = lambda: created_names.append(scenario.entity_name)
+    mocker.patch.object(iothub_test.DYNAMIC_HUB, "name", "test-hub")
+    mocker.patch.object(
+        iothub_test,
+        "generate_dynamic_hub_name",
+        side_effect=["replacement-hub-name-1", "replacement-hub-name-2"],
+    )
+    readiness = mocker.patch(
         "azext_iot.tests.iothub.wait_for_iothub_query_ready",
-        side_effect=[AssertionError(), None],
+        side_effect=[AssertionError(), AssertionError(), None],
     )
 
     result = IoTLiveScenarioTest._ensure_query_ready_hub(scenario, {"id": "initial-hub"})
 
-    assert result == replacement_hub
-    scenario.cmd.assert_called_once_with(
-        "iot hub delete --name test-hub --resource-group test-rg"
+    assert result == replacement_hubs[-1]
+    assert scenario.entity_name == "replacement-hub-name-2"
+    assert iothub_test.DYNAMIC_HUB.name == "replacement-hub-name-2"
+    assert [call.args for call in readiness.call_args_list] == [
+        ("test-hub", "test-rg"),
+        ("replacement-hub-name-1", "test-rg"),
+        ("replacement-hub-name-2", "test-rg"),
+    ]
+    assert [call.args for call in scenario.cmd.call_args_list] == [
+        ("iot hub delete --name test-hub --resource-group test-rg",),
+        ("iot hub delete --name replacement-hub-name-1 --resource-group test-rg",),
+    ]
+    assert created_names == ["replacement-hub-name-1", "replacement-hub-name-2"]
+
+
+def test_dynamic_hub_cleanup_deletes_active_replacement(mocker):
+    mocker.patch.object(iothub_test.settings.env, "azext_iot_testhub", None)
+    mocker.patch.object(iothub_test.DYNAMIC_HUB, "name", "replacement-hub-name")
+    mocker.patch.object(iothub_test, "ENTITY_RG", "test-rg")
+    invoke = mocker.patch.object(iothub_conftest.cli, "invoke")
+    invoke.return_value.success.return_value = True
+
+    cleanup = iothub_conftest._cleanup_dynamic_hub.__wrapped__()
+    next(cleanup)
+    with pytest.raises(StopIteration):
+        next(cleanup)
+
+    invoke.assert_called_once_with(
+        "iot hub delete --name replacement-hub-name --resource-group test-rg"
     )
-    scenario._create_dynamic_hub.assert_called_once_with()
 
 
 def test_iot_hub_provisioner_replaces_query_unready_hub(mocker):

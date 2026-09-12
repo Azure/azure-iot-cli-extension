@@ -22,7 +22,7 @@ from azext_iot.tests.helpers import (
     wait_for_iothub_query_ready,
 )
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
-from azext_iot.tests.iothub import ENTITY_NAME, ENTITY_RG, settings as iothub_settings
+import azext_iot.tests.iothub as iothub_test
 
 logger = get_logger(__name__)
 MAX_RBAC_ASSIGNMENT_TRIES = 10
@@ -73,18 +73,20 @@ def _cleanup_dynamic_hub():
     the same hub on the same worker).
     """
     yield
-    if not iothub_settings.env.azext_iot_testhub:
-        logger.info("Deleting dynamically created hub: %s", ENTITY_NAME)
+    if not iothub_test.settings.env.azext_iot_testhub:
+        logger.info("Deleting dynamically created hub: %s", iothub_test.DYNAMIC_HUB.name)
         from time import sleep
         for attempt in range(3):
-            delete_result = cli.invoke(f"iot hub delete --name {ENTITY_NAME} --resource-group {ENTITY_RG}")
+            delete_result = cli.invoke(
+                f"iot hub delete --name {iothub_test.DYNAMIC_HUB.name} --resource-group {iothub_test.ENTITY_RG}"
+            )
             if delete_result.success():
                 break
             if attempt < 2:
                 logger.warning("Hub deletion attempt %s failed, retrying...", attempt + 1)
                 sleep(30)
         else:
-            logger.error("Failed to delete hub %s after 3 attempts.", ENTITY_NAME)
+            logger.error("Failed to delete hub %s after 3 attempts.", iothub_test.DYNAMIC_HUB.name)
 
 
 @pytest.fixture()
