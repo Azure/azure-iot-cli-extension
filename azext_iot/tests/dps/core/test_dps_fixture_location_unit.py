@@ -10,14 +10,16 @@ import runpy
 from types import SimpleNamespace
 
 import pytest
-from azure.cli.core.azclierror import CLIInternalError, ResourceNotFoundError
+from azure.cli.core.azclierror import CLIInternalError
+from azure.cli.core.commands.arm import show_exception_handler
 from azure.core.credentials import AccessToken
-from azure.core.exceptions import HttpResponseError, ResourceNotFoundError as AzureResourceNotFoundError
+from azure.core.exceptions import HttpResponseError
 from filelock import FileLock, Timeout
 from knack.util import CLIError
 
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.core import custom
+from azext_iot.sdk.dps.mgmt import IotDpsClient
 from azext_iot.sdk.iothub.mgmt import IotHubClient
 from azext_iot.tests.dps import DPS_SERVICE_AUTH_PARAMS
 from azext_iot.tests.dps import conftest as dps_fixtures
@@ -336,34 +338,26 @@ def test_dps_hub_fixture_creates_in_canary_region_without_local_auth(monkeypatch
 @pytest.mark.parametrize("kind", ["hub", "dps"])
 def test_dps_fixture_known_resource_lookup_does_not_list(monkeypatch, mocker, kind):
     cli = mocker.patch.object(dps_fixtures, "cli")
-    factory = mocker.patch.object(dps_fixtures, "iot_hub_service_factory")
+    factory = mocker.patch.object(
+        dps_fixtures, "iot_hub_service_factory" if kind == "hub" else "iot_service_provisioning_factory"
+    )
     target = {"name": "known-target"}
-    cli.invoke.return_value.as_json.return_value = target
-    operations = factory.return_value.iot_hub_resource
+    operations = getattr(factory.return_value, "iot_hub_resource" if kind == "hub" else "iot_dps_resource")
     operations.get.return_value = target
     monkeypatch.setattr(dps_fixtures, "ENTITY_RG", "unit-test-rg")
 
     assert getattr(dps_fixtures, f"_find_{kind}_by_name")("known-target") is target
+    factory.assert_called_once_with(cli.az_cli)
     if kind == "hub":
-        factory.assert_called_once_with(cli.az_cli)
         operations.get.assert_called_once_with(resource_group_name="unit-test-rg", resource_name="known-target")
         operations.check_name_availability.assert_not_called()
-        operations.list_by_subscription.assert_not_called()
-        operations.list_by_resource_group.assert_not_called()
-        cli.invoke.assert_not_called()
     else:
-        cli.invoke.assert_called_once_with(
-            "iot dps show -n known-target -g unit-test-rg", capture_stderr=True
+        operations.get.assert_called_once_with(
+            resource_group_name="unit-test-rg", provisioning_service_name="known-target"
         )
-        factory.assert_not_called()
-
-
-@pytest.mark.parametrize("error_type", [ResourceNotFoundError, AzureResourceNotFoundError])
-def test_dps_fixture_lookup_only_treats_not_found_as_absent(mocker, error_type):
-    cli = mocker.patch.object(dps_fixtures, "cli")
-    cli.invoke.side_effect = error_type("not found")
-
-    assert dps_fixtures._find_dps_by_name("missing-target") is None
+    operations.list_by_subscription.assert_not_called()
+    operations.list_by_resource_group.assert_not_called()
+    cli.invoke.assert_not_called()
 
 
 _HUB_LOOKUP_SUBSCRIPTION = "00000000-0000-0000-0000-000000000001"
@@ -371,6 +365,78 @@ _HUB_LOOKUP_URL = (
     f"https://management.azure.com/subscriptions/{_HUB_LOOKUP_SUBSCRIPTION}"
     "/resourceGroups/unit-test-rg/providers/Microsoft.Devices/IotHubs/missing-hub"
 )
+_DPS_LOOKUP_URL = (
+    f"https://management.azure.com/subscriptions/{_HUB_LOOKUP_SUBSCRIPTION}"
+    "/resourceGroups/unit-test-rg/providers/Microsoft.Devices/provisioningServices/missing-dps"
+)
+
+
+@pytest.fixture
+def dps_lookup_sdk(mocker):
+    credential = mocker.Mock(spec=["get_token"])
+    credential.get_token.return_value = AccessToken("unit-test-token", 4102444800)
+    with IotDpsClient(credential, _HUB_LOOKUP_SUBSCRIPTION, retry_total=0) as client:
+        factory = mocker.patch.object(dps_fixtures, "iot_service_provisioning_factory", return_value=client)
+        yield client, factory
+
+
+@pytest.mark.parametrize("isolated_phase", [False, True])
+def test_dps_presence_lookup_bypasses_actual_cli_show_exit(
+    dps_lookup_sdk, mocked_response, mocker, monkeypatch, isolated_phase
+):
+    client, factory = dps_lookup_sdk
+    mocked_response.add(
+        "GET", _DPS_LOOKUP_URL, status=404,
+        json={"error": {"code": "ResourceNotFound", "message": "DPS does not exist."}},
+    )
+    with pytest.raises(SystemExit) as exited:
+        try:
+            custom.iot_dps_get(client, "missing-dps", "unit-test-rg")
+        except HttpResponseError as error:
+            show_exception_handler(error)
+    assert exited.value.code == 3
+
+    cli = mocker.patch.object(dps_fixtures, "cli")
+    cli.invoke.side_effect = exited.value
+    monkeypatch.setattr(dps_fixtures, "ENTITY_RG", "unit-test-rg")
+    receipts = ("regular", "unit-run", _HUB_LOOKUP_SUBSCRIPTION, "unit-test-rg") if isolated_phase else None
+    mocker.patch.object(dps_fixtures._phase_receipts, "settings", return_value=receipts)
+
+    assert dps_fixtures._find_dps_by_name("missing-dps") is None
+    factory.assert_called_once_with(cli.az_cli, **({"subscription_id": _HUB_LOOKUP_SUBSCRIPTION} if receipts else {}))
+    cli.invoke.assert_not_called()
+    assert len(mocked_response.calls) == 2
+    assert all(call.request.method == "GET" for call in mocked_response.calls)
+
+
+@pytest.mark.parametrize("status,code", [
+    (401, "Unauthorized"), (403, "AuthorizationFailed"), (500, "InternalServerError"), (502, "ProviderError"),
+])
+def test_dps_presence_lookup_propagates_real_sdk_non_404_errors(
+    dps_lookup_sdk, mocked_response, mocker, monkeypatch, status, code
+):
+    _, factory = dps_lookup_sdk
+    cli = mocker.patch.object(dps_fixtures, "cli")
+    monkeypatch.setattr(dps_fixtures, "ENTITY_RG", "unit-test-rg")
+    mocked_response.add("GET", _DPS_LOOKUP_URL, status=status, json={"error": {"code": code, "message": "Failure"}})
+
+    with pytest.raises(HttpResponseError) as raised:
+        dps_fixtures._find_dps_by_name("missing-dps")
+
+    assert raised.value.status_code == status
+    factory.assert_called_once_with(cli.az_cli)
+    cli.invoke.assert_not_called()
+    assert len(mocked_response.calls) == 1
+
+
+def test_dps_presence_lookup_does_not_treat_factory_failure_as_missing(mocker):
+    error = _http_error(404, "NotFound")
+    mocker.patch.object(dps_fixtures, "iot_service_provisioning_factory", side_effect=error)
+
+    with pytest.raises(HttpResponseError) as raised:
+        dps_fixtures._find_dps_by_name("missing-dps")
+
+    assert raised.value is error
 
 
 @pytest.fixture
@@ -498,11 +564,13 @@ def test_dps_fixture_lookup_does_not_hide_service_errors(mocker, kind, status, c
         factory = mocker.patch.object(dps_fixtures, "iot_hub_service_factory")
         factory.return_value.iot_hub_resource.get.side_effect = error
     else:
-        cli.invoke.side_effect = error
+        factory = mocker.patch.object(dps_fixtures, "iot_service_provisioning_factory")
+        factory.return_value.iot_dps_resource.get.side_effect = error
 
     with pytest.raises(HttpResponseError) as raised:
         getattr(dps_fixtures, f"_find_{kind}_by_name")("known-target")
     assert raised.value is error
+    cli.invoke.assert_not_called()
 
 
 def test_dps_hub_list_raises_original_pagination_error(mocker):

@@ -14,8 +14,8 @@ import tempfile
 import uuid
 
 import pytest
-from azure.cli.core.azclierror import CLIInternalError, ResourceNotFoundError
-from azure.core.exceptions import HttpResponseError, ResourceNotFoundError as AzureResourceNotFoundError
+from azure.cli.core.azclierror import CLIInternalError
+from azure.core.exceptions import HttpResponseError
 from azure.mgmt.core.tools import parse_resource_id
 from filelock import FileLock
 from knack.log import get_logger
@@ -353,12 +353,17 @@ def _dps_service_connection_string(resource: Dict) -> str:
 
 
 def _find_dps_by_name(dps_name: str) -> Optional[dict]:
+    # The CLI show handler turns an expected ARM 404 into SystemExit(3).
+    receipt_config = _phase_receipts.settings()
+    client = iot_service_provisioning_factory(cli.az_cli, subscription_id=receipt_config[2]) if receipt_config else (
+        iot_service_provisioning_factory(cli.az_cli)
+    )
     try:
-        return cli.invoke(
-            f"iot dps show -n {dps_name} -g {ENTITY_RG}", capture_stderr=True
-        ).as_json()
-    except (ResourceNotFoundError, AzureResourceNotFoundError):
-        return None
+        return client.iot_dps_resource.get(provisioning_service_name=dps_name, resource_group_name=ENTITY_RG)
+    except HttpResponseError as error:
+        if error.status_code == 404:
+            return None
+        raise
 
 
 def _delete_dps(dps_name: str) -> None:
