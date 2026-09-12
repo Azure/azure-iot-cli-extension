@@ -7,7 +7,10 @@
 import json
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES, IoTLiveScenarioTest
+from azext_iot.tests.iothub._integration_helpers import QUERY_VISIBILITY_TIMEOUT, wait_for_query_ids
 
 
 def _log_job_device_statistics(job, expected_count):
@@ -28,6 +31,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
     def __init__(self, test_case):
         super(TestIoTHubJobs, self).__init__(test_case)
 
+    @pytest.mark.timeout(900 + 2 * QUERY_VISIBILITY_TIMEOUT * len(DATAPLANE_AUTH_TYPES), func_only=False)
     def test_jobs(self):
         for auth_phase in DATAPLANE_AUTH_TYPES:
             device_count = 2
@@ -50,6 +54,17 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             # Update twin tags scenario
             self.kwargs["twin_patch_tags"] = '{"tags": {"deviceClass": "Class1, Class2, Class3"}}'
             query_condition = "deviceId in ['{}']".format("','".join(device_ids_twin_tags))
+            wait_for_query_ids(
+                lambda: self.cmd(
+                    self.set_cmd_auth_type(
+                        f'iot hub query -n {self.host_name} -g {self.entity_rg} '
+                        f'-q "select deviceId from devices where {query_condition}"',
+                        auth_type=auth_phase,
+                    )
+                ).get_output_in_json(),
+                device_ids_twin_tags,
+                id_key="deviceId",
+            )
 
             tag_job = self.cmd(
                 self.set_cmd_auth_type(
@@ -85,6 +100,17 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             # Update twin desired properties
             self.kwargs["twin_patch_props"] = '{"properties": {"desired": {"arbitrary": "value"}}}'
             query_condition = "deviceId in ['{}']".format("','".join(device_ids_twin_props))
+            wait_for_query_ids(
+                lambda: self.cmd(
+                    self.set_cmd_auth_type(
+                        f'iot hub query -n {self.host_name} -g {self.entity_rg} '
+                        f'-q "select deviceId from devices where {query_condition}"',
+                        auth_type=auth_phase,
+                    )
+                ).get_output_in_json(),
+                device_ids_twin_props,
+                id_key="deviceId",
+            )
 
             property_job = self.cmd(
                 self.set_cmd_auth_type(

@@ -7,6 +7,7 @@
 import json
 from collections import defaultdict
 from copy import deepcopy
+from functools import partial
 from types import SimpleNamespace
 
 import pytest
@@ -15,6 +16,7 @@ from azure.cli.core.azclierror import (
     BadRequestError, CLIInternalError, RequiredArgumentMissingError, ResourceNotFoundError,
 )
 
+from azext_iot.tests.iothub._integration_helpers import wait_for_query_ids
 from azext_iot.tests.iothub.state import test_hub_state_int as subject
 
 
@@ -30,9 +32,9 @@ def fake_cli(mocker):
 
 @pytest.mark.parametrize("failure_kind", ["cli_error", "nonzero", "system_exit"])
 @pytest.mark.parametrize("scenario,failed_operation,expected_events", [
-    ("test_migrate_dataplane", None, ["migrate", "compare", "cleanup"]),
+    ("test_migrate_dataplane", None, ["migrate", "ready", "compare", "cleanup"]),
     ("test_migrate_dataplane", "migrate", ["migrate"]),
-    ("test_export_import_dataplane", None, ["export", "compare", "cleanup", "import", "compare"]),
+    ("test_export_import_dataplane", None, ["export", "compare", "cleanup", "import", "ready", "compare"]),
     ("test_export_import_dataplane", "export", ["export"]),
     ("test_export_import_dataplane", "import", ["export", "compare", "cleanup", "import"]),
 ])
@@ -60,6 +62,9 @@ def test_state_command_error_precedes_comparison(
     fake_cli.invoke = mocker.Mock(side_effect=invoke)
     mocker.patch.object(subject.time, "sleep")
     mocker.patch.object(subject, "DATAPLANE_AUTH_TYPES", ["login"])
+    readiness = mocker.patch.object(
+        subject, "_wait_for_dataplane_query", side_effect=lambda *args: events.append("ready")
+    )
     compare_hubs = mocker.patch.object(subject, "compare_hubs_dataplane", side_effect=lambda *args: events.append("compare"))
     compare_file = mocker.patch.object(
         subject, "compare_hub_dataplane_to_file", side_effect=lambda *args: events.append("compare")
@@ -82,6 +87,9 @@ def test_state_command_error_precedes_comparison(
     else:
         getattr(subject, scenario)(hubs)
     assert events == expected_events
+    for call in readiness.call_args_list:
+        assert call.args[0] == subject._hub_auth(hubs[1] if scenario == "test_migrate_dataplane" else hubs[0])
+        assert call.args[1] is owned
     for call in compare_hubs.call_args_list + compare_file.call_args_list:
         assert call.args[-1] is owned
 
@@ -157,6 +165,10 @@ def state_backend(mocker, fake_cli):
     def invoke(args, out_file):
         fake_cli.result.error = None
         name = args[args.index("--hub-name") + 1]
+        if args[:3] == ["iot", "hub", "query"]:
+            assert args[args.index("-q") + 1] == "select deviceId from devices"
+            out_file.write(json.dumps([{"deviceId": device} for device in sorted(states[name]["devices"])]))
+            return 0
         kind = None
         if args[:4] == ["iot", "hub", "configuration", "create"]:
             kind, id_flag = "configs", "--config-id"
@@ -431,6 +443,152 @@ def test_registry_ownership_client_preserves_hub_context(mocker):
     assert kwargs["hub_name"] == "hub"
     assert kwargs["rg"] == "group"
     assert kwargs["auth_type_dataplane"] == "login"
+
+
+@pytest.fixture
+def bounded_query_wait(mocker):
+    return mocker.patch.object(
+        subject, "wait_for_query_ids", side_effect=partial(wait_for_query_ids, attempts=3, wait=0),
+    )
+
+
+def test_source_fixture_waits_after_all_writes_before_exposing_owned_state(
+    mocker, fake_cli, state_backend, state_request, tmp_path, bounded_query_wait
+):
+    queries = []
+
+    def invoke(args, out_file):
+        if args[:3] == ["iot", "hub", "query"]:
+            devices = sorted(state_backend.states["origin"]["devices"])
+            assert len(devices) == 6
+            assert len(state_backend.states["origin"]["configs"]) == 3
+            assert not state_backend.states["destination"]["devices"]
+            queries.append(args)
+            out_file.write(json.dumps([{"deviceId": device} for device in devices[:len(devices) if len(queries) == 2 else 1]]))
+            return 0
+        assert not queries, "Setup must finish before query readiness starts."
+        return state_backend.invoke(args, out_file)
+
+    fake_cli.invoke = mocker.Mock(side_effect=invoke)
+    fixture = _state_fixture(state_backend, state_request, tmp_path)
+    hubs = next(fixture)
+    assert len(queries) == 2
+    bounded_query_wait.assert_called_once()
+    assert bounded_query_wait.call_args.args[1] is hubs[0]["state_data"].device_ids
+    assert hubs[1]["state_data"].device_ids == hubs[0]["state_data"].device_ids
+    fixture.close()
+    assert all(not values for state in state_backend.states.values() for values in state.values())
+
+
+@pytest.mark.parametrize("failure", ["omission", "duplicate", "wrong_id", "cli_error", "nonzero", "system_exit"])
+def test_source_query_failure_cleans_only_written_owned_state(
+    mocker, fake_cli, state_backend, state_request, tmp_path, bounded_query_wait, failure
+):
+    error = BadRequestError("Source query failed")
+    queries = []
+    written = set()
+
+    def invoke(args, out_file):
+        if args[:3] != ["iot", "hub", "query"]:
+            return state_backend.invoke(args, out_file)
+        queries.append(args)
+        state_backend.states["destination"]["devices"].add("borrowed")
+        written.update(state_backend.states["origin"]["devices"] | state_backend.states["origin"]["configs"])
+        fake_cli.result.error = error if failure == "cli_error" else None
+        if failure == "system_exit":
+            raise SystemExit(7)
+        devices = sorted(state_backend.states["origin"]["devices"])
+        if failure == "duplicate":
+            devices.append(devices[-1])
+        elif failure == "wrong_id":
+            devices[-1] = "unowned"
+        else:
+            devices = []
+        out_file.write(json.dumps([{"deviceId": device} for device in devices]))
+        return 7 if failure in ("cli_error", "nonzero") else 0
+
+    fake_cli.invoke = mocker.Mock(side_effect=invoke)
+    expected = {
+        "cli_error": BadRequestError, "nonzero": CLIInternalError, "system_exit": CLIInternalError,
+    }.get(failure, AssertionError)
+    with pytest.raises(expected) as raised:
+        next(_state_fixture(state_backend, state_request, tmp_path))
+    if failure == "cli_error":
+        assert raised.value is error
+    assert len(queries) == (1 if failure in ("cli_error", "nonzero", "system_exit") else 3)
+    bounded_query_wait.assert_called_once()
+    assert {item_id for _, _, item_id in state_backend.deleted} == written
+    assert all(name == "origin" for name, _, _ in state_backend.deleted)
+    assert state_backend.states["origin"] == {"devices": set(), "configs": set()}
+    assert state_backend.states["destination"]["devices"] == {"borrowed"}
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("scenario", ["test_migrate_dataplane", "test_export_import_dataplane"])
+@pytest.mark.parametrize("failure", [None, "omission", "cli_error", "nonzero"])
+def test_destination_readiness_does_not_replay_writes_or_hide_export_failures(
+    mocker, fake_cli, bounded_query_wait, scenario, failure
+):
+    owned = subject._OwnedDataplaneState(config_ids=["config"], device_ids=["one", "two"])
+    hubs = [
+        {"name": "origin", "rg": "rg", "filename": "state.json", "state_data": owned},
+        {"name": "destination", "rg": "rg", "state_data": owned},
+    ]
+    events = []
+    queries = []
+    error = BadRequestError("Destination query failed")
+
+    def invoke(args, out_file):
+        fake_cli.result.error = error if args[:3] == ["iot", "hub", "query"] and failure == "cli_error" else None
+        if args[:3] == ["iot", "hub", "query"]:
+            events.append("query")
+            queries.append(args)
+            name = "destination" if scenario == "test_migrate_dataplane" else "origin"
+            assert args[args.index("--hub-name") + 1] == name
+            assert args[args.index("--auth-type") + 1] == "login"
+            assert args[args.index("-q") + 1] == "select deviceId from devices"
+            rows = [{"deviceId": "one"}]
+            if failure is None and len(queries) == 2:
+                rows.append({"deviceId": "two"})
+            out_file.write(json.dumps(rows))
+            return 7 if failure in ("cli_error", "nonzero") else 0
+        events.append(args[3])
+        out_file.write("{}")
+        return 0
+
+    fake_cli.invoke = mocker.Mock(side_effect=invoke)
+    mocker.patch.object(subject, "DATAPLANE_AUTH_TYPES", ["login"])
+    mocker.patch.object(subject, "compare_hubs_dataplane", side_effect=lambda *args: events.append("compare"))
+    mocker.patch.object(subject, "compare_hub_dataplane_to_file", side_effect=lambda *args: events.append("compare"))
+    mocker.patch.object(subject, "clean_up_hub_dataplane", side_effect=lambda *args: events.append("cleanup"))
+    if failure:
+        expected = {"omission": AssertionError, "cli_error": BadRequestError, "nonzero": CLIInternalError}[failure]
+        with pytest.raises(expected) as raised:
+            getattr(subject, scenario)(hubs)
+        if failure == "cli_error":
+            assert raised.value is error
+    else:
+        getattr(subject, scenario)(hubs)
+    prefix = ["migrate"] if scenario == "test_migrate_dataplane" else ["export", "compare", "cleanup", "import"]
+    suffix = [] if failure else ["compare"] + (["cleanup"] if scenario == "test_migrate_dataplane" else [])
+    assert events == prefix + ["query"] * len(queries) + suffix
+    assert len(queries) == (2 if failure is None else 3 if failure == "omission" else 1)
+    bounded_query_wait.assert_called_once()
+
+
+def test_invalid_export_fails_before_import_or_a_destination_visibility_wait(mocker):
+    owned = subject._OwnedDataplaneState(config_ids=["config"], device_ids=["device"])
+    hubs = [{"name": "origin", "rg": "rg", "filename": "state.json", "state_data": owned}]
+    mocker.patch.object(subject, "DATAPLANE_AUTH_TYPES", ["login"])
+    invoke = mocker.patch.object(subject, "_invoke_state")
+    compare = mocker.patch.object(subject, "compare_hub_dataplane_to_file", side_effect=AssertionError("incomplete export"))
+    ready = mocker.patch.object(subject, "_wait_for_dataplane_query")
+    with pytest.raises(AssertionError, match="incomplete export"):
+        subject.test_export_import_dataplane(hubs)
+    invoke.assert_called_once()
+    assert invoke.call_args.args[0].startswith("iot hub state export")
+    compare.assert_called_once()
+    ready.assert_not_called()
 
 
 def _comparison_read_key(args):

@@ -20,7 +20,9 @@ from msrestazure.azure_exceptions import CloudError
 from azext_iot.common.shared import DeviceAuthApiType
 
 from azext_iot.common.embedded_cli import EmbeddedCLI
-from azext_iot.tests.iothub._integration_helpers import delete_known_devices, invoke_checked
+from azext_iot.tests.iothub._integration_helpers import (
+    QUERY_VISIBILITY_TIMEOUT, delete_known_devices, invoke_checked, wait_for_query_ids,
+)
 from azext_iot.iothub.providers.device_identity import DeviceIdentityProvider
 from azext_iot.tests.iothub.conftest import assign_iot_hub_dataplane_rbac_role, generate_hub_id
 from azext_iot.tests.settings import (
@@ -48,6 +50,8 @@ CONTROLPLANE = "arm"
 MAX_RETRIES = 5
 # An isolated consumer owns both cold setup and shared cleanup, not just the command under test.
 CONTROLPLANE_LIFECYCLE_TIMEOUT = 45 * 60
+# One source-fixture window and one destination window per migration/import auth phase.
+DATAPLANE_LIFECYCLE_TIMEOUT = 900 + QUERY_VISIBILITY_TIMEOUT * (1 + len(DATAPLANE_AUTH_TYPES))
 
 
 def _invoke_state(command: str) -> EmbeddedCLI:
@@ -102,6 +106,15 @@ def generate_device_names(count, edge=False):
 
 def _hub_auth(hub):
     return f"--hub-name {hub['name']} --resource-group {hub['rg']} --auth-type login"
+
+
+def _wait_for_dataplane_query(hub_auth, owned):
+    assert owned.device_ids, "IoT Hub state readiness requires owned device IDs."
+    return wait_for_query_ids(
+        lambda: _invoke_setup(f'iot hub query {hub_auth} -q "select deviceId from devices"').as_json(),
+        owned.device_ids,
+        id_key="deviceId",
+    )
 
 
 def _setup_hub_dataplane_state(hub_auth, owned):
@@ -266,12 +279,11 @@ def setup_hub_states_dataplane(provisioned_iot_hubs_with_storage_user_module, re
             _require_empty_dataplane(hub)
         owned = hubs[0]["state_data"]
         _setup_hub_dataplane_state(_hub_auth(hubs[0]), owned)
+        _wait_for_dataplane_query(_hub_auth(hubs[0]), owned)
         # A failed migration can still have written part of this dataset to an empty destination.
         for hub in hubs[1:]:
             hub["state_data"].config_ids.extend(owned.config_ids)
             hub["state_data"].device_ids.extend(owned.device_ids)
-        # let dataplane state in hub catch up
-        time.sleep(5)
         yield hubs
 
 
@@ -362,6 +374,7 @@ def test_migrate_controlplane(setup_hub_states_controlplane):
 
 
 @pytest.mark.hub_infrastructure(count=2)
+@pytest.mark.timeout(DATAPLANE_LIFECYCLE_TIMEOUT, func_only=False)
 def test_migrate_dataplane(setup_hub_states_dataplane):
     origin_name = setup_hub_states_dataplane[0]["name"]
     origin_rg = setup_hub_states_dataplane[0]["rg"]
@@ -378,7 +391,7 @@ def test_migrate_dataplane(setup_hub_states_dataplane):
             ),
         )
 
-        time.sleep(1)  # gives the hub time to update before the checks
+        _wait_for_dataplane_query(dest_auth, setup_hub_states_dataplane[0]["state_data"])
         compare_hubs_dataplane(origin_auth, dest_auth, setup_hub_states_dataplane[0]["state_data"])
         clean_up_hub_dataplane(setup_hub_states_dataplane[1])
 
@@ -515,6 +528,7 @@ def test_custom_scenarios_controlplane(provisioned_only_iot_hubs_module, provisi
 
 
 @pytest.mark.hub_infrastructure(count=1)
+@pytest.mark.timeout(DATAPLANE_LIFECYCLE_TIMEOUT, func_only=False)
 def test_export_import_dataplane(setup_hub_states_dataplane):
     filename = setup_hub_states_dataplane[0]["filename"]
     hub_name = setup_hub_states_dataplane[0]["name"]
@@ -532,7 +546,6 @@ def test_export_import_dataplane(setup_hub_states_dataplane):
 
     for auth_phase in DATAPLANE_AUTH_TYPES:
         clean_up_hub_dataplane(setup_hub_states_dataplane[0])
-        time.sleep(5)
         _invoke_state(
             set_cmd_auth_type(
                 f"iot hub state import -n {hub_name} -f {quote(filename)} -g {hub_rg} -r --aspects {DATAPLANE}",
@@ -540,7 +553,7 @@ def test_export_import_dataplane(setup_hub_states_dataplane):
                 cstring=None
             ),
         )
-        time.sleep(10)  # gives the hub time to update before the checks
+        _wait_for_dataplane_query(hub_auth, setup_hub_states_dataplane[0]["state_data"])
         compare_hub_dataplane_to_file(filename, hub_auth, setup_hub_states_dataplane[0]["state_data"])
 
 
