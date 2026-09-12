@@ -137,10 +137,10 @@ def test_workflow_failure_propagation_is_wired():
     assert "job.status" in summaries[0]["env"]["COVERAGE_RESULT"]
 
 
-def test_hub_job_budgets_accommodate_the_successful_full_suite_baseline():
+def test_heavy_job_budgets_accommodate_known_resource_lifecycles():
     workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
     jobs = workflow["jobs"]
     matrix = next(step for step in jobs["setup"]["steps"] if step.get("id") == "matrix")
-    budgets = dict(re.findall(r'"(HubMgmt|HubData)\|[^"]+\|(\d+)"', matrix["run"]))
-    assert budgets == {"HubMgmt": "120", "HubData": "120"}
+    budgets = dict(re.findall(r'"(HubMgmt|HubData|ADR)\|[^"]+\|(\d+)"', matrix["run"]))
+    assert budgets == {"HubMgmt": "120", "HubData": "120", "ADR": "120"}
     assert jobs["int-test"]["timeout-minutes"] == "${{ matrix.config.timeout }}"
