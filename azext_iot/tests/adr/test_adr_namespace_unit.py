@@ -592,7 +592,7 @@ def test_namespace_delete_propagates_unrelated_service_error(
         fixture_namespace_provider.delete("namespace", "rg")
 
 
-def test_namespace_delete_not_empty_lists_safe_destructive_cleanup(
+def test_namespace_delete_not_empty_does_not_recommend_deleting_linked_targets(
     fixture_namespace_provider,
 ):
     error = HttpResponseError(
@@ -606,10 +606,10 @@ def test_namespace_delete_not_empty_lists_safe_destructive_cleanup(
     message = str(raised.value)
     assert "job run delete" in message
     assert "ca policy delete" in message
-    assert "link hub delete" in message
-    assert "link dps delete" in message
-    assert "link su delete" in message
-    assert "permanently deletes" in message
+    assert "link hub delete" not in message
+    assert "link dps delete" not in message
+    assert "link su delete" not in message
+    assert "Only remove resources you own" in message
 
 
 def test_namespace_create_preserves_existing_observability(

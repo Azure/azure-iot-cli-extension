@@ -249,8 +249,8 @@ def load_adr_help():
     Certificate policies can only be created under an issuing certificate
     authority with type ICA. Create the ICA under a Root CA, then pass the ICA
     name to --ca-name. The leaf certificate validity period must be between 7
-    and 90 days, inclusive. During the current preview rollout, Central US EUAP
-    may reject values below 30 days even though the contract allows them.
+    and 90 days, inclusive. Use 'ca policy update --validity-days' to change
+    the validity period of an existing policy.
   examples:
     - name: Create a certificate policy with a 30 day leaf certificate validity period
       text: az iot adr ns ca policy create -n myPolicy --ca-name myICA --ns myNamespace -g myResourceGroup --validity-days 30
@@ -330,9 +330,9 @@ def load_adr_help():
   short-summary: Manage links between a Device Registry namespace and downstream resources.
   long-summary: |
     Links live on the namespace, not on the linked IoT Hub, DPS, or Update Instance.
-    Add and update use namespace PATCH. Destructive delete removes the linked Azure
-    resource first and then uses the generated namespace replacement operation because
-    this API exposes no narrow endpoint remove.
+    Add and update use namespace PATCH. Show and list expose each endpoint's
+    top-level linkingState. This group does not provide unlink or composite
+    resource-delete commands; namespace and target lifecycles are managed separately.
   """
 
     helps[
@@ -342,9 +342,8 @@ def load_adr_help():
   short-summary: Manage IoT Hub links (messaging endpoints) on a Device Registry namespace.
   long-summary: |
     A namespace must have a linked DPS before a new Hub can be linked or a failed
-    Hub link can be retried (DPS-first ordering). A successfully linked Hub remains
-    operational and updateable after DPS deletion. Links live on the namespace,
-    not on the IoT Hub resource.
+    Hub link can be retried (DPS-first ordering). Hub updates preserve existing
+    provisioning settings. Links live on the namespace, not on the IoT Hub resource.
   """
 
     helps[
@@ -413,6 +412,8 @@ def load_adr_help():
   examples:
     - name: Show a Hub link by endpoint name
       text: az iot adr ns link hub show -n primary --ns myNamespace -g myResourceGroup
+    - name: Show the endpoint linking state
+      text: az iot adr ns link hub show -n primary --ns myNamespace -g myResourceGroup --query linkingState -o tsv
   """
 
     helps[
@@ -423,24 +424,10 @@ def load_adr_help():
   examples:
     - name: List all Hub links on a namespace
       text: az iot adr ns link hub list --ns myNamespace -g myResourceGroup
-  """
-
-    helps[
-        "iot adr ns link hub delete"
-    ] = """
-  type: command
-  short-summary: Permanently delete a linked IoT Hub and update the namespace.
-  long-summary: |
-    Permanently deletes the actual IoT Hub resource referenced by the named link,
-    then removes that messaging endpoint from the Device Registry namespace. Role
-    assignments are not deleted. Immediately before namespace replacement, the command
-    re-reads the namespace, preserves its latest unrelated state, and aborts if the named
-    endpoint was repointed. The generated API exposes no ETag/If-Match for this replacement,
-    so a narrower race after that final read cannot be eliminated. This operation cannot
-    be undone.
-  examples:
-    - name: Delete the linked IoT Hub and update the namespace without prompting
-      text: az iot adr ns link hub delete -n primary --ns myNamespace -g myResourceGroup --yes
+    - name: List endpoint names and linking states
+      text: az iot adr ns link hub list --ns myNamespace -g myResourceGroup --query "[].{name:name,linkingState:linkingState}"
+    - name: List failed Hub endpoints
+      text: az iot adr ns link hub list --ns myNamespace -g myResourceGroup --query "[?linkingState=='Failed']"
   """
 
     helps[
@@ -525,6 +512,8 @@ def load_adr_help():
   examples:
     - name: Show a DPS link by endpoint name (with brownfield Hubs when accessible)
       text: az iot adr ns link dps show -n primary --ns myNamespace -g myResourceGroup
+    - name: Show the endpoint linking state
+      text: az iot adr ns link dps show -n primary --ns myNamespace -g myResourceGroup --query linkingState -o tsv
   """
 
     helps[
@@ -535,25 +524,10 @@ def load_adr_help():
   examples:
     - name: List all DPS links on a namespace
       text: az iot adr ns link dps list --ns myNamespace -g myResourceGroup
-  """
-
-    helps[
-        "iot adr ns link dps delete"
-    ] = """
-  type: command
-  short-summary: Permanently delete a linked DPS and update the namespace.
-  long-summary: |
-    Permanently deletes the actual Device Provisioning Service resource referenced
-    by the named link, then removes that provisioning endpoint from the Device
-    Registry namespace. Hub links do not block this command. Role assignments are
-    not deleted. Successfully linked Hubs remain operational and updateable, but
-    adding a new Hub or retrying a failed Hub requires linking another DPS first.
-    The namespace is re-read immediately before replacement; latest unrelated state
-    is preserved and a repointed endpoint causes an abort. The generated API has no
-    ETag/If-Match, so a narrower post-read race remains. This operation cannot be undone.
-  examples:
-    - name: Delete the linked DPS and update the namespace without prompting
-      text: az iot adr ns link dps delete -n primary --ns myNamespace -g myResourceGroup --yes
+    - name: List endpoint names and linking states
+      text: az iot adr ns link dps list --ns myNamespace -g myResourceGroup --query "[].{name:name,linkingState:linkingState}"
+    - name: List failed DPS endpoints
+      text: az iot adr ns link dps list --ns myNamespace -g myResourceGroup --query "[?linkingState=='Failed']"
   """
 
     helps[
@@ -590,7 +564,7 @@ def load_adr_help():
   long-summary: |
     Adds a Software Updates updating endpoint entry under the namespace's properties.updating.endpoints.
     Only one Software Updates instance may be linked per namespace. If one is already
-    linked, use 'link su update' to modify it or destructive 'link su delete' to replace it.
+    linked, use 'link su update' to modify the existing endpoint.
     Exactly one of --system-assigned-mi or --user-assigned-mi must be provided to set the
     inbound caller identity that the update instance will use to call back into the namespace.
     Required service-to-service roles: {format_role_requirements("su")}.
@@ -638,6 +612,8 @@ def load_adr_help():
   examples:
     - name: Show a Software Updates link by endpoint name
       text: az iot adr ns link su show -n my-su --ns myNamespace -g myResourceGroup
+    - name: Show the endpoint linking state
+      text: az iot adr ns link su show -n my-su --ns myNamespace -g myResourceGroup --query linkingState -o tsv
   """
 
     helps[
@@ -648,23 +624,10 @@ def load_adr_help():
   examples:
     - name: List all Software Updates links on a namespace
       text: az iot adr ns link su list --ns myNamespace -g myResourceGroup
-  """
-
-    helps[
-        "iot adr ns link su delete"
-    ] = """
-  type: command
-  short-summary: Permanently delete a linked Update Instance and update the namespace.
-  long-summary: |
-    Permanently deletes the actual Microsoft.DeviceUpdate/updateInstances resource
-    referenced by the named link, then removes that updating endpoint from the
-    Device Registry namespace. Role assignments are not deleted. The namespace is
-    re-read immediately before replacement; latest unrelated state is preserved and
-    a repointed endpoint causes an abort. The generated API has no ETag/If-Match, so
-    a narrower post-read race remains. This operation cannot be undone.
-  examples:
-    - name: Delete the linked Update Instance and update the namespace without prompting
-      text: az iot adr ns link su delete -n my-su --ns myNamespace -g myResourceGroup --yes
+    - name: List endpoint names and linking states
+      text: az iot adr ns link su list --ns myNamespace -g myResourceGroup --query "[].{name:name,linkingState:linkingState}"
+    - name: List failed Software Updates endpoints
+      text: az iot adr ns link su list --ns myNamespace -g myResourceGroup --query "[?linkingState=='Failed']"
   """
 
     helps[
@@ -1495,196 +1458,6 @@ def load_adr_help():
 
     helps.update(
         {
-            "iot adr ns registry-device": """
-  type: group
-  short-summary: Manage Registry Devices in a Device Registry namespace.
-  long-summary: Registry Devices are distinct from Namespace Devices and expose service-materialized authentication profiles, attributes, and capabilities.
-  examples:
-    - name: List Registry Devices
-      text: az iot adr ns registry-device list --ns myNamespace -g myResourceGroup
-  """,
-            "iot adr ns registry-device create": """
-  type: command
-  short-summary: Create a Registry Device.
-  examples:
-    - name: Create an enabled Registry Device
-      text: az iot adr ns registry-device create -n myDevice --ns myNamespace -g myResourceGroup --enablement-state Enabled --external-device-id edge-01
-  """,
-            "iot adr ns registry-device show": """
-  type: command
-  short-summary: Show a Registry Device by resource name or external device ID.
-  long-summary: |
-    Specify exactly one of --name or --external-device-id. External-ID lookup
-    follows every page and fails if the value is missing or is not unique.
-  examples:
-    - name: Show a Registry Device
-      text: az iot adr ns registry-device show -n myDevice --ns myNamespace -g myResourceGroup
-    - name: Show a Registry Device by external device ID
-      text: az iot adr ns registry-device show --external-device-id edge-01 --ns myNamespace -g myResourceGroup
-  """,
-            "iot adr ns registry-device list": """
-  type: command
-  short-summary: List Registry Devices in a namespace.
-  examples:
-    - name: List Registry Devices
-      text: az iot adr ns registry-device list --ns myNamespace -g myResourceGroup
-  """,
-            "iot adr ns registry-device update": """
-  type: command
-  short-summary: Update writable Registry Device properties.
-  examples:
-    - name: Disable a Registry Device
-      text: az iot adr ns registry-device update -n myDevice --ns myNamespace -g myResourceGroup --enablement-state Disabled
-  """,
-            "iot adr ns registry-device delete": """
-  type: command
-  short-summary: Delete a Registry Device.
-  examples:
-    - name: Delete a Registry Device without prompting
-      text: az iot adr ns registry-device delete -n myDevice --ns myNamespace -g myResourceGroup --yes
-  """,
-            "iot adr ns registry-device wait": """
-  type: command
-  short-summary: Wait for a Registry Device to reach a desired state.
-  long-summary: |
-    Specify exactly one of --name or --external-device-id. Without an explicit
-    predicate, waits for provisioningState Succeeded. Using
-    --external-device-id provides a bounded materialization wait controlled by
-    --timeout and --interval.
-  examples:
-    - name: Wait until a Registry Device succeeds
-      text: az iot adr ns registry-device wait -n myDevice --ns myNamespace -g myResourceGroup
-    - name: Wait for a registration-created device to materialize
-      text: az iot adr ns registry-device wait --external-device-id edge-01 --ns myNamespace -g myResourceGroup --timeout 300 --interval 10
-  """,
-            "iot adr ns registry-device auth": """
-  type: group
-  short-summary: Inspect authentication profiles materialized beneath a Registry Device.
-  examples:
-    - name: List authentication profiles
-      text: az iot adr ns registry-device auth list --registry-device-name myDevice --ns myNamespace -g myResourceGroup
-  """,
-            "iot adr ns registry-device auth list": """
-  type: command
-  short-summary: List Registry Device authentication profiles.
-  examples:
-    - name: List authentication profiles
-      text: az iot adr ns registry-device auth list --registry-device-name myDevice --ns myNamespace -g myResourceGroup
-  """,
-            "iot adr ns registry-device auth show": """
-  type: command
-  short-summary: Show a Registry Device authentication profile.
-  examples:
-    - name: Show an authentication profile
-      text: az iot adr ns registry-device auth show -n default --registry-device-name myDevice --ns myNamespace -g myResourceGroup
-  """,
-            "iot adr ns registry-device auth show-keys": """
-  type: command
-  short-summary: Retrieve plaintext keys for a symmetric-key authentication profile.
-  long-summary: The response contains secrets. Store and display it securely. The command rejects non-SymmetricKey profiles before requesting keys.
-  examples:
-    - name: Retrieve symmetric keys
-      text: az iot adr ns registry-device auth show-keys -n default --registry-device-name myDevice --ns myNamespace -g myResourceGroup
-  """,
-            "iot adr ns registry-device auth revoke-certs": """
-  type: command
-  short-summary: Revoke Microsoft-managed certificates for an authentication profile.
-  long-summary: This destructive action applies only to CertificateAuthoritySignedX509Certificate profiles and requires confirmation unless --yes is supplied.
-  examples:
-    - name: Revoke certificates without prompting
-      text: az iot adr ns registry-device auth revoke-certs -n default --registry-device-name myDevice --ns myNamespace -g myResourceGroup --yes
-  """,
-            "iot adr ns registry-device auth wait": """
-  type: command
-  short-summary: Wait for a Registry Device authentication profile condition.
-  long-summary: Without an explicit wait predicate, waits until the profile exists.
-  examples:
-    - name: Wait until an authentication profile exists
-      text: az iot adr ns registry-device auth wait -n default --registry-device-name myDevice --ns myNamespace -g myResourceGroup
-  """,
-            "iot adr ns registry-device attribute": """
-  type: group
-  short-summary: Manage Registry Device attributes.
-  long-summary: >
-    Attributes store cloud-side metadata for a device, separate from live telemetry.
-    Customer-authored attributes are always serialized with reportedBy='User'.
-    Microsoft.DeviceUpdate is reserved for backend-materialized attributes, which
-    remain readable through list and show.
-  examples:
-    - name: List attributes
-      text: az iot adr ns registry-device attribute list --registry-device-name myDevice --ns myNamespace -g myResourceGroup
-  """,
-            "iot adr ns registry-device attribute create": """
-  type: command
-  short-summary: Create or replace a Registry Device attribute.
-  long-summary: >
-    The command performs a full replace (PUT). Any property omitted from --properties is
-    removed. --properties accepts inline JSON, a plain JSON file path, or a file path
-    with one leading '@'. reportedBy is always 'User'; attempts to author the
-    service-owned Microsoft.DeviceUpdate value are rejected before mutation.
-  examples:
-    - name: Create a user-authored attribute from inline JSON
-      text: >
-        az iot adr ns registry-device attribute create -n siteInfo --registry-device-name myDevice
-        --ns myNamespace -g myResourceGroup --properties '{"site": "plant-3", "rack": 12}'
-    - name: Create a user-authored attribute from a JSON file and advertise its schema
-      text: >
-        az iot adr ns registry-device attribute create -n siteInfo --registry-device-name myDevice
-        --ns myNamespace -g myResourceGroup --properties @./site.json
-        --schema https://contoso.com/schemas/site.json
-  """,
-            "iot adr ns registry-device attribute list": """
-  type: command
-  short-summary: List Registry Device attributes.
-  examples:
-    - name: List attributes
-      text: az iot adr ns registry-device attribute list --registry-device-name myDevice --ns myNamespace -g myResourceGroup
-  """,
-            "iot adr ns registry-device attribute show": """
-  type: command
-  short-summary: Show a Registry Device attribute.
-  long-summary: >
-    The Azure Device Update attribute is materialized by the service under the
-    canonical resource name 'update'. This command also accepts 'software-update'
-    as an alias, applied only when no attribute matches the name you supplied.
-    The alias is specific to this command; 'list' and 'delete' use canonical names
-    only, and the returned resource still reports its canonical 'name' and 'id'.
-  examples:
-    - name: Show an attribute
-      text: az iot adr ns registry-device attribute show -n agent --registry-device-name myDevice --ns myNamespace -g myResourceGroup
-    - name: Show the Azure Device Update attribute by its canonical name
-      text: az iot adr ns registry-device attribute show -n update --registry-device-name myDevice --ns myNamespace -g myResourceGroup
-    - name: Show the Azure Device Update attribute using the software-update alias
-      text: az iot adr ns registry-device attribute show -n software-update --registry-device-name myDevice --ns myNamespace -g myResourceGroup
-  """,
-            "iot adr ns registry-device attribute delete": """
-  type: command
-  short-summary: Delete a Registry Device attribute.
-  examples:
-    - name: Delete a user-authored attribute
-      text: az iot adr ns registry-device attribute delete -n siteInfo --registry-device-name myDevice --ns myNamespace -g myResourceGroup
-  """,
-            "iot adr ns registry-device capability": """
-  type: group
-  short-summary: Inspect read-only Registry Device capabilities.
-  examples:
-    - name: List capabilities
-      text: az iot adr ns registry-device capability list --registry-device-name myDevice --ns myNamespace -g myResourceGroup
-  """,
-            "iot adr ns registry-device capability list": """
-  type: command
-  short-summary: List read-only Registry Device capabilities.
-  examples:
-    - name: List capabilities
-      text: az iot adr ns registry-device capability list --registry-device-name myDevice --ns myNamespace -g myResourceGroup
-  """,
-            "iot adr ns registry-device capability show": """
-  type: command
-  short-summary: Show a read-only Registry Device capability.
-  examples:
-    - name: Show a capability
-      text: az iot adr ns registry-device capability show -n iothub --registry-device-name myDevice --ns myNamespace -g myResourceGroup
-  """,
             "iot adr ns identity": """
   type: group
   short-summary: Manage identities assigned to a Device Registry namespace.

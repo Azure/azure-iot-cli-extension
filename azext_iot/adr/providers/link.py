@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import Callable, Optional
+from typing import Optional
 
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
@@ -40,10 +40,8 @@ from azext_iot.adr.providers.link_helpers import (
     resolve_inbound_identity as _resolve_inbound_identity,
 )
 from azext_iot.adr.providers.link_persistence import (
-    delete_linked_resource_and_endpoint,
     get_typed_endpoint,
     patch_namespace_endpoints,
-    wait_for_linked_resource_deleted,
 )
 from azext_iot.adr.providers.link_preflight import (
     TargetLookup,
@@ -62,7 +60,6 @@ from azext_iot.adr.topology import (
     hub_endpoint_count,
     is_failed_hub_endpoint,
 )
-from azext_iot.constants import LRO_POLL_WAIT_SEC
 
 logger = get_logger(__name__)
 
@@ -157,49 +154,6 @@ class LinkProvider(ADRProvider):
             endpoint_type,
             namespace_name,
             display_name,
-        )
-
-    @staticmethod
-    def _wait_for_linked_resource_deleted(
-        get_operation: Callable,
-        wait_sec: int = LRO_POLL_WAIT_SEC,
-    ):
-        return wait_for_linked_resource_deleted(
-            get_operation,
-            wait_sec=wait_sec,
-        )
-
-    def _delete_link(
-        self,
-        endpoint_name: str,
-        namespace_name: str,
-        resource_group_name: str,
-        section: str,
-        endpoint_type: str,
-        display_name: str,
-        parse_linked_resource_id: Callable,
-        operations_factory: Callable,
-        operation_group_name: str,
-        delete_name_parameter: str,
-        **kwargs,
-    ):
-        return delete_linked_resource_and_endpoint(
-            cli_ctx=self.cmd.cli_ctx,
-            client=self.client,
-            get_namespace=self._get_namespace,
-            await_terminal=self._await_terminal,
-            wait_for_deleted=self._wait_for_linked_resource_deleted,
-            endpoint_name=endpoint_name,
-            namespace_name=namespace_name,
-            resource_group_name=resource_group_name,
-            section=section,
-            endpoint_type=endpoint_type,
-            display_name=display_name,
-            parse_linked_resource_id=parse_linked_resource_id,
-            operations_factory=operations_factory,
-            operation_group_name=operation_group_name,
-            delete_name_parameter=delete_name_parameter,
-            **kwargs,
         )
 
     def _patch_endpoints(
@@ -341,28 +295,6 @@ class LinkProvider(ADRProvider):
             status_message=(
                 f"Updating messaging endpoints on namespace {namespace_name}..."
             ),
-            **kwargs,
-        )
-
-    def hub_delete(
-        self,
-        endpoint_name: str,
-        namespace_name: str,
-        resource_group_name: str,
-        **kwargs,
-    ):
-        """Delete a linked IoT Hub and remove its namespace endpoint."""
-        return self._delete_link(
-            endpoint_name=endpoint_name,
-            namespace_name=namespace_name,
-            resource_group_name=resource_group_name,
-            section="messaging",
-            endpoint_type=IOT_HUB_ENDPOINT_TYPE,
-            display_name="Hub",
-            parse_linked_resource_id=_parse_hub_resource_id,
-            operations_factory=adr_iot_hub_service_factory,
-            operation_group_name="iot_hub_resource",
-            delete_name_parameter="resource_name",
             **kwargs,
         )
 
@@ -555,28 +487,6 @@ class LinkProvider(ADRProvider):
             **kwargs,
         )
 
-    def dps_delete(
-        self,
-        endpoint_name: str,
-        namespace_name: str,
-        resource_group_name: str,
-        **kwargs,
-    ):
-        """Delete a linked DPS and remove its namespace endpoint."""
-        return self._delete_link(
-            endpoint_name=endpoint_name,
-            namespace_name=namespace_name,
-            resource_group_name=resource_group_name,
-            section="provisioning",
-            endpoint_type=DPS_ENDPOINT_TYPE,
-            display_name="DPS",
-            parse_linked_resource_id=_parse_dps_resource_id,
-            operations_factory=adr_iot_service_provisioning_factory,
-            operation_group_name="iot_dps_resource",
-            delete_name_parameter="provisioning_service_name",
-            **kwargs,
-        )
-
     def dps_show(self, endpoint_name: str, namespace_name: str, resource_group_name: str):
         """Project a single DPS provisioning endpoint, enriched with the DPS RP's existing IoT Hub registrations."""
         ns = self._get_namespace(namespace_name, resource_group_name)
@@ -710,28 +620,6 @@ class LinkProvider(ADRProvider):
                 "Updating software update endpoints on namespace "
                 f"{namespace_name}..."
             ),
-            **kwargs,
-        )
-
-    def su_delete(
-        self,
-        endpoint_name: str,
-        namespace_name: str,
-        resource_group_name: str,
-        **kwargs,
-    ):
-        """Delete a linked Update Instance and remove its namespace endpoint."""
-        return self._delete_link(
-            endpoint_name=endpoint_name,
-            namespace_name=namespace_name,
-            resource_group_name=resource_group_name,
-            section="updating",
-            endpoint_type=SU_ENDPOINT_TYPE,
-            display_name="Software update",
-            parse_linked_resource_id=_parse_su_resource_id,
-            operations_factory=adr_update_instance_service_factory,
-            operation_group_name="update_instances",
-            delete_name_parameter="update_instance_name",
             **kwargs,
         )
 

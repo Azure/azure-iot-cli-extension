@@ -15,7 +15,6 @@ from azext_iot.adr.providers.job import JobProvider
 from azext_iot.adr.providers.job_run import JobRunProvider
 from azext_iot.adr.providers.link import LinkProvider
 from azext_iot.adr.providers.namespace import NamespaceProvider
-from azext_iot.adr.providers.registry_device import RegistryDeviceProvider
 from azext_iot.adr.providers.software_update import SoftwareUpdateProvider
 from azext_iot.adr.providers.update_instance import UpdateInstanceProvider
 from azext_iot.adr.providers.wait import (
@@ -137,74 +136,6 @@ def adr_ca_policy_wait(
             resource_group_name,
         ),
         provisioning_succeeded,
-        timeout,
-        interval,
-        created,
-        updated,
-        deleted,
-        exists,
-        custom,
-    )
-
-
-def adr_registry_device_wait(
-    cmd,
-    namespace_name: str,
-    resource_group_name: str,
-    registry_device_name: Optional[str] = None,
-    external_device_id: Optional[str] = None,
-    timeout: int = DEFAULT_WAIT_TIMEOUT,
-    interval: int = DEFAULT_WAIT_INTERVAL,
-    created: bool = False,
-    updated: bool = False,
-    deleted: bool = False,
-    exists: bool = False,
-    custom: Optional[str] = None,
-):
-    provider = RegistryDeviceProvider(cmd)
-    return _wait(
-        cmd,
-        lambda: provider.show(
-            namespace_name=namespace_name,
-            resource_group_name=resource_group_name,
-            registry_device_name=registry_device_name,
-            external_device_id=external_device_id,
-        ),
-        provisioning_succeeded,
-        timeout,
-        interval,
-        created,
-        updated,
-        deleted,
-        exists,
-        custom,
-    )
-
-
-def adr_registry_device_auth_wait(
-    cmd,
-    authentication_profile_name: str,
-    registry_device_name: str,
-    namespace_name: str,
-    resource_group_name: str,
-    timeout: int = DEFAULT_WAIT_TIMEOUT,
-    interval: int = DEFAULT_WAIT_INTERVAL,
-    created: bool = False,
-    updated: bool = False,
-    deleted: bool = False,
-    exists: bool = False,
-    custom: Optional[str] = None,
-):
-    provider = RegistryDeviceProvider(cmd)
-    return _wait(
-        cmd,
-        lambda: provider.auth_show(
-            authentication_profile_name,
-            registry_device_name,
-            namespace_name,
-            resource_group_name,
-        ),
-        resource_exists,
         timeout,
         interval,
         created,

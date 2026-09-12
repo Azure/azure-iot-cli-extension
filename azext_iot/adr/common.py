@@ -38,47 +38,6 @@ class GroupType(Enum):
     registry_device = "RegistryDevice"
 
 
-class RegistryDeviceEnablementState(Enum):
-    enabled = "Enabled"
-    disabled = "Disabled"
-
-
-class RegistryDeviceAuthenticationType(Enum):
-    certificate_authority_signed_x509_certificate = (
-        "CertificateAuthoritySignedX509Certificate"
-    )
-    self_signed_x509_certificate = "SelfSignedX509Certificate"
-    symmetric_key = "SymmetricKey"
-
-
-class DeviceAttributeReportedType(Enum):
-    """Cloud service that reports a Registry Device attribute.
-
-    `Microsoft.DeviceUpdate` attributes are service-materialized; customers
-    author `User` attributes.
-    """
-
-    adu = "Microsoft.DeviceUpdate"
-    user = "User"
-
-
-# Azure Device Update materializes its device attribute under this reserved ARM
-# resource name. The name is service-owned: it is the URL path segment and is
-# echoed back in the resource's `name` and `id`, so the CLI cannot rename it.
-ADU_ATTRIBUTE_NAME = "update"
-
-
-def is_adu_attribute_alias(attribute_name: str) -> bool:
-    """Return True for the friendlier `software-update` spellings of `update`.
-
-    `az iot adr ns registry-device attribute show` accepts these as an alias.
-    Matching is case-insensitive and ignores `-` and `_`, so `software-update`,
-    `software_update` and `softwareUpdate` all qualify.
-    """
-    normalized = attribute_name.replace("-", "").replace("_", "").lower()
-    return normalized == "softwareupdate"
-
-
 class JobType(Enum):
     software_update = "SoftwareUpdate"
     onboarding_update = "OnboardingUpdate"

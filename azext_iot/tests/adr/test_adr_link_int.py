@@ -17,7 +17,7 @@ Validates the namespace-linking surface exposed as ``iot adr ns link ...``:
 * ``link su add / update / show / list`` — Software Updates updating
   endpoints with UAMI/SAMI identity rotation. Optionally set
   ``azext_iot_adr_update_instance_id`` to a pre-provisioned Update Instance
-  resource ID explicitly marked disposable; otherwise the test creates one.
+  resource ID that cleanup will preserve; otherwise the test creates one.
 
 These tests require real Hub and DPS resources to be linked to a real ADR
 namespace, so they re-use :class:`ADRFullInfraHelper` to provision the full
@@ -35,12 +35,11 @@ What is intentionally NOT covered here (covered by unit tests):
 import os
 import re
 import shlex
-import sys
 import time
 from typing import Optional
 
 import pytest
-from azure.cli.core.azclierror import ArgumentUsageError
+from azure.cli.core.azclierror import ArgumentUsageError, RequiredArgumentMissingError
 from msrestazure.tools import is_valid_resource_id, parse_resource_id
 
 from azext_iot.tests.adr import ADRLiveScenarioTest
@@ -63,10 +62,9 @@ from azext_iot.tests.adr.conftest import (
 )
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests.settings import HUB_TEST_LOCATION
-from azext_iot.adr.providers.link_helpers import failed_link_recovery_commands
+from azext_iot.adr.providers.link_helpers import MI_REQUIRED_MSG, failed_link_recovery_commands
 from azext_iot.adr.topology import (
     DPS_CAP_EXCEEDED_MSG,
-    DPS_REQUIRED_MSG,
     SU_CAP_EXCEEDED_MSG,
 )
 from azext_iot.adr.rbac import LINK_ROLE_MATRIX, LinkRbacManager
@@ -74,9 +72,6 @@ from azext_iot.adr.rbac import LINK_ROLE_MATRIX, LinkRbacManager
 
 _SU_UPDATE_INSTANCE_ENV = "azext_iot_adr_update_instance_id"
 _SU_UPDATE_INSTANCE_ID = os.getenv(_SU_UPDATE_INSTANCE_ENV, "").strip()
-_SU_UPDATE_INSTANCE_DISPOSABLE = os.getenv(
-    "azext_iot_adr_update_instance_disposable", ""
-).lower() in {"1", "true", "yes"}
 _LINKING_POLL_ATTEMPTS = int(
     os.getenv("azext_iot_adr_su_link_poll_attempts", "240")
 )
@@ -156,10 +151,7 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
     5. Step 5-6: tertiary Hub linked with **SAMI** + multi-hub list assertion
     6. Step 7-8: ``link hub update`` rotates inbound identities
     7. Step 9: ``link dps update`` rotates DPS identity
-    8. Step 10: ``link dps delete`` permanently deletes the disposable DPS
-       while Hub links remain, then removes only the DPS endpoint
-    9. Step 11: ``link hub delete`` permanently deletes both disposable Hubs
-       and removes their namespace endpoints
+    Cleanup deletes only the namespace, targets and identity created by this test.
     """
 
     def test_adr_link_lifecycle(self):
@@ -204,7 +196,7 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                     f"--user-assigned-mi {identity_resource_id}"
                 )
                 _log(LogKind.CMD, "az %s", cmd)
-                self.cmd(cmd)
+                self.create_owned_resource(cmd, kind="dps", name=dps_name, resource_group=rg)
                 _log(LogKind.RESULT, "DPS '%s' created", dps_name)
 
                 dps_show = self.cmd(f"iot dps show --name {dps_name} -g {rg}").get_output_in_json()
@@ -269,7 +261,9 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                     "--disable-local-auth true"
                 )
                 _log(LogKind.CMD, "az %s", hub_cmd)
-                hub = self.cmd(hub_cmd).get_output_in_json()
+                hub = self.create_owned_resource(
+                    hub_cmd, kind="hub", name=secondary_hub, resource_group=rg,
+                ).get_output_in_json()
                 hub_id = hub["id"]
                 hub_identity_types = {
                     identity_type.strip()
@@ -424,7 +418,9 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                     "--disable-local-auth true"
                 )
                 _log(LogKind.CMD, "az %s", hub_cmd)
-                hub = self.cmd(hub_cmd).get_output_in_json()
+                hub = self.create_owned_resource(
+                    hub_cmd, kind="hub", name=tertiary_hub, resource_group=rg,
+                ).get_output_in_json()
                 tertiary_hub_id = hub["id"]
                 _log(LogKind.RESULT, "Tertiary Hub '%s' created (SAMI)", tertiary_hub)
 
@@ -559,113 +555,10 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                 )
                 _log(LogKind.OK, "DPS link identity rotated (idempotent)")
 
-            with timed_step(
-                "Step 10 ❯ link dps delete while Hub links remain"
-            ):
-                self.cmd(
-                    f"iot adr ns link dps delete --ns {namespace_name} "
-                    f"-g {rg} -n {dps_endpoint} --yes"
-                )
-                self.cmd(
-                    f"iot dps show --name {dps_name} -g {rg}",
-                    expect_failure=True,
-                )
-                assert self.cmd(
-                    f"iot adr ns link dps list --ns {namespace_name} -g {rg}"
-                ).get_output_in_json() == []
-                remaining_hubs = _names_in(
-                    self.cmd(
-                        f"iot adr ns link hub list --ns {namespace_name} -g {rg}"
-                    ).get_output_in_json()
-                )
-                assert {
-                    secondary_endpoint,
-                    tertiary_endpoint,
-                }.issubset(remaining_hubs)
-
-                succeeded_hub = self.cmd(
-                    f"iot adr ns link hub show --ns {namespace_name} "
-                    f"-g {rg} -n {secondary_endpoint}"
-                ).get_output_in_json()
-                assert succeeded_hub.get("name") == secondary_endpoint
-                assert succeeded_hub.get("resourceId") == hub_id
-
-                # A successful Hub remains updateable after DPS deletion.
-                self.cmd(
-                    f"iot adr ns link hub update --ns {namespace_name} "
-                    f"-g {rg} -n {secondary_endpoint} "
-                    f"--user-assigned-mi {identity_resource_id}"
-                )
-                _wait_for_linking_succeeded(
-                    self,
-                    "hub",
-                    namespace_name,
-                    rg,
-                    secondary_endpoint,
-                    expected_identity_type="UserAssigned",
-                )
-
-                command = (
-                    f"iot adr ns link hub add --ns {namespace_name} -g {rg} "
-                    f"-n rejected-after-dps-delete --hub-id {hub_id}"
-                )
-                _assert_cli_failure(self, command, DPS_REQUIRED_MSG)
-                _log(
-                    LogKind.OK,
-                    "DPS deleted; successful Hubs remain readable while new "
-                    "Hub additions are rejected",
-                )
-
-            with timed_step(
-                "Step 11 ❯ link hub delete (disposable linked resources)"
-            ):
-                for endpoint, hub_name in (
-                    (secondary_endpoint, secondary_hub),
-                    (tertiary_endpoint, tertiary_hub),
-                ):
-                    self.cmd(
-                        f"iot adr ns link hub delete --ns {namespace_name} "
-                        f"-g {rg} -n {endpoint} --yes"
-                    )
-                    self.cmd(
-                        f"iot hub show -n {hub_name} -g {rg}",
-                        expect_failure=True,
-                    )
-                remaining_hubs = _names_in(
-                    self.cmd(
-                        f"iot adr ns link hub list --ns {namespace_name} -g {rg}"
-                    ).get_output_in_json()
-                )
-                assert secondary_endpoint not in remaining_hubs
-                assert tertiary_endpoint not in remaining_hubs
-                _log(
-                    LogKind.OK,
-                    "Both linked Hub resources and selected endpoints deleted",
-                )
-
             _log(LogKind.OK, "Link lifecycle passed")
 
         finally:
-            self.cleanup_full_infra(
-                resource_group=rg,
-                hub_name=primary_hub,
-                namespace_name=namespace_name,
-                identity_name=identity_name,
-                dps_name=dps_name,
-                linked_endpoints=[
-                    ("hub", secondary_endpoint),
-                    ("hub", tertiary_endpoint),
-                    ("dps", dps_endpoint),
-                ],
-            )
-            # Best-effort cleanup of the secondary + tertiary Hubs
-            for label, hub in (("secondary", secondary_hub), ("tertiary", tertiary_hub)):
-                with timed_step(f"Cleanup ❯ Delete {label} Hub"):
-                    try:
-                        self.cmd(f"iot hub delete -n {hub} -g {rg}")
-                        _log(LogKind.RESULT, "%s Hub deleted", label.capitalize())
-                    except Exception as e:
-                        _log(LogKind.WARN, "%s Hub cleanup failed: %s", label.capitalize(), e)
+            self.cleanup_full_infra()
 
 
 @pytest.mark.usefixtures("set_cwd")
@@ -737,28 +630,32 @@ class TestADRLinkBundledAdd(ADRFullInfraHelper, ADRLiveScenarioTest):
             # want the namespace to start with zero linked endpoints so we can
             # observe the bundled add adding both at once.
             with timed_step("Setup 1/4 ❯ Create UAMI"):
-                identity = self.cmd(
-                    f"identity create -n {identity_name} -g {rg} --location {TEST_LOCATION}"
+                identity = self.create_owned_resource(
+                    f"identity create -n {identity_name} -g {rg} --location {TEST_LOCATION}",
+                    kind="identity", name=identity_name, resource_group=rg,
                 ).get_output_in_json()
                 identity_resource_id = identity["id"]
 
             with timed_step("Setup 2/4 ❯ Create ADR namespace (no Hub link)"):
-                self.cmd(
-                    f"iot adr ns create -n {namespace_name} -g {rg} --location {TEST_LOCATION}"
+                self.create_owned_resource(
+                    f"iot adr ns create -n {namespace_name} -g {rg} --location {TEST_LOCATION}",
+                    kind="namespace", name=namespace_name, resource_group=rg,
                 )
 
             with timed_step("Setup 3/4 ❯ Create standalone Standard Hub"):
-                hub = self.cmd(
+                hub = self.create_owned_resource(
                     f"iot hub create -n {hub_name} -g {rg} --sku S1 --location {HUB_TEST_LOCATION} "
                     f"--user-assigned-mi {identity_resource_id} "
-                    "--disable-local-auth true"
+                    "--disable-local-auth true",
+                    kind="hub", name=hub_name, resource_group=rg,
                 ).get_output_in_json()
                 hub_id = hub["id"]
 
             with timed_step("Setup 4/4 ❯ Create standalone DPS"):
-                dps = self.cmd(
+                dps = self.create_owned_resource(
                     f"iot dps create --name {dps_name} -g {rg} --location {TEST_LOCATION} --disable-local-auth true "
-                    f"--user-assigned-mi {identity_resource_id}"
+                    f"--user-assigned-mi {identity_resource_id}",
+                    kind="dps", name=dps_name, resource_group=rg,
                 ).get_output_in_json()
                 dps_id = dps["id"]
 
@@ -811,17 +708,7 @@ class TestADRLinkBundledAdd(ADRFullInfraHelper, ADRLiveScenarioTest):
                 _log(LogKind.OK, "Bundled add produced both endpoints")
 
         finally:
-            self.cleanup_full_infra(
-                resource_group=rg,
-                hub_name=hub_name,
-                namespace_name=namespace_name,
-                identity_name=identity_name,
-                dps_name=dps_name,
-                linked_endpoints=[
-                    ("hub", "primary"),
-                    ("dps", "dps-primary"),
-                ],
-            )
+            self.cleanup_full_infra()
 
 
 @pytest.mark.usefixtures("set_cwd")
@@ -831,8 +718,8 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
     Mirrors the Hub/DPS link lifecycle for the ``iot adr ns link su`` surface:
 
     Resolve the ADU first-party principal before provisioning any test resources.
-    1. Create a disposable Update Instance with SAMI and UAMI identities, or use
-       the explicitly disposable ``azext_iot_adr_update_instance_id`` fixture.
+    1. Create an Update Instance with SAMI and UAMI identities, or borrow
+       ``azext_iot_adr_update_instance_id`` without deleting it during cleanup.
     2. Create an ADR namespace and authorize the update instance identities.
     3. Step 1: ``link su add`` (UAMI) attaches the Software Updates updating endpoint.
     4. Step 2: ``link su show`` / ``list`` surface the single entry.
@@ -852,9 +739,10 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
         namespace_name = generate_adr_namespace_name()
         denied_namespace_name = generate_adr_namespace_name()
         su_endpoint = "su-primary"
-        su_deleted = False
         owned_identity_name = None
         su_id = _SU_UPDATE_INSTANCE_ID or None
+        is_owned_su = not su_id
+        requested_identity_id = None
         su_name = None
         su_rg = rg
 
@@ -866,11 +754,6 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
             properties = endpoint.get("properties") or endpoint
             return (properties.get("inboundCallerIdentity") or {}).get("type")
 
-        if su_id and not _SU_UPDATE_INSTANCE_DISPOSABLE:
-            pytest.skip(
-                "azext_iot_adr_update_instance_id must be explicitly marked "
-                "disposable because link su delete removes the resource."
-            )
         with timed_step("Preflight > Resolve ADU first-party service principal"):
             subscription_id = (
                 parse_resource_id(su_id)["subscription"] if su_id else TEST_SUBSCRIPTION
@@ -880,17 +763,20 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
                 subscription_id
             )
         try:
-            if not su_id:
+            if is_owned_su:
                 owned_identity_name = generate_identity_name()
-                identity = self.cmd(
+                identity = self.create_owned_resource(
                     f"identity create -n {owned_identity_name} -g {rg} "
-                    f"--location {TEST_LOCATION}"
+                    f"--location {TEST_LOCATION}",
+                    kind="identity", name=owned_identity_name, resource_group=rg,
                 ).get_output_in_json()
+                requested_identity_id = identity["id"]
                 su_name = f"testsu{generate_generic_id()[:8]}"
-                self.cmd(
+                self.create_owned_resource(
                     f"iot adr ns su instance create -n {su_name} -g {rg} "
                     f"--location {TEST_LOCATION} --system-assigned-mi "
-                    f"--user-assigned-mi {identity['id']} --no-wait"
+                    f"--user-assigned-mi {requested_identity_id} --no-wait",
+                    kind="su", name=su_name, resource_group=rg,
                 )
                 created = wait_for_resource_succeeded(
                     self,
@@ -916,42 +802,59 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
                 identity = update_instance.get("identity") or {}
                 sami_principal_id = identity.get("principalId")
                 user_identities = identity.get("userAssignedIdentities") or {}
-                if not sami_principal_id or not user_identities:
-                    pytest.skip(
-                        "The supplied update instance must have both system-assigned "
-                        "and user-assigned identities."
+                if is_owned_su:
+                    assert sami_principal_id, (
+                        f"Created update instance '{su_id}' is missing the requested "
+                        "system-assigned identity principalId after provisioning succeeded."
                     )
-                identity_resource_id = next(iter(user_identities))
+                    identity_resource_id = next(
+                        (
+                            resource_id for resource_id in user_identities
+                            if resource_id.lower() == requested_identity_id.lower()
+                        ),
+                        None,
+                    )
+                    assert identity_resource_id, (
+                        f"Created update instance '{su_id}' is missing the requested "
+                        f"user-assigned identity '{requested_identity_id}' after provisioning succeeded."
+                    )
+                else:
+                    if not sami_principal_id or not user_identities:
+                        pytest.skip(
+                            "The supplied update instance must have both system-assigned "
+                            "and user-assigned identities."
+                        )
+                    identity_resource_id = next(iter(user_identities))
                 uami = self.cmd(
                     f"identity show --ids {identity_resource_id}"
                 ).get_output_in_json()
                 identity_principal_id = uami.get("principalId")
                 if not identity_principal_id:
+                    if is_owned_su:
+                        raise AssertionError(
+                            f"Created update instance UAMI '{identity_resource_id}' has no principalId."
+                        )
                     pytest.skip(
                         "The supplied update instance UAMI has no principalId."
                     )
 
             with timed_step("Setup 2/3 ❯ Verify required identity preflight"):
-                self.cmd(
+                self.create_owned_resource(
                     f"iot adr ns create -n {denied_namespace_name} -g {rg} "
-                    f"--location {TEST_LOCATION}"
+                    f"--location {TEST_LOCATION}",
+                    kind="namespace", name=denied_namespace_name, resource_group=rg,
                 )
-                try:
+                with pytest.raises(RequiredArgumentMissingError, match=re.escape(MI_REQUIRED_MSG)):
                     self.cmd(
                         f"iot adr ns link su add "
                         f"--ns {denied_namespace_name} -g {rg} "
-                        f"-n su-no-identity --su-id {su_id}",
-                        expect_failure=True,
-                    )
-                finally:
-                    self.cmd(
-                        f"iot adr ns delete -n {denied_namespace_name} "
-                        f"-g {rg} -y"
+                        f"-n su-no-identity --su-id {su_id}"
                     )
 
             with timed_step("Setup 3/3 ❯ Create authorized ADR namespace"):
-                ns = self.cmd(
-                    f"iot adr ns create -n {namespace_name} -g {rg} --location {TEST_LOCATION}"
+                ns = self.create_owned_resource(
+                    f"iot adr ns create -n {namespace_name} -g {rg} --location {TEST_LOCATION}",
+                    kind="namespace", name=namespace_name, resource_group=rg,
                 ).get_output_in_json()
                 namespace_principal_id = (ns.get("identity") or {}).get("principalId")
                 assert namespace_principal_id, "Namespace SAMI principalId is required."
@@ -1124,111 +1027,10 @@ class TestADRLinkSU(ADRFullInfraHelper, ADRLiveScenarioTest):
                     )
                 _log(LogKind.OK, "Rotated UAMI to SAMI")
 
-            with timed_step(
-                "Step 5 > link su delete (disposable Update Instance)"
-            ):
-                self.cmd(
-                    f"iot adr ns link su delete --ns {namespace_name} -g {rg} "
-                    f"-n {su_endpoint} --yes"
-                )
-                su_deleted = True
-                assert self.cmd(
-                    f"iot adr ns link su list --ns {namespace_name} -g {rg}"
-                ).get_output_in_json() == []
-                self.cmd(
-                    f"resource show --ids {su_id}",
-                    expect_failure=True,
-                )
-                _log(
-                    LogKind.OK,
-                    "Update Instance resource and namespace endpoint deleted",
-                )
-
             _log(LogKind.OK, "Software Updates link lifecycle passed")
 
         finally:
-            active_error = sys.exc_info()[1]
-            cleanup_failures = []
-            with timed_step("Cleanup ❯ Delete Software Updates link"):
-                if not su_deleted:
-                    try:
-                        links = self.cmd(
-                            f"iot adr ns link su list --ns {namespace_name} "
-                            f"-g {rg}"
-                        ).get_output_in_json()
-                        if su_endpoint in {
-                            item.get("name") for item in links or []
-                        }:
-                            self.cmd(
-                                f"iot adr ns link su delete "
-                                f"--ns {namespace_name} -g {rg} "
-                                f"-n {su_endpoint} --yes"
-                            )
-                            su_deleted = True
-                            _log(
-                                LogKind.RESULT,
-                                "Software Updates link and target deleted",
-                            )
-                    except Exception as error:  # noqa: BLE001 - report after all cleanup
-                        cleanup_failures.append(("Software Updates link", error))
-                        _log(
-                            LogKind.WARN,
-                            "Software Updates link cleanup failed: %s",
-                            error,
-                        )
-            with timed_step("Cleanup ❯ Delete disposable Update Instance"):
-                if su_deleted:
-                    _log(
-                        LogKind.RESULT,
-                        "Disposable Update Instance already deleted by link su delete",
-                    )
-                else:
-                    try:
-                        if su_name:
-                            self.cmd(
-                                f"iot adr ns su instance delete -n {su_name} "
-                                f"-g {su_rg} --yes --no-wait"
-                            )
-                            self.cmd(
-                                f"iot adr ns su instance wait -n {su_name} "
-                                f"-g {su_rg} --deleted"
-                            )
-                            _log(
-                                LogKind.RESULT,
-                                "Disposable Update Instance deleted",
-                            )
-                    except Exception as error:  # noqa: BLE001 - report after all cleanup
-                        cleanup_failures.append(("Update Instance", error))
-                        _log(LogKind.WARN, "Update Instance cleanup failed: %s", error)
-            with timed_step("Cleanup ❯ Delete ADR namespace"):
-                try:
-                    self.cmd(f"iot adr ns delete -n {namespace_name} -g {rg} -y")
-                    _log(LogKind.RESULT, "ADR namespace deleted")
-                except Exception as error:  # noqa: BLE001 - report after all cleanup
-                    cleanup_failures.append(("namespace", error))
-                    _log(LogKind.WARN, "Namespace cleanup failed: %s", error)
-            if owned_identity_name:
-                with timed_step("Cleanup ❯ Delete Update Instance UAMI"):
-                    try:
-                        self.cmd(
-                            f"identity delete -n {owned_identity_name} -g {rg}"
-                        )
-                        _log(LogKind.RESULT, "Update Instance UAMI deleted")
-                    except Exception as error:  # noqa: BLE001 - report after all cleanup
-                        cleanup_failures.append(("Update Instance UAMI", error))
-                        _log(
-                            LogKind.WARN,
-                            "Update Instance UAMI cleanup failed: %s",
-                            error,
-                        )
-            if cleanup_failures and active_error is None:
-                detail = ", ".join(
-                    f"{resource}: {error}"
-                    for resource, error in cleanup_failures
-                )
-                raise AssertionError(
-                    f"Cleanup failed: {detail}"
-                ) from cleanup_failures[0][1]
+            self.cleanup_full_infra()
 
 
 @pytest.mark.usefixtures("set_cwd")

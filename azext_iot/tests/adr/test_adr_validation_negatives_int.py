@@ -115,13 +115,6 @@ class TestADRValidationNegatives(ADRLiveScenarioTest):
                 "Nothing to update. Provide --tags, --observability-enabled, or "
                 "an outbound managed identity.",
             )
-        with timed_step("registry-device update ❯ nothing-to-update rejected"):
-            self._assert_argument_error(
-                f"iot adr ns registry-device update -n mydev --ns {ns} -g {rg}",
-                RequiredArgumentMissingError,
-                "Nothing to update. Provide --enablement-state, --manufacturer, --model, "
-                "--hardware-revision, --software-revision, or --tags.",
-            )
         with timed_step("group update ❯ nothing-to-update rejected"):
             self._assert_argument_error(
                 f"iot adr ns group update -n mygroup --ns {ns} -g {rg}",

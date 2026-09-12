@@ -14,9 +14,6 @@ from knack.help_files import helps
 
 from azext_iot.adr._help import load_adr_help
 from azext_iot.adr.command_map import (
-    _DPS_DELETE_CONFIRMATION,
-    _HUB_DELETE_CONFIRMATION,
-    _SU_DELETE_CONFIRMATION,
     adr_link_ops,
     adr_link_wait_ops,
     load_adr_commands,
@@ -107,7 +104,6 @@ def test_root_loader_lazily_keeps_ignite_adr_and_du_surface(mocker):
 
     loader = IoTExtCommandsLoader(DummyCli())
     table = loader.load_command_table([])
-    assert "iot adr ns registry-device create" in table
     assert "iot adr ns link dps add" in table
     assert "iot adr ns su software-update import" in table
     assert "iot du account create" in table
@@ -146,22 +142,7 @@ def test_2026_command_surface_is_registered():
     )
     assert commands["iot adr ns report latest"][1] == "adr_report_latest"
     expected_commands = {
-        "iot adr ns registry-device create",
-        "iot adr ns registry-device show",
-        "iot adr ns registry-device list",
-        "iot adr ns registry-device update",
-        "iot adr ns registry-device delete",
-        "iot adr ns registry-device wait",
         "iot adr ns migrate",
-        "iot adr ns registry-device auth list",
-        "iot adr ns registry-device auth show",
-        "iot adr ns registry-device auth show-keys",
-        "iot adr ns registry-device auth revoke-certs",
-        "iot adr ns registry-device auth wait",
-        "iot adr ns registry-device attribute list",
-        "iot adr ns registry-device attribute show",
-        "iot adr ns registry-device capability list",
-        "iot adr ns registry-device capability show",
         "iot adr ns identity show",
         "iot adr ns identity assign",
         "iot adr ns identity remove",
@@ -171,11 +152,8 @@ def test_2026_command_surface_is_registered():
         "iot adr ns job run wait",
         "iot adr ns link wait",
         "iot adr ns link su wait",
-        "iot adr ns link su delete",
         "iot adr ns link dps wait",
-        "iot adr ns link dps delete",
         "iot adr ns link hub wait",
-        "iot adr ns link hub delete",
         "iot adr ns su instance check-name",
         "iot adr ns su instance create",
         "iot adr ns su instance show",
@@ -204,8 +182,6 @@ def test_2026_command_surface_is_registered():
         "iot adr ns job schedule",
         "iot adr ns job run delete",
         "iot adr ns job run summary",
-        "iot adr ns registry-device attribute create",
-        "iot adr ns registry-device attribute delete",
     }
     assert expected_commands <= set(commands)
     # There is no Jobs_Schedule API; `job schedule` drives JobRuns_CreateOrReplace.
@@ -228,23 +204,10 @@ def test_2026_command_surface_is_registered():
         "adr_job_run_delete",
         {"confirmation": True, "supports_no_wait": True},
     )
-    assert len(commands) == 112
-    confirmations = {
-        "hub": _HUB_DELETE_CONFIRMATION,
-        "dps": _DPS_DELETE_CONFIRMATION,
-        "su": _SU_DELETE_CONFIRMATION,
-    }
+    assert len(commands) == 92
     for endpoint in ("hub", "dps", "su"):
-        assert commands[f"iot adr ns link {endpoint} delete"] == (
-            "command",
-            f"adr_link_{endpoint}_delete",
-            {
-                "confirmation": confirmations[endpoint],
-            },
-        )
-    assert commands[
-        "iot adr ns registry-device auth revoke-certs"
-    ][2] == {"confirmation": True, "supports_no_wait": True}
+        assert f"iot adr ns link {endpoint} delete" not in commands
+        assert not hasattr(commands_link, f"adr_link_{endpoint}_delete")
     assert commands["iot adr ns migrate"] == (
         "command",
         "adr_namespace_migrate",
@@ -254,8 +217,6 @@ def test_2026_command_surface_is_registered():
         "iot adr ns wait": "adr_namespace_wait",
         "iot adr ns ca wait": "adr_ca_wait",
         "iot adr ns ca policy wait": "adr_ca_policy_wait",
-        "iot adr ns registry-device wait": "adr_registry_device_wait",
-        "iot adr ns registry-device auth wait": "adr_registry_device_auth_wait",
         "iot adr ns identity wait": "adr_namespace_wait",
         "iot adr ns link wait": "adr_link_wait",
         "iot adr ns link hub wait": "adr_link_hub_wait",
@@ -283,7 +244,7 @@ def test_all_link_commands_receive_factory_client_without_subscription_arg():
         or name.startswith("iot adr ns link su ")
     }
 
-    assert len(link_commands) == 20
+    assert len(link_commands) == 17
     for _, operation, _ in link_commands.values():
         module = commands_wait if operation.endswith("_wait") else commands_link
         parameters = inspect.signature(getattr(module, operation)).parameters
@@ -327,11 +288,6 @@ def test_unsupported_command_surfaces_are_not_registered():
     )
     # auth and capability remain service-materialized (read-only).
     # attribute gained create/delete in 2026-11-02-preview.
-    for child in ("auth", "capability"):
-        assert f"iot adr ns registry-device {child} create" not in commands
-        assert f"iot adr ns registry-device {child} update" not in commands
-        assert f"iot adr ns registry-device {child} delete" not in commands
-    assert "iot adr ns registry-device attribute update" not in commands
     assert not any(
         command.startswith(
             (
@@ -346,13 +302,6 @@ def test_unsupported_command_surfaces_are_not_registered():
     for endpoint in ("hub", "dps", "su"):
         assert f"iot adr ns link {endpoint} remove" not in commands
     # Pre-rename spellings must not resurface.
-    for stale in (
-        "iot adr ns registry-device auth-profile list",
-        "iot adr ns registry-device auth-profile show",
-        "iot adr ns registry-device auth-profile get-keys",
-        "iot adr ns registry-device auth-profile revoke-certificates",
-    ):
-        assert stale not in commands
     assert not any(
         command.startswith("iot adr ns su link") for command in commands
     )
@@ -414,34 +363,6 @@ def test_load_adr_arguments():
         }.isdisjoint(registered_options)
     assert "observability_enabled" not in arguments["iot adr ns create"]
     assert "observability_enabled" in arguments["iot adr ns update"]
-    assert {
-        "enablement_state",
-        "external_device_id",
-        "hardware_revision",
-        "software_revision",
-    } <= set(arguments["iot adr ns registry-device create"])
-    assert "external_device_id" not in arguments[
-        "iot adr ns registry-device update"
-    ]
-    for command in (
-        "iot adr ns registry-device show",
-        "iot adr ns registry-device wait",
-    ):
-        assert arguments[command]["external_device_id"]["options_list"] == [
-            "--external-device-id",
-            "--ext-id",
-        ]
-    for command in (
-        "iot adr ns registry-device create",
-        "iot adr ns registry-device update",
-    ):
-        for argument in (
-            "manufacturer",
-            "model",
-            "hardware_revision",
-            "software_revision",
-        ):
-            assert arguments[command][argument]["help"]
     assert {"system_assigned", "user_assigned_identities"} <= set(
         arguments["iot adr ns identity assign"]
     )
@@ -481,12 +402,6 @@ def test_load_adr_arguments():
         assert "7" in validity_help
         assert "90" in validity_help
         assert "inclusive" in validity_help
-    for name in ("reported_by", "schema", "properties"):
-        assert name in arguments["iot adr ns registry-device attribute create"]
-    reported_by = arguments[
-        "iot adr ns registry-device attribute create"
-    ]["reported_by"]
-    assert reported_by["deprecate_info"]["hide"] is True
     assert {
         "mi_system_assigned",
         "mi_user_assigned",
@@ -745,12 +660,7 @@ def test_help_surface_matches_2026_commands_and_su_type():
         "iot adr ns job run cancel",
         "iot adr ns report generate",
         "iot adr ns report latest",
-        "iot adr ns registry-device create",
         "iot adr ns migrate",
-        "iot adr ns registry-device auth show-keys",
-        "iot adr ns registry-device auth wait",
-        "iot adr ns registry-device attribute list",
-        "iot adr ns registry-device capability show",
         "iot adr ns identity assign",
         "iot adr ns su instance create",
         "iot adr ns su instance check-name",
@@ -770,14 +680,11 @@ def test_help_surface_matches_2026_commands_and_su_type():
         "iot adr ns job schedule",
         "iot adr ns job run delete",
         "iot adr ns job run summary",
-        "iot adr ns registry-device attribute create",
-        "iot adr ns registry-device attribute delete",
-        "iot adr ns link hub delete",
-        "iot adr ns link dps delete",
-        "iot adr ns link su delete",
     ):
         assert command in helps
     assert "iot adr ns job run create" not in helps
+    for kind in ("hub", "dps", "su"):
+        assert f"iot adr ns link {kind} delete" not in helps
 
     assert "Microsoft.DeviceUpdate/updateInstances" in helps["iot adr ns link su"]
     assert "linkedAccounts" not in helps["iot adr ns link su"]
@@ -794,6 +701,8 @@ def test_help_surface_matches_2026_commands_and_su_type():
         helps["iot adr ns ca policy create"].split()
     )
     assert "between 7 and 90 days" in policy_create_help
+    assert "below 30" not in policy_create_help
+    assert "Central US EUAP" not in policy_create_help
     assert "--validity-days 30" in helps["iot adr ns ca policy create"]
     assert "--validity-days 90" in helps["iot adr ns ca policy update"]
     assert "starts its initial membership calculation" in helps[
@@ -816,10 +725,7 @@ def test_help_surface_matches_2026_commands_and_su_type():
     )
     for endpoint in ("hub", "dps", "su"):
         assert f"iot adr ns link {endpoint} remove" not in helps
-        delete_help = helps[f"iot adr ns link {endpoint} delete"]
-        assert "Permanently delete" in delete_help
-        assert "namespace" in delete_help
-        assert "--delete-linked-resource" not in delete_help
+        assert f"iot adr ns link {endpoint} delete" not in helps
     assert not any(command.startswith("iot adr ns su link") for command in helps)
     assert not any(
         command.startswith("iot adr ns su update") for command in helps

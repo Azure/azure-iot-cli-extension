@@ -265,10 +265,6 @@ _SPECCED_OPERATION_GROUPS = (
     "jobs",
     "job_runs",
     "job_runs_by_namespace",
-    "registry_devices",
-    "registry_device_attributes",
-    "registry_device_authentication_profiles",
-    "registry_device_capabilities",
 )
 
 _REAL_ADR_CLIENT = None
@@ -383,7 +379,6 @@ def fixture_link_provider(fixture_cmd):
             }
         )
         provider._warn_if_hub_classically_linked = MagicMock()  # pylint: disable=protected-access
-        provider._wait_for_linked_resource_deleted = MagicMock()  # pylint: disable=protected-access
         return provider
 
 

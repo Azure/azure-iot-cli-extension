@@ -12,7 +12,6 @@ from typing import Optional
 
 from azure.cli.core.azclierror import (
     ArgumentUsageError,
-    AzureResponseError,
     InvalidArgumentValueError,
     RequiredArgumentMissingError,
 )
@@ -29,7 +28,6 @@ from azext_iot.adr.common import (
 from azext_iot.adr.topology import (
     endpoint_is_type,
     get_endpoints,
-    writable_namespace_properties,
 )
 
 MI_MUTEX_MSG = (
@@ -304,27 +302,3 @@ def sanitize_identity(identity: Optional[dict]) -> Optional[dict]:
             resource_id: {} for resource_id in user_assigned
         }
     return result
-
-
-def namespace_replace_body(namespace: dict) -> dict:
-    """Build a namespace PUT body while preserving current writable state."""
-    body = {
-        key: deepcopy(namespace[key])
-        for key in ("location", "tags")
-        if key in namespace
-    }
-    identity = sanitize_identity(namespace.get("identity"))
-    if identity is not None:
-        body["identity"] = identity
-
-    properties = writable_namespace_properties(
-        namespace.get("properties") or {}
-    )
-    if properties:
-        body["properties"] = properties
-    if not body.get("location"):
-        raise AzureResponseError(
-            "The namespace GET response did not contain the location required "
-            "to replace the namespace."
-        )
-    return body

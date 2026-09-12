@@ -29,13 +29,11 @@ DPS_CAP_EXCEEDED_MSG = (
 SU_CAP_EXCEEDED_MSG = (
     "Namespace already has a linked Software Updates instance; only one may be "
     "linked per namespace. Use 'az iot adr ns link su update' to modify the "
-    "existing link, or 'az iot adr ns link su delete' to permanently delete "
-    "the linked Update Instance before adding another."
+    "existing link."
 )
 
 HUB_CAP_EXCEEDED_MSG = (
-    "Namespace already has the maximum of 10 linked IoT Hubs. Delete a linked "
-    "Hub resource before adding another endpoint."
+    "Namespace already has the maximum of 10 linked IoT Hubs."
 )
 
 
