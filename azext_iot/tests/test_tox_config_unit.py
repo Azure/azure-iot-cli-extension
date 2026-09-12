@@ -37,12 +37,18 @@ def test_dps_phase_junit_is_isolated_and_coverage_remains_cumulative():
     assert "azext_*" in section["passenv"]
 
 
-def test_dps_runner_dependencies_are_installed_before_integration_commands():
+def test_dps_controller_dependencies_are_isolated_from_the_managed_environment():
     config = ConfigParser(interpolation=None)
     config.read(Path(__file__).resolve().parents[2] / "tox.ini")
-    section = config["testenv:{Central,ADT,DPS,HubMgmt,HubData,ADU,ADR}-int"]
+    section = config["testenv:DPS-phases"]
     dependencies = [line.strip() for line in section["deps"].splitlines() if line.strip()]
-    assert "DPS: ." in dependencies
+    assert "." in dependencies
+    assert "azure-cli" in dependencies
+    assert "{[base]deps}" in dependencies
+    assert section.getboolean("skip_install")
+    assert not section["commands"].strip()
+    managed = config["testenv:{Central,ADT,DPS,HubMgmt,HubData,ADU,ADR}-int"]
+    assert "DPS: ." not in managed["deps"]
 
 
 @pytest.mark.parametrize("service", ["ADR", "DPS", "HubMgmt", "HubData"])
