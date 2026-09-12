@@ -132,6 +132,41 @@ To run specific test in any integration test file, such as:
 
 `pytest azext_iot/tests/central/test_iot_central_int.py::TestIotCentral::test_central_query_methods_run`
 
+#### DPS preview authentication phases
+
+The GitHub integration workflow's DPS selection runs two complete `DPS-int`
+invocations serially: `regular`, with local authentication disabled, then
+`service-sas`, with local authentication enabled. The latter covers all 28
+service-key/connection-string lifecycle variants and the KeyBased-to-managed-identity
+Hub-link transition. Device symmetric-key and X.509 attestation remain separate
+from service authentication.
+
+Each phase needs two available DPS slots and creates its own resources. The runner
+rejects supplied-resource pins (`azext_iot_testdps`, `azext_iot_testdps_hub`, and
+`azext_iot_testhub`), verifies owned-resource cleanup before continuing, and preserves
+each phase's outcome and sanitized artifacts under `test-result/dps-phases/`.
+Do not overlap these phases with another DPS-consuming workload.
+
+For direct test invocations, `azext_iot_dps_test_phase=service-sas` selects exactly
+the 29 SAS cases; partial selections are errors. The default retains Entra fixture
+behavior without changing command defaults. Explicit `regular` and `service-sas`
+phases do not include the optional cross-service certificate cases: that workflow
+coverage is not configured yet. Leave `azext_iot_dps_test_phase` unset to select
+existing manually configured certificate tests with their required prerequisites.
+
+Explicit `regular` also requires the complete branch contract (32 modern-registration
+cases, or 30 legacy-registration cases). Neither explicit phase accepts skips.
+The runner pins commands and credential discovery to its subscription only within
+the test process, without switching the shared CLI profile/cloud. Owned fixture
+ARM writes (including identity/link updates, certificate children, and scoped role
+assignments) each disable SDK retries and fence repeat transport attempts. Each
+subsequent explicit SDK operation/CLI command gets a fresh boundary; LRO GET
+polling is unchanged. RBAC creation is followed by read-only visibility polling,
+not repeated creation. This guard does not change data-plane SDK retry policies. At a phase
+deadline the runner asks workers to unwind while keeping tox/xdist's controller
+alive for bounded fixture cleanup, then forcibly terminates any remaining owned
+processes. Timeout/cancellation is always unsuccessful, even when cleanup finishes.
+
 #### Azure Resource Setup
 
 The following resources will be needed for the integration tests.

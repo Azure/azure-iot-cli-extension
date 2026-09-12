@@ -237,7 +237,7 @@ def test_post_acquire_failure_releases_only_its_reference(mocker, monkeypatch, t
     mocker.patch.object(dps_fixtures, "_shared_acquire", return_value=resource)
     mocker.patch.object(dps_fixtures, "_find_hub_by_name" if kind == "hub" else "_find_dps_by_name", return_value=resource)
     error = pytest.fail.Exception("setup timed out before yield")
-    mocker.patch.object(dps_fixtures, "_assert_local_auth_disabled", side_effect=error)
+    mocker.patch.object(dps_fixtures, "_assert_local_auth_policy", side_effect=error)
     delete = mocker.patch.object(dps_fixtures, "_delete_hub" if kind == "hub" else "_delete_dps")
     _, path = dps_fixtures._state_paths("test-run", kind)
     dps_fixtures._write_state(path, {"name": "resource", "refcount": refcount})
@@ -261,7 +261,7 @@ def test_pinned_setup_failure_never_deletes_resource(mocker, monkeypatch, kind):
         dps_fixtures, "_find_hub_by_name" if kind == "hub" else "_find_dps_by_name",
         return_value=_owned_test_resource("external", kind, "other-run"),
     )
-    mocker.patch.object(dps_fixtures, "_assert_local_auth_disabled", side_effect=CLIError("setup denied"))
+    mocker.patch.object(dps_fixtures, "_assert_local_auth_policy", side_effect=CLIError("setup denied"))
     release = mocker.patch.object(dps_fixtures, "_shared_release")
     delete = mocker.patch.object(dps_fixtures, "_delete_hub" if kind == "hub" else "_delete_dps")
     provision = dps_fixtures._iot_hubs_provisioner if kind == "hub" else dps_fixtures._iot_dps_provisioner
@@ -287,11 +287,11 @@ def test_dps_fixture_location_setting(monkeypatch, mocker, location):
     cli.return_value.invoke.assert_not_called()
 
 
-@pytest.mark.parametrize("managed", [False, True])
 @pytest.mark.parametrize("iot_hub", [None, {"name": "existing-hub"}])
 @pytest.mark.parametrize("location", ["centraluseuap", "eastus"])
-def test_dps_fixture_creates_in_configured_region(monkeypatch, mocker, managed, iot_hub, location):
+def test_dps_fixture_creates_in_configured_region(monkeypatch, mocker, iot_hub, location):
     cli = mocker.patch.object(dps_fixtures, "cli")
+    cli.invoke.return_value.as_json.return_value = {"properties": {"disableLocalAuth": True}}
     mocker.patch.object(dps_fixtures, "assign_iot_dps_dataplane_rbac_role")
     mocker.patch.object(dps_fixtures, "_link_hub")
     mocker.patch.object(dps_fixtures, "_unlink_all_hubs")
@@ -299,10 +299,7 @@ def test_dps_fixture_creates_in_configured_region(monkeypatch, mocker, managed, 
     monkeypatch.setattr(dps_fixtures, "ENTITY_LOCATION", location)
     monkeypatch.setattr(dps_fixtures, "ENTITY_RG", "unit-test-rg")
 
-    if managed:
-        dps_fixtures._create_managed_dps("test-run", "h" if iot_hub else "nh", iot_hub)
-    else:
-        dps_fixtures._create_unmanaged_dps("test-dps", iot_hub)
+    dps_fixtures._create_managed_dps("test-run", "h" if iot_hub else "nh", iot_hub)
 
     cli.invoke.assert_called_once()
     command = cli.invoke.call_args.args[0]
@@ -314,8 +311,7 @@ def test_dps_fixture_creates_in_configured_region(monkeypatch, mocker, managed, 
         assert "hubname=existing-hub" in command
 
 
-@pytest.mark.parametrize("managed", [False, True])
-def test_dps_hub_fixture_creates_in_canary_region_without_local_auth(monkeypatch, mocker, managed):
+def test_dps_hub_fixture_creates_in_canary_region_without_local_auth(monkeypatch, mocker):
     cli = mocker.patch.object(dps_fixtures, "cli")
     cli.invoke.return_value.as_json.return_value = {
         "id": "/hub-id", "name": "test-hub", "location": "centraluseuap",
@@ -327,10 +323,7 @@ def test_dps_hub_fixture_creates_in_canary_region_without_local_auth(monkeypatch
     monkeypatch.setattr(dps_fixtures, "HUB_TEST_LOCATION", "centraluseuap")
     monkeypatch.setattr(dps_fixtures.settings.env, "azext_iot_testdps_hub", "test-hub")
 
-    if managed:
-        dps_fixtures._create_managed_hub("test-run", "hub")
-    else:
-        dps_fixtures._iot_hubs_provisioner(mocker.Mock())
+    dps_fixtures._create_managed_hub("test-run", "hub")
 
     cli.invoke.assert_called_once()
     command = cli.invoke.call_args.args[0]
@@ -437,6 +430,14 @@ def test_dps_missing_hub_recovery_bypasses_actual_cli_not_found(
         return create_response
 
     cli.invoke.side_effect = invoke
+
+    if recovery == "env-pinned":
+        with pytest.raises(CLIInternalError, match="Supplied Hub.*was not found"):
+            dps_fixtures._iot_hubs_provisioner(request)
+        cli.invoke.assert_not_called()
+        factory.assert_called_once_with(cli.az_cli)
+        assert len(mocked_response.calls) == 1
+        return
 
     result = dps_fixtures._iot_hubs_provisioner(request)
 
@@ -662,7 +663,7 @@ def test_dps_fixture_does_not_retry_or_hide_role_assignment_errors(mocker, manag
 @pytest.mark.parametrize("linked_hub", [None, {"name": "hub"}])
 def test_dps_managed_fixture_waits_before_finishing_setup(mocker, linked_hub):
     cli = mocker.patch.object(dps_fixtures, "cli")
-    target = {"id": "/dps-id"}
+    target = {"id": "/dps-id", "properties": {"disableLocalAuth": True}}
     cli.invoke.return_value.as_json.side_effect = [target, {"user": {"name": "caller"}}]
     events = []
     mocker.patch.object(dps_fixtures, "assign_role_assignment", side_effect=lambda **_: events.append("assign"))
@@ -760,10 +761,10 @@ def test_dps_fixture_uses_no_service_connection_strings(mocker, monkeypatch):
 def test_dps_fixture_requires_compliant_supplied_resource(local_auth_disabled):
     target = {"name": "supplied", "properties": {"disableLocalAuth": local_auth_disabled}}
     if local_auth_disabled:
-        dps_fixtures._assert_local_auth_disabled(target)
+        dps_fixtures._assert_local_auth_policy(target)
     else:
         with pytest.raises(AssertionError, match="disableLocalAuth=true"):
-            dps_fixtures._assert_local_auth_disabled(target)
+            dps_fixtures._assert_local_auth_policy(target)
 
 
 @pytest.mark.parametrize("device_auth,key,thumbprint", [
@@ -786,7 +787,7 @@ def test_dps_hub_device_checks_use_entra_not_hub_policy(mocker, device_auth, key
     )
 
 
-def test_dps_service_auth_matrix_skips_only_service_sas():
+def test_dps_service_auth_matrix_marks_only_service_sas():
     assert [case.id for case in DPS_SERVICE_AUTH_PARAMS] == ["key", "login", "cstring"]
     for case in DPS_SERVICE_AUTH_PARAMS:
         assert case.values == ((case.id,),)
@@ -794,9 +795,7 @@ def test_dps_service_auth_matrix_skips_only_service_sas():
             assert not case.marks
         else:
             assert len(case.marks) == 1
-            assert case.marks[0].name == "skip"
-            assert "service shared-access-policy SAS" in case.marks[0].kwargs["reason"]
-            assert "device symmetric-key and X.509 attestation remain supported" in case.marks[0].kwargs["reason"]
+            assert case.marks[0].name == "dps_service_sas"
 
 
 @pytest.mark.parametrize("module_name,case_count", [
@@ -807,7 +806,7 @@ def test_dps_service_auth_matrix_skips_only_service_sas():
 ])
 def test_dps_lifecycle_auth_cases_are_collected_independently(mocker, module_name, case_count):
     # Import only: do not execute integration fixtures or tests. In particular,
-    # a skipped service-key phase must not skip the login device-attestation phase.
+    # a deselected service-key phase must not remove the login device-attestation phase.
     cli = mocker.patch("azext_iot.common.embedded_cli.EmbeddedCLI")
     module_path = Path(dps_fixtures.__file__).parent.joinpath(*module_name.split(".")).with_suffix(".py")
     module = SimpleNamespace(**runpy.run_path(str(module_path)))
@@ -840,9 +839,9 @@ def test_dps_linked_hub_coverage_keeps_managed_identity_cases_active(mocker):
         assert len(marks) == 1
         assert marks[0].name == "usefixtures"
         assert marks[0].args == ("dps_linked_hub_identity", "exclusive_iot_dps_no_hub")
-    skipped_marks = module.test_linked_hub_create_keybased_then_switch_to_mi.pytestmark
-    assert [mark.name for mark in skipped_marks] == ["usefixtures", "skip"]
-    assert skipped_marks[0].args == ("exclusive_iot_dps_no_hub",)
+    sas_marks = module.test_linked_hub_create_keybased_then_switch_to_mi.pytestmark
+    assert [mark.name for mark in sas_marks] == ["usefixtures", "dps_service_sas"]
+    assert sas_marks[0].args == ("dps_linked_hub_identity", "exclusive_iot_dps_no_hub")
     cli.return_value.invoke.assert_not_called()
 
 

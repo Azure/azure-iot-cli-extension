@@ -16,13 +16,16 @@ import uuid
 import pytest
 from azure.cli.core.azclierror import CLIInternalError, ResourceNotFoundError
 from azure.core.exceptions import HttpResponseError, ResourceNotFoundError as AzureResourceNotFoundError
+from azure.mgmt.core.tools import parse_resource_id
 from filelock import FileLock
 from knack.log import get_logger
 
-from azext_iot._factory import iot_hub_service_factory
+from azext_iot._factory import iot_hub_service_factory, iot_service_provisioning_factory
+from azext_iot.common._azure import IOT_SERVICE_CS_TEMPLATE
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests.helpers import assign_role_assignment, invoke_checked
+from azext_iot.tests.dps import _phase, _phase_receipts, _phase_runtime
 from azext_iot.tests.settings import (
     DynamoSettings,
     ENV_SET_TEST_IOTHUB_REQUIRED,
@@ -70,6 +73,37 @@ DPS_NO_HUB_LOCK_TIMEOUT_SECONDS = 300
 _LOCAL_RUN_UID = uuid.uuid4().hex
 
 
+def pytest_configure(config):
+    _phase.configure(config)
+    receipts = _phase_receipts.settings()
+    if receipts:
+        if settings.env.azext_iot_testdps or settings.env.azext_iot_testdps_hub or settings.env.azext_iot_testhub:
+            raise pytest.UsageError("Isolated DPS phases reject supplied resource pins, including pytest configuration pins.")
+        if ENTITY_RG != receipts[3] or ENTITY_LOCATION != "centraluseuap" or HUB_TEST_LOCATION != "centraluseuap":
+            raise pytest.UsageError("Isolated DPS phases require the explicit test resource group and centraluseuap fixtures.")
+        from azext_iot.tests import helpers
+        runtime = _phase_runtime.activate(receipts[2], existing=(cli, helpers.cli))
+        runtime.__enter__()
+        config.add_cleanup(lambda: runtime.__exit__(None, None, None))
+
+
+def pytest_sessionstart(session):
+    _phase_receipts.session_started(session.config)
+    _phase_runtime.start_worker(session)
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_collection_modifyitems(config, items):
+    _phase.select_items(config, items)
+    _phase_receipts.selected(config, items)
+
+
+@pytest.hookimpl(hookwrapper=True, tryfirst=True)
+def pytest_runtest_makereport(item):
+    outcome = yield
+    _phase.require_requested_coverage(item, outcome.get_result())
+
+
 def generate_hub_id() -> str:
     return f"aziotclitest-hub-{generate_generic_id()}"[:35]
 
@@ -82,12 +116,18 @@ def assign_iot_dps_dataplane_rbac_role(target_dps):
     _assign_current_user_role(DPS_USER_ROLE, target_dps["id"])
 
 
+def _assign_fixture_role(**kwargs):
+    if _phase_receipts.settings():
+        return _phase_runtime.assign_role_assignment_once(**kwargs)
+    return assign_role_assignment(**kwargs)
+
+
 def _assign_current_user_role(role: str, scope: str):
     account = cli.invoke("account show").as_json()
     user = account["user"]
     if user["name"] is None:
         raise CLIInternalError("User not found")
-    assign_role_assignment(
+    _assign_fixture_role(
         role=role,
         scope=scope,
         assignee=user["name"],
@@ -151,9 +191,12 @@ def _get_run_uid(request) -> str:
     to a per-process uuid so each fresh invocation is treated as its own run.
     """
     workerinput = getattr(request.config, "workerinput", None)
-    if workerinput and workerinput.get("testrunuid"):
-        return workerinput["testrunuid"]
-    return _LOCAL_RUN_UID
+    run_uid = os.environ.get(_phase_receipts.RUN_UID_ENV) or (
+        workerinput["testrunuid"] if workerinput and workerinput.get("testrunuid") else _LOCAL_RUN_UID
+    )
+    # Even if an external runner reuses an xdist run UID, never acquire a regular
+    # phase's DLA-true fixture for SAS (or silently change its resource policy).
+    return run_uid if _phase.get_phase() == _phase.REGULAR else f"{run_uid}-service-sas"
 
 
 def _timestamp() -> str:
@@ -280,11 +323,32 @@ def _list_dps() -> list:
     return cli.invoke('iot dps list -g "{}"'.format(ENTITY_RG), capture_stderr=True).as_json() or []
 
 
-def _assert_local_auth_disabled(resource: Dict) -> None:
-    assert resource["properties"].get("disableLocalAuth") is True, (
-        f"Integration resource {resource['name']} must have disableLocalAuth=true. "
-        "Use a policy-compliant resource; fixtures will not change a supplied resource's auth policy."
+def _assert_local_auth_policy(resource: Dict) -> None:
+    expected = _phase.local_auth_disabled()
+    assert (resource.get("properties") or {}).get("disableLocalAuth") is expected, (
+        f"Integration resource {resource.get('name')} must have disableLocalAuth={str(expected).lower()} "
+        f"for the {_phase.get_phase()} phase. "
+        "Fixtures will not change a supplied resource's auth policy."
     )
+
+
+def _dps_service_connection_string(resource: Dict) -> str:
+    """Retrieve only the selected fixture's service credential, without EmbeddedCLI output logging."""
+    properties = resource.get("properties") or {}
+    hostname = properties.get("serviceOperationsHostName")
+    subscription = parse_resource_id(resource.get("id", "")).get("subscription")
+    if not hostname or not subscription:
+        raise CLIInternalError(
+            "The service-sas phase requires a DPS ARM ID and serviceOperationsHostName before retrieving credentials."
+        )
+    client = iot_service_provisioning_factory(cli.az_cli, subscription_id=subscription)
+    policy = client.iot_dps_resource.list_keys_for_key_name(
+        provisioning_service_name=resource["name"], resource_group_name=ENTITY_RG,
+        key_name="provisioningserviceowner",
+    )
+    if not isinstance(policy, dict) or not policy.get("keyName") or not policy.get("primaryKey"):
+        raise CLIInternalError("The service-sas phase requires a usable DPS service-policy credential.")
+    return IOT_SERVICE_CS_TEMPLATE.format(hostname, policy["keyName"], policy["primaryKey"])
 
 
 def _find_dps_by_name(dps_name: str) -> Optional[dict]:
@@ -297,9 +361,13 @@ def _find_dps_by_name(dps_name: str) -> Optional[dict]:
 
 
 def _delete_dps(dps_name: str) -> None:
-    result = cli.invoke(f"iot dps delete --name {dps_name} --resource-group {ENTITY_RG}", capture_stderr=True)
+    if _phase_receipts.settings() and not _phase_receipts.before_delete(dps_name, _find_dps_by_name(dps_name)):
+        return
+    with _phase_runtime.owned_write(dps_name, "DELETE"):
+        result = cli.invoke(f"iot dps delete --name {dps_name} --resource-group {ENTITY_RG}", capture_stderr=True)
     if not result.success():
         raise CLIInternalError(f"Failed to delete DPS '{dps_name}' in resource group '{ENTITY_RG}'.")
+    _phase_receipts.after_delete(dps_name)
 
 
 def _cleanup_created_resource(name, run_uid, kind, find_fn, delete_fn):
@@ -326,10 +394,15 @@ def _enable_dps_hub_identity(dps_name: str, iot_hub: Dict) -> None:
         f"iot dps identity assign --name {dps_name} -g {ENTITY_RG} --system-assigned",
         capture_stderr=True,
     ).as_json()
-    assign_role_assignment(
+    principal_id = (dps.get("identity") or {}).get("principalId")
+    if not principal_id:
+        raise CLIInternalError(
+            "DPS linked-Hub tests require a system-assigned identity principalId before Hub role assignment."
+        )
+    _assign_fixture_role(
         role=HUB_USER_ROLE,
         scope=iot_hub["hub"]["id"],
-        assignee=dps["identity"]["principalId"],
+        assignee=principal_id,
         max_tries=MAX_RBAC_ASSIGNMENT_TRIES,
     )
     # The DPS managed identity has a separate Hub data-role grant and must
@@ -374,33 +447,30 @@ def _unlink_all_hubs(dps_name: str) -> None:
 def _create_managed_dps(run_uid: str, kind: str, iot_hub: Optional[Dict]) -> tuple:
     """Create a tagged, run-scoped DPS and perform one-time RBAC + hub linking (creator only)."""
     name = f"{INT_TEST_DPS_PREFIX}-{_timestamp()}-{run_uid[:8]}-{kind}"
-    tags = f"intTest=true runUid={run_uid} kind={kind} createdEpoch={int(time())}"
+    tags = f"intTest=true runUid={run_uid} kind={kind} createdEpoch={int(time())} authPhase={_phase.get_phase()}"
     if iot_hub:
         tags += f" hubname={iot_hub['name']}"
     with ExitStack() as cleanup:
+        if _phase_receipts.settings() and _find_dps_by_name(name) is not None:
+            raise CLIInternalError("Isolated DPS name already exists; refusing to overwrite it.")
+        _phase_receipts.before_create(name, ENTITY_RG, run_uid, kind)
         cleanup.callback(_cleanup_created_resource, name, run_uid, kind, _find_dps_by_name, _delete_dps)
-        target_dps = cli.invoke(
-            f"iot dps create --name {name} --resource-group {ENTITY_RG} "
-            f"--location {ENTITY_LOCATION} --disable-local-auth true --tags {tags}",
-            capture_stderr=True,
-        ).as_json()
-        assign_iot_dps_dataplane_rbac_role(target_dps)
+        with _phase_runtime.owned_write(name, "PUT"):
+            target_dps = cli.invoke(
+                f"iot dps create --name {name} --resource-group {ENTITY_RG} "
+                f"--location {ENTITY_LOCATION} --disable-local-auth {str(_phase.local_auth_disabled()).lower()} --tags {tags}",
+                capture_stderr=True,
+            ).as_json()
+        _phase_receipts.after_create(name, target_dps)
+        _assert_local_auth_policy(target_dps)
+        if _phase.local_auth_disabled():
+            assign_iot_dps_dataplane_rbac_role(target_dps)
         if iot_hub:
             _link_hub(name, iot_hub)
         else:
             _unlink_all_hubs(name)
         cleanup.pop_all()
         return name, target_dps
-
-
-def _create_unmanaged_dps(dps_name: str, iot_hub: Optional[Dict]) -> dict:
-    base_command = (
-        f"iot dps create --name {dps_name} --resource-group {ENTITY_RG} "
-        f"--location {ENTITY_LOCATION} --disable-local-auth true"
-    )
-    if iot_hub:
-        base_command += f" --tags hubname={iot_hub['name']}"
-    return cli.invoke(base_command).as_json()
 
 
 def _iot_dps_provisioner(request, iot_hub: Optional[Dict] = None) -> dict:
@@ -411,7 +481,8 @@ def _iot_dps_provisioner(request, iot_hub: Optional[Dict] = None) -> dict:
 
     with ExitStack() as cleanup:
         if use_managed:
-            _gc_stale_resources_once(run_uid)
+            if _phase.local_auth_disabled() and not _phase_receipts.settings():
+                _gc_stale_resources_once(run_uid)
             target_dps = _shared_acquire(
                 run_uid,
                 kind,
@@ -428,21 +499,23 @@ def _iot_dps_provisioner(request, iot_hub: Optional[Dict] = None) -> dict:
             dps_name = settings.env.azext_iot_testdps
             target_dps = _find_dps_by_name(dps_name)
             if not target_dps:
-                logger.error(f"DPS {dps_name} specified in pytest settings not found. DPS will be created")
-                target_dps = _create_unmanaged_dps(dps_name, iot_hub)
-            _assert_local_auth_disabled(target_dps)
-            assign_iot_dps_dataplane_rbac_role(target_dps)
+                raise CLIInternalError(
+                    f"Supplied DPS '{dps_name}' was not found in '{ENTITY_RG}'; fixtures will not create a supplied resource."
+                )
+            _assert_local_auth_policy(target_dps)
+            if _phase.local_auth_disabled():
+                assign_iot_dps_dataplane_rbac_role(target_dps)
             hub_host_name = _link_hub(dps_name, iot_hub) if iot_hub else None
             if not iot_hub:
                 _unlink_all_hubs(dps_name)
 
-        _assert_local_auth_disabled(target_dps)
+        _assert_local_auth_policy(target_dps)
         result = {
             "name": dps_name,
             "resourceGroup": ENTITY_RG,
             "dps": target_dps,
-            # Kept for skipped legacy service-auth cases, without retrieving SAS credentials.
-            "connectionString": None,
+            # Default Entra/device-attestation fixtures do not retrieve service-policy keys.
+            "connectionString": _dps_service_connection_string(target_dps) if not _phase.local_auth_disabled() else None,
             "hubHostName": hub_host_name,
             "iotHub": iot_hub,
             "certificates": [],
@@ -494,7 +567,10 @@ def _list_hubs() -> list:
 def _find_hub_by_name(name: str) -> Optional[dict]:
     # `iot hub show` can translate name availability into an untyped CLIError.
     # A scoped ARM GET preserves the distinction between absence and failures.
-    client = iot_hub_service_factory(cli.az_cli)
+    receipt_config = _phase_receipts.settings()
+    client = iot_hub_service_factory(cli.az_cli, subscription_id=receipt_config[2]) if receipt_config else (
+        iot_hub_service_factory(cli.az_cli)
+    )
     try:
         return client.iot_hub_resource.get(resource_group_name=ENTITY_RG, resource_name=name)
     except HttpResponseError as error:
@@ -506,20 +582,29 @@ def _find_hub_by_name(name: str) -> Optional[dict]:
 def _create_managed_hub(run_uid: str, kind: str) -> tuple:
     name = f"{INT_TEST_HUB_PREFIX}-{_timestamp()}-{run_uid[:8]}"
     with ExitStack() as cleanup:
+        if _phase_receipts.settings() and _find_hub_by_name(name) is not None:
+            raise CLIInternalError("Isolated Hub name already exists; refusing to overwrite it.")
+        _phase_receipts.before_create(name, ENTITY_RG, run_uid, kind)
         cleanup.callback(_cleanup_created_resource, name, run_uid, kind, _find_hub_by_name, _delete_hub)
-        target_hub = cli.invoke(
-            f"iot hub create -n {name} -g {ENTITY_RG} --sku S1 "
-            f"--location {HUB_TEST_LOCATION} --disable-local-auth true "
-            f"--tags intTest=true runUid={run_uid} kind=hub createdEpoch={int(time())}",
-            capture_stderr=True,
-        ).as_json()
+        with _phase_runtime.owned_write(name, "PUT"):
+            target_hub = cli.invoke(
+                f"iot hub create -n {name} -g {ENTITY_RG} --sku S1 "
+                f"--location {HUB_TEST_LOCATION} --disable-local-auth {str(_phase.local_auth_disabled()).lower()} "
+                f"--tags intTest=true runUid={run_uid} kind=hub createdEpoch={int(time())} authPhase={_phase.get_phase()}",
+                capture_stderr=True,
+            ).as_json()
+        _phase_receipts.after_create(name, target_hub)
         cleanup.pop_all()
         return name, target_hub
 
 
 def _delete_hub(name: str) -> None:
-    if not cli.invoke(f"iot hub delete -n {name} -g {ENTITY_RG}", capture_stderr=True).success():
-        raise CLIInternalError(f"Failed to delete iot hub resource '{name}' in resource group '{ENTITY_RG}'.")
+    if _phase_receipts.settings() and not _phase_receipts.before_delete(name, _find_hub_by_name(name)):
+        return
+    with _phase_runtime.owned_write(name, "DELETE"):
+        if not cli.invoke(f"iot hub delete -n {name} -g {ENTITY_RG}", capture_stderr=True).success():
+            raise CLIInternalError(f"Failed to delete iot hub resource '{name}' in resource group '{ENTITY_RG}'.")
+    _phase_receipts.after_delete(name)
 
 
 def _iot_hubs_provisioner(request):
@@ -528,11 +613,9 @@ def _iot_hubs_provisioner(request):
         name = settings.env.azext_iot_testdps_hub
         target_hub = _find_hub_by_name(name)
         if not target_hub:
-            logger.error(f"Hub {name} specified in pytest settings not found. Hub will be created")
-            target_hub = cli.invoke(
-                f"iot hub create -n {name} -g {ENTITY_RG} --sku S1 "
-                f"--location {HUB_TEST_LOCATION} --disable-local-auth true"
-            ).as_json()
+            raise CLIInternalError(
+                f"Supplied Hub '{name}' was not found in '{ENTITY_RG}'; fixtures will not create a supplied resource."
+            )
         run_uid = None
     else:
         run_uid = _get_run_uid(request)
@@ -547,7 +630,7 @@ def _iot_hubs_provisioner(request):
                 _shared_release, run_uid, "hub",
                 lambda target: _cleanup_created_resource(target, run_uid, "hub", _find_hub_by_name, _delete_hub),
             )
-        _assert_local_auth_disabled(target_hub)
+        _assert_local_auth_policy(target_hub)
         assert target_hub["location"].replace(" ", "").casefold() == HUB_TEST_LOCATION.replace(" ", "").casefold(), (
             f"DPS integration Hubs must be in {HUB_TEST_LOCATION}; use a compliant azext_iot_testdps_hub."
         )

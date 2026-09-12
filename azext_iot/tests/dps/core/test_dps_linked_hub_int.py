@@ -16,6 +16,7 @@ Tests cover:
 import pytest
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.helpers import invoke_checked
+from azext_iot.tests.dps import _phase
 
 cli = EmbeddedCLI()
 
@@ -27,6 +28,8 @@ def _require_gwv2_hub(provisioned_hub):
         capture_stderr=True,
     ).as_json()
     if not hub.get("properties", {}).get("deviceHostName"):
+        if _phase.get_phase() == _phase.SERVICE_SAS:
+            pytest.fail("The requested service-sas transition requires a GWv2 Hub with deviceHostName.")
         pytest.skip("Provisioned hub is not GWv2 — TLS 1.3 linked-hub tests require a GWv2 hub")
     return hub
 
@@ -179,14 +182,8 @@ def test_linked_hub_list_shows_hostname(provisioned_iot_dps_no_hub_module, provi
         _cleanup_linked_hub(dps_name, dps_rg, device_hostname)
 
 
-@pytest.mark.skip(
-    reason=(
-        "The initial KeyBased DPS-to-Hub link uses a Hub service shared-access policy, "
-        "which is incompatible with the integration Hub's disableLocalAuth=true policy. "
-        "SystemAssigned linking and hostname lifecycles run separately."
-    )
-)
-@pytest.mark.usefixtures("exclusive_iot_dps_no_hub")
+@pytest.mark.dps_service_sas
+@pytest.mark.usefixtures("dps_linked_hub_identity", "exclusive_iot_dps_no_hub")
 def test_linked_hub_create_keybased_then_switch_to_mi(provisioned_iot_dps_no_hub_module, provisioned_only_iot_hubs_session):
     """KeyBased create -> auth-only SystemAssigned swap (no hostname change)."""
     dps_name = provisioned_iot_dps_no_hub_module["name"]
@@ -197,12 +194,11 @@ def test_linked_hub_create_keybased_then_switch_to_mi(provisioned_iot_dps_no_hub
     hub_name = gwv2_hub["name"]
     device_hostname = gwv2_hub["properties"]["deviceHostName"]
 
-    cli.invoke(f"iot dps identity assign --name {dps_name} -g {dps_rg} --system-assigned")
-
     try:
         cli.invoke(
             f"iot dps linked-hub create --dps-name {dps_name} -g {dps_rg} "
-            f"--hub-name {hub_name} --hub-resource-group {provisioned_only_iot_hubs_session['rg']}"
+            f"--hub-name {hub_name} --hub-resource-group {provisioned_only_iot_hubs_session['rg']} "
+            "--authentication-type KeyBased"
         )
         initial = cli.invoke(
             f"iot dps linked-hub list --dps-name {dps_name} -g {dps_rg}"
