@@ -37,6 +37,14 @@ def test_dps_phase_junit_is_isolated_and_coverage_remains_cumulative():
     assert "azext_*" in section["passenv"]
 
 
+def test_dps_runner_dependencies_are_installed_before_integration_commands():
+    config = ConfigParser(interpolation=None)
+    config.read(Path(__file__).resolve().parents[2] / "tox.ini")
+    section = config["testenv:{Central,ADT,DPS,HubMgmt,HubData,ADU,ADR}-int"]
+    dependencies = [line.strip() for line in section["deps"].splitlines() if line.strip()]
+    assert "DPS: ." in dependencies
+
+
 @pytest.mark.parametrize("service", ["ADR", "DPS", "HubMgmt", "HubData"])
 def test_preview_integration_environments_bound_each_test_and_select_only_integration_files(service):
     config = ConfigParser(interpolation=None)
