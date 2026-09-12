@@ -211,6 +211,8 @@ util.get_latest_version_from_ame_storage = lambda *args, **kwargs: None
 from azext_iot.common.embedded_cli import EmbeddedCLI
 EmbeddedCLI.invoke = deny
 import pytest
+from lifetime_parent_dependency import AVAILABLE
+assert AVAILABLE
 from azext_iot.tests.dps import conftest as fixtures, _phase_runtime
 from azext_iot.tests.dps.core.test_dps_phase_lifetime_unit import LocalResources
 root = Path(__file__).parent
@@ -242,9 +244,13 @@ def owned(request):
 
 @pytest.mark.timeout(60)
 @pytest.mark.skipif(sys.platform != "linux", reason="Bounded actual xdist process proof uses Linux process groups and /proc.")
-def test_real_xdist_late_file_reuses_no_hub_until_actual_controller_sessionfinish(tmp_path, mocker):
+def test_real_xdist_late_file_reuses_no_hub_until_actual_controller_sessionfinish(tmp_path, mocker, monkeypatch):
     directory = tmp_path / "receipts"
     directory.mkdir()
+    dependency_path = tmp_path / "parent-only-imports"
+    dependency_path.mkdir()
+    (dependency_path / "lifetime_parent_dependency.py").write_text("AVAILABLE = True\n", encoding="utf-8")
+    monkeypatch.syspath_prepend(str(dependency_path))
     profile = tmp_path / "private-cli"
     profile.mkdir(mode=0o700)
     (profile / "config").write_text(
@@ -270,8 +276,11 @@ def test_real_xdist_late_file_reuses_no_hub_until_actual_controller_sessionfinis
         "    assert request.getfixturevalue('owned')['name']=='unit-lifetime-nh'\n"
         "    Path('late-pid').write_text(str(os.getpid()))\n", encoding="utf-8",
     )
+    # Azure CLI adds extension dependency directories at runtime, outside the interpreter's site-packages.
+    import_paths = dict.fromkeys([str(ROOT), *(os.path.abspath(path) for path in sys.path)])
     environment = dict(
-        os.environ, PYTHONPATH=str(ROOT), PYTEST_DISABLE_PLUGIN_AUTOLOAD="1", AZURE_CONFIG_DIR=str(profile),
+        os.environ, PYTHONPATH=os.pathsep.join(import_paths), PYTEST_DISABLE_PLUGIN_AUTOLOAD="1",
+        AZURE_CONFIG_DIR=str(profile),
         AZURE_TEST_RUN_LIVE="False", AZURE_CORE_COLLECT_TELEMETRY="0", AZURE_CORE_CHECK_VERSION="no",
         AZURE_EXTENSION_USE_DYNAMIC_INSTALL="no", azext_iot_testrg=GROUP,
         azext_iot_dps_phase_receipts=str(directory), azext_iot_dps_run_uid=UID,
