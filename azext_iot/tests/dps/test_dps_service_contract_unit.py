@@ -89,8 +89,12 @@ def test_reference_create_and_update_preserve_wire(service, group):
         adr_ca_name=REFERENCES["certificateAuthorityName"],
         credential_policy_name=REFERENCES["certificatePolicyName"], **args
     )
-    assert created == record
+    expected = deepcopy(record)
+    if group:
+        expected["attestation"]["symmetricKey"].pop("primaryKey")
+    assert created == expected
     body = json.loads(service.calls[0].request.body)
+    assert body["attestation"]["symmetricKey"]["primaryKey"] == KEY
     assert {key: body[key] for key in REFERENCES} == REFERENCES
     assert "credentialPolicyName" not in body
     service.get(f"https://{HOST}/{path}/test", json=record)

@@ -16,6 +16,7 @@ from azext_iot.common.utility import ensure_azure_namespace_path
 from azext_iot.common.utility import read_file_content
 from azext_iot.tests.settings import DynamoSettings
 from typing import Optional, TypeVar, List
+from azure.cli.core.azclierror import CLIInternalError
 
 ensure_azure_namespace_path()
 
@@ -51,6 +52,13 @@ TEST_PIPELINE_ID = "{} {} {}".format(
     settings.env.job_id
 ).strip()
 USE_TAGS = str(settings.env.use_tags).lower() == "true"
+
+
+def invoke_checked(cli: EmbeddedCLI, command: str, *, description: str) -> EmbeddedCLI:
+    result = cli.invoke(command, capture_stderr=True)
+    if not result.success():
+        raise CLIInternalError(f"{description} failed with exit code {result.error_code}.")
+    return result
 
 
 def load_json(filename):

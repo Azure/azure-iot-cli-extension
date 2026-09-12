@@ -1269,10 +1269,16 @@ helps[
     type: command
     short-summary: Create an enrollment group in an Azure IoT Hub Device Provisioning Service.
     long-summary: |
+                  Symmetric key values are hidden by default. Use --show-keys to include generated or supplied
+                  keys in the response; this does not change credentials submitted to the service.
                   Please provide certificate format using Base64 ASCII encoding and the certificate
                   should have matching BEGIN and END segments, for example:
                   start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----'.
     examples:
+    - name: Create a symmetric-key enrollment group and explicitly return its generated keys.
+      text: >
+        az iot dps enrollment-group create -g {resource_group_name} --dps-name {dps_name}
+        --enrollment-id {enrollment_id} --show-keys
     - name: Create an enrollment group '{enrollment_id}' in the Azure IoT provisioning service
             '{dps_name}' in the resource group '{resource_group_name} using an intermediate certificate as primary certificate'.
       text: >
@@ -1318,6 +1324,7 @@ helps[
     type: command
     short-summary: Update an enrollment group in an Azure IoT Hub Device Provisioning Service.
     long-summary: |
+                  Symmetric key values are hidden by default. Use --show-keys to include them in the response.
                   Please provide certificate format using Base64 ASCII encoding and the certificate
                   should have matching BEGIN and END segments, for example:
                   start with '-----BEGIN CERTIFICATE-----' and end with '-----END CERTIFICATE-----'.

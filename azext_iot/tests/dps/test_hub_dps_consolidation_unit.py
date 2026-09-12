@@ -372,6 +372,38 @@ def test_worker_unrecognized_type_errors_do_not_disclose_messages(message):
     }
 
 
+@pytest.mark.parametrize("level", [logging.WARNING, logging.DEBUG])
+def test_worker_frame_diagnostics_are_bounded_and_debug_only(caplog, level):
+    caplog.set_level(level)
+    with pytest.raises(CLIInternalError) as raised:
+        worker.decode_response("{}")
+    diagnostics = worker._diagnostics(raised.value, "register")
+    assert 1 <= len(diagnostics["frames"]) <= 8
+    assert all(frame["file"] in worker._FRAME_FILES.values() for frame in diagnostics["frames"])
+    encoded = worker._error_to_json(RuntimeError("private payload and key material"), [])
+    encoded["diagnostics"] = diagnostics
+    with pytest.raises(CLIInternalError, match="Unexpected DPS registration worker error"):
+        worker.decode_response(json.dumps({"version": 1, "ok": False, "error": encoded}))
+    assert ("worker stage: register" in caplog.text) is (level == logging.DEBUG)
+    assert "private payload" not in caplog.text
+    assert str(Path(worker.__file__).parent) not in caplog.text
+    assert "source" not in diagnostics and "locals" not in diagnostics
+
+
+@pytest.mark.parametrize("frame", [
+    {"file": "/private/secret.py", "line": 1},
+    {"file": "dps/services/_registration.py", "line": "secret"},
+    {"file": "dps/services/_registration.py", "line": 1, "locals": "secret"},
+])
+def test_worker_rejects_untrusted_diagnostic_metadata(caplog, frame):
+    caplog.set_level(logging.DEBUG)
+    encoded = worker._error_to_json(RuntimeError("secret"), [])
+    encoded["diagnostics"] = {"stage": "register", "frames": [frame]}
+    with pytest.raises(CLIInternalError, match="invalid response"):
+        worker.decode_response(json.dumps({"version": 1, "ok": False, "error": encoded}))
+    assert "secret" not in caplog.text
+
+
 @pytest.fixture
 def fake_worker(mocker):
     child = mocker.MagicMock()

@@ -32,6 +32,8 @@ from azext_iot.common.arm import get_resource_group
 from azext_iot.common.utility import compute_device_key, shell_safe_json_parse
 from azext_iot.common.certops import open_certificate
 from azext_iot.dps.services._enrollment import handle_service_error as handle_service_exception
+from azext_iot.dps.services._enrollment_errors import handle_enrollment_error
+from azext_iot.dps.services._enrollment_output import enrollment_group_output
 from azext_iot.dps.providers.discovery import DPSDiscovery
 from azext_iot._factory import SdkResolver
 
@@ -186,7 +188,7 @@ def iot_dps_device_enrollment_list(
             sdk.individual_enrollment.query, [{"query": "SELECT *"}], top
         )
     except HttpResponseError as e:
-        handle_service_exception(e)
+        handle_enrollment_error(e, target, "list enrollments", handle_service_exception)
 
 
 def iot_dps_device_enrollment_get(
@@ -226,7 +228,7 @@ def iot_dps_device_enrollment_get(
                 )
         return enrollment
     except HttpResponseError as e:
-        handle_service_exception(e)
+        handle_enrollment_error(e, target, "show enrollment", handle_service_exception)
 
 
 def iot_dps_device_enrollment_create(
@@ -327,7 +329,7 @@ def iot_dps_device_enrollment_create(
         enrollment = _drop_none(enrollment)
         return sdk.individual_enrollment.create_or_update(enrollment_id, enrollment)
     except HttpResponseError as e:
-        handle_service_exception(e)
+        handle_enrollment_error(e, target, "create enrollment", handle_service_exception)
 
 
 def iot_dps_device_enrollment_update(
@@ -489,7 +491,7 @@ def iot_dps_device_enrollment_update(
             enrollment_id, _drop_readonly_enrollment(enrollment_record), **_etag_arguments(etag)
         )
     except HttpResponseError as e:
-        handle_service_exception(e)
+        handle_enrollment_error(e, target, "update enrollment", handle_service_exception)
 
 
 def iot_dps_device_enrollment_delete(
@@ -516,7 +518,7 @@ def iot_dps_device_enrollment_delete(
             enrollment_id, **_etag_arguments(etag)
         )
     except HttpResponseError as e:
-        handle_service_exception(e)
+        handle_enrollment_error(e, target, "delete enrollment", handle_service_exception)
 
 
 # DPS Enrollments Group
@@ -540,7 +542,7 @@ def iot_dps_device_enrollment_group_list(
             sdk.enrollment_group.query, [{"query": "SELECT *"}], top
         )
     except HttpResponseError as e:
-        handle_service_exception(e)
+        handle_enrollment_error(e, target, "list enrollment groups", handle_service_exception)
 
 
 def iot_dps_device_enrollment_group_get(
@@ -578,9 +580,9 @@ def iot_dps_device_enrollment_group_get(
                         enrollment_type
                     )
                 )
-        return enrollment_group
+        return enrollment_group_output(enrollment_group, show_keys)
     except HttpResponseError as e:
-        handle_service_exception(e)
+        handle_enrollment_error(e, target, "show enrollment group", handle_service_exception)
 
 
 def iot_dps_device_enrollment_group_create(
@@ -610,6 +612,7 @@ def iot_dps_device_enrollment_group_create(
     api_version=None,
     login=None,
     auth_type_dataplane=None,
+    show_keys=False,
 ):
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
@@ -677,11 +680,11 @@ def iot_dps_device_enrollment_group_create(
                 credential_policy_name,
             ),
         }
-        return sdk.enrollment_group.create_or_update(
-            enrollment_id, _drop_none(group_enrollment)
+        return enrollment_group_output(
+            sdk.enrollment_group.create_or_update(enrollment_id, _drop_none(group_enrollment)), show_keys
         )
     except HttpResponseError as e:
-        handle_service_exception(e)
+        handle_enrollment_error(e, target, "create enrollment group", handle_service_exception)
 
 
 def iot_dps_device_enrollment_group_update(
@@ -714,6 +717,7 @@ def iot_dps_device_enrollment_group_update(
     api_version=None,
     login=None,
     auth_type_dataplane=None,
+    show_keys=False,
 ):
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
@@ -857,13 +861,14 @@ def iot_dps_device_enrollment_group_update(
                     credential_policy_name,
                 )
             )
-        return sdk.enrollment_group.create_or_update(
-            enrollment_id,
-            _drop_readonly_enrollment(enrollment_record),
-            **_etag_arguments(etag),
+        return enrollment_group_output(
+            sdk.enrollment_group.create_or_update(
+                enrollment_id, _drop_readonly_enrollment(enrollment_record), **_etag_arguments(etag),
+            ),
+            show_keys,
         )
     except HttpResponseError as e:
-        handle_service_exception(e)
+        handle_enrollment_error(e, target, "update enrollment group", handle_service_exception)
 
 
 def iot_dps_device_enrollment_group_delete(
@@ -890,7 +895,7 @@ def iot_dps_device_enrollment_group_delete(
             enrollment_id, **_etag_arguments(etag)
         )
     except HttpResponseError as e:
-        handle_service_exception(e)
+        handle_enrollment_error(e, target, "delete enrollment group", handle_service_exception)
 
 
 def iot_dps_compute_device_key(

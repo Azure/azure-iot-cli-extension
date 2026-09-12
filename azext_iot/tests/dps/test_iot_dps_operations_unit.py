@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 import base64
+from copy import deepcopy
 from unittest.mock import MagicMock
 
 import pytest
@@ -379,7 +380,9 @@ def test_compute_device_key_paths(mocker):
 def _mock_sdk(mocker):
     mocker.patch.object(subject, "DPSDiscovery")
     resolver = mocker.patch.object(subject, "SdkResolver")
-    return resolver.return_value.get_sdk.return_value
+    sdk = resolver.return_value.get_sdk.return_value
+    sdk.enrollment_group.create_or_update.side_effect = lambda _name, body, **_kwargs: deepcopy(body)
+    return sdk
 
 
 def test_individual_update_covers_tpm_and_new_certificate_reference(mocker):

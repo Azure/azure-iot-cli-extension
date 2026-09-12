@@ -16,8 +16,8 @@ from azure.core.exceptions import HttpResponseError
 from knack.log import get_logger
 from msrestazure.azure_exceptions import CloudError
 
-from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.tests.helpers import assign_role_assignment, get_role_assignments
+from azext_iot.tests.helpers import invoke_checked  # noqa: F401 - compatibility re-export
 from azext_iot.tests.settings import HUB_TEST_LOCATION
 
 
@@ -31,13 +31,6 @@ LOCAL_AUTH_DEVICE_HTTP_REASON = (
 )
 _CANARY_HUB_LIST_API_VERSIONS = frozenset({"2026-05-01-preview", "2026-10-01-preview"})
 logger = get_logger(__name__)
-
-
-def invoke_checked(cli: EmbeddedCLI, command: str, *, description: str) -> EmbeddedCLI:
-    result = cli.invoke(command, capture_stderr=True)
-    if not result.success():
-        raise CLIInternalError(f"{description} failed with exit code {result.error_code}.")
-    return result
 
 
 def wait_for_query_ids(read, expected_ids, id_key=None, attempts=7, wait=10):

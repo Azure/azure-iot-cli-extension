@@ -33,6 +33,20 @@ from azure.core.exceptions import (
     ClientAuthenticationError, HttpResponseError, ResourceExistsError, ResourceNotFoundError as HttpResourceNotFoundError,
     ServiceRequestError, ServiceResponseError,
 )
+from knack.log import get_logger
+
+
+logger = get_logger(__name__)
+_STAGES = frozenset(("load-extension", "read-request", "register"))
+_FRAME_FILES = {
+    str(Path(__file__).resolve().parents[2] / relative): relative
+    for relative in (
+        "_factory.py", "dps/providers/device_registration.py",
+        "dps/services/_registration.py", "dps/services/_registration_worker.py",
+        "dps/services/_csr.py", "dps/services/_authentication.py",
+        "sdk/dps/device/_client.py", "sdk/dps/device/operations/_operations.py",
+    )
+}
 
 
 _ERROR_TYPES = {kind.__name__: kind for kind in (
@@ -88,7 +102,33 @@ def _error_from_json(value):
         error.error = SimpleNamespace(code=value.get("code"), message=value.get("service_message"))
     if "cause" in value:
         error.__cause__ = _error_from_json(value["cause"])
+    if "diagnostics" in value:
+        diagnostics = value["diagnostics"]
+        stage, frames = diagnostics["stage"], diagnostics["frames"]
+        if stage not in _STAGES or not isinstance(frames, list) or len(frames) > 8:
+            raise ValueError("Invalid worker diagnostics.")
+        for frame in frames:
+            if (
+                not isinstance(frame, dict) or set(frame) != {"file", "line"}
+                or frame["file"] not in _FRAME_FILES.values()
+                or type(frame["line"]) is not int or not 1 <= frame["line"] <= 20000
+            ):
+                raise ValueError("Invalid worker diagnostic frame.")
+        logger.debug("DPS registration worker stage: %s; extension frames: %s", stage, frames)
     return error
+
+
+def _diagnostics(error, stage):
+    frames = []
+    trace = error.__traceback__
+    examined = 0
+    while trace is not None and examined < 32:
+        relative = _FRAME_FILES.get(trace.tb_frame.f_code.co_filename)
+        if relative is not None and 1 <= trace.tb_lineno <= 20000:
+            frames.append({"file": relative, "line": trace.tb_lineno})
+        trace = trace.tb_next
+        examined += 1
+    return {"stage": stage, "frames": frames[-8:]}
 
 
 def decode_response(output):
@@ -109,6 +149,7 @@ def decode_response(output):
 def main():
     output = sys.stdout
     secrets = []
+    stage = "load-extension"
     try:
         # Never mix library output with the protocol, or forward a worker traceback.
         with redirect_stdout(sys.stderr):
@@ -117,13 +158,16 @@ def main():
             if Path(_registration.__file__).resolve() != Path(__file__).with_name("_registration.py").resolve():
                 raise CLIInternalError("DPS registration worker loaded an unexpected extension location.")
 
+            stage = "read-request"
             request = json.load(sys.stdin)
             values = request.pop("provider")
             secrets = [values["device_symmetric_key"], values["passphrase"], request["body"].get("csr")]
+            stage = "register"
             result = _registration.register_in_worker(values, **request)
         response = {"version": 1, "ok": True, "result": result}
     except Exception as error:  # Exceptions must cross the process boundary, never become a successful empty result.
         response = {"version": 1, "ok": False, "error": _error_to_json(error, secrets)}
+        response["error"]["diagnostics"] = _diagnostics(error, stage)
     json.dump(response, output)
     output.flush()
 

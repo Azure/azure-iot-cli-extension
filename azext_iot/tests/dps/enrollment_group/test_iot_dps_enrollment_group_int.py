@@ -242,7 +242,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module,
         enrollment = cli.invoke(
             set_cmd_auth_type(
                 f"iot dps enrollment-group create --enrollment-id {enrollment_id} -g {dps_rg} --dps-name {dps_host_name} "
-                f"--pk {primary_key} --sk {secondary_key} --provisioning-status {EntityStatusType.enabled.value}"
+                f"--pk {primary_key} --sk {secondary_key} --show-keys --provisioning-status {EntityStatusType.enabled.value}"
                 f" --initial-twin-tags \"{generic_dict}\" --initial-twin-properties \"{generic_dict}\" "
                 f"--allocation-policy {AllocationType.geolatency.value} --rp {ReprovisionType.reprovisionandresetdata.value} "
                 f"--iot-hubs {hub_hostname} --edge-enabled",
@@ -285,7 +285,7 @@ def test_dps_enrollment_group_symmetrickey_lifecycle(provisioned_iot_dps_module,
         enrollment_update = cli.invoke(
             set_cmd_auth_type(
                 f"iot dps enrollment-group update -g {dps_rg} --dps-name {dps_host_name} --enrollment-id {enrollment_id}"
-                f" --provisioning-status {EntityStatusType.disabled.value} --etag {etag} --edge-enabled False"
+                f" --provisioning-status {EntityStatusType.disabled.value} --etag {etag} --edge-enabled False --show-keys"
                 f" --allocation-policy {AllocationType.custom.value} --webhook-url {WEBHOOK_URL} --api-version {API_VERSION}",
                 auth_type=auth_phase,
                 cstring=dps_cstring
