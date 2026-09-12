@@ -433,7 +433,8 @@ def _enable_dps_hub_identity(dps_name: str, iot_hub: Dict) -> None:
     _assign_fixture_role(
         role=HUB_USER_ROLE,
         scope=iot_hub["hub"]["id"],
-        assignee=principal_id,
+        assignee_object_id=principal_id,
+        assignee_principal_type="ServicePrincipal",
         max_tries=MAX_RBAC_ASSIGNMENT_TRIES,
     )
     # The DPS managed identity has a separate Hub data-role grant and must

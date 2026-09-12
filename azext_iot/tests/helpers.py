@@ -7,8 +7,11 @@
 import json
 import os
 
+from contextlib import contextmanager
+from functools import wraps
 from inspect import getsourcefile
 from time import sleep
+from unittest.mock import patch
 from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.common.shared import AuthenticationTypeDataplane
@@ -178,12 +181,45 @@ def get_agent_public_ip():
     return requests.head("https://www.wikipedia.org").headers["X-Client-IP"]
 
 
+def role_assignment_create_command(role, scope, assignee=None, *, assignee_object_id=None, assignee_principal_type=None):
+    """Keep caller aliases distinct from already-known Entra object IDs; never infer from UUID shape."""
+    if bool(assignee) == bool(assignee_object_id):
+        raise ValueError("Specify exactly one of assignee or assignee_object_id.")
+    if bool(assignee_object_id) != bool(assignee_principal_type):
+        raise ValueError("Known object IDs require assignee_principal_type; caller aliases must not specify it.")
+    target = f'--assignee "{assignee}"'
+    if assignee_object_id:
+        target = f'--assignee-object-id "{assignee_object_id}" --assignee-principal-type "{assignee_principal_type}"'
+    return f'role assignment create {target} --role "{role}" --scope "{scope}"'
+
+
+@contextmanager
+def role_assignment_create_scope(assignee_object_id=None):
+    """Avoid Graph hydration in native CLI's RoleAssignmentExists fallback for this one known-ID command."""
+    if not assignee_object_id:
+        yield
+        return
+    from azure.cli.command_modules.role import custom as role_commands
+    original = role_commands.list_role_assignments
+
+    @wraps(original)
+    def list_without_names(*args, **kwargs):
+        if kwargs.get("assignee_object_id") == assignee_object_id:
+            kwargs.update(fill_principal_name=False, fill_role_definition_name=False)
+        return original(*args, **kwargs)
+
+    with patch.object(role_commands, "list_role_assignments", list_without_names):
+        yield
+
+
 def get_role_assignments(
     scope: str,
     assignee: str = None,
     role: str = None,
     *,
     fill_role_definition_name: bool = True,
+    assignee_object_id: str = None,
+    fill_principal_name: bool = True,
 ) -> List[dict]:
     """
     Get rbac permissions of resource.
@@ -196,31 +232,46 @@ def get_role_assignments(
 
     if assignee:
         assignee_flag = '--assignee "{}"'.format(assignee)
+    if assignee_object_id:
+        if assignee:
+            raise ValueError("Specify only one of assignee or assignee_object_id.")
+        assignee_flag = f'--assignee-object-id "{assignee_object_id}"'
 
     command = f'role assignment list --scope "{scope}" {role_flag} {assignee_flag}'
     if not fill_role_definition_name:
         command += " --fill-role-definition-name false"
+    if not fill_principal_name:
+        command += " --fill-principal-name false"
+    if assignee_object_id:
+        return cli.invoke(command, capture_stderr=True).as_json()
     return cli.invoke(command).as_json()
 
 
 def assign_role_assignment(
     role: str,
     scope: str,
-    assignee: str,
+    assignee: str = None,
     max_tries=10,
     wait=10,
+    *,
+    assignee_object_id: str = None,
+    assignee_principal_type: str = None,
 ):
     """
     Assign rbac permissions to resource.
     """
     from azure.cli.core.azclierror import CLIInternalError
 
-    principal_kpis = ["name", "principalId", "principalName"]
-    expected_principals = {assignee}
+    command = role_assignment_create_command(
+        role, scope, assignee, assignee_object_id=assignee_object_id, assignee_principal_type=assignee_principal_type,
+    )
+    principal_kpis = ["principalId"] if assignee_object_id else ["name", "principalId", "principalName"]
+    expected_principals = {assignee_object_id or assignee}
+    visibility = {"assignee_object_id": assignee_object_id, "fill_principal_name": False} if assignee_object_id else {}
     for attempt in range(max_tries + 1):
         flat_assignment_kpis = []
         # Visibility checks do not need the CLI's additional role-definition name enumeration.
-        role_assignments = get_role_assignments(scope=scope, role=role, fill_role_definition_name=False)
+        role_assignments = get_role_assignments(scope=scope, role=role, fill_role_definition_name=False, **visibility)
         logger.info(f"Role assignments for the role of '{role}' against scope '{scope}': {role_assignments}")
         for role_assignment in role_assignments:
             for principal_kpi in principal_kpis:
@@ -230,26 +281,30 @@ def assign_role_assignment(
             return
         if attempt == max_tries:
             break
+        if assignee_object_id and attempt:
+            # Known-ID grants create once; subsequent attempts only poll ARM visibility.
+            sleep(wait)
+            continue
         # else assign role to scope and check again
-        output = cli.invoke(
-            f'role assignment create --assignee "{assignee}" --role "{role}" --scope "{scope}"',
-            capture_stderr=True,
-        )
+        with role_assignment_create_scope(assignee_object_id):
+            output = cli.invoke(command, capture_stderr=True)
         if not output.success():
             error = output.get_error()
             if error:
                 raise error
             raise CLIInternalError(
-                f"Role assignment create failed for '{assignee}', role '{role}', scope '{scope}' "
+                f"Role assignment create failed for '{assignee_object_id or assignee}', role '{role}', scope '{scope}' "
                 f"(exit code {output.error_code})."
             )
 
         principal_id = output.as_json().get("principalId")
-        if principal_id:
+        if principal_id and not assignee_object_id:
             expected_principals.add(principal_id)
         sleep(wait)
+    attempt_kind = "verification" if assignee_object_id else "assignment"
     raise CLIInternalError(
-        f"Role '{role}' for '{assignee}' at scope '{scope}' was not visible after {max_tries} assignment attempts."
+        f"Role '{role}' for '{assignee_object_id or assignee}' at scope '{scope}' "
+        f"was not visible after {max_tries} {attempt_kind} attempts."
     )
 
 
