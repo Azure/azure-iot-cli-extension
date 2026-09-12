@@ -30,6 +30,7 @@ class IntegrationProgress:
         self._stop = Event()
         self._thread = None
         self._reporter = None
+        self._finishing = False
 
     @staticmethod
     def _is_integration(nodeid):
@@ -86,7 +87,11 @@ class IntegrationProgress:
         while not self._stop.wait(self.interval):
             with self._lock:
                 if not self._active:
-                    self._write("No active integration test reported; collecting or awaiting workers.")
+                    self._write(
+                        "Waiting for integration session cleanup to finish; no active test."
+                        if self._finishing else
+                        "No active integration test reported; collecting or awaiting workers."
+                    )
                     continue
                 now = self.clock()
                 self._write(
@@ -105,9 +110,14 @@ class IntegrationProgress:
             self._thread.join(timeout=1)
             self._thread = None
 
-    @pytest.hookimpl(tryfirst=True)
+    @pytest.hookimpl(hookwrapper=True, tryfirst=True)
     def pytest_sessionfinish(self):
-        self._shutdown()
+        with self._lock:
+            self._finishing = True
+        try:
+            yield
+        finally:
+            self._shutdown()
 
     def pytest_unconfigure(self):
         self._shutdown()

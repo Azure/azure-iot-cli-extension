@@ -98,6 +98,16 @@ def pytest_sessionstart(session):
 
 
 @pytest.hookimpl(trylast=True)
+def pytest_sessionfinish(session):
+    if not _phase_receipts.settings() or hasattr(session.config, "workerinput"):
+        return
+    run_uid = _get_run_uid(session)
+    with ExitStack() as cleanup:
+        for kind in ("hub", "nh", "h"):
+            cleanup.callback(_release_phase_fixture, run_uid, kind)
+
+
+@pytest.hookimpl(trylast=True)
 def pytest_collection_modifyitems(config, items):
     _phase.select_items(config, items)
     _phase_receipts.selected(config, items)
@@ -211,8 +221,9 @@ def _timestamp() -> str:
 # --- Cross-worker shared-resource coordination -------------------------------------------------
 # A single instance per kind is shared by every xdist worker of the same run. State is a small JSON
 # file (``{"name", "refcount"}``) guarded by a file lock so only the first worker creates the
-# resource and the last worker out deletes it. ``kind`` is one of "h" (hub-linked DPS), "nh"
-# (no-hub DPS) or "hub" (the shared IoT Hub).
+# resource and the last reference released deletes it. Explicit phases reserve a controller
+# reference until every worker finishes, including workers which acquire a resource late.
+# ``kind`` is one of "h" (hub-linked DPS), "nh" (no-hub DPS) or "hub" (the shared IoT Hub).
 def _state_paths(run_uid: str, kind: str):
     base = os.path.join(tempfile.gettempdir(), f"{INT_TEST_DPS_PREFIX}-{run_uid}-{kind}")
     return base + ".lock", base + ".json"
@@ -255,13 +266,13 @@ def _shared_acquire(run_uid: str, kind: str, create_fn, find_fn) -> dict:
                 _cleanup_created_resource, name, run_uid, kind, find_fn,
                 _delete_hub if kind == "hub" else _delete_dps,
             )
-            _write_state(state_path, {"name": name, "refcount": 1})
+            _write_state(state_path, {"name": name, "refcount": 2 if _phase_receipts.settings() else 1})
             cleanup.pop_all()
         return resource
 
 
 def _shared_release(run_uid: str, kind: str, delete_fn) -> None:
-    """Drop one reference to the shared resource for ``kind``; the last worker deletes it."""
+    """Drop one reference to the shared resource for ``kind``; the last reference deletes it."""
     lock_path, state_path = _state_paths(run_uid, kind)
     with FileLock(lock_path):
         state = _read_state(state_path)
@@ -273,6 +284,16 @@ def _shared_release(run_uid: str, kind: str, delete_fn) -> None:
             _safe_remove(state_path)
         else:
             _write_state(state_path, state)
+
+
+def _release_phase_fixture(run_uid: str, kind: str) -> None:
+    logger.info("Releasing phase controller reference for '%s' fixture.", kind)
+    find_fn = _find_hub_by_name if kind == "hub" else _find_dps_by_name
+    delete_fn = _delete_hub if kind == "hub" else _delete_dps
+    _shared_release(
+        run_uid, kind,
+        lambda name: _cleanup_created_resource(name, run_uid, kind, find_fn, delete_fn),
+    )
 
 
 # --- Age-based garbage collection of orphans (from crashed runs) -------------------------------
