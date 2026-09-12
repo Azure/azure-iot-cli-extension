@@ -1,5 +1,8 @@
+# coding=utf-8
+# --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
 
 """No Azure: real SDK HTTP pipelines and real tox/xdist with local-only fixtures."""
 
@@ -405,56 +408,99 @@ def test_separate_real_embedded_clis_and_link_transition_are_pinned_without_prof
 
 
 @pytest.mark.timeout(100)
+@pytest.mark.skipif(sys.platform != "linux", reason="Real DPS orchestration requires Linux signals, process groups and /proc.")
 def test_real_tox_xdist_timeout_allows_twelve_second_fixture_cleanup_and_ends_children(tmp_path, mocker):
     directory = tmp_path / "receipts"
     directory.mkdir()
     environment = dict(
         os.environ, PYTHONPATH=str(ROOT), PYTEST_DISABLE_PLUGIN_AUTOLOAD="1", VIRTUALENV_NO_PERIODIC_UPDATE="1",
+        VIRTUALENV_DOWNLOAD="0", PIP_NO_INDEX="1",
         azext_iot_dps_phase_receipts=str(directory), azext_iot_dps_run_uid=UID,
         azext_iot_dps_test_subscription=SUB_B, azext_iot_dps_test_resource_group="group",
         azext_iot_dps_test_phase="regular",
     )
     config = tmp_path / "tox.ini"
     config.write_text(
-        "[tox]\nenv_list=cleanup-proof\n[testenv:cleanup-proof]\npackage=skip\nsitepackages=true\n"
-        "passenv=PYTHONPATH,PYTEST_DISABLE_PLUGIN_AUTOLOAD,AZURE_CONFIG_DIR,azext_*\n"
-        "commands=python -m pytest -p xdist.plugin -n 2 --max-worker-restart=0 -q test_workers.py\n",
+        "[tox]\nenv_list=cleanup-proof\n[testenv:cleanup-proof]\npackage=skip\nsitepackages=false\n"
+        "passenv=PYTHONPATH,PYTHONNOUSERSITE,PYTHONDONTWRITEBYTECODE,"
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD,AZURE_CONFIG_DIR,azext_*\n"
+        # sitepackages=true exposes the base/user site, NOT the parent tox
+        # venv's dependencies. Run the already-populated interpreter explicitly;
+        # do not install dependencies or depend on global/user-site fallback.
+        f"allowlist_externals={sys.executable}\n"
+        f'commands="{sys.executable}" -m pytest -p xdist.plugin -n 2 --max-worker-restart=0 -q test_workers.py\n',
         encoding="utf-8",
     )
     (tmp_path / "conftest.py").write_text(
-        "import socket\n"
+        "import json,os,socket\nfrom pathlib import Path\n"
         "def deny(*args, **kwargs): raise AssertionError('offline process cannot connect')\n"
         "socket.socket.connect = deny\n"
         "from azext_iot.tests.dps import _phase_runtime\n"
-        "def pytest_sessionstart(session): _phase_runtime.start_worker(session)\n",
+        "def pytest_sessionstart(session):\n"
+        "    _phase_runtime.start_worker(session)\n"
+        "    if not hasattr(session.config, 'workerinput'):\n"
+        "        Path('controller.json').write_text(json.dumps({'pid':os.getpid(),'parent_pid':os.getppid()}))\n",
         encoding="utf-8",
     )
     (tmp_path / "test_workers.py").write_text(
-        "import os,time,pytest\nfrom pathlib import Path\n"
+        "import json,os,sys,time,pytest\nfrom pathlib import Path\n"
         "@pytest.fixture(scope='session')\n"
         "def owned():\n"
-        "    Path('started-'+str(os.getpid())).write_text('started')\n"
+        "    Path('started-'+str(os.getpid())).write_text(json.dumps({\n"
+        "        'executable':sys.executable,'prefix':sys.prefix,'pytest':pytest.__file__}))\n"
         "    yield\n"
+        "    started=time.monotonic()\n"
         "    time.sleep(12)\n"
-        "    Path('cleaned-'+str(os.getpid())).write_text('cleaned')\n"
+        "    Path('cleaned-'+str(os.getpid())).write_text(json.dumps({'elapsed':time.monotonic()-started}))\n"
         "@pytest.mark.parametrize('case',[0,1])\n"
         "def test_wait(owned,case):\n"
         "    while True: time.sleep(.1)\n",
         encoding="utf-8",
     )
-    command = [sys.executable, "-m", "tox", "r", "-c", str(config), "-e", "cleanup-proof"]
-    subprocess.run(command + ["--notest"], env=environment, check=True, capture_output=True, timeout=45)
+    # Outer tox exports TOX_WORK_DIR. Explicit CLI paths keep the nested
+    # environment and its commands inside this test, never the repository's .tox.
+    command = [
+        sys.executable, "-m", "tox", "r", "-c", str(config), "-e", "cleanup-proof",
+        "--root", str(tmp_path), "--workdir", str(tmp_path / ".tox"),
+    ]
+    setup = subprocess.run(command + ["--notest"], env=environment, capture_output=True, timeout=45, check=False)
+    redactor = RUNNER["Redactor"]()
+    setup_status = setup.returncode
+    setup_diagnostic = "".join(
+        redactor.line(line) for line in (setup.stdout + setup.stderr).decode("utf-8", errors="replace").splitlines(True)
+    )[-4096:]
+    del setup  # Assertion rewriting must not include an unbounded/raw CompletedProcess repr.
+    assert setup_status == 0, setup_diagnostic
+    venv_config = tmp_path / ".tox/cleanup-proof/pyvenv.cfg"
+    assert "include-system-site-packages = false" in venv_config.read_text(encoding="utf-8")
     mocker.patch.dict(RUNNER["child"].__globals__, READ_SECONDS=1)
     started = time.monotonic()
     result = RUNNER["child"](command, environment, tmp_path / "log", runtime=10, cleanup=25)
-    assert result["timed_out"] and result["interrupted"] and result["exit_code"] != 0
-    assert 22 <= time.monotonic() - started < 40
+    elapsed = time.monotonic() - started
+    # The runner log is already redacted; bound assertion diagnostics even if
+    # pytest exits during startup, before creating any worker/cleanup receipts.
+    with (tmp_path / "log").open("rb") as stream:
+        stream.seek(max(0, (tmp_path / "log").stat().st_size - 4096))
+        diagnostic = f"{result}; elapsed={elapsed:.2f}s\n{stream.read().decode('utf-8', errors='replace')}"
+    assert result["timed_out"] and result["interrupted"] and result["exit_code"] == 2, diagnostic
+    assert 22 <= elapsed < 40, diagnostic
     markers = sorted(tmp_path.glob("started-*"))
-    assert len(markers) == 2
+    workers = [json.loads(path.read_text()) for path in directory.glob("worker-*.json")]
+    assert len(markers) == len(workers) == 2, diagnostic
+    assert {int(marker.name.partition("-")[2]) for marker in markers} == {worker["pid"] for worker in workers}, diagnostic
     for marker in markers:
         pid = int(marker.name.partition("-")[2])
-        assert (tmp_path / f"cleaned-{pid}").is_file()
-        assert not Path(f"/proc/{pid}").exists()
-    for path in directory.glob("worker-*.json"):
-        assert not Path(f"/proc/{json.loads(path.read_text())['parent_pid']}").exists()
-    assert (directory / "stop-requested.json").is_file()
+        assert json.loads(marker.read_text()) == {
+            "executable": sys.executable, "prefix": sys.prefix, "pytest": pytest.__file__,
+        }, diagnostic
+        cleaned = tmp_path / f"cleaned-{pid}"
+        assert cleaned.is_file(), diagnostic
+        assert json.loads(cleaned.read_text())["elapsed"] >= 12, diagnostic
+        assert not Path(f"/proc/{pid}").exists(), diagnostic
+    controller_path = tmp_path / "controller.json"
+    assert controller_path.is_file(), diagnostic
+    controller = json.loads(controller_path.read_text())
+    assert {worker["parent_pid"] for worker in workers} == {controller["pid"]}, diagnostic
+    assert not Path(f"/proc/{controller['pid']}").exists(), diagnostic
+    assert not Path(f"/proc/{controller['parent_pid']}").exists(), diagnostic
+    assert (directory / "stop-requested.json").is_file(), diagnostic
