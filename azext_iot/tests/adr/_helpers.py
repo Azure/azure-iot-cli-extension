@@ -14,6 +14,7 @@ import time
 from typing import Callable, Dict, Optional, TypeVar
 
 from azure.cli.core.azclierror import ResourceNotFoundError as CLIResourceNotFoundError
+from azure.cli.testsdk.exceptions import CliExecutionError
 from azure.core.exceptions import (
     ClientAuthenticationError,
     HttpResponseError,
@@ -75,29 +76,42 @@ class CleanupLedger:
 
     def __init__(self):
         self._actions = []
+        self._completed = set()
 
     def __enter__(self):
         return self
 
-    def register(self, label: str, cleanup: Callable[[], None]) -> None:
-        self._actions.append((label, cleanup))
+    def register(self, label: str, cleanup: Callable[[], None], *, depends_on=()) -> None:
+        self._completed.discard(label)
+        self._actions.append((label, cleanup, tuple(depends_on)))
 
     def dismiss(self, label: str) -> None:
         self._actions = [
             action for action in self._actions if action[0] != label
         ]
+        self._completed.add(label)
 
     def cleanup(self) -> list:
         failures = []
+        pending = []
         while self._actions:
-            label, cleanup = self._actions.pop()
+            action = self._actions.pop()
+            label, cleanup, dependencies = action
             try:
+                unresolved = [dependency for dependency in dependencies if dependency not in self._completed]
+                if unresolved:
+                    raise AssertionError(
+                        f"Dependent cleanup has not completed: {', '.join(unresolved)}"
+                    )
                 cleanup()
             except Exception as error:  # noqa: BLE001 - report all cleanup errors
                 failures.append((label, error))
+                pending.append(action)
                 _log(LogKind.WARN, "Cleanup failed for %s: %s", label, error)
             else:
+                self._completed.add(label)
                 _log(LogKind.RESULT, "Cleanup completed for %s", label)
+        self._actions.extend(reversed(pending))
         return failures
 
     def __exit__(self, exception_type, _exception, _traceback):
@@ -163,6 +177,17 @@ def is_resource_not_found_error(error: Exception) -> bool:
         # failure as its implicit context. Only unwrap status-less wrappers.
         if cause is None and not response_statuses and not current.__suppress_context__:
             cause = current.__context__
+        if (
+            isinstance(current, CliExecutionError)
+            and current.__cause__ is None
+            and id(current.exception) in seen
+            and current.exception.__context__ is current
+            and current.__context__ in (None, current.exception)
+        ):
+            # testsdk re-raises the same exception; Python can break the
+            # resulting context cycle at this wrapper. Keep all metadata above.
+            current = current.exception
+            break
         if cause is None:
             break
         current = cause
@@ -185,6 +210,34 @@ def is_resource_not_found_error(error: Exception) -> bool:
     if isinstance(current, SystemExit):
         return current.code == 3
     return isinstance(current, CLIError) and RESOURCE_NOT_FOUND_ERROR.fullmatch(str(current)) is not None
+
+
+def resource_is_absent(test, show_command: str, *, description: str = "resource") -> bool:
+    try:
+        test.cmd(show_command)
+    except SystemExit as error:
+        if error.code == 3 and is_resource_not_found_error(error):
+            return True
+        raise AssertionError(f"{description} lookup exited with code {error.code}") from error
+    except (HttpResponseError, CloudError, CLIError) as error:
+        if not is_resource_not_found_error(error):
+            raise
+        return True
+    return False
+
+
+def wait_for_resource_absent(
+    test, show_command: str, *, timeout: float = MATERIALIZATION_POLL_TIMEOUT, interval: float = 5,
+) -> None:
+    wait_for_condition(
+        lambda: resource_is_absent(test, show_command),
+        lambda absent: absent,
+        description=f"resource absence: {show_command}",
+        timeout=timeout,
+        interval=interval,
+        describe=lambda _absent: "resource is still readable",
+        is_retryable_error=lambda _error: False,
+    )
 
 
 def wait_for_condition(
@@ -455,17 +508,7 @@ class ADRFullInfraHelper(RoleAssignmentHelper):
     def _resource_is_absent(self, kind, name, resource_group):
         command = self._RESOURCE_COMMANDS[kind]
         arguments = f"-n {shlex.quote(name)} -g {shlex.quote(resource_group)}"
-        try:
-            self.cmd(f"{command} show {arguments}")
-        except SystemExit as error:
-            if error.code == 3 and is_resource_not_found_error(error):
-                return True
-            raise AssertionError(f"{kind} lookup exited with code {error.code}") from error
-        except (HttpResponseError, CloudError, CLIError) as error:
-            if not is_resource_not_found_error(error):
-                raise
-            return True
-        return False
+        return resource_is_absent(self, f"{command} show {arguments}", description=kind)
 
     def _delete_owned_resource(self, kind, name, resource_group):
         if self._resource_is_absent(kind, name, resource_group):
