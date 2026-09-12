@@ -9,6 +9,7 @@ from copy import deepcopy
 from unittest.mock import Mock
 
 import pytest
+from azure.cli.core.azclierror import CLIInternalError
 from azure.core import MatchConditions
 from azure.core.polling import (
     AsyncLROPoller,
@@ -30,6 +31,30 @@ RESOURCE_ID = (
     "/subscriptions/sub/resourceGroups/rg/providers/"
     "Microsoft.Devices/IotHubs/hub"
 )
+
+
+@pytest.mark.parametrize(
+    "resource",
+    [
+        {"id": RESOURCE_ID},
+        {"id": RESOURCE_ID, "resourcegroup": "stale-rg"},
+        {"resourcegroup": "rg"},
+    ],
+)
+def test_hub_resource_group_supports_modeless_and_legacy_resources(resource):
+    from azext_iot.core.custom import _get_resource_group_from_hub
+
+    original = deepcopy(resource)
+    assert _get_resource_group_from_hub(resource) == "rg"
+    assert resource == original
+
+
+@pytest.mark.parametrize("resource", [None, {}, {"id": 42}, {"id": "invalid"}])
+def test_hub_resource_group_reports_missing_resource_context(resource):
+    from azext_iot.core.custom import _get_resource_group_from_hub
+
+    with pytest.raises(CLIInternalError, match="IoT Hub response did not include a usable resource ID"):
+        _get_resource_group_from_hub(resource)
 
 
 @pytest.mark.parametrize(

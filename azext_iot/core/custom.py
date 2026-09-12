@@ -33,6 +33,7 @@ from knack.util import CLIError
 from azext_iot._factory import iot_hub_service_factory, resource_service_factory
 from azext_iot.common.arm import (
     adapt_modeless_lro_poller,
+    get_resource_group,
     hub_description_for_write as _hub_description_for_write,
     hub_etag_arguments,
     sanitize_arm_identity as _sanitize_arm_identity,
@@ -81,9 +82,9 @@ class SimpleAccessRights(Enum):
     device_connect = AccessRights.DEVICE_CONNECT
 
 
-def _get_resource_group_from_hub(hub):
+def _get_resource_group_from_hub(hub, fallback=None):
     """Extract resource group from an IoT Hub resource dict."""
-    return hub["resourcegroup"]
+    return get_resource_group(hub, fallback=fallback, resource_label="IoT Hub")
 
 
 def _resolve_linked_hub_hostname(hub, hostname_type="auto"):

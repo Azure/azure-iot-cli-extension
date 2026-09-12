@@ -9,8 +9,10 @@
 from copy import deepcopy
 from typing import Optional
 
+from azure.cli.core.azclierror import CLIInternalError
 from azure.core import MatchConditions
 from azure.core.polling import AsyncLROPoller, LROPoller
+from msrestazure.tools import parse_resource_id
 
 
 def _deserialize_modeless_lro_response(pipeline_response):
@@ -37,6 +39,34 @@ def adapt_modeless_lro_poller(poller):
         _deserialize_modeless_lro_response
     )
     return poller
+
+
+def _resource_id_parts(resource: Optional[dict]) -> dict:
+    resource_id = (resource or {}).get("id")
+    if not isinstance(resource_id, str) or not resource_id:
+        return {}
+    return parse_resource_id(resource_id)
+
+
+def get_resource_group(
+    resource: Optional[dict],
+    fallback: Optional[str] = None,
+    resource_label: str = "resource",
+) -> str:
+    """Resolve a resource group from caller context or an ARM resource ID.
+
+    Modeless management clients return the service JSON verbatim and therefore
+    do not add the legacy ``resourcegroup`` convenience field.
+    """
+    if fallback:
+        return fallback
+    resource_group = _resource_id_parts(resource).get("resource_group") or (resource or {}).get("resourcegroup")
+    if not resource_group:
+        raise CLIInternalError(
+            f"The {resource_label} response did not include a usable resource "
+            "ID and no resource group was supplied."
+        )
+    return resource_group
 
 
 def sanitize_arm_identity(identity: Optional[dict]) -> Optional[dict]:
