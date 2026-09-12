@@ -29,6 +29,7 @@ from azext_iot.iothub.providers.helpers.edge_device_config import (
     EDGE_CONFIG_SCRIPT_PARENT_HOSTNAME,
     EDGE_ROOT_CERTIFICATE_FILENAME,
     EDGE_ROOT_CERTIFICATE_SUBJECT,
+    MAX_DEVICE_SCOPE_RETRIES,
     create_edge_device_config_script,
     process_edge_devices_config_args,
     process_edge_devices_config_file_content,
@@ -513,7 +514,7 @@ class TestHierarchyCreateConfig:
         def query_response(request):
             query = json.loads(request.body)["query"]
             response = [] if query == "SELECT deviceId FROM devices" else query_devices
-            return 200, {}, json.dumps(response)
+            return 200, {"Content-Type": "application/json"}, json.dumps(response)
 
         mocked_response.add_callback(
             method=responses.POST,
@@ -749,8 +750,10 @@ class TestHierarchyCreateConfig:
         indirect=["scope_query_client"],
     )
     def test_edge_devices_scope_registry_fallback(
-        self, fixture_cmd, scope_query_client, set_cwd, expect_failure
+        self, fixture_cmd, scope_query_client, set_cwd, expect_failure, mocker
     ):
+        mocker.patch("azext_iot.iothub.providers.device_identity.sleep")
+
         if expect_failure:
             with pytest.raises(AzureResponseError):
                 subject.iot_edge_devices_create(
@@ -764,6 +767,20 @@ class TestHierarchyCreateConfig:
                 devices=None,
                 config_file="device_configs/nested_edge_config.yml"
             )
+
+        scope_queries = [
+            json.loads(request_call.request.body)["query"]
+            for request_call in scope_query_client.calls
+            if (
+                request_call.request.method == "POST"
+                and "/query" in request_call.request.url
+                and json.loads(request_call.request.body)["query"]
+                == "SELECT deviceId, deviceScope FROM devices"
+            )
+        ]
+        assert len(scope_queries) == MAX_DEVICE_SCOPE_RETRIES + 1
+
+        if not expect_failure:
             updated_devices = []
             for request_call in scope_query_client.calls:
                 if request_call.request.method == "PUT":
