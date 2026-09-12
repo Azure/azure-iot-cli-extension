@@ -7,6 +7,7 @@
 from typing import Optional
 from knack.log import get_logger
 from azure.cli.core.azclierror import ResourceNotFoundError
+from azure.cli.core.commands import LongRunningOperation
 from azext_iot.common.utility import handle_service_exception, process_json_arg
 from azext_iot.iothub.common import RouteSourceType
 from azext_iot.iothub.providers.base import IoTHubProvider
@@ -170,5 +171,5 @@ class MessageRoute(IoTHubProvider):
         fallback_route = self.hub_resource["properties"]["routing"]["fallbackRoute"]
         fallback_route["isEnabled"] = enabled
 
-        self._begin_hub_update()
-        return self.show_fallback()
+        hub_resource = LongRunningOperation(self.cmd.cli_ctx)(self._begin_hub_update())
+        return hub_resource["properties"]["routing"]["fallbackRoute"]

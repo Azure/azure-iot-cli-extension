@@ -6,8 +6,21 @@
 
 import json
 from datetime import datetime, timedelta, timezone
+from knack.log import get_logger
 
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES, IoTLiveScenarioTest
+
+
+logger = get_logger(__name__)
+
+
+def _log_job_device_statistics(job, expected_count):
+    statistics = job.get("deviceJobStatistics") or {}
+    counters = {
+        name: statistics.get(name)
+        for name in ("deviceCount", "succeededCount", "failedCount", "pendingCount", "runningCount")
+    }
+    logger.info("Hub job %s: expected devices=%s; service statistics=%s", job["jobId"], expected_count, counters)
 
 
 class TestIoTHubJobs(IoTLiveScenarioTest):
@@ -37,7 +50,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             self.kwargs["twin_patch_tags"] = '{"tags": {"deviceClass": "Class1, Class2, Class3"}}'
             query_condition = "deviceId in ['{}']".format("','".join(device_ids_twin_tags))
 
-            self.cmd(
+            tag_job = self.cmd(
                 self.set_cmd_auth_type(
                     f'iot hub job create --job-id {self.job_ids[0]} --job-type scheduleUpdateTwin -q "{query_condition}" '
                     f"-n {self.host_name} -g {self.entity_rg} "
@@ -56,7 +69,8 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
                     ),
                     self.check("type", "scheduleUpdateTwin"),
                 ],
-            )
+            ).get_output_in_json()
+            _log_job_device_statistics(tag_job, device_count)
 
             for device_id in device_ids_twin_tags:
                 self.cmd(
@@ -71,7 +85,7 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
             self.kwargs["twin_patch_props"] = '{"properties": {"desired": {"arbitrary": "value"}}}'
             query_condition = "deviceId in ['{}']".format("','".join(device_ids_twin_props))
 
-            self.cmd(
+            property_job = self.cmd(
                 self.set_cmd_auth_type(
                     f'iot hub job create --job-id {self.job_ids[1]} --job-type scheduleUpdateTwin -q "{query_condition}" '
                     f"-n {self.host_name} -g {self.entity_rg} "
@@ -90,7 +104,17 @@ class TestIoTHubJobs(IoTLiveScenarioTest):
                     ),
                     self.check("type", "scheduleUpdateTwin"),
                 ],
-            )
+            ).get_output_in_json()
+            _log_job_device_statistics(property_job, device_count)
+
+            for device_id in device_ids_twin_props:
+                self.cmd(
+                    self.set_cmd_auth_type(
+                        f"iot hub device-twin show -d {device_id} -n {self.host_name} -g {self.entity_rg}",
+                        auth_type=auth_phase,
+                    ),
+                    checks=[self.check("properties.desired.arbitrary", "value")],
+                )
 
             # Error - omit queryCondition when scheduleUpdateTwin or scheduleDeviceMethod
 

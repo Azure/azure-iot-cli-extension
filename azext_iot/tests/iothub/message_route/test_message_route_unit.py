@@ -9,6 +9,7 @@ import pytest
 from azure.cli.core.azclierror import ResourceNotFoundError
 from azure.core import MatchConditions
 from azure.core.exceptions import HttpResponseError
+from azure.core.polling import LROPoller
 
 import azext_iot.iothub.commands_message_route as subject
 
@@ -68,6 +69,21 @@ def fixture_route_ops(mocker):
 
     find_resource.side_effect = initialize_mock_client
     yield hub_mock
+
+
+@pytest.fixture()
+def fixture_fallback_ops(fixture_route_ops, mocker):
+    from azext_iot.iothub.providers.message_route import MessageRoute
+
+    cmd = mocker.Mock()
+    cmd.cli_ctx.config.getboolean.return_value = True
+    provider = MessageRoute(cmd=cmd, hub_name=hub_name, rg=hub_rg)
+    poller = mocker.Mock(spec=LROPoller)
+    poller.done.return_value = True
+    poller.result.return_value = fixture_route_ops
+    provider.discovery.client.begin_create_or_update.return_value = poller
+    mocker.patch.object(subject, "MessageRoute", return_value=provider)
+    return provider, poller
 
 
 class TestMessageRouteCreate:
@@ -278,21 +294,58 @@ class TestMessageFallbackRoute:
         )
         assert result["name"] == "$fallback"
 
-    def test_set_fallback(self, fixture_route_ops):
+    @pytest.mark.parametrize("enabled, completed_enabled", [
+        (True, True), (False, False), (False, True),
+    ])
+    def test_set_fallback(self, fixture_fallback_ops, mocker, enabled, completed_enabled):
+        provider, poller = fixture_fallback_ops
+        completed_fallback = {
+            "name": "$fallback", "isEnabled": completed_enabled, "condition": "true",
+        }
+        poller.result.return_value = {
+            "properties": {"routing": {"fallbackRoute": completed_fallback}},
+        }
+        poller.done.side_effect = [False, True]
+        delay = mocker.patch("azure.cli.core.commands.LongRunningOperation._delay")
+
         result = subject.message_fallback_route_set(
-            cmd=None, hub_name=hub_name, enabled=False, resource_group_name=hub_rg
+            cmd=provider.cmd, hub_name=hub_name, enabled=enabled, resource_group_name=hub_rg
         )
-        assert result["isEnabled"] is False
+
+        assert result is completed_fallback
+        poller.result.assert_called_once_with()
+        assert poller.done.call_count == 2
+        delay.assert_called_once_with()
+        kwargs = provider.discovery.client.begin_create_or_update.call_args.kwargs
+        assert kwargs["iot_hub_description"]["properties"]["routing"]["fallbackRoute"]["isEnabled"] is enabled
+
+    @pytest.mark.parametrize("failure_stage", ["submission", "completion"])
+    def test_set_fallback_propagates_update_failure(self, fixture_fallback_ops, failure_stage):
+        provider, poller = fixture_fallback_ops
+        error = HttpResponseError("Hub update failed")
+        if failure_stage == "submission":
+            provider.discovery.client.begin_create_or_update.side_effect = error
+        else:
+            poller.result.side_effect = error
+
+        with pytest.raises(HttpResponseError) as exc_info:
+            subject.message_fallback_route_set(
+                cmd=provider.cmd, hub_name=hub_name, enabled=False, resource_group_name=hub_rg
+            )
+
+        assert exc_info.value is error
+        if failure_stage == "submission":
+            poller.result.assert_not_called()
+        else:
+            poller.result.assert_called_once_with()
 
     def test_set_fallback_uses_conditional_sanitized_put(
-        self, fixture_route_ops
+        self, fixture_route_ops, fixture_fallback_ops
     ):
-        from azext_iot.iothub.providers.message_route import MessageRoute
-
         fixture_route_ops["properties"]["deviceRegistry"] = {
             "namespaceResourceId": "/namespaces/ns"
         }
-        provider = MessageRoute(cmd=None, hub_name=hub_name, rg=hub_rg)
+        provider, _ = fixture_fallback_ops
 
         provider.set_fallback(False)
 
