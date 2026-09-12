@@ -4,522 +4,146 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import random
-import pytest
+"""Control-plane state scenarios share infrastructure only within this loadfile group."""
+
 import json
-import os
 import time
-from contextlib import ExitStack
-from dataclasses import dataclass, field
-from pathlib import Path
-from shlex import quote
-from types import SimpleNamespace
-from typing import List
-from azure.core.exceptions import HttpResponseError
-from msrestazure.azure_exceptions import CloudError
-from azext_iot.common.shared import DeviceAuthApiType
 
-from azext_iot.common.embedded_cli import EmbeddedCLI
-from azext_iot.tests.iothub._integration_helpers import (
-    QUERY_VISIBILITY_TIMEOUT, delete_known_devices, invoke_checked, wait_for_query_ids,
-)
-from azext_iot.iothub.providers.device_identity import DeviceIdentityProvider
-from azext_iot.tests.iothub.conftest import assign_iot_hub_dataplane_rbac_role, generate_hub_id
-from azext_iot.tests.settings import (
-    DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL, HUB_TEST_LOCATION
-)
+import pytest
+from azure.cli.core.azclierror import ResourceNotFoundError, RequiredArgumentMissingError
+
 from azext_iot.tests.generators import generate_generic_id
-from azext_iot.common.utility import generate_key, read_file_content
-from azext_iot.common.certops import create_self_signed_certificate
-from azext_iot.tests.iothub import (
-    PRIMARY_THUMBPRINT,
-    SECONDARY_THUMBPRINT,
-    DATAPLANE_AUTH_TYPES,
-    DEVICE_TYPES,
-    set_cmd_auth_type,
-)
-from azext_iot.common._azure import parse_iot_hub_message_endpoint_connection_string, parse_storage_container_connection_string
-from azure.cli.core.azclierror import ResourceNotFoundError, RequiredArgumentMissingError, CLIInternalError
-
-settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL)
-CWD = os.path.dirname(os.path.abspath(__file__))
-cli = EmbeddedCLI()
-
-DATAPLANE = "configurations devices"
-CONTROLPLANE = "arm"
-MAX_RETRIES = 5
-# An isolated consumer owns both cold setup and shared cleanup, not just the command under test.
-CONTROLPLANE_LIFECYCLE_TIMEOUT = 45 * 60
-# One source-fixture window and one destination window per migration/import auth phase.
-DATAPLANE_LIFECYCLE_TIMEOUT = 900 + QUERY_VISIBILITY_TIMEOUT * (1 + len(DATAPLANE_AUTH_TYPES))
+from azext_iot.tests.iothub.conftest import generate_hub_id
+from azext_iot.tests.iothub.state import _state_helpers as state
+from azext_iot.tests.settings import HUB_TEST_LOCATION
 
 
-def _invoke_state(command: str) -> EmbeddedCLI:
-    return invoke_checked(cli, command, description="IoT Hub state command")
-
-
-def _invoke_setup(command: str) -> EmbeddedCLI:
-    return invoke_checked(cli, command, description="IoT Hub state setup")
-
-
-@dataclass
-class _OwnedDataplaneState:
-    config_ids: List[str] = field(default_factory=list)
-    device_ids: List[str] = field(default_factory=list)
-
-
-def _state_service_sdk(hub):
-    return DeviceIdentityProvider(
-        cmd=SimpleNamespace(cli_ctx=cli.az_cli),
-        hub_name=hub["name"],
-        rg=hub["rg"],
-        auth_type_dataplane="login",
-    ).service_sdk
-
-
-def _require_empty_dataplane(hub):
-    service = _state_service_sdk(hub)
-    # Ownership checks must not mistake a lagging query index for an empty registry.
-    for kind, read in (
-        ("device", service.devices.get_devices),
-        ("configuration", service.configuration.get_configurations),
-    ):
-        resources = read(top=1)
-        if not isinstance(resources, list):
-            raise CLIInternalError(
-                f"IoT Hub state fixture received an invalid {kind} listing for '{hub['name']}'."
-            )
-        if resources:
-            raise CLIInternalError(
-                f"IoT Hub state fixture refuses pre-existing dataplane data in '{hub['name']}'."
-            )
-
-
-def generate_device_names(count, edge=False):
-    prefix = "d" if not edge else "e"
-    names = [
-        prefix + generate_generic_id()
-        for i in range(count)
-    ]
-    return names
-
-
-def _hub_auth(hub):
-    return f"--hub-name {hub['name']} --resource-group {hub['rg']} --auth-type login"
-
-
-def _wait_for_dataplane_query(hub_auth, owned):
-    assert owned.device_ids, "IoT Hub state readiness requires owned device IDs."
-    return wait_for_query_ids(
-        lambda: _invoke_setup(f'iot hub query {hub_auth} -q "select deviceId from devices"').as_json(),
-        owned.device_ids,
-        id_key="deviceId",
-    )
-
-
-def _setup_hub_dataplane_state(hub_auth, owned):
-    # make a configuration for the hub (applies to 0 devices, this is just to test the configuration settings)
-    labels = {generate_generic_id() : generate_generic_id(), generate_generic_id() : generate_generic_id()}
-    labels = json.dumps(labels)
-
-    metrics_path = os.path.join(Path(CWD), "..", "configurations", "test_config_generic_metrics.json")
-    content_path = os.path.join(Path(CWD), "..", "configurations", "test_adm_device_content.json")
-
-    config_content = read_file_content(content_path)
-    metrics = read_file_content(metrics_path)
-    target_condition = "tags.bar=12"
-
-    config_id = generate_generic_id()
-    _invoke_setup(
-        "iot hub configuration create --config-id {} {} --content '{}' --labels '{}' --priority {} --metrics '{}' "
-        "--target-condition {}".format(
-            config_id, hub_auth, config_content, labels, random.randint(1, 10), metrics, target_condition
-        )
-    )
-    owned.config_ids.append(config_id)
-
-    # make a regular edge deployment
-    deployment1_path = os.path.join(Path(CWD), "..", "configurations", "test_edge_deployment.json")
-    edge_content1 = read_file_content(deployment1_path)
-    deployment_id = "deployment1-" + generate_generic_id()
-    _invoke_setup(
-        "iot edge deployment create -d {} {} --content '{}' --labels '{}' --priority {} --metrics '{}' "
-        "--target-condition {}".format(
-            deployment_id, hub_auth, edge_content1, labels, random.randint(1, 10), metrics, target_condition
-        )
-    )
-    owned.config_ids.append(deployment_id)
-
-    # make a layered edge deployment
-    deployment2_path = os.path.join(Path(CWD), "..", "configurations", "test_edge_deployment_layered.json")
-    edge_content2 = read_file_content(deployment2_path)
-    deployment_id = "deployment2-" + generate_generic_id()
-    _invoke_setup(
-        "iot edge deployment create -d {} {} --content '{}' --labels '{}' --priority {} --metrics '{}' "
-        "--target-condition {} --layered".format(
-            deployment_id, hub_auth, edge_content2, labels, random.randint(1, 10), metrics, target_condition
-        )
-    )
-    owned.config_ids.append(deployment_id)
-    edge_content_v1_path = os.path.join(Path(CWD), "..", "configurations", "test_edge_deployment_v1.json")
-
-    # populate hub with devices
-    for device_type in DEVICE_TYPES:
-        device_count = 3
-        device_ids = generate_device_names(device_count, edge=device_type == "edge")
-        module_id = generate_device_names(1)[0]
-        edge_enabled = "--edge-enabled" if device_type == "edge" else ""
-
-        # Create SAS-auth device and module
-        custom_primary_key = generate_key()
-        custom_secondary_key = generate_key()
-        _invoke_setup(
-            f"iot hub device-identity create -d {device_ids[0]} {hub_auth} --pk {custom_primary_key} "
-            f"--sk {custom_secondary_key} {edge_enabled}"
-        )
-        owned.device_ids.append(device_ids[0])
-        _invoke_setup(
-            f"iot hub module-identity create -m {module_id} -d {device_ids[0]} {hub_auth}"
-        )
-
-        # create x509_ca device and module
-        _invoke_setup(
-            f"iot hub device-identity create -d {device_ids[1]} {hub_auth} --am x509_ca {edge_enabled}"
-        )
-        owned.device_ids.append(device_ids[1])
-        _invoke_setup(
-            f"iot hub module-identity create -m {module_id} -d {device_ids[1]} {hub_auth} --am x509_ca"
-        )
-
-        # create x509_thumbprint device and module
-        _invoke_setup(
-            f"iot hub device-identity create -d {device_ids[2]} {hub_auth} --am x509_thumbprint "
-            f"--ptp {PRIMARY_THUMBPRINT} --stp {SECONDARY_THUMBPRINT} {edge_enabled}"
-        )
-        owned.device_ids.append(device_ids[2])
-        ptp = create_self_signed_certificate(subject="aziotcli", valid_days=1, cert_output_dir=None)["thumbprint"]
-        stp = create_self_signed_certificate(subject="aziotcli", valid_days=1, cert_output_dir=None)["thumbprint"]
-        _invoke_setup(
-            f"iot hub module-identity create -m {module_id} -d {device_ids[2]} {hub_auth} "
-            f"--am x509_thumbprint --ptp {ptp} --stp {stp}"
-        )
-
-        if device_type == "edge":
-            # add edge modules to edge devices
-            _invoke_setup(
-                f"iot edge set-modules -d {device_ids[0]} {hub_auth} --content '{edge_content_v1_path}'"
-            )
-
-        # add some children
-        if edge_enabled:
-            _invoke_setup(
-                f"iot hub device-identity children add {hub_auth} -d {device_ids[0]} --cl {device_ids[1]}"
-            )
-            _invoke_setup(
-                f"iot hub device-identity children add {hub_auth} -d {device_ids[1]} --cl {device_ids[2]}"
-            )
-
-        # add a property and a tag to each device's twin
-        for i in range(len(device_ids)):
-            device = device_ids[i]
-
-            val = generate_generic_id()
-            _invoke_setup(
-                f"iot hub device-twin update -d {device} {hub_auth} --set properties.desired.testProp={val}"
-            )
-
-            patch_tags = json.dumps({
-                generate_generic_id(): generate_generic_id(),
-                generate_generic_id(): generate_generic_id(),
-            })
-
-            _invoke_setup(
-                f"iot hub device-twin update -d {device} {hub_auth}"
-                f" --tags '{patch_tags}'"
-            )
-
-            val = generate_generic_id()
-            _invoke_setup(
-                f"iot hub module-twin update -d {device} -m {module_id} {hub_auth} --set "
-                f"properties.desired.testProp={val}"
-            )
-
-            patch_tags = json.dumps({
-                generate_generic_id(): generate_generic_id(),
-                generate_generic_id(): generate_generic_id(),
-            })
-
-            _invoke_setup(
-                f"iot hub module-twin update -d {device} -m {module_id} {hub_auth}"
-                f" --tags '{patch_tags}'"
-            )
-
-
-@pytest.fixture()
-def setup_hub_states_dataplane(provisioned_iot_hubs_with_storage_user_module, request, tmp_path):
-    """Lease empty hubs and clean up only this scenario's dataplane IDs."""
-    marker = request.node.get_closest_marker("hub_infrastructure")
-    count = marker.kwargs.get("count", 1) if marker else 1
-    if not 1 <= count <= len(provisioned_iot_hubs_with_storage_user_module):
-        raise CLIInternalError("IoT Hub state fixture requires the requested provisioned hubs.")
-    hubs = [
-        {**hub, "state_data": _OwnedDataplaneState()}
-        for hub in provisioned_iot_hubs_with_storage_user_module[:count]
-    ]
-    if len({(hub["rg"].lower(), hub["name"].lower()) for hub in hubs}) != count:
-        raise CLIInternalError("IoT Hub state fixture requires distinct source and destination hubs.")
-    filename = tmp_path / (generate_generic_id() + ".json")
-    hubs[0]["filename"] = str(filename)
-    with ExitStack() as cleanup:
-        cleanup.callback(filename.unlink, missing_ok=True)
-        for hub in hubs:
-            cleanup.callback(clean_up_hub_dataplane, hub)
-        assign_iot_hub_dataplane_rbac_role(hubs)
-        for hub in hubs:
-            _require_empty_dataplane(hub)
-        owned = hubs[0]["state_data"]
-        _setup_hub_dataplane_state(_hub_auth(hubs[0]), owned)
-        _wait_for_dataplane_query(_hub_auth(hubs[0]), owned)
-        # A failed migration can still have written part of this dataset to an empty destination.
-        for hub in hubs[1:]:
-            hub["state_data"].config_ids.extend(owned.config_ids)
-            hub["state_data"].device_ids.extend(owned.device_ids)
-        yield hubs
-
-
-@pytest.fixture()
-def setup_hub_states_controlplane(setup_hub_controlplane_states):
-    """Fixture to setup hubs with controlplane aspects."""
-    filename = generate_generic_id() + ".json"
-    setup_hub_controlplane_states[0]["filename"] = filename
-    yield setup_hub_controlplane_states
-    if os.path.isfile(filename):
-        os.remove(filename)
-
-
-@pytest.fixture()
-def setup_file():
-    """Fixture to track a file (and make sure it is deleted at the end)."""
-    filename = generate_generic_id() + ".json"
-    yield filename
-    if os.path.isfile(filename):
-        os.remove(filename)
-
-
-def clean_up_hub_controlplane(hub_name, hub_rg, hub_location):
-    # Note that the file has system assigned identity on - this removes the need to reassign permissions.
-    blank_hub_file = os.path.join(Path(CWD), "blank_hub_arm.json")
-    arm_file = generate_generic_id() + ".json"
-    with open(blank_hub_file, 'r', encoding='utf-8') as f, open(arm_file, 'w', encoding='utf-8') as g:
-        contents = json.load(f)
-        contents["resources"][0]["name"] = hub_name
-        contents["resources"][0]["location"] = hub_location
-        contents["resources"][0]["properties"]["disableLocalAuth"] = True
-        json.dump(contents, g, indent=4, sort_keys=True)
-    cli.invoke(
-        f"deployment group create --template-file {arm_file} -g {hub_rg}"
-    )
-
-    os.remove(arm_file)
-
-
-def _delete_owned_configuration(configurations, config_id):
-    try:
-        configurations.delete(id=config_id, if_match="*")
-    except (CloudError, HttpResponseError) as error:
-        if getattr(error.response, "status_code", None) != 404:
-            raise
-
-
-def clean_up_hub_dataplane(hub):
-    owned = hub["state_data"]
-    if not owned.config_ids and not owned.device_ids:
-        return
-    service = _state_service_sdk(hub)
-    with ExitStack() as cleanup:
-        for device_id in owned.device_ids:
-            cleanup.callback(delete_known_devices, service.devices, [device_id])
-        for config_id in owned.config_ids:
-            cleanup.callback(_delete_owned_configuration, service.configuration, config_id)
-    time.sleep(1)
-
-
-def delete_system_endpoints(hub_name, rg):
-    # delete is a no-op
-    cli.invoke(
-        f"iot hub routing-endpoint delete --hub-name {hub_name} -g {rg} -n eventhub-systemid"
-    )
-    cli.invoke(
-        f"iot hub routing-endpoint delete --hub-name {hub_name} -g {rg} -n queue-systemid"
-    )
-    cli.invoke(
-        f"iot hub routing-endpoint delete --hub-name {hub_name} -g {rg} -n storagecontainer-systemid"
-    )
+setup_hub_states_controlplane = state.setup_hub_states_controlplane
+setup_file = state.setup_file
 
 
 @pytest.mark.hub_infrastructure(count=2, sys_identity=True, user_identity=True, storage=True, desired_tags="abc=def")
-@pytest.mark.timeout(CONTROLPLANE_LIFECYCLE_TIMEOUT, func_only=False)
+@pytest.mark.timeout(state.CONTROLPLANE_LIFECYCLE_TIMEOUT, func_only=False)
 def test_migrate_controlplane(setup_hub_states_controlplane):
     origin_name = setup_hub_states_controlplane[0]["name"]
     origin_rg = setup_hub_states_controlplane[0]["rg"]
     dest_name = setup_hub_states_controlplane[1]["name"]
 
-    _invoke_state(
+    state._invoke_state(
         f"iot hub state migrate --origin-hub {origin_name} --origin-resource-group {origin_rg} "
-        f"--destination-hub {dest_name} --destination-resource-group {origin_rg} -r --aspects {CONTROLPLANE}",
+        f"--destination-hub {dest_name} --destination-resource-group {origin_rg} -r --aspects {state.CONTROLPLANE}",
     )
 
     time.sleep(1)  # gives the hub time to update before the checks
-    compare_hubs_controlplane(origin_name, dest_name, origin_rg)
-
-
-@pytest.mark.hub_infrastructure(count=2)
-@pytest.mark.timeout(DATAPLANE_LIFECYCLE_TIMEOUT, func_only=False)
-def test_migrate_dataplane(setup_hub_states_dataplane):
-    origin_name = setup_hub_states_dataplane[0]["name"]
-    origin_rg = setup_hub_states_dataplane[0]["rg"]
-    origin_auth = _hub_auth(setup_hub_states_dataplane[0])
-    dest_name = setup_hub_states_dataplane[1]["name"]
-    dest_auth = _hub_auth(setup_hub_states_dataplane[1])
-    for auth_phase in DATAPLANE_AUTH_TYPES:
-        _invoke_state(
-            set_cmd_auth_type(
-                f"iot hub state migrate --origin-hub {origin_name} --origin-resource-group {origin_rg} "
-                f"--destination-hub {dest_name} --destination-resource-group {origin_rg} -r --aspects {DATAPLANE}",
-                auth_type=auth_phase,
-                cstring=None
-            ),
-        )
-
-        _wait_for_dataplane_query(dest_auth, setup_hub_states_dataplane[0]["state_data"])
-        compare_hubs_dataplane(origin_auth, dest_auth, setup_hub_states_dataplane[0]["state_data"])
-        clean_up_hub_dataplane(setup_hub_states_dataplane[1])
+    state.compare_hubs_controlplane(origin_name, dest_name, origin_rg)
 
 
 @pytest.mark.hub_infrastructure(
     count=1, sys_identity=True, user_identity=True, storage=True, desired_tags="abc=def", system_endpoints=False
 )
-@pytest.mark.timeout(CONTROLPLANE_LIFECYCLE_TIMEOUT, func_only=False)
+@pytest.mark.timeout(state.CONTROLPLANE_LIFECYCLE_TIMEOUT, func_only=False)
 def test_migrate_controlplane_with_create(setup_hub_states_controlplane):
-    """
-    Try using migrate to create new hubs. One hub is needed, two new hubs will be created.
-    """
+    """Create and compare two fresh destinations, with explicit and default destination RG."""
     origin_name = setup_hub_states_controlplane[0]["name"]
     origin_rg = setup_hub_states_controlplane[0]["rg"]
     dest_name = generate_hub_id()
     setup_hub_states_controlplane.append({"name": dest_name})
-    # ensure that there are no system endpoints
-    delete_system_endpoints(origin_name, origin_rg)
+    state.delete_system_endpoints(origin_name, origin_rg)
 
-    _invoke_state(
+    state._invoke_state(
         f"iot hub state migrate --origin-hub {origin_name} --origin-resource-group {origin_rg} "
-        f"--destination-hub {dest_name} --destination-resource-group {origin_rg} -r --aspects {CONTROLPLANE}",
+        f"--destination-hub {dest_name} --destination-resource-group {origin_rg} -r --aspects {state.CONTROLPLANE}",
     )
+    time.sleep(1)
+    state.compare_hubs_controlplane(origin_name, dest_name, origin_rg)
 
-    # default the destination rg
     dest_name2 = generate_hub_id()
     setup_hub_states_controlplane.append({"name": dest_name2})
-
-    _invoke_state(
+    state._invoke_state(
         f"iot hub state migrate --origin-hub {origin_name} --origin-resource-group {origin_rg} "
-        f"--destination-hub {dest_name} -r --aspects {CONTROLPLANE}",
+        f"--destination-hub {dest_name2} -r --aspects {state.CONTROLPLANE}",
     )
-
-    time.sleep(1)  # gives the hub time to update before the checks
-    compare_hubs_controlplane(origin_name, dest_name, origin_rg)
+    time.sleep(1)
+    state.compare_hubs_controlplane(origin_name, dest_name2, origin_rg)
 
 
 @pytest.mark.hub_infrastructure(count=1)
 def test_mirgate_hub_dataplane_error(provisioned_only_iot_hubs_module):
-    """
-    Have origin hub be there, try to create a destination hub with using dataplane
-    """
+    """A dataplane-only migration cannot create a missing destination."""
     hub_name = provisioned_only_iot_hubs_module[0]["name"]
     hub_rg = provisioned_only_iot_hubs_module[0]["rg"]
     fake_hub_name = "fakehub"
     fake_hub_rg = "fakerg"
-    result = cli.invoke(
+    result = state.cli.invoke(
         f"iot hub state migrate --origin-hub {hub_name} --origin-resource-group {hub_rg} "
-        f"--destination-hub {fake_hub_name} --destination-resource-group {fake_hub_rg} --aspects {DATAPLANE}"
+        f"--destination-hub {fake_hub_name} --destination-resource-group {fake_hub_rg} --aspects {state.DATAPLANE}"
     )
     assert isinstance(result.get_error(), ResourceNotFoundError)
 
 
 @pytest.mark.hub_infrastructure(count=1, sys_identity=True, user_identity=True, storage=True, desired_tags="abc=def")
-@pytest.mark.timeout(CONTROLPLANE_LIFECYCLE_TIMEOUT, func_only=False)
+@pytest.mark.timeout(state.CONTROLPLANE_LIFECYCLE_TIMEOUT, func_only=False)
 def test_export_import_controlplane(setup_hub_states_controlplane):
     filename = setup_hub_states_controlplane[0]["filename"]
     hub_name = setup_hub_states_controlplane[0]["name"]
     hub_rg = setup_hub_states_controlplane[0]["rg"]
     hub_location = setup_hub_states_controlplane[0]["hub"]["location"]
 
-    _invoke_state(
-        f"iot hub state export -n {hub_name} -f {filename} -g {hub_rg} -r --aspects {CONTROLPLANE}",
+    state._invoke_state(
+        f"iot hub state export -n {hub_name} -f {filename} -g {hub_rg} -r --aspects {state.CONTROLPLANE}",
     )
-    compare_hub_controlplane_to_file(filename, hub_name, hub_rg)
-    clean_up_hub_controlplane(hub_name, hub_rg, hub_location)
+    state.compare_hub_controlplane_to_file(filename, hub_name, hub_rg)
+    state.clean_up_hub_controlplane(hub_name, hub_rg, hub_location)
     time.sleep(5)
-    _invoke_state(
-        f"iot hub state import -n {hub_name} -f {filename} -g {hub_rg} -r --aspects {CONTROLPLANE}",
+    state._invoke_state(
+        f"iot hub state import -n {hub_name} -f {filename} -g {hub_rg} -r --aspects {state.CONTROLPLANE}",
     )
     time.sleep(10)  # gives the hub time to update before the checks
-    compare_hub_controlplane_to_file(filename, hub_name, hub_rg)
+    state.compare_hub_controlplane_to_file(filename, hub_name, hub_rg)
 
 
 @pytest.mark.hub_infrastructure(
     count=1, sys_identity=True, user_identity=True, storage=True, desired_tags="abc=def", system_endpoints=False
 )
-@pytest.mark.timeout(CONTROLPLANE_LIFECYCLE_TIMEOUT, func_only=False)
+@pytest.mark.timeout(state.CONTROLPLANE_LIFECYCLE_TIMEOUT, func_only=False)
 def test_export_import_controlplane_with_create(setup_hub_states_controlplane):
-    """
-    Try using export/import to create new hubs. One hub is needed, one new hub will be created.
-    """
+    """Export a source and import into a fresh destination."""
     filename = setup_hub_states_controlplane[0]["filename"]
     hub_name = setup_hub_states_controlplane[0]["name"]
     hub_rg = setup_hub_states_controlplane[0]["rg"]
     dest_name = generate_hub_id()
     setup_hub_states_controlplane.append({"name": dest_name})
-    # ensure that there are no system endpoints
-    delete_system_endpoints(hub_name, hub_rg)
+    state.delete_system_endpoints(hub_name, hub_rg)
 
-    _invoke_state(
-        f"iot hub state export -n {hub_name} -f {filename} -g {hub_rg} -r --aspects {CONTROLPLANE}",
+    state._invoke_state(
+        f"iot hub state export -n {hub_name} -f {filename} -g {hub_rg} -r --aspects {state.CONTROLPLANE}",
     )
-    compare_hub_controlplane_to_file(filename, hub_name, hub_rg)
+    state.compare_hub_controlplane_to_file(filename, hub_name, hub_rg)
     time.sleep(5)
-    _invoke_state(
-        f"iot hub state import -n {dest_name} -f {filename} -g {hub_rg} -r --aspects {CONTROLPLANE}",
+    state._invoke_state(
+        f"iot hub state import -n {dest_name} -f {filename} -g {hub_rg} -r --aspects {state.CONTROLPLANE}",
     )
     time.sleep(10)  # gives the hub time to update before the checks
-    compare_hub_controlplane_to_file(filename, dest_name, hub_rg)
+    state.compare_hub_controlplane_to_file(filename, dest_name, hub_rg)
 
 
-@pytest.mark.hub_infrastructure(
-    count=1,
-)
+@pytest.mark.hub_infrastructure(count=1)
 def test_custom_scenarios_controlplane(provisioned_only_iot_hubs_module, provisioned_event_hub_module, setup_file):
-    """
-    Try using export/import to create new hubs. One hub is needed, one new hub will be created.
-    """
     hub_name = provisioned_only_iot_hubs_module[0]["name"]
     hub_rg = provisioned_only_iot_hubs_module[0]["rg"]
-    # ensure that there are no system endpoints
-    delete_system_endpoints(hub_name, hub_rg)
+    state.delete_system_endpoints(hub_name, hub_rg)
 
-    # add the keybased endpoint without rg or sub
     eventhub_cstring = provisioned_event_hub_module["connectionString"]
     endpoint_name = generate_generic_id()
-    cli.invoke(
+    state.cli.invoke(
         f"resource update -n {hub_name} -g {hub_rg} --resource-type Microsoft.Devices/IotHubs "
         f"--add properties.routing.endpoints.eventHubs connectionString='{eventhub_cstring}' name={endpoint_name}"
     )
     time.sleep(60)
 
-    _invoke_state(
-        f"iot hub state export -n {hub_name} -f {setup_file} -g {hub_rg} -r --aspects {CONTROLPLANE}",
+    state._invoke_state(
+        f"iot hub state export -n {hub_name} -f {setup_file} -g {hub_rg} -r --aspects {state.CONTROLPLANE}",
     )
-
-    # check that the file does not have said props
     with open(setup_file, 'r', encoding='utf-8') as f:
         hub_info = json.load(f)
     hub_resource = hub_info["arm"]["resources"][0]
@@ -527,663 +151,83 @@ def test_custom_scenarios_controlplane(provisioned_only_iot_hubs_module, provisi
     assert len(eventhub_endpoints) == 0
 
 
-@pytest.mark.hub_infrastructure(count=1)
-@pytest.mark.timeout(DATAPLANE_LIFECYCLE_TIMEOUT, func_only=False)
-def test_export_import_dataplane(setup_hub_states_dataplane):
-    filename = setup_hub_states_dataplane[0]["filename"]
-    hub_name = setup_hub_states_dataplane[0]["name"]
-    hub_rg = setup_hub_states_dataplane[0]["rg"]
-    hub_auth = _hub_auth(setup_hub_states_dataplane[0])
-    for auth_phase in DATAPLANE_AUTH_TYPES:
-        _invoke_state(
-            set_cmd_auth_type(
-                f"iot hub state export -n {hub_name} -f {quote(filename)} -g {hub_rg} -r --aspects {DATAPLANE}",
-                auth_type=auth_phase,
-                cstring=None
-            ),
-        )
-        compare_hub_dataplane_to_file(filename, hub_auth, setup_hub_states_dataplane[0]["state_data"])
-
-    for auth_phase in DATAPLANE_AUTH_TYPES:
-        clean_up_hub_dataplane(setup_hub_states_dataplane[0])
-        _invoke_state(
-            set_cmd_auth_type(
-                f"iot hub state import -n {hub_name} -f {quote(filename)} -g {hub_rg} -r --aspects {DATAPLANE}",
-                auth_type=auth_phase,
-                cstring=None
-            ),
-        )
-        _wait_for_dataplane_query(hub_auth, setup_hub_states_dataplane[0]["state_data"])
-        compare_hub_dataplane_to_file(filename, hub_auth, setup_hub_states_dataplane[0]["state_data"])
-
-
 @pytest.mark.hub_infrastructure(count=0)
 def test_export_import_migrate_missing_hubs_error():
-    """
-    All of these tests do not need a hub created.
-    """
     filename = "./somefile.json"
     hub_name = "fakehub"
     hub_rg = "fakerg"
-    result = cli.invoke(
+    result = state.cli.invoke(
         f"iot hub state export -n {hub_name} -f {filename} -g {hub_rg}"
     )
     assert isinstance(result.get_error(), ResourceNotFoundError)
 
-    result = cli.invoke(
+    result = state.cli.invoke(
         f"iot hub state export -n {hub_name} -f {filename}"
     )
     assert isinstance(result.get_error(), ResourceNotFoundError)
 
-    # Import - dataplane
-    result = cli.invoke(
-        f"iot hub state import -n {hub_name} -f {filename} -g {hub_rg} --aspects {DATAPLANE}"
+    result = state.cli.invoke(
+        f"iot hub state import -n {hub_name} -f {filename} -g {hub_rg} --aspects {state.DATAPLANE}"
     )
     assert isinstance(result.get_error(), ResourceNotFoundError)
 
-    # RequiredArgumentMissingError because no resource group
-    result = cli.invoke(
-        f"iot hub state import -n {hub_name} -f {filename} --aspects {DATAPLANE}"
+    result = state.cli.invoke(
+        f"iot hub state import -n {hub_name} -f {filename} --aspects {state.DATAPLANE}"
     )
     assert isinstance(result.get_error(), RequiredArgumentMissingError)
 
-    # Migrate
-    result = cli.invoke(
+    result = state.cli.invoke(
         f"iot hub state migrate --origin-hub {hub_name} --origin-resource-group {hub_rg} "
         f"--destination-hub {hub_name} --destination-resource-group {hub_rg}"
     )
     assert isinstance(result.get_error(), ResourceNotFoundError)
 
 
-# Dataplane main compare commands
-def _compare_dataplane_with_retry(compare):
-    for attempt in range(MAX_RETRIES):
-        try:
-            return compare()
-        except AssertionError:
-            if attempt + 1 == MAX_RETRIES:
-                raise
-            time.sleep(1)
-
-
-def _assert_owned_ids(observed_ids, expected_ids, description):
-    observed_ids = list(observed_ids)
-    assert expected_ids, f"{description}: fixture has no owned IDs."
-    assert len(observed_ids) == len(expected_ids) and set(observed_ids) == set(expected_ids), (
-        f"{description}: expected IDs {sorted(expected_ids)}, observed IDs {sorted(observed_ids)}"
-    )
-
-
-def compare_hubs_dataplane(origin_auth: str, dest_auth: str, owned: _OwnedDataplaneState):
-    def compare_configurations():
-        orig_hub_configs = _invoke_state(f"iot hub configuration list {origin_auth}").as_json()
-        dest_hub_configs = _invoke_state(f"iot hub configuration list {dest_auth}").as_json()
-        orig_hub_deploys = _invoke_state(f"iot edge deployment list {origin_auth}").as_json()
-        dest_hub_deploys = _invoke_state(f"iot edge deployment list {dest_auth}").as_json()
-        for description, configs in (
-            ("origin configurations", orig_hub_configs + orig_hub_deploys),
-            ("destination configurations", dest_hub_configs + dest_hub_deploys),
-        ):
-            _assert_owned_ids((config["id"] for config in configs), owned.config_ids, description)
-        compare_configs(orig_hub_configs, dest_hub_configs)
-        compare_configs(orig_hub_deploys, dest_hub_deploys)
-
-    _compare_dataplane_with_retry(compare_configurations)
-
-    def compare_device_ids():
-        orig_hub_identities = _invoke_state(
-            f"iot hub device-identity list {origin_auth}"
-        ).as_json()
-        dest_hub_identities = _invoke_state(
-            f"iot hub device-identity list {dest_auth}"
-        ).as_json()
-        for description, identities in (
-            ("origin devices", orig_hub_identities), ("destination devices", dest_hub_identities),
-        ):
-            _assert_owned_ids((device["deviceId"] for device in identities), owned.device_ids, description)
-        return orig_hub_identities, dest_hub_identities
-
-    orig_hub_identities, dest_hub_identities = _compare_dataplane_with_retry(compare_device_ids)
-
-    dest_hub_identities_dict = {}
-    for id in dest_hub_identities:
-        dest_hub_identities_dict[id["deviceId"]] = id
-
-    for device in orig_hub_identities:
-        assert device["deviceId"] in dest_hub_identities_dict
-        target = dest_hub_identities_dict[device["deviceId"]]
-
-        if device["authenticationType"] == DeviceAuthApiType.sas.value:
-            id1 = _invoke_state(
-                "iot hub device-identity show {} -d {}".format(origin_auth, device['deviceId'])
-            ).as_json()
-            id2 = _invoke_state(
-                "iot hub device-identity show {} -d {}".format(dest_auth, device['deviceId'])
-            ).as_json()
-
-            device["symmetricKey"] = id1["authentication"]["symmetricKey"]
-            target["symmetricKey"] = id2["authentication"]["symmetricKey"]
-
-        compare_devices(device, target)
-
-        # compare modules
-
-        orig_modules = _invoke_state(
-            "iot hub module-identity list -d {} {}".format(device['deviceId'], origin_auth)
-        ).as_json()
-        dest_modules = _invoke_state(
-            "iot hub module-identity list -d {} {}".format(device['deviceId'], dest_auth)
-        ).as_json()
-
-        if device["capabilities"]["iotEdge"]:
-            assert len(orig_modules) == len(dest_modules)
-        else:
-            assert len(orig_modules) == len(dest_modules)
-
-        for module in orig_modules:
-            target_module = None
-            for mod in dest_modules:
-                if module["moduleId"] == mod["moduleId"]:
-                    target_module = mod
-                    break
-
-            assert target_module
-
-            assert module["authentication"] == target_module["authentication"]
-
-            module_twin = _invoke_state(
-                f"iot hub module-twin show -m {module['moduleId']} -d {device['deviceId']} {origin_auth}"
-            ).as_json()
-            target_module_twin = _invoke_state(
-                f"iot hub module-twin show -m {module['moduleId']} -d {device['deviceId']} {dest_auth}"
-            ).as_json()
-
-            compare_module_twins(module_twin, target_module_twin)
-
-        # compare children
-        if device["capabilities"]["iotEdge"]:
-            orig_children = _invoke_state(
-                f"iot hub device-identity children list -d {device['deviceId']} {origin_auth}"
-            ).as_json()
-            dest_children = _invoke_state(
-                f"iot hub device-identity children list -d {device['deviceId']} {dest_auth}"
-            ).as_json()
-
-            assert orig_children == dest_children
-
-
-def compare_hub_dataplane_to_file(filename: str, hub_auth: str, owned: _OwnedDataplaneState):
-    with open(filename, 'r', encoding='utf-8') as f:
-        hub_info = json.load(f)
-
-    file_configs = list(hub_info["configurations"]["admConfigurations"].values())
-    file_deploys = list(hub_info["configurations"]["edgeDeployments"].values())
-    file_devices = hub_info["devices"]
-    _assert_owned_ids(
-        (config["id"] for config in file_configs + file_deploys), owned.config_ids, "exported configurations"
-    )
-    _assert_owned_ids(file_devices, owned.device_ids, "exported devices")
-
-    def compare_configurations():
-        hub_configs = _invoke_state(f"iot hub configuration list {hub_auth}").as_json()
-        hub_deploys = _invoke_state(f"iot edge deployment list {hub_auth}").as_json()
-        _assert_owned_ids(
-            (config["id"] for config in hub_configs + hub_deploys), owned.config_ids, "Hub configurations"
-        )
-        compare_configs(file_configs, hub_configs)
-        compare_configs(file_deploys, hub_deploys)
-
-    _compare_dataplane_with_retry(compare_configurations)
-
-    def read_devices():
-        devices = _invoke_state(
-            f"iot hub device-identity list {hub_auth}"
-        ).as_json()
-        _assert_owned_ids((device["deviceId"] for device in devices), owned.device_ids, "Hub devices")
-        return devices
-
-    hub_devices = _compare_dataplane_with_retry(read_devices)
-    assert len(file_devices) == len(hub_devices)
-
-    for device in hub_devices:
-        id = _invoke_state(
-            f"iot hub device-identity show {hub_auth} -d {device['deviceId']}"
-        ).as_json()
-        device["symmetricKey"] = id["authentication"]["symmetricKey"]
-
-        file_device = file_devices[device["deviceId"]]
-        file_device_identity = {**file_device["identity"], **file_device["twin"]}
-        # convert auth type to twin style for easier comparisons
-        file_device_identity["authenticationType"] = file_device_identity["authentication"]["type"]
-        if file_device_identity["authenticationType"] == DeviceAuthApiType.sas.value:
-            file_device_identity["symmetricKey"] = file_device_identity["authentication"]["symmetricKey"]
-        elif file_device_identity["authenticationType"] == DeviceAuthApiType.selfSigned.value:
-            file_device_identity["x509Thumbprint"] = file_device_identity["authentication"]["x509Thumbprint"]
-
-        assert file_device_identity
-
-        for key in ["$metadata", "$version"]:
-            device["properties"]["desired"].pop(key)
-
-        compare_devices(device, file_device_identity)
-
-        file_modules = file_device.get("modules", {})
-        hub_modules = _invoke_state(
-            "iot hub module-identity list -d {} {}".format(device["deviceId"], hub_auth)
-        ).as_json()
-
-        assert len(file_modules) == len(hub_modules)
-
-        for module in hub_modules:
-
-            module_twin = _invoke_state(
-                f"iot hub module-twin show -m {module['moduleId']} -d {device['deviceId']} {hub_auth}"
-            ).as_json()
-
-            target_module = file_modules[module["moduleId"]]["identity"]
-            target_module_twin = file_modules[module["moduleId"]]["twin"]
-
-            assert target_module
-            assert module["authentication"] == target_module["authentication"]
-            for key in ["$metadata", "$version"]:
-                module_twin["properties"]["desired"].pop(key)
-
-            compare_module_twins(module_twin, target_module_twin)
-
-        # compare parent
-        if device.get("parentScopes"):
-            device_parent = device["parentScopes"][0].split("://")[1]
-            assert file_device["parent"] == device_parent[:device_parent.rfind("-")]
-
-
-def get_hub_resource_id_with_retry(hub_name: str, rg: str, tries: int = 6, delay: int = 15) -> str:
-    """
-    Return the ARM resource id for the hub, polling `iot hub show` until the control plane GET
-    is consistent.
-
-    A hub created via `iot hub state import`/`migrate` can be briefly unqueryable right after its
-    ARM deployment reports success (control plane read-after-write lag), which makes `iot hub show`
-    return an empty payload. Retry rather than relying on a fixed sleep. If the hub is still not
-    queryable after all attempts, the raised error surfaces the last CLI error so a genuine control
-    plane failure is distinguishable from a short propagation delay.
-    """
-    last_output = ""
-    last_error = None
-    for attempt in range(tries):
-        result = cli.invoke(f"iot hub show -n {hub_name} -g {rg}")
-        last_output = (result.output or "").strip()
-        last_error = result.get_error()
-        if result.success() and last_output:
-            try:
-                payload = json.loads(last_output)
-            except ValueError:
-                payload = None  # control plane may briefly return an empty/partial payload after create
-            if isinstance(payload, dict) and payload.get("id"):
-                return payload["id"]
-        if attempt < tries - 1:
-            time.sleep(delay)
-    waited = max(0, tries - 1) * delay
-    payload_snippet = (last_output[:500] + "...") if len(last_output) > 500 else last_output
-    raise CLIInternalError(
-        f"IoT Hub '{hub_name}' (rg '{rg}') was not queryable via 'iot hub show' after "
-        f"{tries} attempts (~{waited}s). Last error: {last_error!r}. "
-        f"Last payload: '{payload_snippet}'. "
-        "The control plane GET was not consistent after hub creation."
-    )
-
-
-# Controlplane main compare commands
-def compare_hub_controlplane_to_file(filename: str, hub_name: str, rg: str):
-    with open(filename, 'r', encoding='utf-8') as f:
-        file_hub_info = json.load(f)["arm"]["resources"]
-    file_hub = file_hub_info[0]
-
-    # get the hub info
-    hub_resource_id = get_hub_resource_id_with_retry(hub_name, rg)
-    arm_hub_info = cli.invoke(
-        f"group export -n {rg} --resource-ids {hub_resource_id} --skip-all-params"
-    ).as_json()["resources"]
-    arm_hub = arm_hub_info[0]
-
-    # Ignore changed params: name, sku, location
-    assert file_hub["identity"] == arm_hub["identity"]
-    assert file_hub.get("tags") == arm_hub.get("tags")
-    assert len(file_hub["properties"]) == len(arm_hub["properties"])
-    for prop in file_hub["properties"]:
-        if prop not in ["routing", "storageEndpoints"]:
-            assert file_hub["properties"][prop] == arm_hub["properties"][prop]
-
-    # StorageEndpoint - file upload
-    file_hub_file_upload = file_hub["properties"]["storageEndpoints"]["$default"]
-    arm_hub_file_upload = arm_hub["properties"]["storageEndpoints"]["$default"]
-    # Remove account key
-    if file_hub_file_upload.get("connectionString"):
-        assert arm_hub_file_upload.get("connectionString")
-        file_hub_file_upload["connectionString"] = parse_storage_container_connection_string(
-            file_hub_file_upload.pop("connectionString")
-        )
-        file_hub_file_upload["connectionString"].pop("AccountKey")
-        arm_hub_file_upload["connectionString"] = parse_storage_container_connection_string(
-            arm_hub_file_upload.pop("connectionString")
-        )
-        arm_hub_file_upload["connectionString"].pop("AccountKey")
-    assert file_hub_file_upload == arm_hub_file_upload
-
-    # Routes
-    file_hub_routes = file_hub["properties"]["routing"]
-    arm_hub_routes = arm_hub["properties"]["routing"]
-    assert file_hub_routes["fallbackRoute"] == arm_hub_routes["fallbackRoute"]
-    assert file_hub_routes["routes"] == arm_hub_routes["routes"]
-
-    # storage endpoint
-    file_endpoints = file_hub_routes["endpoints"]["storageContainers"]
-    for endpoint in file_endpoints:
-        endpoint.pop("id")
-        if endpoint.get("connectionString"):
-            endpoint["connectionString"] = parse_storage_container_connection_string(endpoint["connectionString"])
-            endpoint["connectionString"].pop("AccountKey")
-    arm_endpoints = arm_hub_routes["endpoints"]["storageContainers"]
-    for endpoint in arm_endpoints:
-        endpoint.pop("id")
-        if endpoint.get("connectionString"):
-            endpoint["connectionString"] = parse_storage_container_connection_string(endpoint["connectionString"])
-            endpoint["connectionString"].pop("AccountKey")
-    assert file_endpoints == arm_endpoints
-
-    # cosmos db endpoint
-    file_endpoints = file_hub_routes["endpoints"].get("cosmosDBSqlCollections", [])
-    for endpoint in file_endpoints:
-        endpoint.pop("id")
-        endpoint.pop("primaryKey")
-        endpoint.pop("secondaryKey")
-    arm_endpoints = arm_hub_routes["endpoints"].get("cosmosDBSqlCollections", [])
-    for endpoint in arm_endpoints:
-        endpoint.pop("id")
-        endpoint.pop("primaryKey")
-        endpoint.pop("secondaryKey")
-    assert file_endpoints == arm_endpoints
-
-    # Other endpoint types
-    for endpoint_type in ["eventHubs", "serviceBusQueues", "serviceBusTopics"]:
-        file_endpoints = file_hub_routes["endpoints"][endpoint_type]
-        for endpoint in file_endpoints:
-            endpoint.pop("id")
-            if endpoint.get("connectionString"):
-                endpoint["connectionString"] = parse_iot_hub_message_endpoint_connection_string(endpoint["connectionString"])
-                endpoint["connectionString"].pop("SharedAccessKey")
-        arm_endpoints = arm_hub_routes["endpoints"][endpoint_type]
-        for endpoint in arm_endpoints:
-            endpoint.pop("id")
-            if endpoint.get("connectionString"):
-                endpoint["connectionString"] = parse_iot_hub_message_endpoint_connection_string(endpoint["connectionString"])
-                endpoint["connectionString"].pop("SharedAccessKey")
-        assert file_endpoints == arm_endpoints
-
-    # compare certificates
-    file_certs = file_hub_info[1:]
-    arm_certs = arm_hub_info[1:]
-    file_hub_name = file_hub["name"]
-    assert len(file_certs) == len(arm_certs)
-    for i in range(len(file_certs)):
-        # Remove hub names
-        orig_certificate = file_certs[i]
-        orig_certificate["dependsOn"][0] = orig_certificate["dependsOn"][0].replace(file_hub_name, "")
-        orig_certificate["name"] = orig_certificate["name"].replace(file_hub_name, "")
-        dest_certificate = arm_certs[i]
-        dest_certificate["dependsOn"][0] = dest_certificate["dependsOn"][0].replace(hub_name, "")
-        dest_certificate["name"] = dest_certificate["name"].replace(hub_name, "")
-
-        assert orig_certificate == dest_certificate
-
-
-def compare_hubs_controlplane(origin_hub_name: str, dest_hub_name: str, rg: str):
-    orig_hub_resource_id = get_hub_resource_id_with_retry(origin_hub_name, rg)
-    orig_hub_info = cli.invoke(
-        f"group export -n {rg} --resource-ids {orig_hub_resource_id} --skip-all-params"
-    ).as_json()["resources"]
-    orig_hub = orig_hub_info[0]
-
-    dest_hub_resource_id = get_hub_resource_id_with_retry(dest_hub_name, rg)
-    dest_hub_info = cli.invoke(
-        f"group export -n {rg} --resource-ids {dest_hub_resource_id} --skip-all-params"
-    ).as_json()["resources"]
-    dest_hub = dest_hub_info[0]
-
-    # Ignore changed params: name, sku, location
-    for param in ["name", "sku", "location"]:
-        orig_hub.pop(param)
-        dest_hub.pop(param)
-
-    # Break up check for easier determination of what isn't the same
-    assert orig_hub["identity"] == dest_hub["identity"]
-    assert len(orig_hub["properties"]) == len(dest_hub["properties"])
-
-    orig_endpoints = orig_hub["properties"]["routing"].pop("endpoints")
-    dest_endpoints = dest_hub["properties"]["routing"].pop("endpoints")
-    for endpoint_type in ["cosmosDBSqlCollections", "eventHubs", "serviceBusQueues", "serviceBusTopics", "storageContainers"]:
-        for endpoint in orig_endpoints.get(endpoint_type, []):
-            endpoint.pop("id")
-        for endpoint in dest_endpoints.get(endpoint_type, []):
-            endpoint.pop("id")
-        assert orig_endpoints.get(endpoint_type, []) == dest_endpoints.get(endpoint_type, [])
-    for prop in orig_hub["properties"].keys():
-        assert orig_hub["properties"][prop] == dest_hub["properties"][prop]
-
-    # compare certificates
-    orig_certs = orig_hub_info[1:]
-    dest_certs = dest_hub_info[1:]
-    assert len(orig_certs) == len(dest_certs)
-    for i in range(len(orig_certs)):
-        # Remove hub names
-        orig_certificate = orig_certs[i]
-        orig_certificate["dependsOn"][0] = orig_certificate["dependsOn"][0].replace(origin_hub_name, "")
-        orig_certificate["name"] = orig_certificate["name"].replace(origin_hub_name, "")
-        dest_certificate = dest_certs[i]
-        dest_certificate["dependsOn"][0] = dest_certificate["dependsOn"][0].replace(dest_hub_name, "")
-        dest_certificate["name"] = dest_certificate["name"].replace(dest_hub_name, "")
-
-        assert orig_certificate == dest_certificate
-
-
-# Compare specific parts
-def compare_configs(configlist1, configlist2):
-    assert len(configlist1) == len(configlist2)
-
-    for config in configlist1:
-        target = None
-        for c in configlist2:
-            if c["id"] == config["id"]:
-                target = c
-                break
-        assert target
-
-        assert config["id"] == target["id"]
-        assert config["content"] == target["content"]
-        assert config["metrics"] == target["metrics"]
-        assert config["priority"] == target["priority"]
-        assert config["systemMetrics"]["queries"] == target["systemMetrics"]["queries"]
-        assert config["targetCondition"] == target["targetCondition"]
-
-
-def compare_devices(device1, device2):
-    # Shared and identity only props
-    assert device1["authenticationType"] == device2["authenticationType"]
-    assert device1["capabilities"]["iotEdge"] == device2["capabilities"]["iotEdge"]
-    assert device1["connectionState"] == device2["connectionState"]
-    assert device1["status"] == device2["status"]
-
-    if device1["authenticationType"] == DeviceAuthApiType.sas.value:
-        assert device1["symmetricKey"]["primaryKey"] == device2["symmetricKey"]["primaryKey"]
-        assert device1["symmetricKey"]["secondaryKey"] == device2["symmetricKey"]["secondaryKey"]
-
-    if device1["authenticationType"] == DeviceAuthApiType.selfSigned.value:
-        assert device1["x509Thumbprint"]["primaryThumbprint"] == device2["x509Thumbprint"]["primaryThumbprint"]
-        assert device1["x509Thumbprint"]["secondaryThumbprint"] == device2["x509Thumbprint"]["secondaryThumbprint"]
-
-    # Twin only props
-    if "tags" in device1:
-        assert device1["tags"] == device2["tags"]
-
-    assert len(device1["properties"]["desired"]) == len(device2["properties"]["desired"])
-
-    for prop in device1["properties"]["desired"]:
-        if prop not in ["$metadata", "$version"]:
-            assert prop in device2["properties"]["desired"]
-            assert device1["properties"]["desired"][prop] == device2["properties"]["desired"][prop]
-
-
-def compare_module_identities(module1, module2):
-    """Focus on shared props and identity only props"""
-    assert module1["managedBy"] == module2["managedBy"]
-    assert module1["connectionState"] == module2["connectionState"]
-
-    assert module1["authentication"]["type"] == module2["authentication"]["type"]
-
-    if module1["authentication"]["type"] == DeviceAuthApiType.sas.value:
-        symkeys1 = module1["authentication"]["symmetricKey"]
-        symkeys2 = module2["authentication"]["symmetricKey"]
-        assert symkeys1["primaryKey"] == symkeys2["primaryKey"]
-        assert symkeys1["secondaryKey"] == symkeys2["secondaryKey"]
-
-    if module1["authentication"]["type"] == DeviceAuthApiType.selfSigned.value:
-        certs1 = module1["authentication"]["x509Thumbprint"]
-        certs2 = module2["authentication"]["x509Thumbprint"]
-        assert certs1["primaryThumbprint"] == certs2["primaryThumbprint"]
-        assert certs1["secondaryThumbprint"] == certs2["secondaryThumbprint"]
-
-
-def compare_module_twins(twin1, twin2):
-    """Focus only on twin only props"""
-    assert twin1["modelId"] == twin2["modelId"]
-    assert len(twin1["properties"]["desired"]) == len(twin2["properties"]["desired"])
-    for prop in twin1["properties"]["desired"]:
-        if prop not in ["$metadata", "$version"]:
-            assert prop in twin2["properties"]["desired"]
-            assert twin1["properties"]["desired"][prop] == twin2["properties"]["desired"][prop]
-
-    if "tags" in twin1:
-        assert twin1["tags"] == twin2["tags"]
-
-
-def compare_certs(cert1, cert2):
-    assert cert1["name"] == cert2["name"]
-    assert cert1["properties"]["certificate"] == cert2["properties"]["certificate"]
-    assert cert1["properties"]["isVerified"] == cert2["properties"]["isVerified"]
-
-
-def compare_endpoints(endpoints1, endpoints2, endpoint_type):
-    for endpoint in endpoints1:
-        target = None
-        for ep in endpoints2:
-            if endpoint["name"] == ep["name"]:
-                target = ep
-                break
-
-        assert target
-        assert endpoint["authenticationType"] == target["authenticationType"]
-        assert endpoint["identity"] == target["identity"]
-        assert endpoint["resourceGroup"] == target["resourceGroup"]
-        assert endpoint["subscriptionId"] == target["subscriptionId"]
-        assert endpoint["endpointUri"] == target["endpointUri"]
-
-        # Ignore keys for connection string
-        if endpoint.get("connectionString"):
-            if endpoint_type == "storageContainers":
-                cstring_props = parse_storage_container_connection_string(endpoint["connectionString"])
-                target_props = parse_storage_container_connection_string(target["connectionString"])
-                cstring_props.pop("AccountKey")
-                target_props.pop("AccountKey")
-                assert cstring_props == target_props
-            else:
-                cstring_props = parse_iot_hub_message_endpoint_connection_string(endpoint["connectionString"])
-                target_props = parse_iot_hub_message_endpoint_connection_string(target["connectionString"])
-                cstring_props.pop("SharedAccessKey")
-                target_props.pop("SharedAccessKey")
-                assert cstring_props == target_props
-
-        if "entityPath" in endpoint:
-            assert endpoint["entityPath"] == target["entityPath"]
-
-        if endpoint_type == "storageContainers":
-            assert endpoint["maxChunkSizeInBytes"] == target["maxChunkSizeInBytes"]
-            assert endpoint["batchFrequencyInSeconds"] == target["batchFrequencyInSeconds"]
-            assert endpoint["containerName"] == target["containerName"]
-            assert endpoint["encoding"] == target["encoding"]
-            assert endpoint["fileNameFormat"] == target["fileNameFormat"]
-
-        if endpoint_type == "cosmosDBSqlCollections":
-            assert endpoint["collectionName"] == target["collectionName"]
-            assert endpoint["databaseName"] == target["databaseName"]
-            assert endpoint["partitionKeyName"] == target["partitionKeyName"]
-            assert endpoint["partitionKeyTemplate"] == target["partitionKeyTemplate"]
-
-
-def compare_routes(routes1, routes2):
-    assert len(routes1) == len(routes2)
-
-    for route in routes1:
-        target = None
-        for r in routes2:
-            if route["name"] == r["name"]:
-                target = r
-                break
-
-        assert target
-        assert route["condition"] == target["condition"]
-        assert route["endpointNames"] == target["endpointNames"]
-        assert route["isEnabled"] == target["isEnabled"]
-        assert route["source"] == target["source"]
-
-
 @pytest.mark.hub_infrastructure(count=1)
 def test_export_endpoint_resource_name_starting_with_scheme_char(
     provisioned_only_iot_hubs_module, setup_file
 ):
-    """Export must keep a routing endpoint"""
+    """Export must keep a routing endpoint."""
     hub_name = provisioned_only_iot_hubs_module[0]["name"]
     hub_rg = provisioned_only_iot_hubs_module[0]["rg"]
-    delete_system_endpoints(hub_name, hub_rg)
+    state.delete_system_endpoints(hub_name, hub_rg)
 
     sb_namespace = ("sb" + generate_generic_id())[:24]
     topic_name = "topic1"
     endpoint_name = generate_generic_id()
     try:
-        cli.invoke(
+        state.cli.invoke(
             f"servicebus namespace create --name {sb_namespace} -g {hub_rg} --sku Standard --location {HUB_TEST_LOCATION}"
         )
-        cli.invoke(
+        state.cli.invoke(
             f"servicebus topic create --namespace-name {sb_namespace} -g {hub_rg} --name {topic_name}"
         )
-        cli.invoke(
+        state.cli.invoke(
             f"servicebus topic authorization-rule create --namespace-name {sb_namespace} -g {hub_rg} "
             f"--topic-name {topic_name} --name iothubroute --rights Send"
         )
-        endpoint_cstring = cli.invoke(
+        endpoint_cstring = state.cli.invoke(
             f"servicebus topic authorization-rule keys list --namespace-name {sb_namespace} -g {hub_rg} "
             f"--topic-name {topic_name} --name iothubroute"
         ).as_json()["primaryConnectionString"]
-
-        # Key-based endpoint with resource group
-        cli.invoke(
+        state.cli.invoke(
             f"iot hub message-endpoint create servicebus-topic -n {hub_name} -g {hub_rg} "
             f"--en {endpoint_name} -c '{endpoint_cstring}' --erg {hub_rg}"
         )
         time.sleep(10)  # gives the hub time to update before the export
 
-        _invoke_state(
-            f"iot hub state export -n {hub_name} -f {setup_file} -g {hub_rg} -r --aspects {CONTROLPLANE}",
+        state._invoke_state(
+            f"iot hub state export -n {hub_name} -f {setup_file} -g {hub_rg} -r --aspects {state.CONTROLPLANE}",
         )
-
         with open(setup_file, "r", encoding="utf-8") as f:
             hub_info = json.load(f)
         topics = hub_info["arm"]["resources"][0]["properties"]["routing"]["endpoints"]["serviceBusTopics"]
-
         exported = [ep for ep in topics if ep["name"] == endpoint_name]
         assert len(exported) == 1, "endpoint was dropped from export (namespace likely corrupted)"
         assert sb_namespace in exported[0]["connectionString"]
     finally:
-        cli.invoke(f"iot hub message-endpoint delete -n {hub_name} -g {hub_rg} --en {endpoint_name} -y")
-        cli.invoke(f"servicebus namespace delete --name {sb_namespace} -g {hub_rg}")
+        state.cli.invoke(f"iot hub message-endpoint delete -n {hub_name} -g {hub_rg} --en {endpoint_name} -y")
+        state.cli.invoke(f"servicebus namespace delete --name {sb_namespace} -g {hub_rg}")
 
 
 @pytest.mark.hub_infrastructure(count=1)
@@ -1192,50 +236,46 @@ def test_export_endpoint_resource_name_starting_with_scheme_char(
 def test_export_cosmosdb_endpoint_resource_name_starting_with_scheme_char(
     provisioned_only_iot_hubs_module, setup_file
 ):
-    """Export must keep a Cosmos DB routing endpoint"""
+    """Export must keep a Cosmos DB routing endpoint."""
     hub_name = provisioned_only_iot_hubs_module[0]["name"]
     hub_rg = provisioned_only_iot_hubs_module[0]["rg"]
-    delete_system_endpoints(hub_name, hub_rg)
+    state.delete_system_endpoints(hub_name, hub_rg)
 
     cosmos_account = ("scos" + generate_generic_id())[:40]
     database_name = "routedb"
     container_name = "routecontainer"
     endpoint_name = generate_generic_id()
     try:
-        cli.invoke(
+        state.cli.invoke(
             f"cosmosdb create --name {cosmos_account} -g {hub_rg} "
             f"--locations regionName={HUB_TEST_LOCATION} failoverPriority=0"
         )
-        cli.invoke(
+        state.cli.invoke(
             f"cosmosdb sql database create --account-name {cosmos_account} -g {hub_rg} --name {database_name}"
         )
-        cli.invoke(
+        state.cli.invoke(
             f"cosmosdb sql container create --account-name {cosmos_account} -g {hub_rg} "
             f"--database-name {database_name} --name {container_name} -p /deviceid"
         )
-        endpoint_cstring = cli.invoke(
+        endpoint_cstring = state.cli.invoke(
             f"cosmosdb keys list --name {cosmos_account} -g {hub_rg} --type connection-strings"
         ).as_json()["connectionStrings"][0]["connectionString"]
-
-        # Key-based endpoint with resource group
-        cli.invoke(
+        state.cli.invoke(
             f"iot hub message-endpoint create cosmosdb-container -n {hub_name} -g {hub_rg} "
             f"--en {endpoint_name} --db {database_name} --container {container_name} "
             f"-c '{endpoint_cstring}' --erg {hub_rg}"
         )
         time.sleep(10)  # gives the hub time to update before the export
 
-        _invoke_state(
-            f"iot hub state export -n {hub_name} -f {setup_file} -g {hub_rg} -r --aspects {CONTROLPLANE}",
+        state._invoke_state(
+            f"iot hub state export -n {hub_name} -f {setup_file} -g {hub_rg} -r --aspects {state.CONTROLPLANE}",
         )
-
         with open(setup_file, "r", encoding="utf-8") as f:
             hub_info = json.load(f)
         containers = hub_info["arm"]["resources"][0]["properties"]["routing"]["endpoints"]["cosmosDBSqlContainers"]
-
         exported = [ep for ep in containers if ep["name"] == endpoint_name]
         assert len(exported) == 1, "endpoint was dropped from export (account name likely corrupted)"
         assert cosmos_account in exported[0]["endpointUri"]
     finally:
-        cli.invoke(f"iot hub message-endpoint delete -n {hub_name} -g {hub_rg} --en {endpoint_name} -y")
-        cli.invoke(f"cosmosdb delete --name {cosmos_account} -g {hub_rg} -y")
+        state.cli.invoke(f"iot hub message-endpoint delete -n {hub_name} -g {hub_rg} --en {endpoint_name} -y")
+        state.cli.invoke(f"cosmosdb delete --name {cosmos_account} -g {hub_rg} -y")
