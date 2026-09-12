@@ -17,7 +17,9 @@ from azure.cli.core.azclierror import (
 )
 
 from azext_iot.tests.iothub._integration_helpers import wait_for_query_ids
-from azext_iot.tests.iothub.state import test_hub_state_int as subject
+from azext_iot.tests.iothub.state import _state_helpers as subject
+from azext_iot.tests.iothub.state import test_hub_state_dataplane_int as dataplane
+from azext_iot.tests.iothub.state import test_hub_state_int as controlplane
 
 
 @pytest.fixture
@@ -32,7 +34,7 @@ def fake_cli(mocker):
 
 @pytest.mark.parametrize("failure_kind", ["cli_error", "nonzero", "system_exit"])
 @pytest.mark.parametrize("scenario,failed_operation,expected_events", [
-    ("test_migrate_dataplane", None, ["migrate", "ready", "compare", "cleanup"]),
+    ("test_migrate_dataplane", None, ["migrate", "ready", "compare"]),
     ("test_migrate_dataplane", "migrate", ["migrate"]),
     ("test_export_import_dataplane", None, ["export", "compare", "cleanup", "import", "ready", "compare"]),
     ("test_export_import_dataplane", "export", ["export"]),
@@ -79,13 +81,13 @@ def test_state_command_error_precedes_comparison(
     if failed_operation:
         expected_error = BadRequestError if failure_kind == "cli_error" else CLIInternalError
         with pytest.raises(expected_error) as raised:
-            getattr(subject, scenario)(hubs)
+            getattr(dataplane, scenario)(hubs)
         if failure_kind == "cli_error":
             assert raised.value is error
         else:
             assert str(raised.value) == f"IoT Hub state command failed with exit code {exit_code}."
     else:
-        getattr(subject, scenario)(hubs)
+        getattr(dataplane, scenario)(hubs)
     assert events == expected_events
     for call in readiness.call_args_list:
         assert call.args[0] == subject._hub_auth(hubs[1] if scenario == "test_migrate_dataplane" else hubs[0])
@@ -115,11 +117,11 @@ def test_expected_state_failures_still_assert_original_error(mocker, fake_cli, s
     fake_cli.invoke = mocker.Mock(side_effect=invoke)
     args = ([{"name": "hub", "rg": "rg"}],) if scenario == "test_mirgate_hub_dataplane_error" else ()
     if outcome == "expected_error":
-        getattr(subject, scenario)(*args)
+        getattr(controlplane, scenario)(*args)
         assert fake_cli.invoke.call_count == (1 if args else 5)
     else:
         with pytest.raises(AssertionError):
-            getattr(subject, scenario)(*args)
+            getattr(controlplane, scenario)(*args)
 
 
 def _http_error(mocker, status):
@@ -564,13 +566,13 @@ def test_destination_readiness_does_not_replay_writes_or_hide_export_failures(
     if failure:
         expected = {"omission": AssertionError, "cli_error": BadRequestError, "nonzero": CLIInternalError}[failure]
         with pytest.raises(expected) as raised:
-            getattr(subject, scenario)(hubs)
+            getattr(dataplane, scenario)(hubs)
         if failure == "cli_error":
             assert raised.value is error
     else:
-        getattr(subject, scenario)(hubs)
+        getattr(dataplane, scenario)(hubs)
     prefix = ["migrate"] if scenario == "test_migrate_dataplane" else ["export", "compare", "cleanup", "import"]
-    suffix = [] if failure else ["compare"] + (["cleanup"] if scenario == "test_migrate_dataplane" else [])
+    suffix = [] if failure else ["compare"]
     assert events == prefix + ["query"] * len(queries) + suffix
     assert len(queries) == (2 if failure is None else 3 if failure == "omission" else 1)
     bounded_query_wait.assert_called_once()
@@ -584,11 +586,118 @@ def test_invalid_export_fails_before_import_or_a_destination_visibility_wait(moc
     compare = mocker.patch.object(subject, "compare_hub_dataplane_to_file", side_effect=AssertionError("incomplete export"))
     ready = mocker.patch.object(subject, "_wait_for_dataplane_query")
     with pytest.raises(AssertionError, match="incomplete export"):
-        subject.test_export_import_dataplane(hubs)
+        dataplane.test_export_import_dataplane(hubs)
     invoke.assert_called_once()
     assert invoke.call_args.args[0].startswith("iot hub state export")
     compare.assert_called_once()
     ready.assert_not_called()
+
+
+@pytest.mark.parametrize("auth_phases", [["login"], ["login", "key"]])
+@pytest.mark.parametrize("failure", [None, "compare", "cleanup"])
+def test_final_migration_cleanup_belongs_to_fixture(
+    mocker, state_backend, state_request, tmp_path, auth_phases, failure
+):
+    mocker.patch.object(subject, "DATAPLANE_AUTH_TYPES", auth_phases)
+    fixture = _state_fixture(state_backend, state_request, tmp_path)
+    hubs = next(fixture)
+    owned = hubs[0]["state_data"]
+    destination = state_backend.states["destination"]
+    events = []
+
+    def migrate(command):
+        assert command.startswith("iot hub state migrate ")
+        assert not destination["devices"] and not destination["configs"]
+        destination["devices"].update(owned.device_ids)
+        destination["configs"].update(owned.config_ids)
+        events.append("migrate")
+
+    def compare(origin_auth, dest_auth, expected):
+        assert origin_auth == subject._hub_auth(hubs[0])
+        assert dest_auth == subject._hub_auth(hubs[1])
+        assert expected is owned
+        events.append("compare")
+        if failure == "compare":
+            raise AssertionError("comparison failed")
+
+    mocker.patch.object(subject, "_invoke_state", side_effect=migrate)
+    mocker.patch.object(subject, "compare_hubs_dataplane", side_effect=compare)
+    if failure == "compare":
+        with pytest.raises(AssertionError, match="comparison failed"):
+            dataplane.test_migrate_dataplane(hubs)
+    else:
+        dataplane.test_migrate_dataplane(hubs)
+    assert destination["devices"] == set(owned.device_ids)
+    assert destination["configs"] == set(owned.config_ids)
+    assert hubs[1]["state_data"].device_ids == owned.device_ids
+    assert hubs[1]["state_data"].config_ids == owned.config_ids
+    phases_run = 1 if failure == "compare" else len(auth_phases)
+    assert events == ["migrate", "compare"] * phases_run
+    assert len(state_backend.deleted) == (phases_run - 1) * 9
+
+    if failure == "cleanup":
+        def fail_delete(**_kwargs):
+            raise _http_error(mocker, 500)
+
+        state_backend.clients["destination"].devices.delete_identity.side_effect = fail_delete
+        with pytest.raises(HttpResponseError):
+            fixture.close()
+    else:
+        fixture.close()
+        assert not destination["devices"] and not destination["configs"]
+        for item_id in owned.device_ids + owned.config_ids:
+            assert sum(name == "destination" and deleted_id == item_id
+                       for name, _, deleted_id in state_backend.deleted) == phases_run
+    assert state_backend.states["origin"] == {"devices": set(), "configs": set()}
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("failed_destination", [None, "fresh-explicit", "fresh-default"])
+@pytest.mark.parametrize("failure_kind", ["cli_error", "nonzero", "system_exit"])
+def test_controlplane_migration_creates_and_compares_both_owned_destinations(
+    mocker, fake_cli, failed_destination, failure_kind
+):
+    hubs = [{"name": "origin", "rg": "owned-rg"}]
+    mocker.patch.object(controlplane, "generate_hub_id", side_effect=["fresh-explicit", "fresh-default"])
+    mocker.patch.object(subject, "delete_system_endpoints")
+    mocker.patch.object(subject.time, "sleep")
+    compare = mocker.patch.object(subject, "compare_hubs_controlplane")
+    commands = []
+    error = BadRequestError("Migration create failed")
+
+    def invoke(args, out_file):
+        commands.append(args)
+        assert args[:4] == ["iot", "hub", "state", "migrate"]
+        assert args[args.index("--origin-hub") + 1] == "origin"
+        assert args[args.index("--origin-resource-group") + 1] == "owned-rg"
+        assert args[args.index("--aspects") + 1] == "arm"
+        destination = args[args.index("--destination-hub") + 1]
+        assert destination == ("fresh-explicit" if len(commands) == 1 else "fresh-default")
+        assert destination == hubs[-1]["name"], "Track the attempted destination before creation."
+        if len(commands) == 1:
+            assert args[args.index("--destination-resource-group") + 1] == "owned-rg"
+        else:
+            assert "--destination-resource-group" not in args
+            compare.assert_called_once_with("origin", "fresh-explicit", "owned-rg")
+        fake_cli.result.error = error if destination == failed_destination and failure_kind == "cli_error" else None
+        if destination == failed_destination:
+            if failure_kind == "system_exit":
+                raise SystemExit(7)
+            return 7
+        out_file.write("{}")
+        return 0
+
+    fake_cli.invoke = mocker.Mock(side_effect=invoke)
+    if failed_destination:
+        expected = BadRequestError if failure_kind == "cli_error" else CLIInternalError
+        with pytest.raises(expected):
+            controlplane.test_migrate_controlplane_with_create(hubs)
+    else:
+        controlplane.test_migrate_controlplane_with_create(hubs)
+    attempted = ["fresh-explicit"] if failed_destination == "fresh-explicit" else ["fresh-explicit", "fresh-default"]
+    assert [hub["name"] for hub in hubs] == ["origin"] + attempted
+    successful = [destination for destination in attempted if destination != failed_destination]
+    assert compare.call_args_list == [mocker.call("origin", destination, "owned-rg") for destination in successful]
 
 
 def _comparison_read_key(args):

@@ -15,6 +15,7 @@ from azext_iot.tests.iothub.jobs import test_iothub_jobs_int as jobs
 from azext_iot.tests.iothub.message_endpoint import test_iothub_message_endpoint_int as endpoints
 from azext_iot.tests.iothub.modules import test_iothub_modules_int as modules
 from azext_iot.tests.iothub.state import test_hub_state_int as state
+from azext_iot.tests.iothub.state import test_hub_state_dataplane_int as state_dataplane
 
 
 def _assert_lifecycle_budget(scenario, seconds):
@@ -58,8 +59,8 @@ def test_ordinary_scenarios_keep_the_default_timeout(scenario):
     (modules.TestIoTHubModules.test_iothub_module_identity, len(DATAPLANE_AUTH_TYPES) * len(DEVICE_TYPES)),
     (nested.TestIoTHubNestedEdge.test_iothub_nested_edge, 3 * len(DATAPLANE_AUTH_TYPES)),
     (jobs.TestIoTHubJobs.test_jobs, 2 * len(DATAPLANE_AUTH_TYPES)),
-    (state.test_migrate_dataplane, 1 + len(DATAPLANE_AUTH_TYPES)),
-    (state.test_export_import_dataplane, 1 + len(DATAPLANE_AUTH_TYPES)),
+    (state_dataplane.test_migrate_dataplane, 1 + len(DATAPLANE_AUTH_TYPES)),
+    (state_dataplane.test_export_import_dataplane, 1 + len(DATAPLANE_AUTH_TYPES)),
 ])
 def test_query_scenarios_budget_each_sequential_window_and_the_existing_lifecycle(scenario, windows):
     _assert_lifecycle_budget(scenario, 900 + 1800 * windows)
