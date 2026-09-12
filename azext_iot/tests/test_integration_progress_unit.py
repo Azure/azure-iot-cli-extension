@@ -128,13 +128,34 @@ def test_finish_and_crashed_worker_report_clear_active_test(progress):
     assert not plugin._active
 
 
-def test_progress_thread_stops_once_on_session_finish_and_unconfigure(progress):
-    plugin, _, _, thread = progress
+@pytest.mark.parametrize("cleanup_fails", [False, True])
+def test_progress_thread_stops_once_after_session_cleanup_and_unconfigure(progress, mocker, cleanup_fails):
+    plugin, reporter, _, thread = progress
     thread.assert_called_once_with(
         target=plugin._heartbeat, name="iot-integration-progress", daemon=True,
     )
     thread.return_value.start.assert_called_once_with()
-    plugin.pytest_sessionfinish()
+    mocker.patch.object(plugin._stop, "wait", side_effect=[False, True])
+
+    class Cleanup:
+        @pytest.hookimpl(trylast=True)
+        def pytest_sessionfinish(self):
+            assert not plugin._stop.is_set()
+            plugin._heartbeat()
+            reporter.write_line.assert_called_once_with(
+                "[integration progress] Waiting for integration session cleanup to finish; no active test."
+            )
+            if cleanup_fails:
+                raise RuntimeError("Cleanup failed")
+
+    manager = pytest.PytestPluginManager()
+    manager.register(plugin)
+    manager.register(Cleanup())
+    if cleanup_fails:
+        with pytest.raises(RuntimeError, match="Cleanup failed"):
+            manager.hook.pytest_sessionfinish(session=None, exitstatus=0)
+    else:
+        manager.hook.pytest_sessionfinish(session=None, exitstatus=0)
     plugin.pytest_unconfigure()
     assert plugin._stop.is_set()
     thread.return_value.join.assert_called_once_with(timeout=1)

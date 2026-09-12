@@ -145,6 +145,10 @@ Each phase needs two available DPS slots and creates its own resources. The runn
 rejects supplied-resource pins (`azext_iot_testdps`, `azext_iot_testdps_hub`, and
 `azext_iot_testhub`), verifies owned-resource cleanup before continuing, and preserves
 each phase's outcome and sanitized artifacts under `test-result/dps-phases/`.
+Shared fixtures retain a controller reference until all pytest workers finish,
+so an early worker cannot delete a resource before a later worker first uses it.
+The controller releases DPS references before the shared Hub reference, preserving
+ownership checks and the single-create guard.
 Do not overlap these phases with another DPS-consuming workload.
 
 The serial runner and receipt-enabled integration fixtures are **Linux-only**:
