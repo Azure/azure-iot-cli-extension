@@ -6,8 +6,9 @@
 
 import shlex
 from contextlib import contextmanager
+from math import isfinite
 from queue import Queue
-from time import sleep
+from time import monotonic, sleep
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -30,28 +31,49 @@ LOCAL_AUTH_DEVICE_HTTP_REASON = (
     "operation uses a Hub shared-access policy, not a device key, and has no Entra/device-key option."
 )
 _CANARY_HUB_LIST_API_VERSIONS = frozenset({"2026-05-01-preview", "2026-10-01-preview"})
+# Documented query tolerance, not a maximum-latency guarantee:
+# https://learn.microsoft.com/azure/iot-hub/iot-hub-devguide-query-language#twin-query-limitations
+QUERY_VISIBILITY_TIMEOUT = 30 * 60
 logger = get_logger(__name__)
 
 
-def wait_for_query_ids(read, expected_ids, id_key=None, attempts=7, wait=10):
-    """Wait only for post-write query visibility; command/service errors propagate."""
-    if attempts < 1 or wait < 0:
-        raise ValueError("Query wait requires at least one attempt and a nonnegative interval.")
+def wait_for_query_ids(read, expected_ids, id_key=None, attempts=None, wait=10, timeout=QUERY_VISIBILITY_TIMEOUT):
+    """Wait for exact query IDs, charging reads and sleeps to one elapsed-time budget.
+
+    An optional attempt limit can shorten the budget. In-flight reads retain their
+    own transport timeouts; late results do not extend this visibility deadline.
+    Command/service errors propagate without retry.
+    """
+    if attempts is not None and (isinstance(attempts, bool) or not isinstance(attempts, int) or attempts < 1):
+        raise ValueError("Query wait requires at least one attempt when an attempt limit is supplied.")
+    if any(isinstance(value, bool) or not isinstance(value, (int, float)) or not isfinite(value)
+           for value in (wait, timeout)) or wait < 0 or timeout <= 0 or (attempts is None and wait == 0):
+        raise ValueError("Query wait requires a finite positive timeout and polling interval (zero only with attempts).")
     expected = set(expected_ids)
-    for attempt in range(attempts):
+    start = monotonic()
+    elapsed = 0
+    attempt = 0
+    ids = []
+    while elapsed < timeout:
+        attempt += 1
         rows = read()
-        observed = {row[id_key] for row in rows} if id_key else set(rows)
-        if observed == expected:
+        ids = [row[id_key] for row in rows] if id_key else list(rows)
+        observed = set(ids)
+        elapsed = monotonic() - start
+        if observed == expected and len(ids) == len(expected) and elapsed <= timeout:
             return rows
         logger.warning(
-            "Query visibility %s/%s: expected IDs %s, observed IDs %s",
-            attempt + 1, attempts, sorted(expected), sorted(observed),
+            "Query visibility after %s reads, %.1fs/%.1fs: expected IDs %s, observed IDs %s (%s rows)",
+            attempt, elapsed, timeout, sorted(expected), sorted(observed), len(ids),
         )
-        if attempt + 1 < attempts:
-            sleep(wait)
+        if elapsed >= timeout or (attempts is not None and attempt >= attempts):
+            break
+        sleep(min(wait, timeout - elapsed))
+        elapsed = monotonic() - start
     raise AssertionError(
-        f"Query did not converge after {attempts} reads: expected IDs {sorted(expected)}, "
-        f"observed IDs {sorted(observed)}"
+        f"Query visibility deadline/attempt limit exhausted after {attempt} reads, {elapsed:.1f}s "
+        f"(budget {timeout:.1f}s): expected IDs {sorted(expected)}, "
+        f"observed IDs {sorted(ids)}"
     )
 
 

@@ -8,7 +8,12 @@ import inspect
 
 import pytest
 
+from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES, DEVICE_TYPES
+from azext_iot.tests.iothub.devices import test_iothub_devices_int as devices
+from azext_iot.tests.iothub.devices import test_iothub_nested_edge_int as nested
+from azext_iot.tests.iothub.jobs import test_iothub_jobs_int as jobs
 from azext_iot.tests.iothub.message_endpoint import test_iothub_message_endpoint_int as endpoints
+from azext_iot.tests.iothub.modules import test_iothub_modules_int as modules
 from azext_iot.tests.iothub.state import test_hub_state_int as state
 
 
@@ -39,10 +44,37 @@ def test_expensive_last_items_include_shared_resource_teardown(scenario, seconds
 
 
 @pytest.mark.parametrize("scenario", [
-    state.test_migrate_dataplane,
+    state.test_custom_scenarios_controlplane,
     state.test_mirgate_hub_dataplane_error,
     state.test_export_import_migrate_missing_hubs_error,
     endpoints.test_iot_eventhub_endpoint_lifecycle,
 ])
 def test_ordinary_scenarios_keep_the_default_timeout(scenario):
     assert not any(mark.name == "timeout" for mark in getattr(scenario, "pytestmark", []))
+
+
+@pytest.mark.parametrize("scenario,windows", [
+    (devices.TestIoTHubDevices.test_iothub_device_identity, len(DATAPLANE_AUTH_TYPES) * len(DEVICE_TYPES)),
+    (modules.TestIoTHubModules.test_iothub_module_identity, len(DATAPLANE_AUTH_TYPES) * len(DEVICE_TYPES)),
+    (nested.TestIoTHubNestedEdge.test_iothub_nested_edge, len(DATAPLANE_AUTH_TYPES)),
+    (jobs.TestIoTHubJobs.test_jobs, 2 * len(DATAPLANE_AUTH_TYPES)),
+    (state.test_migrate_dataplane, 1 + len(DATAPLANE_AUTH_TYPES)),
+    (state.test_export_import_dataplane, 1 + len(DATAPLANE_AUTH_TYPES)),
+])
+def test_query_scenarios_budget_each_sequential_window_and_the_existing_lifecycle(scenario, windows):
+    _assert_lifecycle_budget(scenario, 900 + 1800 * windows)
+
+
+@pytest.mark.parametrize("scenario_class,heavy", [
+    (devices.TestIoTHubDevices, "test_iothub_device_identity"),
+    (modules.TestIoTHubModules, "test_iothub_module_identity"),
+    (nested.TestIoTHubNestedEdge, "test_iothub_nested_edge"),
+])
+def test_other_identity_methods_do_not_inherit_query_timeouts(scenario_class, heavy):
+    ordinary = [
+        scenario for name, scenario in vars(scenario_class).items()
+        if name.startswith("test_") and name != heavy
+    ]
+    assert ordinary
+    for scenario in ordinary:
+        assert not any(mark.name == "timeout" for mark in getattr(scenario, "pytestmark", []))

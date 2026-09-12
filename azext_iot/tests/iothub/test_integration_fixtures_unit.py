@@ -15,7 +15,7 @@ from requests import Response
 import pytest
 import yaml
 from azure.cli.core.azclierror import CLIInternalError, RequiredArgumentMissingError
-from azure.core.exceptions import HttpResponseError
+from azure.core.exceptions import HttpResponseError, ServiceRequestError
 
 from azext_iot.tests import CaptureOutputLiveScenarioTest, iothub
 from azext_iot.tests.iothub import IoTLiveScenarioTest, conftest as fixtures
@@ -516,12 +516,12 @@ def test_query_wait_exhaustion_preserves_observed_ids_and_fails(mocker):
     sleep = mocker.patch.object(integration_helpers, "sleep")
     read = Mock(return_value=["unexpected-device"])
     with pytest.raises(AssertionError, match="expected IDs.*new-device.*observed IDs.*unexpected-device"):
-        integration_helpers.wait_for_query_ids(read, ["new-device"])
+        integration_helpers.wait_for_query_ids(read, ["new-device"], attempts=7)
     assert read.call_count == 7
     assert sleep.call_count == 6
 
 
-@pytest.mark.parametrize("status", [400, 403, 502])
+@pytest.mark.parametrize("status", [400, 401, 403, 404, 502])
 def test_query_wait_never_retries_service_errors(mocker, status):
     sleep = mocker.patch.object(integration_helpers, "sleep")
     error = service_error(status, "ProviderError")
@@ -533,12 +533,102 @@ def test_query_wait_never_retries_service_errors(mocker, status):
     sleep.assert_not_called()
 
 
-@pytest.mark.parametrize("attempts,wait", [(0, 10), (1, -1)])
-def test_query_wait_invalid_bounds_fail_before_reading(attempts, wait):
+@pytest.mark.parametrize("kwargs", [
+    {"attempts": value} for value in (0, -1, 1.5, True, "7")
+] + [
+    {"wait": value} for value in (-1, 0, float("inf"), float("nan"), True, "10", None)
+] + [
+    {"timeout": value} for value in (0, -1, float("inf"), float("nan"), True, "1800", None)
+])
+def test_query_wait_invalid_bounds_fail_before_reading(kwargs):
     read = Mock()
-    with pytest.raises(ValueError, match="at least one attempt"):
-        integration_helpers.wait_for_query_ids(read, [], attempts=attempts, wait=wait)
+    with pytest.raises(ValueError, match="Query wait requires"):
+        integration_helpers.wait_for_query_ids(read, [], **kwargs)
     read.assert_not_called()
+
+
+@pytest.fixture
+def query_clock(mocker):
+    clock = SimpleNamespace(now=0)
+
+    def advance(seconds):
+        clock.now += seconds
+
+    mocker.patch.object(integration_helpers, "monotonic", side_effect=lambda: clock.now)
+    clock.sleep = mocker.patch.object(integration_helpers, "sleep", side_effect=advance)
+    return clock
+
+
+@pytest.mark.parametrize("converges", [False, True])
+def test_query_wait_uses_one_thirty_minute_budget(query_clock, converges):
+    read = Mock(side_effect=lambda: ["device"] if converges and query_clock.now >= 1790 else [])
+    if converges:
+        assert integration_helpers.wait_for_query_ids(read, ["device"]) == ["device"]
+        assert query_clock.now == 1790
+    else:
+        with pytest.raises(AssertionError, match=r"180 reads, 1800.0s.*expected IDs.*device.*observed IDs \[\]"):
+            integration_helpers.wait_for_query_ids(read, ["device"])
+        assert query_clock.now == 1800
+    assert integration_helpers.QUERY_VISIBILITY_TIMEOUT == 1800
+    assert read.call_count == 180
+    assert query_clock.sleep.call_count == (179 if converges else 180)
+    assert all(call.args == (10,) for call in query_clock.sleep.call_args_list)
+
+
+def test_query_wait_charges_rpc_time_and_truncates_the_last_sleep(query_clock):
+    def slow_read():
+        query_clock.now += 4
+        return ["partial"]
+
+    read = Mock(side_effect=slow_read)
+    with pytest.raises(AssertionError, match="2 reads, 17.0s.*observed IDs.*partial"):
+        integration_helpers.wait_for_query_ids(read, ["partial", "missing"], wait=5, timeout=17)
+    assert read.call_count == 2
+    assert query_clock.now == 17
+    assert [call.args[0] for call in query_clock.sleep.call_args_list] == [5, 4]
+
+
+def test_query_wait_stops_if_a_sleep_runs_past_the_deadline(query_clock):
+    def oversleep(_seconds):
+        query_clock.now += 15
+
+    query_clock.sleep.side_effect = oversleep
+    read = Mock(return_value=[])
+    with pytest.raises(AssertionError, match="1 reads, 15.0s"):
+        integration_helpers.wait_for_query_ids(read, ["device"], timeout=10)
+    read.assert_called_once_with()
+
+
+@pytest.mark.parametrize("latency", [10, 11])
+def test_query_wait_does_not_accept_success_after_the_deadline(query_clock, latency):
+    def read():
+        query_clock.now += latency
+        return ["device"]
+
+    if latency == 10:
+        assert integration_helpers.wait_for_query_ids(read, ["device"], timeout=10) == ["device"]
+    else:
+        with pytest.raises(AssertionError, match="1 reads, 11.0s"):
+            integration_helpers.wait_for_query_ids(read, ["device"], timeout=10)
+    query_clock.sleep.assert_not_called()
+
+
+@pytest.mark.parametrize("error", [ServiceRequestError("Transport failure"), TimeoutError("RPC timeout")])
+def test_query_wait_propagates_transport_errors_without_sleep(query_clock, error):
+    read = Mock(side_effect=error)
+    with pytest.raises(type(error)) as raised:
+        integration_helpers.wait_for_query_ids(read, ["device"])
+    assert raised.value is error
+    read.assert_called_once_with()
+    query_clock.sleep.assert_not_called()
+
+
+@pytest.mark.parametrize("id_key", [None, "deviceId"])
+def test_query_wait_rejects_duplicate_rows(query_clock, id_key):
+    rows = [{"deviceId": "device"}] * 2 if id_key else ["device"] * 2
+    with pytest.raises(AssertionError, match="1 reads"):
+        integration_helpers.wait_for_query_ids(lambda: rows, ["device"], id_key=id_key, attempts=1, wait=0)
+    query_clock.sleep.assert_not_called()
 
 
 @pytest.mark.parametrize("error_type", [HttpResponseError, integration_helpers.CloudError])
