@@ -147,6 +147,14 @@ rejects supplied-resource pins (`azext_iot_testdps`, `azext_iot_testdps_hub`, an
 each phase's outcome and sanitized artifacts under `test-result/dps-phases/`.
 Do not overlap these phases with another DPS-consuming workload.
 
+The serial runner and receipt-enabled integration fixtures are **Linux-only**:
+their bounded cleanup relies on Linux signals, process groups, `/proc`, and pipe
+polling. Windows and macOS entry attempts fail before credential discovery or
+resource execution; they are not supported orchestration platforms. Normal CLI
+use and phase-unset manual tests are unchanged. Portable selection, receipt,
+SDK/HTTP, and result-gate unit tests still run on every OS; only real Linux
+process/timer proofs are platform-marked.
+
 For direct test invocations, `azext_iot_dps_test_phase=service-sas` selects exactly
 the 29 SAS cases; partial selections are errors. The default retains Entra fixture
 behavior without changing command defaults. Explicit `regular` and `service-sas`

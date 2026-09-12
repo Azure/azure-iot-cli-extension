@@ -1,14 +1,19 @@
+# coding=utf-8
+# --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
 
 """Offline runner tests: fake ARM inventories/fixtures and harmless local child processes."""
 
+from contextlib import nullcontext
 import json
 import os
 from pathlib import Path
 import runpy
 import sys
 import time
+from types import SimpleNamespace
 import xml.etree.ElementTree as ET
 
 import pytest
@@ -225,10 +230,71 @@ def test_read_failure_blocks_without_publishing_raw_exception_body(tmp_path, exc
     assert json.loads(text)["status"] == "failed"
 
 
-def test_exhausted_read_budget_never_starts_network_work():
+def test_exhausted_read_budget_never_starts_network_work(mocker):
+    timer = mocker.Mock()
+    mocker.patch.dict(RUNNER["require_linux"].__globals__, signal=timer)
     with pytest.raises(RUNNER["PhaseError"], match="budget"):
         with RUNNER["bounded_read"](time.monotonic() - 1):
             pytest.fail("No operation may start outside its deadline")
+    assert not timer.mock_calls
+
+
+@pytest.mark.parametrize("platform", ["win32", "darwin"])
+def test_unsupported_entry_rejects_before_credentials_artifacts_or_execution(tmp_path, mocker, capsys, platform):
+    reader = mocker.Mock()
+    execute = mocker.Mock()
+    output = tmp_path / "must-not-exist"
+    mocker.patch.object(sys, "argv", [
+        "run_dps_phases.py", "--subscription", SUB, "--resource-group", GROUP, "--output", str(output),
+    ])
+    mocker.patch.dict(RUNNER["main"].__globals__, sys=SimpleNamespace(platform=platform), ArmReader=reader, run=execute)
+    assert RUNNER["main"]() == 1
+    assert "requires Linux" in capsys.readouterr().out
+    reader.assert_not_called()
+    execute.assert_not_called()
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("platform", ["win32", "darwin"])
+def test_unsupported_child_rejects_before_files_processes_or_signals(tmp_path, mocker, platform):
+    processes = mocker.Mock()
+    timer = mocker.Mock()
+    mocker.patch.dict(
+        RUNNER["child"].__globals__, sys=SimpleNamespace(platform=platform), subprocess=processes, signal=timer,
+    )
+    with pytest.raises(RUNNER["PhaseError"], match="requires Linux"):
+        RUNNER["child"](["not-executed"], {}, tmp_path / "log", 1, 1)
+    assert not processes.mock_calls and not timer.mock_calls
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("platform", ["win32", "darwin"])
+def test_unsupported_read_rejects_before_timer_or_network_work(mocker, platform):
+    timer = mocker.Mock()
+    mocker.patch.dict(RUNNER["require_linux"].__globals__, sys=SimpleNamespace(platform=platform), signal=timer)
+    with pytest.raises(RUNNER["PhaseError"], match="requires Linux"):
+        with RUNNER["bounded_read"]():
+            pytest.fail("Unsupported platform must not start credential or ARM work")
+    assert not timer.mock_calls
+
+
+@pytest.mark.parametrize("fails", [False, True])
+def test_linux_read_timer_is_bounded_and_restored_on_all_exit_paths(mocker, fails):
+    previous = object()
+    timer = SimpleNamespace(
+        SIGALRM="alarm", ITIMER_REAL="real",
+        signal=mocker.Mock(return_value=previous), setitimer=mocker.Mock(),
+    )
+    mocker.patch.dict(RUNNER["require_linux"].__globals__, sys=SimpleNamespace(platform="linux"), signal=timer)
+    with pytest.raises(ValueError) if fails else nullcontext():
+        with RUNNER["bounded_read"]():
+            if fails:
+                raise ValueError("synthetic body failure")
+    assert timer.setitimer.call_args_list == [mocker.call("real", RUNNER["READ_SECONDS"]), mocker.call("real", 0)]
+    assert timer.signal.call_count == 2
+    assert timer.signal.call_args == mocker.call("alarm", previous)
+    with pytest.raises(RUNNER["PhaseError"], match="exceeded"):
+        timer.signal.call_args_list[0].args[1](None, None)
 
 
 @pytest.mark.parametrize("defect", [
@@ -305,6 +371,7 @@ def test_private_key_and_bare_service_keys_are_redacted():
     assert redactor.line("test_progress") == "test_progress"
 
 
+@pytest.mark.skipif(sys.platform != "linux", reason="Real DPS child pipe polling/process-group cleanup is Linux-only.")
 def test_child_stream_reassembles_chunks_before_redacting_and_omits_oversized_lines(tmp_path, capsys):
     script = (
         "import os,time; os.write(1,b'primary'); time.sleep(.01); "
@@ -318,6 +385,7 @@ def test_child_stream_reassembles_chunks_before_redacting_and_omits_oversized_li
 
 
 @pytest.mark.parametrize("cooperative", [False, True])
+@pytest.mark.skipif(sys.platform != "linux", reason="Real DPS process-group signaling/cleanup is Linux-only.")
 def test_child_runtime_timeout_allows_cleanup_but_never_turns_green(tmp_path, mocker, cooperative):
     mocker.patch.dict(RUNNER["child"].__globals__, READ_SECONDS=0.1)
     handler = "lambda *_: (print('cleanup finished', flush=True), sys.exit(0))" if cooperative else "signal.SIG_IGN"
@@ -359,6 +427,8 @@ def test_reader_uses_explicit_subscription_audience_and_branch_api(mocker):
 @responses.activate
 @pytest.mark.parametrize("body", [{}, None, {"value": None}, {"value": []}])
 def test_inventory_wire_contract_does_not_confuse_missing_results_with_empty_inventory(mocker, body):
+    # Test the real SDK/HTTP parsing on every OS, independently of Linux's alarm.
+    mocker.patch.dict(RUNNER["ArmReader"].inventory.__globals__, bounded_read=nullcontext)
     mocker.patch("azure.cli.core._profile.Profile.get_raw_token",
                  return_value=(("Bearer", "fake-unit-token", {"expires_on": 9999999999}), SUB, "tenant"))
     url = RUNNER["ARM"] + f"/subscriptions/{SUB}/providers/Microsoft.Devices/provisioningServices"
@@ -375,6 +445,7 @@ def test_inventory_wire_contract_does_not_confuse_missing_results_with_empty_inv
 
 @responses.activate
 def test_inventory_pagination_failure_is_not_partial_capacity_or_retried(mocker):
+    mocker.patch.dict(RUNNER["ArmReader"].inventory.__globals__, bounded_read=nullcontext)
     mocker.patch("azure.cli.core._profile.Profile.get_raw_token",
                  return_value=(("Bearer", "fake-unit-token", {"expires_on": 9999999999}), SUB, "tenant"))
     url = RUNNER["ARM"] + f"/subscriptions/{SUB}/providers/Microsoft.Devices/provisioningServices"

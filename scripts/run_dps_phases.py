@@ -2,7 +2,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
 
-"""Run only regular -> service-SAS DPS, with read-only ownership/capacity gates."""
+"""Linux-only regular -> service-SAS DPS orchestration, with read-only ownership/capacity gates."""
 
 import argparse
 from contextlib import contextmanager
@@ -36,6 +36,11 @@ MANIFEST = runpy.run_path(str(ROOT / "azext_iot/tests/dps/_phase_manifest.py"))
 
 class PhaseError(RuntimeError):
     """A prerequisite/receipt is missing; do not guess or mutate resources to recover."""
+
+
+def require_linux():
+    if sys.platform != "linux":
+        raise PhaseError("DPS phase orchestration requires Linux: signals, process groups, /proc and pipe polling.")
 
 
 def utc():
@@ -87,11 +92,11 @@ class Redactor:
 def bounded_read(deadline=None):
     def expired(_signum, _frame):
         raise PhaseError("Read-only ARM/authentication operation exceeded its 60-second bound.")
-    previous = signal.signal(signal.SIGALRM, expired)
     seconds = READ_SECONDS if deadline is None else min(READ_SECONDS, deadline - time.monotonic())
     if seconds <= 0:
-        signal.signal(signal.SIGALRM, previous)
         raise PhaseError("Read-only verification budget exhausted.")
+    require_linux()
+    previous = signal.signal(signal.SIGALRM, expired)
     signal.setitimer(signal.ITIMER_REAL, seconds)
     try:
         yield
@@ -329,6 +334,7 @@ def selection_count(receipts, phase):
 
 def child(command, env, log_path, runtime, cleanup, cancelled=lambda: False):
     """Ask workers to unwind while tox/xdist's controller remains alive to await them."""
+    require_linux()  # Reject before opening logs, spawning children, or accessing signal/pipe APIs.
     started = time.monotonic()
     runtime_end = started + runtime
     hard_end = runtime_end + cleanup
@@ -575,11 +581,13 @@ def main():
         parser.error("--resource-group must not be empty")
     logging.getLogger("azure").setLevel(logging.ERROR)
     try:
+        require_linux()  # Public entry: no profiles, credentials, ARM reads, output writes, or children before this.
         with bounded_read():
             reader = ArmReader(args.subscription)
         return run(args.subscription, args.resource_group, args.output, reader)
     except Exception as error:
-        print(f"[DPS phases] failed before launch: {type(error).__name__}", flush=True)
+        diagnostic = str(error) if isinstance(error, PhaseError) else type(error).__name__
+        print(f"[DPS phases] failed before launch: {diagnostic}", flush=True)
         return 1
 
 

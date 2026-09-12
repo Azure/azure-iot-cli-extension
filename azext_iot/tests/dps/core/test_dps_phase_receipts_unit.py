@@ -1,12 +1,17 @@
+# coding=utf-8
+# --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
 
 import json
+import os
 from types import SimpleNamespace
 
 import pytest
 
 from azext_iot.tests.dps import _phase, _phase_receipts as receipts
+from azext_iot.tests.dps import _phase_runtime as runtime
 from azext_iot.tests.dps import conftest as fixtures
 
 UID = "a" * 32
@@ -54,7 +59,8 @@ def test_create_receipt_precedes_mutation_and_refuses_replay(receipt_directory, 
     record = json.loads(path.read_text())
     assert record["subscription"] == SUB
     assert record["tags"] == {"intTest": "true", "runUid": uid, "kind": kind}
-    assert path.stat().st_mode & 0o777 == 0o600
+    if os.name == "posix":
+        assert path.stat().st_mode & 0o777 == 0o600
     with pytest.raises(RuntimeError, match="repeat"):
         receipts.before_create("owned", "group", uid, kind)
     receipts.after_create("owned", dict(record, properties={"provisioningState": "Succeeded"}))
@@ -140,3 +146,44 @@ def test_receipt_mode_rejects_pytest_loaded_pins_and_scope_before_any_fixtures(r
         mocker.patch.object(fixtures, "ENTITY_LOCATION", "westus")
     with pytest.raises(pytest.UsageError, match="Isolated"):
         fixtures.pytest_configure(mocker.Mock())
+
+
+@pytest.mark.parametrize("platform", ["win32", "darwin"])
+@pytest.mark.parametrize("entry", ["configure", "worker"])
+def test_receipt_entry_rejects_unsupported_platform_before_cli_or_ownership_writes(
+    receipt_directory, mocker, platform, entry,
+):
+    mocker.patch.object(runtime, "sys", SimpleNamespace(platform=platform))
+    mocker.patch.object(fixtures, "ENTITY_RG", "group")
+    mocker.patch.object(fixtures, "ENTITY_LOCATION", "centraluseuap")
+    mocker.patch.object(fixtures, "HUB_TEST_LOCATION", "centraluseuap")
+    settings = mocker.patch.object(fixtures, "settings")
+    settings.env.azext_iot_testdps = settings.env.azext_iot_testdps_hub = settings.env.azext_iot_testhub = ""
+    activate = mocker.patch.object(runtime, "activate")
+    invoke = mocker.patch.object(fixtures.cli, "invoke")
+    config = mocker.Mock(workerinput={"workerid": "gw0"})
+    with pytest.raises(pytest.UsageError, match="requires Linux"):
+        if entry == "configure":
+            fixtures.pytest_configure(config)
+        else:
+            runtime.start_worker(SimpleNamespace(config=config))
+    activate.assert_not_called()
+    invoke.assert_not_called()
+    config.pluginmanager.register.assert_not_called()
+    assert not list(receipt_directory.iterdir())
+
+
+@pytest.mark.parametrize("platform", ["win32", "darwin"])
+def test_phase_unset_without_receipts_keeps_default_behavior_on_other_platforms(monkeypatch, mocker, platform):
+    for name in (
+        receipts.DIRECTORY_ENV, receipts.RUN_UID_ENV, receipts.SUBSCRIPTION_ENV,
+        receipts.RESOURCE_GROUP_ENV, _phase.PHASE_ENV,
+    ):
+        monkeypatch.delenv(name, raising=False)
+    mocker.patch.object(runtime, "sys", SimpleNamespace(platform=platform))
+    activate = mocker.patch.object(runtime, "activate")
+    config = mocker.Mock(workerinput={"workerid": "gw0"})
+    fixtures.pytest_configure(config)
+    runtime.start_worker(SimpleNamespace(config=config))
+    activate.assert_not_called()
+    config.pluginmanager.register.assert_not_called()

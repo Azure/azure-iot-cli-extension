@@ -1,5 +1,8 @@
+# coding=utf-8
+# --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See License.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
 
 """Process-local safeguards used only by receipt-enabled DPS integration workers."""
 
@@ -11,6 +14,7 @@ import json
 import os
 import shlex
 import signal
+import sys
 from time import sleep
 from unittest.mock import patch
 from urllib.parse import urlsplit
@@ -31,6 +35,11 @@ _READ_ACTIONS = {"listkeys", "checknameavailability", "checkprovisioningservicen
 
 class ScopeError(RuntimeError):
     """Refuse an out-of-scope call or a replay before it reaches the transport."""
+
+
+def require_linux():
+    if sys.platform != "linux":
+        raise pytest.UsageError("Isolated DPS phase orchestration requires Linux for bounded owned-process cleanup.")
 
 
 @contextmanager
@@ -286,6 +295,7 @@ def start_worker(session):
     config = receipts.settings()
     if not config or not hasattr(session.config, "workerinput"):
         return
+    require_linux()
     directory = config[0]
     plugin = WorkerStop(session, directory)
     session.config.pluginmanager.register(plugin, "dps-worker-stop")
