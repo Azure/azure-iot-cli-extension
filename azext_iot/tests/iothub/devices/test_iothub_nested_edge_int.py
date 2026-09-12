@@ -6,7 +6,7 @@
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest
 from azext_iot.tests.iothub import DATAPLANE_AUTH_TYPES
-from time import sleep
+from azext_iot.tests.helpers import wait_for_assertion
 
 # TODO: assert device scope format in device twin.
 # from azext_iot.constants import DEVICE_DEVICESCOPE_PREFIX
@@ -167,17 +167,11 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
                 checks=self.is_empty(),
             )
 
-            # Wait for API to catch up
-            sleep(10)
-
-            # List child devices of edge device
-            output = self.cmd(
-                self.set_cmd_auth_type(
-                    f"iot hub device-identity children list -d {edge_device_ids[0]} -n {self.host_name} -g {self.entity_rg}",
-                    auth_type=auth_phase,
-                )
+            self._wait_for_children(
+                edge_device_ids[0],
+                [device_ids[1]],
+                auth_phase,
             )
-            assert output.get_output_in_json() == [device_ids[1]]
 
             # Error - Remove all child devices of non-edge device
             self.cmd(
@@ -199,8 +193,7 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
                 checks=self.is_empty(),
             )
 
-            # Wait for child devices to be removed to prevent failures
-            sleep(40)
+            self._wait_for_children(edge_device_ids[1], [], auth_phase)
 
             # Error - remove all child devices of edge device which does not have any child devices
             self.cmd(
@@ -261,14 +254,19 @@ class TestIoTHubNestedEdge(IoTLiveScenarioTest):
                 expect_failure=True,
             )
 
-            # List child devices of edge device which doesn't have any children
+            self._wait_for_children(edge_device_ids[1], [], auth_phase)
+
+    def _wait_for_children(self, parent_id, expected_children, auth_phase):
+        def check():
             output = self.cmd(
                 self.set_cmd_auth_type(
-                    f"iot hub device-identity children list -d {edge_device_ids[1]} -n {self.host_name} -g {self.entity_rg}",
+                    f"iot hub device-identity children list -d {parent_id} -n {self.host_name} -g {self.entity_rg}",
                     auth_type=auth_phase,
                 )
-            )
-            assert output.get_output_in_json() == []
+            ).get_output_in_json()
+            assert output == expected_children
+
+        wait_for_assertion(check)
 
     def test_iothub_device_scope_on_create(self):
         for auth_phase in DATAPLANE_AUTH_TYPES:

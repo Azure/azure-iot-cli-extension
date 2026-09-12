@@ -8,12 +8,15 @@ import pytest
 
 from azure.cli.core.azclierror import CLIInternalError
 from time import sleep
+from types import SimpleNamespace
 from azext_iot.tests.helpers import (
     add_test_tag,
     assign_role_assignment,
     clean_up_iothub_device_config,
     create_storage_account,
-    set_cmd_auth_type
+    set_cmd_auth_type,
+    wait_for_assertion,
+    wait_for_iothub_query_ready,
 )
 from azext_iot.tests.settings import DynamoSettings, ENV_SET_TEST_IOTHUB_REQUIRED, ENV_SET_TEST_IOTHUB_OPTIONAL
 from azext_iot.tests.generators import generate_generic_id
@@ -48,11 +51,20 @@ DEFAULT_CONTAINER = "devices"
 
 settings = DynamoSettings(req_env_set=ENV_SET_TEST_IOTHUB_REQUIRED, opt_env_set=ENV_SET_TEST_IOTHUB_OPTIONAL)
 ENTITY_RG = settings.env.azext_iot_testrg
-ENTITY_NAME = settings.env.azext_iot_testhub or "test-hub-" + generate_generic_id()
+
+
+def generate_dynamic_hub_name():
+    return "test-hub-" + generate_generic_id()
+
+
+DYNAMIC_HUB = SimpleNamespace(
+    name=settings.env.azext_iot_testhub or generate_dynamic_hub_name()
+)
 STORAGE_ACCOUNT = settings.env.azext_iot_teststorageaccount or "hubstore" + generate_generic_id()[:4]
 STORAGE_CONTAINER = settings.env.azext_iot_teststoragecontainer or DEFAULT_CONTAINER
 MAX_RBAC_ASSIGNMENT_TRIES = settings.env.azext_iot_rbac_max_tries or 10
 ROLE_ASSIGNMENT_REFRESH_TIME = 120
+HUB_PROVISION_ATTEMPTS = 3
 
 
 @pytest.mark.usefixtures("fixture_provision_existing_hub_role", "fixture_provision_existing_hub_device_config")
@@ -60,42 +72,31 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
     def __init__(self, test_scenario, add_data_contributor=True):
         assert test_scenario
         self.entity_rg = ENTITY_RG
-        self.entity_name = ENTITY_NAME
+        self.entity_name = DYNAMIC_HUB.name
         super(IoTLiveScenarioTest, self).__init__(test_scenario)
 
         if hasattr(self, 'storage_cstring'):
             self._create_storage_account()
 
+        target_hub = None
+        created_hub = False
         if not settings.env.azext_iot_testhub:
             hubs_list = self.cmd(
                 'iot hub list -g "{}"'.format(self.entity_rg)
             ).get_output_in_json()
 
-            target_hub = None
             for hub in hubs_list:
                 if hub["name"] == self.entity_name:
                     target_hub = hub
                     break
 
             if not target_hub:
-                if hasattr(self, 'storage_cstring'):
-                    self.cmd(
-                        "iot hub create --name {} --resource-group {} --fc {} --fcs {} --sku S1 ".format(
-                            self.entity_name, self.entity_rg,
-                            self.storage_container, self.storage_cstring
-                        )
-                    )
-                else:
-                    self.cmd(
-                        "iot hub create --name {} --resource-group {} --sku S1 ".format(
-                            self.entity_name, self.entity_rg
-                        )
-                    )
-                sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
+                self._create_dynamic_hub()
+                created_hub = True
 
-        target_hub = self.cmd(
-            "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg)
-        ).get_output_in_json()
+        target_hub = self._wait_for_ready_hub()
+        if created_hub:
+            target_hub = self._ensure_query_ready_hub(target_hub)
 
         if add_data_contributor:
             self._add_data_contributor(target_hub)
@@ -112,6 +113,48 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
             rtype=ResourceTypes.hub.value,
             test_tag=test_scenario
         )
+
+    def _wait_for_ready_hub(self):
+        return wait_for_assertion(
+            lambda: self.cmd(
+                "iot hub show -n {} -g {}".format(self.entity_name, self.entity_rg),
+                checks=[self.exists("id"), self.exists("properties.hostName")],
+            )
+        ).get_output_in_json()
+
+    def _create_dynamic_hub(self):
+        if hasattr(self, 'storage_cstring'):
+            self.cmd(
+                "iot hub create --name {} --resource-group {} --fc {} --fcs {} --sku S1 ".format(
+                    self.entity_name, self.entity_rg,
+                    self.storage_container, self.storage_cstring
+                )
+            )
+        else:
+            self.cmd(
+                "iot hub create --name {} --resource-group {} --sku S1 ".format(
+                    self.entity_name, self.entity_rg
+                )
+            )
+        sleep(ROLE_ASSIGNMENT_REFRESH_TIME)
+
+    def _ensure_query_ready_hub(self, target_hub):
+        for attempt in range(HUB_PROVISION_ATTEMPTS):
+            try:
+                wait_for_iothub_query_ready(self.entity_name, self.entity_rg)
+                return target_hub
+            except AssertionError:
+                self.cmd(
+                    "iot hub delete --name {} --resource-group {}".format(
+                        self.entity_name, self.entity_rg
+                    )
+                )
+                if attempt == HUB_PROVISION_ATTEMPTS - 1:
+                    raise
+                self.entity_name = generate_dynamic_hub_name()
+                DYNAMIC_HUB.name = self.entity_name
+                self._create_dynamic_hub()
+                target_hub = self._wait_for_ready_hub()
 
     def _add_data_contributor(self, target_hub):
         account = self.cmd("account show").get_output_in_json()

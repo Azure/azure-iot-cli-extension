@@ -372,28 +372,43 @@ class DeviceIdentityProvider(IoTHubProvider):
         scope_retries = 0
         query_args = ["SELECT deviceId, deviceScope FROM devices"]
         query_method = self.service_sdk.query.get_twins
+        required_scope_ids = set(device_to_parent_dict.values())
+
+        def get_required_scopes(devices):
+            return {
+                device["deviceId"]: device["deviceScope"]
+                for device in devices
+                if (
+                    device["deviceId"] in required_scope_ids
+                    and device.get("deviceScope")
+                )
+            }
+
         all_hub_devices = _execute_query(query_args, query_method)
+        scope_dict = get_required_scopes(all_hub_devices)
 
         # Ensure we retrieve all device scopes
-        while len(all_hub_devices) < len(config.devices) and scope_retries < MAX_DEVICE_SCOPE_RETRIES:
+        while len(scope_dict) < len(required_scope_ids) and scope_retries < MAX_DEVICE_SCOPE_RETRIES:
             sleep(3)
             scope_retries += 1
             logger.info("Retrying device scope query - attempt {} of {}"
                         .format(scope_retries, MAX_DEVICE_SCOPE_RETRIES))
             all_hub_devices = _execute_query(query_args, query_method)
+            scope_dict = get_required_scopes(all_hub_devices)
 
-        if len(all_hub_devices) < len(config.devices):
-            raise AzureResponseError(
-                "An error occurred - Failed to fetch device scopes for all devices after {} retries"
-                .format(scope_retries)
-            )
+        # Set scopes required for parent / child relationships
+        if len(scope_dict) < len(required_scope_ids):
+            missing_device_ids = sorted(required_scope_ids.difference(scope_dict))
+            for device_id in missing_device_ids:
+                device = self.service_sdk.devices.get_identity(id=device_id)
+                if device.device_scope:
+                    scope_dict[device_id] = device.device_scope
 
-        # set all device scopes
-        scope_dict: Dict[str, str] = {}
-        for device in all_hub_devices:
-            id = device["deviceId"]
-            if device_config_dict.get(id, None):
-                scope_dict[id] = device["deviceScope"]
+            if len(scope_dict) < len(required_scope_ids):
+                raise AzureResponseError(
+                    "An error occurred - Failed to fetch device scopes for all devices after {} retries"
+                    .format(scope_retries)
+                )
 
         # Set parent / child relationships
         device_to_parent_iterator = (
