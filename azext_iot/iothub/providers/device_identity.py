@@ -382,21 +382,23 @@ class DeviceIdentityProvider(IoTHubProvider):
                         .format(scope_retries, MAX_DEVICE_SCOPE_RETRIES))
             all_hub_devices = _execute_query(query_args, query_method)
 
-        # set all device scopes
+        # Set scopes required for parent / child relationships
+        required_scope_ids = set(device_to_parent_dict.values())
         scope_dict: Dict[str, str] = {}
         for device in all_hub_devices:
-            id = device["deviceId"]
-            if device_config_dict.get(id, None):
-                scope_dict[id] = device["deviceScope"]
+            device_id = device["deviceId"]
+            device_scope = device.get("deviceScope")
+            if device_id in required_scope_ids and device_scope:
+                scope_dict[device_id] = device_scope
 
-        if len(all_hub_devices) < len(config.devices):
-            missing_device_ids = sorted(set(device_config_dict).difference(scope_dict))
+        if len(scope_dict) < len(required_scope_ids):
+            missing_device_ids = sorted(required_scope_ids.difference(scope_dict))
             for device_id in missing_device_ids:
                 device = self.service_sdk.devices.get_identity(id=device_id)
                 if device.device_scope:
                     scope_dict[device_id] = device.device_scope
 
-            if len(scope_dict) < len(config.devices):
+            if len(scope_dict) < len(required_scope_ids):
                 raise AzureResponseError(
                     "An error occurred - Failed to fetch device scopes for all devices after {} retries"
                     .format(scope_retries)

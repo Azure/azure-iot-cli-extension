@@ -391,8 +391,14 @@ def clean_up_iothub_device_config(
         )
 
     def assert_configurations_deleted():
-        assert not _list_with_retry(f"iot edge deployment list -n {hub_name} -g {rg}")
-        assert not _list_with_retry(f"iot hub configuration list -n {hub_name} -g {rg}")
+        assert not _list_with_retry(
+            f"iot edge deployment list -n {hub_name} -g {rg}",
+            delay=2,
+        )
+        assert not _list_with_retry(
+            f"iot hub configuration list -n {hub_name} -g {rg}",
+            delay=2,
+        )
 
     wait_for_assertion(assert_configurations_deleted, timeout=60, poll_interval=2)
 

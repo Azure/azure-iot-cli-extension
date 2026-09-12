@@ -72,6 +72,14 @@ test_device_scopes = [
     {"deviceId": "device_6", "deviceScope": "dev6-scope-value"},
     {"deviceId": "device_7", "deviceScope": "dev7-scope-value"},
 ]
+unrelated_device_scopes = [
+    {"deviceId": f"unrelated_device_{index}", "deviceScope": device["deviceScope"]}
+    for index, device in enumerate(test_device_scopes)
+]
+empty_device_scopes = [
+    {"deviceId": device["deviceId"], "deviceScope": ""}
+    for device in test_device_scopes
+]
 test_path = getcwd()
 
 
@@ -500,14 +508,17 @@ class TestHierarchyCreateConfig:
     @pytest.fixture()
     def scope_query_client(self, request, mocked_response, fixture_ghcs, fixture_sas):
         devices_url = f"https://{hub_entity}/devices"
-        # always return empty query
-        mocked_response.add(
+        query_devices, registry_device_scope = request.param
+
+        def query_response(request):
+            query = json.loads(request.body)["query"]
+            response = [] if query == "SELECT deviceId FROM devices" else query_devices
+            return 200, {}, json.dumps(response)
+
+        mocked_response.add_callback(
             method=responses.POST,
             url=f"{devices_url}/query",
-            body="[]",
-            status=200,
-            content_type="application/json",
-            match_querystring=False,
+            callback=query_response,
         )
 
         # Create / Update device-identities
@@ -522,17 +533,20 @@ class TestHierarchyCreateConfig:
             match_querystring=False,
         )
 
-        device_scope = request.param
         mocked_response.add(
             method=responses.GET,
             url=re.compile(r"{}/device_\d+".format(devices_url)),
-            body=json.dumps({"deviceScope": device_scope} if device_scope else {}),
+            body=json.dumps(
+                {"deviceScope": registry_device_scope}
+                if registry_device_scope
+                else {}
+            ),
             status=200,
             content_type="application/json",
             match_querystring=False,
         )
 
-        if device_scope:
+        if registry_device_scope:
             mocked_response.add(
                 method=responses.POST,
                 url=re.compile(
@@ -726,7 +740,12 @@ class TestHierarchyCreateConfig:
 
     @pytest.mark.parametrize(
         "scope_query_client, expect_failure",
-        [("registry-device-scope", False), (None, True)],
+        [
+            (([], "registry-device-scope"), False),
+            (([], None), True),
+            ((unrelated_device_scopes, "registry-device-scope"), False),
+            ((empty_device_scopes, "registry-device-scope"), False),
+        ],
         indirect=["scope_query_client"],
     )
     def test_edge_devices_scope_registry_fallback(
@@ -744,6 +763,18 @@ class TestHierarchyCreateConfig:
                 cmd=fixture_cmd,
                 devices=None,
                 config_file="device_configs/nested_edge_config.yml"
+            )
+            updated_devices = []
+            for request_call in scope_query_client.calls:
+                if request_call.request.method == "PUT":
+                    request_body = json.loads(request_call.request.body)
+                    if request_body.get("parentScopes"):
+                        updated_devices.append(request_body)
+
+            assert updated_devices
+            assert all(
+                device["parentScopes"] == ["registry-device-scope"]
+                for device in updated_devices
             )
 
 
