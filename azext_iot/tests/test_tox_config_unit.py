@@ -25,6 +25,18 @@ def test_integration_environments_discover_the_candidate_extension():
     assert all(line.startswith("ADR: ") for line in adr_settings)
 
 
+def test_dps_phase_junit_is_isolated_and_coverage_remains_cumulative():
+    config = ConfigParser(interpolation=None)
+    config.read(Path(__file__).resolve().parents[2] / "tox.ini")
+    section = config["testenv:{Central,ADT,DPS,HubMgmt,HubData,ADU,ADR}-int"]
+    dps = " ".join(line.strip() for line in section["commands"].splitlines() if line.strip().startswith("DPS:"))
+    assert "--junitxml={env:azext_iot_dps_junit:junit/test-iotext-dps-int.xml}" in dps
+    assert "--cov-append" in dps and "-n 7" in dps
+    # Grace is provided by worker cancellation, not tox's SIGINT/execnet teardown path.
+    assert "interrupt_timeout" not in section
+    assert "azext_*" in section["passenv"]
+
+
 @pytest.mark.parametrize("service", ["ADR", "DPS", "HubMgmt", "HubData"])
 def test_preview_integration_environments_bound_each_test_and_select_only_integration_files(service):
     config = ConfigParser(interpolation=None)

@@ -119,7 +119,8 @@ jobs:
           set -euo pipefail
           # --- Service registry: service|test_dir|tox_env|timeout ---
           all_services=(
-            "DPS|azext_iot/tests/dps|DPS-int|45"
+            # Two serial phases only: regular -> service-SAS; certificate is not wired.
+            "DPS|azext_iot/tests/dps|DPS-int|90"
             # Successful Hub suites include more than 90 minutes of shared resource lifecycles.
             "HubMgmt|azext_iot/tests/iothub|HubMgmt-int|120"
             "HubData|azext_iot/tests/iothub|HubData-int|120"
@@ -331,7 +332,17 @@ jobs:
           azext_iot_adr_location: ${{ matrix.config.region }}
         run: |
           set -o pipefail
-          tox r -e ${{ matrix.config.tox_env }} --skip-pkg-install 2>&1 | \
+          run_service() {
+            if [ "${{ matrix.config.service }}" = "DPS" ]; then
+              echo "DPS coverage: regular and service-SAS; certificate coverage is not configured in this workflow."
+              .tox/DPS-int/bin/python scripts/run_dps_phases.py \
+                --subscription "${{ env.TEST_SUBSCRIPTION_ID }}" --resource-group "${{ env.RESOURCE_GROUP }}" \
+                --region "${{ matrix.config.region }}"
+            else
+              tox r -e ${{ matrix.config.tox_env }} --skip-pkg-install
+            fi
+          }
+          run_service 2>&1 | \
             sed -u 's/SharedAccessKey=[^;& "'"'"']*//g; s/AccountKey=[^;& "'"'"']*//g; s/sig=[^&"]*//g' | \
             sed -u 's/\("primaryKey"\s*:\s*\)"[^"]*"/\1"***"/g; s/\("secondaryKey"\s*:\s*\)"[^"]*"/\1"***"/g' | \
             sed -u 's/--pk [^ ]*/--pk ***/g; s/--sk [^ ]*/--sk ***/g; s/--key [^ ]*/--key ***/g' | \

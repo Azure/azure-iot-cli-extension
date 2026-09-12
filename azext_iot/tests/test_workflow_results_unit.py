@@ -144,3 +144,19 @@ def test_heavy_job_budgets_accommodate_known_resource_lifecycles():
     budgets = dict(re.findall(r'"(HubMgmt|HubData|ADR)\|[^"]+\|(\d+)"', matrix["run"]))
     assert budgets == {"HubMgmt": "120", "HubData": "120", "ADR": "120"}
     assert jobs["int-test"]["timeout-minutes"] == "${{ matrix.config.timeout }}"
+
+
+def test_dps_workflow_runs_two_serial_complete_phases_with_existing_redaction_and_gate():
+    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/int_test.yml").read_text(encoding="utf-8"))
+    jobs = workflow["jobs"]
+    matrix = next(step for step in jobs["setup"]["steps"] if step.get("id") == "matrix")
+    assert '"DPS|azext_iot/tests/dps|DPS-int|90"' in matrix["run"]
+    step = next(step for step in jobs["int-test"]["steps"] if step.get("id") == "run_tests")
+    assert ".tox/DPS-int/bin/python scripts/run_dps_phases.py" in step["run"]
+    assert "certificate coverage is not configured in this workflow" in step["run"]
+    assert '--subscription "${{ env.TEST_SUBSCRIPTION_ID }}"' in step["run"]
+    assert "set -o pipefail" in step["run"] and "run_service 2>&1 |" in step["run"]
+    assert "SharedAccessKey=" in step["run"] and "tee test-output.log" in step["run"]
+    assert "tox r -e ${{ matrix.config.tox_env }} --skip-pkg-install" in step["run"]
+    upload = next(step for step in jobs["int-test"]["steps"] if step["name"] == "Upload test result")
+    assert upload["with"]["path"] == "test-result/"

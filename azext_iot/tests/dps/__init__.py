@@ -11,20 +11,12 @@ from knack.log import get_logger
 
 
 logger = get_logger(__name__)
-# Each lifecycle keeps its sequence of auth phases, but policy-incompatible
-# service credentials are now separate, visibly skipped pytest cases. This
-# does NOT disable symmetric-key/X.509 device enrollment or registration.
-_SERVICE_SAS_DISABLED = pytest.mark.skip(
-    reason=(
-        "DPS disableLocalAuth=true rejects service shared-access-policy SAS authentication "
-        "(--auth-type key / --login connection string). The same lifecycle runs with "
-        "Entra login; device symmetric-key and X.509 attestation remain supported."
-    )
-)
+# Service-policy SAS requires its own explicitly local-auth-enabled fixture phase.
+# Device symmetric-key/X.509 attestation is independent and remains in regular coverage.
 DPS_SERVICE_AUTH_PARAMS = [
-    pytest.param((AuthenticationTypeDataplane.key.value,), id="key", marks=_SERVICE_SAS_DISABLED),
+    pytest.param((AuthenticationTypeDataplane.key.value,), id="key", marks=pytest.mark.dps_service_sas),
     pytest.param((AuthenticationTypeDataplane.login.value,), id="login"),
-    pytest.param(("cstring",), id="cstring", marks=_SERVICE_SAS_DISABLED),
+    pytest.param(("cstring",), id="cstring", marks=pytest.mark.dps_service_sas),
 ]
 
 CERT_NAME = "aziotcli"
