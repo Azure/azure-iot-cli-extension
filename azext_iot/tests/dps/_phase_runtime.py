@@ -148,24 +148,29 @@ class ScopedTransport(HttpTransport):
         return self.inner.send(request, **kwargs)
 
 
-def assign_role_assignment_once(role, scope, assignee, max_tries=10, wait=10):
+def assign_role_assignment_once(
+    role, scope, assignee=None, max_tries=10, wait=10, *, assignee_object_id=None, assignee_principal_type=None,
+):
     """One create followed only by bounded visibility reads, not new assignment GUIDs."""
     from azext_iot.tests import helpers
     _require_owned_path(scope)
-    principals = {assignee}
+    command = helpers.role_assignment_create_command(
+        role, scope, assignee, assignee_object_id=assignee_object_id, assignee_principal_type=assignee_principal_type,
+    )
+    principals = {assignee_object_id or assignee}
+    keys = ("principalId",) if assignee_object_id else ("name", "principalId", "principalName")
+    visibility = {"assignee_object_id": assignee_object_id, "fill_principal_name": False} if assignee_object_id else {}
     for attempt in range(max_tries + 1):
-        assignments = helpers.get_role_assignments(scope=scope, role=role, fill_role_definition_name=False)
-        if any(value.get(key) in principals for value in assignments for key in ("name", "principalId", "principalName")):
+        assignments = helpers.get_role_assignments(scope=scope, role=role, fill_role_definition_name=False, **visibility)
+        if any(value.get(key) in principals for value in assignments for key in keys):
             return
         if attempt == max_tries:
             break
         if attempt == 0:
-            result = helpers.invoke_checked(
-                helpers.cli, f'role assignment create --assignee "{assignee}" --role "{role}" --scope "{scope}"',
-                description="Owned fixture role assignment",
-            )
+            with helpers.role_assignment_create_scope(assignee_object_id):
+                result = helpers.invoke_checked(helpers.cli, command, description="Owned fixture role assignment")
             principal = (result.as_json() or {}).get("principalId")
-            if principal:
+            if principal and not assignee_object_id:
                 principals.add(principal)
         sleep(wait)
     raise ScopeError("Owned role assignment was not visible before its read-only verification bound.")

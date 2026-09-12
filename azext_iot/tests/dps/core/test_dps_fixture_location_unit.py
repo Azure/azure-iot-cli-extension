@@ -46,6 +46,60 @@ def test_role_assignment_listing_can_skip_unused_role_names(mocker, fill_role_de
     assert "--fill-principal-name" not in command
 
 
+@pytest.mark.parametrize("caller", ["caller@example.invalid", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"])
+def test_role_target_keeps_caller_names_and_app_ids_on_the_alias_path(caller):
+    assert helpers.role_assignment_create_command("role", "/scope", caller) == (
+        f'role assignment create --assignee "{caller}" --role "role" --scope "/scope"'
+    )
+
+
+@pytest.mark.parametrize("arguments", [
+    {}, {"assignee": "caller", "assignee_object_id": "object"},
+    {"assignee_object_id": "object"}, {"assignee": "caller", "assignee_principal_type": "ServicePrincipal"},
+])
+def test_role_target_interface_rejects_missing_or_ambiguous_principal_before_cli(mocker, arguments):
+    cli = mocker.patch.object(helpers, "cli")
+    with pytest.raises(ValueError):
+        helpers.assign_role_assignment("role", "/scope", **arguments)
+    cli.invoke.assert_not_called()
+
+
+def test_known_object_visibility_never_matches_an_assignment_name_or_recreates(mocker):
+    reads = mocker.patch.object(helpers, "get_role_assignments", side_effect=[
+        [{"name": "object", "principalId": "other"}], [], [{"principalId": "object"}],
+    ])
+    cli = mocker.patch.object(helpers, "cli")
+    cli.invoke.return_value.success.return_value = True
+    cli.invoke.return_value.as_json.return_value = {"principalId": "object"}
+    wait = mocker.patch.object(helpers, "sleep")
+    helpers.assign_role_assignment(
+        "role", "/scope", assignee_object_id="object", assignee_principal_type="ServicePrincipal", max_tries=2, wait=1,
+    )
+    assert reads.call_count == 3
+    assert all(call.kwargs == {
+        "scope": "/scope", "role": "role", "fill_role_definition_name": False,
+        "assignee_object_id": "object", "fill_principal_name": False,
+    } for call in reads.call_args_list)
+    cli.invoke.assert_called_once_with(
+        'role assignment create --assignee-object-id "object" --assignee-principal-type "ServicePrincipal" '
+        '--role "role" --scope "/scope"', capture_stderr=True,
+    )
+    assert wait.call_count == 2
+
+
+def test_known_object_visibility_exhaustion_fails_after_one_create(mocker):
+    mocker.patch.object(helpers, "get_role_assignments", return_value=[])
+    cli = mocker.patch.object(helpers, "cli")
+    cli.invoke.return_value.success.return_value = True
+    cli.invoke.return_value.as_json.return_value = {"principalId": "object"}
+    mocker.patch.object(helpers, "sleep")
+    with pytest.raises(CLIInternalError, match="not visible"):
+        helpers.assign_role_assignment(
+            "role", "/scope", assignee_object_id="object", assignee_principal_type="ServicePrincipal", max_tries=2, wait=0,
+        )
+    cli.invoke.assert_called_once()
+
+
 @pytest.mark.parametrize("managed_identity", [False, True])
 def test_required_grant_surfaces_original_cli_error_without_waiting(mocker, managed_identity):
     error = HttpResponseError(
@@ -665,12 +719,16 @@ def test_dps_linked_hostname_uses_resource_not_connection_string(device_hostname
     )
 
 
-def test_dps_fixture_grants_managed_identity_hub_data_access(monkeypatch, mocker):
+@pytest.mark.parametrize("receipt_mode", [False, True])
+def test_dps_fixture_grants_managed_identity_hub_data_access(monkeypatch, mocker, receipt_mode):
     cli = mocker.patch.object(dps_fixtures, "cli")
     cli.invoke.return_value.as_json.return_value = {"identity": {"principalId": "dps-principal"}}
     events = []
+    mocker.patch.object(dps_fixtures._phase_receipts, "settings", return_value=("receipt",) if receipt_mode else None)
     assign_role = mocker.patch.object(
-        dps_fixtures, "assign_role_assignment", side_effect=lambda **_: events.append("assign")
+        dps_fixtures._phase_runtime if receipt_mode else dps_fixtures,
+        "assign_role_assignment_once" if receipt_mode else "assign_role_assignment",
+        side_effect=lambda **_: events.append("assign"),
     )
     mocker.patch.object(dps_fixtures, "sleep", side_effect=lambda seconds: events.append(("wait", seconds)))
     monkeypatch.setattr(dps_fixtures, "ENTITY_RG", "unit-test-rg")
@@ -682,7 +740,8 @@ def test_dps_fixture_grants_managed_identity_hub_data_access(monkeypatch, mocker
         capture_stderr=True,
     )
     assign_role.assert_called_once_with(
-        role="IoT Hub Data Contributor", scope="/hub-id", assignee="dps-principal",
+        role="IoT Hub Data Contributor", scope="/hub-id", assignee_object_id="dps-principal",
+        assignee_principal_type="ServicePrincipal",
         max_tries=dps_fixtures.MAX_RBAC_ASSIGNMENT_TRIES,
     )
     assert events == ["assign", ("wait", 60)]

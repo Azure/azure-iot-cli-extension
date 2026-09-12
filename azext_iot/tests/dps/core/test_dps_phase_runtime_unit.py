@@ -6,6 +6,7 @@
 
 """No Azure: real SDK HTTP pipelines and real tox/xdist with local-only fixtures."""
 
+from contextlib import nullcontext
 import json
 import os
 from pathlib import Path
@@ -106,7 +107,7 @@ def test_transport_fence_blocks_policy_resends_but_allows_distinct_later_updates
     assert len(responses.calls) == 3
 
 
-def _real_cli(mocker):
+def _real_cli(mocker, loader_cls=None):
     from azure.cli.core import MainCommandsLoader
     from azure.cli.core._profile import Profile
     from azext_iot import IoTExtCommandsLoader
@@ -120,7 +121,7 @@ def _real_cli(mocker):
 
     class LocalExtensionLoader(MainCommandsLoader):
         def load_command_table(self, args):
-            extension = IoTExtCommandsLoader(cli_ctx=self.cli_ctx)
+            extension = (loader_cls or IoTExtCommandsLoader)(cli_ctx=self.cli_ctx)
             self.command_table.update(extension.load_command_table(args))
             self.cmd_to_loader_map.update({name: [extension] for name in self.command_table})
             return self.command_table
@@ -132,6 +133,88 @@ def _real_cli(mocker):
     cli.az_cli.data["subscription_id"] = SUB_A
     cli.user_subscription = SUB_A
     return cli
+
+
+@responses.activate
+@pytest.mark.parametrize("receipt_mode,outcome", [
+    (mode, outcome) for mode in (False, True)
+    for outcome in ("ready", "exists", "denied", "conflict", "read-denied")
+] + [(True, "uncertain")])
+def test_native_known_object_role_grant_never_queries_graph(scope, mocker, monkeypatch, receipt_mode, outcome):
+    from azure.cli.command_modules.role import RoleCommandsLoader, custom as role_commands
+    from azure.cli.command_modules.role._msgrpah import GraphClient
+    from azext_iot.tests import helpers
+    from azext_iot.tests.dps import conftest as fixtures
+
+    owned = _owned("hub").removeprefix(ARM)
+    if not receipt_mode:
+        for name in (receipts.DIRECTORY_ENV, receipts.RUN_UID_ENV, receipts.SUBSCRIPTION_ENV, receipts.RESOURCE_GROUP_ENV):
+            monkeypatch.delenv(name)
+    cli = _real_cli(mocker, RoleCommandsLoader)
+    cli.user_subscription = SUB_B
+    mocker.patch.object(helpers, "cli", cli)
+    mocker.patch.object(helpers, "sleep")
+    mocker.patch.object(runtime, "sleep")
+    graph = mocker.patch.object(GraphClient, "_send", side_effect=AssertionError("Graph must not be queried"))
+    resolve = mocker.patch.object(
+        role_commands, "_resolve_object_id_and_type", side_effect=AssertionError("Known object ID must not be resolved"),
+    )
+    resolve_type = mocker.patch.object(
+        role_commands, "_get_principal_type_from_object_id", side_effect=AssertionError("Known type must not be resolved"),
+    )
+    assignment_name = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+    role_id = f"/subscriptions/{SUB_B}/providers/Microsoft.Authorization/roleDefinitions/dddddddd-dddd-dddd-dddd-dddddddddddd"
+    mocker.patch.object(role_commands, "_gen_guid", return_value=assignment_name)
+    base = ARM if receipt_mode else "https://management.azure.com"
+    assignments = base + owned + "/providers/Microsoft.Authorization/roleAssignments"
+    target = assignments + "/" + assignment_name
+    resource = {
+        "id": target.removeprefix(base), "name": assignment_name,
+        "properties": {"scope": owned, "principalId": SUB_A, "principalType": "ServicePrincipal",
+                       "roleDefinitionId": role_id},
+    }
+    responses.add("GET", base + owned + "/providers/Microsoft.Authorization/roleDefinitions", json={
+        "value": [{"id": role_id, "properties": {"roleName": fixtures.HUB_USER_ROLE}}],
+    })
+    if outcome == "read-denied":
+        responses.add("GET", assignments, status=403, json={"error": {"code": "AuthorizationFailed"}})
+    else:
+        responses.add("GET", assignments, json={"value": []})
+        if outcome == "ready":
+            responses.add("PUT", target, json=resource)
+            responses.add("GET", assignments, json={"value": []})
+        elif outcome == "uncertain":
+            responses.add("PUT", target, status=504, json={"error": {"code": "GatewayTimeout"}})
+            responses.add("PUT", target, json=resource)  # An illicit SDK retry would consume this.
+        else:
+            code = {"exists": "RoleAssignmentExists", "denied": "AuthorizationFailed", "conflict": "Conflict"}[outcome]
+            responses.add("PUT", target, status=403 if outcome == "denied" else 409, json={
+                "error": {"code": code, "message": "synthetic role response"},
+            })
+        responses.add("GET", assignments, json={"value": [resource]})
+    original_list = role_commands.list_role_assignments
+    with runtime.activate(SUB_B, existing=(cli,)) if receipt_mode else nullcontext():
+        with pytest.raises(HttpResponseError) if outcome in ("denied", "conflict", "read-denied", "uncertain") else nullcontext():
+            fixtures._assign_fixture_role(
+                role=fixtures.HUB_USER_ROLE, scope=owned, assignee_object_id=SUB_A,
+                assignee_principal_type="ServicePrincipal", max_tries=3, wait=0,
+            )
+    assert role_commands.list_role_assignments is original_list  # No leaked override, including error exits.
+    graph.assert_not_called()
+    resolve.assert_not_called()
+    resolve_type.assert_not_called()
+    puts = [call for call in responses.calls if call.request.method == "PUT"]
+    assert len(puts) == (0 if outcome == "read-denied" else 1)
+    if puts:
+        properties = json.loads(puts[0].request.body)["properties"]
+        assert properties["principalId"] == SUB_A
+        assert properties["principalType"] == "ServicePrincipal"
+        assert properties["roleDefinitionId"] == role_id
+        assert puts[0].request.url.startswith(target + "?")
+    if outcome == "ready":
+        assert len([call for call in responses.calls if call.request.url.startswith(assignments)
+                    and call.request.method == "GET"]) == 3  # One create, then read-only visibility retries.
+    assert all(call.request.url.startswith(base + f"/subscriptions/{SUB_B}/") for call in responses.calls)
 
 
 def _arm_resources(url):
