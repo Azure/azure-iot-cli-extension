@@ -194,7 +194,7 @@ def _wait_for_device_query(cstring, expected_device_ids):
 @pytest.fixture()
 def setup_hub_states_dataplane(provisioned_iot_hubs_with_storage_user_module):
     """Fixture to setup hubs with dataplane aspects."""
-    hubs = provisioned_iot_hubs_with_storage_user_module
+    hubs = [hub for hub in provisioned_iot_hubs_with_storage_user_module if hub.get("hub")]
     filename = generate_generic_id() + ".json"
     origin_hub = hubs[0]
     origin_hub["filename"] = filename

@@ -9,6 +9,7 @@ import os
 
 from inspect import getsourcefile
 from time import monotonic, sleep
+from uuid import uuid4
 from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.common.shared import AuthenticationTypeDataplane
@@ -245,7 +246,7 @@ def delete_role_assignment(
     )
 
 
-def wait_for_assertion(check, timeout=300, poll_interval=5):
+def wait_for_assertion(check, timeout=60, poll_interval=5):
     deadline = monotonic() + timeout
     while True:
         try:
@@ -254,6 +255,55 @@ def wait_for_assertion(check, timeout=300, poll_interval=5):
             if monotonic() >= deadline:
                 raise
             sleep(poll_interval)
+
+
+def wait_for_iothub_query_ready(hub_name, rg, timeout=60, poll_interval=5):
+    probe_suffix = uuid4().hex[:16]
+    device_id = f"query-readiness-{probe_suffix}"
+    module_id = f"query-readiness-module-{probe_suffix}"
+    target = f"-n {hub_name} -g {rg} --auth-type key"
+
+    def invoke(command):
+        result = cli.invoke(command)
+        if not result.success():
+            raise RuntimeError(
+                f"IoT Hub query readiness command failed with exit code {result.error_code}: {result.output}"
+            )
+        return result
+
+    device_query = f"select deviceId from devices where deviceId='{device_id}'"
+    module_query = f"select moduleId from devices.modules where devices.deviceId='{device_id}'"
+
+    def assert_query_results(expected_device_ids, expected_module_ids):
+        devices = invoke(f'iot hub query -q "{device_query}" {target}').as_json()
+        modules = invoke(f'iot hub query -q "{module_query}" {target}').as_json()
+        actual_device_ids = {device["deviceId"] for device in devices}
+        actual_module_ids = {module["moduleId"] for module in modules}
+        assert actual_device_ids == expected_device_ids, (
+            f"Device query readiness mismatch for {hub_name}: "
+            f"expected {expected_device_ids}, got {actual_device_ids}"
+        )
+        assert actual_module_ids == expected_module_ids, (
+            f"Module query readiness mismatch for {hub_name}: "
+            f"expected {expected_module_ids}, got {actual_module_ids}"
+        )
+
+    invoke(f"iot hub device-identity create -d {device_id} {target}")
+    try:
+        invoke(f"iot hub module-identity create -d {device_id} -m {module_id} {target}")
+        wait_for_assertion(
+            lambda: assert_query_results({device_id}, {module_id}),
+            timeout=timeout,
+            poll_interval=poll_interval,
+        )
+    finally:
+        invoke(f"iot hub device-identity delete -d {device_id} {target}")
+
+    wait_for_assertion(
+        lambda: assert_query_results(set(), set()),
+        timeout=timeout,
+        poll_interval=poll_interval,
+    )
 
 
 def clean_up_iothub_device_config(

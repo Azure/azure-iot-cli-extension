@@ -498,7 +498,7 @@ class TestHierarchyCreateConfig:
         yield mocked_response
 
     @pytest.fixture()
-    def scope_retry_failed_client(self, mocked_response, fixture_ghcs, fixture_sas):
+    def scope_query_client(self, request, mocked_response, fixture_ghcs, fixture_sas):
         devices_url = f"https://{hub_entity}/devices"
         # always return empty query
         mocked_response.add(
@@ -521,6 +521,28 @@ class TestHierarchyCreateConfig:
             content_type="application/json",
             match_querystring=False,
         )
+
+        device_scope = request.param
+        mocked_response.add(
+            method=responses.GET,
+            url=re.compile(r"{}/device_\d+".format(devices_url)),
+            body=json.dumps({"deviceScope": device_scope} if device_scope else {}),
+            status=200,
+            content_type="application/json",
+            match_querystring=False,
+        )
+
+        if device_scope:
+            mocked_response.add(
+                method=responses.POST,
+                url=re.compile(
+                    r"{}/device_\d+/applyConfigurationContent".format(devices_url)
+                ),
+                body="{}",
+                status=200,
+                content_type="application/json",
+                match_querystring=False,
+            )
         return mocked_response
 
     @pytest.fixture()
@@ -702,8 +724,22 @@ class TestHierarchyCreateConfig:
 
             rmtree(out)
 
-    def test_edge_devices_scope_retry_failure(self, fixture_cmd, scope_retry_failed_client, set_cwd):
-        with pytest.raises(AzureResponseError):
+    @pytest.mark.parametrize(
+        "scope_query_client, expect_failure",
+        [("registry-device-scope", False), (None, True)],
+        indirect=["scope_query_client"],
+    )
+    def test_edge_devices_scope_registry_fallback(
+        self, fixture_cmd, scope_query_client, set_cwd, expect_failure
+    ):
+        if expect_failure:
+            with pytest.raises(AzureResponseError):
+                subject.iot_edge_devices_create(
+                    cmd=fixture_cmd,
+                    devices=None,
+                    config_file="device_configs/nested_edge_config.yml"
+                )
+        else:
             subject.iot_edge_devices_create(
                 cmd=fixture_cmd,
                 devices=None,

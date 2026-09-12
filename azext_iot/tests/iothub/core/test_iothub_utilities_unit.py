@@ -11,6 +11,8 @@ from azure.cli.core.azclierror import ArgumentUsageError, CLIInternalError
 from azext_iot.operations import hub as subject
 from azext_iot.tests.generators import generate_generic_id
 from azext_iot.tests import helpers
+from azext_iot.tests.iothub import IoTLiveScenarioTest
+from azext_iot.tests.iothub import conftest as iothub_conftest
 
 
 def generate_valid_cs(validate_pairs=[]):
@@ -49,6 +51,118 @@ def test_wait_for_assertion(mocker):
     mocker.patch("azext_iot.tests.helpers.monotonic", side_effect=[0, 1])
     with pytest.raises(AssertionError, match="not ready"):
         helpers.wait_for_assertion(check, timeout=1, poll_interval=0)
+
+
+def test_wait_for_iothub_query_ready(mocker):
+    device_id = "query-readiness-0123456789abcdef"
+    module_id = "query-readiness-module-0123456789abcdef"
+    device_results = iter([[{"deviceId": device_id}], []])
+    module_results = iter([[{"moduleId": module_id}], []])
+    commands = []
+
+    def invoke(command):
+        commands.append(command)
+        result = mocker.Mock()
+        result.success.return_value = True
+        if "from devices.modules" in command:
+            result.as_json.return_value = next(module_results)
+        elif "iot hub query" in command:
+            result.as_json.return_value = next(device_results)
+        return result
+
+    mocker.patch.object(helpers.cli, "invoke", side_effect=invoke)
+    mocker.patch.object(helpers, "uuid4", return_value=mocker.Mock(hex="0123456789abcdef"))
+
+    helpers.wait_for_iothub_query_ready("test-hub", "test-rg")
+
+    assert len(commands) == 7
+    assert commands[0].startswith("iot hub device-identity create")
+    assert commands[1].startswith("iot hub module-identity create")
+    assert commands[4].startswith("iot hub device-identity delete")
+
+
+def test_wait_for_iothub_query_ready_cleans_up_on_timeout(mocker):
+    commands = []
+
+    def invoke(command):
+        commands.append(command)
+        result = mocker.Mock()
+        result.success.return_value = True
+        if "iot hub query" in command:
+            result.as_json.return_value = []
+        return result
+
+    mocker.patch.object(helpers.cli, "invoke", side_effect=invoke)
+
+    with pytest.raises(AssertionError, match="Device query readiness mismatch"):
+        helpers.wait_for_iothub_query_ready(
+            "test-hub",
+            "test-rg",
+            timeout=0,
+            poll_interval=0,
+        )
+
+    assert any(command.startswith("iot hub device-identity delete") for command in commands)
+
+
+def test_iot_live_scenario_replaces_query_unready_hub(mocker):
+    scenario = mocker.Mock()
+    scenario.entity_name = "test-hub"
+    scenario.entity_rg = "test-rg"
+    replacement_hub = {"id": "replacement-hub"}
+    scenario._wait_for_ready_hub.return_value = replacement_hub
+    mocker.patch(
+        "azext_iot.tests.iothub.wait_for_iothub_query_ready",
+        side_effect=[AssertionError(), None],
+    )
+
+    result = IoTLiveScenarioTest._ensure_query_ready_hub(scenario, {"id": "initial-hub"})
+
+    assert result == replacement_hub
+    scenario.cmd.assert_called_once_with(
+        "iot hub delete --name test-hub --resource-group test-rg"
+    )
+    scenario._create_dynamic_hub.assert_called_once_with()
+
+
+def test_iot_hub_provisioner_replaces_query_unready_hub(mocker):
+    marker = mocker.Mock()
+    marker.kwargs = {}
+    commands = []
+
+    def invoke(command):
+        commands.append(command)
+        result = mocker.Mock()
+        result.success.return_value = True
+        if command.startswith("iot hub create"):
+            result.as_json.return_value = {"name": command.split()[4]}
+        return result
+
+    mocker.patch.object(iothub_conftest, "RG", "test-rg")
+    mocker.patch.object(iothub_conftest, "get_closest_marker", return_value=marker)
+    mocker.patch.object(
+        iothub_conftest,
+        "generate_hub_id",
+        side_effect=["query-unready-hub", "query-ready-hub"],
+    )
+    mocker.patch.object(iothub_conftest.cli, "invoke", side_effect=invoke)
+    mocker.patch.object(
+        iothub_conftest,
+        "_get_hub_connection_string",
+        side_effect=lambda name, _rg: f"{name}-connection-string",
+    )
+    readiness = mocker.patch.object(
+        iothub_conftest,
+        "wait_for_iothub_query_ready",
+        side_effect=[AssertionError(), None],
+    )
+
+    result = iothub_conftest._iot_hubs_provisioner(mocker.Mock(), query_ready=True)
+
+    assert result[0]["name"] == "query-ready-hub"
+    assert result[0]["connectionString"] == "query-ready-hub-connection-string"
+    assert readiness.call_count == 2
+    assert "iot hub delete -n query-unready-hub -g test-rg" in commands
 
 
 class TestGenerateSasToken:
