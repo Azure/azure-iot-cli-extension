@@ -26,6 +26,8 @@ from azext_iot.common.shared import (
 from azext_iot.common.utility import compute_device_key, handle_service_exception, shell_safe_json_parse
 from azext_iot.common.certops import open_certificate
 from azext_iot.dps.providers.discovery import DPSDiscovery
+from azext_iot.dps.services._enrollment_errors import handle_enrollment_error
+from azext_iot.dps.services._enrollment_output import enrollment_group_output
 from azext_iot.operations.generic import _execute_query
 from azext_iot._factory import SdkResolver
 from azext_iot.sdk.dps.service.models import (
@@ -79,7 +81,7 @@ def iot_dps_device_enrollment_list(
         query = [QuerySpecification(query=query_command)]
         return _execute_query(query, sdk.individual_enrollment.query, top)
     except ProvisioningServiceErrorDetailsException as e:
-        handle_service_exception(e)
+        handle_enrollment_error(e, target, "list enrollments", handle_service_exception)
 
 
 def iot_dps_device_enrollment_get(
@@ -121,7 +123,7 @@ def iot_dps_device_enrollment_get(
                 )
         return enrollment
     except ProvisioningServiceErrorDetailsException as e:
-        handle_service_exception(e)
+        handle_enrollment_error(e, target, "show enrollment", handle_service_exception)
 
 
 def iot_dps_device_enrollment_create(
@@ -213,7 +215,7 @@ def iot_dps_device_enrollment_create(
         )
         return sdk.individual_enrollment.create_or_update(enrollment_id, enrollment)
     except ProvisioningServiceErrorDetailsException as e:
-        handle_service_exception(e)
+        handle_enrollment_error(e, target, "create enrollment", handle_service_exception)
 
 
 def iot_dps_device_enrollment_update(
@@ -341,7 +343,7 @@ def iot_dps_device_enrollment_update(
             enrollment_id, enrollment_record, if_match=(etag if etag else "*")
         )
     except ProvisioningServiceErrorDetailsException as e:
-        handle_service_exception(e)
+        handle_enrollment_error(e, target, "update enrollment", handle_service_exception)
 
 
 def iot_dps_device_enrollment_delete(
@@ -366,7 +368,7 @@ def iot_dps_device_enrollment_delete(
 
         return sdk.individual_enrollment.delete(enrollment_id, if_match=(etag if etag else "*"))
     except ProvisioningServiceErrorDetailsException as e:
-        handle_service_exception(e)
+        handle_enrollment_error(e, target, "delete enrollment", handle_service_exception)
 
 
 # DPS Enrollments Group
@@ -392,7 +394,7 @@ def iot_dps_device_enrollment_group_list(
         query1 = [QuerySpecification(query=query_command)]
         return _execute_query(query1, sdk.enrollment_group.query, top)
     except ProvisioningServiceErrorDetailsException as e:
-        handle_service_exception(e)
+        handle_enrollment_error(e, target, "list enrollment groups", handle_service_exception)
 
 
 def iot_dps_device_enrollment_group_get(
@@ -432,9 +434,9 @@ def iot_dps_device_enrollment_group_get(
                         enrollment_type
                     )
                 )
-        return enrollment_group
+        return enrollment_group_output(enrollment_group, show_keys)
     except ProvisioningServiceErrorDetailsException as e:
-        handle_service_exception(e)
+        handle_enrollment_error(e, target, "show enrollment group", handle_service_exception)
 
 
 def iot_dps_device_enrollment_group_create(
@@ -461,6 +463,7 @@ def iot_dps_device_enrollment_group_create(
     api_version=None,
     login=None,
     auth_type_dataplane=None,
+    show_keys=False,
 ):
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
@@ -523,9 +526,11 @@ def iot_dps_device_enrollment_group_create(
             custom_allocation_definition=custom_allocation_definition,
             credential_policy_name=credential_policy_name
         )
-        return sdk.enrollment_group.create_or_update(enrollment_id, group_enrollment)
+        return enrollment_group_output(
+            sdk.enrollment_group.create_or_update(enrollment_id, group_enrollment), show_keys
+        )
     except ProvisioningServiceErrorDetailsException as e:
-        handle_service_exception(e)
+        handle_enrollment_error(e, target, "create enrollment group", handle_service_exception)
 
 
 def iot_dps_device_enrollment_group_update(
@@ -555,6 +560,7 @@ def iot_dps_device_enrollment_group_update(
     api_version=None,
     login=None,
     auth_type_dataplane=None,
+    show_keys=False,
 ):
     discovery = DPSDiscovery(cmd)
     target = discovery.get_target(
@@ -659,11 +665,14 @@ def iot_dps_device_enrollment_group_update(
             enrollment_record.capabilities = DeviceCapabilities(iot_edge=edge_enabled)
         if credential_policy_name is not None:
             enrollment_record.credential_policy_name = credential_policy_name
-        return sdk.enrollment_group.create_or_update(
-            enrollment_id, enrollment_record, if_match=(etag if etag else "*")
+        return enrollment_group_output(
+            sdk.enrollment_group.create_or_update(
+                enrollment_id, enrollment_record, if_match=(etag if etag else "*")
+            ),
+            show_keys,
         )
     except ProvisioningServiceErrorDetailsException as e:
-        handle_service_exception(e)
+        handle_enrollment_error(e, target, "update enrollment group", handle_service_exception)
 
 
 def iot_dps_device_enrollment_group_delete(
@@ -688,7 +697,7 @@ def iot_dps_device_enrollment_group_delete(
 
         return sdk.enrollment_group.delete(enrollment_id, if_match=(etag if etag else "*"))
     except ProvisioningServiceErrorDetailsException as e:
-        handle_service_exception(e)
+        handle_enrollment_error(e, target, "delete enrollment group", handle_service_exception)
 
 
 def iot_dps_compute_device_key(

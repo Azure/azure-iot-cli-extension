@@ -485,7 +485,11 @@ def _svc_exc():
 def dps_sdk(mocker):
     mocker.patch.object(subject, "DPSDiscovery")
     resolver = mocker.patch.object(subject, "SdkResolver")
-    return resolver.return_value.get_sdk.return_value
+    sdk = resolver.return_value.get_sdk.return_value
+    sdk.enrollment_group.create_or_update.return_value = subject.EnrollmentGroup.deserialize({
+        "enrollmentGroupId": "gid", "attestation": {"type": "symmetricKey"},
+    })
+    return sdk
 
 
 @pytest.fixture

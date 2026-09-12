@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------------------------
 
 
+import base64
 from time import sleep
 from typing import Dict
 
@@ -55,3 +56,66 @@ def check_hub_device(
         assert key == device_auth["symmetricKey"]["primaryKey"]
     if thumbprint:
         assert thumbprint == device_auth["x509Thumbprint"]["primaryThumbprint"]
+
+
+def register_fresh_generated_credential(
+    cli, resource, kind, key_name, request, endpoint=None, auth_type="login", connection_string=None,
+):
+    """Authenticate once with service-generated keys on an independent identity/group."""
+    from azext_iot.constants import IOTDPS_PROVISIONING_HOST
+    from azext_iot.tests.generators import generate_names
+    from azext_iot.tests.helpers import invoke_checked, set_cmd_auth_type
+
+    enrollment_id, device_id = generate_names(count=2)
+    group = kind == "group"
+    if not group:
+        device_id = enrollment_id
+    command_group = "enrollment-group" if group else "enrollment"
+    context = f"--dps-name {resource['name']} -g {resource['resourceGroup']}"
+
+    def invoke(command):
+        return invoke_checked(
+            cli,
+            set_cmd_auth_type(command, auth_type=auth_type, cstring=connection_string),
+            description="DPS credential integration command",
+        )
+
+    create = f"iot dps {command_group} create {context} --enrollment-id {enrollment_id}"
+    create += " --show-keys" if group else " --attestation-type symmetricKey"
+    response = invoke(create)
+    request.addfinalizer(lambda: invoke(f"iot dps {command_group} delete {context} --enrollment-id {enrollment_id}"))
+    enrollment = response.as_json()
+    keys = enrollment["attestation"]["symmetricKey"]
+    complete = all(isinstance(keys.get(name), str) and keys[name] for name in ("primaryKey", "secondaryKey"))
+    assert complete, "DPS did not return both service-generated keys."
+    distinct = keys["primaryKey"] != keys["secondaryKey"]
+    assert distinct, "DPS returned identical primary and secondary keys."
+    try:
+        valid = all(bool(base64.b64decode(keys[name], validate=True)) for name in ("primaryKey", "secondaryKey"))
+    except ValueError:
+        valid = False
+    assert valid, "DPS returned an invalid base64 credential."
+    target = context
+    if endpoint is not None:
+        properties = resource["dps"]["properties"]
+        host = properties["deviceProvisioningHostName"] if endpoint == "configured" else IOTDPS_PROVISIONING_HOST
+        assert host
+        target = f"--id-scope {properties['idScope']} --host {host}"
+    registration = invoke(
+        f"iot device registration create {target} --registration-id {device_id} --key {keys[key_name]}"
+        + (" --compute-key" if group else "")
+    ).as_json()
+    assert registration["operationId"]
+    assert registration["status"] == "assigned"
+    state = registration["registrationState"]
+    assert state["registrationId"] == device_id
+    assert state["deviceId"] == device_id
+    assert state["assignedHub"] == resource["hubHostName"]
+    assert state["substatus"] == "initialAssignment"
+    check_hub_device(cli, device_id, "sas", resource["iotHub"])
+    identifier = "--registration-id" if group else "--enrollment-id"
+    service_state = invoke(
+        f"iot dps {command_group} registration show {context} {identifier} {device_id}"
+    ).as_json()
+    compare_registrations(state, service_state)
+    return registration

@@ -18,7 +18,9 @@ import pytest
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.common.shared import EntityStatusType
 from azext_iot.tests.dps import DPS_SERVICE_AUTH_PARAMS
-from azext_iot.tests.dps.device_registration import check_hub_device, compare_registrations
+from azext_iot.tests.dps.device_registration import (
+    check_hub_device, compare_registrations, register_fresh_generated_credential,
+)
 from azext_iot.tests.generators import generate_generic_id, generate_names
 from azext_iot.tests.helpers import CERT_ENDING, KEY_ENDING, set_cmd_auth_type
 from azext_iot.tests.test_utils import create_certificate
@@ -28,7 +30,7 @@ cli = EmbeddedCLI()
 
 
 @pytest.mark.parametrize("auth_phases", DPS_SERVICE_AUTH_PARAMS)
-def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_module, auth_phases):
+def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_module, auth_phases, request):
     dps_name = provisioned_iot_dps_module['name']
     dps_rg = provisioned_iot_dps_module['resourceGroup']
     hub_hostname = provisioned_iot_dps_module['hubHostName']
@@ -78,7 +80,7 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
         # Regular enrollment group
         keys = cli.invoke(
             set_cmd_auth_type(
-                f"iot dps enrollment-group create --group-id {group_id} --dps-name {dps_name} -g {dps_rg}",
+                f"iot dps enrollment-group create --group-id {group_id} --dps-name {dps_name} -g {dps_rg} --show-keys",
                 auth_type=auth_phase,
                 cstring=dps_cstring
             ),
@@ -159,6 +161,7 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
         assert registration["registrationState"]["substatus"] == "initialAssignment"
         assert registration["status"] == "assigned"
         check_hub_device(cli, device_id1, "sas", hub, key=device_key)
+        device1_registration = registration["registrationState"]
 
         # Can register a second device within the same enrollment group
         registration = cli.invoke(
@@ -178,23 +181,10 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
         assert registration["status"] == "assigned"
         check_hub_device(cli, device_id2, "sas", hub)
 
-        # Can re-register a first device within the same enrollment group using a different key
-        registration = cli.invoke(
-            set_cmd_auth_type(
-                f"iot device registration create --dps-name {dps_name} -g {dps_rg} --registration-id {device_id1} "
-                f"--key {keys['secondaryKey']} --ck",
-                auth_type=auth_phase,
-                cstring=dps_cstring
-            ),
-            capture_stderr=True,
-        ).as_json()
-        device1_registration = registration["registrationState"]
-        assert registration["operationId"]
-        assert registration["registrationState"]["assignedHub"] == hub_hostname
-        assert registration["registrationState"]["deviceId"] == device_id1
-        assert registration["registrationState"]["registrationId"] == device_id1
-        assert registration["registrationState"]["substatus"] == "initialAssignment"
-        assert registration["status"] == "assigned"
+        register_fresh_generated_credential(
+            cli, provisioned_iot_dps_module, "group", "secondaryKey", request,
+            auth_type=auth_phase, connection_string=dps_cstring,
+        )
 
         # Check for both registration from service side
         random_registration = cli.invoke(

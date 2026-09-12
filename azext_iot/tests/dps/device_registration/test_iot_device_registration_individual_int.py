@@ -18,7 +18,9 @@ import pytest
 from azext_iot.common.embedded_cli import EmbeddedCLI
 from azext_iot.common.shared import EntityStatusType, AttestationType
 from azext_iot.tests.dps import DPS_SERVICE_AUTH_PARAMS
-from azext_iot.tests.dps.device_registration import compare_registrations, check_hub_device
+from azext_iot.tests.dps.device_registration import (
+    compare_registrations, check_hub_device, register_fresh_generated_credential,
+)
 from azext_iot.tests.helpers import CERT_ENDING, KEY_ENDING, create_test_cert, set_cmd_auth_type
 from azext_iot.tests.generators import generate_names
 
@@ -26,7 +28,7 @@ cli = EmbeddedCLI()
 
 
 @pytest.mark.parametrize("auth_phases", DPS_SERVICE_AUTH_PARAMS)
-def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_module, auth_phases):
+def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_module, auth_phases, request):
     dps_name = provisioned_iot_dps_module['name']
     dps_rg = provisioned_iot_dps_module['resourceGroup']
     hub_hostname = provisioned_iot_dps_module['hubHostName']
@@ -130,6 +132,8 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
         assert registration["registrationState"]["substatus"] == "initialAssignment"
         assert registration["status"] == "assigned"
 
+        registration_state = registration["registrationState"]
+
         # Unauthorized
         bad_key = keys["primaryKey"].replace(keys["primaryKey"][0], "")
 
@@ -143,23 +147,10 @@ def test_dps_device_registration_symmetrickey_lifecycle(provisioned_iot_dps_modu
                 capture_stderr=True
             )
 
-        # Try secondary key
-        registration = cli.invoke(
-            set_cmd_auth_type(
-                f"iot device registration create --dps-name {dps_name} -g {dps_rg} --registration-id {enrollment_id} "
-                f"--key {keys['secondaryKey']}",
-                auth_type=auth_phase,
-                cstring=dps_cstring
-            ),
-            capture_stderr=True,
-        ).as_json()
-        registration_state = registration["registrationState"]
-        assert registration["operationId"]
-        assert registration["registrationState"]["assignedHub"] == hub_hostname
-        assert registration["registrationState"]["deviceId"] == enrollment_id
-        assert registration["registrationState"]["registrationId"] == enrollment_id
-        assert registration["registrationState"]["substatus"] == "initialAssignment"
-        assert registration["status"] == "assigned"
+        register_fresh_generated_credential(
+            cli, provisioned_iot_dps_module, "individual", "secondaryKey", request,
+            auth_type=auth_phase, connection_string=dps_cstring,
+        )
 
         # Check registration from service side
         service_state = cli.invoke(
