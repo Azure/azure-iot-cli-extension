@@ -14,7 +14,9 @@ from azure.cli.core.azclierror import RequiredArgumentMissingError
 from azext_iot.iothub.common import NON_DECODABLE_PAYLOAD
 from azext_iot.tests.conftest import get_context_path
 from azext_iot.tests.iothub import IoTLiveScenarioTest, PREFIX_DEVICE
-from azext_iot.tests.iothub._integration_helpers import LOCAL_AUTH_DEVICE_HTTP_REASON, LOCAL_AUTH_MONITOR_REASON
+from azext_iot.tests.iothub._integration_helpers import (
+    LOCAL_AUTH_DEVICE_HTTP_REASON, LOCAL_AUTH_MONITOR_REASON, QUERY_VISIBILITY_TIMEOUT, wait_for_query_ids,
+)
 from azext_iot.tests.iothub._sas_phase import enabled as sas_phase_enabled
 from azext_iot.tests.iothub.conftest import _delete_fixture_resource
 from azext_iot.common.utility import (
@@ -989,6 +991,7 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         )
 
     @pytest.mark.skipif(not sas_phase_enabled(), reason=LOCAL_AUTH_MONITOR_REASON)
+    @pytest.mark.timeout(900 + QUERY_VISIBILITY_TIMEOUT, func_only=False)
     def test_hub_monitor_events(self):
         for cg in LIVE_CONSUMER_GROUPS:
             self.addCleanup(
@@ -1103,6 +1106,16 @@ class TestIoTHubMessaging(IoTLiveScenarioTest):
         )
         query_string = "select * from devices where deviceId in [{}]".format(
             device_include_string
+        )
+
+        # Fresh identities may not yet be query-visible. Require exactly the
+        # included cohort (no excluded or duplicate IDs) using the monitor's SQL.
+        wait_for_query_ids(
+            lambda: self.cmd(
+                f'iot hub query -n {self.entity_name} -g {self.entity_rg} -q "{query_string}"'
+            ).get_output_in_json(),
+            device_subset_include,
+            id_key="deviceId",
         )
 
         query_output = self.command_execute_assert(

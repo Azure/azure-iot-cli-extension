@@ -115,7 +115,7 @@ def test_all_six_existing_nodes_have_conditional_not_unconditional_skips():
         owner = next(value for value in tree.body if isinstance(value, ast.ClassDef) and value.name == cls)
         function = next(value for value in owner.body if isinstance(value, ast.FunctionDef) and value.name == method)
         decorators = [ast.unparse(value) for value in function.decorator_list]
-        assert len(decorators) == 1
+        assert len(decorators) == (2 if method == "test_hub_monitor_events" else 1)
         assert decorators[0].startswith("pytest.mark.skipif(not sas_phase_enabled(),")
 
 
@@ -478,23 +478,29 @@ def test_real_http_body_exercises_key_login_and_cstring(monkeypatch):
     messaging.sleep.assert_called_once_with(30)
 
 
-@pytest.mark.parametrize("leak_excluded", [False, True])
-def test_monitor_scenario_checks_inclusion_and_exclusion_in_one_capture(leak_excluded, mocker):
-    from azext_iot.tests.iothub.core import test_iot_messaging_int as messaging
+@pytest.fixture
+def monitor_scenario(mocker):
+    from azext_iot.tests.iothub import _integration_helpers as helpers
     devices = [f"device-{index}" for index in range(10)]
     scenario = SimpleNamespace(
         entity_name="hub", entity_rg="rg", cli_ctx=Mock(), connection_string="unit",
         addCleanup=Mock(), cmd=Mock(), check=Mock(), start_background=Mock(),
-        generate_device_names=Mock(return_value=devices),
+        generate_device_names=Mock(return_value=devices), device_ids=devices,
+        query_read=Mock(return_value=[{"deviceId": device} for device in devices[:5]]),
+        query_monitors=[], clock=SimpleNamespace(now=0), leak_excluded=False,
+    )
+    scenario.cmd.return_value.get_output_in_json = scenario.query_read
+    mocker.patch.object(helpers, "monotonic", side_effect=lambda: scenario.clock.now)
+    scenario.query_sleep = mocker.patch.object(
+        helpers, "sleep", side_effect=lambda seconds: setattr(scenario.clock, "now", scenario.clock.now + seconds),
     )
     mocker.patch("azext_iot._factory.iot_hub_service_factory")
-    queries = []
 
     def monitor(command, expected):
         if "--device-query" in command:
-            queries.append(command)
+            scenario.query_monitors.append((command, scenario.query_read.call_count))
             assert expected == devices[:5]
-            return "\n".join(devices if leak_excluded else devices[:5])
+            return "\n".join(devices if scenario.leak_excluded else devices[:5])
         if "--mc -5" in command:
             raise CLIError("Message count must be greater than 0.")
         if "--login" in command:
@@ -502,13 +508,87 @@ def test_monitor_scenario_checks_inclusion_and_exclusion_in_one_capture(leak_exc
         return ""
 
     scenario.command_execute_assert = monitor
+    return scenario
+
+
+@pytest.mark.parametrize("leak_excluded", [False, True])
+def test_monitor_scenario_checks_inclusion_and_exclusion_in_one_capture(monitor_scenario, leak_excluded):
+    from azext_iot.tests.iothub.core import test_iot_messaging_int as messaging
+    scenario = monitor_scenario
+    scenario.leak_excluded = leak_excluded
+    included = scenario.query_read.return_value
+    excluded = [{"deviceId": device} for device in scenario.device_ids[5:]]
+    scenario.query_read.side_effect = [[], included[:1], included + excluded, included + included[:1], included]
     if leak_excluded:
         with pytest.raises(AssertionError):
             messaging.TestIoTHubMessaging.test_hub_monitor_events(scenario)
     else:
         with pytest.raises(RuntimeError, match="Offline proof stops"):
             messaging.TestIoTHubMessaging.test_hub_monitor_events(scenario)
-    assert len(queries) == 1
+    assert len(scenario.query_monitors) == 1
+    command, reads_before_monitor = scenario.query_monitors[0]
+    assert reads_before_monitor == 5
+    sql = shlex.split(command)[shlex.split(command).index("--device-query") + 1]
+    assert sql == "select * from devices where deviceId in ['device-0', 'device-1', 'device-2', 'device-3', 'device-4']"
+    query = f'iot hub query -n hub -g rg -q "{sql}"'
+    reads = [call.args[0] for call in scenario.cmd.call_args_list if call.args[0].startswith("iot hub query ")]
+    assert reads == [query] * 5
+    assert scenario.query_sleep.call_count == 4
+
+
+@pytest.mark.parametrize("failure", [
+    "empty", "extra", "duplicate", HttpResponseError("Query denied"), ServiceRequestError("Transport failed"),
+    TimeoutError("RPC timeout"),
+])
+def test_monitor_query_readiness_failure_prevents_query_monitor(monitor_scenario, failure):
+    from azext_iot.tests.iothub.core import test_iot_messaging_int as messaging
+    scenario = monitor_scenario
+    if isinstance(failure, Exception):
+        scenario.query_read.side_effect = failure
+    elif failure == "empty":
+        scenario.query_read.return_value = []
+    else:
+        extra = "excluded" if failure == "extra" else scenario.device_ids[0]
+        scenario.query_read.return_value += [{"deviceId": extra}]
+    with pytest.raises(type(failure) if isinstance(failure, Exception) else AssertionError) as raised:
+        messaging.TestIoTHubMessaging.test_hub_monitor_events(scenario)
+    assert not scenario.query_monitors
+    if isinstance(failure, Exception):
+        assert raised.value is failure
+        scenario.query_read.assert_called_once_with()
+        scenario.query_sleep.assert_not_called()
+    else:
+        assert scenario.clock.now == 1800
+        assert scenario.query_read.call_count == 180
+        assert "deadline/attempt limit exhausted" in str(raised.value)
+
+
+def test_monitor_query_readiness_rejects_exact_ids_after_deadline(monitor_scenario):
+    from azext_iot.tests.iothub.core import test_iot_messaging_int as messaging
+    scenario = monitor_scenario
+
+    def late_read():
+        scenario.clock.now += 1801
+        return [{"deviceId": device} for device in scenario.device_ids[:5]]
+
+    scenario.query_read.side_effect = late_read
+    with pytest.raises(AssertionError, match="deadline/attempt limit exhausted"):
+        messaging.TestIoTHubMessaging.test_hub_monitor_events(scenario)
+    assert not scenario.query_monitors
+    scenario.query_read.assert_called_once_with()
+    scenario.query_sleep.assert_not_called()
+
+
+def test_query_monitor_budgets_one_readiness_window_and_existing_lifecycle():
+    from azext_iot.tests.iothub.core import test_iot_messaging_int as messaging
+    marks = [
+        mark for mark in getattr(messaging.TestIoTHubMessaging.test_hub_monitor_events, "pytestmark", [])
+        if mark.name == "timeout"
+    ]
+    assert messaging.QUERY_VISIBILITY_TIMEOUT == 1800
+    assert len(marks) == 1
+    assert marks[0].args == (2700,)
+    assert marks[0].kwargs == {"func_only": False}
 
 
 @pytest.mark.parametrize("expect_json", [False, True])
