@@ -149,10 +149,10 @@ class IoTLiveScenarioTest(CaptureOutputLiveScenarioTest):
                         self.entity_name, self.entity_rg
                     )
                 )
-                if attempt == HUB_PROVISION_ATTEMPTS - 1:
-                    raise
                 self.entity_name = generate_dynamic_hub_name()
                 DYNAMIC_HUB.name = self.entity_name
+                if attempt == HUB_PROVISION_ATTEMPTS - 1:
+                    raise
                 self._create_dynamic_hub()
                 target_hub = self._wait_for_ready_hub()
 
