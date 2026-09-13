@@ -12,6 +12,7 @@ import subprocess
 import sys
 import shlex
 import threading
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -192,7 +193,7 @@ def test_constructor_failure_is_not_replayed(phase, monkeypatch):
 
 def test_one_cohort_is_shared_without_recreating_or_regranting(phase, monkeypatch):
     target = {"id": phase.ids["hub"], "properties": {"disableLocalAuth": False}}
-    reads = iter([None, None, None, target, {"id": phase.ids["role"]}])
+    reads = iter([None, None, None, None, target, {"id": phase.ids["role"]}])
     monkeypatch.setattr(phase, "read", lambda _kind: next(reads))
     waits = Mock()
     monkeypatch.setattr(subject, "sleep", waits)
@@ -310,13 +311,12 @@ def test_cleanup_non404_propagates(phase, monkeypatch):
 
 
 @pytest.mark.parametrize("error", [ResourceNotFoundError("Gone"), ForbiddenError("Denied")])
-def test_reads_only_accept_actual_not_found(phase, error):
-    phase.command.side_effect = error
-    if isinstance(error, ResourceNotFoundError):
-        assert phase.read("storage") is None
-    else:
-        with pytest.raises(ForbiddenError):
-            phase.read("storage")
+def test_read_does_not_treat_cli_errors_as_native_absence(phase, error, mocker):
+    client = mocker.patch.object(phase, "arm_client").return_value
+    client.storage_accounts.get_properties.side_effect = error
+    with pytest.raises(type(error)) as raised:
+        phase.read("storage")
+    assert raised.value is error
 
 
 def test_uncertain_creation_first_404_does_not_prove_cleanup(phase, monkeypatch):
@@ -366,6 +366,22 @@ def test_unfinished_background_prevents_resource_cleanup(phase):
         phase.cleanup()
     phase.command.assert_not_called()
     assert 0 <= thread.join.call_args.args[0] <= 90
+
+
+def test_background_workers_share_one_drain_budget(monkeypatch):
+    tasks = subject.BackgroundTasks()
+    threads = [Mock(), Mock()]
+    for thread in threads:
+        thread.is_alive.return_value = False
+    stops = [Mock(), Mock()]
+    tasks.tasks = [(stop, thread, []) for stop, thread in zip(stops, threads)]
+    monkeypatch.setattr(subject, "monotonic", Mock(side_effect=[0, 20, 85]))
+    tasks.finish(timeout=90)
+    for stop in stops:
+        stop.set.assert_called_once_with()
+    threads[0].join.assert_called_once_with(70)
+    threads[1].join.assert_called_once_with(5)
+    assert not tasks.tasks
 
 
 @pytest.mark.parametrize("text", [
@@ -461,21 +477,147 @@ def test_real_http_body_exercises_key_login_and_cstring(monkeypatch):
 
 
 @pytest.mark.parametrize("passed,bad", [(subject.NODES[:-1], False), (subject.NODES, True), (subject.NODES, False)])
-def test_phase_requires_every_node_pass_and_no_skips(phase, passed, bad):
+def test_phase_requires_every_node_pass_and_no_skips(phase, passed, bad, monkeypatch):
+    monkeypatch.setattr(subject, "signal", SimpleNamespace())  # Policy also runs where SIGALRM does not exist.
     phase.passed, phase.bad_report = set(passed), bad
     phase.sent = {"PUT " + resource_id.casefold() for resource_id in phase.ids.values()}
     phase.absent = set(phase.ids)
-    phase.cleanup = Mock()
     session = SimpleNamespace(exitstatus=0)
-    phase.pytest_sessionfinish(session)
+    phase.check_results(session)
     assert (session.exitstatus == 0) == (len(passed) == 6 and not bad)
 
 
-def test_six_pass_reports_without_provisioning_receipts_cannot_pass(phase):
+def test_six_pass_reports_without_provisioning_receipts_cannot_pass(phase, monkeypatch):
+    monkeypatch.setattr(subject, "signal", SimpleNamespace())
+    phase.passed = set(subject.NODES)
+    session = SimpleNamespace(exitstatus=0)
+    phase.check_results(session)
+    assert session.exitstatus == pytest.ExitCode.TESTS_FAILED
+
+
+def test_session_finish_retains_cleanup_and_result_gates(phase, mocker):
+    deadline = mocker.patch.object(subject, "cleanup_timeout", side_effect=nullcontext)
+    phase.cleanup = Mock(side_effect=RuntimeError("Cleanup denied"))
     phase.passed = set(subject.NODES)
     session = SimpleNamespace(exitstatus=0)
     phase.pytest_sessionfinish(session)
+    deadline.assert_called_once_with()
+    phase.cleanup.assert_called_once_with()
     assert session.exitstatus == pytest.ExitCode.TESTS_FAILED
+    phase.config.pluginmanager.getplugin.return_value.write_line.assert_called_once()
+
+
+@pytest.mark.parametrize("platform", ["win32", "freebsd"])
+@pytest.mark.parametrize("mode", ["regular", "local-auth"])
+def test_unsupported_phase_fails_before_constructor_credentials_or_receipt(platform, mode, tmp_path, monkeypatch, mocker):
+    from azext_iot.tests.iothub import conftest as fixtures
+    monkeypatch.setenv(subject.ENV, mode)
+    monkeypatch.setattr(subject.sys, "platform", platform)
+    receipt = tmp_path / "unsupported.json"
+    monkeypatch.setenv("azext_iot_hubsas_receipt", str(receipt))
+    constructor = mocker.patch.object(subject, "HubSasPhase")
+    credential = mocker.patch("azure.cli.core._profile.Profile.get_login_credentials")
+    token = mocker.patch("azure.cli.core._profile.Profile.get_raw_token")
+    transport = mocker.patch.object(requests.Session, "send")
+    if mode == "local-auth":
+        with pytest.raises(pytest.UsageError, match="requires Linux or macOS"):
+            fixtures.pytest_configure(configuration())
+    else:
+        fixtures.pytest_configure(configuration())
+    constructor.assert_not_called()
+    credential.assert_not_called()
+    token.assert_not_called()
+    transport.assert_not_called()
+    assert not receipt.exists()
+
+
+def timer_api():
+    return SimpleNamespace(
+        SIGALRM=14, ITIMER_REAL=0, getitimer=Mock(return_value=(30, 2)),
+        setitimer=Mock(), signal=Mock(return_value="previous-handler"),
+    )
+
+
+@pytest.mark.parametrize("platform", ["linux", "darwin"])
+@pytest.mark.parametrize("missing", ["SIGALRM", "ITIMER_REAL", "getitimer", "setitimer"])
+def test_missing_timer_capability_rejected_before_phase_setup(platform, missing, monkeypatch, mocker):
+    from azext_iot.tests.iothub import conftest as fixtures
+    api = timer_api()
+    delattr(api, missing)
+    monkeypatch.setattr(subject, "signal", api)
+    monkeypatch.setattr(subject.sys, "platform", platform)
+    monkeypatch.setenv(subject.ENV, "local-auth")
+    constructor = mocker.patch.object(subject, "HubSasPhase")
+    with pytest.raises(pytest.UsageError, match="POSIX interval timers"):
+        fixtures.pytest_configure(configuration())
+    constructor.assert_not_called()
+
+
+def test_non_main_thread_rejected_before_timer_install(monkeypatch):
+    monkeypatch.setattr(subject, "signal", timer_api())
+    monkeypatch.setattr(subject.sys, "platform", "linux")
+    monkeypatch.setattr(subject.threading, "current_thread", lambda: object())
+    with pytest.raises(pytest.UsageError, match="main thread"):
+        subject.require_posix_timers()
+    subject.signal.signal.assert_not_called()
+
+
+@pytest.mark.parametrize("previous,initial,remaining", [
+    ((30, 2), 30, 28), ((900, 0), 690, 898), ((0, 0), 690, 0), ((1, 0), 1, 0.0001),
+])
+def test_timer_never_extends_outer_deadline_and_restores_it(monkeypatch, previous, initial, remaining):
+    api = timer_api()
+    api.getitimer.return_value = previous
+    monkeypatch.setattr(subject, "signal", api)
+    monkeypatch.setattr(subject.sys, "platform", "linux")
+    monkeypatch.setattr(subject, "monotonic", Mock(side_effect=[10, 12]))
+    with subject.cleanup_timeout():
+        api.setitimer.assert_called_once_with(api.ITIMER_REAL, initial)
+    assert api.setitimer.call_args.args == (api.ITIMER_REAL, remaining, previous[1])
+    assert api.signal.call_args.args == (api.SIGALRM, "previous-handler")
+
+
+def test_hard_deadline_stops_cleanup_before_any_further_resource_reads(phase, monkeypatch):
+    api = timer_api()
+    monkeypatch.setattr(subject, "signal", api)
+    monkeypatch.setattr(subject.sys, "platform", "linux")
+    key = "PUT " + phase.ids["storage"].casefold()
+    phase.sent.add(key)
+    phase.statuses[key] = 400
+    reads = []
+
+    def read(kind):
+        reads.append(kind)
+        if kind == "role":
+            api.signal.call_args.args[1](api.SIGALRM, None)
+        return None
+
+    monkeypatch.setattr(phase, "read", read)
+    session = SimpleNamespace(exitstatus=0)
+    phase.pytest_sessionfinish(session)
+    assert reads == ["role"]
+    assert session.exitstatus == pytest.ExitCode.TESTS_FAILED
+    reporter = phase.config.pluginmanager.getplugin.return_value
+    assert "hard deadline" in reporter.write_line.call_args.args[0]
+    assert api.signal.call_args.args == (api.SIGALRM, "previous-handler")
+
+
+@pytest.mark.skipif(sys.platform not in ("linux", "darwin"), reason="Exercises actual POSIX interval timers.")
+def test_real_posix_timer_interrupts_blocking_cleanup_and_restores_handler(phase, monkeypatch):
+    alarm, timer, get_timer, _set_timer = subject.require_posix_timers()
+    previous = subject.signal.getsignal(alarm)
+    previous_timer = get_timer(timer)
+    phase.sent.add("PUT " + phase.ids["storage"].casefold())
+    read = Mock(side_effect=lambda _kind: subject.sleep(2))
+    monkeypatch.setattr(phase, "read", read)
+    with pytest.raises(subject.HubSasCleanupTimeout, match="hard deadline"):
+        with subject.cleanup_timeout(timeout=0.02):
+            phase.cleanup()
+    read.assert_called_once_with("role")
+    assert subject.signal.getsignal(alarm) == previous
+    remaining, interval = get_timer(timer)
+    assert interval == previous_timer[1]
+    assert 0 <= remaining <= previous_timer[0]
 
 
 @pytest.mark.parametrize("mode", ["regular", "local-auth"])
@@ -544,8 +686,13 @@ sys.exit(pytest.main(["-c", "setup.cfg", "--collect-only", "-q", "-o", "addopts=
         [sys.executable, "-c", script], cwd=REPO, env=env,
         capture_output=True, text=True, timeout=45, check=False,
     )
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert "SAFE_COLLECTION nodes=6 skipped=" + ("6" if mode == "regular" else "0") in result.stdout
+    if mode == "local-auth" and sys.platform not in ("linux", "darwin"):
+        assert result.returncode == pytest.ExitCode.USAGE_ERROR, result.stdout + result.stderr
+        assert "HubSAS requires Linux or macOS" in result.stderr
+        assert not (tmp_path / "receipt.json").exists()
+    else:
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "SAFE_COLLECTION nodes=6 skipped=" + ("6" if mode == "regular" else "0") in result.stdout
 
 
 @pytest.mark.parametrize("subscription", [None, "", " \t\n"])
@@ -614,6 +761,219 @@ def test_native_factory_failure_is_outside_absence_catch(phase, mocker):
     with pytest.raises(HttpResponseError) as error:
         phase.read("hub")
     assert error.value is failure
+
+
+@pytest.fixture
+def native_resources(phase, native_hub, mocker):
+    from azure.cli.core._profile import Profile
+    from azure.cli.core.profiles import ResourceType
+    credential = SimpleNamespace(get_token=lambda *_args, **_kwargs: AccessToken("offline-token", 4102444800))
+    credentials = mocker.patch.object(
+        Profile, "get_login_credentials", return_value=(credential, phase.subscription, "offline-tenant"),
+    )
+    storage = phase.arm_client(ResourceType.MGMT_STORAGE)
+    authorization = phase.arm_client(ResourceType.MGMT_AUTHORIZATION)
+    assert len(credentials.call_args_list) == 2
+    assert all(call.kwargs["subscription_id"] == phase.subscription for call in credentials.call_args_list)
+    # No retry delays are needed when deliberately testing server errors offline.
+    for client in (native_hub, storage, authorization):
+        client._config.retry_policy.total_retries = 0
+    return storage, authorization
+
+
+@pytest.mark.parametrize("kind", ["hub", "storage", "container", "role"])
+def test_lazy_credential_http404_is_not_resource_absence(phase, native_resources, mocker, kind):
+    from azure.core.pipeline.transport import HttpRequest, RequestsTransportResponse
+    response = requests.Response()
+    response.status_code = 404
+    response._content = b'{"error": "Synthetic credential endpoint failure"}'
+    native = RequestsTransportResponse(
+        HttpRequest("POST", "https://login.microsoftonline.com/offline-tenant/oauth2/v2.0/token"), response,
+    )
+    failure = HttpResponseError(response=native)
+    for client in (phase.hub_client, *native_resources):
+        mocker.patch.object(client._config.credential, "get_token", side_effect=failure)
+    with responses.RequestsMock() as wire:
+        with pytest.raises(HttpResponseError) as error:
+            phase.read(kind)
+        assert error.value is failure
+        assert not wire.calls
+    phase.command.assert_not_called()
+
+
+@pytest.mark.parametrize("kind", ["storage", "container", "role"])
+@pytest.mark.parametrize("status", [400, 401, 403, 404, 409, 500, 502])
+def test_native_arm_reads_preserve_only_http404_as_absence(phase, native_resources, kind, status):
+    with responses.RequestsMock() as wire:
+        wire.add("GET", "https://management.azure.com" + phase.ids[kind],
+                 json={"error": {"code": "SyntheticFailure"}}, status=status)
+        if status == 404:
+            assert phase.read(kind) is None
+        else:
+            with pytest.raises(HttpResponseError) as error:
+                phase.read(kind)
+            assert error.value.status_code == status
+        assert len(wire.calls) == 1
+        phase.command.assert_not_called()
+
+
+@pytest.mark.parametrize("kind", ["storage", "container", "role"])
+def test_native_arm_read_preserves_wire_model_shape_without_graph(phase, native_resources, kind):
+    resource = {
+        "id": phase.ids[kind], "name": phase.ids[kind].rsplit("/", 1)[1],
+        "tags": {"runUid": subject.UID},
+        "properties": {"provisioningState": "Deleting", "principalId": "offline-principal"},
+    }
+    with responses.RequestsMock() as wire:
+        wire.add("GET", "https://management.azure.com" + phase.ids[kind], json=resource, status=200)
+        assert phase.read(kind) == resource
+        assert len(wire.calls) == 1
+        assert wire.calls[0].request.method == "GET"
+        phase.command.assert_not_called()
+
+
+@pytest.mark.parametrize("kind", ["storage", "container", "role"])
+def test_native_read_callback_supports_legacy_transport_without_json_method(phase, kind, mocker):
+    from azure.core.pipeline.transport import HttpRequest, RequestsTransportResponse
+    resource = {
+        "id": phase.ids[kind], "tags": {"runUid": subject.UID}, "properties": {"provisioningState": "Deleting"},
+    }
+    response = requests.Response()
+    response.status_code = 200
+    response._content = json.dumps(resource).encode("utf-8")
+    native = RequestsTransportResponse(HttpRequest("GET", "https://management.azure.com" + phase.ids[kind]), response)
+    assert not hasattr(native, "json")
+    client = mocker.patch.object(phase, "arm_client").return_value
+    operation = {
+        "storage": client.storage_accounts.get_properties,
+        "container": client.blob_containers.get,
+        "role": client.role_assignments.get_by_id,
+    }[kind]
+    operation.side_effect = lambda **kwargs: kwargs["cls"](SimpleNamespace(http_response=native), object(), {})
+    assert phase.read(kind) == resource
+
+
+@pytest.mark.parametrize("kind", ["storage", "container", "role"])
+def test_arm_factory_404_is_not_resource_absence(phase, kind, mocker):
+    failure = HttpResponseError("Synthetic credential/factory failure")
+    failure.status_code = 404
+    mocker.patch("azure.cli.core.commands.client_factory.get_mgmt_service_client", side_effect=failure)
+    with pytest.raises(HttpResponseError) as error:
+        phase.read(kind)
+    assert error.value is failure
+
+
+def test_actual_storage_cli_show_exits3_but_native_get_preserves_absence(phase, native_resources, mocker):
+    from azure.cli.core import AzCommandsLoader
+    from azure.cli.core.commands.command_operation import ShowCommandOperation
+    from azure.cli.core.azclierror import ResourceNotFoundError as CLIResourceNotFoundError
+    storage, _authorization = native_resources
+    show = ShowCommandOperation(
+        AzCommandsLoader(cli_ctx=phase.cli.az_cli), "storage.operations#StorageAccountsOperations.get_properties",
+        client_factory=lambda _context: storage.storage_accounts, client_arg_name="self",
+    )
+    mocker.patch.object(show, "get_op_handler", return_value=type(storage.storage_accounts).get_properties)
+    mocker.patch.object(CLIResourceNotFoundError, "print_error")
+    mocker.patch.object(CLIResourceNotFoundError, "send_telemetry")
+    with responses.RequestsMock() as wire:
+        wire.add("GET", "https://management.azure.com" + phase.ids["storage"],
+                 json={"error": {"code": "ResourceNotFound", "message": "Synthetic absence"}}, status=404)
+        with pytest.raises(SystemExit) as error:
+            show.handler({
+                "cmd": SimpleNamespace(cli_ctx=phase.cli.az_cli),
+                "resource_group_name": phase.group, "account_name": phase.storage,
+            })
+        assert error.value.code == 3
+        assert phase.read("storage") is None
+        assert [call.request.method for call in wire.calls] == ["GET", "GET"]
+        phase.command.assert_not_called()
+
+
+def test_native_preflight_reaches_one_recorded_write_after_all_fresh404s(phase, native_resources):
+    from azure.mgmt.storage.models import Sku, StorageAccountCreateParameters
+    storage, _authorization = native_resources
+    phase.install()
+    resource = {
+        "id": phase.ids["storage"], "location": phase.location, "tags": {"runUid": subject.UID},
+        "kind": "StorageV2", "sku": {"name": "Standard_LRS"}, "properties": {"allowSharedKeyAccess": True},
+    }
+
+    def first_write(command):
+        assert command.startswith("storage account create")
+        storage.storage_accounts.begin_create(
+            resource_group_name=phase.group, account_name=phase.storage,
+            parameters=StorageAccountCreateParameters(
+                sku=Sku(name="Standard_LRS"), kind="StorageV2", location=phase.location,
+                tags={"runUid": subject.UID}, allow_shared_key_access=True,
+            ), polling=False, retry_total=0,
+        )
+        raise RuntimeError("Offline proof stops after first approved write")
+
+    def accepted(_request):
+        receipt = json.loads(phase.path.read_text(encoding="utf-8"))
+        assert receipt["mutations"] == ["PUT " + phase.ids["storage"].casefold()]
+        return 200, {"Content-Type": "application/json"}, json.dumps(resource)
+
+    phase.command.side_effect = first_write
+    scenario = SimpleNamespace(_testMethodName="test_device_upload_file")
+    with responses.RequestsMock() as wire:
+        for kind, resource_id in phase.ids.items():
+            root = "https://centraluseuap.management.azure.com" if kind == "hub" else "https://management.azure.com"
+            wire.add("GET", root + resource_id, json={"error": {"code": "ResourceNotFound"}}, status=404)
+        wire.add_callback("PUT", "https://management.azure.com" + phase.ids["storage"], callback=accepted)
+        with pytest.raises(RuntimeError, match="proof stops"):
+            phase.provision(scenario)
+        with pytest.raises(subject.HubSasError, match="not be replayed"):
+            phase.provision(scenario)
+        assert [call.request.method for call in wire.calls] == ["GET", "GET", "GET", "GET", "PUT"]
+    assert phase.statuses == {"PUT " + phase.ids["storage"].casefold(): 200}
+    assert phase.command.call_count == 1
+
+
+def test_native_cleanup_reads_every_owned_id_without_cli_show_or_graph(phase, native_resources, monkeypatch):
+    storage, authorization = native_resources
+    phase.sent = {"PUT " + resource_id.casefold() for resource_id in phase.ids.values()}
+    phase.install()
+    monkeypatch.setattr(subject, "sleep", Mock())
+
+    def delete(command):
+        if command.startswith("role assignment delete --ids"):
+            return authorization.role_assignments.delete_by_id(phase.ids["role"])
+        assert command.startswith("storage account delete")
+        return storage.storage_accounts.delete(resource_group_name=phase.group, account_name=phase.storage)
+
+    phase.command.side_effect = delete
+    with responses.RequestsMock() as wire:
+        for kind, resource_id in phase.ids.items():
+            root = "https://centraluseuap.management.azure.com" if kind == "hub" else "https://management.azure.com"
+            resource = {"id": resource_id, "tags": {"runUid": subject.UID}, "properties": {}}
+            wire.add("GET", root + resource_id, json=resource, status=200)
+            wire.add("GET", root + resource_id, json={"error": {"code": "ResourceNotFound"}}, status=404)
+            if kind != "container":
+                wire.add("DELETE", root + resource_id, status=204)
+        phase.cleanup(timeout=30)
+        assert [call.request.method for call in wire.calls] == [
+            "GET", "DELETE", "GET", "DELETE", "GET", "DELETE", "GET", "GET", "GET", "GET", "GET",
+        ]
+    assert phase.absent == set(phase.ids)
+    assert phase.command.call_count == 2
+    assert phase.cleanup_failures == {}
+
+
+def test_native_storage_deleting_wire_state_prevents_repeat_delete(phase, native_resources):
+    phase.sent.add("PUT " + phase.ids["storage"].casefold())
+    resource = {
+        "id": phase.ids["storage"], "tags": {"runUid": subject.UID},
+        "properties": {"provisioningState": "Deleting"},
+    }
+    with responses.RequestsMock() as wire:
+        wire.add("GET", "https://management.azure.com" + phase.ids["storage"], json=resource, status=200)
+        wire.add("GET", "https://management.azure.com" + phase.ids["storage"],
+                 json={"error": {"code": "ResourceNotFound"}}, status=404)
+        assert phase.cleanup_one("storage", subject.monotonic() + 30) is False
+        assert phase.cleanup_one("storage", subject.monotonic() + 30) is True
+        assert [call.request.method for call in wire.calls] == ["GET", "GET"]
+    phase.command.assert_not_called()
 
 
 def test_native_hub_delete_submits_once_without_polling_and_then_reads(phase, native_hub):
