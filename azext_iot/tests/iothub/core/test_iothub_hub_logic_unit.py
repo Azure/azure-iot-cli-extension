@@ -341,10 +341,13 @@ class TestIotHubDistributedTracingUpdate:
         mocker.patch.object(
             subject, "_iot_hub_distributed_tracing_show", return_value=twin
         )
-        updated = mocker.MagicMock()
-        updated.device_id = "d1"
-        updated.properties.desired = {TRACING_PROPERTY: {"sampling_mode": 1, "sampling_rate": 30}}
-        updated.properties.reported = {}
+        updated = {
+            "deviceId": "d1",
+            "properties": {
+                "desired": {TRACING_PROPERTY: {"sampling_mode": 1, "sampling_rate": 30}},
+                "reported": {},
+            },
+        }
         mocker.patch.object(subject, "iot_device_twin_update", return_value=updated)
 
         result = subject.iot_hub_distributed_tracing_update(

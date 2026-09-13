@@ -263,11 +263,7 @@ class SdkResolver(object):
 
     def get_sdk(self, sdk_type):
         sdk_map = self._construct_sdk_map()
-        sdk_client = sdk_map[sdk_type]()
-        if hasattr(sdk_client, "config"):
-            sdk_client.config.enable_http_logger = True
-            sdk_client.config.add_user_agent(USER_AGENT)
-        return sdk_client
+        return sdk_map[sdk_type]()
 
     def _construct_sdk_map(self):
         return {
@@ -278,23 +274,41 @@ class SdkResolver(object):
 
     def _get_iothub_device_sdk(self):
         from azext_iot.sdk.iothub.device import IotHubGatewayDeviceAPIs
+        from azure.core.credentials import AzureKeyCredential
+        from azure.core.pipeline.policies import SansIOHTTPPolicy
+        from azext_iot.iothub._authentication import HubAuthenticationPolicy
+        from azext_iot.iothub._client import HubClient
 
         hostname = self.target.get("deviceHostName") or self.target["entity"]
-        sas_uri = hostname
+        endpoint = _as_https_endpoint(hostname, service="Hub")
+        sas_uri = urlsplit(endpoint).netloc
         if self.device_id:
-            sas_uri = "{}/devices/{}".format(hostname, self.device_id)
+            sas_uri = "{}/devices/{}".format(sas_uri, self.device_id)
         credentials = SasTokenAuthentication(
             uri=sas_uri,
             shared_access_policy_name=self.target["policy"],
             shared_access_key=self.target["primarykey"],
         )
 
-        return IotHubGatewayDeviceAPIs(credentials=credentials, base_url="https://{}".format(hostname))
+        client = IotHubGatewayDeviceAPIs(
+            credential=AzureKeyCredential("unused"),
+            endpoint=endpoint,
+            authentication_policy=HubAuthenticationPolicy(credentials, endpoint),
+            redirect_max=0, retry_total=0, logging_policy=SansIOHTTPPolicy(),
+            user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
+            http_logging_policy=_get_default_logging_policy(),
+        )
+        return HubClient(client, ("device",))
 
     def _get_iothub_service_sdk(self):
         from azext_iot.sdk.iothub.service import IotHubGatewayServiceAPIs
+        from azure.core.credentials import AzureKeyCredential
+        from azure.core.pipeline.policies import SansIOHTTPPolicy
+        from azext_iot.iothub._authentication import HubAuthenticationPolicy
+        from azext_iot.iothub._client import HubClient
 
         hostname = self.target.get("serviceHostName") or self.target["entity"]
+        endpoint = _as_https_endpoint(hostname, service="Hub")
         credentials = None
 
         if self.auth_override:
@@ -303,12 +317,23 @@ class SdkResolver(object):
             credentials = IoTOAuth(cli_ctx=self.target["cmd"].cli_ctx, resource_id=IOTHUB_RESOURCE_ID)
         else:
             credentials = SasTokenAuthentication(
-                uri=hostname,
+                uri=urlsplit(endpoint).netloc,
                 shared_access_policy_name=self.target["policy"],
                 shared_access_key=self.target["primarykey"],
             )
 
-        return IotHubGatewayServiceAPIs(credentials=credentials, base_url="https://{}".format(hostname))
+        client = IotHubGatewayServiceAPIs(
+            credential=AzureKeyCredential("unused"),
+            endpoint=endpoint,
+            authentication_policy=HubAuthenticationPolicy(credentials, endpoint),
+            redirect_max=0, retry_total=0, logging_policy=SansIOHTTPPolicy(),
+            user_agent_policy=UserAgentPolicy(user_agent=USER_AGENT),
+            http_logging_policy=_get_default_logging_policy(),
+        )
+        return HubClient(client, (
+            "configuration", "statistics", "devices", "bulk_registry", "query",
+            "jobs", "cloud_to_device_messages", "service", "modules", "digital_twin",
+        ))
 
     def _get_dps_service_sdk(self):
         from azure.core.credentials import AzureKeyCredential
@@ -345,7 +370,7 @@ class SdkResolver(object):
         return client
 
 
-def _as_https_endpoint(hostname):
+def _as_https_endpoint(hostname, service="DPS"):
     from azure.cli.core.azclierror import InvalidArgumentValueError
 
     endpoint = hostname if "://" in hostname else f"https://{hostname}"
@@ -354,7 +379,9 @@ def _as_https_endpoint(hostname):
         parsed.scheme.casefold() != "https" or not parsed.hostname
         or parsed.username or parsed.password or parsed.path not in ("", "/") or parsed.query or parsed.fragment
     ):
-        raise InvalidArgumentValueError("DPS endpoints must be HTTPS origins without credentials, paths, queries or fragments.")
+        raise InvalidArgumentValueError(
+            f"{service} endpoints must be HTTPS origins without credentials, paths, queries or fragments."
+        )
     return endpoint.rstrip("/")
 
 

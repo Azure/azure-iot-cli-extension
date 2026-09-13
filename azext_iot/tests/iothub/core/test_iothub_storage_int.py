@@ -14,6 +14,7 @@ from azure.cli.core.azclierror import CLIInternalError
 from time import sleep
 from knack.util import CLIError
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from azext_iot.tests.iothub import IoTLiveScenarioTest, MAX_RBAC_ASSIGNMENT_TRIES
 from azext_iot.tests.iothub._integration_helpers import LOCAL_AUTH_DEVICE_HTTP_REASON
@@ -160,6 +161,8 @@ class TestIoTStorage(IoTLiveScenarioTest):
 
     @pytest.mark.skipif(not sas_phase_enabled(), reason=LOCAL_AUTH_DEVICE_HTTP_REASON)
     def test_device_upload_file(self):
+        from azure.storage.blob import ContainerClient
+
         device_count = 1
 
         content_path = os.path.join(Path(CWD).parent, "test_generic_replace.json")
@@ -186,6 +189,26 @@ class TestIoTStorage(IoTLiveScenarioTest):
             ),
             checks=self.is_empty(),
         )
+
+        # Assert the actual Blob bytes, not merely two successful Hub notifications.
+        # A fresh filename isolates this upload without assuming a service-chosen
+        # directory/prefix in the returned Blob URL.
+        with TemporaryDirectory(prefix="hub-upload-") as directory:
+            binary_path = Path(directory) / (uuid4().hex + ".bin")
+            binary_path.write_bytes(bytes(range(256)))
+            self.cmd(
+                f'iot device upload-file -d {device_ids[0]} -n {self.entity_name} '
+                f'--fp "{binary_path}" --ct application/octet-stream',
+                checks=self.is_empty(),
+            )
+            with ContainerClient.from_connection_string(
+                self.storage_cstring, self.storage_container,
+                connection_timeout=60, read_timeout=60, retry_total=0,
+            ) as container:
+                matches = [blob.name for blob in container.list_blobs() if blob.name.rsplit("/", 1)[-1] == binary_path.name]
+                assert len(matches) == 1, "The successful upload did not create exactly one uniquely named Blob."
+                actual = container.download_blob(matches[0]).readall()
+                assert actual == binary_path.read_bytes()
 
     def test_storage(self):
         # Import/export authenticate as the service with Entra; storage SAS is

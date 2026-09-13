@@ -47,7 +47,6 @@ from azure.cli.core.azclierror import (
     MutuallyExclusiveArgumentError,
 )
 from azext_iot.operations.hub import _assemble_device
-from azext_iot.sdk.iothub.service.models import Device
 from msrestazure.azure_exceptions import CloudError
 
 logger = get_logger(__name__)
@@ -286,7 +285,7 @@ class DeviceIdentityProvider(IoTHubProvider):
                 edge_enabled=True,
             )
             # create device identity
-            device_result: Device = self.service_sdk.devices.create_or_update_identity(
+            device_result = self.service_sdk.devices.create_or_update_identity(
                 id=device_id, device=assembled_device
             )
 
@@ -308,8 +307,8 @@ class DeviceIdentityProvider(IoTHubProvider):
                         overwrite=True
                     )
                 else:
-                    device_keys = device_result.authentication.symmetric_key
-                    device_pk = device_keys.primary_key if device_keys else None
+                    device_keys = device_result["authentication"].get("symmetricKey")
+                    device_pk = device_keys.get("primaryKey") if device_keys else None
 
                 # edge device config
                 create_edge_device_config(
@@ -373,9 +372,9 @@ class DeviceIdentityProvider(IoTHubProvider):
         scope_dict: Dict[str, str] = {}
         for parent_id in dict.fromkeys(device_to_parent_dict.values()):
             parent = self.service_sdk.devices.get_identity(id=parent_id)
-            if not parent.device_scope:
+            if not parent.get("deviceScope"):
                 raise AzureResponseError(f"Parent device '{parent_id}' did not return a device scope.")
-            scope_dict[parent_id] = parent.device_scope
+            scope_dict[parent_id] = parent["deviceScope"]
 
         # Set parent / child relationships
         device_to_parent_iterator = (
@@ -389,7 +388,7 @@ class DeviceIdentityProvider(IoTHubProvider):
             parent_id = device_to_parent_dict[device_id]
             parent_scope = scope_dict[parent_id]
             # set new parent scope
-            device.parent_scopes = [parent_scope]
+            device["parentScopes"] = [parent_scope]
             # update device
             self.service_sdk.devices.create_or_update_identity(
                 id=device_id, device=device, if_match="*"

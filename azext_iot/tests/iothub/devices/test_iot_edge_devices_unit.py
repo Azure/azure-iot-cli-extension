@@ -6,7 +6,7 @@
 
 from os import getcwd
 from pathlib import PurePath
-from unittest.mock import call
+from unittest.mock import ANY, call
 import pytest
 import json
 import responses
@@ -18,7 +18,6 @@ from azext_iot.common.certops import create_self_signed_certificate
 from azext_iot.common.fileops import write_content_to_file
 from azext_iot.common.shared import DeviceAuthType
 from azext_iot.common.utility import process_json_arg, process_yaml_arg
-from azext_iot.sdk.iothub.service.models import ConfigurationContent
 from azext_iot.iothub import commands_device_identity as subject
 from azext_iot.iothub.providers.helpers.edge_device_config import (
     EDGE_CONFIG_SCRIPT_APPLY,
@@ -139,6 +138,45 @@ class TestEdgeHierarchyCreateArgs:
         )
 
         yield mocked_response
+
+    @pytest.mark.parametrize("devices", [[["id=duplicate"], ["id=duplicate"]], [["id=|root|"]]])
+    def test_duplicate_ids_fail_before_registry_requests(self, fixture_cmd, service_client, devices):
+        with pytest.raises(InvalidArgumentValueError, match="Duplicate deviceId"):
+            subject.iot_edge_devices_create(
+                cmd=fixture_cmd, devices=devices, visualize=False,
+            )
+        assert not service_client.calls
+
+    def test_clean_requires_confirmation_before_any_delete(self, fixture_cmd, service_client, mocker):
+        from azext_iot.iothub.providers.device_identity import ManualInterrupt
+
+        mocker.patch("azext_iot.iothub.providers.device_identity.prompt_y_n", return_value=False)
+        with pytest.raises(ManualInterrupt, match="not confirmed"):
+            subject.iot_edge_devices_create(
+                cmd=fixture_cmd, devices=[["id=dev3"]], clean=True, yes=False, visualize=False,
+            )
+        assert not any(call.request.method in ("DELETE", "PUT") for call in service_client.calls)
+
+    def test_clean_checks_registry_before_creating_replacements(self, fixture_cmd, service_client):
+        service_client.replace(
+            responses.GET, url=f"https://{hub_entity}/devices", json=[{"deviceId": "still-present"}], status=200,
+        )
+        with pytest.raises(AzureResponseError, match="Not all devices were deleted"):
+            subject.iot_edge_devices_create(
+                cmd=fixture_cmd, devices=[["id=dev3"]], clean=True, yes=True, visualize=False,
+            )
+        assert not any(call.request.method == "PUT" for call in service_client.calls)
+
+    def test_existing_owned_bundle_directory_is_rebuilt(self, fixture_cmd, service_client, tmp_path):
+        output = tmp_path / "bundles"
+        (output / "dev3").mkdir(parents=True)
+        obsolete = output / "dev3" / "obsolete.txt"
+        obsolete.write_text("old generated bundle")
+        subject.iot_edge_devices_create(
+            cmd=fixture_cmd, devices=[["id=dev3"]], bundle_output_path=str(output), visualize=False,
+        )
+        assert not obsolete.exists()
+        assert (output / "dev3.tgz").is_file()
 
     @pytest.mark.parametrize(
         "devices, config, visualize, clean, auth, output",
@@ -924,7 +962,7 @@ class TestEdgeHierarchyConfigFunctions:
     def test_process_edge_config_content(self, set_cwd, deployment, error):
         try:
             config_content = try_parse_valid_deployment_config(deployment)
-            assert isinstance(config_content, ConfigurationContent)
+            assert isinstance(config_content, dict)
         except error as ex:
             assert isinstance(ex, error)
 
@@ -1301,7 +1339,7 @@ class TestDevicesDelete:
 
     @pytest.fixture()
     def mock_service_delete(self, mocker):
-        from azext_iot.sdk.iothub.service.operations.devices_operations import DevicesOperations
+        from azext_iot.sdk.iothub.service.operations import DevicesOperations
 
         mock = mocker.spy(DevicesOperations, "delete_identity")
         mock.metadata = {'url': '/devices/{id}'}
@@ -1335,5 +1373,9 @@ class TestDevicesDelete:
         )
         assert mock_bulk_delete.call_args[1]["device_ids"] == devices
         mock_self = mock_service_delete.call_args[0][0]
-        calls = [call(mock_self, id=device, if_match="*") for device in devices]
+        calls = [
+            call(mock_self, id=device, headers={"If-Match": "*"}, retry_total=0, raw_response_hook=ANY)
+            for device in devices
+        ]
         mock_service_delete.assert_has_calls(calls)
+        assert all(callable(item.kwargs["raw_response_hook"]) for item in mock_service_delete.call_args_list)

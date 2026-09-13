@@ -427,8 +427,7 @@ class TestDownloadDevices:
             f"{sp}._iot_device_show",
             return_value={"authentication": {"symmetricKey": {"primaryKey": "pk"}}},
         )
-        module = mocker.MagicMock()
-        module.serialize.return_value = {
+        module = {
             "moduleId": "m1",
             "generationId": "g",
             "connectionStateUpdatedTime": "t",
@@ -486,8 +485,7 @@ class TestDownloadDevices:
         }
 
     def _serialized_module(self, mocker):
-        module = mocker.MagicMock()
-        module.serialize.return_value = {
+        module = {
             "moduleId": "m1",
             "generationId": "g",
             "connectionStateUpdatedTime": "t",

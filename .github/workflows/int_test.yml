@@ -54,7 +54,7 @@ on:
         type: boolean
         default: true
       testHubSAS:
-        description: "Run six existing Hub key/connection-string cases on an owned local-auth-enabled Hub"
+        description: "Run Hub local-auth compatibility cases on an owned local-auth-enabled Hub"
         type: boolean
         default: false
       testADU:

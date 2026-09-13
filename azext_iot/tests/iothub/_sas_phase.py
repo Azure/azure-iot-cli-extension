@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""Opt-in, serial ownership boundary for the six existing Hub local-auth cases."""
+"""Opt-in, serial ownership boundary for the Hub local-auth and preview cases."""
 
 import json
 import logging
@@ -40,6 +40,8 @@ NODES = (
     MESSAGING + "test_hub_monitor_events",
     MESSAGING + "test_hub_monitor_feedback",
     ROOT + "messaging/test_iothub_c2d_messages_int.py::TestIoTHubC2DMessages::test_iothub_c2d_messages_http",
+    ROOT + "devices/test_hub_preview_int.py::TestHubPreview::test_identity_roundtrip",
+    ROOT + "devices/test_hub_preview_int.py::TestHubPreview::test_responding_digital_twin",
 )
 AUTH_TYPES = ("key", "login", "cstring")
 PINS = ("azext_iot_testhub", "azext_iot_teststorageaccount", "azext_iot_teststoragecontainer")
@@ -63,7 +65,7 @@ def enabled():
 
 def require_runtime():
     if ACTIVE is None:
-        raise HubSasError("HubSAS must use its validated six-node pytest entry point.")
+        raise HubSasError("HubSAS must use its validated eight-node pytest entry point.")
     return ACTIVE
 
 
@@ -77,7 +79,7 @@ def sanitize(text, redactor=None):
 
 def validate_selection(config):
     if tuple(arg.removeprefix("./") for arg in config.args) != NODES:
-        raise pytest.UsageError("HubSAS requires exactly its six node arguments, with upload first.")
+        raise pytest.UsageError("HubSAS requires exactly its eight node arguments, with upload first.")
     if (
         config.getoption("numprocesses", default=None) not in (None, 0)
         or config.getoption("keyword", default="")
@@ -545,7 +547,7 @@ class HubSasPhase:
     @pytest.hookimpl(trylast=True)
     def pytest_collection_modifyitems(self, items):
         if tuple(item.nodeid for item in items) != NODES:
-            raise pytest.UsageError("HubSAS collection changed the exact six-node order.")
+            raise pytest.UsageError("HubSAS collection changed the exact required node order.")
 
     def pytest_collection_finish(self, session):
         self.pytest_collection_modifyitems(session.items)

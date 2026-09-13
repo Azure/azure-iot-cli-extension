@@ -554,19 +554,21 @@ class StateProvider(IoTHubProvider):
 
             # create the device identity from the device twin
             # primary and secondary keys show up in the "show" output but not in the "list" output
-            authentication = {
-                "type": device_twin.pop("authenticationType"),
-                "x509Thumbprint": device_twin.pop("x509Thumbprint")
-            }
-            if authentication["type"] == DeviceAuthApiType.sas.value:
-                # Cannot retrieve the sas key for some reason - throw out the device
-                try:
-                    id2 = _iot_device_show(target=target, device_id=device_id)
-                    authentication["symmetricKey"] = id2["authentication"]["symmetricKey"]
-                except AzCLIError:
-                    logger.warning(usr_msgs.SAVE_SPECIFIC_DEVICE_RETRIEVE_FAIL_MSG.format(device_id))
-                    continue
-            device_twin["authentication"] = authentication
+            # Identity GET is authoritative for authentication and ADR metadata;
+            # neither is promised on Twin/query. Preserve them in the snapshot,
+            # but the restore path projects only writable identity extensions.
+            from azext_iot.iothub._payload import OWNED_IDENTITY_FIELDS
+            try:
+                identity = _iot_device_show(target=target, device_id=device_id)
+            except AzCLIError:
+                logger.warning(usr_msgs.SAVE_SPECIFIC_DEVICE_RETRIEVE_FAIL_MSG.format(device_id))
+                continue
+            device_twin.pop("authenticationType")
+            device_twin.pop("x509Thumbprint")
+            device_twin["authentication"] = identity["authentication"]
+            for name in ("attributes", *OWNED_IDENTITY_FIELDS):
+                if identity.get(name) is not None:
+                    device_twin[name] = identity[name]
 
             for key in IMMUTABLE_DEVICE_IDENTITY_FIELDS:
                 device_twin.pop(key, None)
@@ -583,7 +585,6 @@ class StateProvider(IoTHubProvider):
                 device_obj["modules"] = {}
 
             for module in module_objs:
-                module = module.serialize()
                 module_id = module["moduleId"]
                 # Fail to retrieve module identity - log and continue without module
                 try:
@@ -940,17 +941,16 @@ class StateProvider(IoTHubProvider):
         auth_type = identity["authentication"]["type"]
         edge = identity["capabilities"]["iotEdge"]
         status = identity["status"]
-        ptp = identity["authentication"]["x509Thumbprint"]["primaryThumbprint"]
-        stp = identity["authentication"]["x509Thumbprint"]["secondaryThumbprint"]
+        thumbprints = identity["authentication"].get("x509Thumbprint") or {}
+        ptp = thumbprints.get("primaryThumbprint")
+        stp = thumbprints.get("secondaryThumbprint")
 
-        if "status_reason" in identity.keys():
-            status_reason = identity["statusReason"]
-        else:
-            status_reason = None
+        status_reason = identity.get("statusReason")
 
         if auth_type == DeviceAuthApiType.sas.value:
-            pk = identity["authentication"]["symmetricKey"]["primaryKey"]
-            sk = identity["authentication"]["symmetricKey"]["secondaryKey"]
+            keys = identity["authentication"].get("symmetricKey") or {}
+            pk = keys.get("primaryKey")
+            sk = keys.get("secondaryKey")
 
             _iot_device_create(
                 target=self.target,
@@ -959,7 +959,8 @@ class StateProvider(IoTHubProvider):
                 primary_key=pk,
                 secondary_key=sk,
                 status=status,
-                status_reason=status_reason
+                status_reason=status_reason,
+                identity_properties=identity,
             )
 
         elif auth_type == DeviceAuthApiType.selfSigned.value:
@@ -971,7 +972,8 @@ class StateProvider(IoTHubProvider):
                 primary_thumbprint=ptp,
                 secondary_thumbprint=stp,
                 status=status,
-                status_reason=status_reason
+                status_reason=status_reason,
+                identity_properties=identity,
             )
 
         elif auth_type == DeviceAuthApiType.certificateAuthority.value:
@@ -983,7 +985,8 @@ class StateProvider(IoTHubProvider):
                 primary_thumbprint=ptp,
                 secondary_thumbprint=stp,
                 status=status,
-                status_reason=status_reason
+                status_reason=status_reason,
+                identity_properties=identity,
             )
 
         else:
@@ -995,11 +998,12 @@ class StateProvider(IoTHubProvider):
         auth_type = identity["authentication"]["type"]
 
         if auth_type == DeviceAuthApiType.sas.value:
-            pk = identity["authentication"]["symmetricKey"]["primaryKey"]
-            sk = identity["authentication"]["symmetricKey"]["secondaryKey"]
+            keys = identity["authentication"].get("symmetricKey") or {}
+            pk = keys.get("primaryKey")
+            sk = keys.get("secondaryKey")
 
             _iot_device_module_create(target=self.target, device_id=device_id, module_id=module_id, primary_key=pk,
-                                      secondary_key=sk)
+                                      secondary_key=sk, identity_properties=identity)
 
         elif auth_type == DeviceAuthApiType.selfSigned.value:
             ptp = identity["authentication"]["x509Thumbprint"]["primaryThumbprint"]
@@ -1007,11 +1011,11 @@ class StateProvider(IoTHubProvider):
 
             _iot_device_module_create(target=self.target, device_id=device_id, module_id=module_id,
                                       auth_method=DeviceAuthType.x509_thumbprint.value, primary_thumbprint=ptp,
-                                      secondary_thumbprint=stp)
+                                      secondary_thumbprint=stp, identity_properties=identity)
 
         elif auth_type == DeviceAuthApiType.certificateAuthority.value:
             _iot_device_module_create(target=self.target, device_id=device_id, module_id=module_id,
-                                      auth_method=DeviceAuthType.x509_ca.value)
+                                      auth_method=DeviceAuthType.x509_ca.value, identity_properties=identity)
 
         else:
             logger.error(usr_msgs.BAD_DEVICE_MODULE_AUTHORIZATION_MSG.format(module_id, device_id))

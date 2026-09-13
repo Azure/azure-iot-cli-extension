@@ -269,7 +269,7 @@ class TestSdkResolverHostnames:
         SdkResolver(self._target(), device_id="device1")._get_iothub_device_sdk()
 
         assert auth.call_args.kwargs["uri"] == "myhub.device.azure-devices.net/devices/device1"
-        assert client.call_args.kwargs["base_url"] == "https://myhub.device.azure-devices.net"
+        assert client.call_args.kwargs["endpoint"] == "https://myhub.device.azure-devices.net"
 
     def test_service_sdk_uses_service_hostname(self, mocker):
         from azext_iot._factory import SdkResolver
@@ -280,7 +280,7 @@ class TestSdkResolverHostnames:
         SdkResolver(self._target())._get_iothub_service_sdk()
 
         assert auth.call_args.kwargs["uri"] == "myhub.service.azure-devices.net"
-        assert client.call_args.kwargs["base_url"] == "https://myhub.service.azure-devices.net"
+        assert client.call_args.kwargs["endpoint"] == "https://myhub.service.azure-devices.net"
 
     def test_device_sdk_falls_back_to_classic_hostname(self, mocker):
         from azext_iot._factory import SdkResolver
@@ -296,7 +296,7 @@ class TestSdkResolverHostnames:
         SdkResolver(target, device_id="device1")._get_iothub_device_sdk()
 
         assert auth.call_args.kwargs["uri"] == "myhub.azure-devices.net/devices/device1"
-        assert client.call_args.kwargs["base_url"] == "https://myhub.azure-devices.net"
+        assert client.call_args.kwargs["endpoint"] == "https://myhub.azure-devices.net"
 
     def test_service_sdk_falls_back_to_classic_hostname(self, mocker):
         from azext_iot._factory import SdkResolver
@@ -312,4 +312,4 @@ class TestSdkResolverHostnames:
         SdkResolver(target)._get_iothub_service_sdk()
 
         assert auth.call_args.kwargs["uri"] == "myhub.azure-devices.net"
-        assert client.call_args.kwargs["base_url"] == "https://myhub.azure-devices.net"
+        assert client.call_args.kwargs["endpoint"] == "https://myhub.azure-devices.net"

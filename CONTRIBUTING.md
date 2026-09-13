@@ -192,7 +192,8 @@ The normal `HubMgmt-int` and `HubData-int` suites retain `disableLocalAuth=true`
 and Entra service authentication. This is a test policy, not a claim that Azure
 requires local authentication to be disabled.
 
-`HubSAS-int` runs six existing HTTP, messaging, monitoring and file-upload cases
+`HubSAS-int` runs eight HTTP, messaging, monitoring, file-upload, identity-roundtrip
+and responding-digital-twin cases
 serially against a separate, generated S1 Hub with `disableLocalAuth=false`.
 This opt-in phase supports Linux and macOS only, with POSIX interval timers on
 the main thread. Unsupported platforms or missing timer capabilities are rejected
@@ -215,8 +216,9 @@ The phase writes credential-free ownership/results to `test-result/hub-sas.json`
 before mutations. Cleanup operates only on those IDs, checks ownership, observes
 already-Deleting resources without repeating DELETE, and reports incomplete
 cleanup as failure. Constructor failure cannot trigger another creation attempt.
-Cases use 900-second item deadlines, except event monitoring, which allows 2,700
-seconds to include its bounded 30-minute wait for exact query-cohort visibility.
+Cases use 900-second item deadlines, including the responding digital twin's
+three authentication phases. Event monitoring allows 2,700 seconds, including its bounded 30-minute
+wait for exact query-cohort visibility.
 There are no scenario reruns, and cleanup deadlines remain unchanged.
 Background cleanup is bounded; a worker still running prevents resource deletion.
 Forced process termination can prevent finalizers: consult the ownership receipt
@@ -224,8 +226,13 @@ and obtain explicit authorization for any remaining resource cleanup.
 
 Captured reports and logging are filtered using the existing integration
 redactor before pytest/GitHub reporting. Do not use `--showlocals`, live logging
-or `--capture=no`. A phase is successful only with six actual passes, no skips,
+or `--capture=no`. A phase is successful only with eight actual passes, no skips,
 and complete owned-resource cleanup; DLA-false creation alone is not SAS proof.
+
+The [Hub preview dataplane integration manifest](docs/hub-dataplane-2026-11-01-preview.md)
+also covers `HubMgmt-int` (including configurations, jobs, import/export and
+state), `HubData-int`, and the separately leased ADR-linked portability scenario.
+Passing HubSAS alone is not coverage of the entire Hub dataplane.
 
 #### Azure Resource Setup
 

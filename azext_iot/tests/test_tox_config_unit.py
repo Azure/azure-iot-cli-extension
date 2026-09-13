@@ -75,9 +75,11 @@ def test_preview_integration_environments_bound_each_test_and_select_only_integr
         if line.strip().startswith(f"{service}:")
     ]
     if service == "HubSAS":
+        from azext_iot.tests.iothub._sas_phase import NODES
+
         arguments = [line.split(":", 1)[1].strip() for line in service_lines]
         nodes = [argument for argument in arguments if argument.startswith("azext_iot/")]
-        assert len(nodes) == 6
+        assert tuple(node.rstrip(" \\") for node in nodes) == NODES
         assert all(node.partition("::")[0].endswith("_int.py") for node in nodes)
         assert "-n 0" in " ".join(service_lines)
     # Even --reruns 0 buffers phase reports until teardown finishes.

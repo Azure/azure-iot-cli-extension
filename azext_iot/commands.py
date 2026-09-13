@@ -12,6 +12,7 @@ from azext_iot import (
     iothub_ops,
     iotdps_ops,
 )
+from azext_iot.iothub._payload import validate_identity_update
 
 _DPS_ENROLLMENT_LIST_TABLE = (
     "[].{RegistrationId:registrationId,DeviceId:deviceId,"
@@ -63,7 +64,8 @@ def load_command_table(self, _):
             getter_name="iot_device_show",
             custom_func_type=iothub_ops,
             setter_name="iot_device_update",
-            custom_func_name="update_iot_device_custom"
+            custom_func_name="update_iot_device_custom",
+            validator=validate_identity_update,
         )
         cmd_group.command("renew-key", "iot_device_key_regenerate")
         cmd_group.command("import", "iot_device_import")

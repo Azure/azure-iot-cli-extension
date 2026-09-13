@@ -310,7 +310,7 @@ class TestUploadFile:
     def test_upload_success(self, mocker):
         p = _provider(mocker)
         mocker.patch(f"{dm_path}.exists", return_value=True)
-        mocker.patch(f"{dm_path}.read_file_content", return_value="content")
+        mocker.patch(f"{dm_path}.Path.read_bytes", return_value=b"content")
         mocker.patch(f"{dm_path}.basename", return_value="f.txt")
         p.device_sdk.device.create_file_upload_sas_uri.return_value.response.json.return_value = {
             "hostName": "host",
@@ -328,7 +328,7 @@ class TestUploadFile:
     def test_upload_error(self, mocker):
         p = _provider(mocker)
         mocker.patch(f"{dm_path}.exists", return_value=True)
-        mocker.patch(f"{dm_path}.read_file_content", return_value="content")
+        mocker.patch(f"{dm_path}.Path.read_bytes", return_value=b"content")
         mocker.patch(f"{dm_path}.basename", return_value="f.txt")
         handler = mocker.patch(f"{dm_path}.handle_service_exception")
         p.device_sdk.device.create_file_upload_sas_uri.side_effect = _cloud_error(mocker)

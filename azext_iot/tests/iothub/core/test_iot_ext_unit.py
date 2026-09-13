@@ -1844,8 +1844,9 @@ class TestDeviceMethodInvoke:
 
         if methodbody:
             assert body["payload"] == json.loads(payload)
-        elif "payload" in body.keys():
+        else:
             # We must ensure null is passed for payload.
+            assert "payload" in body
             assert body["payload"] is None
 
         assert body["responseTimeoutInSeconds"] == timeout
@@ -1925,8 +1926,9 @@ class TestDeviceModuleMethodInvoke:
 
         if methodbody:
             assert body["payload"] == json.loads(payload)
-        elif "payload" in body.keys():
+        else:
             # We must ensure null is passed for payload.
+            assert "payload" in body
             assert body["payload"] is None
 
         assert body["responseTimeoutInSeconds"] == timeout

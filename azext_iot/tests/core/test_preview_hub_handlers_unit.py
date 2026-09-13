@@ -450,13 +450,13 @@ def test_device_scope_is_parent_only_when_creating_edge_device(is_update, edge_e
         is_update=is_update, device_id="device", auth_method="sas", edge_enabled=edge_enabled,
         pk="primary", sk="secondary", device_scope="scope",
     )
-    assert device.device_id == "device"
-    assert device.capabilities.iot_edge is edge_enabled
-    assert device.authentication.symmetric_key.primary_key == "primary"
-    assert device.authentication.symmetric_key.secondary_key == "secondary"
+    assert device["deviceId"] == "device"
+    assert device["capabilities"]["iotEdge"] is edge_enabled
+    assert device["authentication"]["symmetricKey"]["primaryKey"] == "primary"
+    assert device["authentication"]["symmetricKey"]["secondaryKey"] == "secondary"
     if edge_enabled and not is_update:
-        assert device.parent_scopes == ["scope"]
-        assert device.device_scope is None
+        assert device["parentScopes"] == ["scope"]
+        assert "deviceScope" not in device
     else:
-        assert device.device_scope == "scope"
-        assert device.parent_scopes is None
+        assert device["deviceScope"] == "scope"
+        assert "parentScopes" not in device
