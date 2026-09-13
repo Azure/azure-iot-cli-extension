@@ -7,7 +7,7 @@
 """Bounded readiness checks for owned ADR integration fixtures, not CLI retries.
 
 Only exact resource GET HTTP 404 proves cleanup absence. Accepted namespace
-deletes are polled, never replayed. Hub recovery is restricted to the observed
+deletes are polled, never replayed. Hub/DPS recovery is restricted to the observed
 namespace-MI read-authorization failure after a persisted link write; it neither
 changes grants nor treats ARM role visibility as effective authorization.
 """
@@ -23,13 +23,18 @@ from azure.core.exceptions import HttpResponseError
 from knack.util import CLIError
 from msrestazure.azure_exceptions import CloudError
 
-from azext_iot.adr.common import IOT_HUB_ENDPOINT_TYPE
+from azext_iot.adr.common import DPS_ENDPOINT_TYPE, IOT_HUB_ENDPOINT_TYPE
 from azext_iot.adr.providers.link_helpers import failed_link_recovery_commands
 from azext_iot.tests.adr._helpers import is_resource_not_found_error
 from azext_iot.tests.adr._log import LogKind, _log
 
 
-HUB_LINK_READINESS_TIMEOUT = 240
+LINK_READINESS_TIMEOUT = 240
+HUB_LINK_READINESS_TIMEOUT = LINK_READINESS_TIMEOUT  # Existing test-helper import compatibility.
+_OWNED_LINK_TYPES = {
+    "hub": ("messaging", IOT_HUB_ENDPOINT_TYPE),
+    "dps": ("provisioning", DPS_ENDPOINT_TYPE),
+}
 _CHILD_REJECTIONS = {"CannotDeleteResource", "NamespaceNotEmpty"}
 _ACTIVE_STATES = {"Creating", "Updating", "InProgress", "Accepted"}
 
@@ -222,17 +227,47 @@ def link_hub_with_readiness(
     scenario, command, namespace_name, resource_group, endpoint_name, expected_endpoint,
     *, timeout=HUB_LINK_READINESS_TIMEOUT, clock=None, sleeper=None,
 ):
+    """Compatibility wrapper for owned Hub adds."""
+    return link_with_readiness(
+        scenario, command, namespace_name, resource_group, endpoint_name, expected_endpoint,
+        link_kind="hub", timeout=timeout, clock=clock, sleeper=sleeper,
+    )
+
+
+def link_dps_with_readiness(
+    scenario, command, namespace_name, resource_group, endpoint_name, expected_endpoint,
+    *, timeout=LINK_READINESS_TIMEOUT, clock=None, sleeper=None,
+):
+    """Apply the same narrow authorization recovery to owned DPS adds."""
+    return link_with_readiness(
+        scenario, command, namespace_name, resource_group, endpoint_name, expected_endpoint,
+        link_kind="dps", timeout=timeout, clock=clock, sleeper=sleeper,
+    )
+
+
+def link_with_readiness(
+    scenario, command, namespace_name, resource_group, endpoint_name, expected_endpoint,
+    *, link_kind, timeout=LINK_READINESS_TIMEOUT, clock=None, sleeper=None,
+):
     """Submit once, then recover only a persisted terminal authorization failure.
 
+    Only owned Hub/messaging and DPS/provisioning adds are supported, never SU.
     Recovery uses the existing identity-preserving update/preflight. After an
     accepted update, stale Failed reads cannot trigger another write: observe
     progress first, or Succeeded. All CLI/read errors propagate unchanged.
     """
-    budget = _Deadline(timeout, clock, sleeper, "owned Hub link readiness")
+    assert link_kind in _OWNED_LINK_TYPES, "Readiness recovery supports only owned Hub/DPS adds"
+    section, endpoint_type = _OWNED_LINK_TYPES[link_kind]
+    tokens = shlex.split(command)
+    if tokens and tokens[0] == "az":
+        tokens = tokens[1:]
+    assert tokens[:6] == ["iot", "adr", "ns", "link", link_kind, "add"], "Expected a matching owned link add"
+    label = "Hub" if link_kind == "hub" else "DPS"
+    budget = _Deadline(timeout, clock, sleeper, f"owned {label} link readiness")
     budget.call(scenario.cmd, command + " --no-wait")
     show = "iot adr ns show " + shlex.join(["-n", namespace_name, "-g", resource_group])
     expected = deepcopy(expected_endpoint)
-    expected["endpointType"] = IOT_HUB_ENDPOINT_TYPE
+    expected["endpointType"] = endpoint_type
     expected = _endpoint_settings(expected)
     progressed = True  # The initial add is never replayed.
     retries = 0
@@ -241,23 +276,23 @@ def link_hub_with_readiness(
         namespace = budget.call(scenario.cmd, show).get_output_in_json()
         properties = namespace["properties"]
         ns_state = properties.get("provisioningState")
-        endpoint = (properties.get("messaging") or {}).get("endpoints", {}).get(endpoint_name)
+        endpoint = (properties.get(section) or {}).get("endpoints", {}).get(endpoint_name)
         state = _link_state(endpoint) if endpoint else None
         budget.observation = f"namespace={ns_state!r}, endpoint={state!r}, recovery updates={retries}"
         others = [
             other
-            for section in ("messaging", "provisioning", "updating")
-            for name, other in (properties.get(section) or {}).get("endpoints", {}).items()
-            if (section, name) != ("messaging", endpoint_name)
+            for other_section in ("messaging", "provisioning", "updating")
+            for name, other in (properties.get(other_section) or {}).get("endpoints", {}).items()
+            if (other_section, name) != (section, endpoint_name)
         ]
         if any(_link_state(other) in {"Failed", "Canceled", "Cancelled"} for other in others):
             raise AssertionError("Non-recoverable failure on another namespace endpoint")
         if endpoint:
             assert _endpoint_settings(endpoint) == expected, (
-                "Hub endpoint target, identity or provisioning settings changed"
+                f"{label} endpoint target, identity or provisioning settings changed"
             )
         if ns_state == "Succeeded" and state == "Succeeded":
-            _log(LogKind.RESULT, "Hub link namespace and endpoint both Succeeded after %d recovery updates", retries)
+            _log(LogKind.RESULT, "%s link namespace and endpoint both Succeeded after %d recovery updates", label, retries)
             return {"name": endpoint_name, **endpoint}
         if ns_state in _ACTIVE_STATES or state in _ACTIVE_STATES:
             progressed = True
@@ -271,13 +306,13 @@ def link_hub_with_readiness(
                 if budget.clock() >= retry_at:
                     recovery = failed_link_recovery_commands({
                         "id": namespace["id"],
-                        "properties": {"messaging": {"endpoints": {endpoint_name: endpoint}}},
+                        "properties": {section: {"endpoints": {endpoint_name: endpoint}}},
                     })
-                    assert len(recovery) == 1, "Cannot safely recover the persisted Hub endpoint"
+                    assert len(recovery) == 1, f"Cannot safely recover the persisted {label} endpoint"
                     budget.call(scenario.cmd, recovery[0] + " --no-wait")
                     retries += 1
                     progressed = False
                     retry_at = None
         elif ns_state in {"Failed", "Canceled", "Cancelled"} or state in {"Failed", "Canceled", "Cancelled"}:
-            raise AssertionError(f"Non-recoverable Hub link failure: {budget.observation}")
+            raise AssertionError(f"Non-recoverable {label} link failure: {budget.observation}")
         budget.pause(10)

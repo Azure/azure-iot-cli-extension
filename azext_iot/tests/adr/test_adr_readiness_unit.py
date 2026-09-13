@@ -4,7 +4,7 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""Offline state-machine proofs for ADR integration cleanup and Hub readiness."""
+"""Offline state-machine proofs for ADR integration cleanup and Hub/DPS readiness."""
 
 from copy import deepcopy
 import shlex
@@ -21,7 +21,7 @@ from azure.core.exceptions import (
 from azure.core.rest import HttpRequest
 from knack.util import CLIError
 
-from azext_iot.adr.common import IOT_HUB_ENDPOINT_TYPE
+from azext_iot.adr.common import DPS_ENDPOINT_TYPE, IOT_HUB_ENDPOINT_TYPE
 from azext_iot.adr.providers.link_helpers import failed_link_recovery_commands
 from azext_iot.adr.providers.namespace import NamespaceProvider
 from azext_iot.sdk.deviceregistry import DeviceRegistryMgmtClient
@@ -29,11 +29,13 @@ from azext_iot.tests.adr import _readiness as readiness
 from azext_iot.tests.adr import test_adr_group_int as group_scenarios
 from azext_iot.tests.adr import test_adr_job_int as job_scenarios
 from azext_iot.tests.adr import test_adr_job_run_int as run_scenarios
+from azext_iot.tests.adr import test_adr_link_int as link_scenarios
 from azext_iot.tests.adr.test_adr_cleanup_regressions_unit import _sdk_error
 
 
 NS_ID = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.DeviceRegistry/namespaces/ns"
 HUB_ID = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Devices/IotHubs/hub"
+DPS_ID = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Devices/provisioningServices/dps"
 UAMI_ID = "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.ManagedIdentity/userAssignedIdentities/uami"
 ADD = f"iot adr ns link hub add --ns ns -g rg -n secondary --hub-id {HUB_ID} --system-assigned-mi"
 EXPECTED = {
@@ -41,6 +43,27 @@ EXPECTED = {
     "inboundCallerIdentity": {"type": "SystemAssigned"},
     "provisioning": {"availability": "Available", "allocationWeight": 2},
 }
+LINKS = {
+    "hub": ("messaging", IOT_HUB_ENDPOINT_TYPE, "secondary"),
+    "dps": ("provisioning", DPS_ENDPOINT_TYPE, "dps-primary"),
+}
+
+
+@pytest.fixture(params=["hub", "dps"])
+def link_kind(request):
+    return request.param
+
+
+def _expected(kind):
+    if kind == "hub":
+        return deepcopy(EXPECTED)
+    return {"resourceId": DPS_ID, "inboundCallerIdentity": {"type": "SystemAssigned"}}
+
+
+def _add(kind):
+    if kind == "hub":
+        return ADD
+    return f"iot adr ns link dps add --ns ns -g rg -n dps-primary --dps-id {DPS_ID} --system-assigned-mi"
 
 
 class Clock:
@@ -353,12 +376,13 @@ def test_accepted_delete_only_polls_even_if_namespace_state_is_stale(already_del
     assert sum(" delete " in cmd for cmd in _commands(scenario)) == (0 if already_deleting else 1)
 
 
-def _namespace(ns_state="Failed", state="Failed", expected=None, message=None):
-    endpoint = deepcopy(expected or EXPECTED)
-    endpoint.update(endpointType=IOT_HUB_ENDPOINT_TYPE, linkingState=state)
+def _namespace(ns_state="Failed", state="Failed", expected=None, message=None, *, kind="hub"):
+    section, endpoint_type, name = LINKS[kind]
+    endpoint = deepcopy(expected or _expected(kind))
+    endpoint.update(endpointType=endpoint_type, linkingState=state)
     endpoint["linkingError"] = {
         "message": message or (
-            f"The namespace's managed identity is not authorized to read the linked resource '{HUB_ID}'. "
+            f"The namespace's managed identity is not authorized to read the linked resource '{endpoint['resourceId']}'. "
             "Grant it read access on the resource, then resubmit the request."
         ),
     }
@@ -366,27 +390,29 @@ def _namespace(ns_state="Failed", state="Failed", expected=None, message=None):
         "id": NS_ID,
         "properties": {
             "provisioningState": ns_state,
-            "messaging": {"endpoints": {"secondary": endpoint}},
+            section: {"endpoints": {name: endpoint}},
         },
     }
 
 
-def _link(scenario, clock, expected=None, **kwargs):
-    return readiness.link_hub_with_readiness(
-        scenario, ADD, "ns", "rg", "secondary", expected or EXPECTED,
+def _link(scenario, clock, expected=None, *, kind="hub", **kwargs):
+    helper = readiness.link_hub_with_readiness if kind == "hub" else readiness.link_dps_with_readiness
+    return helper(
+        scenario, _add(kind), "ns", "rg", LINKS[kind][2], expected or _expected(kind),
         clock=clock, sleeper=clock.sleep, **kwargs,
     )
 
 
 @pytest.mark.parametrize("user_assigned", [False, True])
 @pytest.mark.parametrize("error_field", ["linkingError", "error", "provisioningStatus"])
-def test_auth_recovery_updates_persisted_identity_and_requires_both_successes(user_assigned, error_field):
-    expected = deepcopy(EXPECTED)
+def test_auth_recovery_updates_persisted_identity_and_requires_both_successes(user_assigned, error_field, link_kind):
+    expected = _expected(link_kind)
     if user_assigned:
         expected["inboundCallerIdentity"] = {"type": "UserAssigned", "userAssignedIdentity": UAMI_ID}
-    failed = _namespace(expected=expected)
+    failed = _namespace(expected=expected, kind=link_kind)
     if error_field != "linkingError":
-        endpoint = failed["properties"]["messaging"]["endpoints"]["secondary"]
+        section, _, name = LINKS[link_kind]
+        endpoint = failed["properties"][section]["endpoints"][name]
         error = endpoint.pop("linkingError")
         if error_field == "provisioningStatus":
             endpoint["provisioningStatus"] = {"status": endpoint.pop("linkingState"), "error": error}
@@ -396,16 +422,16 @@ def test_auth_recovery_updates_persisted_identity_and_requires_both_successes(us
     scenario = Mock()
     scenario.cmd.side_effect = [
         _output(None),
-        _output(_namespace("Updating", "InProgress", expected)),
+        _output(_namespace("Updating", "InProgress", expected, kind=link_kind)),
         _output(failed), _output(failed), _output(None),
         _output(failed),  # A stale Failed GET after accepted update must not replay it.
-        _output(_namespace("Updating", "Succeeded", expected)),
-        _output(_namespace("Succeeded", "Succeeded", expected)),
+        _output(_namespace("Updating", "Succeeded", expected, kind=link_kind)),
+        _output(_namespace("Succeeded", "Succeeded", expected, kind=link_kind)),
     ]
     clock = Clock()
-    endpoint = _link(scenario, clock, expected)
+    endpoint = _link(scenario, clock, expected, kind=link_kind)
     commands = _commands(scenario)
-    assert commands[0] == ADD + " --no-wait"
+    assert commands[0] == _add(link_kind) + " --no-wait"
     assert commands[4] == failed_link_recovery_commands(failed)[0] + " --no-wait"
     assert sum(" update " in command for command in commands) == 1
     assert endpoint["linkingState"] == "Succeeded"
@@ -415,21 +441,21 @@ def test_auth_recovery_updates_persisted_identity_and_requires_both_successes(us
 
 
 @pytest.mark.parametrize("user_assigned", [False, True])
-def test_arm_id_casing_is_not_a_changed_hub_target_or_identity(user_assigned):
-    persisted = deepcopy(EXPECTED)
+def test_arm_id_casing_is_not_a_changed_link_target_or_identity(user_assigned, link_kind):
+    persisted = _expected(link_kind)
     if user_assigned:
         persisted["inboundCallerIdentity"] = {"type": "UserAssigned", "userAssignedIdentity": UAMI_ID}
     expected = deepcopy(persisted)
     expected["resourceId"] = expected["resourceId"].casefold()
     if user_assigned:
         expected["inboundCallerIdentity"]["userAssignedIdentity"] = UAMI_ID.casefold()
-    failed = _namespace(expected=persisted)
+    failed = _namespace(expected=persisted, kind=link_kind)
     scenario = Mock()
     scenario.cmd.side_effect = [
         _output(None), _output(failed), _output(failed), _output(None),
-        _output(_namespace("Succeeded", "Succeeded", persisted)),
+        _output(_namespace("Succeeded", "Succeeded", persisted, kind=link_kind)),
     ]
-    result = _link(scenario, Clock(), expected)
+    result = _link(scenario, Clock(), expected, kind=link_kind)
     assert _commands(scenario)[3] == failed_link_recovery_commands(failed)[0] + " --no-wait"
     assert all(result[key] == value for key, value in persisted.items())
 
@@ -439,26 +465,26 @@ def test_arm_id_casing_is_not_a_changed_hub_target_or_identity(user_assigned):
     AzureResponseError("403 not authorized"), _http(403, "AuthorizationFailed"),
     ServiceRequestError("PATCH response lost"), CLIError("timeout"),
 ])
-def test_link_write_errors_preserve_preflight_and_uncertain_acceptance(error):
+def test_link_write_errors_preserve_preflight_and_uncertain_acceptance(error, link_kind):
     scenario = Mock()
     scenario.cmd.side_effect = error
     with pytest.raises(type(error)) as raised:
-        _link(scenario, Clock())
+        _link(scenario, Clock(), kind=link_kind)
     assert raised.value is error
-    scenario.cmd.assert_called_once_with(ADD + " --no-wait")
+    scenario.cmd.assert_called_once_with(_add(link_kind) + " --no-wait")
 
 
 @pytest.mark.parametrize("message", [
-    "not authorized", "Forbidden", "some unrelated failure",
+    "not authorized", "Forbidden", "some unrelated failure", "resource-rejected-invalid",
     f"The linked resource's managed identity is not authorized to read the namespace '{NS_ID}'.",
     "The namespace's managed identity is not authorized to read the linked resource 'other'. "
     "Grant it read access on the resource, then resubmit the request.",
 ])
-def test_other_terminal_link_failures_are_not_retried_or_reported_as_success(message):
+def test_other_terminal_link_failures_are_not_retried_or_reported_as_success(message, link_kind):
     scenario = Mock()
-    scenario.cmd.side_effect = [_output(None), _output(_namespace(message=message))]
-    with pytest.raises(AssertionError, match="Non-recoverable Hub link failure"):
-        _link(scenario, Clock())
+    scenario.cmd.side_effect = [_output(None), _output(_namespace(message=message, kind=link_kind))]
+    with pytest.raises(AssertionError, match="Non-recoverable (Hub|DPS) link failure"):
+        _link(scenario, Clock(), kind=link_kind)
     assert scenario.cmd.call_count == 2
 
 
@@ -466,28 +492,28 @@ def test_other_terminal_link_failures_are_not_retried_or_reported_as_success(mes
     ("Updating", "Failed"), ("Failed", "InProgress"), ("Succeeded", "InProgress"),
     ("Succeeded", "Succeeded"),
 ])
-def test_busy_and_successful_link_states_never_retry(ns_state, state):
+def test_busy_and_successful_link_states_never_retry(ns_state, state, link_kind):
     scenario = Mock()
-    scenario.cmd.return_value = _output(_namespace(ns_state, state))
+    scenario.cmd.return_value = _output(_namespace(ns_state, state, kind=link_kind))
     if state == ns_state == "Succeeded":
-        _link(scenario, Clock())
+        _link(scenario, Clock(), kind=link_kind)
     else:
         with pytest.raises(AssertionError, match="Timed out"):
-            _link(scenario, Clock(), timeout=25)
+            _link(scenario, Clock(), kind=link_kind, timeout=25)
     assert not any(" update " in cmd for cmd in _commands(scenario))
 
 
-def test_accepted_recovery_requires_progress_before_another_retry():
+def test_accepted_recovery_requires_progress_before_another_retry(link_kind):
     scenario = Mock()
-    scenario.cmd.return_value = _output(_namespace())
+    scenario.cmd.return_value = _output(_namespace(kind=link_kind))
     clock = Clock()
     with pytest.raises(AssertionError, match="recovery updates=1"):
-        _link(scenario, clock, timeout=65)
+        _link(scenario, clock, kind=link_kind, timeout=65)
     assert clock.now == 65
     assert sum(" update " in cmd for cmd in _commands(scenario)) == 1
 
 
-def test_repeated_auth_failure_backoff_is_bounded_and_charges_cli_time():
+def test_repeated_auth_failure_backoff_is_bounded_and_charges_cli_time(link_kind):
     scenario = Mock()
     clock = Clock()
     writes = []
@@ -501,12 +527,12 @@ def test_repeated_auth_failure_backoff_is_bounded_and_charges_cli_time():
             return _output(None)
         if progressing[0]:
             progressing[0] = False
-            return _output(_namespace("Updating", "InProgress"))
-        return _output(_namespace())
+            return _output(_namespace("Updating", "InProgress", kind=link_kind))
+        return _output(_namespace(kind=link_kind))
 
     scenario.cmd.side_effect = command
     with pytest.raises(AssertionError, match="Timed out"):
-        _link(scenario, clock, timeout=180)
+        _link(scenario, clock, kind=link_kind, timeout=180)
     assert clock.now == 180
     assert writes == [1, 25, 70, 126]
     assert max(clock.sleeps) == 10  # Actual GETs continue during 10/20/30s backoff.
@@ -518,66 +544,165 @@ def test_repeated_auth_failure_backoff_is_bounded_and_charges_cli_time():
     ("provisioning", {"availability": "Unavailable", "allocationWeight": 9}),
     ("endpointType", "Microsoft.Devices/other"),
 ])
-def test_recovery_never_retargets_or_changes_endpoint_settings(field, value):
-    namespace = _namespace()
-    namespace["properties"]["messaging"]["endpoints"]["secondary"][field] = value
+def test_recovery_never_retargets_or_changes_endpoint_settings(field, value, link_kind):
+    namespace = _namespace(kind=link_kind)
+    section, _, name = LINKS[link_kind]
+    namespace["properties"][section]["endpoints"][name][field] = value
     scenario = Mock()
     scenario.cmd.side_effect = [_output(None), _output(namespace)]
     with pytest.raises(AssertionError, match="settings changed"):
-        _link(scenario, Clock())
+        _link(scenario, Clock(), kind=link_kind)
     assert scenario.cmd.call_count == 2
 
 
-def test_recovery_read_and_update_errors_are_not_hidden():
+def test_recovery_read_and_update_errors_are_not_hidden(link_kind):
     for responses in (
         [_output(None), _http(502, "BadGateway")],
-        [_output(None), _output(_namespace()), _output(_namespace()), AzureResponseError("preflight denied")],
+        [_output(None), _output(_namespace(kind=link_kind)), _output(_namespace(kind=link_kind)),
+         AzureResponseError("preflight denied")],
     ):
         scenario = Mock()
         scenario.cmd.side_effect = responses
         with pytest.raises((HttpResponseError, AzureResponseError)):
-            _link(scenario, Clock())
+            _link(scenario, Clock(), kind=link_kind)
         assert scenario.cmd.call_count == len(responses)
 
 
 @pytest.mark.parametrize("state", ["Failed", "InProgress"])
-def test_other_endpoint_failure_or_progress_cannot_trigger_hub_recovery(state):
-    namespace = _namespace()
-    namespace["properties"]["provisioning"] = {"endpoints": {"dps": {"linkingState": state}}}
+@pytest.mark.parametrize("section", ["messaging", "provisioning", "updating"])
+def test_other_endpoint_failure_or_progress_cannot_trigger_link_recovery(state, section, link_kind):
+    namespace = _namespace(kind=link_kind)
+    own_section, _, name = LINKS[link_kind]
+    if section == own_section:
+        name = "unrelated"
+    namespace["properties"].setdefault(section, {}).setdefault("endpoints", {})[name] = {"linkingState": state}
     scenario = Mock()
     scenario.cmd.return_value = _output(namespace)
     with pytest.raises(AssertionError):
-        _link(scenario, Clock(), timeout=25)
+        _link(scenario, Clock(), kind=link_kind, timeout=25)
     assert not any(" update " in cmd for cmd in _commands(scenario))
 
 
-def test_deadline_exhausted_inside_cli_call_cannot_pass_or_start_another_write():
+def test_deadline_exhausted_inside_cli_call_cannot_pass_or_start_another_write(link_kind):
     clock = Clock()
     scenario = Mock()
 
     def command(_cmd):
         clock.now += 25
-        return _output(_namespace("Succeeded", "Succeeded"))
+        return _output(_namespace("Succeeded", "Succeeded", kind=link_kind))
 
     scenario.cmd.side_effect = command
     with pytest.raises(AssertionError, match="Timed out"):
-        _link(scenario, clock, timeout=20)
+        _link(scenario, clock, kind=link_kind, timeout=20)
     scenario.cmd.assert_called_once()
 
 
-def test_recovery_commands_keep_exact_scope_and_no_permissions_shortcuts():
+def test_recovery_commands_keep_exact_scope_and_no_permissions_shortcuts(link_kind):
     scenario = Mock()
     scenario.cmd.side_effect = [
-        _output(None), _output(_namespace()), _output(_namespace()), _output(None),
-        _output(_namespace("Succeeded", "Succeeded")),
+        _output(None), _output(_namespace(kind=link_kind)), _output(_namespace(kind=link_kind)), _output(None),
+        _output(_namespace("Succeeded", "Succeeded", kind=link_kind)),
     ]
-    _link(scenario, Clock())
+    _link(scenario, Clock(), kind=link_kind)
     update = shlex.split(_commands(scenario)[3])
     assert update == [
-        "az", "iot", "adr", "ns", "link", "hub", "update", "-n", "secondary",
+        "az", "iot", "adr", "ns", "link", link_kind, "update", "-n", LINKS[link_kind][2],
         "--ns", "ns", "-g", "rg", "--subscription", "sub",
         "--system-assigned-mi", "--no-wait",
     ]
+
+
+@pytest.mark.parametrize("kind", ["su", "unknown", "messaging", None])
+def test_readiness_kind_whitelist_rejects_unsupported_services_before_any_command(kind):
+    scenario = Mock()
+    with pytest.raises(AssertionError, match="only owned Hub/DPS adds"):
+        readiness.link_with_readiness(
+            scenario, ADD, "ns", "rg", "secondary", EXPECTED, link_kind=kind,
+        )
+    scenario.cmd.assert_not_called()
+
+
+@pytest.mark.parametrize("command", [
+    "iot adr ns link su add --ns ns -g rg",
+    "iot adr ns link hub add --ns ns -g rg",
+    "iot adr ns link dps update --ns ns -g rg",
+])
+def test_dps_readiness_cannot_submit_a_different_kind_or_operation(command):
+    scenario = Mock()
+    with pytest.raises(AssertionError, match="matching owned link add"):
+        readiness.link_dps_with_readiness(scenario, command, "ns", "rg", "dps-primary", _expected("dps"))
+    scenario.cmd.assert_not_called()
+
+
+@pytest.mark.parametrize("authorization_failure", [True, False])
+def test_native_namespace_get_drives_only_precise_link_recovery(mocked_response, link_kind, authorization_failure):
+    """Exercise SDK GET serialization; mutations are offline command receipts."""
+    failed = _namespace(kind=link_kind, message=None if authorization_failure else "resource-rejected-invalid")
+    url = "https://management.azure.com" + NS_ID
+    mocked_response.add("GET", url, json=failed)
+    if authorization_failure:
+        mocked_response.add("GET", url, json=failed)
+        mocked_response.add("GET", url, json=_namespace("Updating", "InProgress", kind=link_kind))
+        mocked_response.add("GET", url, json=_namespace("Succeeded", "Succeeded", kind=link_kind))
+    credential = Mock(spec=["get_token"])
+    credential.get_token.return_value = AccessToken("unit-test-token", 4102444800)
+    scenario = Mock()
+    clock = Clock()
+    with DeviceRegistryMgmtClient(credential, "sub", retry_total=0) as client:
+        def command(text):
+            if text.startswith("iot adr ns show "):
+                return _output(client.namespaces.get("rg", "ns"))
+            return _output(None)
+        scenario.cmd.side_effect = command
+        if authorization_failure:
+            result = _link(scenario, clock, kind=link_kind)
+            assert result["linkingState"] == "Succeeded"
+            assert result["resourceId"] == _expected(link_kind)["resourceId"]
+            assert clock.sleeps == [10, 10, 10]
+        else:
+            with pytest.raises(AssertionError, match="Non-recoverable"):
+                _link(scenario, clock, kind=link_kind)
+            assert not clock.sleeps
+    writes = [cmd for cmd in _commands(scenario) if " add " in cmd or " update " in cmd]
+    assert writes == [_add(link_kind) + " --no-wait"] + (
+        [failed_link_recovery_commands(failed)[0] + " --no-wait"] if authorization_failure else []
+    )
+    assert len(mocked_response.calls) == (4 if authorization_failure else 1)
+    assert all(call.request.method == "GET" and urlsplit(call.request.url).path == NS_ID
+               for call in mocked_response.calls)
+
+
+@pytest.mark.parametrize("ready", [True, False])
+def test_link_lifecycle_routes_step_one_through_owned_dps_readiness_before_hubs(monkeypatch, ready):
+    scenario = Mock()
+    scenario.setup_full_infra.return_value = {"identity_resource_id": UAMI_ID}
+    monkeypatch.setattr(link_scenarios, "generate_adr_namespace_name", lambda: "ns")
+    monkeypatch.setattr(link_scenarios, "generate_dps_name", lambda: "dps")
+    dps_readiness = Mock(side_effect=None if ready else RuntimeError("stop at DPS readiness"))
+    hub_readiness = Mock()
+    monkeypatch.setattr(link_scenarios, "link_dps_with_readiness", dps_readiness)
+    monkeypatch.setattr(link_scenarios, "link_hub_with_readiness", hub_readiness)
+
+    def command(text):
+        if text.startswith("iot dps show "):
+            return _output({"id": DPS_ID})
+        if text.startswith("iot adr ns link dps wait "):
+            return _output(None)
+        raise RuntimeError("stop after DPS readiness")
+
+    scenario.cmd.side_effect = command
+    with pytest.raises(RuntimeError, match="stop (at|after) DPS readiness"):
+        link_scenarios.TestADRLinkLifecycle.test_adr_link_lifecycle(scenario)
+    rg = link_scenarios.TEST_RG
+    dps_readiness.assert_called_once_with(
+        scenario,
+        f"iot adr ns link dps add --ns ns -g {rg} -n dps-primary --dps-id {DPS_ID} --user-assigned-mi {UAMI_ID}",
+        "ns", rg, "dps-primary",
+        {"resourceId": DPS_ID, "inboundCallerIdentity": {"type": "UserAssigned", "userAssignedIdentity": UAMI_ID}},
+    )
+    assert any("link dps wait" in cmd for cmd in _commands(scenario)) is ready
+    hub_readiness.assert_not_called()
+    scenario.cleanup_full_infra.assert_called_once()
 
 
 def test_real_namespace_not_empty_translation_survives_testsdk_context_loss():

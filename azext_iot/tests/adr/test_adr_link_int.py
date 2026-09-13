@@ -31,7 +31,7 @@ What is intentionally NOT covered here (covered by unit tests):
 - MI mutually-exclusive rejection
 - Invalid DPS resource id rejection
 
-Owned Hub adds allow up to 240 seconds each for actual namespace/endpoint
+Owned Hub and DPS adds allow up to 240 seconds each for actual namespace/endpoint
 readiness, including read-authorization propagation recovery via link update.
 This is not a generic Failed/403 retry and does not extend SU readiness.
 """
@@ -56,7 +56,9 @@ from azext_iot.tests.adr._helpers import (
     wait_for_resource_succeeded,
 )
 from azext_iot.tests.adr._log import LogKind, _log, timed_step
-from azext_iot.tests.adr._readiness import HUB_LINK_READINESS_TIMEOUT, link_hub_with_readiness
+from azext_iot.tests.adr._readiness import (
+    LINK_READINESS_TIMEOUT, link_dps_with_readiness, link_hub_with_readiness,
+)
 from azext_iot.tests.adr.conftest import (
     TEST_LOCATION,
     TEST_RG,
@@ -161,9 +163,9 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
     """
 
     # Retain the suite's existing 900s for three-Hub setup, lifecycle and cleanup.
-    # Reserve a separate bounded readiness window for each of the two Hub adds;
+    # Reserve one bounded readiness window per add: two Hubs and one DPS;
     # do not spend their propagation retries out of the existing cleanup allowance.
-    @pytest.mark.timeout(900 + 2 * HUB_LINK_READINESS_TIMEOUT, func_only=False)
+    @pytest.mark.timeout(900 + 3 * LINK_READINESS_TIMEOUT, func_only=False)
     def test_adr_link_lifecycle(self):
         _log(LogKind.TEST, "test_adr_link_lifecycle")
         rg = TEST_RG
@@ -219,14 +221,14 @@ class TestADRLinkLifecycle(ADRFullInfraHelper, ADRLiveScenarioTest):
                     f"--user-assigned-mi {identity_resource_id}"
                 )
                 _log(LogKind.CMD, "az %s", add_cmd)
-                self.cmd(add_cmd)
-                _wait_for_linking_succeeded(
-                    self,
-                    "dps",
-                    namespace_name,
-                    rg,
-                    dps_endpoint,
-                    expected_identity_type="UserAssigned",
+                link_dps_with_readiness(
+                    self, add_cmd, namespace_name, rg, dps_endpoint,
+                    {
+                        "resourceId": dps_id,
+                        "inboundCallerIdentity": {
+                            "type": "UserAssigned", "userAssignedIdentity": identity_resource_id,
+                        },
+                    },
                 )
                 self.cmd(
                     f"iot adr ns link dps wait -n {dps_endpoint} "
