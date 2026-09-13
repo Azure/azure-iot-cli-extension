@@ -36,10 +36,10 @@ def test_ordinary_adr_scenarios_keep_the_default_timeout(scenario):
     assert not any(mark.name == "timeout" for mark in getattr(scenario, "pytestmark", []))
 
 
-def test_owned_hub_link_lifecycle_includes_bounded_recovery_and_cleanup():
-    assert readiness.HUB_LINK_READINESS_TIMEOUT == 240
+def test_owned_hub_dps_link_lifecycle_includes_bounded_recovery_and_cleanup():
+    assert readiness.HUB_LINK_READINESS_TIMEOUT == readiness.LINK_READINESS_TIMEOUT == 240
     scenario = links.TestADRLinkLifecycle.test_adr_link_lifecycle
     markers = [mark for mark in getattr(scenario, "pytestmark", []) if mark.name == "timeout"]
     assert len(markers) == 1
-    assert markers[0].args == (900 + 2 * readiness.HUB_LINK_READINESS_TIMEOUT,)
+    assert markers[0].args == (900 + 3 * readiness.LINK_READINESS_TIMEOUT,)
     assert markers[0].kwargs == {"func_only": False}
