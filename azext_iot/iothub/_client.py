@@ -13,7 +13,7 @@ from urllib.parse import urlsplit
 
 import requests
 from azure.cli.core.azclierror import FileOperationError
-from azure.core.exceptions import HttpResponseError
+from azure.core.exceptions import HttpResponseError, map_error
 from azure.core.utils import case_insensitive_dict
 from msrestazure.azure_exceptions import CloudError
 
@@ -115,6 +115,8 @@ class HubOperationGroup:
 
         kwargs["raw_response_hook"] = observe_response
         try:
+            if self.name == "device" and name == "receive_device_bound_notification":
+                return self._receive_device_bound_notification(*args, raw=raw, **kwargs)
             if self.name == "device" and name == "send_device_event":
                 from azext_iot.sdk.iothub.device.operations._operations import build_device_send_device_event_request
                 request = build_device_send_device_event_request(
@@ -137,6 +139,39 @@ class HubOperationGroup:
             if self.name == "configuration" and name == "apply_on_edge_device" and error.status_code == 200:
                 return SimpleNamespace(response=_response(error.response)) if raw else None
             raise CloudError(_response(error.response), error=error.message) from error
+
+    def _receive_device_bound_notification(self, id, raw=False, **kwargs):
+        """C2D content is opaque, not a JSON/XML document described by its HTTP media type."""
+        from azext_iot.sdk.iothub.device.operations._operations import build_device_receive_device_bound_notification_request
+
+        request = build_device_receive_device_bound_notification_request(
+            id=id, api_version=self.client.sdk._config.api_version,
+            headers=kwargs.pop("headers"), params=kwargs.pop("params", None),
+        )
+        hook = kwargs.pop("raw_response_hook")
+        callback = kwargs.pop("cls", None)
+        error_map = kwargs.pop("error_map", None) or {}
+        captured = None
+
+        def receive_response(pipeline_response):
+            nonlocal captured
+            # Buffer bytes and close even if reading or a user hook fails. The
+            # supported stream=True request option skips ContentDecodePolicy;
+            # generated receive's stream=False would parse before its cls hook.
+            with pipeline_response.http_response as response:
+                response.read()
+                hook(pipeline_response)
+            captured = pipeline_response
+
+        response = self.client.sdk.send_request(request, stream=True, raw_response_hook=receive_response, **kwargs)
+        if response.status_code not in (200, 204):
+            map_error(status_code=response.status_code, response=response, error_map=error_map)
+            raise HttpResponseError(response=response)
+        if raw:
+            return _capture(captured, None, {})
+        if callback:
+            return callback(captured, None, {})
+        return None
 
 
 class HubClient:

@@ -15,6 +15,19 @@ from types import SimpleNamespace
 
 import pytest
 from azure.cli.core.azclierror import InvalidArgumentValueError
+from azure.cli.testsdk.base import CheckerMixin
+from azure.iot.device.common.transport_exceptions import NoConnectionError
+
+
+class _ConnectedPnpClient(SimpleNamespace):
+    def __setattr__(self, name, value):
+        if name in ("on_method_request_received", "on_twin_desired_properties_patch_received") and not self.connected:
+            raise NoConnectionError("Subscriptions require an explicit connection when auto_connect is disabled.")
+        super().__setattr__(name, value)
+
+
+def _arguments(text):
+    return split(CheckerMixin._apply_kwargs(SimpleNamespace(kwargs={}), text))
 
 
 @pytest.fixture(params=[
@@ -58,7 +71,7 @@ def test_identity_scenario_executes_each_required_authentication(preview, mocker
     authentication = {"symmetricKey": {"primaryKey": "unit-primary", "secondaryKey": "unit-secondary"}}
 
     def command(text):
-        args = split(text)
+        args = _arguments(text)
         identifier = args[args.index("-d") + 1]
         if args[2] == "module-identity":
             identifier = "module"
@@ -102,13 +115,17 @@ def test_pnp_scenario_executes_each_required_authentication(preview, mocker):
     scenario, calls = _scenario(mocker)
     scenario.generate_device_names.return_value = ["device"]
     scenario.get_device_cstring.return_value = "unit-connection-string"
-    client = mocker.Mock()
+    client = _ConnectedPnpClient(
+        connected=False, connect=mocker.Mock(), shutdown=mocker.Mock(),
+        send_method_response=mocker.Mock(), patch_twin_reported_properties=mocker.Mock(),
+    )
+    client.connect.side_effect = lambda: setattr(client, "connected", True)
     constructor = mocker.patch(
         "azure.iot.device.IoTHubDeviceClient.create_from_connection_string", return_value=client,
     )
 
     def command(text):
-        args = split(text)
+        args = _arguments(text)
         if args[2] == "device-identity":
             return _result()
         action = args[3]
@@ -139,4 +156,21 @@ def test_pnp_scenario_executes_each_required_authentication(preview, mocker):
     timeout = next(mark for mark in method.pytestmark if mark.name == "timeout")
     assert timeout.args == (300 * len(expected),)
     constructor.assert_called_once()
+    client.connect.assert_called_once()
+    client.shutdown.assert_called_once()
+
+
+@pytest.mark.parametrize("failure", ["connect", "subscribe"])
+def test_pnp_initialization_failure_still_shuts_down(preview, mocker, failure):
+    module, _ = preview
+    scenario, _ = _scenario(mocker)
+    scenario.generate_device_names.return_value = ["device"]
+    client = _ConnectedPnpClient(connected=False, connect=mocker.Mock(), shutdown=mocker.Mock())
+    if failure == "connect":
+        client.connect.side_effect = RuntimeError("Connection failed")
+    mocker.patch("azure.iot.device.IoTHubDeviceClient.create_from_connection_string", return_value=client)
+
+    with pytest.raises(RuntimeError if failure == "connect" else NoConnectionError):
+        module.TestHubPreview.test_responding_digital_twin(scenario)
+
     client.shutdown.assert_called_once()

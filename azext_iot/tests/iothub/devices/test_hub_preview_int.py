@@ -35,6 +35,8 @@ class TestHubPreview(IoTLiveScenarioTest):
             module = self.generate_module_names(1)[0]
 
             def command(text):
+                # The test SDK formats braces after these literal CLI arguments are built.
+                text = text.replace("{", "{{").replace("}", "}}")
                 return self.cmd(self.set_cmd_auth_type(
                     f"{text} -n {self.entity_name} -g {self.entity_rg}", auth_type=auth_phase,
                 ))
@@ -101,15 +103,16 @@ class TestHubPreview(IoTLiveScenarioTest):
             except Exception as error:  # A callback exception must fail the test, not disappear on the SDK thread.
                 failures.put(error)
 
-        client.on_method_request_received = respond
-        client.on_twin_desired_properties_patch_received = lambda patch: desired.set() if "thermostat1" in patch else None
         try:
             client.connect()
+            client.on_method_request_received = respond
+            client.on_twin_desired_properties_patch_received = lambda patch: desired.set() if "thermostat1" in patch else None
             client.patch_twin_reported_properties({
                 "serialNumber": device, "thermostat1": {"__t": "c", "temperature": 21},
             })
             for index, auth_phase in enumerate(AUTH_TYPES):
                 def command(text):
+                    text = text.replace("{", "{{").replace("}", "}}")
                     return self.cmd(self.set_cmd_auth_type(
                         f"{text} -d {device} -n {self.entity_name} -g {self.entity_rg}", auth_type=auth_phase,
                     ))
