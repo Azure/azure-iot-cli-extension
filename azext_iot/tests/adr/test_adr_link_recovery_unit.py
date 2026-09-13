@@ -133,6 +133,9 @@ def test_persisted_failed_link_rejects_add_but_update_reruns_real_preflight(
         namespace["properties"]["provisioning"] = {
             "endpoints": {"dps": {"endpointType": DPS_ENDPOINT_TYPE}},
         }
+        namespace["properties"][section]["endpoints"]["primary"]["provisioning"] = {
+            "availability": "Available", "allocationWeight": 2,
+        }
     target_id = namespace["properties"][section]["endpoints"]["primary"]["resourceId"]
     provider = LinkProvider(Mock(), client=Mock())
     provider.client.namespaces.get.return_value = namespace
@@ -164,9 +167,12 @@ def test_persisted_failed_link_rejects_add_but_update_reruns_real_preflight(
         linked_principal_id="target-user" if user_assigned else "target-system",
     )
     patch = provider.client.namespaces.begin_update.call_args.kwargs["properties"]
-    assert patch == {"properties": {section: {"endpoints": {"primary": {
+    expected_patch = {
         "endpointType": endpoint_type, "resourceId": target_id, "inboundCallerIdentity": identity,
-    }}}}}
+    }
+    if kind == "hub":
+        expected_patch["provisioning"] = {"availability": "Available", "allocationWeight": 2}
+    assert patch == {"properties": {section: {"endpoints": {"primary": expected_patch}}}}
 
     provider.client.namespaces.begin_update.reset_mock()
     provider._rbac.ensure.side_effect = AzureResponseError("RBAC preflight failed")

@@ -47,13 +47,13 @@ from urllib.parse import unquote
 
 import pytest
 from azure.cli.core.azclierror import AzureResponseError
-from azure.core.exceptions import HttpResponseError
 from msrestazure.tools import parse_resource_id
 
 from azext_iot.adr.common import SU_ENDPOINT_TYPE
 from azext_iot.tests.adr import ADRLiveScenarioTest
-from azext_iot.tests.adr._helpers import ADRFullInfraHelper, CleanupLedger, wait_for_condition
+from azext_iot.tests.adr._helpers import ADRFullInfraHelper, CleanupLedger
 from azext_iot.tests.adr._log import LogKind, _log, timed_step
+from azext_iot.tests.adr._readiness import delete_test_namespace as _delete_test_namespace
 from azext_iot.tests.adr.conftest import (
     TEST_LOCATION,
     TEST_RG,
@@ -92,41 +92,6 @@ def _delete_test_run(scenario, scope):
     """Delete only an owned, scheduled or terminal run; never cancel as cleanup."""
     _wait_for_run_statuses(scenario, scope, ("Scheduled", *_TERMINAL_RUN_STATUSES))
     scenario.cmd(f"iot adr ns job run delete {scope} -y")
-
-
-def _delete_test_namespace(scenario, namespace_name, resource_group):
-    """Allow the observed child-visibility delay after owned child cleanup."""
-    scope = f"--namespace {quote(namespace_name)} -g {quote(resource_group)}"
-
-    def delete_when_empty():
-        try:
-            scenario.cmd(f"iot adr ns delete {scope} -y")
-        except HttpResponseError as error:
-            if getattr(error.error, "code", None) != "CannotDeleteResource":
-                raise
-            # Live OnboardingUpdate cleanup returned CannotDeleteResource for
-            # an already deleted job. Never retry generic Conflict, or mask a
-            # remaining child / failed child cleanup. These reads delete nothing.
-            jobs = scenario.cmd(f"iot adr ns job list {scope}").get_output_in_json()
-            groups = scenario.cmd(f"iot adr ns group list {scope}").get_output_in_json()
-            if jobs != [] or groups != []:
-                raise
-            _log(
-                LogKind.WARN,
-                "Namespace deletion reports children, but job/group lists are empty; retrying within the cleanup deadline",
-            )
-            return False
-        return True
-
-    wait_for_condition(
-        delete_when_empty,
-        bool,
-        description=f"Delete test namespace '{namespace_name}' after child cleanup",
-        timeout=_RUN_WAIT_TIMEOUT,
-        interval=10,
-        is_retryable_error=lambda _error: False,
-        describe=lambda _value: "CannotDeleteResource despite empty job/group lists",
-    )
 
 
 def _cancel_active_run(scenario, scope):
@@ -224,7 +189,9 @@ class TestADRJobRunSurface(ADRFullInfraHelper, ADRLiveScenarioTest):
                 )
                 cleanup.register(
                     "namespace",
-                    lambda: _delete_test_namespace(self, namespace_name, rg),
+                    lambda: _delete_test_namespace(
+                        self, namespace_name, rg, jobs=(job_name,), groups=(group_name,),
+                    ),
                 )
                 self.cmd(
                     f"iot adr ns group create -n {group_name} --ns {namespace_name} -g {rg} "
