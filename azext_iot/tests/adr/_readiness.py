@@ -24,6 +24,7 @@ from knack.util import CLIError
 from msrestazure.azure_exceptions import CloudError
 
 from azext_iot.adr.common import DPS_ENDPOINT_TYPE, IOT_HUB_ENDPOINT_TYPE
+from azext_iot.adr.providers.base import ADRProvider
 from azext_iot.adr.providers.link_helpers import failed_link_recovery_commands
 from azext_iot.tests.adr._helpers import is_resource_not_found_error
 from azext_iot.tests.adr._log import LogKind, _log
@@ -279,6 +280,9 @@ def link_with_readiness(
         endpoint = (properties.get(section) or {}).get("endpoints", {}).get(endpoint_name)
         state = _link_state(endpoint) if endpoint else None
         budget.observation = f"namespace={ns_state!r}, endpoint={state!r}, recovery updates={retries}"
+        detail = ADRProvider._extract_failure_detail(namespace)
+        if detail:
+            budget.observation += f"; {detail}"
         others = [
             other
             for other_section in ("messaging", "provisioning", "updating")

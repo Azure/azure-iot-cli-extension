@@ -483,8 +483,9 @@ def test_link_write_errors_preserve_preflight_and_uncertain_acceptance(error, li
 def test_other_terminal_link_failures_are_not_retried_or_reported_as_success(message, link_kind):
     scenario = Mock()
     scenario.cmd.side_effect = [_output(None), _output(_namespace(message=message, kind=link_kind))]
-    with pytest.raises(AssertionError, match="Non-recoverable (Hub|DPS) link failure"):
+    with pytest.raises(AssertionError, match="Non-recoverable (Hub|DPS) link failure") as failure:
         _link(scenario, Clock(), kind=link_kind)
+    assert message in str(failure.value)
     assert scenario.cmd.call_count == 2
 
 
@@ -507,8 +508,9 @@ def test_accepted_recovery_requires_progress_before_another_retry(link_kind):
     scenario = Mock()
     scenario.cmd.return_value = _output(_namespace(kind=link_kind))
     clock = Clock()
-    with pytest.raises(AssertionError, match="recovery updates=1"):
+    with pytest.raises(AssertionError, match="recovery updates=1") as failure:
         _link(scenario, clock, kind=link_kind, timeout=65)
+    assert "not authorized to read the linked resource" in str(failure.value)
     assert clock.now == 65
     assert sum(" update " in cmd for cmd in _commands(scenario)) == 1
 
