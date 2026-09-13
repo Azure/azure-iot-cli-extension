@@ -368,14 +368,14 @@ class HubSasPhase:
         with self.scoped_cleanup_cli():
             clean_up_iothub_device_config(hub_name=self.hub, rg=self.group)
 
-    def command(self, command):
+    def command(self, command, *, expect_json=True):
         result = self.get_cli().invoke(command, subscription=self.subscription, capture_stderr=True)
         if not result.success():
             error = result.get_error()
             if error:
                 raise error
             raise HubSasError(f"HubSAS command failed with exit code {result.error_code}.")
-        return result.as_json()
+        return result.as_json() if expect_json else None
 
     def read(self, kind):
         from azure.cli.core.profiles import ResourceType
@@ -534,8 +534,9 @@ class HubSasPhase:
                             resource_group_name=self.group, resource_name=self.hub, polling=False, retry_total=0,
                         )
                     else:
-                        # Storage's native delete is a single request, not an LRO.
-                        self.command(commands[kind])
+                        # Successful DELETE commands can have no output. GETs
+                        # below, not a response body, prove resource absence.
+                        self.command(commands[kind], expect_json=False)
                 except (AzCLIError, HttpResponseError, CloudError) as error:
                     if not is_not_found(error):
                         raise

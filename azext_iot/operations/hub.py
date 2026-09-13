@@ -2855,6 +2855,9 @@ def _iot_hub_monitor_events(  # pragma: no cover
         if devices_result:
             for device_result in devices_result:
                 device_ids[device_result["deviceId"]] = True
+        if not device_ids:
+            raise ResourceNotFoundError("No devices matched --device-query. Event monitoring was not started.")
+        logger.info("Device query matched %s device(s).", len(device_ids))
 
     discovery = IotHubDiscovery(cmd)
     target = discovery.get_target(
